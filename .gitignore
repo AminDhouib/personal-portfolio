@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.production
+.superpowers/
+out/
+dist/
+*.tsbuildinfo
