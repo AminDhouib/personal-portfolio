@@ -150,30 +150,51 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 #### App Details
 
 **Shorty** (`/work/shorty`)
-- AI YouTube & Spotify summarization app
+- AI YouTube & Spotify summarization app — turns videos, podcasts, and documents into quick, digestible takeaways
 - 50% month-over-month growth
-- Built with: Next.js, Python microservices, Figma
-- Platforms: App Store (id6740627456), Google Play (ai.shortee.twa), Microsoft Store (9nphlg2cfnwb), Chrome Extension, Firefox Add-on, Safari
+- Built with: Next.js, Python microservices, Figma, Selenium + TOR
+- Platforms:
+  - App Store: id6740627456
+  - Google Play: ai.shortee.twa
+  - Microsoft Store: 9nphlg2cfnwb
+  - Chrome Web Store: pndkkfhcfhhhebmmndaiohkbknenlchl
+  - Firefox Add-ons: shorty-ai-youtube-summarizer
+  - Safari: via App Store
 - URL: aishorty.com
+- Contra detail: https://contra.com/p/QsA7PFlq-nextjs-figma-python-seleniumandtor-browser-ext-shorty
+- Tags: Data Scraper, DevOps Engineer, Fullstack Engineer
 
 **uNotes** (`/work/unotes`)
-- Community-driven note-sharing platform with 30,000+ user-uploaded university docs
+- Community-driven note-sharing platform with 30,000+ user-uploaded university docs (past papers, exams, assignments, labs)
 - 5,000+ active monthly users
+- Free and open alternative to Chegg, CourseHero, StuDocu
 - Built with: Next.js, TypeScript, AWS
-- Platforms: App Store (id6477337434), Google Play (net.unotes.twa), Microsoft Store (9nsmfdd0r238), Web
+- Platforms:
+  - App Store: id6477337434
+  - Google Play: net.unotes.twa
+  - Microsoft Store: 9nsmfdd0r238
+  - Web
 - URL: unotes.net
+- Contra detail: https://contra.com/p/bve7Lces-nextjs-typescript-aws-u-notes
+- Key features: Instant access, community driven, personal profile, search and filter, no login required, offline support
 
 **Caramel** (`/work/caramel`)
-- Open-source alternative to Honey (coupon finder browser extension)
+- Open-source alternative to Honey — browser extension that automatically applies the best coupon code at checkout, without selling data or hijacking creators' commissions
 - Source code public on GitHub: github.com/DevinoSolutions/caramel
 - Built with: JavaScript, iOS, macOS
-- Platforms: App Store (id6741873881), Chrome Web Store, Firefox Add-on
+- Platforms:
+  - App Store / Safari: id6741873881
+  - Chrome Web Store: gaimofgglbackoimfjopicmbmnlccfoe
+  - Firefox Add-ons: grabcaramel
 - URL: grabcaramel.com
+- Contra detail: https://contra.com/p/v3Ek6YPZ-caramel-open-source-alternative-to-honey-coupon-finder
 
 **UpUp** (`/work/upup`)
-- Open-source React file upload component with cloud storage integrations (Google Drive, OneDrive, S3)
-- NPM package: useupup.com
-- Source code: github.com/DevinoSolutions/upup (or similar)
+- Open-source, free, and secure React file upload component with cloud storage integrations (Google Drive, OneDrive, S3)
+- Versatile NPM component
+- Source code: github.com/DevinoSolutions/upup
+- URL: useupup.com
+- Contra detail: https://contra.com/p/ZQl3WYFY-g-drive-one-drive-s3-integrations-open-react-file-uploader
 
 **GetItDone** (`/work/getitdone`)
 - One dashboard for daily check-ins, task updates, time tracking
@@ -505,11 +526,14 @@ Each app (Shorty, Caramel, uNotes, UpUp, GetItDone) gets a dedicated page with:
 - **Location:** Ottawa, Canada
 - **Education:** University of Ottawa, BASc Computer Software Engineering, Summa Cum Laude (A+)
 - **Languages:** Fluent English & French, Working Arabic
-- **Revenue:** $1M+ across projects, 100+ clients, 30K+ users acquired, 5.0 avg rating
-- **Contra:** contra.com/amin — $25K+ earned, 5.00 rating, 7x hired
+- **Favorite Stack:** Next.js, Prisma, TypeScript, Python (Django, FastAPI)
+- **Revenue:** $1M+ across projects, 100+ clients, 30K+ users acquired, 5.0 avg rating, 95% on-time completion rate
+- **Contra:** contra.com/amin — $25K+ earned, 5.00 rating (9 reviews), 7x hired, $50-75/hr
+- **Featured on:** Best freelance Fullstack Engineers 2026, Best Python freelancers 2026
 - **GitHub:** github.com/AminDhouib
 - **LinkedIn:** linkedin.com/in/amin-dhouib
 - **Social:** YouTube (@amin_dhou), Instagram (@amin-dhou)
+- **Reviews source:** devino.ca/reviews (also in GitHub repo: github.com/DevinoSolutions/devino-landing-page)
 - **Infrastructure:** Self-hosted home server, Docker Swarm via Dokploy, Tailscale + Cloudflared, 99.99% uptime with monitoring
 
 ---
@@ -517,16 +541,86 @@ Each app (Shorty, Caramel, uNotes, UpUp, GetItDone) gets a dedicated page with:
 ## Work Experience (for AI chatbot knowledge base)
 
 1. **CEO & CTO — Devino Solutions** (Jan 2023 - Present)
-2. **GIS Full Stack / Code Migration Specialist — Fujitsu** (Nov 2022 - Apr 2024)
-3. **Senior Full Stack Developer — Math Anex** (Mar 2023 - Jun 2023)
+   - Successfully generated over $1M in project revenue, working with 100+ satisfied clients and earning an average 5-star rating
+   - Developed many great B2B relationships (devino.ca/reviews)
+   - Published several apps including uNotes (unotes.net) and Shorty (aishorty.com), reaching a cumulative 30K+ monthly active users
+
+2. **GIS Full Stack / Code Migration Modernization Specialist — Fujitsu** (Nov 2022 - Apr 2024)
+   - GIS Full Stack: Optimized spatial data storage and query management using PostGIS. Developed dynamic front-end features with jQuery and CSS. Ported old JS/jQuery code to Vue.js (SPAs). Managed backend systems with SQLAlchemy. Automated CI/CD with Jenkins and Azure.
+   - Code Migration: Migrated legacy Cobol code to C#. Converted Cobol code to Java. Recreated frontend terminals using React.js.
+
+3. **Senior Full Stack Developer — Math Anex (Acquired)** (Mar 2023 - Jun 2023)
+   - Managed webapp hosting using AWS services (EC2, S3, RDS) and NGINX
+   - Created and maintained Django REST APIs for data communication between frontend and backend
+   - Managed PostgreSQL database migrations using Django's ORM
+   - Implemented responsive UI components using React.js
+   - Developed scripts to perform cronjobs and automate sending emails using the Sendgrid API
+
 4. **B2B MERN Integration Developer — Left Hook** (Dec 2022 - Feb 2023)
+   - Designed integrations between Slack and third-party SaaS using Express.js, Node.js, React.js, MongoDB
+   - Worked with webhooks, 3rd party REST APIs, and OAuth
+   - Created custom Zapier integration for Freshbooks and AutoTask API
+
 5. **API / AWS Software + DevOps Engineer — RentCheck** (Mar 2022 - Nov 2022)
+   - Designed and created many public REST API endpoints with JavaScript/TypeScript
+   - Designed B2B integrations with Zapier and Latchel
+   - Created AWS Lambda functions with Terraform
+   - Managed NoSQL Firebase (GCP) database and used Algolia
+   - Built UI tests with Playwright
+   - Worked with Bitbucket Pipelines for CI/CD
+
 6. **Scrum Master Software + DevOps — Sirch** (Dec 2021 - Nov 2022)
+   - Led a group of developers to create an advanced search engine with NestJS (JavaScript)
+   - Managed Git repo and maintained code by constantly performing code reviews
+   - Implemented key features with HyperBeam
+   - Managed CI/CD pipelines to automate publishing and running tests
+
 7. **Software Developer — Bell** (May 2021 - Jan 2022)
+   - Led a group of 5 developers to create a Docker-contained React/JavaScript frontend with Python backend
+   - OSINT practices by scrapping publicly available data from social media platforms, analyzing and displaying in graphs
+   - Interfaced with stakeholders to adjust changes and implement features
+
 8. **Research Development Software Engineer — Lumenium** (May 2021 - Sep 2021)
+   - Created a C# CLI program for cloud file sharing and management
+   - Designed key features in Visual Basic on embedded platforms for high performance optical modules
+   - Performed in-lab optical wave test experiments with high-tech equipment
+
 9. **CyberSecurity Software Developer — Crypto4A Technologies** (Jan 2020 - Jan 2021)
+   - Created services using Java/Python/Bash to manage cryptographic keys (MC-Eliece, RSA, ECC, AES, HSS) from HSM and Yubico's Yubikey
+   - Created test cases for low-level C/C++ programs handling HSM hardware logic (80%+ coverage)
+   - Developed JavaScript Web Apps interfacing with Crypto4A's Java services via REST API
+   - Migrated entire Java/Maven project from JDK8 to JDK11
+   - Supervised newly recruited students
+
 10. **Java Software Engineer — Department of National Defence Canada** (May 2019 - Sep 2019)
+    - Built foundations for a Java application for DND to create, build, and run automated tests for SOAP Services
+    - Worked with JUnit, Oracle MySQL Database, and Hibernate
+
 11. **Software Quality Assurance Developer — Infosys** (May 2018 - Sep 2018)
+    - Trained in Software Developer in Test (Selenium, SOAPUI, agile, CI/CD) with 100+ other developers
+    - Performed functional testing using Java and Selenium to validate 20+ modules on Infosys's Essence Bank application
+    - Produced data-driven testing solution reducing labor time by over 50%
+
+## Additional Contra Portfolio Projects (for AI chatbot context)
+
+- **Syncara** — Healthcare Solutions for Canadians
+- **Bitbuy Converter Page** — Webflow + CMS + JS + SEO
+- **WooCommerce & ShipStation Sync/Integration** — $500 earned
+- **Lugano Caffe** — Shopify + Figma + Photoshop + Illustrator + CSS
+- **Chronicler** — AI Messaging Companion
+- **Algo Trading Bot** — Reverse Engineering with Burp Suite & Wireshark
+- **LinkedIn Auto Apply Jobs Automation**
+- **AI Rehabilitation Letter Writer** — Webflow + GCP + GPT
+- **AI COVID-19 Data Analysis** — ETL + OpenCV + Scikit-learn
+- **GoHighLevel Wix Form Lead Generation**
+
+## Skills & Roles (from Contra, for AI chatbot)
+
+Fullstack Engineer, Data Scraper, DevOps Engineer, Web Designer, Backend Engineer, UX Designer, Web Developer, UX Engineer, Webflow Developer, Data Engineer, iOS Developer, Chrome Extension Developer, UI Designer, WordPress Developer, Shopify Designer, Shopify Developer, Cybersecurity Specialist, Data Scientist, Data Visualizer, Lead Generator, Automation Engineer, Prompt Engineer
+
+## Technologies (comprehensive, for AI chatbot and tech marquee)
+
+Next.js, Python, JavaScript, TypeScript, Figma, Webflow, iOS, AWS, React, Adobe Illustrator, Adobe Photoshop, Selenium, Azure, npm, ShipStation, WooCommerce, WordPress, Shopify, Stripe, Temporal, Burp Suite, Wireshark, Google Cloud Platform, OpenCV, PostgreSQL, Tableau, Go High Level, BeautifulSoup, pandas, Scrapy, TensorFlow, CSS, Make, Zapier, DigitalOcean, Prisma, Django, FastAPI, Docker, Terraform, Jenkins, NestJS, Express.js, Node.js, MongoDB, Firebase, Redis, Algolia, Playwright, Vue.js, jQuery, SQLAlchemy, PostGIS, Java, C#, C, C++, Rust, Ruby, Rails, Tailwind CSS, Framer Motion, Three.js, LangChain
 
 ---
 
