@@ -16,10 +16,27 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Amin Dhouib — Engineer, Founder, Builder",
+  title: {
+    default: "Amin Dhouib — Engineer, Founder, Builder",
+    template: "%s — Amin Dhouib",
+  },
   description:
     "Personal portfolio of Amin Dhouib — CEO & CTO of Devino Solutions. I build apps people actually use, then self-host them on my home server.",
   metadataBase: new URL("https://amindhou.com"),
+  keywords: [
+    "Amin Dhouib",
+    "Full Stack Developer",
+    "Software Engineer",
+    "Devino Solutions",
+    "Ottawa Developer",
+    "Next.js",
+    "TypeScript",
+    "Python",
+    "React",
+    "AI Automation",
+  ],
+  authors: [{ name: "Amin Dhouib", url: "https://amindhou.com" }],
+  creator: "Amin Dhouib",
   openGraph: {
     title: "Amin Dhouib — Engineer, Founder, Builder",
     description:
@@ -28,14 +45,33 @@ export const metadata: Metadata = {
     siteName: "Amin Dhouib",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Amin Dhouib — Engineer, Founder, Builder",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Amin Dhouib — Engineer, Founder, Builder",
     description:
       "I build apps people actually use, then self-host them on my home server.",
+    images: ["/og.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
   },
 };
+
+import { Navbar } from "@/components/navbar";
 
 export default function RootLayout({
   children,
@@ -49,7 +85,10 @@ export default function RootLayout({
       className={`${outfit.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <Navbar />
+          {children}
+        </Providers>
       </body>
     </html>
   );

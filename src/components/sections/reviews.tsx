@@ -20,12 +20,12 @@ export function Reviews() {
       </div>
 
       {/* Auto-scrolling marquee */}
-      <div className="relative">
-        <div className="flex gap-6 animate-marquee">
+      <div className="relative marquee-container">
+        <div className="flex gap-6 animate-marquee py-2">
           {scrollReviews.map((review, i) => (
             <div
               key={`${review.name}-${i}`}
-              className="shrink-0 w-85 rounded-xl border border-(--border) bg-(--card) p-6"
+              className="shrink-0 w-85 rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors"
             >
               {/* Quote */}
               <p className="text-sm text-(--foreground) leading-relaxed mb-4 line-clamp-4">

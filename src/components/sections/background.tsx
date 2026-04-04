@@ -89,8 +89,8 @@ export function Background() {
       </div>
 
       {/* Tech logo marquee */}
-      <div className="overflow-hidden">
-        <div className="flex gap-12 items-center animate-marquee">
+      <div className="overflow-hidden marquee-container">
+        <div className="flex gap-12 items-center animate-marquee py-4">
           {scrollLogos.map((slug, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img

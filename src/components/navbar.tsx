@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Sun, Moon, Menu, X, ArrowRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import { navItems, CALENDLY_URL } from "@/data/nav";
@@ -11,6 +12,8 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
   const { theme, setTheme } = useTheme();
+  const pathname = usePathname();
+  const isHome = pathname === "/";
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -62,13 +65,14 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link
-            href="#hero"
+            href="/"
             className="font-display text-lg font-black tracking-tight"
           >
             AMIN DHOUIB
           </Link>
 
-          {/* Desktop nav links */}
+          {/* Desktop nav links — only show on homepage */}
+          {isHome && (
           <div className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
               <Link
@@ -87,6 +91,7 @@ export function Navbar() {
               </Link>
             ))}
           </div>
+          )}
 
           {/* Right side: theme toggle + CTA + mobile burger */}
           <div className="flex items-center gap-3">
@@ -117,6 +122,8 @@ export function Navbar() {
             </a>
 
             {/* Mobile burger */}
+            {/* Mobile burger — only on homepage */}
+            {isHome && (
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden rounded-lg p-2 text-(--muted) hover:text-(--foreground)"
@@ -128,12 +135,13 @@ export function Navbar() {
                 <Menu className="h-5 w-5" />
               )}
             </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
-      {mobileOpen && (
+      {isHome && mobileOpen && (
         <div className="md:hidden bg-(--background)/95 backdrop-blur-xl border-t border-(--border)">
           <div className="px-4 py-4 space-y-3">
             {navItems.map((item) => (

@@ -85,6 +85,45 @@ html {
   animation-play-state: paused;
 }
 
+/* Marquee edge fade masks */
+.marquee-container {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+}
+
+/* Section divider accent line */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--border) 20%,
+    var(--border) 80%,
+    transparent
+  );
+}
+
+/* Subtle gradient backgrounds for sections */
+.section-gradient {
+  background: radial-gradient(
+    ellipse 80% 50% at 50% -20%,
+    rgba(34, 197, 94, 0.03) 0%,
+    transparent 100%
+  );
+}
+
 /* Selection color */
 ::selection {
   background: rgba(34, 197, 94, 0.3);

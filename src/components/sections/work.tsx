@@ -3,21 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Globe } from "lucide-react";
+import { Globe, AppWindow } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { projects } from "@/data/projects";
 
 function PlatformIcon({ icon }: { icon: string }) {
-  // For "globe" use Lucide icon, for others render Simple Icons SVG
-  if (icon === "globe") {
-    return <Globe className="h-4 w-4" />;
-  }
-  // Use Simple Icons — external CDN, can't use next/image
+  if (icon === "globe") return <Globe className="h-4 w-4" />;
+  if (icon === "microsoft") return <AppWindow className="h-4 w-4" />;
   const siSlug = icon.toLowerCase();
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`https://cdn.simpleicons.org/${siSlug}`}
+      src={`https://cdn.simpleicons.org/${siSlug}/888888`}
       alt={icon}
       className="h-4 w-4"
       loading="lazy"

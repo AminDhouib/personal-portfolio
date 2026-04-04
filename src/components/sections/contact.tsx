@@ -6,6 +6,14 @@ import { CALENDLY_URL, socialLinks } from "@/data/nav";
 
 function SocialIcon({ icon }: { icon: string }) {
   if (icon === "mail") return <Mail className="h-5 w-5" />;
+  // Contra not available on Simple Icons — use Lucide Briefcase as fallback
+  if (icon === "contra") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6zm4 4h-2v-2h2v2zm0-4h-2V7h2v6z" />
+      </svg>
+    );
+  }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -21,7 +29,7 @@ export function Contact() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <section id="contact" className="py-32">
+    <section id="contact" className="py-32 section-gradient">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -29,6 +37,9 @@ export function Contact() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
+          <p className="text-sm text-(--muted) mb-6 tracking-widest uppercase">
+            11 — Contact
+          </p>
           <h2 className="font-display text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
             LET&apos;S
             <br />
@@ -70,7 +81,8 @@ export function Contact() {
         </div>
 
         {/* Footer */}
-        <div className="mt-16 pt-8 border-t border-(--border)">
+        <div className="mt-16 pt-8">
+          <div className="section-divider mb-8" />
           <p className="text-xs text-(--muted)">
             &copy; {currentYear} Amin Dhouib / amindhou.com
           </p>

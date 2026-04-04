@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Globe } from "lucide-react";
+import { ArrowLeft, Globe, AppWindow } from "lucide-react";
 import { projects } from "@/data/projects";
 
 export function generateStaticParams() {
@@ -24,10 +24,11 @@ export async function generateMetadata({
 
 function PlatformIcon({ icon }: { icon: string }) {
   if (icon === "globe") return <Globe className="h-4 w-4" />;
+  if (icon === "microsoft") return <AppWindow className="h-4 w-4" />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`https://cdn.simpleicons.org/${icon.toLowerCase()}`}
+      src={`https://cdn.simpleicons.org/${icon.toLowerCase()}/888888`}
       alt={icon}
       className="h-4 w-4"
       loading="lazy"

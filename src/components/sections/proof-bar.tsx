@@ -12,11 +12,14 @@ interface CounterProps {
   label: string;
   color: string;
   inView: boolean;
+  decimals?: number;
 }
 
-function Counter({ target, prefix = "", suffix = "", label, color, inView }: CounterProps) {
+function Counter({ target, prefix = "", suffix = "", label, color, inView, decimals = 0 }: CounterProps) {
   const count = useMotionValue(0);
-  const rounded = useTransform(count, (v) => Math.round(v));
+  const display = useTransform(count, (v) =>
+    decimals > 0 ? v.toFixed(decimals) : Math.round(v).toString()
+  );
 
   useEffect(() => {
     if (inView) {
@@ -32,7 +35,7 @@ function Counter({ target, prefix = "", suffix = "", label, color, inView }: Cou
     <div className="text-center">
       <div className="font-display text-3xl sm:text-4xl font-black tracking-tight mb-1">
         {prefix}
-        <motion.span>{rounded}</motion.span>
+        <motion.span>{display}</motion.span>
         {suffix}
       </div>
       <div className="text-xs text-(--muted) uppercase tracking-wider mb-2">
@@ -82,6 +85,7 @@ export function ProofBar() {
       suffix: "%",
       label: "Uptime",
       color: "var(--color-accent-green)",
+      decimals: 2,
     },
   ];
 
@@ -118,6 +122,7 @@ export function ProofBar() {
                   label={m.label}
                   color={m.color}
                   inView={inView}
+                  decimals={"decimals" in m ? m.decimals : 0}
                 />
               )}
             </div>
