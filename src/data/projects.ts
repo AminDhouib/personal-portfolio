@@ -5,6 +5,9 @@ export interface Project {
   description: string;
   story?: string[];
   heroImage?: string;
+  heroVideo?: string;
+  heroVideoPoster?: string;
+  figmaEmbed?: string;
   logo: string;
   url: string;
   isOSS: boolean;
@@ -30,6 +33,9 @@ export const projects: Project[] = [
     tagline: "AI YouTube & Spotify Summarizer",
     description:
       "Turns videos, podcasts, and documents into quick, digestible takeaways. 50% month-over-month growth.",
+    heroImage: "/screenshots/shorty.webp",
+    heroVideo: "/videos/shorty-demo.mp4",
+    heroVideoPoster: "/videos/shorty-poster.webp",
     logo: "/logos/shorty.png",
     url: "https://aishorty.com",
     isOSS: false,
@@ -78,6 +84,7 @@ export const projects: Project[] = [
     tagline: "30K+ docs shared by students",
     description:
       "Community-driven note-sharing platform with 30,000+ user-uploaded university docs. Free alternative to Chegg, CourseHero, StuDocu.",
+    heroImage: "/screenshots/unotes.webp",
     logo: "/logos/unotes.png",
     url: "https://unotes.net",
     isOSS: false,
@@ -116,6 +123,7 @@ export const projects: Project[] = [
     tagline: "Open-source Honey alternative",
     description:
       "Browser extension that automatically applies the best coupon code at checkout, without selling data or hijacking creators' commissions.",
+    heroImage: "/screenshots/caramel.webp",
     logo: "/logos/caramel.png",
     url: "https://grabcaramel.com",
     isOSS: true,
@@ -154,6 +162,7 @@ export const projects: Project[] = [
     tagline: "React file uploader NPM component",
     description:
       "Open-source, free, and secure React file upload component with cloud storage integrations (Google Drive, OneDrive, S3).",
+    heroImage: "/screenshots/upup.webp",
     logo: "/logos/upup.png",
     url: "https://useupup.com",
     isOSS: true,

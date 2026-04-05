@@ -81,9 +81,19 @@ export default async function WorkDetailPage({
           </div>
         </div>
 
-        {/* Hero banner */}
+        {/* Hero: video > image > geometric fallback */}
         <div className="mb-8 rounded-xl border border-(--border) bg-gradient-to-br from-(--card) to-(--surface) overflow-hidden">
-          {project.heroImage ? (
+          {project.heroVideo ? (
+            <video
+              src={project.heroVideo}
+              poster={project.heroVideoPoster}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-auto"
+            />
+          ) : project.heroImage ? (
             <Image
               src={project.heroImage}
               alt={`${project.name} screenshot`}
@@ -94,7 +104,6 @@ export default async function WorkDetailPage({
             />
           ) : (
             <div className="h-52 flex items-center justify-center relative">
-              {/* Geometric accent */}
               <div className="absolute inset-0 overflow-hidden opacity-5">
                 <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full border-2 border-accent-green" />
                 <div className="absolute -bottom-4 -left-4 w-32 h-32 rotate-45 border-2 border-accent-blue" />
@@ -151,6 +160,23 @@ export default async function WorkDetailPage({
                 {paragraph}
               </p>
             ))}
+          </div>
+        )}
+
+        {/* Figma prototype embed */}
+        {project.figmaEmbed && (
+          <div className="mb-8">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-(--muted) mb-3">
+              Interactive Prototype
+            </h2>
+            <div className="rounded-xl border border-(--border) overflow-hidden bg-(--card)" style={{ aspectRatio: "16/9" }}>
+              <iframe
+                src={project.figmaEmbed}
+                className="w-full h-full"
+                allowFullScreen
+                title={`${project.name} Figma prototype`}
+              />
+            </div>
           </div>
         )}
 
