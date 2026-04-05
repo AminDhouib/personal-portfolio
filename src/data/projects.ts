@@ -4,6 +4,7 @@ export interface Project {
   tagline: string;
   description: string;
   story?: string[];
+  heroImage?: string;
   logo: string;
   url: string;
   isOSS: boolean;

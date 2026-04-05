@@ -81,6 +81,41 @@ export default async function WorkDetailPage({
           </div>
         </div>
 
+        {/* Hero banner */}
+        <div className="mb-8 rounded-xl border border-(--border) bg-gradient-to-br from-(--card) to-(--surface) overflow-hidden">
+          {project.heroImage ? (
+            <Image
+              src={project.heroImage}
+              alt={`${project.name} screenshot`}
+              width={1200}
+              height={630}
+              className="w-full h-auto"
+              priority
+            />
+          ) : (
+            <div className="h-52 flex items-center justify-center relative">
+              {/* Geometric accent */}
+              <div className="absolute inset-0 overflow-hidden opacity-5">
+                <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full border-2 border-accent-green" />
+                <div className="absolute -bottom-4 -left-4 w-32 h-32 rotate-45 border-2 border-accent-blue" />
+              </div>
+              <div className="text-center z-10">
+                <div className="text-5xl font-black text-(--foreground) font-display tracking-tighter mb-2 opacity-10">
+                  {project.name.toUpperCase()}
+                </div>
+                <a
+                  href={project.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-accent-blue hover:underline"
+                >
+                  {project.url.replace("https://", "")}
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Live MAU */}
         <div className="flex items-center gap-2 mb-8 p-4 rounded-lg bg-(--card) border border-(--border)">
           <span className="relative flex h-2.5 w-2.5">

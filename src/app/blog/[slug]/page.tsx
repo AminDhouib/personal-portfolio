@@ -3,7 +3,10 @@ import { ArrowLeft, Clock, Tag } from "lucide-react";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypePrettyCode from "rehype-pretty-code";
-import { getBlogPost, getAllBlogSlugs, formatDate } from "@/lib/blog";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import { getBlogPost, getAllBlogSlugs, formatDate, extractToc } from "@/lib/blog";
+import { ShareButton, TableOfContents } from "@/components/blog/toc-share";
 import type { Options } from "rehype-pretty-code";
 
 export async function generateStaticParams() {
@@ -38,9 +41,12 @@ export default async function BlogPostPage({
   const post = getBlogPost(slug);
   if (!post) notFound();
 
+  const toc = extractToc(post.content);
+
   return (
     <div className="min-h-screen pt-24 pb-16">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* Back link */}
         <Link
           href="/blog"
           className="inline-flex items-center gap-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors mb-8"
@@ -49,15 +55,13 @@ export default async function BlogPostPage({
           Back to Blog
         </Link>
 
-        {/* Header */}
-        <header className="mb-12">
+        {/* Header — full width */}
+        <header className="mb-10 max-w-3xl">
           <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mb-4">
             {post.title}
           </h1>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-(--muted)">
-            {post.date && (
-              <span>{formatDate(post.date)}</span>
-            )}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-(--muted)">
+            {post.date && <span>{formatDate(post.date)}</span>}
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
               {post.readingTime}
@@ -75,24 +79,37 @@ export default async function BlogPostPage({
                 ))}
               </div>
             )}
+            <div className="ml-auto">
+              <ShareButton title={post.title} />
+            </div>
           </div>
           <div className="mt-6 h-px bg-gradient-to-r from-accent-blue/50 via-accent-blue/20 to-transparent" />
         </header>
 
-        {/* MDX Content */}
-        <article className="prose max-w-none">
-          <MDXRemote
-            source={post.content}
-            options={{
-              mdxOptions: {
-                rehypePlugins: [[rehypePrettyCode, prettyCodeOptions]],
-              },
-            }}
-          />
-        </article>
+        {/* Two-column layout: article + ToC */}
+        <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-12">
+          {/* MDX Content */}
+          <article className="prose max-w-none min-w-0">
+            <MDXRemote
+              source={post.content}
+              options={{
+                mdxOptions: {
+                  rehypePlugins: [
+                    rehypeSlug,
+                    [rehypeAutolinkHeadings, { behavior: "wrap" }],
+                    [rehypePrettyCode, prettyCodeOptions],
+                  ],
+                },
+              }}
+            />
+          </article>
+
+          {/* Sticky ToC sidebar */}
+          <TableOfContents entries={toc} />
+        </div>
 
         {/* Footer */}
-        <div className="mt-16 pt-8 border-t border-(--border)">
+        <div className="mt-16 pt-8 border-t border-(--border) flex items-center justify-between">
           <Link
             href="/blog"
             className="inline-flex items-center gap-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors"
@@ -100,6 +117,7 @@ export default async function BlogPostPage({
             <ArrowLeft className="h-4 w-4" />
             All posts
           </Link>
+          <ShareButton title={post.title} />
         </div>
       </div>
     </div>
