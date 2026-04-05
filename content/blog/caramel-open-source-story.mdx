@@ -1,0 +1,91 @@
+---
+title: "Building an Open-Source Honey Alternative: The Caramel Story"
+excerpt: "Why I built Caramel, how the browser extension works under the hood, and the lessons from shipping open-source software."
+date: "2026-02-08"
+tags: ["open-source", "browser-extension", "javascript", "caramel"]
+---
+
+Honey was the most-installed browser extension in the world before PayPal acquired it. Then came [the FTC investigation](https://ftc.gov). Honey was quietly hijacking affiliate commissions from YouTubers and content creators — the very people who promoted it.
+
+I built [Caramel](https://grabcaramel.com) as the honest alternative.
+
+## What Honey Does (and Why It's Problematic)
+
+Honey's business model was always suspicious in hindsight. It was free to users, but Honey got paid by merchants every time someone used a coupon. The conflict of interest: Honey would suppress better coupons to favor merchants who paid more.
+
+The affiliate hijacking was worse. If you clicked a YouTube affiliate link and then used Honey at checkout, Honey replaced the creator's affiliate ID with its own. The creator got nothing. PayPal made money.
+
+## How Caramel Works
+
+Caramel is fully open source at [github.com/DevinoSolutions/caramel](https://github.com/DevinoSolutions/caramel).
+
+```javascript
+// The core coupon-finding loop
+async function findBestCoupon(checkoutUrl) {
+  const domain = extractDomain(checkoutUrl);
+  const coupons = await fetchCoupons(domain);
+  
+  return await tryEachCoupon(coupons, (coupon) => ({
+    code: coupon.code,
+    savings: applyCoupon(coupon.code),
+  }));
+}
+```
+
+Key differences from Honey:
+1. **No affiliate tracking** — Caramel never touches your affiliate clicks
+2. **Open source** — anyone can audit what the extension does
+3. **No data selling** — browsing history stays on your machine
+4. **Best coupon wins** — no merchant-paid suppression
+
+## The Browser Extension Architecture
+
+Chrome extensions have a 3-part architecture:
+
+```
+popup.html          ← User interface
+background.js       ← Service worker, API calls
+content-script.js   ← Runs on web pages, detects checkout
+```
+
+The tricky part is detecting when a checkout page appears. Different retailers have wildly different checkout flows. We use a combination of URL pattern matching and DOM observation:
+
+```javascript
+// content-script.js
+const checkoutPatterns = [
+  /\/checkout/i,
+  /\/cart\/checkout/i, 
+  /\/payment/i,
+  // ... 60+ patterns
+];
+
+function isCheckoutPage() {
+  return checkoutPatterns.some(p => p.test(window.location.href)) 
+    || document.querySelector('[data-checkout]') !== null;
+}
+```
+
+## iOS/macOS Safari Extension
+
+The Chrome extension was straightforward. Safari on iOS was... not.
+
+Apple requires Safari extensions to be wrapped inside a native iOS/macOS app distributed through the App Store. You write the extension in JavaScript, but you also write a native Swift wrapper app that Apple reviews.
+
+The review process took 3 weeks and 2 rejections before approval. The review notes were: "Functionality unclear to reviewer during testing." (The reviewer didn't have coupon codes to test with.)
+
+## GitHub Stats After Launch
+
+Within 3 months of launch:
+- 200+ GitHub stars
+- 40+ forks
+- 5 external contributors PRed improvements
+
+The open-source community found edge cases we never would have caught solo. One contributor added support for 30 additional coupon sites in a single PR.
+
+## Lessons
+
+**Privacy is a feature, not a constraint.** Users are increasingly aware of how free tools monetize them. Caramel's "we don't track you" message resonates.
+
+**Open source builds trust faster than marketing.** The code is right there. If we were doing something sketchy, you'd know.
+
+**Platform distribution is everything.** Getting into the Chrome Web Store and Firefox Add-ons is the hard part. Once you're there, installs compound.

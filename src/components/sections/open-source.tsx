@@ -4,8 +4,18 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { GitFork, Star, ArrowRight } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
+import type { RepoStats, ContributionDay } from "@/lib/github";
 
-const ossProjects = [
+interface OSSProject {
+  name: string;
+  description: string;
+  logo: string;
+  github: string;
+  forks: number;
+  stars: number;
+}
+
+const ossDefaults: OSSProject[] = [
   {
     name: "Caramel",
     description: "Open-source Honey alternative",
@@ -24,23 +34,56 @@ const ossProjects = [
   },
 ];
 
-const ciTools = [
-  "Prettier",
-  "ESLint",
-  "knip",
-  "ruff",
-  "pyright",
-  "CodeRabbit",
-];
+const ciTools = ["Prettier", "ESLint", "knip", "ruff", "pyright", "CodeRabbit"];
 
-// Pre-generate contribution levels (deterministic based on index)
-const contributionLevels = Array.from({ length: 364 }, (_, i) => {
-  // Deterministic pseudo-random based on index
-  const hash = ((i * 2654435761) >>> 0) / 4294967296;
-  return hash > 0.8 ? 1 : hash > 0.5 ? 0.6 : hash > 0.2 ? 0.3 : 0.1;
-});
+// Generate deterministic fallback contribution data
+const fallbackContributions: ContributionDay[] = Array.from(
+  { length: 364 },
+  (_, i) => {
+    const hash = ((i * 2654435761) >>> 0) / 4294967296;
+    const count = hash > 0.8 ? 8 : hash > 0.5 ? 4 : hash > 0.2 ? 1 : 0;
+    const level = (hash > 0.8 ? 4 : hash > 0.5 ? 2 : hash > 0.2 ? 1 : 0) as
+      | 0
+      | 1
+      | 2
+      | 3
+      | 4;
+    return { date: "", count, level };
+  }
+);
 
-export function OpenSource() {
+const levelColor: Record<0 | 1 | 2 | 3 | 4, string> = {
+  0: "rgba(34,197,94,0.06)",
+  1: "rgba(34,197,94,0.25)",
+  2: "rgba(34,197,94,0.50)",
+  3: "rgba(34,197,94,0.75)",
+  4: "rgba(34,197,94,1.0)",
+};
+
+interface Props {
+  caramelStats?: RepoStats;
+  upupStats?: RepoStats;
+  contributions?: ContributionDay[];
+}
+
+export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
+  const projects: OSSProject[] = [
+    {
+      ...ossDefaults[0],
+      forks: caramelStats?.forks ?? ossDefaults[0].forks,
+      stars: caramelStats?.stars ?? ossDefaults[0].stars,
+    },
+    {
+      ...ossDefaults[1],
+      forks: upupStats?.forks ?? ossDefaults[1].forks,
+      stars: upupStats?.stars ?? ossDefaults[1].stars,
+    },
+  ];
+
+  const graph = contributions?.length ? contributions : fallbackContributions;
+  // Take last 364 days (52 weeks × 7)
+  const graphDays = graph.slice(-364);
+
   return (
     <section id="opensource" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -52,7 +95,7 @@ export function OpenSource() {
 
         {/* OSS project cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          {ossProjects.map((project, i) => (
+          {projects.map((project, i) => (
             <motion.a
               key={project.name}
               href={project.github}
@@ -76,20 +119,18 @@ export function OpenSource() {
                   <h3 className="font-display text-lg font-bold tracking-tight">
                     {project.name.toUpperCase()}
                   </h3>
-                  <p className="text-sm text-(--muted)">
-                    {project.description}
-                  </p>
+                  <p className="text-sm text-(--muted)">{project.description}</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-6 mb-4">
                 <div className="flex items-center gap-1.5 text-sm text-(--muted)">
                   <GitFork className="h-4 w-4" />
-                  <span>{project.forks}</span>
+                  <span>{project.forks.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-(--muted)">
                   <Star className="h-4 w-4" />
-                  <span>{project.stars}</span>
+                  <span>{project.stars.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -101,9 +142,9 @@ export function OpenSource() {
           ))}
         </div>
 
-        {/* GitHub Contribution Graph placeholder */}
+        {/* GitHub Contribution Graph */}
         <motion.div
-          className="rounded-xl border border-(--border) bg-(--card) p-6 mb-8"
+          className="rounded-xl border border-(--border) bg-(--card) p-6 mb-8 overflow-x-auto"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
@@ -111,18 +152,42 @@ export function OpenSource() {
         >
           <h3 className="text-sm font-semibold text-(--muted) mb-4 uppercase tracking-wider">
             Contribution Graph
+            {contributions?.length ? (
+              <span className="ml-2 text-accent-green/60 normal-case font-normal">
+                — live from GitHub
+              </span>
+            ) : null}
           </h3>
-          {/* Grid of green squares — will be connected to GitHub API */}
-          <div className="grid grid-cols-[repeat(52,1fr)] gap-1">
-            {contributionLevels.map((level, i) => (
-                <div
-                  key={i}
-                  className="aspect-square rounded-sm"
-                  style={{
-                    backgroundColor: `rgba(34, 197, 94, ${level})`,
-                  }}
-                />
+          <div
+            className="grid gap-1"
+            style={{ gridTemplateColumns: "repeat(52, minmax(10px, 1fr))" }}
+          >
+            {Array.from({ length: 52 }, (_, col) =>
+              Array.from({ length: 7 }, (__, row) => {
+                const idx = col * 7 + row;
+                const day = graphDays[idx];
+                if (!day) return null;
+                return (
+                  <div
+                    key={`${col}-${row}`}
+                    className="aspect-square rounded-sm min-w-[10px]"
+                    style={{ backgroundColor: levelColor[day.level] }}
+                    title={day.date ? `${day.date}: ${day.count} contributions` : undefined}
+                  />
+                );
+              })
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-3 justify-end">
+            <span className="text-xs text-(--muted)">Less</span>
+            {([0, 1, 2, 3, 4] as const).map((l) => (
+              <div
+                key={l}
+                className="h-3 w-3 rounded-sm"
+                style={{ backgroundColor: levelColor[l] }}
+              />
             ))}
+            <span className="text-xs text-(--muted)">More</span>
           </div>
         </motion.div>
 

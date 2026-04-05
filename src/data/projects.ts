@@ -3,6 +3,7 @@ export interface Project {
   name: string;
   tagline: string;
   description: string;
+  story?: string[];
   logo: string;
   url: string;
   isOSS: boolean;
@@ -64,6 +65,11 @@ export const projects: Project[] = [
       },
     ],
     techStack: ["Next.js", "Python", "Figma", "Selenium"],
+    story: [
+      "Shorty started as a personal frustration: I was spending hours watching YouTube videos and listening to podcasts just to extract a few key ideas. I built a Chrome extension that summarizes them in seconds.",
+      "The technical challenge was getting clean transcripts from YouTube, Spotify, and arbitrary podcast feeds. I built Python microservices with Selenium + TOR rotation to scrape and process content without hitting rate limits.",
+      "After launching on the Chrome Web Store, growth accelerated 50% month-over-month as creators started sharing it. The extension is now available on iOS, Android, Firefox, and the Microsoft Store.",
+    ],
   },
   {
     slug: "unotes",
@@ -97,6 +103,11 @@ export const projects: Project[] = [
       { name: "Web", icon: "globe", url: "https://unotes.net" },
     ],
     techStack: ["Next.js", "TypeScript", "AWS"],
+    story: [
+      "uNotes was born from a conversation with university students who were paying $30/month for CourseHero just to access past exams and lab reports. The content was created by students — it shouldn't be paywalled.",
+      "I built a community platform where students can upload and download notes, exams, and assignments for free. The key insight was making it searchable by university, course code, and professor — not just generic file dumps.",
+      "uNotes now has 30,000+ documents from universities across Canada and the US, with 5,000+ monthly active users. It's available on the App Store, Google Play, Microsoft Store, and web.",
+    ],
   },
   {
     slug: "caramel",
@@ -130,6 +141,11 @@ export const projects: Project[] = [
       },
     ],
     techStack: ["JavaScript", "iOS", "macOS"],
+    story: [
+      "After the FTC published findings that Honey was hijacking affiliate commissions from content creators, I decided to build the transparent, honest alternative. Caramel is fully open-source — anyone can audit what it does.",
+      "The core challenge was building a coupon-finding system that works across thousands of different checkout flows. The content script uses URL pattern matching and DOM observation to detect and inject coupon codes.",
+      "Getting into Safari on iOS required building a full Swift wrapper app. The App Store review took 3 weeks and 2 rejections. Worth it — the iOS Safari market was significant. Caramel is now live on Chrome, Firefox, and Safari.",
+    ],
   },
   {
     slug: "upup",
@@ -158,6 +174,11 @@ export const projects: Project[] = [
       },
     ],
     techStack: ["React", "TypeScript", "S3", "Google Drive"],
+    story: [
+      "UpUp started because every client project needed file uploads, and every solution was either overpriced, locked to one cloud provider, or a security risk. I built a drop-in React component that handles all three.",
+      "The architecture supports simultaneous uploads to S3, Google Drive, and OneDrive with a unified API. The component handles chunking for large files, retry logic, and progress tracking out of the box.",
+      "After open-sourcing on GitHub and publishing to npm, the component was adopted by dozens of projects. The documentation site (useupup.com) drives organic installs through search.",
+    ],
   },
   {
     slug: "getitdone",
@@ -174,5 +195,10 @@ export const projects: Project[] = [
       { name: "Web", icon: "globe", url: "https://nowgetitdone.com" },
     ],
     techStack: ["Next.js", "TypeScript", "Prisma"],
+    story: [
+      "GetItDone came from managing multiple development teams at Devino Solutions. Between Jira, Slack standups, time trackers, and task boards, the overhead was killing productivity.",
+      "The app consolidates async standups (no more scheduling 15-minute meetings), task updates, and time tracking into a single dashboard. Teams submit daily check-ins in 2 minutes instead of meeting for 15.",
+      "Built on Next.js with Prisma for the data layer. Currently at 500 MAU with steady growth from B2B referrals.",
+    ],
   },
 ];

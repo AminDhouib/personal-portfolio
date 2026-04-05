@@ -12,21 +12,39 @@ import {
   BeyondCode,
   Contact,
 } from "@/components/sections";
+import { fetchAllMAU } from "@/lib/ga4";
+import { fetchRepoStats, fetchContributionGraph } from "@/lib/github";
+import { getAllBlogPosts } from "@/lib/blog";
 
-export default function Home() {
+// ISR: revalidate every 24h for live MAU + GitHub data
+export const revalidate = 86400;
+
+export default async function Home() {
+  const [mauData, caramelStats, upupStats, contributions] = await Promise.all([
+    fetchAllMAU(),
+    fetchRepoStats("DevinoSolutions", "caramel"),
+    fetchRepoStats("DevinoSolutions", "upup"),
+    fetchContributionGraph("AminDhouib"),
+  ]);
+  const blogPosts = getAllBlogPosts();
+
   return (
     <>
       <GeometricBackgroundLoader />
       <main className="relative z-10">
         <Hero />
         <ProofBar />
-        <Work />
+        <Work mauData={mauData} />
         <Services />
         <Reviews />
-        <OpenSource />
+        <OpenSource
+          caramelStats={caramelStats}
+          upupStats={upupStats}
+          contributions={contributions}
+        />
         <Background />
         <Game />
-        <Blog />
+        <Blog posts={blogPosts} />
         <BeyondCode />
         <Contact />
       </main>

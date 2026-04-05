@@ -1,29 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-
-const blogPosts = [
-  {
-    slug: "self-hosting-home-server",
-    title: "How I Self-Host Everything on a Home Server with 99.99% Uptime",
-    excerpt:
-      "A deep dive into running Docker Swarm on a home server with Dokploy, Tailscale mesh networking, and Cloudflare tunnels.",
-    readingTime: "8 min read",
-  },
-  {
-    slug: "caramel-open-source-story",
-    title: "Building an Open-Source Honey Alternative: The Caramel Story",
-    excerpt:
-      "Why I built Caramel, how it works, and what I learned shipping an open-source browser extension.",
-    readingTime: "6 min read",
-  },
-  {
-    slug: "ai-agents-dev-workflow",
-    title: "Why I Use AI Agents to Automate My Entire Dev Workflow",
-    excerpt:
-      "From code reviews to deployments — how AI agents save me hours every week.",
-    readingTime: "5 min read",
-  },
-];
+import { getAllBlogPosts, formatDate } from "@/lib/blog";
 
 export const metadata = {
   title: "Blog — Amin Dhouib",
@@ -31,6 +8,8 @@ export const metadata = {
 };
 
 export default function BlogPage() {
+  const posts = getAllBlogPosts();
+
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -47,7 +26,7 @@ export default function BlogPage() {
         </h1>
 
         <div className="space-y-0">
-          {blogPosts.map((post) => (
+          {posts.map((post) => (
             <Link
               key={post.slug}
               href={`/blog/${post.slug}`}
@@ -58,9 +37,17 @@ export default function BlogPage() {
                   {post.title}
                 </h2>
                 <p className="text-sm text-(--muted) mb-2">{post.excerpt}</p>
-                <span className="text-xs text-(--muted)/60">
-                  {post.readingTime}
-                </span>
+                <div className="flex items-center gap-3">
+                  {post.date && (
+                    <span className="text-xs text-(--muted)/60">
+                      {formatDate(post.date)}
+                    </span>
+                  )}
+                  <span className="text-xs text-(--muted)/60">·</span>
+                  <span className="text-xs text-(--muted)/60">
+                    {post.readingTime}
+                  </span>
+                </div>
               </div>
               <ArrowRight className="h-5 w-5 shrink-0 mt-1 text-(--muted) group-hover:text-accent-blue group-hover:translate-x-1 transition-all" />
             </Link>

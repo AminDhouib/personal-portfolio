@@ -72,6 +72,7 @@ export const metadata: Metadata = {
 };
 
 import { Navbar } from "@/components/navbar";
+import { ChatWidget } from "@/components/chat/widget";
 
 export default function RootLayout({
   children,
@@ -88,6 +89,7 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           {children}
+          <ChatWidget enabled={!!process.env.OPENAI_API_KEY} />
         </Providers>
       </body>
     </html>

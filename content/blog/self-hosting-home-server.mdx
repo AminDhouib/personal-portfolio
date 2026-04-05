@@ -1,0 +1,67 @@
+---
+title: "How I Self-Host Everything on a Home Server with 99.99% Uptime"
+excerpt: "A deep dive into running Docker Swarm on a home server with Dokploy, Tailscale mesh networking, and Cloudflare tunnels."
+date: "2026-01-15"
+tags: ["devops", "self-hosting", "docker", "tailscale"]
+---
+
+When most developers ship a product, they reach for AWS or Vercel. I built a home server instead — and it runs everything: Shorty, uNotes, Caramel, UpUp, this portfolio, and devino.ca. With 99.99% measured uptime.
+
+Here's the full stack and why each piece was chosen.
+
+## The Hardware
+
+A refurbished Dell PowerEdge R710 with 48GB RAM and dual Xeon processors. Cost: $200. Monthly electricity: ~$15. Compare that to AWS EC2 for equivalent compute: $300+/month.
+
+## Orchestration: Dokploy on Docker Swarm
+
+[Dokploy](https://dokploy.com) is an open-source Heroku/Vercel alternative you self-host. It gives you a UI for deploying apps, managing environment variables, and viewing logs — all on your own infrastructure.
+
+```bash
+# Deploy an app with nixpacks (auto-detects your stack)
+dokploy deploy --app my-nextjs-app --nixpacks
+```
+
+Docker Swarm handles replication and service discovery. Each app gets its own container, and Swarm restarts failed containers automatically.
+
+## Networking: Tailscale + Cloudflared
+
+The internet never touches my home network directly. Here's the flow:
+
+```
+User → Cloudflare CDN → cloudflared tunnel → Tailscale mesh → Home server
+```
+
+**Cloudflared** creates an outbound-only tunnel from my server to Cloudflare's edge. No port forwarding, no firewall holes. Cloudflare handles DDoS protection and TLS termination for free.
+
+**Tailscale** creates a WireGuard mesh between all my devices. My laptop, phone, and servers all get private IPs (100.x.x.x) that can reach each other securely from anywhere.
+
+## Reverse Proxy: Traefik
+
+Traefik auto-discovers Docker containers and configures routing automatically. Zero-downtime deploys just work.
+
+```yaml
+labels:
+  - "traefik.http.routers.app.rule=Host(`myapp.com`)"
+  - "traefik.http.services.app.loadbalancer.server.port=3000"
+```
+
+## Monitoring: Uptime Kuma + Grafana
+
+[Uptime Kuma](https://uptime.kuma.pet) pings every endpoint every 60 seconds and sends alerts via Telegram. It's how I know the 99.99% number is real, not aspirational.
+
+Grafana + Prometheus gives me CPU, memory, and request metrics. All on the same home server.
+
+## Why Not Just Use the Cloud?
+
+**Cost**: $215/month vs ~$15/month all-in.
+
+**Control**: I own the data. No vendor lock-in. No surprise bills.
+
+**Learning**: Running your own infra teaches you things no managed service does. I've debugged kernel OOM events, ZFS pool degradation, and Swarm leader elections. All valuable.
+
+The downside is real: you need to be ready to SSH in at 2am when something breaks. For me, that's fine. For a business with SLA requirements, factor that in.
+
+---
+
+The setup isn't for everyone. But if you're a developer who wants to understand infrastructure from the ground up — and save a lot of money — a home server is worth every hour of setup time.

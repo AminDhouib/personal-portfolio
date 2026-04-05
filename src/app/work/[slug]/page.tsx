@@ -105,6 +105,20 @@ export default async function WorkDetailPage({
           {project.description}
         </p>
 
+        {/* Story */}
+        {project.story && project.story.length > 0 && (
+          <div className="mb-8 space-y-4">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-(--muted) mb-3">
+              The Story
+            </h2>
+            {project.story.map((paragraph, i) => (
+              <p key={i} className="text-base leading-relaxed text-(--foreground)">
+                {paragraph}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* Tech stack */}
         <div className="mb-8">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-(--muted) mb-3">
@@ -161,6 +175,16 @@ export default async function WorkDetailPage({
               className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-5 py-2.5 text-sm font-medium hover:border-(--muted)/30 transition-colors"
             >
               View on GitHub
+            </a>
+          )}
+          {project.contraUrl && (
+            <a
+              href={project.contraUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-5 py-2.5 text-sm font-medium hover:border-(--muted)/30 transition-colors"
+            >
+              Case Study on Contra
             </a>
           )}
         </div>

@@ -1,9 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { Gamepad2 } from "lucide-react";
+import { Gamepad2, Trophy, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
+
+const GeometricFlowGame = dynamic(
+  () =>
+    import("@/components/game/geometric-flow").then(
+      (m) => m.GeometricFlowGame
+    ),
+  { ssr: false }
+);
 
 export function Game() {
   return (
@@ -16,29 +25,44 @@ export function Game() {
         />
 
         <motion.div
-          className="rounded-xl border border-(--border) bg-(--card) p-12 text-center"
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <Gamepad2 className="h-12 w-12 mx-auto mb-4 text-accent-pink opacity-50" />
-          <h3 className="font-display text-2xl font-bold mb-2">
-            Geometric Flow
-          </h3>
-          <p className="text-(--muted) text-sm mb-6 max-w-md mx-auto">
-            The wireframe shapes decorating this page will come alive as a
-            playable game. Navigate through the geometric field. Coming soon.
-          </p>
-          <Link
-            href="/games"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-pink hover:brightness-110 transition-all"
-          >
-            <Gamepad2 className="h-4 w-4" />
-            View Games
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-display text-xl font-bold">
+                Geometric Flow
+              </h3>
+              <p className="text-sm text-(--muted) mt-1">
+                The shapes decorating this page just became obstacles. Navigate through. Click / tap to switch lanes.
+              </p>
+            </div>
+            <div className="hidden sm:flex items-center gap-4 text-xs text-(--muted)">
+              <span className="flex items-center gap-1">
+                <Trophy className="h-3.5 w-3.5 text-accent-amber" /> High score saved
+              </span>
+              <span className="flex items-center gap-1">
+                <RotateCcw className="h-3.5 w-3.5" /> Tap to restart
+              </span>
+            </div>
+          </div>
+
+          <GeometricFlowGame />
+
+          <div className="flex items-center justify-center mt-4">
+            <Link
+              href="/games"
+              className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) hover:text-(--foreground) transition-colors"
+            >
+              <Gamepad2 className="h-4 w-4 text-accent-pink" />
+              More games →
+            </Link>
+          </div>
         </motion.div>
       </div>
     </section>
   );
 }
+

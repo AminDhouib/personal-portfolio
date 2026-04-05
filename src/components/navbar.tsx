@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Menu, X, ArrowRight } from "lucide-react";
+import { Sun, Moon, Menu, X, ArrowRight, Bookmark } from "lucide-react";
 import { useTheme } from "next-themes";
 import { navItems, CALENDLY_URL } from "@/data/nav";
 
@@ -107,6 +107,24 @@ export function Navbar() {
                 ) : (
                   <Moon className="h-4 w-4" />
                 )}
+              </button>
+            )}
+
+            {/* Bookmark */}
+            {mounted && (
+              <button
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({ title: document.title, url: window.location.href }).catch(() => {});
+                  } else {
+                    alert("Press Ctrl+D (Cmd+D on Mac) to bookmark this page!");
+                  }
+                }}
+                className="rounded-lg p-2 text-(--muted) hover:text-(--foreground) hover:bg-(--surface) transition-colors"
+                aria-label="Bookmark"
+                title="Bookmark this page"
+              >
+                <Bookmark className="h-4 w-4" />
               </button>
             )}
 

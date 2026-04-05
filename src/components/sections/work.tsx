@@ -22,14 +22,22 @@ function PlatformIcon({ icon }: { icon: string }) {
   );
 }
 
-export function Work() {
+function formatMAU(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return String(n);
+}
+
+export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
   return (
     <section id="work" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading number="03" title="Work" color="var(--color-accent-blue)" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {projects.map((project, i) => (
+          {projects.map((project, i) => {
+            const liveMAU = mauData?.[project.slug] ?? null;
+            const displayMAU = liveMAU ?? project.mauFallback;
+            return (
             <motion.div
               key={project.slug}
               initial={{ opacity: 0, y: 20 }}
@@ -74,12 +82,12 @@ export function Work() {
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-green" />
                   </span>
                   <span className="text-sm font-medium">
-                    {project.mauFallback >= 1000
-                      ? `${(project.mauFallback / 1000).toFixed(1)}K`
-                      : project.mauFallback}{" "}
-                    MAU
+                    {formatMAU(displayMAU)} MAU
                   </span>
-                  {project.mauGrowth && (
+                  {liveMAU ? (
+                    <span className="text-xs text-accent-green/60 font-medium">live</span>
+                  ) : null}
+                  {!liveMAU && project.mauGrowth && (
                     <span className="text-xs text-accent-green font-medium">
                       {project.mauGrowth}
                     </span>
@@ -101,7 +109,8 @@ export function Work() {
                 </div>
               </Link>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
 
         <p className="text-xs text-(--muted)/60 text-center mt-8">
