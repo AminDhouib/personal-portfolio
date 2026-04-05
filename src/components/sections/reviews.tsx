@@ -25,7 +25,7 @@ export function Reviews() {
           {scrollReviews.map((review, i) => (
             <div
               key={`${review.name}-${i}`}
-              className="shrink-0 w-85 rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors"
+              className="shrink-0 w-[340px] rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors"
             >
               {/* Quote */}
               <p className="text-sm text-(--foreground) leading-relaxed mb-4 line-clamp-4">
@@ -72,7 +72,7 @@ export function Reviews() {
           </div>
           <span className="text-sm font-semibold">5.0 avg</span>
           <span className="text-sm text-(--muted)">
-            / {reviews.length} reviews
+            / 81 reviews on Contra
           </span>
         </div>
       </div>

@@ -80,18 +80,7 @@ export default async function BlogPostPage({
         </header>
 
         {/* MDX Content */}
-        <article className="prose prose-neutral dark:prose-invert max-w-none
-          prose-headings:font-display prose-headings:tracking-tight
-          prose-h2:text-2xl prose-h2:font-bold prose-h2:mt-10 prose-h2:mb-4
-          prose-h3:text-xl prose-h3:font-semibold
-          prose-p:text-base prose-p:leading-relaxed prose-p:text-(--foreground)
-          prose-a:text-accent-blue prose-a:no-underline hover:prose-a:underline
-          prose-strong:text-(--foreground)
-          prose-code:rounded prose-code:bg-(--surface) prose-code:px-1 prose-code:py-0.5 prose-code:text-sm prose-code:text-accent-green prose-code:before:content-none prose-code:after:content-none
-          prose-pre:rounded-xl prose-pre:border prose-pre:border-(--border) prose-pre:bg-(--card) prose-pre:p-4
-          prose-blockquote:border-l-accent-blue prose-blockquote:text-(--muted)
-          prose-hr:border-(--border)
-          prose-li:text-(--foreground)">
+        <article className="prose max-w-none">
           <MDXRemote
             source={post.content}
             options={{
