@@ -2,6 +2,9 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
+import { formatDate, formatRelativeDate } from "@/lib/date-utils";
+
+export { formatDate, formatRelativeDate };
 
 const BLOG_DIR = path.join(process.cwd(), "content/blog");
 
@@ -54,15 +57,6 @@ export function getAllBlogPosts(): BlogPostMeta[] {
     .sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-}
-
-export function formatDate(dateStr: string): string {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 export interface TocEntry {

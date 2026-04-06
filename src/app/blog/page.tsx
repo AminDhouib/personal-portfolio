@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { getAllBlogPosts, formatDate } from "@/lib/blog";
+import { getAllBlogPosts } from "@/lib/blog";
+import { formatRelativeDate, formatDate } from "@/lib/date-utils";
 
 export const metadata = {
   title: "Blog — Amin Dhouib",
@@ -39,8 +40,8 @@ export default function BlogPage() {
                 <p className="text-sm text-(--muted) mb-2">{post.excerpt}</p>
                 <div className="flex items-center gap-3">
                   {post.date && (
-                    <span className="text-xs text-(--muted)/60">
-                      {formatDate(post.date)}
+                    <span className="text-xs text-(--muted)/60" title={formatDate(post.date)}>
+                      {formatRelativeDate(post.date)}
                     </span>
                   )}
                   <span className="text-xs text-(--muted)/60">·</span>

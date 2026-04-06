@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sun, Moon, Menu, X, ArrowRight, Bookmark } from "lucide-react";
 import { useTheme } from "next-themes";
-import { navItems, CALENDLY_URL } from "@/data/nav";
+import { AnimatePresence, motion } from "framer-motion";
+import { navItems, CALENDLY_URL, socialLinks } from "@/data/nav";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -158,36 +159,104 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {isHome && mobileOpen && (
-        <div className="md:hidden bg-(--background)/95 backdrop-blur-xl border-t border-(--border)">
-          <div className="px-4 py-4 space-y-3">
-            {navItems.map((item) => (
-              <Link
-                key={item.sectionId}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`block text-base font-medium py-2 transition-colors ${
-                  activeSection === item.sectionId
-                    ? "text-accent-green"
-                    : "text-(--muted)"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-            <a
-              href={CALENDLY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 rounded-lg bg-accent-green px-4 py-3 text-sm font-semibold text-black w-full mt-4"
+      {/* Mobile slide-out panel */}
+      <AnimatePresence>
+        {isHome && mobileOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+            />
+            {/* Panel */}
+            <motion.div
+              className="fixed top-0 right-0 h-full w-72 bg-(--background) border-l border-(--border) z-50 md:hidden flex flex-col"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
             >
-              Book a Call
-              <ArrowRight className="h-3.5 w-3.5" />
-            </a>
-          </div>
-        </div>
-      )}
+              {/* Panel header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-(--border)">
+                <span className="font-display text-sm font-black tracking-tight">
+                  AMIN DHOUIB
+                </span>
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg p-1.5 text-(--muted) hover:text-(--foreground) hover:bg-(--surface) transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Nav links */}
+              <nav className="flex-1 px-4 py-6 space-y-1">
+                {navItems.map((item, i) => (
+                  <motion.div
+                    key={item.sectionId}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <Link
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                        activeSection === item.sectionId
+                          ? "bg-accent-green/10 text-accent-green"
+                          : "text-(--muted) hover:text-(--foreground) hover:bg-(--surface)"
+                      }`}
+                    >
+                      {activeSection === item.sectionId && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent-green shrink-0" />
+                      )}
+                      {item.label}
+                    </Link>
+                  </motion.div>
+                ))}
+              </nav>
+
+              {/* Social links */}
+              <div className="px-5 pb-3 flex items-center gap-4">
+                {socialLinks.slice(0, 4).map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-(--muted) hover:text-(--foreground) transition-colors"
+                    aria-label={link.name}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://cdn.simpleicons.org/${link.icon}/888888`}
+                      alt={link.name}
+                      className="h-4 w-4"
+                    />
+                  </a>
+                ))}
+              </div>
+
+              {/* CTA */}
+              <div className="px-4 pb-8">
+                <a
+                  href={CALENDLY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-accent-green px-4 py-3 text-sm font-semibold text-black w-full"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Book a Call
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </nav>
   );
 }

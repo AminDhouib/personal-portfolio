@@ -6,14 +6,6 @@ import { CALENDLY_URL, socialLinks } from "@/data/nav";
 
 function SocialIcon({ icon }: { icon: string }) {
   if (icon === "mail") return <Mail className="h-5 w-5" />;
-  // Contra not available on Simple Icons — use Lucide Briefcase as fallback
-  if (icon === "contra") {
-    return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6zm4 4h-2v-2h2v2zm0-4h-2V7h2v6z" />
-      </svg>
-    );
-  }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Clock } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { BlogPostMeta } from "@/lib/blog";
+import { formatRelativeDate } from "@/lib/date-utils";
 
 const staticPosts: BlogPostMeta[] = [
   {
@@ -55,12 +56,23 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
             >
               <Link
                 href={`/blog/${post.slug}`}
-                className="group flex items-center justify-between py-6 border-b border-(--border) transition-colors hover:border-accent-blue/30"
+                className="group flex items-start justify-between py-6 border-b border-(--border) transition-colors hover:border-accent-blue/30"
               >
-                <h3 className="font-display text-lg font-bold tracking-tight group-hover:text-accent-blue transition-colors pr-4">
-                  {post.title}
-                </h3>
-                <ArrowRight className="h-4 w-4 shrink-0 text-(--muted) group-hover:text-accent-blue group-hover:translate-x-1 transition-all" />
+                <div>
+                  <h3 className="font-display text-lg font-bold tracking-tight group-hover:text-accent-blue transition-colors mb-1">
+                    {post.title}
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-(--muted)/60">
+                    {post.date && <span>{formatRelativeDate(post.date)}</span>}
+                    {post.readingTime && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {post.readingTime}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-(--muted) group-hover:text-accent-blue group-hover:translate-x-1 transition-all mt-1" />
               </Link>
             </motion.div>
           ))}

@@ -84,6 +84,30 @@ function Shapes() {
         speed={0.35}
         color="#22c55e"
       />
+      <WireframeShape
+        geometry={geometries.triangle}
+        position={[3.5, 3, -5]}
+        speed={0.25}
+        color="#f59e0b"
+      />
+      <WireframeShape
+        geometry={geometries.circle}
+        position={[-4, -2, -3]}
+        speed={0.45}
+        color="#a78bfa"
+      />
+      <WireframeShape
+        geometry={geometries.diamond}
+        position={[-1.5, 3.5, -6]}
+        speed={0.28}
+        color="#6366f1"
+      />
+      <WireframeShape
+        geometry={geometries.triangle}
+        position={[2.5, -1, -4]}
+        speed={0.55}
+        color="#06b6d4"
+      />
     </>
   );
 }
