@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getAllBlogSlugs } from "@/lib/blog";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://amindhou.com";
@@ -11,11 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "getitdone",
   ];
 
-  const blogSlugs = [
-    "self-hosting-home-server",
-    "caramel-open-source-story",
-    "ai-agents-dev-workflow",
-  ];
+  const blogSlugs = getAllBlogSlugs();
 
   return [
     { url: baseUrl, lastModified: new Date(), changeFrequency: "monthly", priority: 1 },

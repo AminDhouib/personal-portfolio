@@ -44,11 +44,32 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className={`group relative rounded-xl border border-(--border) bg-(--card) p-6 transition-all hover:border-(--muted)/30 ${
+              className={`group relative rounded-xl border border-(--border) bg-(--card) overflow-hidden transition-all hover:border-(--muted)/30 ${
                 project.slug === "getitdone" ? "md:col-span-2" : ""
               }`}
             >
               <Link href={`/work/${project.slug}`} className="block">
+                {/* Thumbnail */}
+                {project.heroImage ? (
+                  <div className="relative w-full h-40 overflow-hidden bg-(--surface)">
+                    <Image
+                      src={project.heroImage}
+                      alt={`${project.name} screenshot`}
+                      fill
+                      className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-(--card)" />
+                  </div>
+                ) : (
+                  <div className="h-28 bg-gradient-to-br from-(--surface) to-(--card) flex items-center justify-center opacity-30">
+                    <span className="font-display text-3xl font-black tracking-tighter">
+                      {project.name.toUpperCase()}
+                    </span>
+                  </div>
+                )}
+
+                <div className="p-6">
                 {/* Header: Logo + Name + OSS badge */}
                 <div className="flex items-start gap-4 mb-4">
                   <Image
@@ -107,6 +128,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                     </span>
                   ))}
                 </div>
+                </div>{/* /p-6 */}
               </Link>
             </motion.div>
             );
