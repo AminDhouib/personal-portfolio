@@ -1,0 +1,186 @@
+---
+title: "My Full DevSecOps Pipeline: ESLint, knip, CodeRabbit, and Beyond"
+excerpt: "Every tool in my CI/CD pipeline — from pre-commit hooks to AI-powered code review — and why each one earns its place."
+date: "2026-04-01"
+tags: ["devops", "tooling", "ci-cd", "security"]
+---
+
+I've wasted a lot of time on bad CI pipelines — ones that either let too much slip through or slow down shipping to a crawl. This is the pipeline I've converged on after years of iteration.
+
+## The Philosophy: Fail Fast, Fail Local
+
+Every check that can run on the developer's machine should run there first. CI should be a safety net, not a primary gate. Slow CI builds kill developer momentum.
+
+```
+Pre-commit (< 2s) → Push (< 30s) → PR (< 5min) → Merge (deploy)
+```
+
+## Pre-commit: The Fastest Feedback Loop
+
+[Husky](https://typicode.github.io/husky/) runs these on every `git commit`:
+
+```json
+// .husky/pre-commit
+pnpm lint-staged
+```
+
+```json
+// package.json lint-staged config
+{
+  "lint-staged": {
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{py}": ["ruff check --fix", "ruff format"],
+    "*.{json,md,yml}": ["prettier --write"]
+  }
+}
+```
+
+**Runtime: ~1.5s on a changed file.** Anything slower than 2 seconds and developers start bypassing it.
+
+## ESLint: The Opinionated Linter
+
+My ESLint setup catches three categories of bugs before they ship:
+
+**1. Type coercions that cause silent bugs:**
+```typescript
+// ESLint catches this — comparing undefined to a number
+if (user.age == "30") { ... } // Should be ===
+```
+
+**2. React-specific footguns:**
+```typescript
+// react-hooks/exhaustive-deps catches stale closures
+useEffect(() => {
+  fetchData(userId); // userId missing from deps array
+}, []); // ESLint flags this
+```
+
+**3. Security-adjacent patterns:**
+```typescript
+// eslint-plugin-security flags dangerous RegExp patterns
+const re = new RegExp(userInput); // Potential ReDoS
+```
+
+Key plugins I use: `@typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-security`, `eslint-plugin-import`.
+
+## knip: Dead Code Elimination
+
+[knip](https://knip.dev) finds unused exports, files, and dependencies. Run it quarterly and you'll be shocked at the dead code that accumulates.
+
+```bash
+pnpm knip
+```
+
+Recent results on a client project:
+```
+Unused files (3):     src/utils/legacy-auth.ts, src/hooks/useObsoleteCarousel.ts
+Unused exports (12):  formatCurrency() was exported but never imported
+Unused dependencies:  lodash (replaced by native methods months ago)
+```
+
+`knip` saved about 40KB from that bundle and removed 3 files that had been quietly rotting.
+
+## ruff + pyright: Python Discipline
+
+For Python microservices (Shorty's scraper, API adapters), I run:
+
+```bash
+# ruff: linting + formatting in one tool (100x faster than flake8 + black)
+ruff check --fix src/
+ruff format src/
+
+# pyright: strict type checking
+pyright src/
+```
+
+`ruff` replaced four separate tools: `flake8`, `isort`, `autoflake`, and `black`. One tool, one config, 100x faster.
+
+`pyright` in strict mode has caught several runtime errors that Python's duck typing would have silently swallowed:
+
+```python
+def process_video(url: str) -> Transcript:
+    result = fetch_transcript(url)
+    return result.text  # pyright: "text" does not exist on Transcript | None
+                        # fetch_transcript can return None on failure
+```
+
+## CodeRabbit: AI Code Review
+
+[CodeRabbit](https://coderabbit.ai) reviews every PR automatically. It's not just syntax — it reads the diff in context of the codebase and spots logic errors.
+
+The review format it produces:
+
+```
+⚠️ Potential issue in src/lib/ga4.ts:
+  fetchMAU() calls client.runReport() without a timeout. The GA4 API 
+  occasionally returns no response on first request. Based on the 
+  7-day log patterns in this repo, this has caused 3 silent failures 
+  in the past month.
+
+  Suggestion: Add AbortController with 10s timeout, matching the 
+  pattern in fetchRepoStats().
+```
+
+That kind of context-aware review catches things a human reviewer would miss on a quick pass.
+
+## Security Scanning
+
+Two layers:
+
+**GitHub secret scanning** — enabled at the org level. Blocks pushes with API keys, tokens, or credentials.
+
+**OWASP ZAP** (for web services with public endpoints):
+```bash
+docker run -t owasp/zap2docker-stable zap-baseline.py \
+  -t https://staging.aishorty.com \
+  -g gen.conf \
+  -r zap-report.html
+```
+
+Run on staging before every release. The baseline scan takes ~3 minutes and catches the OWASP Top 10 automatically.
+
+## Package Size Budgets
+
+For frontend projects, bundle size regressions ship silently unless you enforce a budget:
+
+```json
+// next.config.ts
+experimental: {
+  bundlePagesRouterDependencies: true,
+}
+```
+
+Combined with [bundlewatch](https://bundlewatch.io) in CI:
+```yaml
+# .bundlewatch.config.json
+{
+  "files": [
+    { "path": ".next/static/chunks/**.js", "maxSize": "200 kB" }
+  ]
+}
+```
+
+A new dependency that adds 150KB will fail the check before it merges.
+
+## The Full Pipeline Summary
+
+```
+Developer machine:
+└── Husky pre-commit: ESLint + Prettier + ruff (1.5s)
+
+Git push:
+└── GitHub Actions: typecheck (tsc) + knip + pyright (30s)
+
+Pull request open:
+└── CodeRabbit AI review (automatic, 2-3 min)
+└── OWASP ZAP on staging deploy (3 min)
+└── bundlewatch size check (10s)
+
+Merge to main:
+└── Docker build + nixpacks deploy to Dokploy
+└── Uptime Kuma confirms endpoint live (60s)
+```
+
+Total time from commit to deployed: ~8 minutes. Time wasted on avoidable bugs in production: approaching zero.
+
+The key is that each tool does one thing and does it well. The pipeline isn't impressive — it's boring. Boring is the goal.

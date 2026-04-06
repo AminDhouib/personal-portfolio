@@ -5,7 +5,8 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypePrettyCode from "rehype-pretty-code";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import { getBlogPost, getAllBlogSlugs, formatDate, extractToc } from "@/lib/blog";
+import { getBlogPost, getAllBlogSlugs, extractToc } from "@/lib/blog";
+import { formatDate, formatRelativeDate } from "@/lib/date-utils";
 import { ShareButton, TableOfContents } from "@/components/blog/toc-share";
 import type { Options } from "rehype-pretty-code";
 
@@ -61,7 +62,11 @@ export default async function BlogPostPage({
             {post.title}
           </h1>
           <div className="flex flex-wrap items-center gap-3 text-sm text-(--muted)">
-            {post.date && <span>{formatDate(post.date)}</span>}
+            {post.date && (
+                    <span title={formatDate(post.date)}>
+                      {formatRelativeDate(post.date)}
+                    </span>
+                  )}
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
               {post.readingTime}

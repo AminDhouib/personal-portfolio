@@ -9,20 +9,20 @@ import { formatRelativeDate } from "@/lib/date-utils";
 
 const staticPosts: BlogPostMeta[] = [
   {
-    slug: "self-hosting-home-server",
-    title: "How I Self-Host Everything on a Home Server with 99.99% Uptime",
-    excerpt: "Docker Swarm, Dokploy, Tailscale, and Cloudflare tunnels.",
-    date: "2026-01-15",
+    slug: "devsecops-pipeline",
+    title: "My Full DevSecOps Pipeline: ESLint, knip, CodeRabbit, and Beyond",
+    excerpt: "Every tool in my CI/CD pipeline and why each one earns its place.",
+    date: "2026-04-01",
     tags: ["devops"],
-    readingTime: "8 min read",
+    readingTime: "7 min read",
   },
   {
-    slug: "caramel-open-source-story",
-    title: "Building an Open-Source Honey Alternative: The Caramel Story",
-    excerpt: "Why Caramel was built and what I learned shipping open-source.",
-    date: "2026-02-08",
-    tags: ["open-source"],
-    readingTime: "6 min read",
+    slug: "devino-solutions-lessons",
+    title: "From $0 to $1M: What I Learned Building Devino Solutions",
+    excerpt: "Pricing, hiring, retention, and the moment I almost quit.",
+    date: "2026-03-25",
+    tags: ["business"],
+    readingTime: "9 min read",
   },
   {
     slug: "ai-agents-dev-workflow",

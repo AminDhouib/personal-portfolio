@@ -3,6 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Globe, AppWindow } from "lucide-react";
 import { projects } from "@/data/projects";
+import { fetchMAU } from "@/lib/ga4";
+
+// ISR: revalidate every 24h so live MAU stays fresh
+export const revalidate = 86400;
 
 export function generateStaticParams() {
   return projects.map((p) => ({ slug: p.slug }));
@@ -44,6 +48,11 @@ export default async function WorkDetailPage({
   const { slug } = await params;
   const project = projects.find((p) => p.slug === slug);
   if (!project) notFound();
+
+  // Fetch live MAU from GA4 (falls back to null if not configured)
+  const liveMAU = await fetchMAU(slug);
+  const displayMAU = liveMAU ?? project.mauFallback;
+  const isLive = liveMAU !== null;
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -132,14 +141,19 @@ export default async function WorkDetailPage({
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent-green" />
           </span>
           <span className="text-base font-semibold">
-            {project.mauFallback >= 1000
-              ? `${(project.mauFallback / 1000).toFixed(1)}K`
-              : project.mauFallback}{" "}
+            {displayMAU >= 1000
+              ? `${(displayMAU / 1000).toFixed(1)}K`
+              : displayMAU}{" "}
             monthly active users
           </span>
           {project.mauGrowth && (
             <span className="text-sm text-accent-green font-medium">
               {project.mauGrowth}
+            </span>
+          )}
+          {isLive && (
+            <span className="ml-auto text-xs text-accent-green/60 font-medium">
+              live · last 30 days
             </span>
           )}
         </div>
