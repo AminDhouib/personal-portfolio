@@ -2,13 +2,25 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { Gamepad2, Keyboard, Trophy, RotateCcw, Lock } from "lucide-react";
+import { Gamepad2, Keyboard, Trophy, RotateCcw } from "lucide-react";
 
 const GeometricFlowGame = dynamic(
   () =>
     import("@/components/game/geometric-flow").then(
       (m) => m.GeometricFlowGame
     ),
+  { ssr: false, loading: () => <GameSkeleton /> }
+);
+
+const TypingSpeedGame = dynamic(
+  () =>
+    import("@/components/game/typing-speed").then((m) => m.TypingSpeedGame),
+  { ssr: false, loading: () => <GameSkeleton /> }
+);
+
+const CodePuzzleGame = dynamic(
+  () =>
+    import("@/components/game/code-puzzle").then((m) => m.CodePuzzleGame),
   { ssr: false, loading: () => <GameSkeleton /> }
 );
 
@@ -32,19 +44,19 @@ const GAMES = [
   },
   {
     id: "typing-speed",
-    title: "Typing Speed Test",
+    title: "Typing Speed",
     description: "Code snippets from real projects. How fast can you type?",
     icon: Keyboard,
-    iconColor: "text-accent-cyan",
-    available: false,
+    iconColor: "text-accent-blue",
+    available: true,
   },
   {
     id: "code-puzzle",
     title: "Code Puzzle",
-    description: "Fix the broken code snippet. A debugging mini-game.",
+    description: "Spot the bug in 6 real-world snippets. Multiple choice.",
     icon: Trophy,
     iconColor: "text-accent-amber",
-    available: false,
+    available: true,
   },
 ];
 
@@ -58,23 +70,24 @@ export function GamesClient() {
         {GAMES.map((game) => (
           <button
             key={game.id}
-            onClick={() => game.available && setActiveGame(game.id)}
+            onClick={() => setActiveGame(game.id)}
             className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all shrink-0 ${
-              game.available
-                ? activeGame === game.id
+              activeGame === game.id
+                ? game.id === "geometric-flow"
                   ? "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
-                  : "border-(--border) text-(--muted) hover:border-(--muted)/40 hover:text-(--foreground)"
-                : "border-(--border) text-(--muted)/40 cursor-not-allowed"
+                  : game.id === "typing-speed"
+                  ? "border-accent-blue/50 bg-accent-blue/10 text-accent-blue"
+                  : "border-accent-amber/50 bg-accent-amber/10 text-accent-amber"
+                : "border-(--border) text-(--muted) hover:border-(--muted)/40 hover:text-(--foreground)"
             }`}
           >
-            <game.icon className={`h-4 w-4 ${game.available ? game.iconColor : "opacity-40"}`} />
+            <game.icon className={`h-4 w-4 ${activeGame === game.id ? game.iconColor : "opacity-60"}`} />
             {game.title}
-            {!game.available && <Lock className="h-3 w-3 opacity-40" />}
           </button>
         ))}
       </div>
 
-      {/* Active game */}
+      {/* Geometric Flow */}
       {activeGame === "geometric-flow" && (
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -96,6 +109,32 @@ export function GamesClient() {
             </div>
           </div>
           <GeometricFlowGame key="arcade-game" />
+        </div>
+      )}
+
+      {/* Typing Speed */}
+      {activeGame === "typing-speed" && (
+        <div>
+          <div className="mb-4">
+            <h2 className="font-display text-xl font-bold">Typing Speed</h2>
+            <p className="text-sm text-(--muted) mt-0.5">
+              Real code snippets. Click "Start typing" then type the snippet exactly.
+            </p>
+          </div>
+          <TypingSpeedGame />
+        </div>
+      )}
+
+      {/* Code Puzzle */}
+      {activeGame === "code-puzzle" && (
+        <div>
+          <div className="mb-4">
+            <h2 className="font-display text-xl font-bold">Code Puzzle</h2>
+            <p className="text-sm text-(--muted) mt-0.5">
+              Find the bug. 6 puzzles, multiple choice, instant explanation.
+            </p>
+          </div>
+          <CodePuzzleGame />
         </div>
       )}
     </div>

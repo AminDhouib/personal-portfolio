@@ -34,7 +34,14 @@ const ossDefaults: OSSProject[] = [
   },
 ];
 
-const ciTools = ["Prettier", "ESLint", "knip", "ruff", "pyright", "CodeRabbit"];
+const ciTools = [
+  { name: "Prettier", icon: "prettier" },
+  { name: "ESLint", icon: "eslint" },
+  { name: "knip", icon: null },
+  { name: "ruff", icon: "astral" },
+  { name: "pyright", icon: null },
+  { name: "CodeRabbit", icon: "coderabbit" },
+];
 
 // Generate deterministic fallback contribution data
 const fallbackContributions: ContributionDay[] = Array.from(
@@ -198,10 +205,19 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
           </span>
           {ciTools.map((tool) => (
             <span
-              key={tool}
-              className="rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-xs text-(--muted)"
+              key={tool.name}
+              className="inline-flex items-center gap-1.5 rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-xs text-(--muted)"
             >
-              {tool}
+              {tool.icon && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`https://cdn.simpleicons.org/${tool.icon}/888888`}
+                  alt={tool.name}
+                  className="h-3 w-3"
+                  loading="lazy"
+                />
+              )}
+              {tool.name}
             </span>
           ))}
         </div>
