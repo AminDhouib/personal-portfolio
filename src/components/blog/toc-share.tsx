@@ -1,7 +1,7 @@
 "use client";
 
 import { Share2, Check, Link } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function ShareButton({ title }: { title: string }) {
   const [copied, setCopied] = useState(false);
@@ -47,6 +47,29 @@ export function TableOfContents({
 }: {
   entries: { id: string; text: string; level: 2 | 3 }[];
 }) {
+  const [activeId, setActiveId] = useState<string>("");
+
+  useEffect(() => {
+    if (entries.length === 0) return;
+    const ids = entries.map((e) => e.id);
+    const observers: IntersectionObserver[] = [];
+
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActiveId(id);
+        },
+        { rootMargin: "-20% 0px -70% 0px" }
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, [entries]);
+
   if (entries.length === 0) return null;
 
   return (
@@ -60,10 +83,17 @@ export function TableOfContents({
             <li key={entry.id}>
               <a
                 href={`#${entry.id}`}
-                className={`block text-sm leading-snug text-(--muted) hover:text-(--foreground) transition-colors ${
+                className={`block text-sm leading-snug transition-colors ${
                   entry.level === 3 ? "pl-3" : ""
+                } ${
+                  activeId === entry.id
+                    ? "text-accent-blue font-medium"
+                    : "text-(--muted) hover:text-(--foreground)"
                 }`}
               >
+                {activeId === entry.id && (
+                  <span className="inline-block w-1 h-1 rounded-full bg-accent-blue mr-1.5 align-middle" />
+                )}
                 {entry.text}
               </a>
             </li>

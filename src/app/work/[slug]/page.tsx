@@ -8,6 +8,40 @@ import { fetchMAU } from "@/lib/ga4";
 // ISR: revalidate every 24h so live MAU stays fresh
 export const revalidate = 86400;
 
+// Map common tech names to Simple Icons slugs (lowercase)
+const TECH_ICON_MAP: Record<string, string> = {
+  "next.js": "nextdotjs",
+  nextjs: "nextdotjs",
+  react: "react",
+  typescript: "typescript",
+  javascript: "javascript",
+  python: "python",
+  docker: "docker",
+  aws: "amazonaws",
+  prisma: "prisma",
+  django: "django",
+  fastapi: "fastapi",
+  "tailwind css": "tailwindcss",
+  tailwindcss: "tailwindcss",
+  figma: "figma",
+  selenium: "selenium",
+  terraform: "terraform",
+  postgresql: "postgresql",
+  mongodb: "mongodb",
+  redis: "redis",
+  firebase: "firebase",
+  ios: "apple",
+  macos: "apple",
+  swift: "swift",
+  "node.js": "nodedotjs",
+  nodejs: "nodedotjs",
+  rust: "rust",
+  s3: "amazons3",
+  "google drive": "googledrive",
+  npm: "npm",
+  github: "github",
+};
+
 export function generateStaticParams() {
   return projects.map((p) => ({ slug: p.slug }));
 }
@@ -200,14 +234,26 @@ export default async function WorkDetailPage({
             Tech Stack
           </h2>
           <div className="flex flex-wrap gap-2">
-            {project.techStack.map((tech) => (
-              <span
-                key={tech}
-                className="rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-sm"
-              >
-                {tech}
-              </span>
-            ))}
+            {project.techStack.map((tech) => {
+              const iconSlug = TECH_ICON_MAP[tech.toLowerCase()];
+              return (
+                <span
+                  key={tech}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-sm"
+                >
+                  {iconSlug && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`https://cdn.simpleicons.org/${iconSlug}/888888`}
+                      alt={tech}
+                      className="h-3.5 w-3.5"
+                      loading="lazy"
+                    />
+                  )}
+                  {tech}
+                </span>
+              );
+            })}
           </div>
         </div>
 

@@ -9,6 +9,14 @@ import { formatRelativeDate } from "@/lib/date-utils";
 
 const staticPosts: BlogPostMeta[] = [
   {
+    slug: "5-apps-5-lessons",
+    title: "5 Apps, 5 Lessons: What I Learned Shipping Products Nobody Asked For",
+    excerpt: "I built five apps after nobody asked me to. Here's what each one taught me.",
+    date: "2026-04-05",
+    tags: ["products"],
+    readingTime: "8 min read",
+  },
+  {
     slug: "devsecops-pipeline",
     title: "My Full DevSecOps Pipeline: ESLint, knip, CodeRabbit, and Beyond",
     excerpt: "Every tool in my CI/CD pipeline and why each one earns its place.",
@@ -23,14 +31,6 @@ const staticPosts: BlogPostMeta[] = [
     date: "2026-03-25",
     tags: ["business"],
     readingTime: "9 min read",
-  },
-  {
-    slug: "ai-agents-dev-workflow",
-    title: "Why I Use AI Agents to Automate My Entire Dev Workflow",
-    excerpt: "AI agents that save 6 hours per week.",
-    date: "2026-03-10",
-    tags: ["ai"],
-    readingTime: "5 min read",
   },
 ];
 

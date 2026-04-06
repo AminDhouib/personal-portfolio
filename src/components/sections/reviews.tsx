@@ -27,6 +27,13 @@ export function Reviews() {
               key={`${review.name}-${i}`}
               className="shrink-0 w-[340px] rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors"
             >
+              {/* Stars */}
+              <div className="flex gap-0.5 mb-3">
+                {Array.from({ length: review.rating }).map((_, s) => (
+                  <Star key={s} className="h-3.5 w-3.5 fill-accent-amber text-accent-amber" />
+                ))}
+              </div>
+
               {/* Quote */}
               <p className="text-sm text-(--foreground) leading-relaxed mb-4 line-clamp-4">
                 &ldquo;{review.comment}&rdquo;
