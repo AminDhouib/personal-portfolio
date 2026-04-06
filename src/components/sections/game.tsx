@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { Gamepad2, Trophy, RotateCcw } from "lucide-react";
+import { Gamepad2, Trophy, RotateCcw, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
 
@@ -57,7 +57,8 @@ export function Game() {
               className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) hover:text-(--foreground) transition-colors"
             >
               <Gamepad2 className="h-4 w-4 text-accent-pink" />
-              More games →
+              Want more?
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </motion.div>

@@ -243,7 +243,10 @@ export function TypingSpeedGame() {
           <div className="text-sm text-(--muted)">
             {accuracy}% accuracy · {(elapsed / 1000).toFixed(1)}s
             {currentWPM >= highScore && currentWPM > 0 && (
-              <span className="ml-2 text-accent-amber font-semibold">🏆 New best!</span>
+              <span className="ml-2 inline-flex items-center gap-1 text-accent-amber font-semibold">
+                <Trophy className="h-3.5 w-3.5" />
+                New best!
+              </span>
             )}
           </div>
           <button

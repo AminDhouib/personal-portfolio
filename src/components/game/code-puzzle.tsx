@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { RotateCcw, Trophy, CheckCircle, XCircle } from "lucide-react";
+import { RotateCcw, Trophy, CheckCircle, XCircle, ArrowRight } from "lucide-react";
 
 interface Puzzle {
   label: string;
@@ -260,7 +260,9 @@ export function CodePuzzleGame() {
           onClick={next}
           className="rounded-lg bg-accent-blue px-5 py-2 text-sm font-semibold text-white hover:brightness-110 transition-all"
         >
-          {idx + 1 >= PUZZLES.length ? "See results" : "Next puzzle →"}
+          {idx + 1 >= PUZZLES.length ? "See results" : (
+            <span className="inline-flex items-center gap-1.5">Next puzzle <ArrowRight className="h-3.5 w-3.5" /></span>
+          )}
         </button>
       )}
     </div>
