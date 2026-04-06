@@ -137,8 +137,10 @@ export function ProofBar() {
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           <div className="flex items-center gap-2 text-(--muted)">
-            <Server className="h-4 w-4" />
-            <span className="text-sm">Self-hosted on home server</span>
+            <Server className="h-4 w-4 shrink-0" />
+            <span className="text-sm">
+              Did you know this site runs on my home server?
+            </span>
           </div>
           <p className="text-xs text-(--muted)/60">
             Docker Swarm &nbsp;/&nbsp; Tailscale &nbsp;/&nbsp; Cloudflared
