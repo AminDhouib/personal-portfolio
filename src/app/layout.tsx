@@ -45,21 +45,12 @@ export const metadata: Metadata = {
     siteName: "Amin Dhouib",
     locale: "en_US",
     type: "website",
-    images: [
-      {
-        url: "/og.png",
-        width: 1200,
-        height: 630,
-        alt: "Amin Dhouib — Engineer, Founder, Builder",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Amin Dhouib — Engineer, Founder, Builder",
     description:
       "I build apps people actually use, then self-host them on my home server.",
-    images: ["/og.png"],
   },
   robots: {
     index: true,

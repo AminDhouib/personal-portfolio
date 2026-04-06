@@ -1,0 +1,108 @@
+---
+title: "Why I Reverse-Engineered a Trading Bot with Burp Suite"
+excerpt: "I wanted to understand how automated trading tools bypass rate limits and spoof browser fingerprints. So I intercepted the traffic and read the code."
+date: "2026-02-20"
+tags: ["security", "reverse-engineering", "tools"]
+---
+
+This started because I couldn't understand how a trading bot I'd been asked to analyze was maintaining dozens of simultaneous sessions without triggering broker rate limits. I'd read the source code. There was no obvious session management. I was missing something.
+
+So I intercepted the traffic.
+
+## Setting Up the Interception
+
+The bot was a Electron app — a packaged Node.js application with a Chromium shell. Electron apps are interesting targets because the "browser" traffic goes through the same pipes as any web app, but the wrapper makes it easy for developers to assume they're invisible.
+
+To intercept the traffic:
+
+```bash
+# Start Burp Suite, set the proxy listener on 127.0.0.1:8080
+# Configure Electron app to use proxy via environment variable
+HTTPS_PROXY=http://127.0.0.1:8080 ./trading-bot
+```
+
+The problem: Electron apps use certificate pinning by default for `https` requests. My Burp certificate wouldn't be trusted.
+
+**The bypass:** Electron doesn't pin certificates the same way mobile apps do — it trusts the system certificate store. I added Burp's CA to the Windows trusted root certificates.
+
+```powershell
+# Import Burp's CA into Windows Trusted Root store
+Import-Certificate -FilePath .\burp-ca.der -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+First HTTPS request captured. I could now see every broker API call in plain text.
+
+## What the Traffic Revealed
+
+The bot was maintaining session state through three mechanisms I hadn't seen in the source code:
+
+**1. Fingerprint spoofing in a bundled binary**
+
+The `node_modules/.bin/` directory contained a pre-compiled `.node` (native addon) that wasn't in the `package.json`. It was injecting custom User-Agent strings and `Accept-Language` headers at the socket level — below the JavaScript layer where I'd been reading. Source code analysis had shown me nothing because the fingerprinting wasn't in JavaScript.
+
+**2. Request timing jitter**
+
+Between the UI-triggered events and the actual API calls, there was variable timing — 80–340ms of artificial delay. The pattern mimicked human input latency. Implemented entirely in the native addon.
+
+**3. WebSocket session multiplexing**
+
+The broker's documented API was REST, but the bot was using an undocumented WebSocket endpoint to batch 12 operations through a single authenticated connection. This explained how it handled rate limits — it wasn't making 12 requests, it was making 1.
+
+## Why This Matters for Your Code
+
+Three security takeaways from this exercise that changed how I write applications:
+
+### Never trust client-side rate limiting
+
+The broker's rate limits were enforced entirely on the server's REST API. The WebSocket endpoint had no equivalent enforcement. This is a classic failure: the new endpoint was added quickly, the rate limiting middleware was never applied to it.
+
+If you're adding a new endpoint, **apply your middleware first, then write the handler.** Not the other way around.
+
+### Native addons are a blind spot in code review
+
+When I review a Node.js application for security issues, I now explicitly check for native addons:
+
+```bash
+# Find all .node files
+find node_modules -name "*.node" -type f
+
+# Check what functions they export
+node -e "const m = require('./path/to/module.node'); console.log(Object.keys(m))"
+```
+
+A `.node` file that's not in `package.json` is either a build artifact someone forgot to `.gitignore`, or it's hiding something intentionally. Either way it needs attention.
+
+### Traffic monitoring reveals what code review misses
+
+For applications that interact with third-party services, intercepting real production traffic during development is one of the most valuable debugging and security testing practices I know. Most bugs and vulnerabilities I've found in integrations would have taken 10x longer to find through code reading alone.
+
+My standard flow now for any third-party integration:
+
+1. Route dev traffic through Burp Suite or mitmproxy
+2. Capture a full session doing all key operations
+3. Replay specific requests to understand edge cases
+4. Write tests that assert the specific header/body patterns the integration depends on
+
+## The Broader Lesson: Assume the Network Is Observable
+
+The bot developer's mental model was that they were shipping a closed binary that nobody could inspect. That mental model was wrong in 2020 and it's still wrong. TLS provides confidentiality against passive eavesdropping, not against a local proxy with CA trust. Certificate pinning in native Electron is minimal. Binary obfuscation in JavaScript is theater.
+
+If your application is making API calls from a client device, assume those calls — headers, bodies, timing — are observable by a motivated person with 20 minutes and a free tool.
+
+Design your server-side accordingly:
+- Rate limit on the server, not just the client
+- Validate session state server-side on every request
+- Don't rely on API obscurity (undocumented endpoints without auth aren't "private")
+- Log anomalous request patterns — multiple sessions from the same user agent at human-impossible speeds is a signal
+
+The bot worked because the broker built their system assuming clients would play by the documented rules. Burp Suite just made the real rules visible.
+
+## Tools Used
+
+- **Burp Suite Community** — HTTP/S interception proxy. Free version is sufficient for most analysis.
+- **mitmproxy** — Python-based alternative, better for scripted/automated interception.
+- **Ghidra** — NSA's reverse engineering toolkit, useful when you need to analyze the compiled native addon.
+- **Wireshark** — For lower-level network capture when proxy-based interception isn't practical.
+- **strings / objdump** — Quick first pass on any binary you don't recognize.
+
+All of these are standard defensive security tools. Understanding offense is necessary to defend well.
