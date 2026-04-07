@@ -105,9 +105,10 @@ export default async function WorkDetailPage({
           <Image
             src={project.logo}
             alt={`${project.name} logo`}
-            width={80}
-            height={80}
+            width={project.logoWidth}
+            height={project.logoHeight}
             className="rounded-xl"
+            style={{ width: 80, height: "auto" }}
           />
           <div>
             <div className="flex items-center gap-3">

@@ -10,6 +10,8 @@ interface OSSProject {
   name: string;
   description: string;
   logo: string;
+  logoWidth: number;
+  logoHeight: number;
   github: string;
   forks: number;
   stars: number;
@@ -20,6 +22,8 @@ const ossDefaults: OSSProject[] = [
     name: "Caramel",
     description: "Open-source Honey alternative",
     logo: "/logos/caramel.png",
+    logoWidth: 1830,
+    logoHeight: 467,
     github: "https://github.com/DevinoSolutions/caramel",
     forks: 45,
     stars: 234,
@@ -28,6 +32,8 @@ const ossDefaults: OSSProject[] = [
     name: "UpUp",
     description: "React file upload component",
     logo: "/logos/upup.png",
+    logoWidth: 6400,
+    logoHeight: 1366,
     github: "https://github.com/DevinoSolutions/upup",
     forks: 32,
     stars: 189,
@@ -118,9 +124,10 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
                 <Image
                   src={project.logo}
                   alt={`${project.name} logo`}
-                  width={48}
-                  height={48}
+                  width={project.logoWidth}
+                  height={project.logoHeight}
                   className="rounded-lg"
+                  style={{ width: 48, height: "auto" }}
                 />
                 <div>
                   <h3 className="font-display text-lg font-bold tracking-tight">

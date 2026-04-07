@@ -75,9 +75,10 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                   <Image
                     src={project.logo}
                     alt={`${project.name} logo`}
-                    width={48}
-                    height={48}
+                    width={project.logoWidth}
+                    height={project.logoHeight}
                     className="rounded-lg"
+                    style={{ width: 48, height: "auto" }}
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">

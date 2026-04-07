@@ -9,6 +9,8 @@ export interface Project {
   heroVideoPoster?: string;
   figmaEmbed?: string;
   logo: string;
+  logoWidth: number;
+  logoHeight: number;
   url: string;
   isOSS: boolean;
   githubUrl?: string;
@@ -37,6 +39,8 @@ export const projects: Project[] = [
     heroVideo: "/videos/shorty-demo.mp4",
     heroVideoPoster: "/videos/shorty-poster.webp",
     logo: "/logos/shorty.png",
+    logoWidth: 1687,
+    logoHeight: 457,
     url: "https://aishorty.com",
     isOSS: false,
     contraUrl:
@@ -86,6 +90,8 @@ export const projects: Project[] = [
       "Community-driven note-sharing platform with 30,000+ user-uploaded university docs. Free alternative to Chegg, CourseHero, StuDocu.",
     heroImage: "/screenshots/unotes.webp",
     logo: "/logos/unotes.png",
+    logoWidth: 727,
+    logoHeight: 129,
     url: "https://unotes.net",
     isOSS: false,
     contraUrl:
@@ -125,6 +131,8 @@ export const projects: Project[] = [
       "Browser extension that automatically applies the best coupon code at checkout, without selling data or hijacking creators' commissions.",
     heroImage: "/screenshots/caramel.webp",
     logo: "/logos/caramel.png",
+    logoWidth: 1830,
+    logoHeight: 467,
     url: "https://grabcaramel.com",
     isOSS: true,
     githubUrl: "https://github.com/DevinoSolutions/caramel",
@@ -164,6 +172,8 @@ export const projects: Project[] = [
       "Open-source, free, and secure React file upload component with cloud storage integrations (Google Drive, OneDrive, S3).",
     heroImage: "/screenshots/upup.webp",
     logo: "/logos/upup.png",
+    logoWidth: 6400,
+    logoHeight: 1366,
     url: "https://useupup.com",
     isOSS: true,
     githubUrl: "https://github.com/DevinoSolutions/upup",
@@ -197,6 +207,8 @@ export const projects: Project[] = [
     description:
       "One dashboard for daily check-ins, task updates, time tracking. Skip stand-ups and stop tool-hopping.",
     logo: "/logos/getitdone.png",
+    logoWidth: 1646,
+    logoHeight: 445,
     url: "https://nowgetitdone.com",
     isOSS: false,
     mauFallback: 500,
