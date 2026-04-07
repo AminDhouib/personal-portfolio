@@ -9,7 +9,7 @@ const techLogos = [
   "typescript",
   "python",
   "docker",
-  "amazonaws",
+  "googlecloud",
   "prisma",
   "django",
   "terraform",
