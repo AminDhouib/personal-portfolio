@@ -1,0 +1,113 @@
+---
+title: "Why I Use AI Agents to Automate My Entire Dev Workflow"
+excerpt: "GitHub issues that write themselves, PR reviews that actually understand context, and code that deploys after passing AI validation."
+date: "2026-03-10"
+tags: ["ai", "automation", "devops", "productivity"]
+---
+
+I spend about 2 hours a day on dev work that used to take 8. The difference is AI agents — not just Copilot autocomplete, but full agentic pipelines that handle the boring parts end-to-end.
+
+Here's my actual stack.
+
+## The Philosophy
+
+AI agents are most valuable when they handle tasks that are:
+1. **Routine** — you've done it 100 times and know the pattern
+2. **Low-stakes on failure** — wrong output can be reviewed before it ships
+3. **Time-consuming** — the ROI is obvious if you track hours saved
+
+Code review, issue triage, release notes, PR descriptions, test generation, deployment checks. All of these qualify.
+
+## GitHub Issues That Write Themselves
+
+My Slack bot listens to client messages. When a client reports a bug, the bot:
+
+```python
+async def handle_slack_message(message: str, channel: str):
+    # 1. Classify: bug report, feature request, or question?
+    intent = await classify_intent(message)
+    
+    if intent == "bug":
+        # 2. Extract structured data
+        bug_data = await extract_bug_details(message)
+        
+        # 3. Search existing issues for duplicates
+        similar = await search_github_issues(bug_data.description)
+        
+        if similar:
+            await comment_on_issue(similar.id, message)
+        else:
+            # 4. Create new issue with template
+            await create_github_issue(
+                title=bug_data.title,
+                body=generate_issue_body(bug_data),
+                labels=bug_data.suggested_labels,
+            )
+```
+
+The Mastra agent handles steps 2-4. It uses GPT-4o-mini (cheap) for classification and extraction, and GPT-4o for the issue body generation where quality matters.
+
+## PR Review That Understands Context
+
+Standard Copilot review is pattern matching. My CodeRabbit integration does something better: it reads the PR diff in the context of recent commits and the spec doc.
+
+When it finds an issue, it doesn't just say "consider adding error handling." It says:
+
+> "In `fetchMAU()`, the GA4 API can return a 429 rate limit error. The current implementation re-throws, which will surface as a 500 to users. Based on the fallback pattern used in similar API calls (`fetchRepoStats`, `fetchContributionGraph`), consider catching 429/5xx and returning `null` to trigger the static fallback."
+
+That's useful. That saves a code review round.
+
+## Automated Release Notes
+
+Before each release, I run:
+
+```bash
+pnpm release-notes
+```
+
+This runs a LangChain pipeline that:
+1. Gets all commits since last tag (`git log v1.x..HEAD`)
+2. Filters out noise (bumps, typos, WIP)
+3. Groups by type (feat/fix/perf)
+4. Generates markdown with a summary paragraph
+
+```python
+chain = (
+    get_commits_since_last_tag 
+    | filter_noise_commits
+    | group_by_conventional_type
+    | RunnableLambda(generate_release_notes)
+)
+```
+
+Takes 8 seconds. Previously took 30 minutes.
+
+## Deployment Validation
+
+My CI pipeline includes an AI validation step before deploy:
+
+```yaml
+- name: AI sanity check
+  run: |
+    python scripts/ai_check.py \
+      --diff "${{ github.event.pull_request.diff_url }}" \
+      --files-changed "${{ steps.changed.outputs.files }}"
+```
+
+The script checks:
+- No debug `console.log` statements in non-dev files
+- No hardcoded API keys (secondary to gitleaks, which runs first)
+- No `TODO` comments older than 30 days
+- Bundle size regression > 10%
+
+If any check fails, it leaves a PR comment instead of blocking the build. The human decides.
+
+## The Limit
+
+AI agents are unreliable when the task requires judgment about business context that isn't in the codebase. "Is this feature aligned with our product direction?" — no amount of context injection will make an LLM answer that reliably.
+
+Use agents for the mechanical. Keep humans on the strategic.
+
+---
+
+The total setup time was about 40 hours spread over 3 months. At 6 hours saved per week, ROI hit in week 7. Now it just compounds.

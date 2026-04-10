@@ -1,0 +1,11 @@
+export { Hero } from "./hero";
+export { ProofBar } from "./proof-bar";
+export { Work } from "./work";
+export { Services } from "./services";
+export { Reviews } from "./reviews";
+export { OpenSource } from "./open-source";
+export { Background } from "./background";
+export { Game } from "./game";
+export { Blog } from "./blog";
+export { BeyondCode } from "./beyond-code";
+export { Contact } from "./contact";

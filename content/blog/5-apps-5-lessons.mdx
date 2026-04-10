@@ -1,0 +1,90 @@
+---
+title: "5 Apps, 5 Lessons: What I Learned Shipping Products Nobody Asked For"
+excerpt: "I built Shorty, uNotes, Caramel, UpUp, and GetItDone after nobody asked me to. Here's what each one taught me — and the one mistake I made with every single one of them."
+date: "2026-04-05"
+tags: ["products", "lessons", "entrepreneurship"]
+---
+
+Nobody asked me to build any of these apps. No customer development calls. No landing page validation. No waiting for permission. I just built them, shipped them, and then figured out if anyone cared.
+
+Here's what each one taught me.
+
+## Shorty: Distribution Is the Product
+
+**The app:** AI YouTube & Spotify summarizer. You paste a URL, get the key ideas in 60 seconds.
+
+**What I thought would be hard:** The AI summarization.
+
+**What was actually hard:** Getting YouTube transcripts reliably. YouTube actively blocks scrapers. It took three iterations — direct API access, then transcript extraction with Selenium, then a TOR-rotated scraper — to get something stable enough to ship.
+
+**The lesson:** People don't share tools because they're clever. They share them because they solve a moment. Shorty grew 50% month-over-month not because the AI was great but because the share flow was: open the extension → get summary → copy it → paste it into a chat message to your friend. The product *became* a sharing mechanism without me designing that intentionally.
+
+**What I'd do differently:** Design the sharing callback first, not last.
+
+## uNotes: Solve a Problem You Can Prove Exists
+
+**The app:** Free community note-sharing for university students. 30,000+ documents.
+
+**What I thought would be hard:** Building search.
+
+**What was actually hard:** The first 500 documents. Platforms die at zero. I manually uploaded 400 past exams from my own courses, asked 3 classmates to upload theirs, and launched. The cold-start problem is always the real problem.
+
+**The lesson:** The value of a marketplace is asymptotic — near-zero at the start, exponential past a threshold. The only way to cross the threshold is to fake density until it becomes real. The 400 documents I seeded haven't been touched in 2 years; 29,600 others built on top of them.
+
+**What I'd do differently:** Seed with higher-quality initial content. Some of those early documents were barely readable.
+
+## Caramel: Open Source as a Distribution Strategy
+
+**The app:** Browser extension that finds and applies coupon codes at checkout. Fully open source.
+
+**What I thought would be hard:** The coupon-finding algorithm.
+
+**What was actually hard:** Getting into the App Store. Apple's App Store review for Caramel took 3 weeks, 2 rejections, and a complete rewrite of the native Swift wrapper. The rejection reasons were: "unclear purpose" and "incomplete functionality" — feedback so vague it was useless. I filed an appeal the second time and won.
+
+**The lesson:** "Open source" is a distribution signal that no amount of PR can replicate. When I published the code, it got written up in three different developer newsletters within a week. None of them were promised exclusives. They covered it because it was something you could inspect, fork, and trust. Closed-source Caramel would have been invisible.
+
+**What I'd do differently:** Launch the GitHub repo before the Chrome extension, not after.
+
+## UpUp: Solve Your Own Problem, Then Package It
+
+**The app:** React file upload component with S3/Google Drive/OneDrive support. npm package.
+
+**What I thought would be hard:** The multi-cloud integration.
+
+**What was actually hard:** Writing documentation. The component itself took 2 weeks to build. The documentation site took 3 weeks. And documentation is what drives organic installs — not the code quality, not the GitHub stars. Every `npm install @upup-company/upup` came from a search result pointing to a docs page.
+
+**The lesson:** A developer tool is only as good as its getting-started experience. I rewrote the README four times. Each rewrite increased install velocity.
+
+**What I'd do differently:** Write the README before writing the code. If I can't explain what it does in three sentences, the scope is wrong.
+
+## GetItDone: B2B Products Need Champions, Not Just Users
+
+**The app:** Daily async check-ins, task tracking, and time reporting for remote teams.
+
+**What I thought would be hard:** Adoption.
+
+**What was actually hard:** Retention. Teams would try GetItDone, love it for 3 weeks, then one person would miss a check-in, the habit would break, and they'd drift back to Slack.
+
+**The lesson:** In B2B tools, you don't need most users to love the product. You need one person per team — the champion — to love it enough to enforce the habit. GetItDone's stickiest teams were always the ones where a founder or engineering lead personally cared. Without a champion, no product survives organizational entropy.
+
+**What I'd do differently:** Design onboarding around activating the champion, not the whole team at once.
+
+---
+
+## The One Mistake I Made Five Times
+
+Every single time, I shipped before setting up proper analytics.
+
+I could have told you whether Shorty was growing. I couldn't tell you which transcript sources were failing, which summarization models users preferred, or which onboarding step caused them to drop off.
+
+I could have told you uNotes had 5,000 users. I couldn't tell you which universities they were from, which courses they searched most, or whether the users who uploaded documents ever came back.
+
+The same for the others.
+
+Good analytics isn't about ego — checking dashboards to watch numbers go up. It's about maintaining a causal model of your product: what leads users to the moment of value, what causes them to leave, and where the leverage is.
+
+Set it up before you ship. It takes 2 hours with GA4 and PostHog. The data you'd have 6 months from now will be worth more than any feature you'll spend 6 months building.
+
+---
+
+The main thing I've learned from 5 unsolicited apps: build the product nobody asked for, but deeply understand the job people are already trying to do. Those two things aren't contradictory. The best products make the job obvious in retrospect — *of course* I needed a way to get YouTube video ideas without watching the whole thing. It just took someone building Shorty to make that obvious.
