@@ -16,7 +16,6 @@
     "@copilotkit/react-ui": "^1.54.1",
     "@copilotkit/runtime": "^1.54.1",
     "@google-analytics/data": "^5.2.1",
-    "@mastra/core": "^1.22.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "ai": "^6.0.146",
