@@ -80,7 +80,7 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           {children}
-          <ChatWidget enabled={!!process.env.OPENROUTER_KEY} />
+          <ChatWidget enabled />
         </Providers>
       </body>
     </html>
