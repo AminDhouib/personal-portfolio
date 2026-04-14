@@ -272,7 +272,8 @@ html {
 .copilotKitButton {
   width: 4rem !important;
   height: 4rem !important;
-  background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 25%, #06b6d4 50%, #ec4899 75%, #8b5cf6 100%) !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 25%, #06b6d4 50%, #ec4899 75%, #8b5cf6 100%) !important;
   background-size: 300% 300% !important;
   border: none !important;
   box-shadow:
@@ -324,7 +325,13 @@ html {
 
 /* CopilotKit dark theme overrides */
 .copilotKitPopup,
-.copilotKitSidebar {
+.copilotKitSidebar,
+.copilotKitChat,
+.copilotKitWindow,
+.copilotKitMessages,
+.copilotKitHeader,
+.copilotKitInput,
+.copilotKitInputContainer {
   --copilot-kit-primary-color: #8b5cf6 !important;
   --copilot-kit-contrast-color: #ffffff !important;
   --copilot-kit-background-color: #111111 !important;
@@ -335,20 +342,56 @@ html {
   --copilot-kit-muted-color: #2d2d2d !important;
 }
 
-/* Hide like/dislike feedback buttons */
-.copilotkit-response-completed-feedback,
-.copilotKitPopup .copilotkit-response-completed-feedback,
-[class*="copilotkit-response-completed-feedback"] {
+/* Force dark backgrounds on specific CopilotKit elements */
+.copilotKitHeader {
+  background-color: #111111 !important;
+  color: #ffffff !important;
+}
+
+.copilotKitMessages {
+  background-color: #111111 !important;
+}
+
+.copilotKitInput {
+  background-color: #1a1a1a !important;
+  color: #fafafa !important;
+}
+
+.copilotKitInputContainer {
+  background-color: #111111 !important;
+}
+
+.copilotKitChat {
+  background-color: #111111 !important;
+}
+
+/* Hide like/dislike feedback buttons (camelCase class names in CopilotKit v1) */
+.copilotKitMessageControls,
+.copilotKitMessageControls.currentMessage,
+.copilotKitAssistantMessage:hover .copilotKitMessageControls,
+.copilotKitMessageControlButton {
   display: none !important;
   visibility: hidden !important;
-  height: 0 !important;
-  width: 0 !important;
-  overflow: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
-  position: absolute !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Also hide via aria-label as fallback */
+button[aria-label="Thumbs up"],
+button[aria-label="Thumbs down"],
+button[aria-label="Regenerate response"],
+button[aria-label="Copy to clipboard"] {
+  display: none !important;
+}
+
+/* Mobile media query override (source forces opacity: 1) */
+@media (max-width: 768px) {
+  .copilotKitMessageControls {
+    display: none !important;
+  }
 }
 
 /* Hide powered-by attribution */
