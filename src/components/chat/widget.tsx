@@ -76,7 +76,7 @@ function ChatActions() {
   });
 
   useCopilotChatSuggestions({
-    instructions: "Suggest helpful questions about Amin's skills, projects, services, and experience",
+    instructions: "ALWAYS suggest EXACTLY these 3 options (do not deviate or rephrase): 1. 'How can I reach out to Amin?' 2. 'What services does Amin offer?' 3. 'Tell me about Amin's projects'",
     maxSuggestions: 3,
   }, []);
 
