@@ -268,22 +268,22 @@ html {
   z-index: 9999 !important;
 }
 
-/* Make chatbot button more prominent */
+/* Multi-color AI gradient button */
 .copilotKitButton {
   width: 4rem !important;
   height: 4rem !important;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
-  border-color: #22c55e !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 33%, #06b6d4 66%, #ec4899 100%) !important;
+  border: none !important;
   box-shadow:
-    0 0 20px rgba(34, 197, 94, 0.4),
-    0 0 60px rgba(34, 197, 94, 0.15) !important;
+    0 0 20px rgba(139, 92, 246, 0.4),
+    0 0 60px rgba(59, 130, 246, 0.15) !important;
   animation: chatbot-pulse 3s ease-in-out infinite !important;
 }
 
 .copilotKitButton:hover {
   box-shadow:
-    0 0 25px rgba(34, 197, 94, 0.6),
-    0 0 80px rgba(34, 197, 94, 0.25) !important;
+    0 0 25px rgba(139, 92, 246, 0.6),
+    0 0 80px rgba(59, 130, 246, 0.25) !important;
 }
 
 .copilotKitButton .copilotKitButtonIcon svg {
@@ -295,20 +295,41 @@ html {
   0%,
   100% {
     box-shadow:
-      0 0 20px rgba(34, 197, 94, 0.4),
-      0 0 60px rgba(34, 197, 94, 0.15);
+      0 0 20px rgba(139, 92, 246, 0.4),
+      0 0 60px rgba(59, 130, 246, 0.15);
   }
   50% {
     box-shadow:
-      0 0 30px rgba(34, 197, 94, 0.6),
-      0 0 80px rgba(34, 197, 94, 0.3);
+      0 0 30px rgba(139, 92, 246, 0.6),
+      0 0 80px rgba(59, 130, 246, 0.3);
   }
+}
+
+/* Multi-color AI border on chat popup */
+.copilotKitPopup {
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.5),
+    0 0 15px rgba(139, 92, 246, 0.2),
+    0 0 30px rgba(59, 130, 246, 0.1) !important;
 }
 
 /* CopilotKit theme colors */
 .copilotKitPopup,
 .copilotKitSidebar {
-  --copilot-kit-primary-color: #22c55e !important;
+  --copilot-kit-primary-color: #8b5cf6 !important;
   --copilot-kit-contrast-color: #ffffff !important;
+}
+
+/* Hide like/dislike feedback buttons */
+.copilotkit-response-completed-feedback {
+  display: none !important;
+}
+
+/* Hide powered-by attribution */
+.poweredByContainer,
+.poweredBy {
+  display: none !important;
 }
 

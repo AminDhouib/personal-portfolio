@@ -2,7 +2,7 @@
 
 import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotAction } from "@copilotkit/react-core";
-import { CopilotPopup } from "@copilotkit/react-ui";
+import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 
 const INSTRUCTIONS = `You are Amin Dhouib's personal AI assistant on his portfolio site amindhou.com.
@@ -74,6 +74,11 @@ function ChatActions() {
       }
     },
   });
+
+  useCopilotChatSuggestions({
+    instructions: "Suggest helpful questions about Amin's skills, projects, services, and experience",
+    maxSuggestions: 3,
+  }, []);
 
   return null;
 }
