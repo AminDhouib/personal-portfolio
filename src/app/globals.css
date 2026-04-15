@@ -474,8 +474,7 @@ button[aria-label="Copy to clipboard"] {
   color: #fafafa !important;
 }
 
-/* Hide powered-by attribution */
-.poweredByContainer,
+/* Hide powered-by attribution (only target the tag, NOT the container which also holds the input) */
 .poweredBy {
   display: none !important;
 }
