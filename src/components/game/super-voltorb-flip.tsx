@@ -95,6 +95,33 @@ function GameScreen({
           />
         </div>
       </div>
+      {(state.phase === "won" || state.phase === "lost") && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+          <div className="bg-white/95 dark:bg-(--card) rounded-lg p-6 text-center max-w-sm border border-(--border)">
+            <div className="text-xl font-bold mb-2">
+              {state.phase === "won"
+                ? `Level ${state.level} Cleared!`
+                : state.shieldedLoss
+                ? "Shield Absorbed! Coins Saved."
+                : "Voltorb! Coins Lost."}
+            </div>
+            <div className="text-sm text-(--muted) mb-4">
+              {state.phase === "won"
+                ? `+${state.currentCoins} coins`
+                : state.shieldedLoss
+                ? `Kept ${state.currentCoins} coins`
+                : ""}
+            </div>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "continue" })}
+              className="px-4 py-2 bg-accent-pink text-white rounded font-medium"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

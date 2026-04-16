@@ -272,9 +272,79 @@ export function applyAction(
       return { ...s, board };
     }
 
+    case "continue": {
+      if (s.phase === "won") {
+        const totalGain = s.currentCoins;
+        const newTotal = Math.min(99999, s.totalCoins + totalGain);
+        const newLevel = Math.min(8, s.level + 1);
+        const newStats = {
+          ...s.stats,
+          gamesPlayed: s.stats.gamesPlayed + 1,
+          wins: s.stats.wins + 1,
+          currentStreak: s.stats.currentStreak + 1,
+          bestStreak: Math.max(s.stats.bestStreak, s.stats.currentStreak + 1),
+          highestSingleRoundCoins: Math.max(s.stats.highestSingleRoundCoins, s.currentCoins),
+          highestLevelCleared: Math.max(s.stats.highestLevelCleared, s.level),
+          lifetimeCoins: s.stats.lifetimeCoins + totalGain,
+        };
+        opts.onPersist({ totalCoins: newTotal, stats: newStats });
+        const { board, maxCoins, twos, threes } = generateBoard(newLevel);
+        const { rowHints, colHints } = computeHints(board);
+        return {
+          ...s, phase: "ready", level: newLevel,
+          board, rowHints, colHints,
+          maxCoins, currentCoins: 0, totalCoins: newTotal,
+          weather: pickWeather(), timeOfDay: getTimeOfDay(),
+          shieldArmed: false, shieldedLoss: false, voltorbRevealsUsed: 0,
+          successfulFlipsThisRound: 0,
+          requiredFlipsThisRound: twos + threes,
+          stats: newStats,
+        };
+      }
+
+      if (s.phase === "lost") {
+        const totalGain = s.shieldedLoss ? s.currentCoins : 0;
+        const newTotal = Math.min(99999, s.totalCoins + totalGain);
+        let newLevel = s.level;
+        if (s.shieldedLoss) {
+          newLevel = s.level;
+        } else if (s.mode === "super") {
+          newLevel = applyDrop(s.level, s.requiredFlipsThisRound, s.successfulFlipsThisRound);
+        } else {
+          // Classic Mode: HGSS-style drop. Approximation: drop 2 levels.
+          newLevel = Math.max(1, s.level - 2);
+        }
+        const newStats = {
+          ...s.stats,
+          gamesPlayed: s.stats.gamesPlayed + 1,
+          losses: s.stats.losses + 1,
+          currentStreak: 0,
+          highestSingleRoundCoins: s.shieldedLoss
+            ? Math.max(s.stats.highestSingleRoundCoins, s.currentCoins)
+            : s.stats.highestSingleRoundCoins,
+          lifetimeCoins: s.stats.lifetimeCoins + totalGain,
+        };
+        opts.onPersist({ totalCoins: newTotal, stats: newStats });
+        const { board, maxCoins, twos, threes } = generateBoard(newLevel);
+        const { rowHints, colHints } = computeHints(board);
+        return {
+          ...s, phase: "ready", level: newLevel,
+          board, rowHints, colHints,
+          maxCoins, currentCoins: 0, totalCoins: newTotal,
+          weather: pickWeather(), timeOfDay: getTimeOfDay(),
+          shieldArmed: false, shieldedLoss: false, voltorbRevealsUsed: 0,
+          successfulFlipsThisRound: 0,
+          requiredFlipsThisRound: twos + threes,
+          stats: newStats,
+        };
+      }
+
+      return s;
+    }
+
     default:
-      // armShield, useVoltorbReveal, cashOut, continue
-      // are added in later tasks (18, 20).
+      // armShield, useVoltorbReveal, cashOut
+      // are added in later tasks (20).
       return s;
   }
 }
