@@ -10,6 +10,8 @@ import { MemoPanel } from "./super-voltorb-flip/MemoPanel";
 import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
 import { SettingsMenu } from "./super-voltorb-flip/SettingsMenu";
 import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
+import { ThemeSwitcher } from "./super-voltorb-flip/ThemeSwitcher";
+import { THEMES } from "./super-voltorb-flip/theme";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -78,7 +80,7 @@ function GameScreen({
       style={{
         aspectRatio: "4 / 3",
         minHeight: 420,
-        backgroundImage: `url(/games/super-voltorb-flip/sprites/background.png)`,
+        backgroundImage: THEMES[state.activeTheme].bgUrl,
         backgroundSize: "cover",
         imageRendering: "pixelated" as const,
       }}
@@ -172,6 +174,12 @@ function GameScreen({
       />
     )}
     <StatsPanel stats={state.stats} />
+    <ThemeSwitcher
+      unlocked={state.unlockedThemes}
+      active={state.activeTheme}
+      totalCoins={state.totalCoins}
+      onSelect={(id) => dispatch({ type: "unlockTheme", theme: id })}
+    />
     </>
   );
 }
