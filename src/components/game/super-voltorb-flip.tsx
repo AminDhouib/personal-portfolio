@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Shield, Sparkles } from "lucide-react";
 import { useSave } from "./super-voltorb-flip/use-save";
 import { useGame } from "./super-voltorb-flip/use-game";
@@ -13,6 +13,7 @@ import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
 import { ThemeSwitcher } from "./super-voltorb-flip/ThemeSwitcher";
 import { Atmosphere } from "./super-voltorb-flip/Atmosphere";
 import { THEMES } from "./super-voltorb-flip/theme";
+import { BgmPlayer } from "./super-voltorb-flip/audio";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -51,6 +52,42 @@ function GameScreen({
     initialStats: save.stats,
     onPersist: updateSave,
   });
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const bgmRef = useRef<BgmPlayer | null>(null);
+
+  const ensureAudio = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    if (!audioCtxRef.current) {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return null;
+      audioCtxRef.current = new Ctor();
+      bgmRef.current = new BgmPlayer(audioCtxRef.current, save.musicVolume);
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  }, [save.musicVolume]);
+
+  useEffect(() => {
+    const bgm = bgmRef.current;
+    if (!bgm) return;
+    const tier =
+      state.level <= 3 ? "rookie" : state.level <= 6 ? "veteran" : "master";
+    const isInRound =
+      state.phase === "ready" ||
+      state.phase === "playing" ||
+      state.phase === "memo";
+    const url = isInRound
+      ? `/games/super-voltorb-flip/music/${tier}.mp3`
+      : THEMES[state.activeTheme].bgmUrl;
+    bgm.crossfadeTo(url).catch(() => {});
+  }, [state.level, state.activeTheme, state.phase]);
+
+  useEffect(() => {
+    bgmRef.current?.setVolume(save.musicVolume);
+  }, [save.musicVolume]);
 
   useEffect(() => {
     let raf = 0;
@@ -108,6 +145,7 @@ function GameScreen({
               rowHints={state.rowHints}
               colHints={state.colHints}
               onTileClick={(r, c) => {
+                ensureAudio();
                 if (state.phase === "memo") {
                   dispatch({ type: "selectMemoTile", row: r, col: c });
                 } else {
