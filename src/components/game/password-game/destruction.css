@@ -215,25 +215,30 @@
 @keyframes pg-glitch-pulse {
   0%, 95%, 100% {
     text-shadow:
-      -1.2px 0 rgba(255, 0, 60, 0.75),
-      1.2px 0 rgba(0, 220, 255, 0.75);
+      calc(-1.2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.75 * var(--fx-chromatic))),
+      calc(1.2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.75 * var(--fx-chromatic))),
+      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext))),
+      calc(1px * var(--fx-ghosttext)) calc(-2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.14 * var(--fx-ghosttext)));
   }
   96% {
     text-shadow:
-      -3px 0 rgba(255, 0, 60, 0.9),
-      3px 0 rgba(0, 220, 255, 0.9);
+      calc(-3px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.9 * var(--fx-chromatic))),
+      calc(3px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.9 * var(--fx-chromatic))),
+      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext)));
     transform: translateX(1px);
   }
   97% {
     text-shadow:
-      2px 0 rgba(255, 0, 60, 0.95),
-      -2px 0 rgba(0, 220, 255, 0.95);
+      calc(2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.95 * var(--fx-chromatic))),
+      calc(-2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.95 * var(--fx-chromatic))),
+      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext)));
     transform: translateX(-1px);
   }
   98% {
     text-shadow:
-      -3px 0 rgba(255, 0, 60, 0.9),
-      3px 0 rgba(0, 220, 255, 0.9);
+      calc(-3px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.9 * var(--fx-chromatic))),
+      calc(3px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.9 * var(--fx-chromatic))),
+      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext)));
   }
 }
 
@@ -399,29 +404,14 @@
   animation-play-state: paused;
 }
 
-/* Slow heartbeat — very subtle scale pulse. Unsettling without being
-   distracting; like the UI is breathing. */
+/* Slow heartbeat — very subtle scale pulse. No filter changes so the
+   container's filter slot remains free for border wobble. */
 @keyframes pg-heartbeat {
-  0%, 100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  8% {
-    transform: scale(1.003);
-    filter: brightness(1.04);
-  }
-  16% {
-    transform: scale(0.999);
-    filter: brightness(1);
-  }
-  25% {
-    transform: scale(1.002);
-    filter: brightness(1.02);
-  }
-  45%, 65% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
+  0%, 100% { transform: scale(1); }
+  8% { transform: scale(1.003); }
+  16% { transform: scale(0.999); }
+  25% { transform: scale(1.002); }
+  45%, 65% { transform: scale(1); }
 }
 
 /* Edge burn marks — dark radial smudges at specific points along the border
@@ -559,9 +549,8 @@
   99% { opacity: 0.3; transform: translateX(1px); }
 }
 
-/* Stutter-freeze — whole container briefly snaps to a shifted/scaled state,
-   suggesting a rendering stall. Runs on the inner .pg-container so it
-   doesn't interfere with the pg-chaos-root's drift/flicker animations. */
+/* Stutter-freeze — whole container briefly snaps to a shifted state. Uses
+   translate only (not filter) so it composes with the border wobble filter. */
 .pg-chaos-root[data-chaos="4"] .pg-container,
 .pg-chaos-root[data-chaos="5"] .pg-container {
   animation: pg-stutter 13s steps(1) infinite, pg-heartbeat 2.4s ease-in-out infinite;
@@ -572,35 +561,21 @@
 }
 
 @keyframes pg-stutter {
-  0%, 94%, 100% { transform: translate(0, 0); filter: none; }
-  95% {
-    transform: translate(calc(-3px * var(--fx-stutter)), calc(1px * var(--fx-stutter)));
-    filter: contrast(calc(1 + var(--fx-stutter) * 0.3));
-  }
-  96% {
-    transform: translate(calc(2px * var(--fx-stutter)), 0);
-    filter: none;
-  }
-  96.5% {
-    transform: translate(calc(-1px * var(--fx-stutter)), calc(-2px * var(--fx-stutter)));
-  }
+  0%, 94%, 100% { transform: translate(0, 0); }
+  95% { transform: translate(calc(-3px * var(--fx-stutter)), calc(1px * var(--fx-stutter))); }
+  96% { transform: translate(calc(2px * var(--fx-stutter)), 0); }
+  96.5% { transform: translate(calc(-1px * var(--fx-stutter)), calc(-2px * var(--fx-stutter))); }
 }
 
-/* Text wave — characters in rule descriptions subtly ride a sine wave. The
-   description is one span so we use a filter oscillation rather than per-letter
-   animation (which would require DOM expansion). */
-.pg-chaos-root[data-chaos="4"] .pg-rule-description,
-.pg-chaos-root[data-chaos="5"] .pg-rule-description {
-  animation: pg-text-wave 6s ease-in-out infinite;
-}
-
-.pg-chaos-root[style*="--fx-wave: 0"] .pg-rule-description {
-  animation: none !important;
-}
-
+/* Text wave — keyframes only; animation is applied together with
+   chromatic/desync in the chaos=5 block. Intensity scales via var(--fx-wave). */
 @keyframes pg-text-wave {
   0%, 100% { letter-spacing: normal; }
   50% { letter-spacing: calc(0.04em * var(--fx-wave)); }
+}
+
+.pg-chaos-root[data-chaos="4"] .pg-rule-description {
+  animation: pg-text-wave 6s ease-in-out infinite;
 }
 
 /* Ghost text echo — adds a soft vertical offset duplicate via extra
@@ -619,7 +594,12 @@
     calc(1.2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.75 * var(--fx-chromatic))),
     0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext))),
     calc(1px * var(--fx-ghosttext)) calc(-2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.14 * var(--fx-ghosttext)));
-  animation: pg-glitch-pulse 3.1s steps(1) infinite;
+  /* All three text animations play together — individual intensity vars
+     scale their respective visual contributions to 0 when disabled. */
+  animation:
+    pg-glitch-pulse 3.1s steps(1) infinite,
+    pg-text-wave 6s ease-in-out infinite,
+    pg-color-desync 5s ease-in-out infinite;
 }
 
 /* Border wobble — inline SVG filter creates a turbulent displacement along
@@ -739,18 +719,9 @@
   92% { opacity: 0; }
 }
 
-/* Text color desync — rule descriptions have an additional animated cyan
-   shadow that drifts out of sync with the chromatic aberration. */
-.pg-chaos-root[data-chaos="5"] .pg-rule-description {
-  animation:
-    pg-glitch-pulse 3.1s steps(1) infinite,
-    pg-color-desync 5s ease-in-out infinite;
-}
-
-.pg-chaos-root[style*="--fx-desync: 0"] .pg-rule-description {
-  animation: pg-glitch-pulse 3.1s steps(1) infinite !important;
-}
-
+/* Text color desync — hue-rotate animation on rule description. The
+   actual animation is applied in the chaos=5 block above; this just defines
+   the keyframes. Intensity scales via var(--fx-desync). */
 @keyframes pg-color-desync {
   0%, 100% { filter: hue-rotate(0); }
   25% { filter: hue-rotate(calc(15deg * var(--fx-desync))); }
@@ -758,18 +729,28 @@
   75% { filter: hue-rotate(calc(-15deg * var(--fx-desync))); }
 }
 
-/* Reveal shake — added as a class to the container when a new rule appears. */
+/* Reveal shake — uses the CSS `translate` property so it doesn't conflict
+   with the container's ongoing `transform:` animations. Appended to the
+   existing animation list at high chaos levels. */
 .pg-reveal-shake {
   animation: pg-reveal-shake-kf 420ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
+.pg-chaos-root[data-chaos="4"] .pg-container.pg-reveal-shake,
+.pg-chaos-root[data-chaos="5"] .pg-container.pg-reveal-shake {
+  animation:
+    pg-stutter 13s steps(1) infinite,
+    pg-heartbeat 2.4s ease-in-out infinite,
+    pg-reveal-shake-kf 420ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
 @keyframes pg-reveal-shake-kf {
-  0% { transform: translate(0, 0); }
-  15% { transform: translate(calc(-4px * var(--fx-revealshake)), calc(2px * var(--fx-revealshake))); }
-  30% { transform: translate(calc(5px * var(--fx-revealshake)), calc(-2px * var(--fx-revealshake))); }
-  50% { transform: translate(calc(-3px * var(--fx-revealshake)), calc(1px * var(--fx-revealshake))); }
-  70% { transform: translate(calc(2px * var(--fx-revealshake)), 0); }
-  100% { transform: translate(0, 0); }
+  0% { translate: 0 0; }
+  15% { translate: calc(-4px * var(--fx-revealshake)) calc(2px * var(--fx-revealshake)); }
+  30% { translate: calc(5px * var(--fx-revealshake)) calc(-2px * var(--fx-revealshake)); }
+  50% { translate: calc(-3px * var(--fx-revealshake)) calc(1px * var(--fx-revealshake)); }
+  70% { translate: calc(2px * var(--fx-revealshake)) 0; }
+  100% { translate: 0 0; }
 }
 
 /* Tier 5 rule-specific hazards. Applied by adding a data attribute to the input wrapper. */
