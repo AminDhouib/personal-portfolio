@@ -842,6 +842,8 @@ interface GameRefs {
   shipAgilityMul: number;
   shipCoinMagnetMul: number;
   shipHullTint: string;
+  shipEngineTint: string;
+  shipDeathFxKind: string | null;
   startShieldCharges: number;
   coinBoostMul: number;
   reviveAvailable: boolean;
@@ -960,7 +962,7 @@ function createRefs(): GameRefs {
     coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
     comboWindowMs: 0, shieldDurationMs: 0,
     shipFireRateMul: 1, shipDamageMul: 1, shipAgilityMul: 1, shipCoinMagnetMul: 1,
-    shipHullTint: "#60a5fa", startShieldCharges: 0, coinBoostMul: 1,
+    shipHullTint: "#60a5fa", shipEngineTint: "#22d3ee", shipDeathFxKind: null, startShieldCharges: 0, coinBoostMul: 1,
     reviveAvailable: false, reviveUsed: false,
     prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
     gyroTilt: { x: 0, y: 0 },
@@ -1036,6 +1038,12 @@ function startRun(g: GameRefs): boolean {
   // Cosmetic hull (if equipped) overrides the ship's built-in tint
   const hullCosmetic = profile.equippedHull ? cosmeticById(profile.equippedHull) : undefined;
   g.shipHullTint = hullCosmetic && hullCosmetic.slot === "hull" ? hullCosmetic.value : ship.hullTint;
+  // Engine trail / thruster tint — cosmetic override falls back to cyan default
+  const engineCosmetic = profile.equippedEngine ? cosmeticById(profile.equippedEngine) : undefined;
+  g.shipEngineTint = engineCosmetic && engineCosmetic.slot === "engine" ? engineCosmetic.value : "#22d3ee";
+  // Death FX variant (spiral / shatter / disintegrate) — consumed in onDeath
+  const deathCosmetic = profile.equippedDeathFx ? cosmeticById(profile.equippedDeathFx) : undefined;
+  g.shipDeathFxKind = deathCosmetic && deathCosmetic.slot === "deathFx" ? deathCosmetic.value : null;
   g.startShieldCharges = ship.startShieldCharges;
   if (g.startShieldCharges > 0) {
     const effShieldMs = g.shieldDurationMs > 0 ? g.shieldDurationMs : POWERUP_DURATION_MS;
@@ -1502,7 +1510,7 @@ function spawnShipDebris(g: GameRefs) {
 
 // ---------- sound (Web Audio synth, no asset files) ----------
 
-type SoundType = "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff" | "warp";
+type SoundType = "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff" | "warp" | "purchase";
 
 class SoundManager {
   private ctx: AudioContext | null = null;
@@ -1510,7 +1518,7 @@ class SoundManager {
   private sfxEnabled = true;
   private musicEnabled = true;
   private lastPlay: Record<SoundType, number> = {
-    laser: 0, boom: 0, chime: 0, crash: 0, shieldOn: 0, shieldOff: 0, warp: 0,
+    laser: 0, boom: 0, chime: 0, crash: 0, shieldOn: 0, shieldOff: 0, warp: 0, purchase: 0,
   };
   // Sustained warp whoosh that loops while warp power-up is active
   private warpLoop: { src: AudioBufferSourceNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode } | null = null;
@@ -1570,7 +1578,47 @@ class SoundManager {
       case "shieldOn": this.playShieldOn(); break;
       case "shieldOff": this.playShieldOff(); break;
       case "warp": this.playWarp(); break;
+      case "purchase": this.playPurchase(); break;
     }
+  }
+
+  // Cash-register / coin-drop for shop purchases. Bright triplet chime with
+  // a coin "tink" click on top — reads clearly as money-spent feedback.
+  private playPurchase() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const notes = [880, 1174.66, 1567.98]; // A5, D6, G6 — bright rising major
+    notes.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = f;
+      const at = t + i * 0.055;
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(0.1, at + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.22);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + 0.24);
+    });
+    // Coin "tink" click at the end — short filtered noise burst
+    const noiseDur = 0.06;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * noiseDur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 18);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.frequency.value = 4800;
+    filt.Q.value = 12;
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.12, t + 0.18);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    src.connect(filt).connect(clickGain).connect(ctx.destination);
+    src.start(t + 0.18);
   }
 
   // Biome-change sting — short drum fill + whoosh so the player hears the
@@ -3263,9 +3311,14 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
   const engineTrailRef = useRef<THREE.Mesh>(null);
   const warpAuraRef = useRef<THREE.Mesh>(null);
   const fuselageRef = useRef<THREE.Mesh>(null);
+  const wingRef = useRef<THREE.Mesh>(null);
+  const nacelleLRef = useRef<THREE.Mesh>(null);
+  const nacelleRRef = useRef<THREE.Mesh>(null);
   const magnetRingRef = useRef<THREE.Mesh>(null);
   const magnetRingInnerRef = useRef<THREE.Mesh>(null);
   const tintColor = useMemo(() => new THREE.Color("#60a5fa"), []);
+  const wingColor = useMemo(() => new THREE.Color("#60a5fa"), []);
+  const engineColor = useMemo(() => new THREE.Color("#22d3ee"), []);
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -3273,11 +3326,33 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
     const now = performance.now();
     grpRef.current.position.set(g.shipX, g.shipY, g.shipZ);
     grpRef.current.rotation.z = g.shipRotZ;
-    // Apply equipped-hull tint (updates when player swaps cosmetic + restarts)
+    // Apply equipped-hull tint to ALL hull parts (fuselage + wings +
+    // nacelles). A slightly darker variant goes on the wing box so the
+    // silhouette still reads as layered even with a solid cosmetic color.
+    tintColor.set(g.shipHullTint);
     if (fuselageRef.current) {
-      const mat = fuselageRef.current.material as THREE.MeshToonMaterial;
-      tintColor.set(g.shipHullTint);
-      mat.color.copy(tintColor);
+      (fuselageRef.current.material as THREE.MeshToonMaterial).color.copy(tintColor);
+    }
+    if (wingRef.current) {
+      wingColor.copy(tintColor).multiplyScalar(0.72);
+      (wingRef.current.material as THREE.MeshToonMaterial).color.copy(wingColor);
+    }
+    if (nacelleLRef.current) {
+      (nacelleLRef.current.material as THREE.MeshToonMaterial).color.copy(tintColor);
+    }
+    if (nacelleRRef.current) {
+      (nacelleRRef.current.material as THREE.MeshToonMaterial).color.copy(tintColor);
+    }
+    // Engine tint — apply cosmetic engine color to the trail, aura, and core
+    engineColor.set(g.shipEngineTint);
+    if (engineRef.current) {
+      (engineRef.current.material as THREE.MeshBasicMaterial).color.copy(engineColor);
+    }
+    if (engineTrailRef.current) {
+      (engineTrailRef.current.material as THREE.MeshBasicMaterial).color.copy(engineColor);
+    }
+    if (warpAuraRef.current) {
+      (warpAuraRef.current.material as THREE.MeshBasicMaterial).color.copy(engineColor);
     }
     if (g.status === "dying") {
       grpRef.current.rotation.x += 0.05;
@@ -3376,15 +3451,15 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
         <coneGeometry args={[0.22, 1.0, 8]} />
         <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.45} />
       </mesh>
-      <mesh position={[0, -0.03, 0.15]}>
+      <mesh ref={wingRef} position={[0, -0.03, 0.15]}>
         <boxGeometry args={[1.1, 0.06, 0.32]} />
         <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.3} />
       </mesh>
-      <mesh position={[0.55, -0.03, 0.28]}>
+      <mesh ref={nacelleRRef} position={[0.55, -0.03, 0.28]}>
         <boxGeometry args={[0.18, 0.05, 0.16]} />
         <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
       </mesh>
-      <mesh position={[-0.55, -0.03, 0.28]}>
+      <mesh ref={nacelleLRef} position={[-0.55, -0.03, 0.28]}>
         <boxGeometry args={[0.18, 0.05, 0.16]} />
         <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
       </mesh>
@@ -4923,6 +4998,7 @@ export function SpaceShooterGame() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [shopTab, setShopTab] = useState<"upgrades" | "consumables" | "ships" | "cosmetics" | "missions" | "achievements">("upgrades");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefs, setPrefs] = useState({
@@ -5097,7 +5173,7 @@ export function SpaceShooterGame() {
     const spend = spendCoins(cost);
     if (!spend.ok) return;
     setUpgradeLevel(id, currentLevel + 1);
-    sounds.play("chime");
+    sounds.play("purchase");
     refreshProfile();
   }, [profile, refreshProfile]);
 
@@ -5161,8 +5237,9 @@ export function SpaceShooterGame() {
     if (ui.status === "playing" || ui.status === "dying") {
       if (shopOpen) setShopOpen(false);
       if (settingsOpen) setSettingsOpen(false);
+      if (achievementsOpen) setAchievementsOpen(false);
     }
-  }, [ui.status, shopOpen, settingsOpen]);
+  }, [ui.status, shopOpen, settingsOpen, achievementsOpen]);
   // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
   const [devFps, setDevFps] = useState(60);
   useEffect(() => {
@@ -5606,28 +5683,31 @@ export function SpaceShooterGame() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex flex-col bg-black/80 backdrop-blur-md p-4 overflow-y-auto z-10"
+                  className="absolute inset-0 flex flex-col bg-black/80 backdrop-blur-md z-10"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <ShoppingCart className="h-5 w-5 text-accent-amber" />
-                      <h3 className="text-lg font-bold text-white">Shop</h3>
-                      <div className="flex items-center gap-1.5 rounded-md bg-accent-amber/20 border border-accent-amber/40 px-2 py-1 text-sm font-mono text-accent-amber">
-                        <CoinsIcon className="h-3.5 w-3.5" />
-                        {profile.walletCoins}
+                  {/* Sticky header + tabs — always visible so the player can
+                      navigate between sub-sections without being forced to
+                      close the shop. */}
+                  <div className="sticky top-0 z-20 bg-black/85 backdrop-blur-md border-b border-white/10 px-4 pt-4 pb-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <ShoppingCart className="h-5 w-5 text-accent-amber" />
+                        <h3 className="text-lg font-bold text-white">Shop</h3>
+                        <div className="flex items-center gap-1.5 rounded-md bg-accent-amber/20 border border-accent-amber/40 px-2 py-1 text-sm font-mono text-accent-amber">
+                          <CoinsIcon className="h-3.5 w-3.5" />
+                          {profile.walletCoins}
+                        </div>
                       </div>
+                      <button
+                        onClick={() => setShopOpen(false)}
+                        className="rounded-lg bg-white/10 border border-white/20 p-1.5 text-white hover:bg-white/20 transition-colors"
+                        aria-label="Close shop"
+                      >
+                        <XIcon className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setShopOpen(false)}
-                      className="rounded-lg bg-white/10 border border-white/20 p-1.5 text-white hover:bg-white/20 transition-colors"
-                      aria-label="Close shop"
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {/* Tabs row */}
-                  <div className="flex items-center gap-1 mb-3 max-w-3xl mx-auto w-full overflow-x-auto">
-                    {(["upgrades", "consumables", "ships", "cosmetics", "missions", "achievements"] as const).map((t) => (
+                    <div className="flex items-center gap-1 max-w-3xl mx-auto w-full overflow-x-auto">
+                    {(["upgrades", "consumables", "ships", "cosmetics"] as const).map((t) => (
                       <button
                         key={t}
                         type="button"
@@ -5639,7 +5719,10 @@ export function SpaceShooterGame() {
                         {t}
                       </button>
                     ))}
+                    </div>
                   </div>
+                  {/* Scrollable tab body */}
+                  <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4">
                   {shopTab === "upgrades" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto w-full">
                     {UPGRADES.map((u) => {
@@ -5664,9 +5747,20 @@ export function SpaceShooterGame() {
                           <div className="flex flex-col gap-1 flex-1 min-w-0">
                             <div className="flex items-center gap-2 w-full">
                               <span className="font-semibold text-white flex-1 truncate">{u.label}</span>
-                              <span className="text-xs font-mono text-white/60">
-                                L{level}/{u.maxLevel}
-                              </span>
+                              <div className="flex items-center gap-0.5" aria-label={`Level ${level} of ${u.maxLevel}`}>
+                                {Array.from({ length: u.maxLevel }).map((_, i) => (
+                                  <span
+                                    key={i}
+                                    className={`h-1.5 w-2.5 rounded-sm ${
+                                      i < level
+                                        ? maxed
+                                          ? "bg-emerald-400"
+                                          : "bg-accent-blue"
+                                        : "bg-white/15"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
                             </div>
                             <div className="text-xs text-white/70">{u.description}</div>
                             <div className="flex items-center gap-1.5 mt-1 text-xs font-mono">
@@ -5710,7 +5804,7 @@ export function SpaceShooterGame() {
                                   const p = loadProfile();
                                   p.consumableInventory[c.id] = (p.consumableInventory[c.id] ?? 0) + 1;
                                   saveProfile(p);
-                                  sounds.play("chime");
+                                  sounds.play("purchase");
                                   refreshProfile();
                                 }
                               }}
@@ -5767,7 +5861,7 @@ export function SpaceShooterGame() {
                                       const key = `ship:${s.id}`;
                                       if (!p.ownedCosmetics.includes(key)) p.ownedCosmetics.push(key);
                                       saveProfile(p);
-                                      sounds.play("chime");
+                                      sounds.play("purchase");
                                       refreshProfile();
                                     }
                                   }}
@@ -5838,7 +5932,7 @@ export function SpaceShooterGame() {
                                     const p = loadProfile();
                                     if (!p.ownedCosmetics.includes(c.id)) p.ownedCosmetics.push(c.id);
                                     saveProfile(p);
-                                    sounds.play("chime");
+                                    sounds.play("purchase");
                                     refreshProfile();
                                   }
                                 }}
@@ -5852,44 +5946,67 @@ export function SpaceShooterGame() {
                       })}
                     </div>
                   )}
-                  {shopTab === "missions" && (
-                    <MissionsPanel refreshProfile={refreshProfile} />
-                  )}
-                  {shopTab === "achievements" && (
-                    <div className="flex flex-col gap-2 max-w-3xl mx-auto w-full">
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Achievements modal — separate surface from shop so progress
+                and spending are not conflated. */}
+            <AnimatePresence>
+              {achievementsOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex flex-col bg-black/80 backdrop-blur-md z-10"
+                >
+                  <div className="sticky top-0 z-20 bg-black/85 backdrop-blur-md border-b border-white/10 px-4 pt-4 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-5 w-5 text-accent-amber" />
+                      <h3 className="text-lg font-bold text-white">Trophies</h3>
                       <div className="text-[10px] uppercase tracking-[0.25em] text-white/50 font-bold">
-                        {profile.unlockedAchievements.length} / {ACHIEVEMENTS.length} unlocked
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {ACHIEVEMENTS.map((a) => {
-                          const owned = profile.unlockedAchievements.includes(a.id);
-                          return (
-                            <div
-                              key={a.id}
-                              className={`flex items-start gap-3 rounded-lg border p-3 ${
-                                owned ? "border-amber-500/50 bg-amber-900/20" : "border-white/10 bg-white/5 opacity-70"
-                              }`}
-                            >
-                              <div className={`flex items-center justify-center w-9 h-9 rounded font-black text-xs shrink-0 ${
-                                owned ? "bg-amber-400 text-amber-900" : "bg-slate-700 text-slate-500"
-                              }`}>
-                                {a.icon}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className={`font-bold text-sm ${owned ? "text-white" : "text-slate-400"}`}>
-                                  {a.name}
-                                </div>
-                                <div className="text-xs text-slate-400">{a.description}</div>
-                                {a.unlocksCosmeticId && owned && (
-                                  <div className="text-[10px] text-emerald-400 mt-1">Unlocked cosmetic: {a.unlocksCosmeticId}</div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                        {profile.unlockedAchievements.length} / {ACHIEVEMENTS.length}
                       </div>
                     </div>
-                  )}
+                    <button
+                      onClick={() => setAchievementsOpen(false)}
+                      className="rounded-lg bg-white/10 border border-white/20 p-1.5 text-white hover:bg-white/20 transition-colors"
+                      aria-label="Close trophies"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto w-full">
+                      {ACHIEVEMENTS.map((a) => {
+                        const owned = profile.unlockedAchievements.includes(a.id);
+                        return (
+                          <div
+                            key={a.id}
+                            className={`flex items-start gap-3 rounded-lg border p-3 ${
+                              owned ? "border-amber-500/50 bg-amber-900/20" : "border-white/10 bg-white/5 opacity-70"
+                            }`}
+                          >
+                            <div className={`flex items-center justify-center w-9 h-9 rounded font-black text-xs shrink-0 ${
+                              owned ? "bg-amber-400 text-amber-900" : "bg-slate-700 text-slate-500"
+                            }`}>
+                              {a.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className={`font-bold text-sm ${owned ? "text-white" : "text-slate-400"}`}>
+                                {a.name}
+                              </div>
+                              <div className="text-xs text-slate-400">{a.description}</div>
+                              {a.unlocksCosmeticId && owned && (
+                                <div className="text-[10px] text-emerald-400 mt-1">Unlocked cosmetic: {a.unlocksCosmeticId}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -6217,6 +6334,15 @@ export function SpaceShooterGame() {
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Shop
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setAchievementsOpen(true)}
+                  className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-5 py-3 text-sm font-bold uppercase tracking-wider text-white/80"
+                >
+                  <Trophy className="h-4 w-4" />
+                  Trophies
                 </motion.button>
               </div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-white/50">
