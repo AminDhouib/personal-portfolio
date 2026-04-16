@@ -57,7 +57,7 @@ const NEAR_MISS_POINTS = 15;
 // `armed` = scene is alive (ship visible, speed lines flowing) but the run
 // hasn't started — waiting for the player's first mouse/touch/key input.
 type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
-type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp";
+type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp" | "magnet";
 type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall";
 type BulletStyle = "sprite" | "bolt" | "plasma";
 
@@ -140,9 +140,10 @@ const POWERUP_DEFS: Record<PowerUpType, PowerUpDef> = {
   rapid: { color: "#facc15", emissive: "#854d0e", label: "Rapid Fire" },
   mega: { color: "#a78bfa", emissive: "#4c1d95", label: "Plasma" },
   warp: { color: "#22d3ee", emissive: "#0e7490", label: "Warp Drive" },
+  magnet: { color: "#10b981", emissive: "#064e3b", label: "Magnet" },
 };
 
-const POWERUP_TYPES: PowerUpType[] = ["shield", "triple", "rapid", "mega", "warp"];
+const POWERUP_TYPES: PowerUpType[] = ["shield", "triple", "rapid", "mega", "warp", "magnet"];
 
 // ---------- entity types ----------
 
@@ -175,7 +176,8 @@ interface Coin {
   id: number;
   x: number; y: number; z: number;
   rx: number; ry: number; rz: number;
-  value: number; // how many coins this token is worth (scales with combo)
+  vx: number; vy: number;   // transverse velocity (magnet pull builds this up)
+  value: number;            // how many coins this token is worth (scales with combo)
 }
 
 interface Explosion {
@@ -1347,6 +1349,7 @@ function spawnCoin(g: GameRefs, x: number, y: number, z: number, value: number) 
     id: nextId(g),
     x, y, z,
     rx: 0, ry: 0, rz: 0,
+    vx: 0, vy: 0,
     value,
   });
 }
@@ -2629,8 +2632,15 @@ function runTick(
     }
   }
 
-  // Coins: drift toward camera, get pulled by magnet, collect on proximity
-  const magnetBonusRadius = g.coinMagnetExtra;
+  // Coins: drift toward camera; when magnet is active, smoothly accelerate
+  // each coin toward the ship with a velocity-based lerp (no more "sticking").
+  // Magnet is OFF by default — the player earns it via the Magnet power-up OR
+  // the coin-magnet upgrade (g.coinMagnetExtra > 0).
+  const magnetActive = isPowerUpActive(g, "magnet") || g.coinMagnetExtra > 0;
+  const magnetStrength = isPowerUpActive(g, "magnet")
+    ? 1.8                                            // strong while power-up active
+    : 0.6 + g.coinMagnetExtra * 0.15;                // gentler from upgrade alone
+  const magnetRange = isPowerUpActive(g, "magnet") ? 6 : (2 + g.coinMagnetExtra);
   for (let i = g.coins.length - 1; i >= 0; i--) {
     const c = g.coins[i];
     c.z += 8 * step * obstacleSpeedMul;
@@ -2640,24 +2650,39 @@ function runTick(
       g.coins.splice(i, 1);
       continue;
     }
-    if (c.z > -4 && c.z < 4) {
+    // Magnet pull: build up velocity toward ship, lerp-decay if out of range
+    if (magnetActive && c.z > -6 && c.z < 3) {
       const dx = g.shipX - c.x;
       const dy = g.shipY - c.y;
-      const dist2d = Math.sqrt(dx * dx + dy * dy);
-      const pullRadius = (1.5 + magnetBonusRadius) * g.shipCoinMagnetMul;
-      if (dist2d < pullRadius) {
-        const pull = step * 6;
-        c.x += (dx / (dist2d || 1)) * pull;
-        c.y += (dy / (dist2d || 1)) * pull;
+      const d2 = Math.sqrt(dx * dx + dy * dy);
+      if (d2 < magnetRange && d2 > 0.001) {
+        // Accel proportional to how close (inverse-distance) so faraway coins
+        // catch a small tug; near coins snap in hard.
+        const proximity = 1 - d2 / magnetRange; // 0..1
+        const accel = magnetStrength * (8 + proximity * 14);
+        c.vx += (dx / d2) * accel * step;
+        c.vy += (dy / d2) * accel * step;
       }
-      const pickupR = (0.6 + magnetBonusRadius * 0.3) * g.shipCoinMagnetMul;
-      if (Math.abs(c.z - g.shipZ) < 1.2 && dist2d < pickupR) {
-        const val = Math.round(c.value * g.coinBoostMul);
-        g.coinsThisRun += val;
-        spawnScorePopup(g, c.x, c.y, c.z, val);
-        sounds.play("chime");
-        g.coins.splice(i, 1);
-      }
+    }
+    // Damp transverse velocity so coins don't overshoot wildly
+    const damp = Math.pow(0.0002, step);
+    c.vx *= damp;
+    c.vy *= damp;
+    c.x += c.vx * step;
+    c.y += c.vy * step;
+
+    // Collect whenever the coin is close in 3D — generous, gameplay feel
+    const pdx = g.shipX - c.x;
+    const pdy = g.shipY - c.y;
+    const pdz = g.shipZ - c.z;
+    const d3 = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
+    const pickupR = 0.7;
+    if (d3 < pickupR) {
+      const val = Math.round(c.value * g.coinBoostMul);
+      g.coinsThisRun += val;
+      spawnScorePopup(g, c.x, c.y, c.z, val);
+      sounds.play("chime");
+      g.coins.splice(i, 1);
     }
   }
 
@@ -3156,6 +3181,34 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
                 </mesh>
                 <mesh geometry={sphereGeo} scale={0.5}>
                   <meshBasicMaterial color={def.color} transparent opacity={0.15} wireframe />
+                </mesh>
+              </>
+            )}
+            {p.type === "magnet" && (
+              <>
+                {/* Horseshoe magnet: half-torus body + two red pole caps + two white pole tips */}
+                <mesh rotation={[0, 0, Math.PI]}>
+                  <torusGeometry args={[0.28, 0.08, 10, 20, Math.PI]} />
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.8} />
+                </mesh>
+                {/* Left pole — red */}
+                <mesh position={[-0.28, -0.06, 0]}>
+                  <boxGeometry args={[0.12, 0.12, 0.12]} />
+                  <meshToonMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+                </mesh>
+                {/* Right pole — red */}
+                <mesh position={[0.28, -0.06, 0]}>
+                  <boxGeometry args={[0.12, 0.12, 0.12]} />
+                  <meshToonMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+                </mesh>
+                {/* White tips */}
+                <mesh position={[-0.28, -0.14, 0]}>
+                  <boxGeometry args={[0.14, 0.05, 0.14]} />
+                  <meshBasicMaterial color="#ffffff" />
+                </mesh>
+                <mesh position={[0.28, -0.14, 0]}>
+                  <boxGeometry args={[0.14, 0.05, 0.14]} />
+                  <meshBasicMaterial color="#ffffff" />
                 </mesh>
               </>
             )}
@@ -4217,6 +4270,14 @@ export function SpaceShooterGame() {
       stopRecording();
     }
   }, [ui.status, isRecording, stopRecording]);
+  // Shop + settings must never cover active gameplay. Close when status leaves
+  // armed/dead so a menu opened on idle doesn't linger into a run.
+  useEffect(() => {
+    if (ui.status === "playing" || ui.status === "dying") {
+      if (shopOpen) setShopOpen(false);
+      if (settingsOpen) setSettingsOpen(false);
+    }
+  }, [ui.status, shopOpen, settingsOpen]);
   // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
   const [devFps, setDevFps] = useState(60);
   useEffect(() => {
@@ -4977,7 +5038,7 @@ export function SpaceShooterGame() {
                 <div className="flex items-center gap-2">
                   {ui.active.map((a) => {
                     const def = POWERUP_DEFS[a.type];
-                    const Icon = a.type === "shield" ? Shield : a.type === "triple" ? Crosshair : a.type === "rapid" ? Zap : a.type === "warp" ? Rocket : Target;
+                    const Icon = a.type === "shield" ? Shield : a.type === "triple" ? Crosshair : a.type === "rapid" ? Zap : a.type === "warp" ? Rocket : a.type === "magnet" ? Magnet : Target;
                     const pct = Math.min(100, (a.remainingMs / POWERUP_DURATION_MS) * 100);
                     return (
                       <div key={a.type} className="flex items-center gap-1 rounded-md bg-black/50 backdrop-blur-sm px-2 py-1 border border-white/10" style={{ borderColor: `${def.color}55` }}>
