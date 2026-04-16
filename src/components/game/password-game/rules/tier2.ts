@@ -15,6 +15,8 @@ import { asciiRule } from "./tier2-ascii";
 import { colorMixRule } from "./tier2-color-mix";
 import { diceRule } from "./tier2-dice";
 import { phoneKeypadRule } from "./tier2-phone";
+import { brailleRule } from "./tier2-braille";
+import { base64Rule } from "./tier2-base64";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -255,4 +257,6 @@ export const TIER_2_RULES: readonly RuleDef[] = [
   colorMixRule,
   diceRule,
   phoneKeypadRule,
+  brailleRule,
+  base64Rule,
 ];

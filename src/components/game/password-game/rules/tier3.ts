@@ -11,6 +11,8 @@ import { shapeCountRule } from "./tier3-shape-count";
 import { leapYearRule } from "./tier3-leap-year";
 import { bracketBalanceRule } from "./tier3-brackets";
 import { countryBordersRule } from "./tier3-borders";
+import { physicsFactRule } from "./tier3-physics";
+import { fibonacciRule } from "./tier3-fibonacci";
 
 function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
   let n = 0;
@@ -172,4 +174,6 @@ export const TIER_3_RULES: readonly RuleDef[] = [
   leapYearRule,
   bracketBalanceRule,
   countryBordersRule,
+  physicsFactRule,
+  fibonacciRule,
 ];

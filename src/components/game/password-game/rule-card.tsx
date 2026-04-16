@@ -203,6 +203,23 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     );
   }
 
+  const brailleMatch = text.match(/\[\[BRAILLE:([\u2800-\u28FF ]+)\]\]/);
+  if (brailleMatch) {
+    const before = text.slice(0, brailleMatch.index);
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <span
+          aria-label="braille"
+          className="ml-2 inline-block align-middle font-mono text-3xl leading-none text-(--foreground)"
+          style={{ letterSpacing: "0.15em" }}
+        >
+          {brailleMatch[1]}
+        </span>
+      </>
+    );
+  }
+
   const chessMatch = text.match(/\[\[CHESS:([\w-]+)\]\]/);
   if (chessMatch) {
     const id = chessMatch[1];
