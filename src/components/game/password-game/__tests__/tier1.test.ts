@@ -186,3 +186,27 @@ describe("Tier 1 — planet rule", () => {
     expect(rule.validate(makeState("xyz", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 1 — palindrome rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "palindrome")!;
+
+  it("min length is between 3 and 5", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const n = rule.params.n as number;
+      expect(n).toBeGreaterThanOrEqual(3);
+      expect(n).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("passes when password contains a palindrome of sufficient length", () => {
+    const rule = def.create(mulberry32(1));
+    const pw = "abc" + "level" + "xyz";
+    expect(rule.validate(makeState(pw, rule)).passed).toBe(true);
+  });
+
+  it("fails without a palindrome", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("abcdefg", rule)).passed).toBe(false);
+  });
+});

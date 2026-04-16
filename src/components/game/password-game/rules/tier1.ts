@@ -164,4 +164,39 @@ const planet: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName, dayOfWeek, planet];
+function hasPalindromeOfLength(s: string, n: number): boolean {
+  const lower = s.toLowerCase();
+  for (let len = n; len <= lower.length; len++) {
+    for (let i = 0; i + len <= lower.length; i++) {
+      const sub = lower.slice(i, i + len);
+      let ok = true;
+      for (let j = 0; j < Math.floor(len / 2); j++) {
+        if (sub[j] !== sub[len - 1 - j]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return true;
+    }
+  }
+  return false;
+}
+
+const palindrome: RuleDef = {
+  id: "palindrome",
+  tier: 1,
+  create(rng) {
+    const n = rangeInt(rng, 3, 5);
+    return {
+      id: "palindrome",
+      tier: 1,
+      description: `Your password must contain a palindrome of at least ${n} characters.`,
+      params: { n },
+      validate(state) {
+        return { passed: hasPalindromeOfLength(state.password, n) };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName, dayOfWeek, planet, palindrome];
