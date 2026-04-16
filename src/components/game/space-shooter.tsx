@@ -2814,7 +2814,8 @@ export function SpaceShooterGame() {
     setSubmitted(false);
     setCelebration(isPersonalBest ? "personal" : null);
     fetchLeaderboard().then(setLeaderboard);
-  }, [highScore]);
+    refreshProfile();
+  }, [highScore, refreshProfile]);
 
   // "Fly again" — reset everything to the armed state. The next mouse/touch
   // /key press starts a fresh run.
@@ -3238,9 +3239,9 @@ export function SpaceShooterGame() {
           )}
         </AnimatePresence>
 
-        {/* Armed instructions */}
+        {/* Armed instructions: first-timer sees the pulsing pill; returning player sees Play/Shop buttons */}
         <AnimatePresence>
-          {ui.status === "armed" && (
+          {ui.status === "armed" && !isReturningPlayer && (
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -3253,7 +3254,6 @@ export function SpaceShooterGame() {
                 transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                {/* Soft pulsing glow ring behind the instruction pill */}
                 <motion.span
                   className="absolute inset-0 rounded-full bg-accent-blue/15 blur-xl"
                   animate={{ scale: [1, 1.4, 1] }}
@@ -3265,6 +3265,45 @@ export function SpaceShooterGame() {
               </motion.div>
               <div className="text-xs uppercase tracking-[0.25em] text-white/60">
                 Cannons fire automatically
+              </div>
+            </motion.div>
+          )}
+          {ui.status === "armed" && isReturningPlayer && (
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.4 }}
+              className="absolute inset-x-0 bottom-6 flex flex-col items-center gap-3"
+            >
+              <div className="flex items-center gap-1.5 rounded-md bg-accent-amber/15 border border-accent-amber/40 px-2.5 py-1 text-xs font-mono text-accent-amber">
+                <CoinsIcon className="h-3.5 w-3.5" />
+                {profile.walletCoins}
+              </div>
+              <div className="flex items-center gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    const g = gameRefs.current;
+                    if (g.status === "armed") startRun(g);
+                  }}
+                  className="rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-7 py-3 text-base font-bold uppercase tracking-wider text-white shadow-lg shadow-accent-blue/30"
+                >
+                  Play
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShopOpen(true)}
+                  className="flex items-center gap-2 rounded-xl bg-accent-amber/20 border border-accent-amber/50 px-5 py-3 text-sm font-bold uppercase tracking-wider text-accent-amber"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Shop
+                </motion.button>
+              </div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/50">
+                {isTouch ? "Or drag finger" : "Or move mouse / press WASD"}
               </div>
             </motion.div>
           )}
@@ -3392,15 +3431,28 @@ export function SpaceShooterGame() {
                 </div>
               )}
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={launch}
-                className="inline-flex items-center gap-2 rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-white shadow-lg"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Fly again
-              </motion.button>
+              <div className="flex items-center gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={launch}
+                  className="inline-flex items-center gap-2 rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-white shadow-lg"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Fly again
+                </motion.button>
+                {isReturningPlayer && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShopOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent-amber/20 border border-accent-amber/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-accent-amber"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    Shop
+                  </motion.button>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
