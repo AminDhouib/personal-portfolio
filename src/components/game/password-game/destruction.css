@@ -1,0 +1,132 @@
+/*
+ * Password Game 2 — Progressive UI Destruction
+ * Controlled by --pg-chaos (0-5). Level 0 is pristine; level 5 is total chaos.
+ * All effects are additive: higher levels stack on top of lower ones.
+ */
+
+.pg-chaos-root {
+  --pg-chaos: 0;
+  --pg-shake-x: 0px;
+  --pg-shake-y: 0px;
+  --pg-hue-shift: 0deg;
+  --pg-saturate: 1;
+  position: relative;
+  transition: filter 600ms ease-out, background-color 600ms ease-out;
+  filter: hue-rotate(var(--pg-hue-shift)) saturate(var(--pg-saturate));
+}
+
+/* Level 1-2: pristine. No effects beyond baseline. */
+
+/* Level 3: hairline fractures and subtle shake on rule reveal. */
+.pg-chaos-root[data-chaos="3"] {
+  --pg-hue-shift: 3deg;
+  animation: pg-drift 12s ease-in-out infinite;
+}
+
+/* Level 4: structural damage. */
+.pg-chaos-root[data-chaos="4"] {
+  --pg-hue-shift: -6deg;
+  --pg-saturate: 0.85;
+  animation: pg-drift 8s ease-in-out infinite;
+}
+
+/* Level 5: total chaos. */
+.pg-chaos-root[data-chaos="5"] {
+  --pg-hue-shift: 12deg;
+  --pg-saturate: 0.7;
+  animation: pg-drift 4s ease-in-out infinite, pg-flicker 7s steps(1) infinite;
+}
+
+@keyframes pg-drift {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  50% { transform: translate(-1px, 1px); }
+  75% { transform: translate(1px, 1px); }
+}
+
+@keyframes pg-flicker {
+  0%, 4%, 100% { opacity: 1; filter: invert(0); }
+  2% { opacity: 0.92; filter: invert(0.05); }
+  3% { opacity: 1; filter: invert(0); }
+}
+
+/* Rule card jitter for level 4+ */
+.pg-chaos-root[data-chaos="4"] .pg-rule-card,
+.pg-chaos-root[data-chaos="5"] .pg-rule-card {
+  animation: pg-card-jitter 3.5s ease-in-out infinite;
+  animation-delay: calc(var(--pg-card-idx, 0) * -0.2s);
+}
+
+@keyframes pg-card-jitter {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  50% { transform: translate(0.5px, -0.5px) rotate(-0.15deg); }
+}
+
+/* Text glitch overlay for level 5 on rule descriptions */
+.pg-chaos-root[data-chaos="5"] .pg-rule-description {
+  position: relative;
+  animation: pg-glitch-color 4s steps(1) infinite;
+}
+
+@keyframes pg-glitch-color {
+  0%, 97%, 100% { text-shadow: none; }
+  98% { text-shadow: 1px 0 #ff003c, -1px 0 #00f0ff; }
+  99% { text-shadow: -1px 0 #ff003c, 1px 0 #00f0ff; }
+}
+
+/* Crack overlay — positioned absolute inside .pg-chaos-root. */
+.pg-cracks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 800ms ease-out;
+  mix-blend-mode: multiply;
+}
+
+.pg-chaos-root[data-chaos="3"] .pg-cracks { opacity: 0.18; }
+.pg-chaos-root[data-chaos="4"] .pg-cracks { opacity: 0.42; }
+.pg-chaos-root[data-chaos="5"] .pg-cracks { opacity: 0.75; }
+
+/* Reveal pulse — one-shot shake when a new rule appears. */
+.pg-chaos-root[data-chaos="3"] .pg-rule-card[data-new="true"] { animation: pg-pulse 280ms ease-out; }
+.pg-chaos-root[data-chaos="4"] .pg-rule-card[data-new="true"] { animation: pg-pulse-hard 320ms ease-out; }
+.pg-chaos-root[data-chaos="5"] .pg-rule-card[data-new="true"] { animation: pg-pulse-chaotic 360ms ease-out; }
+
+@keyframes pg-pulse {
+  0% { transform: translate(0, 0); }
+  30% { transform: translate(2px, -1px); }
+  60% { transform: translate(-2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes pg-pulse-hard {
+  0% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-4px, 2px) rotate(-0.5deg); }
+  40% { transform: translate(4px, -2px) rotate(0.5deg); }
+  60% { transform: translate(-2px, 1px) rotate(-0.25deg); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+
+@keyframes pg-pulse-chaotic {
+  0% { transform: translate(0, 0); filter: blur(0); }
+  15% { transform: translate(-6px, 3px); filter: blur(1px); }
+  30% { transform: translate(6px, -3px); filter: blur(1px); }
+  50% { transform: translate(-3px, -4px); filter: blur(0.5px); }
+  70% { transform: translate(4px, 2px); filter: blur(0); }
+  100% { transform: translate(0, 0); filter: blur(0); }
+}
+
+/* Container — progressive border damage via box-shadow layering. */
+.pg-chaos-root[data-chaos="4"] .pg-container {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 0, 60, 0.08),
+    inset 0 0 16px rgba(255, 0, 60, 0.06);
+}
+
+.pg-chaos-root[data-chaos="5"] .pg-container {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 0, 60, 0.2),
+    inset 0 0 24px rgba(255, 0, 60, 0.15),
+    0 0 0 1px rgba(0, 240, 255, 0.08);
+}
