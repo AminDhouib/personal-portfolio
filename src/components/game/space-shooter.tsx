@@ -225,6 +225,84 @@ interface Debris {
   ttl: number; // ms — fades out and despawns
 }
 
+// ---------- boss system ----------
+
+type BossId =
+  | "sentinel"      // tier 1 @ 1500m
+  | "drifter"       // tier 2 @ 3000m
+  | "swarm-mother"  // tier 3 @ 4500m
+  | "mirror"        // tier 4 @ 6000m
+  | "pulsar"        // tier 5 @ 7500m
+  | "harvester"     // tier 6 @ 9000m
+  | "warden"        // tier 7 @ 11000m
+  | "void-tyrant";  // tier 8 @ 13000m
+
+type BossPhase = "intro" | "fighting" | "dying" | "defeated";
+
+interface SubEntity {
+  type: "drone" | "mine" | "beam-segment";
+  position: [number, number, number];
+  velocity: [number, number, number];
+  hp: number;
+  createdAt: number;
+  ttlMs: number;
+}
+
+interface BossState {
+  id: BossId;
+  tier: number;
+  hp: number;
+  hpMax: number;
+  position: [number, number, number];
+  velocity: [number, number, number];
+  phase: BossPhase;
+  phaseStartAt: number;
+  encounterStartAt: number;
+  lastShotAt: number;
+  patternIndex: number;
+  difficultyMult: number;
+  subEntities: SubEntity[];
+  rng: () => number;
+}
+
+interface BossProjectile {
+  id: number;
+  position: [number, number, number];
+  velocity: [number, number, number];
+  radius: number;
+  color: string;
+  spawnedAt: number;
+  ttlMs: number;
+  homing: boolean;
+  shielded: boolean;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildBossSchedule(): { distance: number; bossId: BossId }[] {
+  return [
+    { distance: 1500,  bossId: "sentinel" },
+    { distance: 3000,  bossId: "drifter" },
+    { distance: 4500,  bossId: "swarm-mother" },
+    { distance: 6000,  bossId: "mirror" },
+    { distance: 7500,  bossId: "pulsar" },
+    { distance: 9000,  bossId: "harvester" },
+    { distance: 11000, bossId: "warden" },
+    { distance: 13000, bossId: "void-tyrant" },
+    { distance: 16000, bossId: "sentinel" },
+    { distance: 19000, bossId: "drifter" },
+    { distance: 22000, bossId: "swarm-mother" },
+  ];
+}
+
 interface GameRefs {
   status: GameStatus;
   score: number;
@@ -240,6 +318,15 @@ interface GameRefs {
   powerUps: PowerUp[];
   coins: Coin[];
   coinsThisRun: number;
+  // Boss system
+  boss: BossState | null;
+  bossProjectiles: BossProjectile[];
+  bossSchedule: { distance: number; bossId: BossId }[];
+  bossScheduleIdx: number;
+  bossesDefeatedThisRun: number;
+  normalSpawningPausedUntil: number;
+  devHotkeyArmed: boolean;
+  nextBossProjectileId: number;
   // Upgrade-derived run modifiers, set at startRun from profile.ownedUpgrades.
   coinMagnetExtra: number;    // world units added to coin pickup radius
   coinValueBonus: number;     // added to each coin's base value
@@ -320,6 +407,10 @@ function createRefs(): GameRefs {
     powerUps: [], coins: [], coinsThisRun: 0,
     coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
     comboWindowMs: 0, shieldDurationMs: 0,
+    boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
+    bossScheduleIdx: 0, bossesDefeatedThisRun: 0,
+    normalSpawningPausedUntil: 0, devHotkeyArmed: false,
+    nextBossProjectileId: 0,
     activePowerUps: [], debris: [], scorePopups: [],
     targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
     fogColor: new THREE.Color(initEnv.fog),
@@ -2837,6 +2928,12 @@ export function SpaceShooterGame() {
     g.powerUps.length = 0;
     g.coins.length = 0;
     g.coinsThisRun = 0;
+    g.boss = null;
+    g.bossProjectiles.length = 0;
+    g.bossSchedule = buildBossSchedule();
+    g.bossScheduleIdx = 0;
+    g.bossesDefeatedThisRun = 0;
+    g.normalSpawningPausedUntil = 0;
     g.activePowerUps.length = 0;
     g.debris.length = 0;
     g.scorePopups.length = 0;
