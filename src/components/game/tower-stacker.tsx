@@ -104,6 +104,48 @@ interface GameRefs {
   ambientCooldown: number;
 }
 
+function spawnParticle(r: GameRefs, p: Partial<Particle>) {
+  const slot = r.particles[r.particleCursor];
+  Object.assign(slot, {
+    kind: "dust" as const, x: 0, y: 0, vx: 0, vy: 0, rot: 0, rotSpeed: 0,
+    life: 0, maxLife: 1, size: 2, color: "#fff", width: undefined, height: undefined,
+    ...p,
+  });
+  r.particleCursor = (r.particleCursor + 1) % PARTICLE_MAX;
+}
+
+function updateParticles(r: GameRefs, dt: number) {
+  for (const p of r.particles) {
+    if (p.life <= 0) continue;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    if (p.kind !== "ambient") p.vy += 900 * dt;
+    p.rot += p.rotSpeed * dt;
+    p.life -= dt;
+  }
+}
+
+function drawParticles(r: GameRefs, ctx: CanvasRenderingContext2D) {
+  for (const p of r.particles) {
+    if (p.life <= 0) continue;
+    const alpha = Math.min(1, p.life / p.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (p.kind === "debris" && p.width && p.height) {
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 const BASE_BLOCK_HEIGHT = 28;
 const BASE_BLOCK_WIDTH_PX = 220;
 const BASE_BLOCK_SPEED = 260;
@@ -200,6 +242,126 @@ export default function TowerStacker() {
       isGolden: false,
     };
     r.droppingLock = false;
+  }
+
+  function dropBlock() {
+    const r = refs.current;
+    if (r.state !== "playing" || !r.activeBlock || r.droppingLock) return;
+    r.droppingLock = true;
+
+    const a = r.activeBlock;
+    const prev = r.floors[r.floors.length - 1];
+    const overlapL = Math.max(a.x, prev.x);
+    const overlapR = Math.min(a.x + a.width, prev.x + prev.width);
+    const overlapW = overlapR - overlapL;
+
+    // Complete miss
+    if (overlapW <= 0) {
+      r.shake = 0.6;
+      r.hp -= 1;
+      setUiHp(r.hp);
+      spawnParticle(r, {
+        kind: "debris",
+        x: a.x + a.width / 2, y: a.y + a.height / 2,
+        vx: a.direction * 120, vy: -40,
+        rot: 0, rotSpeed: (Math.random() - 0.5) * 6,
+        life: 3, maxLife: 3,
+        color: `hsl(${a.hue} 80% 55%)`,
+        width: a.width, height: a.height,
+      });
+      r.perfectCombo = 0;
+      setUiCombo(0);
+      r.activeBlock = null;
+      if (r.mode !== "classic" || r.hp <= 0) {
+        endRun();
+      } else {
+        setTimeout(() => spawnBlock(), 400);
+      }
+      return;
+    }
+
+    // Perfect detection
+    const offset = Math.abs(a.x - prev.x);
+    const isPerfect = offset < PERFECT_THRESHOLD;
+
+    let newWidth: number;
+    let newX: number;
+    if (isPerfect) {
+      newWidth = prev.width;
+      newX = prev.x;
+      r.perfectCombo += 1;
+      r.perfectsCount += 1;
+      r.maxCombo = Math.max(r.maxCombo, r.perfectCombo);
+      for (let i = 0; i < 12; i++) {
+        spawnParticle(r, {
+          kind: "sparkle",
+          x: a.x + a.width / 2, y: a.y,
+          vx: (Math.random() - 0.5) * 240, vy: -Math.random() * 280 - 60,
+          life: 0.9, maxLife: 0.9,
+          size: 3, color: "#fde047",
+        });
+      }
+    } else {
+      newWidth = overlapW;
+      newX = overlapL;
+      const chopLeft = a.x < prev.x;
+      const chopX = chopLeft ? a.x : prev.x + prev.width;
+      const chopW = a.width - overlapW;
+      spawnParticle(r, {
+        kind: "debris",
+        x: chopX + chopW / 2,
+        y: a.y + a.height / 2,
+        vx: (chopLeft ? -1 : 1) * 180,
+        vy: -40,
+        rot: 0, rotSpeed: (Math.random() - 0.5) * 4,
+        life: 3, maxLife: 3,
+        color: `hsl(${a.hue} 80% 55%)`,
+        width: chopW, height: a.height,
+      });
+      for (let i = 0; i < 7; i++) {
+        spawnParticle(r, {
+          kind: "dust",
+          x: newX + Math.random() * newWidth,
+          y: a.y,
+          vx: (Math.random() - 0.5) * 100, vy: -Math.random() * 120,
+          life: 0.5, maxLife: 0.5, size: 2, color: "rgba(255,255,255,0.6)",
+        });
+      }
+      r.perfectCombo = 0;
+    }
+
+    r.floors.push({
+      x: newX, y: a.y, width: newWidth, height: a.height,
+      hue: a.hue, isPerfect, isGolden: a.isGolden,
+    });
+    r.runRecord.floors.push({
+      floorIndex: r.floors.length - 1, x: newX, width: newWidth,
+      timeMs: performance.now() - r.runStartMs,
+    });
+
+    let pts = isPerfect ? 50 : 25;
+    if (isPerfect && r.perfectCombo >= 3) pts += 25 * (r.perfectCombo - 2);
+    if (a.isGolden) pts *= 2;
+    r.score += pts;
+    setUiScore(r.score);
+    setUiCombo(r.perfectCombo);
+
+    r.activeBlock = null;
+    setTimeout(() => spawnBlock(), 180);
+  }
+
+  function endRun() {
+    const r = refs.current;
+    r.state = "game-over";
+    r.runRecord.score = r.score;
+    r.runRecord.durationMs = performance.now() - r.runStartMs;
+    setUiState("game-over");
+  }
+
+  function togglePause() {
+    const r = refs.current;
+    if (r.state === "playing") { r.state = "paused"; setUiState("paused"); }
+    else if (r.state === "paused") { r.state = "playing"; setUiState("playing"); }
   }
 
   function startRun() {
@@ -310,11 +472,15 @@ export default function TowerStacker() {
         if (a.x + a.width >= w) { a.x = w - a.width; a.direction = -1; }
       }
 
+      updateParticles(r, dt);
+
       // draw floors
       for (const f of r.floors) {
         ctx.fillStyle = `hsl(${f.hue} 80% 55%)`;
         ctx.fillRect(f.x, f.y, f.width, f.height);
       }
+
+      drawParticles(r, ctx);
 
       // draw active block
       if (r.activeBlock) {
@@ -347,6 +513,20 @@ export default function TowerStacker() {
     forceTick((n) => (n + 1) % 1_000_000);
   }, []);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === "Space" || e.code === "Enter" || e.code === "ArrowDown") {
+        e.preventDefault();
+        dropBlock();
+      } else if (e.code === "KeyP" || e.code === "Escape") {
+        e.preventDefault();
+        togglePause();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -354,6 +534,7 @@ export default function TowerStacker() {
     >
       <canvas
         ref={canvasRef}
+        onPointerDown={(e) => { e.preventDefault(); dropBlock(); }}
         className="block w-full touch-none select-none"
         style={{ touchAction: "manipulation" }}
       />
