@@ -46,7 +46,7 @@ const START_INVULN_MS = 2500;
 // hasn't started — waiting for the player's first mouse/touch/key input.
 type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
 type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp";
-type ObstacleVariant = "basic" | "heavy" | "speeder";
+type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall";
 type BulletStyle = "sprite" | "bolt" | "plasma";
 
 interface Environment {
@@ -533,7 +533,7 @@ function spawnWall(g: GameRefs) {
       const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
       g.obstacles.push({
         id: nextId(g),
-        variant: "basic",
+        variant: "wall",
         x,
         // Small per-piece jitter so the rows don't look like a perfect grid
         y: rowYs[r] + (Math.random() - 0.5) * 0.4,
@@ -547,8 +547,9 @@ function spawnWall(g: GameRefs) {
         vx: 0, vy: 0,
         vz: baseSpeed,
         size: 0.8,
-        hp: 2, // slightly beefier — auto-fire clears the piece in the player's
-               // lane, but wall pieces in OTHER lanes survive by design
+        hp: 999, // wall pieces are bullet-immune (variant === "wall" skips
+                 // the collision), so HP is a no-op — high value avoids any
+                 // edge case where despawn logic might read it
         shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
       });
     }
@@ -1547,27 +1548,30 @@ function runTick(
       continue;
     }
 
-    // Bullet vs obstacle
-    for (let j = g.bullets.length - 1; j >= 0; j--) {
-      const b = g.bullets[j];
-      const dx = b.x - o.x;
-      const dy = b.y - o.y;
-      const dz = b.z - o.z;
-      const r = o.size + b.size + 0.18;
-      if (dx * dx + dy * dy + dz * dz < r * r) {
-        o.hp -= b.damage;
-        b.hp -= 1;
-        spawnExplosion(g, b.x, b.y, b.z, b.color, 240, 0.18);
-        if (b.hp <= 0) g.bullets.splice(j, 1);
-        if (o.hp <= 0) {
-          spawnExplosion(g, o.x, o.y, o.z, "#fb923c", 600, 0.35);
-          g.obstacles.splice(i, 1);
-          const points = 12 + Math.floor(o.size * 8);
-          g.score += points;
-          g.kills += 1;
-          spawnScorePopup(g, o.x, o.y, o.z, points);
-          sounds.play("boom");
-          break;
+    // Bullet vs obstacle. Wall-variant pieces are dodge-only — they ignore
+    // bullets entirely so the player can't just auto-fire through a wall.
+    if (o.variant !== "wall") {
+      for (let j = g.bullets.length - 1; j >= 0; j--) {
+        const b = g.bullets[j];
+        const dx = b.x - o.x;
+        const dy = b.y - o.y;
+        const dz = b.z - o.z;
+        const r = o.size + b.size + 0.18;
+        if (dx * dx + dy * dy + dz * dz < r * r) {
+          o.hp -= b.damage;
+          b.hp -= 1;
+          spawnExplosion(g, b.x, b.y, b.z, b.color, 240, 0.18);
+          if (b.hp <= 0) g.bullets.splice(j, 1);
+          if (o.hp <= 0) {
+            spawnExplosion(g, o.x, o.y, o.z, "#fb923c", 600, 0.35);
+            g.obstacles.splice(i, 1);
+            const points = 12 + Math.floor(o.size * 8);
+            g.score += points;
+            g.kills += 1;
+            spawnScorePopup(g, o.x, o.y, o.z, points);
+            sounds.play("boom");
+            break;
+          }
         }
       }
     }
@@ -1844,10 +1848,16 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     emissive: "#92400e",
     emissiveIntensity: 0.55,
   }), []);
+  const wallMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: "#991b1b",          // deep crimson — reads as "hazard / do not shoot"
+    emissive: "#dc2626",
+    emissiveIntensity: 0.6,
+  }), []);
   useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
   useEffect(() => () => baseMat.dispose(), [baseMat]);
   useEffect(() => () => heavyMat.dispose(), [heavyMat]);
   useEffect(() => () => speederMat.dispose(), [speederMat]);
+  useEffect(() => () => wallMat.dispose(), [wallMat]);
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -1863,7 +1873,10 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
   });
 
   const matFor = (v: ObstacleVariant) =>
-    v === "heavy" ? heavyMat : v === "speeder" ? speederMat : baseMat;
+    v === "heavy" ? heavyMat
+    : v === "speeder" ? speederMat
+    : v === "wall" ? wallMat
+    : baseMat;
 
   return (
     <group>
