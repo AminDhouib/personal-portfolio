@@ -68,3 +68,47 @@ describe("Tier 2 — math equation rule", () => {
     expect(rule.validate(makeState("abc", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 2 — Roman numeral range rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "roman-range")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params include numeric min/max bounds with min < max", () => {
+    const rule = def.create(mulberry32(5));
+    const min = rule.params.min as number;
+    const max = rule.params.max as number;
+    expect(min).toBeLessThan(max);
+    expect(min).toBeGreaterThanOrEqual(1);
+    expect(max).toBeLessThanOrEqual(100);
+  });
+
+  it("passes with a valid Roman numeral in the range", () => {
+    const rule = def.create(mulberry32(5));
+    const min = rule.params.min as number;
+    const max = rule.params.max as number;
+    const mid = Math.floor((min + max) / 2);
+    const numeral = toRomanForTest(mid);
+    expect(rule.validate(makeState(`123${numeral}456`, rule)).passed).toBe(true);
+  });
+
+  it("fails with a numeral outside the range or no numeral at all", () => {
+    const rule = def.create(mulberry32(5));
+    expect(rule.validate(makeState("no roman here", rule)).passed).toBe(false);
+  });
+});
+
+function toRomanForTest(n: number): string {
+  const table: [number, string][] = [
+    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let out = "";
+  let rem = n;
+  for (const [v, s] of table) {
+    while (rem >= v) { out += s; rem -= v; }
+  }
+  return out;
+}

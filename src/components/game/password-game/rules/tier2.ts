@@ -57,4 +57,58 @@ const mathEquation: RuleDef = {
   },
 };
 
-export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation];
+const ROMAN_TABLE: readonly [number, string][] = [
+  [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+  [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+];
+
+function toRoman(n: number): string {
+  let out = "";
+  let rem = n;
+  for (const [v, s] of ROMAN_TABLE) {
+    while (rem >= v) { out += s; rem -= v; }
+  }
+  return out;
+}
+
+function fromRoman(s: string): number {
+  const map: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  let total = 0;
+  let prev = 0;
+  for (let i = s.length - 1; i >= 0; i--) {
+    const v = map[s[i]] ?? 0;
+    if (v === 0) return NaN;
+    if (v < prev) total -= v; else total += v;
+    prev = v;
+  }
+  return total;
+}
+
+const romanRange: RuleDef = {
+  id: "roman-range",
+  tier: 2,
+  create(rng) {
+    const width = rangeInt(rng, 10, 30);
+    const min = rangeInt(rng, 1, 100 - width);
+    const max = min + width;
+    return {
+      id: "roman-range",
+      tier: 2,
+      description: `Your password must include a Roman numeral whose value is between ${min} and ${max} (inclusive).`,
+      params: { min, max, toRomanExample: toRoman((min + max) >> 1) },
+      validate(state) {
+        const matches = state.password.match(/[IVXLCDM]+/gi) ?? [];
+        for (const raw of matches) {
+          const upper = raw.toUpperCase();
+          const value = fromRoman(upper);
+          if (Number.isFinite(value) && value >= min && value <= max && toRoman(value) === upper) {
+            return { passed: true };
+          }
+        }
+        return { passed: false };
+      },
+    };
+  },
+};
+
+export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange];
