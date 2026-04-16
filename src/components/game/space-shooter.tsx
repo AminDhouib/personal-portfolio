@@ -390,6 +390,9 @@ function elapsedSeconds(g: GameRefs): number {
   return (performance.now() - g.startedAt) / 1000;
 }
 
+// NOTE: "wall" is intentionally excluded from this list. Wall pieces are
+// bullet-immune dodge hazards and are only created by spawnWall() as a
+// time-triggered event — never by the random spawn path.
 function unlockedVariants(seconds: number): ObstacleVariant[] {
   const list: ObstacleVariant[] = ["basic"];
   if (seconds > 25) list.push("heavy");
