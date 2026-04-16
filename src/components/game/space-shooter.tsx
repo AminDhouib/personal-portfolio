@@ -10,6 +10,10 @@ import {
   Volume2, VolumeX, Crosshair, Zap, Target,
   Maximize2, Minimize2, Pause, Play,
 } from "lucide-react";
+import {
+  addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted,
+} from "./profile";
+import { UPGRADES, upgradeById } from "./shop-data";
 
 // ---------- constants ----------
 
@@ -353,6 +357,24 @@ function startRun(g: GameRefs): boolean {
   // First wall at least 20s into the run — the player needs warm-up time
   // before facing a forced-positioning challenge.
   g.nextWallAt = now + 20_000;
+
+  // Apply purchased upgrades as per-run modifiers. All lookups happen here —
+  // per-frame logic reads these fields, never the profile/catalog directly.
+  const profile = loadProfile();
+  const getLevel = (id: string) => profile.ownedUpgrades[id] ?? 0;
+  const magnetDef = upgradeById("coin-magnet");
+  const valueDef = upgradeById("coin-value");
+  const scoreDef = upgradeById("score-multiplier");
+  const comboDef = upgradeById("combo-window");
+  const shieldDef = upgradeById("shield-duration");
+  // coin-magnet: base 1.0 at level 0 → 3.0 at level 5, add the delta to base 0
+  g.coinMagnetExtra = magnetDef ? magnetDef.effectAtLevel(getLevel("coin-magnet")) - 1 : 0;
+  // coin-value: base 1 → up to 6, so delta goes above baseline coin.value
+  g.coinValueBonus = valueDef ? valueDef.effectAtLevel(getLevel("coin-value")) - 1 : 0;
+  g.scoreMultiplier = scoreDef ? scoreDef.effectAtLevel(getLevel("score-multiplier")) : 1;
+  g.comboWindowMs = comboDef ? comboDef.effectAtLevel(getLevel("combo-window")) * 1000 : 0;
+  g.shieldDurationMs = shieldDef ? shieldDef.effectAtLevel(getLevel("shield-duration")) : 0;
+
   sounds.startGameplayMusic();
   return true;
 }
@@ -394,7 +416,11 @@ function envColors(env: Environment) {
 
 function activatePowerUp(g: GameRefs, t: PowerUpType): void {
   const now = performance.now();
-  const expiresAt = now + POWERUP_DURATION_MS;
+  // Shield duration is upgradable; other power-ups use the base duration.
+  const durationMs = (t === "shield" && g.shieldDurationMs > 0)
+    ? g.shieldDurationMs
+    : POWERUP_DURATION_MS;
+  const expiresAt = now + durationMs;
   const existing = g.activePowerUps.find((p) => p.type === t);
   if (existing) {
     existing.expiresAt = expiresAt;
@@ -1523,8 +1549,9 @@ function runTick(
     if (g.activePowerUps[i].expiresAt <= now) g.activePowerUps.splice(i, 1);
   }
 
-  // Combo decay: if no new kill within COMBO_WINDOW_MS, drop to 1
-  if (g.combo > 1 && now - g.comboLastAt > COMBO_WINDOW_MS) {
+  // Combo decay: if no new kill within the effective window (upgrade overrides base), drop to 1
+  const effectiveComboWindow = g.comboWindowMs > 0 ? g.comboWindowMs : COMBO_WINDOW_MS;
+  if (g.combo > 1 && now - g.comboLastAt > effectiveComboWindow) {
     g.combo = 1;
   }
 
@@ -2752,7 +2779,12 @@ export function SpaceShooterGame() {
     // Losing jingle was played at collision; give it ~1s before crossfading
     // into the leaderboard track so the two don't talk over each other.
     setTimeout(() => sounds.startLeaderboardMusic(), 1100);
-    const final = Math.floor(g.score);
+    // Persist everything that compounds across runs.
+    addCoins(g.coinsThisRun);
+    addRunStats({ asteroidsDestroyed: g.kills, distance: Math.floor(g.distance) });
+    incrementRunsPlayed();
+    markFirstRunCompleted();
+    const final = Math.floor(g.score * g.scoreMultiplier);
     // Compare against the current state value synchronously so the celebration
     // flag is correct in the same render cycle.
     const isPersonalBest = final > highScore && final > 0;
