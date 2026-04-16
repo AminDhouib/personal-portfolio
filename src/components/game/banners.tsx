@@ -239,17 +239,17 @@ function HextrisBanner() {
   const INDIGO = "#6366f1";
   const GREEN = "#22c55e";
 
-  // Cycle length per face — short enough that blocks feel like they're
-  // streaming in rather than pausing. Three faces stagger by CYCLE/3 so
-  // something is always mid-fall somewhere on the board.
-  const CYCLE = 3.0;
+  // One full drop cycle: fall → stack → match → clear → buffer → hex-rotate.
+  // All three active faces fire in sync so the rotation happens on a clean
+  // empty board, matching the real game's "rotate between moves" rhythm.
+  const CYCLE = 4.2;
 
-  // Three active faces run the same loop with a stagger. Faces not listed
-  // stay empty — the real game rarely has all 6 faces firing at once either.
+  // Three active faces drop together (no stagger) so they all clear at the
+  // same moment and the rotation snap happens over a blank hex.
   const faces = [
     { angleDeg: -90, color: PINK, delay: 0 },
-    { angleDeg: 30, color: GREEN, delay: CYCLE / 3 },
-    { angleDeg: 150, color: INDIGO, delay: (2 * CYCLE) / 3 },
+    { angleDeg: 30, color: GREEN, delay: 0 },
+    { angleDeg: 150, color: INDIGO, delay: 0 },
   ];
   // Extra one-off filler blocks on the remaining faces — these never match
   // (stay at slot 0) so the hex doesn't look half-empty between clears.
@@ -277,15 +277,41 @@ function HextrisBanner() {
   const START_R = 55; // well past the outer hex apothem
 
   // Keyframe times normalized to CYCLE. Three blocks fall sequentially,
-  // land in order, then pop+clear together at the end. Scale is held at 1
-  // through the rest period (t_landed → t_rest_end) so earlier-landing
-  // blocks don't slowly grow while waiting for the third to arrive —
-  // only a tiny 1→1.12 pop fires at t_pop.
-  const t_release = [0.001, 0.22, 0.44];
-  const t_landed = [0.22, 0.44, 0.64];
-  const t_rest_end = 0.70;
-  const t_pop = 0.73;
-  const t_clear = 0.82;
+  // land in order, pop+clear, then a buffer + hex rotation closes the cycle.
+  //   drops (0.00 → 0.60)  clear (0.60 → 0.70)  buffer+rotation (0.70 → 1.0)
+  const t_release = [0.001, 0.18, 0.36];
+  const t_landed = [0.18, 0.36, 0.54];
+  const t_rest_end = 0.58;
+  const t_pop = 0.62;
+  const t_clear = 0.70;
+
+  // Rotation: once per CYCLE the whole canvas snaps 60° (6 steps = one full
+  // revolution, so the outer animation cycle = 6·CYCLE seconds and loops
+  // seamlessly at 360° = 0°). Inside each sub-cycle the hex holds still
+  // until the drops clear (t < 0.70), then does an overshoot-and-snap to
+  // the next step during the buffer.
+  const ROT_STEPS = 6;
+  const rotDuration = CYCLE * ROT_STEPS;
+  const rotKeyframes: number[] = [0];
+  const rotTimes: number[] = [0];
+  for (let k = 0; k < ROT_STEPS; k++) {
+    const base = k * 60;
+    const next = (k + 1) * 60;
+    const subStart = k / ROT_STEPS;
+    const subLen = 1 / ROT_STEPS;
+    // Hold at base through the drop+clear phases
+    rotKeyframes.push(base);
+    rotTimes.push(subStart + 0.70 * subLen);
+    // Overshoot past next by 12°
+    rotKeyframes.push(next + 12);
+    rotTimes.push(subStart + 0.88 * subLen);
+    // Snap back to next
+    rotKeyframes.push(next);
+    rotTimes.push(subStart + 0.95 * subLen);
+    // Settle at next for the remainder of this sub-cycle
+    rotKeyframes.push(next);
+    rotTimes.push(subStart + subLen);
+  }
 
   // All animated geometry lives inside the same SVG viewBox so a block's
   // position is expressed in viewBox units — aspect-ratio-invariant. The
@@ -371,6 +397,18 @@ function HextrisBanner() {
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="xMidYMid meet"
       >
+        {/* Rotating canvas — the outer hex, inner hex, blocks, fillers and
+            pop texts are all children so the whole board snaps 60° between
+            drop cycles (matching the real game's rotate-between-moves). */}
+        <motion.g
+          animate={{ rotate: rotKeyframes }}
+          transition={{
+            duration: rotDuration,
+            repeat: Infinity,
+            times: rotTimes,
+            ease: "easeOut",
+          }}
+        >
         {/* Outer hex boundary — flat-top orientation (flat edges at top/
             bottom, vertex points on left and right). Matches the real game
             layout so blocks sit ON faces at -90/-30/30/90/150/210. Outer
@@ -456,6 +494,7 @@ function HextrisBanner() {
             </motion.text>
           );
         })}
+        </motion.g>
       </svg>
     </div>
   );
