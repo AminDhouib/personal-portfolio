@@ -145,4 +145,23 @@ const dayOfWeek: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName, dayOfWeek];
+const PLANETS = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
+
+const planet: RuleDef = {
+  id: "planet",
+  tier: 1,
+  create() {
+    return {
+      id: "planet",
+      tier: 1,
+      description: "Your password must include the name of a planet.",
+      params: {},
+      validate(state) {
+        const lower = state.password.toLowerCase();
+        return { passed: PLANETS.some((p) => lower.includes(p)) };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName, dayOfWeek, planet];

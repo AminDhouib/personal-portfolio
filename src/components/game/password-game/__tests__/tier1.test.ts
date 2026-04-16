@@ -172,3 +172,17 @@ describe("Tier 1 — day of week rule", () => {
     expect(rule.validate(makeState("Abc123!", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 1 — planet rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "planet")!;
+
+  it("passes with Earth, Mars, etc.", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("Abc123earth!", rule)).passed).toBe(true);
+  });
+
+  it("fails without a planet name", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("xyz", rule)).passed).toBe(false);
+  });
+});
