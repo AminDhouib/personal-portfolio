@@ -3703,9 +3703,24 @@ export function SpaceShooterGame() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
+  const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
+  });
   const [profile, setProfile] = useState(() => loadProfile());
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
   const isReturningPlayer = profile.firstRunCompleted;
+  // Persist "first boss seen" flag when boss enters fighting phase
+  useEffect(() => {
+    if (firstBossSeen) return;
+    const b = gameRefs.current.boss;
+    if (b && b.phase === "fighting") {
+      try {
+        window.localStorage.setItem("orbital-dodge-first-boss-seen", "1");
+      } catch { /* noop */ }
+      setFirstBossSeen(true);
+    }
+  }, [tick, firstBossSeen]);
   const buyUpgrade = useCallback((id: string) => {
     const def = upgradeById(id as "coin-magnet" | "coin-value" | "score-multiplier" | "combo-window" | "shield-duration");
     if (!def) return;
@@ -4269,6 +4284,11 @@ export function SpaceShooterGame() {
             <div className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
               {BOSS_DISPLAY_NAMES[gameRefs.current.boss.id]}
             </div>
+            {!firstBossSeen && (
+              <div className="mt-2 text-xs text-slate-300 max-w-xs text-center">
+                Bosses interrupt normal flight. Shoot them to progress. Dodge their attacks.
+              </div>
+            )}
           </div>
         )}
         {/* Boss HP bar */}
