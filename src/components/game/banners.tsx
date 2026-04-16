@@ -239,15 +239,17 @@ function HextrisBanner() {
   const INDIGO = "#6366f1";
   const GREEN = "#22c55e";
 
-  // Cycle length per face, in seconds: fall-stack-match-clear-empty-loop.
-  const CYCLE = 4.8;
+  // Cycle length per face — short enough that blocks feel like they're
+  // streaming in rather than pausing. Three faces stagger by CYCLE/3 so
+  // something is always mid-fall somewhere on the board.
+  const CYCLE = 3.0;
 
   // Three active faces run the same loop with a stagger. Faces not listed
   // stay empty — the real game rarely has all 6 faces firing at once either.
   const faces = [
     { angleDeg: -90, color: PINK, delay: 0 },
-    { angleDeg: 30, color: GREEN, delay: 1.6 },
-    { angleDeg: 150, color: INDIGO, delay: 3.2 },
+    { angleDeg: 30, color: GREEN, delay: CYCLE / 3 },
+    { angleDeg: 150, color: INDIGO, delay: (2 * CYCLE) / 3 },
   ];
   // Extra one-off filler blocks on the remaining faces — these never match
   // (stay at slot 0) so the hex doesn't look half-empty between clears.
@@ -257,28 +259,31 @@ function HextrisBanner() {
     { angleDeg: 210, color: GREEN },
   ];
 
-  // Inner hex is flat-top (flat edges at top and bottom, vertex pointing
-  // right/left). Its vertex-radius is 14, so its apothem (distance from
-  // center to face midpoint) is 14·cos(30°) ≈ 12.12. Blocks sit flush on
-  // the apothem — slot 0 is the block closest to the face, slot 2 the
-  // outermost.
-  const SLOT_R = [16, 23, 30]; // apothem + N·blockHeight
-  const START_R = 52; // past the outer hex apothem (~40)
-  const BLOCK_W = 22;
-  const BLOCK_H = 7;
+  // Inner hex is flat-top. For a regular hex the edge length equals the
+  // vertex radius, so an inner hex with vertex-radius 14 has 14-unit edges.
+  // Blocks are sized to match that edge length so a stack reads as column
+  // of three blocks locked to the face, like the real game.
+  const INNER_R = 14;
+  const APOTHEM = INNER_R * Math.cos(Math.PI / 6); // ≈ 12.12
+  const BLOCK_W = INNER_R; // = face edge length
+  const BLOCK_H = 6.5;
+  // Slot 0 centers half-a-block out from the face; each next slot stacks
+  // one block-height further out.
+  const SLOT_R = [
+    APOTHEM + BLOCK_H / 2,
+    APOTHEM + BLOCK_H / 2 + BLOCK_H,
+    APOTHEM + BLOCK_H / 2 + 2 * BLOCK_H,
+  ];
+  const START_R = 55; // well past the outer hex apothem
 
-  // Normalized (0-1) keyframe times within one CYCLE:
-  //   0: waiting (pre-release)   release → fall begins
-  //   landed: block rests on its slot
-  //   match: hold
-  //   pop: face clears, scale spike
-  //   clear: opacity 0
-  //   1: loop boundary
-  const t_release = [0.00, 0.16, 0.32];
-  const t_landed = [0.10, 0.26, 0.42];
-  const t_match = 0.70;
-  const t_pop = 0.74;
-  const t_clear = 0.80;
+  // Keyframe times normalized to CYCLE (3s). No resting/dead time — the
+  // third block lands and the face clears immediately, so blocks feel like
+  // they're streaming through rather than alighting and pausing.
+  //   release → fall → land → (3rd block lands = match pop) → clear → loop
+  const t_release = [0.00, 0.22, 0.44];
+  const t_landed = [0.22, 0.44, 0.66];
+  const t_pop = 0.72;
+  const t_clear = 0.82;
 
   // All animated geometry lives inside the same SVG viewBox so a block's
   // position is expressed in viewBox units — aspect-ratio-invariant. The
@@ -304,17 +309,17 @@ function HextrisBanner() {
       <motion.g
         key={key}
         animate={{
-          x: [startX, startX, landX, landX, landX, landX, startX],
-          y: [startY, startY, landY, landY, landY, landY, startY],
-          opacity: [0, 0, 1, 1, 1, 0, 0],
-          scale: [1, 1, 1, 1, 1.25, 0.4, 1],
+          x: [startX, startX, landX, landX, landX, startX],
+          y: [startY, startY, landY, landY, landY, startY],
+          opacity: [0, 0, 1, 1, 0, 0],
+          scale: [1, 1, 1, 1.3, 0.3, 1],
         }}
         transition={{
           duration: CYCLE,
           repeat: Infinity,
           delay,
           ease: "linear",
-          times: [0, t_release[slot], t_landed[slot], t_match, t_pop, t_clear, 1],
+          times: [0, t_release[slot], t_landed[slot], t_pop, t_clear, 1],
         }}
       >
         <rect
