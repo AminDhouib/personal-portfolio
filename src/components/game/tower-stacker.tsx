@@ -460,6 +460,37 @@ function drawBlockWithTheme(
   }
 }
 
+function drawGhost(
+  ctx: CanvasRenderingContext2D,
+  r: GameRefs,
+  w: number,
+  h: number,
+  onPass: () => void,
+) {
+  if (!r.ghost || r.ghost.floors.length === 0 || r.mode === "speedrun") return;
+  const elapsed = performance.now() - r.runStartMs;
+  const visible = r.ghost.floors.filter((f) => f.timeMs <= elapsed);
+  if (visible.length === 0) return;
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  const stripX = 8;
+  const stripW = 32;
+  const totalFloors = r.ghost.floors.length;
+  const towerH = totalFloors * BASE_BLOCK_HEIGHT;
+  const scale = Math.min(1, (h - 100) / Math.max(1, towerH));
+  for (const f of visible) {
+    const yPos = h - 80 - f.floorIndex * BASE_BLOCK_HEIGHT * scale;
+    ctx.fillStyle = `hsl(${(HUE_BASE + f.floorIndex * HUE_STEP) % 360} 60% 55%)`;
+    ctx.fillRect(stripX, yPos, stripW, BASE_BLOCK_HEIGHT * scale * 0.95);
+  }
+  ctx.restore();
+
+  if (!r.ghostPassed && r.floors.length - 1 > totalFloors) {
+    r.ghostPassed = true;
+    onPass();
+  }
+}
+
 function fireMilestone(r: GameRefs, floor: number) {
   if (floor === 40) { r.bannerText = "LIGHTNING"; r.bannerTime = 0.8; r.shake = 0.5; }
   if (floor === 60) { r.bannerText = "RADIANCE"; r.bannerTime = 0.8; }
@@ -966,6 +997,11 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
     } else {
       r.prng = Math.random;
     }
+    try {
+      const raw = localStorage.getItem(LS_PREFIX + "ghost");
+      r.ghost = raw ? JSON.parse(raw) as RunRecord : null;
+    } catch { r.ghost = null; }
+    r.ghostPassed = false;
     const { w, h } = viewportRef.current;
     r.state = "playing";
     r.score = 0;
@@ -1171,6 +1207,16 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
         if (fc >= 40 && fc < 45 && r.bannerText === "LIGHTNING") drawLightning(ctx, w, h);
         if (fc >= 60 && fc < 65 && r.bannerText === "RADIANCE") drawRadiance(ctx, w, h);
         if (fc >= 80 && fc < 85 && r.bannerText === "RIFT") drawRift(ctx, w, h);
+      }
+
+      if (r.state === "playing") {
+        drawGhost(ctx, r, w, h, () => {
+          r.bannerText = "GHOST PASSED";
+          r.bannerTime = 2;
+          playTone(523, "sine", 0.2);
+          setTimeout(() => playTone(659, "sine", 0.25), 100);
+          setTimeout(() => playTone(784, "sine", 0.4), 250);
+        });
       }
 
       if (r.perfectCombo >= 30) {
