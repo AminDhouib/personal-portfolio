@@ -486,7 +486,7 @@ function pickWallGapX(playerX: number, arenaW: number): number {
   const half = arenaW / 2;
   // Try candidates; pick the one farthest from the player, subject to the
   // minimum-distance rule.
-  let best = -playerX; // mirror is always guaranteed far
+  let best = -playerX; // mirror is usually far; safety fallback below handles center-spawn
   let bestDist = Math.abs(best - playerX);
   for (let i = 0; i < 5; i++) {
     const candidate = (Math.random() - 0.5) * (arenaW - 2);
@@ -509,15 +509,23 @@ function pickWallGapX(playerX: number, arenaW: number): number {
 // Z with a single gap. Forces the player to move into the gap — breaks the
 // "camp at the edge and let auto-fire clear everything" exploit.
 function spawnWall(g: GameRefs) {
-  const GAP_WIDTH = 2.5;          // world units — about one ship-radius each side of center
   const WALL_COUNT = 6;           // 6 asteroid slots evenly spaced across ARENA_W
   const gapX = pickWallGapX(g.shipX, ARENA_W);
   const slotWidth = ARENA_W / WALL_COUNT;
   const baseSpeed = 10 + difficulty(g) * 3;
+  // Find the single slot index whose center is closest to gapX — that's the
+  // one we skip. This guarantees exactly one slot missing per wall so the
+  // gap width is predictable (~= slotWidth = 1.5 world units).
+  let gapIndex = 0;
+  let gapBestDist = Infinity;
   for (let i = 0; i < WALL_COUNT; i++) {
     const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
-    // Skip slots that fall inside the gap zone
-    if (Math.abs(x - gapX) < GAP_WIDTH / 2 + 0.4) continue;
+    const d = Math.abs(x - gapX);
+    if (d < gapBestDist) { gapBestDist = d; gapIndex = i; }
+  }
+  for (let i = 0; i < WALL_COUNT; i++) {
+    if (i === gapIndex) continue;
+    const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
     g.obstacles.push({
       id: nextId(g),
       variant: "basic",
@@ -533,7 +541,9 @@ function spawnWall(g: GameRefs) {
       vx: 0, vy: 0, // walls stay in-line; no drift, they must remain a wall
       vz: baseSpeed,
       size: 0.8,
-      hp: 2, // walls are beefier so auto-fire can't clear one piece before it arrives
+      hp: 2, // slightly beefier — auto-fire clears the piece in the player's
+             // lane, but wall pieces in OTHER lanes survive by design (the
+             // player must relocate to the gap, not camp-and-shoot)
       shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
     });
   }
