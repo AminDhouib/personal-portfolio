@@ -1,6 +1,7 @@
 "use client";
 
 import { CoinDigits } from "./Digits";
+import { dsFont } from "./ds-font";
 
 const ASSETS = "/games/super-voltorb-flip/sprites";
 
@@ -29,6 +30,7 @@ export function CurrentScoreboard({
     >
       <div
         aria-label={`${label[0]} ${label[1]}`}
+        className={dsFont.className}
         style={{
           position: "absolute",
           left: 14,
@@ -40,13 +42,9 @@ export function CurrentScoreboard({
           justifyContent: "center",
           alignItems: "center",
           textAlign: "center",
-          fontFamily:
-            "'Courier New', ui-monospace, Menlo, Consolas, monospace",
-          fontWeight: 700,
-          fontSize: 9,
+          fontSize: 7,
           lineHeight: "10px",
           color: "#0a0a0a",
-          letterSpacing: "-0.25px",
           userSelect: "none",
         }}
       >

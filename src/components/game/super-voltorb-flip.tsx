@@ -215,14 +215,16 @@ function GameScreen({
           />
         </div>
 
-        <DsCanvas
-          state={state}
-          scale={2}
-          onTileClick={handleTileClick}
-          onMemoToggle={() => dispatch({ type: "toggleMemo" })}
-          onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
-          onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
-        />
+        <div className="relative z-10">
+          <DsCanvas
+            state={state}
+            scale={2}
+            onTileClick={handleTileClick}
+            onMemoToggle={() => dispatch({ type: "toggleMemo" })}
+            onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
+            onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
+          />
+        </div>
 
         {(state.phase === "won" || state.phase === "lost") && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
