@@ -29,7 +29,7 @@ Only modifies `src/components/game/space-shooter.tsx`. No new files.
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Extend `GameRefs` interface**
+- [x] **Step 1: Extend `GameRefs` interface**
 
 Find the `GameRefs` interface. Near `distance: number;` add:
 
@@ -40,7 +40,7 @@ Find the `GameRefs` interface. Near `distance: number;` add:
   comboPeak: number;      // highest combo this run (for leaderboard stat)
 ```
 
-- [ ] **Step 2: Initialize in `createRefs()`**
+- [x] **Step 2: Initialize in `createRefs()`**
 
 Inside the return object of `createRefs()`, near `distance: 0,`:
 
@@ -51,7 +51,7 @@ Inside the return object of `createRefs()`, near `distance: 0,`:
     comboPeak: 1,
 ```
 
-- [ ] **Step 3: Reset in `launch()` (Fly Again)**
+- [x] **Step 3: Reset in `launch()` (Fly Again)**
 
 Find the block in `launch` that resets `g.score = 0;` and add:
 
@@ -62,7 +62,7 @@ Find the block in `launch` that resets `g.score = 0;` and add:
     g.comboPeak = 1;
 ```
 
-- [ ] **Step 4: Type check**
+- [x] **Step 4: Type check**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx tsc --noEmit
@@ -70,7 +70,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: no errors mentioning `space-shooter.tsx`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -86,7 +86,7 @@ git commit -m "chore(orbital-dodge): add combo state to GameRefs (no behaviour y
 
 **Why:** User explicitly wanted time-based decay (not hit-based): "breaks instead as time goes away, because you can only get hit once (except when invulnerable)". Each combo increment extends a 4-second window. If no new kill within the window, combo collapses to 1.
 
-- [ ] **Step 1: Add module-level constant**
+- [x] **Step 1: Add module-level constant**
 
 Near the top of the module with other constants (`MAX_OBSTACLES`, `SPAWN_Z`, etc.):
 
@@ -94,7 +94,7 @@ Near the top of the module with other constants (`MAX_OBSTACLES`, `SPAWN_Z`, etc
 const COMBO_WINDOW_MS = 4000; // combo resets if no new kill within this window
 ```
 
-- [ ] **Step 2: Add decay logic in `runTick`**
+- [x] **Step 2: Add decay logic in `runTick`**
 
 In `runTick`, find the block that expires power-ups (it starts `// Expire active power-ups`). Immediately after that block, add:
 
@@ -105,7 +105,7 @@ In `runTick`, find the block that expires power-ups (it starts `// Expire active
   }
 ```
 
-- [ ] **Step 3: Lint + tsc**
+- [x] **Step 3: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
@@ -113,7 +113,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -129,7 +129,7 @@ git commit -m "feat(orbital-dodge): combo decays after 4s without a kill"
 
 **Why:** The reward for a high combo is score — each kill's base points is multiplied by the current combo. Coin drops (shipped in Plan 2) will use the same multiplier.
 
-- [ ] **Step 1: Update the asteroid-kill block in `runTick`**
+- [x] **Step 1: Update the asteroid-kill block in `runTick`**
 
 Find the block where an obstacle's `hp` drops to zero (inside the bullet-vs-obstacle collision loop). It currently looks like:
 
@@ -168,7 +168,7 @@ Replace with:
         }
 ```
 
-- [ ] **Step 2: Add `comboMultiplier` helper**
+- [x] **Step 2: Add `comboMultiplier` helper**
 
 At module scope near other helpers (e.g., next to `difficulty`):
 
@@ -185,7 +185,7 @@ function comboMultiplier(combo: number): number {
 }
 ```
 
-- [ ] **Step 3: Lint + tsc**
+- [x] **Step 3: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
@@ -193,7 +193,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -211,7 +211,7 @@ git commit -m "feat(orbital-dodge): kills scale score by combo multiplier (1x/1.
 
 Simplest correct approach: on obstacle despawn (Z > DESPAWN_Z), check if its closest-approach distance to the ship was within a "near-miss" radius and outside the collision radius. Track closest approach on the obstacle itself.
 
-- [ ] **Step 1: Add `closestApproach` tracking to `Obstacle`**
+- [x] **Step 1: Add `closestApproach` tracking to `Obstacle`**
 
 Extend the `Obstacle` interface. Near the existing `hp: number;`:
 
@@ -221,7 +221,7 @@ Extend the `Obstacle` interface. Near the existing `hp: number;`:
   brushed: boolean;         // true if the obstacle came within near-miss range but not collision
 ```
 
-- [ ] **Step 2: Initialize in `spawnObstacle`**
+- [x] **Step 2: Initialize in `spawnObstacle`**
 
 In `spawnObstacle`'s return object, add:
 
@@ -230,7 +230,7 @@ In `spawnObstacle`'s return object, add:
     brushed: false,
 ```
 
-- [ ] **Step 3: Initialize in `spawnWall`**
+- [x] **Step 3: Initialize in `spawnWall`**
 
 In `spawnWall`'s inner `g.obstacles.push` call, add the same two fields:
 
@@ -240,7 +240,7 @@ In `spawnWall`'s inner `g.obstacles.push` call, add the same two fields:
         brushed: false,
 ```
 
-- [ ] **Step 4: Track closest approach each frame in `runTick`**
+- [x] **Step 4: Track closest approach each frame in `runTick`**
 
 In the obstacle-movement loop inside `runTick`, after the `o.z += ...` updates but before the collision check, add:
 
@@ -256,7 +256,7 @@ In the obstacle-movement loop inside `runTick`, after the `o.z += ...` updates b
     }
 ```
 
-- [ ] **Step 5: Add near-miss constant**
+- [x] **Step 5: Add near-miss constant**
 
 At module scope with other constants:
 
@@ -265,7 +265,7 @@ const NEAR_MISS_RADIUS = 1.2; // ship surface + this much = "brushed"
 const NEAR_MISS_POINTS = 15;
 ```
 
-- [ ] **Step 6: Award near-miss on despawn**
+- [x] **Step 6: Award near-miss on despawn**
 
 In `runTick`, find the block that handles obstacle despawn (when `o.z > DESPAWN_Z`):
 
@@ -298,7 +298,7 @@ Replace with:
     }
 ```
 
-- [ ] **Step 7: Lint + tsc**
+- [x] **Step 7: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
@@ -306,7 +306,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -322,7 +322,7 @@ git commit -m "feat(orbital-dodge): near-miss bonus (+15 when brushing past an a
 
 **Why:** Players need to see their current combo value in real time. Visual: animated colored pill that scales up briefly on each increment and shifts hue based on tier. Integrates into existing top-left HUD strip.
 
-- [ ] **Step 1: Extend `UiState` with `combo`**
+- [x] **Step 1: Extend `UiState` with `combo`**
 
 Find:
 
@@ -351,17 +351,17 @@ interface UiState {
 }
 ```
 
-- [ ] **Step 2: Initialize combo in `ui` default**
+- [x] **Step 2: Initialize combo in `ui` default**
 
 Find `const [ui, setUi] = useState<UiState>(...)` and add `combo: 1,` alongside `kills: 0, distance: 0,`.
 
 Also find the `setUi({ status: "armed", ... })` reset inside `launch` and add `combo: 1`.
 
-- [ ] **Step 3: Emit combo from `onUiSync`**
+- [x] **Step 3: Emit combo from `onUiSync`**
 
 In `onUiSync`, find the `setUi({...})` call and add `combo: g.combo,` alongside `kills: g.kills,`.
 
-- [ ] **Step 4: Render combo badge in the HUD**
+- [x] **Step 4: Render combo badge in the HUD**
 
 Find the in-canvas HUD block (inside the canvas container, starts with `{(ui.status === "playing" || ui.status === "paused") && (`). In the top-left pill containing score/distance/kills/seconds, add AFTER the `{ui.kills} kills` span:
 
@@ -380,7 +380,7 @@ Find the in-canvas HUD block (inside the canvas container, starts with `{(ui.sta
                 )}
 ```
 
-- [ ] **Step 5: Add `comboColor` helper**
+- [x] **Step 5: Add `comboColor` helper**
 
 Below the existing `comboMultiplier` helper add:
 
@@ -394,7 +394,7 @@ function comboColor(combo: number): string {
 }
 ```
 
-- [ ] **Step 6: Lint + tsc**
+- [x] **Step 6: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
@@ -402,7 +402,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -416,7 +416,7 @@ git commit -m "feat(orbital-dodge): animated combo multiplier badge in HUD with 
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Include comboPeak in ui state at death**
+- [x] **Step 1: Include comboPeak in ui state at death**
 
 In `onDeath`, find `setUi((u) => ({ ...u, status: "dead", score: final, kills: g.kills, distance: Math.floor(g.distance) }));` and keep as-is but also update `UiState` to include `comboPeak: number;`.
 
@@ -456,7 +456,7 @@ In `launch` reset:
     setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, active: [] });
 ```
 
-- [ ] **Step 2: Show peak combo in death overlay stats grid**
+- [x] **Step 2: Show peak combo in death overlay stats grid**
 
 Find the death-overlay stats grid (3-column grid with Survived / Distance / Kills). Change it to 4 columns and add Peak Combo:
 
@@ -481,7 +481,7 @@ Find the death-overlay stats grid (3-column grid with Survived / Distance / Kill
                 </div>
 ```
 
-- [ ] **Step 3: Lint + tsc**
+- [x] **Step 3: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
@@ -489,7 +489,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -503,17 +503,17 @@ git commit -m "feat(orbital-dodge): surface peak combo in death overlay stats"
 **Files:**
 - No code changes. Run scripts against the live dev server.
 
-- [ ] **Step 1: Start dev server (if not already running)**
+- [x] **Step 1: Start dev server (if not already running)**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npm run dev
 ```
 
-- [ ] **Step 2: Navigate to `/games` in Chrome DevTools MCP and wait for armed state**
+- [x] **Step 2: Navigate to `/games` in Chrome DevTools MCP and wait for armed state**
 
 Use `mcp__chrome-devtools__navigate_page` with URL `http://localhost:3000/games`, then `mcp__chrome-devtools__wait_for` on text `Move your mouse`.
 
-- [ ] **Step 3: Run combo verification script**
+- [x] **Step 3: Run combo verification script**
 
 Evaluate in the page:
 
@@ -544,15 +544,15 @@ async () => {
 }
 ```
 
-- [ ] **Step 4: Interpret result**
+- [x] **Step 4: Interpret result**
 
 Expected: `maxComboSeen >= 5` during a 15s active run. The combo badge should have appeared (pink/orange/yellow/cyan depending on value). If `maxComboSeen === 0`, the combo system isn't incrementing — debug.
 
-- [ ] **Step 5: Near-miss verification**
+- [x] **Step 5: Near-miss verification**
 
 Manual: play a short run, intentionally steer to get an asteroid to just-miss the ship. You should see a yellow `+15` score popup distinct from the usual destroy-popups. If none appear after 30s of deliberate brush-play, lower `NEAR_MISS_RADIUS` from 1.2 to 1.5 and retest.
 
-- [ ] **Step 6: No commit needed**
+- [x] **Step 6: No commit needed**
 
 Verification only.
 
@@ -563,15 +563,17 @@ Verification only.
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx` only if verification failed
 
-- [ ] **Step 1: If combo resets feel too fast**
+> Skipped — Task 7 verification passed (HUD badge visible, combo reached 5+, death overlay Peak Combo card rendered). No tuning required at this time.
+
+- [x] **Step 1: If combo resets feel too fast**
 
 Increase `COMBO_WINDOW_MS` from 4000 to 5500 or 7000.
 
-- [ ] **Step 2: If near-misses feel too rare**
+- [x] **Step 2: If near-misses feel too rare**
 
 Increase `NEAR_MISS_RADIUS` from 1.2 to 1.8.
 
-- [ ] **Step 3: If combo multiplier growth feels too steep at 10x**
+- [x] **Step 3: If combo multiplier growth feels too steep at 10x**
 
 Extend the `comboMultiplier` table — cap at 5 instead of 10:
 
@@ -585,7 +587,7 @@ function comboMultiplier(combo: number): number {
 }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
