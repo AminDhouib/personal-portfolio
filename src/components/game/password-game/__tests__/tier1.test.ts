@@ -74,3 +74,22 @@ describe("Tier 1 — digit count rule", () => {
     }
   });
 });
+
+describe("Tier 1 — uppercase rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "uppercase")!;
+
+  it("exists and is tier 1", () => {
+    expect(def).toBeDefined();
+    expect(def.tier).toBe(1);
+  });
+
+  it("fails without uppercase", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("abc123", rule)).passed).toBe(false);
+  });
+
+  it("passes with uppercase", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("Abc123", rule)).passed).toBe(true);
+  });
+});

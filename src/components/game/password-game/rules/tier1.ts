@@ -40,4 +40,20 @@ const digitCount: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount];
+const uppercase: RuleDef = {
+  id: "uppercase",
+  tier: 1,
+  create() {
+    return {
+      id: "uppercase",
+      tier: 1,
+      description: "Your password must include an uppercase letter.",
+      params: {},
+      validate(state) {
+        return { passed: /[A-Z]/.test(state.password) };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase];
