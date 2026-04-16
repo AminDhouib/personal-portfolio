@@ -329,6 +329,66 @@ function normalizeVec3(v: [number, number, number]): [number, number, number] {
   return [v[0] / len, v[1] / len, v[2] / len];
 }
 
+function runSwarmMotherBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+  boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2;
+  boss.position[1] = 3;
+  boss.position[2] = -14;
+  const droneCount = boss.subEntities.filter((s) => s.type === "drone").length;
+  if (droneCount < 8 && now - boss.lastShotAt >= 1500 / boss.difficultyMult) {
+    for (let k = 0; k < 2; k++) {
+      const offset = (k - 0.5) * 2;
+      boss.subEntities.push({
+        type: "drone",
+        position: [boss.position[0] + offset, boss.position[1], boss.position[2]],
+        velocity: [0, 0, 3.5],
+        hp: 1,
+        createdAt: now,
+        ttlMs: 12000,
+      });
+    }
+    boss.lastShotAt = now;
+  }
+  for (let i = boss.subEntities.length - 1; i >= 0; i--) {
+    const d = boss.subEntities[i];
+    if (d.type !== "drone") continue;
+    const dir = normalizeVec3([
+      g.shipX - d.position[0],
+      g.shipY - d.position[1],
+      g.shipZ - d.position[2],
+    ]);
+    const lerp = 0.05;
+    d.velocity[0] = d.velocity[0] * (1 - lerp) + dir[0] * 3.5 * lerp;
+    d.velocity[1] = d.velocity[1] * (1 - lerp) + dir[1] * 3.5 * lerp;
+    d.velocity[2] = d.velocity[2] * (1 - lerp) + dir[2] * 3.5 * lerp;
+    d.position[0] += d.velocity[0] * step;
+    d.position[1] += d.velocity[1] * step;
+    d.position[2] += d.velocity[2] * step;
+    const sdx = d.position[0] - g.shipX;
+    const sdy = d.position[1] - g.shipY;
+    const sdz = d.position[2] - g.shipZ;
+    const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
+    if (now > g.invulnUntil && !shieldedShip &&
+        sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
+      g.status = "dying";
+      g.dyingAt = now;
+      g.deathVelX = -sdx / (Math.hypot(sdx, sdy) || 1) * 7;
+      g.deathVelY = -sdy / (Math.hypot(sdx, sdy) || 1) * 7 + 3.5;
+      g.deathVelZ = 2.5;
+      g.deathAngVel = (Math.random() - 0.5) * 10;
+      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#d946ef", 500, 0.45);
+      spawnShipDebris(g);
+      sounds.play("crash");
+      sounds.stopMusic(0.4);
+      sounds.playLosingJingle();
+      boss.subEntities.splice(i, 1);
+      continue;
+    }
+    if (now - d.createdAt > d.ttlMs || d.position[2] > 10) {
+      boss.subEntities.splice(i, 1);
+    }
+  }
+}
+
 function runDrifterBehavior(g: GameRefs, boss: BossState, now: number): void {
   const phaseAge = now - boss.phaseStartAt;
   boss.position[0] = Math.sin(phaseAge * 0.0005) * 4;
@@ -1833,6 +1893,7 @@ function runTick(
     } else if (b.phase === "fighting") {
       if (b.id === "sentinel") runSentinelBehavior(g, b, now);
       else if (b.id === "drifter") runDrifterBehavior(g, b, now);
+      else if (b.id === "swarm-mother") runSwarmMotherBehavior(g, b, now, step);
       // other boss behaviors added in later tasks
       if (now - g.lastBossPulseAt > 700) {
         sounds.bossPulse();
@@ -1945,21 +2006,47 @@ function runTick(
     b.x += b.vx * step;
     b.y += b.vy * step;
     b.z += b.vz * step;
-    // Bullet-vs-boss: fighting phase only
+    // Bullet-vs-boss-drone: Swarm Mother drones take a hit first
+    if (g.boss && g.boss.id === "swarm-mother" && g.boss.phase === "fighting") {
+      const subs = g.boss.subEntities;
+      let droneHit = false;
+      for (let s = subs.length - 1; s >= 0; s--) {
+        const d = subs[s];
+        if (d.type !== "drone") continue;
+        const dx = b.x - d.position[0];
+        const dy = b.y - d.position[1];
+        const dz = b.z - d.position[2];
+        if (dx * dx + dy * dy + dz * dz < 0.5 * 0.5) {
+          subs.splice(s, 1);
+          g.bullets.splice(i, 1);
+          g.score += 10;
+          spawnExplosion(g, b.x, b.y, b.z, "#d946ef", 240, 0.22);
+          droneHit = true;
+          break;
+        }
+      }
+      if (droneHit) continue;
+    }
+    // Bullet-vs-boss: fighting phase only; Swarm Mother requires drones cleared
     if (g.boss && g.boss.phase === "fighting") {
       const bo = g.boss;
+      const droneAlive = bo.id === "swarm-mother"
+        && bo.subEntities.some((s) => s.type === "drone");
       const dx = b.x - bo.position[0];
       const dy = b.y - bo.position[1];
       const dz = b.z - bo.position[2];
       const hitR = 1.5;
       if (dx * dx + dy * dy + dz * dz < hitR * hitR) {
-        bo.hp -= b.damage;
-        spawnExplosion(g, b.x, b.y, b.z, b.color, 240, 0.2);
-        g.bullets.splice(i, 1);
-        if (bo.hp <= 0) {
-          bo.phase = "dying";
-          bo.phaseStartAt = now;
+        if (!droneAlive) {
+          bo.hp -= b.damage;
+          if (bo.hp <= 0) {
+            bo.phase = "dying";
+            bo.phaseStartAt = now;
+          }
         }
+        // Consume bullet + spark even if shielded by drones
+        spawnExplosion(g, b.x, b.y, b.z, b.color, 200, 0.18);
+        g.bullets.splice(i, 1);
         continue;
       }
     }
@@ -2623,6 +2710,21 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
       </group>
     );
   }
+  if (boss.id === "swarm-mother") {
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <sphereGeometry args={[1.6, 16, 12]} />
+          <meshStandardMaterial color="#86198f" emissive="#a21caf" emissiveIntensity={0.4} />
+        </mesh>
+        <mesh scale={[1.2, 0.6, 1.2]}>
+          <torusKnotGeometry args={[0.9, 0.2, 32, 8]} />
+          <meshStandardMaterial color="#d946ef" emissive="#d946ef" emissiveIntensity={0.6} />
+        </mesh>
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
   // Fallback placeholder for other bosses until their meshes ship
   return (
     <group ref={groupRef}>
@@ -2630,6 +2732,28 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
         <icosahedronGeometry args={[1.3, 0]} />
         <meshStandardMaterial color="#475569" emissive="#ef4444" emissiveIntensity={0.35} wireframe />
       </mesh>
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function BossSubEntities({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const boss = gameRefs.current?.boss;
+  const list = boss?.subEntities ?? [];
+  useFrame(() => {
+    // Position updates already in refs — JSX binds position directly
+  });
+  if (!boss) return null;
+  return (
+    <group>
+      {list.map((d, idx) =>
+        d.type === "drone" ? (
+          <mesh key={`drone-${idx}-${d.createdAt}`} position={d.position}>
+            <tetrahedronGeometry args={[0.35]} />
+            <meshStandardMaterial color="#d946ef" emissive="#d946ef" emissiveIntensity={0.6} />
+          </mesh>
+        ) : null
+      )}
       <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
     </group>
   );
@@ -3017,6 +3141,7 @@ function Scene({
       <Coins gameRefs={gameRefs} tick={tick} />
       <BossMesh gameRefs={gameRefs} tick={tick} />
       <BossProjectiles gameRefs={gameRefs} tick={tick} />
+      <BossSubEntities gameRefs={gameRefs} tick={tick} />
       <Bullets gameRefs={gameRefs} tick={tick} />
       <Explosions gameRefs={gameRefs} tick={tick} />
       <ScorePopups gameRefs={gameRefs} tick={tick} />
@@ -3742,6 +3867,12 @@ export function SpaceShooterGame() {
                 style={{ width: `${Math.max(0, (gameRefs.current.boss.hp / gameRefs.current.boss.hpMax) * 100)}%` }}
               />
             </div>
+            {gameRefs.current.boss.id === "swarm-mother" &&
+              gameRefs.current.boss.subEntities.some((s) => s.type === "drone") && (
+                <div className="text-[10px] tracking-[0.3em] text-fuchsia-300 animate-pulse">
+                  CLEAR DRONES
+                </div>
+            )}
           </div>
         )}
 
