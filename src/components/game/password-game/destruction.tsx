@@ -13,18 +13,41 @@ import { useEffect, useRef } from "react";
  * elements. Higher chaos levels reveal additional chips. No red tint, no
  * color overlay — the effect is purely structural.
  */
-export function CracksOverlay() {
+export function CracksOverlay({ seed = 0 }: { seed?: number }) {
+  // Derive per-chip visual jitter from the seed so runs don't look identical.
+  const variant = (n: number) => {
+    // Bit-mixing so the 3 variants differ even for small seeds.
+    const h = ((seed ^ (n * 0x9e3779b1)) * 0x85ebca6b) >>> 0;
+    const rotDeg = ((h % 1000) / 1000) * 30 - 15;        // -15° … +15°
+    const scaleJitter = 0.9 + ((h >> 10) % 1000) / 1000 * 0.25; // 0.9 … 1.15
+    return { rotate: `${rotDeg.toFixed(1)}deg`, scale: scaleJitter.toFixed(2) };
+  };
+  const v1 = variant(1);
+  const v2 = variant(2);
+  const v3 = variant(3);
   return (
     <>
       <BorderWobbleFilter />
       <MatrixRain />
-      <div className="pg-chip pg-chip-1" data-chaos-min="3">
+      <div
+        className="pg-chip pg-chip-1"
+        data-chaos-min="3"
+        style={{ ["--chip-rot" as string]: v1.rotate, ["--chip-scale" as string]: v1.scale }}
+      >
         <ChipShape flipX={true} flipY={true} />
       </div>
-      <div className="pg-chip pg-chip-2" data-chaos-min="4">
+      <div
+        className="pg-chip pg-chip-2"
+        data-chaos-min="4"
+        style={{ ["--chip-rot" as string]: v2.rotate, ["--chip-scale" as string]: v2.scale }}
+      >
         <ChipShape flipX={true} flipY={false} />
       </div>
-      <div className="pg-chip pg-chip-3" data-chaos-min="5">
+      <div
+        className="pg-chip pg-chip-3"
+        data-chaos-min="5"
+        style={{ ["--chip-rot" as string]: v3.rotate, ["--chip-scale" as string]: v3.scale }}
+      >
         <ChipShape flipX={false} flipY={false} />
       </div>
       <FloatingDebris />
