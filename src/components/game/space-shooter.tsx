@@ -414,6 +414,7 @@ interface GameRefs {
   normalSpawningPausedUntil: number;
   devHotkeyArmed: boolean;
   nextBossProjectileId: number;
+  lastBossPulseAt: number;
   // Upgrade-derived run modifiers, set at startRun from profile.ownedUpgrades.
   coinMagnetExtra: number;    // world units added to coin pickup radius
   coinValueBonus: number;     // added to each coin's base value
@@ -497,7 +498,7 @@ function createRefs(): GameRefs {
     boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
     bossScheduleIdx: 0, bossesDefeatedThisRun: 0,
     normalSpawningPausedUntil: 0, devHotkeyArmed: false,
-    nextBossProjectileId: 0,
+    nextBossProjectileId: 0, lastBossPulseAt: 0,
     activePowerUps: [], debris: [], scorePopups: [],
     targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
     fogColor: new THREE.Color(initEnv.fog),
@@ -996,6 +997,25 @@ class SoundManager {
       case "shieldOff": this.playShieldOff(); break;
       case "warp": this.playWarp(); break;
     }
+  }
+
+  // Low triangle pulse during boss fights — driven from runTick every ~700ms.
+  bossPulse() {
+    if (!this.enabled) return;
+    this.ensure();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(55, t);
+    gain.gain.setValueAtTime(0.0, t);
+    gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.45);
   }
 
   // Soft sine pulse, easy on the ears since it fires constantly.
@@ -1787,6 +1807,10 @@ function runTick(
     } else if (b.phase === "fighting") {
       if (b.id === "sentinel") runSentinelBehavior(g, b, now);
       // other boss behaviors added in later tasks
+      if (now - g.lastBossPulseAt > 700) {
+        sounds.bossPulse();
+        g.lastBossPulseAt = now;
+      }
     } else if (b.phase === "dying") {
       const dyingAge = now - b.phaseStartAt;
       b.position[1] += 0.02;
@@ -2917,11 +2941,14 @@ function Scene({
   env: Environment;
   tick: number;
 }) {
+  const bossFighting = gameRefs.current?.boss && gameRefs.current.boss.phase !== "defeated";
+  const ambientI = bossFighting ? 0.18 : 0.5;
+  const dirI = bossFighting ? 0.35 : 0.7;
   return (
     <>
       <BiomeBlender gameRefs={gameRefs} />
-      <ambientLight intensity={0.5} color={env.ambient} />
-      <directionalLight position={[5, 6, 4]} intensity={0.7} />
+      <ambientLight intensity={ambientI} color={bossFighting ? "#7f1d1d" : env.ambient} />
+      <directionalLight position={[5, 6, 4]} intensity={dirI} />
       <Starfield env={env} />
       <SpeedLines gameRefs={gameRefs} env={env} tick={tick} />
       <Ship gameRefs={gameRefs} env={env} />
