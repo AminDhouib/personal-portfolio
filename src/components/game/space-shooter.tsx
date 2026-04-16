@@ -17,6 +17,7 @@ import {
 } from "./profile";
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
 import { activeMissions, claimMissionReward, rollMissionsIfNewDay } from "./missions";
+import { ACHIEVEMENTS, checkAchievements, grantAchievements, type Achievement } from "./achievements";
 
 // ---------- constants ----------
 
@@ -823,6 +824,7 @@ interface GameRefs {
   bossSchedule: { distance: number; bossId: BossId }[];
   bossScheduleIdx: number;
   bossesDefeatedThisRun: number;
+  damageTakenThisRun: number;
   normalSpawningPausedUntil: number;
   devHotkeyArmed: boolean;
   nextBossProjectileId: number;
@@ -913,7 +915,7 @@ function createRefs(): GameRefs {
     prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
     gyroTilt: { x: 0, y: 0 },
     boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
-    bossScheduleIdx: 0, bossesDefeatedThisRun: 0,
+    bossScheduleIdx: 0, bossesDefeatedThisRun: 0, damageTakenThisRun: 0,
     normalSpawningPausedUntil: 0, devHotkeyArmed: false,
     nextBossProjectileId: 0, lastBossPulseAt: 0,
     activePowerUps: [], debris: [], scorePopups: [],
@@ -2633,6 +2635,7 @@ function runTick(
         const dz = g.shipZ - o.z;
         const r = o.size + SHIP_RADIUS;
         if (dx * dx + dy * dy + dz * dz < r * r) {
+          g.damageTakenThisRun += 1;
           g.status = "dying";
           g.dyingAt = now;
           // Death impulse: ship is knocked AWAY from the asteroid's center
@@ -3886,6 +3889,14 @@ export function SpaceShooterGame() {
     musicEnabled: true,
     sfxEnabled: true,
   });
+  const [achievementToasts, setAchievementToasts] = useState<(Achievement & { firedAt: number })[]>([]);
+  useEffect(() => {
+    if (achievementToasts.length === 0) return;
+    const t = setInterval(() => {
+      setAchievementToasts((prev) => prev.filter((x) => Date.now() - x.firedAt < 3500));
+    }, 500);
+    return () => clearInterval(t);
+  }, [achievementToasts.length]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -4176,6 +4187,29 @@ export function SpaceShooterGame() {
     addRunStats({ asteroidsDestroyed: g.kills, distance: Math.floor(g.distance) });
     incrementRunsPlayed();
     markFirstRunCompleted();
+    // Bump totalBossesDefeated + evaluate achievements
+    try {
+      const p = loadProfile();
+      p.totalBossesDefeated = (p.totalBossesDefeated ?? 0) + g.bossesDefeatedThisRun;
+      saveProfile(p);
+      const runSnapshot = {
+        finalScore: Math.floor(g.score * g.scoreMultiplier),
+        finalDistance: Math.floor(g.distance),
+        finalCombo: g.combo,
+        asteroidsDestroyed: g.kills,
+        bossesDefeated: g.bossesDefeatedThisRun,
+        runSurvivalSeconds: Math.floor(((g.dyingAt || performance.now()) - g.startedAt) / 1000),
+        peakCombo: g.comboPeak,
+        coinsCollectedThisRun: g.coinsThisRun,
+        damageTakenThisRun: g.damageTakenThisRun,
+      };
+      const fresh = loadProfile();
+      const earned = checkAchievements(fresh, runSnapshot);
+      if (earned.length > 0) {
+        grantAchievements(earned);
+        setAchievementToasts((t) => [...t, ...earned.map((a) => ({ ...a, firedAt: Date.now() }))]);
+      }
+    } catch { /* noop */ }
     // Update mission progress using this run's stats (max-of so multi-run peaks count)
     try {
       const p = loadProfile();
@@ -4234,6 +4268,7 @@ export function SpaceShooterGame() {
     g.bossSchedule = buildBossSchedule();
     g.bossScheduleIdx = 0;
     g.bossesDefeatedThisRun = 0;
+    g.damageTakenThisRun = 0;
     g.normalSpawningPausedUntil = 0;
     g.activePowerUps.length = 0;
     g.debris.length = 0;
@@ -4846,6 +4881,27 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Achievement toasts */}
+        {achievementToasts.length > 0 && (
+          <div className="absolute top-14 right-4 flex flex-col gap-2 z-40 pointer-events-none">
+            {achievementToasts.map((a) => (
+              <div
+                key={`${a.id}-${a.firedAt}`}
+                className="flex items-center gap-3 bg-amber-900/80 backdrop-blur-sm border border-amber-400/60 rounded-lg px-4 py-2 min-w-[220px]"
+              >
+                <div className="flex items-center justify-center w-9 h-9 rounded bg-amber-400 text-amber-900 font-black text-xs">
+                  {a.icon}
+                </div>
+                <div className="flex-1">
+                  <div className="text-[10px] text-amber-200 tracking-wide">ACHIEVEMENT</div>
+                  <div className="font-bold text-white text-sm">{a.name}</div>
+                  <div className="text-xs text-amber-100">{a.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Dev-only FPS + object counts */}
         {process.env.NODE_ENV !== "production" && (
