@@ -144,7 +144,7 @@ li,ol,ul{list-style-type:none;padding:0;margin:0}
 <script src="./dist/main.js"></script>
 <script src="./assets/zepto-1.1.6.min.js"></script>
 <script>
-var domReady, loadFinish, canvasReady, loadError, gameStart, game, score, successCount;
+var domReady, loadFinish, canvasReady, loadError, gameStart, game, score = 0, successCount = 0;
 
 // Size the game to fill the iframe viewport, preserving a 3:2 portrait ratio.
 var gameWidth = window.innerWidth;
@@ -193,16 +193,250 @@ function overShowOver() {
   $('#over-zero').show();
 }
 
+// ── Synthesized audio (replaces upstream low-bitrate samples) ──────────
+var actx, master, bgmBus, delayIn, noiseBuf;
+var bgmRunning = false, bgmTimer = null;
+var prevScore = 0, prevSuccess = 0, audioUnlocked = false;
+
+function ensureAudio() {
+  if (actx) return actx;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  actx = new AC();
+
+  master = actx.createGain();
+  master.gain.value = 0.8;
+  master.connect(actx.destination);
+
+  // Shared feedback delay (adds space / reverb tail to pads & bells)
+  var delay = actx.createDelay(1.5);
+  delay.delayTime.value = 0.38;
+  var fb = actx.createGain();
+  fb.gain.value = 0.34;
+  var dampen = actx.createBiquadFilter();
+  dampen.type = 'lowpass';
+  dampen.frequency.value = 2000;
+  delay.connect(dampen).connect(fb).connect(delay);
+  var wet = actx.createGain();
+  wet.gain.value = 0.55;
+  delay.connect(wet).connect(master);
+  delayIn = delay;
+
+  bgmBus = actx.createGain();
+  bgmBus.gain.value = 0;
+  bgmBus.connect(master);
+
+  // Pre-built pink-ish noise buffer (reused across SFX)
+  var len = actx.sampleRate * 2;
+  noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+  var d = noiseBuf.getChannelData(0);
+  var b0 = 0, b1 = 0, b2 = 0;
+  for (var i = 0; i < len; i++) {
+    var w = Math.random() * 2 - 1;
+    b0 = 0.99765 * b0 + w * 0.0990460;
+    b1 = 0.96300 * b1 + w * 0.2965164;
+    b2 = 0.57000 * b2 + w * 1.0526913;
+    d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.15;
+  }
+  return actx;
+}
+
+function unlockAudio() {
+  var c = ensureAudio();
+  if (c && c.state === 'suspended') c.resume();
+  audioUnlocked = true;
+}
+
+// Warm wooden thud: pitch-dropping sine + bandpass noise transient
+function playDrop() {
+  var c = ensureAudio(); if (!c) return;
+  var t = c.currentTime;
+  var osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(190, t);
+  osc.frequency.exponentialRampToValueAtTime(55, t + 0.2);
+  var g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.42, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+  osc.connect(g).connect(master);
+  osc.start(t); osc.stop(t + 0.35);
+
+  var n = c.createBufferSource();
+  n.buffer = noiseBuf;
+  n.playbackRate.value = 0.8 + Math.random() * 0.2;
+  var nf = c.createBiquadFilter();
+  nf.type = 'bandpass';
+  nf.frequency.value = 720;
+  nf.Q.value = 1.2;
+  var ng = c.createGain();
+  ng.gain.setValueAtTime(0.22, t);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  n.connect(nf).connect(ng).connect(master);
+  n.start(t); n.stop(t + 0.1);
+}
+
+// Bright bell (not chiptune): triangle harmonic stack + sine sparkle, with delay send
+function playPerfect() {
+  var c = ensureAudio(); if (!c) return;
+  var t = c.currentTime;
+  var fund = 659.25; // E5
+  var harmonics = [1, 2.01, 2.96, 4.03];
+  var gains = [0.22, 0.13, 0.07, 0.035];
+  harmonics.forEach(function (h, i) {
+    var osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = fund * h;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gains[i], t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1 - i * 0.18);
+    osc.connect(g);
+    g.connect(master);
+    g.connect(delayIn);
+    osc.start(t); osc.stop(t + 1.3);
+  });
+  var spark = c.createOscillator();
+  spark.type = 'sine';
+  spark.frequency.value = fund * 6;
+  var sg = c.createGain();
+  sg.gain.setValueAtTime(0.0001, t);
+  sg.gain.exponentialRampToValueAtTime(0.07, t + 0.003);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  spark.connect(sg).connect(master);
+  spark.start(t); spark.stop(t + 0.25);
+}
+
+// Cinematic descent: detuned saws sweeping down through LPF + low boom
+function playFail() {
+  var c = ensureAudio(); if (!c) return;
+  var t = c.currentTime;
+  [0, -11, 11].forEach(function (detune) {
+    var osc = c.createOscillator();
+    osc.type = 'sawtooth';
+    osc.detune.value = detune;
+    osc.frequency.setValueAtTime(330, t);
+    osc.frequency.exponentialRampToValueAtTime(58, t + 0.9);
+    var f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(2400, t);
+    f.frequency.exponentialRampToValueAtTime(240, t + 0.9);
+    f.Q.value = 4;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.15, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+    osc.connect(f).connect(g);
+    g.connect(master);
+    g.connect(delayIn);
+    osc.start(t); osc.stop(t + 1.05);
+  });
+  var boom = c.createOscillator();
+  boom.type = 'sine';
+  boom.frequency.setValueAtTime(90, t);
+  boom.frequency.exponentialRampToValueAtTime(34, t + 0.55);
+  var bg = c.createGain();
+  bg.gain.setValueAtTime(0.0001, t);
+  bg.gain.exponentialRampToValueAtTime(0.38, t + 0.01);
+  bg.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+  boom.connect(bg).connect(master);
+  boom.start(t); boom.stop(t + 0.9);
+}
+
+// Ambient pad BGM: slow 4-chord loop, unison saws through LPF with delay send
+var CHORDS = [
+  [220.00, 261.63, 329.63], // Am
+  [174.61, 220.00, 261.63], // F
+  [196.00, 246.94, 293.66], // G
+  [164.81, 207.65, 246.94]  // Em-ish
+];
+
+function playChord(freqs, duration) {
+  var c = ensureAudio(); if (!c) return;
+  var t = c.currentTime;
+  freqs.forEach(function (f) {
+    [-9, 0, 9].forEach(function (detune) {
+      var osc = c.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = f;
+      osc.detune.value = detune;
+      var filt = c.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.setValueAtTime(850, t);
+      filt.frequency.linearRampToValueAtTime(1400, t + 2.5);
+      filt.frequency.linearRampToValueAtTime(850, t + duration);
+      filt.Q.value = 1.4;
+      var g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.032, t + 1.6);
+      g.gain.setValueAtTime(0.032, t + Math.max(1.6, duration - 1.8));
+      g.gain.linearRampToValueAtTime(0.0001, t + duration);
+      osc.connect(filt).connect(g);
+      g.connect(bgmBus);
+      g.connect(delayIn);
+      osc.start(t); osc.stop(t + duration + 0.1);
+    });
+  });
+}
+
+function startBgm() {
+  var c = ensureAudio(); if (!c) return;
+  if (bgmRunning) return;
+  bgmRunning = true;
+  var t = c.currentTime;
+  bgmBus.gain.cancelScheduledValues(t);
+  bgmBus.gain.setValueAtTime(bgmBus.gain.value, t);
+  bgmBus.gain.linearRampToValueAtTime(0.55, t + 2.5);
+
+  var idx = 0;
+  var chordLen = 6.0;
+  function nextChord() {
+    if (!bgmRunning) return;
+    playChord(CHORDS[idx % CHORDS.length], chordLen);
+    idx++;
+    bgmTimer = setTimeout(nextChord, (chordLen - 0.5) * 1000);
+  }
+  nextChord();
+}
+
+function stopBgm(fadeSec) {
+  if (!bgmRunning) return;
+  bgmRunning = false;
+  if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+  if (actx && bgmBus) {
+    var t = actx.currentTime;
+    bgmBus.gain.cancelScheduledValues(t);
+    bgmBus.gain.setValueAtTime(bgmBus.gain.value, t);
+    bgmBus.gain.linearRampToValueAtTime(0.0001, t + (fadeSec || 1.2));
+  }
+}
+
 var option = {
   width: gameWidth,
   height: gameHeight,
   canvasId: 'canvas',
-  soundOn: true,
-  setGameScore: function (s) { score = s; },
+  soundOn: false,
+  setGameScore: function (s) {
+    var delta = s - prevScore;
+    prevScore = s;
+    score = s;
+    if (delta > 0 && audioUnlocked) {
+      // Defer so setGameSuccess (which may fire in the same tick) updates first.
+      setTimeout(function () {
+        if (successCount > prevSuccess) playPerfect();
+        else playDrop();
+        prevSuccess = successCount;
+      }, 0);
+    }
+  },
   setGameSuccess: function (s) { successCount = s; },
   setGameFailed: function (f) {
     $('#score').text(score);
-    if (f >= 3) overShowOver();
+    if (audioUnlocked) playFail();
+    if (f >= 3) {
+      stopBgm(1.0);
+      overShowOver();
+    }
   }
 };
 
@@ -210,7 +444,6 @@ function gameReady() {
   game = TowerGame(option);
   game.load(function () {
     game.init();
-    setTimeout(function () { game.playBgm(); });
   }, updateLoading);
 }
 
@@ -225,7 +458,8 @@ function indexHide() {
 $('#start').on('click', function () {
   if (gameStart) return;
   gameStart = true;
-  setTimeout(function () { game.playBgm(); });
+  unlockAudio();
+  startBgm();
   indexHide();
   setTimeout(game.start, 400);
 });
