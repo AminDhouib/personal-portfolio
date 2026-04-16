@@ -140,7 +140,7 @@ interface Obstacle {
   x: number; y: number; z: number;
   rx: number; ry: number; rz: number;
   rsx: number; rsy: number; rsz: number;
-  vz: number; // forward speed
+  vx: number; vy: number; vz: number; // full 3D velocity
   size: number;
   hp: number;
   shape: 0 | 1 | 2;
@@ -437,6 +437,19 @@ function spawnObstacle(g: GameRefs): Obstacle {
     speed = baseSpeed * 1.6;
   }
 
+  // ~25% of basic asteroids get a lateral drift so even a stationary player
+  // can't rely on asteroids staying out of their column. Speeders and heavies
+  // stay straight-line — they already have their own identity.
+  let vx = 0;
+  let vy = 0;
+  if (variant === "basic" && Math.random() < 0.25) {
+    // Drift toward the opposite half of the arena so an asteroid spawned on
+    // the left sweeps right and vice versa. 1-2.5 units/sec horizontal,
+    // slight vertical component for visual variety.
+    vx = -Math.sign(x || 1) * (1 + Math.random() * 1.5);
+    vy = (Math.random() - 0.5) * 1.5;
+  }
+
   return {
     id: nextId(g),
     variant,
@@ -448,7 +461,7 @@ function spawnObstacle(g: GameRefs): Obstacle {
     rsx: (Math.random() - 0.5) * 1.8,
     rsy: (Math.random() - 0.5) * 1.8,
     rsz: (Math.random() - 0.5) * 1.8,
-    vz: speed,
+    vx, vy, vz: speed,
     size, hp,
     shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
   };
@@ -1415,10 +1428,13 @@ function runTick(
   }
 
   // Move + collide obstacles. Warp multiplies forward velocity so they whip
-  // past the ship dramatically.
+  // past the ship dramatically. Lateral drift also scales with warp so the
+  // world feels coherent during warp bursts.
   const obstacleSpeedMul = THREE.MathUtils.lerp(1, 5, wi);
   for (let i = g.obstacles.length - 1; i >= 0; i--) {
     const o = g.obstacles[i];
+    o.x += o.vx * step * obstacleSpeedMul;
+    o.y += o.vy * step * obstacleSpeedMul;
     o.z += o.vz * step * obstacleSpeedMul;
     o.rx += o.rsx * step;
     o.ry += o.rsy * step;
