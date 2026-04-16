@@ -33,7 +33,7 @@ export function RuleCard({ rule, result, index, isActive }: Props) {
         <div className="min-w-0 flex-1">
           <div className="text-xs text-(--muted) mb-1">Rule {index + 1}</div>
           <div className={`text-sm ${passed ? "text-(--muted) line-through" : "text-(--foreground)"}`}>
-            {rule.description}
+            <RuleDescription text={rule.description} />
           </div>
           {result.message && !passed && (
             <div className="mt-1 text-xs text-accent-amber">{result.message}</div>
@@ -41,5 +41,22 @@ export function RuleCard({ rule, result, index, isActive }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+function RuleDescription({ text }: { text: string }) {
+  const idx = text.indexOf("\n\n");
+  if (idx === -1) {
+    return <span>{text}</span>;
+  }
+  const prose = text.slice(0, idx);
+  const code = text.slice(idx + 2);
+  return (
+    <>
+      <span>{prose}</span>
+      <pre className="mt-2 rounded-md bg-(--background) border border-(--border) p-3 text-xs font-mono overflow-x-auto whitespace-pre text-(--foreground)">
+        {code}
+      </pre>
+    </>
   );
 }
