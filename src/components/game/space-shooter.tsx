@@ -248,6 +248,7 @@ interface GameRefs {
   // Distance-based biome system (replaces the fixed time-based cycle)
   currentEnv: Environment;
   nextBiomeAt: number; // distance in metres at which to swap biomes
+  nextWallAt: number;  // performance.now() timestamp for next wall spawn
   lastBullet: number;
   lastSpawn: number;
   lastPowerUpSpawn: number;
@@ -265,6 +266,12 @@ interface GameRefs {
 // Random distance until next biome change — keeps transitions unpredictable.
 function pickNextBiomeDistance(currentDist: number): number {
   return currentDist + 700 + Math.random() * 900; // 700–1600m further
+}
+
+// Walls trigger every 25-40s of real time. Randomized so the player can't
+// memorize the cadence.
+function nextWallTimeMs(now: number): number {
+  return now + 25_000 + Math.random() * 15_000;
 }
 
 function pickRandomBiome(exclude: Environment | null): Environment {
@@ -295,6 +302,7 @@ function createRefs(): GameRefs {
     invertedArmed: false,
     currentEnv: initEnv,
     nextBiomeAt: pickNextBiomeDistance(0),
+    nextWallAt: 0, // set by startRun
     lastBullet: 0, lastSpawn: 0, lastPowerUpSpawn: 0, lastUiSync: 0,
     nextId: 1, startedAt: 0,
     invulnUntil: 0,
@@ -315,6 +323,9 @@ function startRun(g: GameRefs): boolean {
   g.lastSpawn = now;
   g.lastPowerUpSpawn = now;
   g.lastUiSync = 0;
+  // First wall at least 20s into the run — the player needs warm-up time
+  // before facing a forced-positioning challenge.
+  g.nextWallAt = now + 20_000;
   sounds.startGameplayMusic();
   return true;
 }
@@ -2514,6 +2525,7 @@ export function SpaceShooterGame() {
     g.lastBullet = 0;
     g.lastSpawn = 0;
     g.lastPowerUpSpawn = 0;
+    g.nextWallAt = 0;
     g.lastUiSync = 0;
     g.invulnUntil = 0;
     g.startedAt = 0;
