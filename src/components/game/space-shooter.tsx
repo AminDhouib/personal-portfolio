@@ -17,7 +17,6 @@ import {
   setUpgradeLevel, spendCoins, type Profile,
 } from "./profile";
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
-import { activeMissions, claimMissionReward, rollMissionsIfNewDay } from "./missions";
 import { PostFx } from "./post-fx";
 import { ACHIEVEMENTS, checkAchievements, grantAchievements, type Achievement } from "./achievements";
 
@@ -844,6 +843,7 @@ interface GameRefs {
   shipHullTint: string;
   shipEngineTint: string;
   shipDeathFxKind: string | null;
+  shipId: string;
   startShieldCharges: number;
   coinBoostMul: number;
   reviveAvailable: boolean;
@@ -962,7 +962,7 @@ function createRefs(): GameRefs {
     coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
     comboWindowMs: 0, shieldDurationMs: 0,
     shipFireRateMul: 1, shipDamageMul: 1, shipAgilityMul: 1, shipCoinMagnetMul: 1,
-    shipHullTint: "#60a5fa", shipEngineTint: "#22d3ee", shipDeathFxKind: null, startShieldCharges: 0, coinBoostMul: 1,
+    shipHullTint: "#60a5fa", shipEngineTint: "#22d3ee", shipDeathFxKind: null, shipId: "falcon", startShieldCharges: 0, coinBoostMul: 1,
     reviveAvailable: false, reviveUsed: false,
     prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
     gyroTilt: { x: 0, y: 0 },
@@ -1031,6 +1031,7 @@ function startRun(g: GameRefs): boolean {
 
   // Equipped ship stats
   const ship = shipById(profile.equippedShip) ?? SHIPS[0];
+  g.shipId = ship.id;
   g.shipFireRateMul = ship.fireRateMul;
   g.shipDamageMul = ship.damageMul;
   g.shipAgilityMul = ship.moveAgilityMul;
@@ -3303,7 +3304,7 @@ function buildStarPoints(): Float32Array {
 
 // ---------- 3D components ----------
 
-function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Environment }) {
+function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<GameRefs>; env: Environment; shipId: string }) {
   const grpRef = useRef<THREE.Group>(null);
   const shieldRef = useRef<THREE.Mesh>(null);
   const engineRef = useRef<THREE.Mesh>(null);
@@ -3359,9 +3360,30 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
       grpRef.current.rotation.y += 0.07;
       grpRef.current.visible = (now - g.dyingAt) < 1500;
     } else {
+      // Per-ship movement feel:
+      //   juggernaut: heavy, slow-to-bank (0.11) with a low-freq bob
+      //   phantom:    snappy, twitchy banks (0.28), fast lateral yaw
+      //   scavenger:  stable cargo roll + gentle vertical float
+      //   void:       drifts on a low-freq sine yaw
+      //   falcon:     baseline
+      const sid = g.shipId;
+      const pitchLerp =
+        sid === "juggernaut" ? 0.11 :
+        sid === "phantom"    ? 0.28 :
+        sid === "void"       ? 0.22 : 0.18;
       const targetPitch = THREE.MathUtils.clamp((g.targetY - g.shipY) * 0.18, -0.25, 0.25);
-      grpRef.current.rotation.x = THREE.MathUtils.lerp(grpRef.current.rotation.x, targetPitch, 0.18);
-      grpRef.current.rotation.y *= 0.9;
+      grpRef.current.rotation.x = THREE.MathUtils.lerp(grpRef.current.rotation.x, targetPitch, pitchLerp);
+      if (sid === "void") {
+        grpRef.current.rotation.y = Math.sin(now * 0.0012) * 0.08;
+      } else if (sid === "scavenger") {
+        grpRef.current.rotation.y *= 0.9;
+        grpRef.current.position.y += Math.sin(now * 0.0024) * 0.025;
+      } else if (sid === "juggernaut") {
+        grpRef.current.rotation.y *= 0.9;
+        grpRef.current.position.y += Math.sin(now * 0.0015) * 0.015;
+      } else {
+        grpRef.current.rotation.y *= 0.9;
+      }
       grpRef.current.visible = true;
     }
 
@@ -3387,14 +3409,18 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
     }
     if (engineTrailRef.current) {
       // Plume length is capped so it never reaches the camera plane.
-      // Cone height = 0.7 (in local Y after rotation = world Z). With scale,
-      // total length = 0.7 * stretch. Position the cone so its BASE sits at
-      // the engine and the tip extends backwards (toward camera) but stops
-      // well short of the camera regardless of FOV/orientation.
-      const stretch = isWarping ? 3.4 + Math.sin(now * 0.05) * 0.4 : 1.6 + Math.sin(now * 0.025) * 0.4;
-      const widen = isWarping ? 2.0 : 0.9;
+      // Cone height = 0.7. Per-ship exhaust character:
+      //   juggernaut: shorter, thicker (heavy twin-engine feel)
+      //   phantom:    longer, thinner (needle stealth-drive)
+      //   scavenger:  short, wide (cargo-thruster puffs)
+      //   void:       jittery length with crackle
+      const sid = g.shipId;
+      const baseStretch = sid === "phantom" ? 2.2 : sid === "juggernaut" ? 1.2 : sid === "scavenger" ? 1.15 : 1.6;
+      const baseWiden = sid === "juggernaut" ? 1.3 : sid === "scavenger" ? 1.2 : sid === "phantom" ? 0.55 : 0.9;
+      const jitter = sid === "void" ? (Math.random() - 0.5) * 0.25 : 0;
+      const stretch = isWarping ? 3.4 + Math.sin(now * 0.05) * 0.4 : baseStretch + Math.sin(now * 0.025) * 0.4 + jitter;
+      const widen = isWarping ? 2.0 : baseWiden;
       engineTrailRef.current.scale.set(widen, widen, stretch);
-      // Offset so the cone's base stays at the engine and only the tip extends
       engineTrailRef.current.position.z = 0.55 + (0.7 * stretch * 0.5);
       const mat = engineTrailRef.current.material as THREE.MeshBasicMaterial;
       mat.opacity = isWarping ? 0.95 : 0.5;
@@ -3447,26 +3473,137 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
 
   return (
     <group ref={grpRef}>
-      <mesh ref={fuselageRef} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.22, 1.0, 8]} />
-        <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.45} />
-      </mesh>
-      <mesh ref={wingRef} position={[0, -0.03, 0.15]}>
-        <boxGeometry args={[1.1, 0.06, 0.32]} />
-        <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh ref={nacelleRRef} position={[0.55, -0.03, 0.28]}>
-        <boxGeometry args={[0.18, 0.05, 0.16]} />
-        <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
-      </mesh>
-      <mesh ref={nacelleLRef} position={[-0.55, -0.03, 0.28]}>
-        <boxGeometry args={[0.18, 0.05, 0.16]} />
-        <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
-      </mesh>
-      <mesh position={[0, 0.1, -0.18]} scale={[1, 0.7, 1]}>
-        <sphereGeometry args={[0.13, 14, 12]} />
-        <meshToonMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.7} />
-      </mesh>
+      {/* Hull + silhouette varies by ship. The fuselage / wing / nacelle refs
+          attach to whichever ship is rendered — missing parts leave the ref
+          null, which the useFrame tinter handles gracefully. */}
+      {shipId === "juggernaut" ? (
+        <>
+          {/* Juggernaut: wide stubby hull, thick double wing, twin nacelle pairs */}
+          <mesh ref={fuselageRef} rotation={[-Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.28, 0.32, 1.05, 8]} />
+            <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.45} />
+          </mesh>
+          <mesh ref={wingRef} position={[0, -0.05, 0.12]}>
+            <boxGeometry args={[1.35, 0.12, 0.42]} />
+            <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh ref={nacelleRRef} position={[0.58, -0.04, 0.3]}>
+            <boxGeometry args={[0.24, 0.08, 0.24]} />
+            <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
+          </mesh>
+          <mesh ref={nacelleLRef} position={[-0.58, -0.04, 0.3]}>
+            <boxGeometry args={[0.24, 0.08, 0.24]} />
+            <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
+          </mesh>
+          {/* Secondary outer nacelles — purely visual, give twin-engine look */}
+          <mesh position={[0.42, 0.02, 0.55]}>
+            <cylinderGeometry args={[0.08, 0.08, 0.3, 8]} />
+            <meshBasicMaterial color={env.starColor} transparent opacity={0.7} />
+          </mesh>
+          <mesh position={[-0.42, 0.02, 0.55]}>
+            <cylinderGeometry args={[0.08, 0.08, 0.3, 8]} />
+            <meshBasicMaterial color={env.starColor} transparent opacity={0.7} />
+          </mesh>
+          <mesh position={[0, 0.15, -0.22]} scale={[1.1, 0.8, 1.1]}>
+            <sphereGeometry args={[0.15, 14, 12]} />
+            <meshToonMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.7} />
+          </mesh>
+        </>
+      ) : shipId === "phantom" ? (
+        <>
+          {/* Phantom: long needle fuselage + swept delta wing, no nacelles */}
+          <mesh ref={fuselageRef} rotation={[-Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.14, 1.35, 6]} />
+            <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.55} />
+          </mesh>
+          <mesh ref={wingRef} position={[0, -0.02, 0.25]} rotation={[0, 0, 0]}>
+            <coneGeometry args={[0.75, 0.05, 4]} />
+            <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.35} />
+          </mesh>
+          <mesh position={[0, 0.08, -0.3]} scale={[1, 0.5, 1.2]}>
+            <sphereGeometry args={[0.1, 14, 12]} />
+            <meshToonMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.8} />
+          </mesh>
+        </>
+      ) : shipId === "scavenger" ? (
+        <>
+          {/* Scavenger: octahedron cargo hull + side pods + wing racks */}
+          <mesh ref={fuselageRef} rotation={[0, 0, Math.PI / 4]}>
+            <octahedronGeometry args={[0.38, 0]} />
+            <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.45} />
+          </mesh>
+          <mesh ref={wingRef} position={[0, -0.06, 0.12]}>
+            <boxGeometry args={[1.0, 0.08, 0.22]} />
+            <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh ref={nacelleRRef} position={[0.48, 0.02, 0.25]}>
+            <boxGeometry args={[0.2, 0.16, 0.3]} />
+            <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh ref={nacelleLRef} position={[-0.48, 0.02, 0.25]}>
+            <boxGeometry args={[0.2, 0.16, 0.3]} />
+            <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.4} />
+          </mesh>
+          {/* Cargo-grabber arms poking forward */}
+          <mesh position={[0.2, -0.08, -0.3]} rotation={[0, 0, -0.15]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.36, 6]} />
+            <meshToonMaterial color="#fbbf24" emissive="#d97706" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[-0.2, -0.08, -0.3]} rotation={[0, 0, 0.15]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.36, 6]} />
+            <meshToonMaterial color="#fbbf24" emissive="#d97706" emissiveIntensity={0.4} />
+          </mesh>
+        </>
+      ) : shipId === "void" ? (
+        <>
+          {/* Void Prototype: crystalline octahedron core + floating wing shards */}
+          <mesh ref={fuselageRef}>
+            <octahedronGeometry args={[0.32, 0]} />
+            <meshToonMaterial color="#60a5fa" emissive="#4c1d95" emissiveIntensity={0.7} />
+          </mesh>
+          <mesh ref={wingRef} position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.55, 0.035, 8, 20]} />
+            <meshToonMaterial color="#1d4ed8" emissive="#7c3aed" emissiveIntensity={0.6} />
+          </mesh>
+          {/* Floating shard panels */}
+          <mesh ref={nacelleRRef} position={[0.52, 0.04, 0.1]} rotation={[0, 0, 0.4]}>
+            <tetrahedronGeometry args={[0.14, 0]} />
+            <meshToonMaterial color="#dc2626" emissive="#7c3aed" emissiveIntensity={0.7} />
+          </mesh>
+          <mesh ref={nacelleLRef} position={[-0.52, 0.04, 0.1]} rotation={[0, 0, -0.4]}>
+            <tetrahedronGeometry args={[0.14, 0]} />
+            <meshToonMaterial color="#dc2626" emissive="#7c3aed" emissiveIntensity={0.7} />
+          </mesh>
+          <mesh position={[0, 0.08, -0.05]}>
+            <sphereGeometry args={[0.09, 14, 12]} />
+            <meshBasicMaterial color="#f0abfc" transparent opacity={0.9} />
+          </mesh>
+        </>
+      ) : (
+        <>
+          {/* Falcon (default): balanced wedge fighter */}
+          <mesh ref={fuselageRef} rotation={[-Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.22, 1.0, 8]} />
+            <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.45} />
+          </mesh>
+          <mesh ref={wingRef} position={[0, -0.03, 0.15]}>
+            <boxGeometry args={[1.1, 0.06, 0.32]} />
+            <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh ref={nacelleRRef} position={[0.55, -0.03, 0.28]}>
+            <boxGeometry args={[0.18, 0.05, 0.16]} />
+            <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
+          </mesh>
+          <mesh ref={nacelleLRef} position={[-0.55, -0.03, 0.28]}>
+            <boxGeometry args={[0.18, 0.05, 0.16]} />
+            <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
+          </mesh>
+          <mesh position={[0, 0.1, -0.18]} scale={[1, 0.7, 1]}>
+            <sphereGeometry args={[0.13, 14, 12]} />
+            <meshToonMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.7} />
+          </mesh>
+        </>
+      )}
       <mesh ref={engineRef} position={[0, 0, 0.55]}>
         <sphereGeometry args={[0.13, 12, 10]} />
         <meshBasicMaterial color={env.starColor} transparent opacity={0.75} />
@@ -3824,7 +3961,7 @@ function DashAfterimages({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
   );
 }
 
-function SpinningPreviewMesh({ color }: { color: string }) {
+function SpinningPreviewMesh({ color, shipId }: { color: string; shipId: string }) {
   const ref = useRef<THREE.Group>(null);
   useFrame((_, dt) => {
     if (ref.current) {
@@ -3832,16 +3969,100 @@ function SpinningPreviewMesh({ color }: { color: string }) {
       ref.current.rotation.x = Math.sin(performance.now() * 0.0008) * 0.2;
     }
   });
+  const darker = useMemo(() => {
+    const c = new THREE.Color(color);
+    c.multiplyScalar(0.72);
+    return `#${c.getHexString()}`;
+  }, [color]);
+  if (shipId === "juggernaut") {
+    return (
+      <group ref={ref}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.32, 0.36, 1.1, 8]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, -0.08, 0.12]}>
+          <boxGeometry args={[1.4, 0.14, 0.4]} />
+          <meshStandardMaterial color={darker} emissive={darker} emissiveIntensity={0.35} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.45, -0.02, 0.55]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.32, 8]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.9} />
+        </mesh>
+        <mesh position={[-0.45, -0.02, 0.55]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.32, 8]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+  if (shipId === "phantom") {
+    return (
+      <group ref={ref}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.16, 1.4, 6]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, -0.02, 0.25]}>
+          <coneGeometry args={[0.75, 0.06, 4]} />
+          <meshStandardMaterial color={darker} emissive={darker} emissiveIntensity={0.4} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, -0.02, 0.68]}>
+          <sphereGeometry args={[0.08, 10, 10]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.95} />
+        </mesh>
+      </group>
+    );
+  }
+  if (shipId === "scavenger") {
+    return (
+      <group ref={ref}>
+        <mesh rotation={[0, 0, Math.PI / 4]}>
+          <octahedronGeometry args={[0.42, 0]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, -0.08, 0.1]}>
+          <boxGeometry args={[1.0, 0.09, 0.22]} />
+          <meshStandardMaterial color={darker} emissive={darker} emissiveIntensity={0.35} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.22, -0.1, -0.32]} rotation={[0, 0, -0.15]}>
+          <cylinderGeometry args={[0.04, 0.04, 0.4, 6]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#d97706" emissiveIntensity={0.4} />
+        </mesh>
+        <mesh position={[-0.22, -0.1, -0.32]} rotation={[0, 0, 0.15]}>
+          <cylinderGeometry args={[0.04, 0.04, 0.4, 6]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#d97706" emissiveIntensity={0.4} />
+        </mesh>
+      </group>
+    );
+  }
+  if (shipId === "void") {
+    return (
+      <group ref={ref}>
+        <mesh>
+          <octahedronGeometry args={[0.36, 0]} />
+          <meshStandardMaterial color={color} emissive="#7c3aed" emissiveIntensity={0.8} roughness={0.2} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.58, 0.04, 8, 20]} />
+          <meshStandardMaterial color="#a78bfa" emissive="#7c3aed" emissiveIntensity={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, 0, 0]}>
+          <sphereGeometry args={[0.1, 14, 12]} />
+          <meshBasicMaterial color="#f0abfc" transparent opacity={0.9} />
+        </mesh>
+      </group>
+    );
+  }
   return (
     <group ref={ref}>
-      {/* Compact ship silhouette: fuselage cone + wide wing box + engine bulb */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <coneGeometry args={[0.28, 1.0, 8]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.4} />
       </mesh>
       <mesh position={[0, -0.05, 0.1]}>
         <boxGeometry args={[1.1, 0.09, 0.3]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.5} />
+        <meshStandardMaterial color={darker} emissive={darker} emissiveIntensity={0.35} roughness={0.5} />
       </mesh>
       <mesh position={[0, -0.05, 0.55]}>
         <sphereGeometry args={[0.14, 10, 10]} />
@@ -3851,13 +4072,13 @@ function SpinningPreviewMesh({ color }: { color: string }) {
   );
 }
 
-function ShipPreview({ color }: { color: string }) {
+function ShipPreview({ color, shipId }: { color: string; shipId: string }) {
   return (
     <div className="w-14 h-14 shrink-0 rounded-md bg-black/40 border border-white/10 overflow-hidden">
       <Canvas camera={{ position: [0, 0.3, 2], fov: 40 }} dpr={[1, 1.5]}>
         <ambientLight intensity={0.6} />
         <directionalLight position={[2, 3, 2]} intensity={0.6} />
-        <SpinningPreviewMesh color={color} />
+        <SpinningPreviewMesh color={color} shipId={shipId} />
       </Canvas>
     </div>
   );
@@ -4103,56 +4324,6 @@ function CosmeticPreview({ slot, value }: { slot: CosmeticSlotKind; value: strin
         <directionalLight position={[2, 3, 2]} intensity={0.5} />
         <SpinningCosmeticMesh slot={slot} value={value} />
       </Canvas>
-    </div>
-  );
-}
-
-function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
-  const [version, setVersion] = useState(0);
-  const list = useMemo(() => activeMissions(), [version]);
-  return (
-    <div className="flex flex-col gap-2 max-w-3xl mx-auto w-full">
-      {list.map(({ def, progress }) => {
-        const pct = Math.min(100, (progress.progress / def.target) * 100);
-        const ready = progress.progress >= def.target && !progress.claimed;
-        return (
-          <div
-            key={def.id}
-            className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-white text-sm">{def.label}</span>
-                <span className="text-[10px] text-accent-amber font-mono">{def.reward} coins</span>
-              </div>
-              <div className="text-xs text-slate-400">{def.description}</div>
-              <div className="mt-1 h-1 rounded bg-black/60 overflow-hidden">
-                <div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} />
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{progress.progress} / {def.target}</div>
-            </div>
-            {progress.claimed ? (
-              <span className="px-3 py-1 rounded text-xs font-bold uppercase bg-slate-600/30 border border-slate-500/40 text-slate-400">Claimed</span>
-            ) : (
-              <button
-                type="button"
-                disabled={!ready}
-                onClick={() => {
-                  const r = claimMissionReward(def.id);
-                  if (r.ok) {
-                    sounds.play("chime");
-                    refreshProfile();
-                    setVersion((v) => v + 1);
-                  }
-                }}
-                className={`px-3 py-1 rounded text-xs font-bold uppercase ${ready ? "bg-accent-amber/20 border border-accent-amber/50 text-accent-amber" : "bg-white/5 border border-white/10 text-slate-500"}`}
-              >
-                Claim
-              </button>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -4824,13 +4995,14 @@ function BiomeBlender({ gameRefs }: { gameRefs: React.RefObject<GameRefs> }) {
 }
 
 function Scene({
-  gameRefs, onDeath, onUiSync, env, tick,
+  gameRefs, onDeath, onUiSync, env, tick, shipId,
 }: {
   gameRefs: React.RefObject<GameRefs>;
   onDeath: () => void;
   onUiSync: () => void;
   env: Environment;
   tick: number;
+  shipId: string;
 }) {
   const bossFighting = gameRefs.current?.boss && gameRefs.current.boss.phase !== "defeated";
   const voidFight = bossFighting && gameRefs.current?.boss?.id === "void-tyrant";
@@ -4843,7 +5015,7 @@ function Scene({
       <directionalLight position={[5, 6, 4]} intensity={dirI} />
       <Starfield env={env} />
       <SpeedLines gameRefs={gameRefs} env={env} tick={tick} />
-      <Ship gameRefs={gameRefs} env={env} />
+      <Ship gameRefs={gameRefs} env={env} shipId={shipId} />
       <Obstacles gameRefs={gameRefs} env={env} tick={tick} />
       <ZapperBeams gameRefs={gameRefs} tick={tick} />
       <PowerUps gameRefs={gameRefs} tick={tick} />
@@ -5114,10 +5286,6 @@ export function SpaceShooterGame() {
   const [profile, setProfile] = useState(() => loadProfile());
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
   const isReturningPlayer = profile.firstRunCompleted;
-  // Roll daily missions on mount (no-op if already rolled today)
-  useEffect(() => {
-    try { rollMissionsIfNewDay(); } catch { /* noop */ }
-  }, []);
   // Tutorial removed — players learn the game by playing it.
   // Load player prefs from profile (or localStorage fallback)
   useEffect(() => {
@@ -5663,6 +5831,7 @@ export function SpaceShooterGame() {
             onUiSync={onUiSync}
             env={env}
             tick={tick}
+            shipId={profile.equippedShip}
           />
           <PostFx
             enabled={prefs.bloomEnabled}
@@ -5828,7 +5997,7 @@ export function SpaceShooterGame() {
                             key={s.id}
                             className={`flex gap-3 rounded-lg border p-3 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
                           >
-                            <ShipPreview color={s.hullTint} />
+                            <ShipPreview color={s.hullTint} shipId={s.id} />
                             <div className="flex flex-col gap-1 flex-1 min-w-0"><div className="flex items-center justify-between">
                               <span className="font-semibold text-white text-sm">{s.label}</span>
                               <span className="inline-block w-4 h-4 rounded border border-white/20" style={{ background: s.hullTint }} />
