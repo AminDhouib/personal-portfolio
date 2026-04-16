@@ -1,45 +1,77 @@
 "use client";
 
 /**
- * Decorative SVG overlay that renders progressively more cracks as the chaos
- * level rises. The opacity is driven by the data-chaos attribute on the
- * enclosing .pg-chaos-root (see destruction.css).
+ * Glass-crack overlays. Each crack is a localized impact point with radiating
+ * fractures, positioned in a specific corner of the container. Higher chaos
+ * levels reveal additional cracks.
  *
- * Cracks are pure SVG paths — no external assets, no state.
+ * No red tint, no color overlay — the effect should feel like the glass over
+ * the game has been struck, not that the game itself is in error.
+ *
+ * Each crack is wrapped in a container with a data attribute so CSS can show
+ * them progressively based on the parent's data-chaos.
  */
 export function CracksOverlay() {
   return (
-    <svg
-      className="pg-cracks"
-      viewBox="0 0 400 400"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <g stroke="#ff3355" strokeLinecap="round" fill="none" opacity="0.95">
-        {/* Short cracks — visible from level 3 (via CSS opacity). */}
-        <path d="M 60 20 L 72 40 L 70 60" strokeWidth="1.6" />
-        <path d="M 330 25 L 340 48 L 332 68" strokeWidth="1.6" />
-        <path d="M 20 150 L 45 165 L 55 190" strokeWidth="1.4" />
-        <path d="M 370 180 L 355 200 L 360 225" strokeWidth="1.4" />
+    <>
+      {/* Crack 1: top-right corner. Appears at chaos 3. */}
+      <div className="pg-crack pg-crack-1" data-chaos-min="3">
+        <GlassCrack />
+      </div>
+      {/* Crack 2: bottom-left corner. Appears at chaos 4. */}
+      <div className="pg-crack pg-crack-2" data-chaos-min="4">
+        <GlassCrack />
+      </div>
+      {/* Crack 3: center-right edge. Appears at chaos 5. */}
+      <div className="pg-crack pg-crack-3" data-chaos-min="5">
+        <GlassCrack />
+      </div>
+    </>
+  );
+}
 
-        {/* Medium cracks — more visible at level 4. */}
-        <path d="M 100 10 L 120 45 L 115 85 L 135 120" strokeWidth="2.2" />
-        <path d="M 280 380 L 265 340 L 280 300 L 270 260" strokeWidth="2.2" />
-        <path d="M 380 60 L 350 100 L 360 140" strokeWidth="1.9" />
-
-        {/* Large jagged cracks — dominant at level 5. */}
-        <path
-          d="M 0 90 L 30 100 L 60 85 L 95 110 L 130 95 L 170 130 L 200 115 L 240 150 L 280 135 L 320 165 L 360 150 L 400 175"
-          strokeWidth="2.6"
-        />
-        <path
-          d="M 200 0 L 210 35 L 195 70 L 215 105 L 200 140 L 220 175 L 205 210 L 225 245"
-          strokeWidth="2.4"
-        />
-        <path
-          d="M 0 300 L 40 290 L 80 310 L 120 295 L 160 315 L 200 300 L 240 320 L 280 305"
-          strokeWidth="2.1"
-        />
+/**
+ * A single glass-crack impact pattern. Rendered as a small SVG (viewBox 100x100)
+ * that's positioned and scaled by the parent container's CSS. Strokes are
+ * white + dark shadow to simulate depth against either dark or light themes.
+ */
+function GlassCrack() {
+  return (
+    <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden>
+      <defs>
+        <filter id="pg-crack-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0.5" dy="0.5" stdDeviation="0.4" floodColor="#000" floodOpacity="0.6" />
+        </filter>
+      </defs>
+      <g filter="url(#pg-crack-shadow)" fill="none" strokeLinecap="round">
+        {/* Impact point (tiny dark spot). */}
+        <circle cx="50" cy="50" r="1.2" fill="#0008" stroke="none" />
+        {/* Primary radiating fractures from impact. */}
+        <g stroke="#fff" strokeWidth="0.7">
+          <path d="M 50 50 L 18 14" />
+          <path d="M 50 50 L 78 20" />
+          <path d="M 50 50 L 90 55" />
+          <path d="M 50 50 L 70 88" />
+          <path d="M 50 50 L 20 86" />
+          <path d="M 50 50 L 8 55" />
+        </g>
+        {/* Secondary hairline fractures — shorter, branching off primaries. */}
+        <g stroke="#fff" strokeWidth="0.35" opacity="0.75">
+          <path d="M 34 32 L 26 22" />
+          <path d="M 66 34 L 72 24" />
+          <path d="M 74 62 L 82 68" />
+          <path d="M 60 72 L 66 82" />
+          <path d="M 32 68 L 24 74" />
+          <path d="M 26 50 L 16 48" />
+          <path d="M 40 24 L 34 12" />
+          <path d="M 74 46 L 84 40" />
+        </g>
+        {/* Concentric micro-cracks around impact — tiny arcs. */}
+        <g stroke="#fff" strokeWidth="0.25" opacity="0.55">
+          <path d="M 46 46 Q 50 43 54 46" />
+          <path d="M 44 54 Q 50 57 56 54" />
+          <path d="M 44 50 Q 44 47 46 45" />
+        </g>
       </g>
     </svg>
   );

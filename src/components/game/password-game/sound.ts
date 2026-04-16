@@ -5,7 +5,7 @@
  * button in the UI; until then, nothing plays.
  */
 
-type SfxKind = "rule-complete" | "rule-fail" | "rule-reveal" | "win" | "chaos" | "keypress";
+type SfxKind = "rule-complete" | "rule-fail" | "rule-reveal" | "win" | "chaos" | "crack" | "keypress";
 
 let audioCtx: AudioContext | null = null;
 let enabled = false;
@@ -59,6 +59,14 @@ export function play(kind: SfxKind): void {
     case "chaos":
       noise(ctx, 0.25, 0.08);
       break;
+    case "crack":
+      // Glass-breaking impression: sharp initial click, then tinkling high burst.
+      tone(ctx, 2800, 0.04, "square", 0.15);
+      setTimeout(() => filteredNoise(ctx, 0.22, 0.18, 4500), 15);
+      setTimeout(() => tone(ctx, 3200 + Math.random() * 400, 0.05, "triangle", 0.06), 80);
+      setTimeout(() => tone(ctx, 2600 + Math.random() * 300, 0.05, "triangle", 0.05), 140);
+      setTimeout(() => tone(ctx, 3800 + Math.random() * 200, 0.04, "triangle", 0.04), 200);
+      break;
     case "keypress":
       tone(ctx, 1400 + Math.random() * 200, 0.02, "square", 0.02);
       break;
@@ -98,6 +106,34 @@ function noise(ctx: AudioContext, duration: number, volume: number): void {
   gain.gain.setValueAtTime(volume, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
   src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start();
+}
+
+/** High-pass filtered noise burst — for tinkling-glass character. */
+function filteredNoise(
+  ctx: AudioContext,
+  duration: number,
+  volume: number,
+  cutoffHz: number
+): void {
+  const bufferSize = Math.floor(ctx.sampleRate * duration);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * volume;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = cutoffHz;
+  hp.Q.value = 0.7;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  src.connect(hp);
+  hp.connect(gain);
   gain.connect(ctx.destination);
   src.start();
 }

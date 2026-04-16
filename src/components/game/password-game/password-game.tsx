@@ -143,7 +143,7 @@ export function PasswordGame() {
 
   useEffect(() => {
     if (chaosLevel > prevChaos.current && chaosLevel >= 3) {
-      playSfx("chaos");
+      playSfx("crack");
     }
     prevChaos.current = chaosLevel;
   }, [chaosLevel]);
