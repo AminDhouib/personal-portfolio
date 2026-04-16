@@ -151,3 +151,25 @@ describe("Tier 3 — bold count rule", () => {
     expect(rule.validate(makeState("hello", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 3 — italic count rule", () => {
+  const def = TIER_3_RULES.find((r) => r.id === "italic-count")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("passes when enough chars are italic", () => {
+    const rule = def.create(mulberry32(1));
+    const n = rule.params.n as number;
+    const state: GameState = {
+      password: "xxxxxxxx",
+      formatting: Array.from({ length: 8 }, (_, i) => (i < n ? { italic: true } : {})),
+      elapsedSeconds: 0,
+      activeRuleIndex: 0,
+      rules: [rule],
+      seed: 1,
+    };
+    expect(rule.validate(state).passed).toBe(true);
+  });
+});

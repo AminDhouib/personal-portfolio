@@ -104,4 +104,22 @@ const boldCount: RuleDef = {
   },
 };
 
-export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase, boldCount];
+const italicCount: RuleDef = {
+  id: "italic-count",
+  tier: 3,
+  create(rng) {
+    const n = rangeInt(rng, 3, 6);
+    return {
+      id: "italic-count",
+      tier: 3,
+      description: `At least ${n} characters of your password must be italic.`,
+      params: { n },
+      validate(state) {
+        const c = countFmt(state.formatting, "italic");
+        return { passed: c >= n, message: `${c} / ${n}` };
+      },
+    };
+  },
+};
+
+export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase, boldCount, italicCount];
