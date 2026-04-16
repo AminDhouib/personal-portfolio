@@ -134,7 +134,7 @@ export function applyAction(
 ): GameState {
   switch (a.type) {
     case "toggleMemo":
-      if (s.phase === "playing") return { ...s, phase: "memo" };
+      if (s.phase === "playing" || s.phase === "ready") return { ...s, phase: "memo" };
       if (s.phase === "memo") return { ...s, phase: "playing" };
       return s;
 
