@@ -4,10 +4,11 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "next-themes";
 import {
   Rocket, Trophy, Shield, RotateCcw, Send,
   Volume2, VolumeX, Crosshair, Zap, Target,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, Pause, Play,
 } from "lucide-react";
 
 // ---------- constants ----------
@@ -43,7 +44,7 @@ const START_INVULN_MS = 2500;
 
 // `armed` = scene is alive (ship visible, speed lines flowing) but the run
 // hasn't started — waiting for the player's first mouse/touch/key input.
-type GameStatus = "armed" | "playing" | "dying" | "dead";
+type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
 type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp";
 type ObstacleVariant = "basic" | "heavy" | "speeder";
 type BulletStyle = "sprite" | "bolt" | "plasma";
@@ -96,6 +97,19 @@ const ENVIRONMENTS: Environment[] = [
     starColor: "#fed7aa",
   },
 ];
+
+// Light-mode "armed" palette — inverts the space so the game section doesn't
+// scream DARK MODE on an otherwise light portfolio page. Reverts to the
+// normal dark-space biome once the player starts the run.
+const INVERTED_ARMED_ENV: Environment = {
+  name: "Deep Space",
+  fog: "#e2e8f0",
+  ambient: "#94a3b8",
+  asteroidColor: "#64748b",
+  asteroidEmissive: "#334155",
+  bg: "radial-gradient(ellipse at center, #f8fafc 0%, #e2e8f0 70%, #cbd5e1 100%)",
+  starColor: "#1e293b",
+};
 
 // Switch biome every 35 seconds of play time
 function envForTime(seconds: number): Environment {
@@ -226,6 +240,11 @@ interface GameRefs {
   // Mobile flag — affects spawn rates / difficulty so the smaller arena
   // remains playable.
   isMobile: boolean;
+  // Smooth warp ramp — lerps 0→1 on activation, 1→0 on expiry (deceleration)
+  warpIntensity: number;
+  // Toggle: when true, armed-state colors lerp toward INVERTED_ARMED_ENV
+  // (used on light-themed portfolio to blend with the page).
+  invertedArmed: boolean;
   // Distance-based biome system (replaces the fixed time-based cycle)
   currentEnv: Environment;
   nextBiomeAt: number; // distance in metres at which to swap biomes
@@ -272,6 +291,8 @@ function createRefs(): GameRefs {
     warpActiveLast: false,
     isMobile: typeof window !== "undefined" &&
       (matchMedia("(pointer: coarse)").matches || window.innerWidth < 640),
+    warpIntensity: 0,
+    invertedArmed: false,
     currentEnv: initEnv,
     nextBiomeAt: pickNextBiomeDistance(0),
     lastBullet: 0, lastSpawn: 0, lastPowerUpSpawn: 0, lastUiSync: 0,
@@ -572,7 +593,7 @@ class SoundManager {
     return this.enabled;
   }
 
-  private ensure() {
+  ensure() {
     if (this.ctx) {
       if (this.ctx.state === "suspended") this.ctx.resume();
       return;
@@ -828,40 +849,47 @@ class SoundManager {
   }
 
   // -------- Music (procedurally generated, no asset files) --------
-  // Multi-section sequencer: each "track" (gameplay / leaderboard) cycles
-  // through several chord-progression sections so the music doesn't feel
-  // like a 2-bar loop. Every section has its own lead + bass pattern and
-  // lasts 16 8th-note steps before advancing.
+  // Multi-section sequencer with space-themed texture layers:
+  //  - Lead melody with detuned shimmer (chorus effect)
+  //  - Bass pulse
+  //  - Continuous low drone pad (spaceship engine room hum)
+  //  - Periodic scanner pings, radio crackle bursts, deep-space rumbles
+  // Melodies use rests (0 = silent step), wider intervals, and distinctive
+  // motifs so the soundtrack is recognizable rather than generic arpeggios.
 
+  // 0 = rest (silence on that step — creates rhythmic breathing room).
   private static GAMEPLAY_SECTIONS: { lead: number[]; bass: number[]; leadType: OscillatorType }[] = [
-    // A-minor rising arpeggio — driving energy
-    { lead: [440, 523.25, 659.25, 880, 659.25, 523.25, 440, 880], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 98, 98], leadType: "triangle" },
-    // E-minor ascending — tension
-    { lead: [329.63, 392, 493.88, 659.25, 493.88, 392, 329.63, 659.25], bass: [82.41, 82.41, 98, 98, 73.42, 73.42, 82.41, 82.41], leadType: "triangle" },
-    // D-minor descending — moody
-    { lead: [587.33, 523.25, 440, 349.23, 440, 523.25, 587.33, 698.46], bass: [146.83, 146.83, 130.81, 130.81, 110, 110, 98, 98], leadType: "sine" },
-    // G-major bright lift — contrast
-    { lead: [392, 493.88, 587.33, 783.99, 587.33, 493.88, 392, 783.99], bass: [98, 98, 123.47, 123.47, 146.83, 146.83, 98, 98], leadType: "triangle" },
-    // F-major suspended — floating
-    { lead: [349.23, 440, 523.25, 698.46, 523.25, 440, 349.23, 523.25], bass: [87.31, 87.31, 110, 110, 130.81, 130.81, 87.31, 87.31], leadType: "sine" },
-    // A-minor high octave variation — climax
-    { lead: [880, 1046.5, 1318.5, 880, 1046.5, 1318.5, 1760, 1318.5], bass: [110, 110, 130.81, 130.81, 146.83, 146.83, 98, 98], leadType: "triangle" },
-    // C-major resolving — release
-    { lead: [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 523.25, 659.25], bass: [130.81, 130.81, 110, 110, 87.31, 87.31, 98, 98], leadType: "sine" },
-    // Return to Am with octave drop — reset
-    { lead: [220, 261.63, 329.63, 440, 329.63, 261.63, 220, 440], bass: [110, 110, 87.31, 87.31, 73.42, 73.42, 98, 98], leadType: "triangle" },
+    // "Launch" motif — signature ascending 5th leap then fall-back
+    { lead: [440, 0, 659.25, 880, 0, 659.25, 0, 880], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 98, 98], leadType: "triangle" },
+    // "Drift" — slow wide intervals, spacey and eerie
+    { lead: [329.63, 0, 0, 659.25, 493.88, 0, 329.63, 0], bass: [82.41, 82.41, 98, 98, 73.42, 73.42, 82.41, 82.41], leadType: "sine" },
+    // "Pulse" — syncopated rhythm, octave jumps
+    { lead: [0, 587.33, 293.66, 0, 587.33, 0, 440, 880], bass: [146.83, 146.83, 130.81, 130.81, 110, 110, 98, 98], leadType: "triangle" },
+    // "Nebula" — high shimmering, tritone tension
+    { lead: [783.99, 0, 554.37, 783.99, 0, 0, 1046.5, 783.99], bass: [98, 98, 123.47, 123.47, 87.31, 87.31, 98, 98], leadType: "sine" },
+    // "Comet" — fast descending run then silence
+    { lead: [1318.5, 1046.5, 880, 659.25, 0, 0, 0, 440], bass: [87.31, 87.31, 110, 110, 130.81, 130.81, 87.31, 87.31], leadType: "triangle" },
+    // "Supernova" — the signature motif returns an octave higher (climax)
+    { lead: [880, 0, 1318.5, 1760, 0, 1318.5, 0, 1760], bass: [110, 110, 130.81, 130.81, 146.83, 146.83, 98, 98], leadType: "triangle" },
+    // "Resolve" — descending 4ths, calming
+    { lead: [1046.5, 0, 783.99, 0, 523.25, 0, 392, 523.25], bass: [130.81, 130.81, 110, 110, 87.31, 87.31, 98, 98], leadType: "sine" },
+    // "Echo" — the launch motif low and quiet, then rest (reset)
+    { lead: [220, 0, 329.63, 440, 0, 0, 0, 0], bass: [110, 110, 87.31, 87.31, 73.42, 73.42, 98, 98], leadType: "triangle" },
   ];
 
   private static LEADERBOARD_SECTIONS: { lead: number[]; bass: number[]; leadType: OscillatorType }[] = [
-    // E-minor reflective
-    { lead: [329.63, 415.30, 493.88, 659.25, 493.88, 415.30, 329.63, 246.94], bass: [82.41, 82.41, 110, 110, 73.42, 73.42, 98, 98], leadType: "sine" },
-    // A-minor gentle
-    { lead: [220, 261.63, 329.63, 440, 329.63, 261.63, 220, 329.63], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 110, 110], leadType: "sine" },
-    // D-major hopeful
-    { lead: [293.66, 369.99, 440, 587.33, 440, 369.99, 293.66, 440], bass: [146.83, 146.83, 110, 110, 123.47, 123.47, 146.83, 146.83], leadType: "triangle" },
-    // G-major warm resolve
-    { lead: [392, 493.88, 587.33, 392, 493.88, 587.33, 783.99, 587.33], bass: [98, 98, 82.41, 82.41, 73.42, 73.42, 98, 98], leadType: "sine" },
+    // "Aftermath" — sparse, wide intervals
+    { lead: [329.63, 0, 0, 659.25, 0, 493.88, 0, 246.94], bass: [82.41, 82.41, 110, 110, 73.42, 73.42, 98, 98], leadType: "sine" },
+    // "Memory" — gentle stepwise with pauses
+    { lead: [220, 261.63, 0, 329.63, 0, 0, 220, 0], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 110, 110], leadType: "sine" },
+    // "Stars" — rising hope with held high note
+    { lead: [293.66, 0, 440, 0, 587.33, 587.33, 0, 0], bass: [146.83, 146.83, 110, 110, 123.47, 123.47, 146.83, 146.83], leadType: "triangle" },
+    // "Home" — the launch motif low and gentle, nostalgic
+    { lead: [220, 0, 329.63, 440, 0, 329.63, 0, 220], bass: [98, 98, 82.41, 82.41, 73.42, 73.42, 98, 98], leadType: "sine" },
   ];
+
+  // Drone pad node — a sustained low hum under the music
+  private dronePad: { osc1: OscillatorNode; osc2: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
 
   startGameplayMusic() {
     this.startMusicLoop("gameplay", {
@@ -881,6 +909,107 @@ class SoundManager {
       bassType: "triangle",
       masterTarget: 0.11,
     });
+  }
+
+  private startDronePad(masterGain: GainNode) {
+    this.stopDronePad();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.14, t + 2);
+    gain.connect(masterGain);
+    // Two slightly detuned sines at ~55Hz — creates a warm "ship engine" hum
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.value = 55;
+    osc1.connect(gain);
+    osc1.start(t);
+    const osc2 = ctx.createOscillator();
+    osc2.type = "sine";
+    osc2.frequency.value = 55.8; // ~25 cents sharp → slow beating chorus
+    osc2.connect(gain);
+    osc2.start(t);
+    // Slow LFO vibrato so the drone breathes
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 0.15; // very slow
+    lfoGain.gain.value = 3;
+    lfo.connect(lfoGain).connect(osc1.frequency);
+    lfo.start(t);
+    this.dronePad = { osc1, osc2, lfo, gain };
+  }
+
+  private stopDronePad() {
+    if (!this.dronePad || !this.ctx) return;
+    const { osc1, osc2, lfo, gain } = this.dronePad;
+    const t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(gain.gain.value, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.5);
+    setTimeout(() => {
+      try { osc1.stop(); } catch { /* */ }
+      try { osc2.stop(); } catch { /* */ }
+      try { lfo.stop(); } catch { /* */ }
+    }, 600);
+    this.dronePad = null;
+  }
+
+  // Space texture one-shots triggered periodically inside the sequencer.
+  private playScannerPing(dest: AudioNode) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(2400, t);
+    osc.frequency.exponentialRampToValueAtTime(1800, t + 0.12);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(gain).connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+
+  private playRadioCrackle(dest: AudioNode) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const dur = 0.18;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 5);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.frequency.value = 3500;
+    filt.Q.value = 6;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.06, t);
+    src.connect(filt).connect(gain).connect(dest);
+    src.start(t);
+  }
+
+  private playDeepRumble(dest: AudioNode) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(35, t);
+    osc.frequency.exponentialRampToValueAtTime(22, t + 1.2);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.2, t + 0.3);
+    gain.gain.linearRampToValueAtTime(0, t + 1.2);
+    osc.connect(gain).connect(dest);
+    osc.start(t);
+    osc.stop(t + 1.3);
   }
 
   private startMusicLoop(
@@ -904,6 +1033,8 @@ class SoundManager {
     masterGain.gain.setValueAtTime(0, t);
     masterGain.gain.linearRampToValueAtTime(cfg.masterTarget, t + 0.8);
     masterGain.connect(ctx.destination);
+    // Drone pad underneath — a sustained low hum giving "spaceship interior"
+    this.startDronePad(masterGain);
     const beatMs = 60000 / cfg.bpm / 2; // 8th notes
     let step = 0;
     let sectionIdx = 0;
@@ -914,27 +1045,40 @@ class SoundManager {
       const sectionStep = step % cfg.stepsPerSection;
       const leadF = sec.lead[sectionStep % sec.lead.length];
       const bassF = sec.bass[sectionStep % sec.bass.length];
-      // Lead voice
-      const leadOsc = this.ctx.createOscillator();
-      const leadGain = this.ctx.createGain();
-      leadOsc.type = sec.leadType;
-      leadOsc.frequency.value = leadF;
-      leadGain.gain.setValueAtTime(0.36, now);
-      leadGain.gain.exponentialRampToValueAtTime(0.001, now + (beatMs / 1000) * 0.85);
-      leadOsc.connect(leadGain).connect(masterGain);
-      leadOsc.start(now);
-      leadOsc.stop(now + (beatMs / 1000));
-      // Harmony: every 4th step add a fifth above for richness
-      if (step % 4 === 2) {
+      const dur = beatMs / 1000;
+      // Lead voice (skip if 0 = rest)
+      if (leadF > 0) {
+        const leadOsc = this.ctx.createOscillator();
+        const leadGain = this.ctx.createGain();
+        leadOsc.type = sec.leadType;
+        leadOsc.frequency.value = leadF;
+        leadGain.gain.setValueAtTime(0.34, now);
+        leadGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.85);
+        leadOsc.connect(leadGain).connect(masterGain);
+        leadOsc.start(now);
+        leadOsc.stop(now + dur);
+        // Shimmer: detuned copy ~6 cents sharp creates a chorus/space-pad
+        const shimOsc = this.ctx.createOscillator();
+        const shimGain = this.ctx.createGain();
+        shimOsc.type = "sine";
+        shimOsc.frequency.value = leadF * 1.0035; // ~6 cents sharp
+        shimGain.gain.setValueAtTime(0.12, now);
+        shimGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.9);
+        shimOsc.connect(shimGain).connect(masterGain);
+        shimOsc.start(now);
+        shimOsc.stop(now + dur);
+      }
+      // Harmony: every 4th step add a fifth above
+      if (leadF > 0 && step % 4 === 2) {
         const harmOsc = this.ctx.createOscillator();
         const harmGain = this.ctx.createGain();
         harmOsc.type = "sine";
         harmOsc.frequency.value = leadF * 1.5;
-        harmGain.gain.setValueAtTime(0.12, now);
-        harmGain.gain.exponentialRampToValueAtTime(0.001, now + (beatMs / 1000) * 0.6);
+        harmGain.gain.setValueAtTime(0.10, now);
+        harmGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.6);
         harmOsc.connect(harmGain).connect(masterGain);
         harmOsc.start(now);
-        harmOsc.stop(now + (beatMs / 1000) * 0.7);
+        harmOsc.stop(now + dur * 0.7);
       }
       // Bass — quarter notes (every other 8th)
       if (step % 2 === 0) {
@@ -942,11 +1086,24 @@ class SoundManager {
         const bassGain = this.ctx.createGain();
         bassOsc.type = cfg.bassType;
         bassOsc.frequency.value = bassF;
-        bassGain.gain.setValueAtTime(0.48, now);
-        bassGain.gain.exponentialRampToValueAtTime(0.001, now + (beatMs / 1000) * 1.6);
+        bassGain.gain.setValueAtTime(0.45, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.6);
         bassOsc.connect(bassGain).connect(masterGain);
         bassOsc.start(now);
-        bassOsc.stop(now + (beatMs / 1000) * 1.7);
+        bassOsc.stop(now + dur * 1.7);
+      }
+      // ---- Space texture events (periodic) ----
+      // Scanner ping every ~4s (every section start)
+      if (step > 0 && step % cfg.stepsPerSection === 0) {
+        this.playScannerPing(masterGain);
+      }
+      // Radio crackle burst every ~8s
+      if (step > 0 && step % (cfg.stepsPerSection * 2) === 8) {
+        this.playRadioCrackle(masterGain);
+      }
+      // Deep-space rumble every ~16s
+      if (step > 0 && step % (cfg.stepsPerSection * 4) === 0) {
+        this.playDeepRumble(masterGain);
       }
       step++;
       // Advance section every N steps so the progression evolves
@@ -959,6 +1116,7 @@ class SoundManager {
 
   // Crossfade the current music out over `fadeSec` seconds (default 0.5).
   stopMusic(fadeSec = 0.5) {
+    this.stopDronePad();
     if (!this.music || !this.ctx) {
       this.music = null;
       return;
@@ -1034,8 +1192,10 @@ function runTick(
     g.currentEnv = pickRandomBiome(g.currentEnv);
     g.nextBiomeAt = pickNextBiomeDistance(g.distance);
   }
-  // Smooth biome lerp toward current env's colors.
-  const tc = envColors(g.currentEnv);
+  // Color target: inverted (light-mode armed) or the current biome.
+  // The lerp handles a smooth cross-fade when the player starts the run.
+  const useInverted = g.invertedArmed && g.status === "armed";
+  const tc = envColors(useInverted ? INVERTED_ARMED_ENV : g.currentEnv);
   const colorLerp = Math.min(1, dt * 1.5);
   g.fogColor.lerp(tc.fog, colorLerp);
   g.ambientColor.lerp(tc.ambient, colorLerp);
@@ -1130,11 +1290,16 @@ function runTick(
     return;
   }
 
-  // Always-on: ship lerp, camera, speed lines. During warp the ship LURCHES
-  // forward — instant input response + everything in the world rushes past
-  // many times faster. ~10× perceived speed.
-  const warpActive = g.status === "playing" && isPowerUpActive(g, "warp");
-  const lerpFactor = warpActive ? dt * 90 : dt * 11;
+  // Warp intensity ramps up on activation and ramps DOWN on expiry so the
+  // transition out of warp is a smooth deceleration, not a hard cut.
+  const warpTarget = (g.status === "playing" && isPowerUpActive(g, "warp")) ? 1 : 0;
+  const warpRampSpeed = warpTarget > 0 ? dt * 4 : dt * 1.8; // fast in, slower out
+  g.warpIntensity = THREE.MathUtils.lerp(g.warpIntensity, warpTarget, Math.min(1, warpRampSpeed));
+  if (g.warpIntensity < 0.01) g.warpIntensity = 0;
+  const wi = g.warpIntensity; // shorthand
+  const warpActive = wi > 0.05;
+  // Ship lerp, camera, speed lines. Warp intensity interpolates everything.
+  const lerpFactor = dt * THREE.MathUtils.lerp(11, 90, wi);
   const lerp = Math.min(1, lerpFactor);
   g.shipX += (g.targetX - g.shipX) * lerp;
   g.shipY += (g.targetY - g.shipY) * lerp;
@@ -1142,22 +1307,22 @@ function runTick(
   g.shipRotZ = THREE.MathUtils.lerp(g.shipRotZ, targetBank, 0.18);
   g.cameraTargetX = g.shipX * 0.18;
   g.cameraTargetY = g.shipY * 0.12;
-  // Camera Z respects portrait so the wider FOV setup isn't overridden.
+  // Camera Z: smooth interpolation between base and warp-punch positions
   const baseCamZ = portraitOrMobile ? 7.5 : 5;
   const warpCamZ = portraitOrMobile ? 6.0 : 3.9;
-  g.cameraTargetZ = warpActive ? warpCamZ : baseCamZ;
+  g.cameraTargetZ = THREE.MathUtils.lerp(baseCamZ, warpCamZ, wi);
 
-  const desiredLines = warpActive ? 60 : 32;
+  const desiredLines = wi > 0.5 ? 60 : 32;
   while (g.speedLines.length < desiredLines) {
     g.speedLines.push({
       x: (Math.random() - 0.5) * 14,
       y: (Math.random() - 0.5) * 8,
       z: -8 - Math.random() * 32,
-      length: warpActive ? 4 + Math.random() * 4 : 1.4 + Math.random() * 2.6,
+      length: THREE.MathUtils.lerp(1.4, 5, wi) + Math.random() * 2.6,
       life: 0,
     });
   }
-  const lineSpeed = warpActive ? 360 : 65; // ~5× during warp
+  const lineSpeed = THREE.MathUtils.lerp(65, 360, wi);
   for (const l of g.speedLines) {
     l.z += step * lineSpeed;
     const t = THREE.MathUtils.clamp((l.z + 40) / 44, 0, 1);
@@ -1178,7 +1343,7 @@ function runTick(
   g.targetY = Math.max(-hh, Math.min(hh, g.targetY));
 
   if (g.status !== "playing") {
-    // Throttled UI sync even while armed so the HUD render stays alive
+    // Paused / armed / dead — just sync HUD and keep speed lines animated
     if (now - g.lastUiSync > 200) {
       g.lastUiSync = now;
       onUiSync();
@@ -1210,7 +1375,7 @@ function runTick(
   g.score += step * 8;
   // Distance: matches forward asteroid speed so the score "feels" like flight.
   // Warp turbo-charges the distance counter to match the visible speed.
-  const distMultiplier = warpActive ? 6 : 1;
+  const distMultiplier = THREE.MathUtils.lerp(1, 6, wi);
   g.distance += step * (10 + difficulty(g) * 4) * distMultiplier;
 
   // Auto-fire
@@ -1248,7 +1413,7 @@ function runTick(
 
   // Move + collide obstacles. Warp multiplies forward velocity so they whip
   // past the ship dramatically.
-  const obstacleSpeedMul = warpActive ? 5 : 1;
+  const obstacleSpeedMul = THREE.MathUtils.lerp(1, 5, wi);
   for (let i = g.obstacles.length - 1; i >= 0; i--) {
     const o = g.obstacles[i];
     o.z += o.vz * step * obstacleSpeedMul;
@@ -2198,6 +2363,19 @@ export function SpaceShooterGame() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const togglePause = useCallback(() => {
+    const g = gameRefs.current;
+    if (g.status === "playing") {
+      g.status = "paused";
+      sounds.stopMusic(0.3);
+      setUi((u) => ({ ...u, status: "paused" }));
+    } else if (g.status === "paused") {
+      g.status = "playing";
+      sounds.startGameplayMusic();
+      setUi((u) => ({ ...u, status: "playing" }));
+    }
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -2217,6 +2395,12 @@ export function SpaceShooterGame() {
     if (typeof window === "undefined") return false;
     return navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches;
   }, []);
+  const { resolvedTheme } = useTheme();
+  const invertedArmed = resolvedTheme === "light" && ui.status === "armed";
+  // Mirror to gameRefs so runTick can pick the right color target each frame.
+  useEffect(() => {
+    gameRefs.current.invertedArmed = invertedArmed;
+  }, [invertedArmed]);
 
   // sync sound manager with React state
   useEffect(() => {
@@ -2287,6 +2471,7 @@ export function SpaceShooterGame() {
     g.scorePopups.length = 0;
     g.shieldActiveLast = false;
     g.warpActiveLast = false;
+    g.warpIntensity = 0;
     g.currentEnv = ENVIRONMENTS[0];
     g.nextBiomeAt = pickNextBiomeDistance(0);
     sounds.stopWarpLoop();
@@ -2374,6 +2559,10 @@ export function SpaceShooterGame() {
     const el = containerRef.current;
     if (!el) return;
 
+    // Resume AudioContext on ANY interaction — Chrome requires a user gesture
+    // but pointermove alone may not qualify. Pointerdown/touchstart always do.
+    const ensureAudio = () => sounds.ensure();
+
     const updateTarget = (clientX: number, clientY: number) => {
       const g = gameRefs.current;
       if (g.status !== "armed" && g.status !== "playing") return;
@@ -2387,20 +2576,30 @@ export function SpaceShooterGame() {
     const tryStart = () => {
       const g = gameRefs.current;
       if (g.status === "armed") startRun(g);
+      // Unpause on movement
+      if (g.status === "paused") g.status = "playing";
     };
 
     const onMove = (e: PointerEvent) => {
+      ensureAudio();
+      tryStart();
+      updateTarget(e.clientX, e.clientY);
+    };
+    const onDown = (e: PointerEvent) => {
+      ensureAudio();
       tryStart();
       updateTarget(e.clientX, e.clientY);
     };
     const onTouch = (e: TouchEvent) => {
       if (e.touches.length > 0) {
         e.preventDefault();
+        ensureAudio();
         tryStart();
         updateTarget(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
     el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerdown", onDown);
     el.addEventListener("touchmove", onTouch, { passive: false });
     el.addEventListener("touchstart", onTouch, { passive: false });
 
@@ -2437,6 +2636,7 @@ export function SpaceShooterGame() {
 
     return () => {
       el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("touchmove", onTouch);
       el.removeEventListener("touchstart", onTouch);
       window.removeEventListener("keydown", onKey);
@@ -2446,69 +2646,24 @@ export function SpaceShooterGame() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* HUD */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <div className="flex items-center gap-1.5 text-(--muted)">
-          <Rocket className="h-3.5 w-3.5 text-accent-blue" />
-          <span className="font-mono font-semibold tabular-nums text-accent-blue">{ui.score}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
-          {ui.seconds.toFixed(0)}s
-        </div>
-        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
-          {ui.distance}m
-        </div>
-        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
-          {ui.kills} kills
-        </div>
-        {ui.active.map((a) => {
-          const def = POWERUP_DEFS[a.type];
-          const Icon = a.type === "shield" ? Shield : a.type === "triple" ? Crosshair : a.type === "rapid" ? Zap : a.type === "warp" ? Rocket : Target;
-          const remaining = (a.remainingMs / 1000).toFixed(1);
-          return (
-            <div key={a.type} className="flex items-center gap-1.5 font-mono" style={{ color: def.color }}>
-              <Icon className="h-3.5 w-3.5" />
-              <span className="tabular-nums">{remaining}s</span>
-            </div>
-          );
-        })}
-        {highScore > 0 && (
-          <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
-            <Trophy className="h-3.5 w-3.5 text-accent-amber" />
-            <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
-          </div>
-        )}
-        <button
-          onClick={toggleSound}
-          aria-label={soundEnabled ? "Mute sound" : "Enable sound"}
-          className="rounded-md border border-(--border) p-1.5 text-(--muted) hover:text-(--foreground) transition-colors"
-        >
-          {soundEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-        </button>
-        <button
-          onClick={toggleFullscreen}
-          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          className="rounded-md border border-(--border) p-1.5 text-(--muted) hover:text-(--foreground) transition-colors"
-        >
-          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        </button>
-      </div>
-
+    <div>
       {/* 3D Canvas — responsive across mobile / 16:9 / 21:9 with a cap so
           super-ultrawide viewports get letterboxed instead of giving the
-          player extra play area. Fullscreen mode fills the screen. */}
+          player extra play area. Fullscreen mode fills the screen.
+          touch-none is only applied while the game is consuming touches;
+          during dead/dying we allow normal touch so the death overlay's
+          Fly Again button is tappable on mobile fullscreen. */}
       <div
         ref={containerRef}
-        className={`relative rounded-xl border border-(--border) overflow-hidden touch-none mx-auto ${
+        className={`relative rounded-xl border border-(--border) overflow-hidden mx-auto ${
+          (ui.status === "playing" || ui.status === "armed" || ui.status === "paused") ? "touch-none" : "touch-auto"
+        } ${
           isFullscreen
             ? "fixed inset-0 z-50 w-screen h-screen rounded-none border-0"
-            // Default (mobile) is portrait 3:4 so it feels native on phones;
-            // sm:+ switches to fixed-height landscape.
             : "w-full aspect-3/4 sm:aspect-auto sm:h-115"
         }`}
         style={{
-          background: env.bg,
+          background: invertedArmed ? INVERTED_ARMED_ENV.bg : env.bg,
           cursor: ui.status === "playing" ? "none" : "default",
           // Cap so 16:1 monitors letterbox at ~21:9, AND cap mobile portrait
           // height so the canvas doesn't dominate the viewport on tall phones.
@@ -2526,16 +2681,106 @@ export function SpaceShooterGame() {
           />
         </Canvas>
 
-        {/* Biome label */}
-        {ui.status === "playing" && (
-          <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-accent-blue/80">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-blue animate-pulse" />
-            {env.name}
-          </div>
+        {/* ===== In-canvas HUD — lives inside the 3D viewport ===== */}
+        {(ui.status === "playing" || ui.status === "paused") && (
+          <>
+            {/* Top-left: score + distance + kills — styled to match game aesthetic */}
+            <div className="pointer-events-none absolute top-3 left-3 flex flex-col gap-1.5 text-xs sm:text-sm">
+              <div className="flex items-center gap-4 rounded-lg bg-black/50 backdrop-blur-sm px-3 py-1.5 border border-white/10">
+                <span className="flex items-center gap-1.5 font-mono font-bold tabular-nums text-accent-blue">
+                  <Rocket className="h-3.5 w-3.5" />
+                  {ui.score}
+                </span>
+                <span className="font-mono tabular-nums text-white/80">{ui.distance}m</span>
+                <span className="font-mono tabular-nums text-white/80">{ui.kills} kills</span>
+                <span className="font-mono tabular-nums text-white/50">{ui.seconds.toFixed(0)}s</span>
+              </div>
+              {/* Active power-ups */}
+              {ui.active.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {ui.active.map((a) => {
+                    const def = POWERUP_DEFS[a.type];
+                    const Icon = a.type === "shield" ? Shield : a.type === "triple" ? Crosshair : a.type === "rapid" ? Zap : a.type === "warp" ? Rocket : Target;
+                    const pct = Math.min(100, (a.remainingMs / POWERUP_DURATION_MS) * 100);
+                    return (
+                      <div key={a.type} className="flex items-center gap-1 rounded-md bg-black/50 backdrop-blur-sm px-2 py-1 border border-white/10" style={{ borderColor: `${def.color}55` }}>
+                        <Icon className="h-3 w-3" style={{ color: def.color }} />
+                        <div className="h-1 w-10 rounded-full bg-white/15 overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: def.color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Top-right: best + controls (pause / mute / fullscreen) */}
+            <div className="absolute top-3 right-3 flex items-center gap-2">
+              {highScore > 0 && (
+                <div className="pointer-events-none flex items-center gap-1 rounded-lg bg-black/50 backdrop-blur-sm px-2.5 py-1.5 border border-white/10 text-xs font-mono tabular-nums text-accent-amber">
+                  <Trophy className="h-3 w-3" />
+                  {highScore}
+                </div>
+              )}
+              <button
+                onClick={togglePause}
+                aria-label={ui.status === "paused" ? "Resume" : "Pause"}
+                className="rounded-lg bg-black/50 backdrop-blur-sm p-1.5 border border-white/10 text-white/80 hover:text-white transition-colors"
+              >
+                {ui.status === "paused" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={toggleSound}
+                aria-label={soundEnabled ? "Mute" : "Unmute"}
+                className="rounded-lg bg-black/50 backdrop-blur-sm p-1.5 border border-white/10 text-white/80 hover:text-white transition-colors"
+              >
+                {soundEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                className="rounded-lg bg-black/50 backdrop-blur-sm p-1.5 border border-white/10 text-white/80 hover:text-white transition-colors"
+              >
+                {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+
+            {/* Biome label — bottom center */}
+            <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/40">
+              <span className="h-1 w-1 rounded-full bg-accent-blue/60 animate-pulse" />
+              {env.name}
+            </div>
+          </>
         )}
 
         {/* Pulsing instruction overlay — anchored low so the ship in the
             centre of the canvas stays visible behind it. */}
+        {/* Pause overlay */}
+        <AnimatePresence>
+          {ui.status === "paused" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50 backdrop-blur-[2px]"
+            >
+              <div className="text-xs uppercase tracking-[0.3em] text-white/60 font-bold">
+                Paused
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={togglePause}
+                className="rounded-xl bg-white/10 border border-white/20 backdrop-blur-md px-6 py-2.5 text-sm font-semibold text-white"
+              >
+                Resume
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Armed instructions */}
         <AnimatePresence>
           {ui.status === "armed" && (
             <motion.div
