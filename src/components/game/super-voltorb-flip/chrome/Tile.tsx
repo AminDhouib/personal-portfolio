@@ -1,6 +1,7 @@
 "use client";
 
 import type { Tile as TileData } from "../types";
+import { Explosion } from "./Explosion";
 
 const ASSETS = "/games/super-voltorb-flip/sprites";
 
@@ -12,12 +13,18 @@ const PIXEL: React.CSSProperties = {
 };
 
 /**
- * Map a Tile's current flipped/animFrame state to its sprite URL.
- * Frames 0-5:  pressed-blank
- *        6-11: flip phase 0
- *        12-17: flip phase 1
- *        18:   mid-flip reveal (value-specific)
- *        19+:  settled value (voltorbs keep animating through explosion)
+ * Map a Tile's current flipped/animFrame state to its underlying sprite URL.
+ * Explosion (for voltorbs in animFrame >= 19) is layered as a separate
+ * Explosion component so the revealed voltorb sprite remains visible
+ * underneath the explosion cloud.
+ *
+ * Frame phases:
+ *   not flipped: blank
+ *   0-5:  pressed-blank (just clicked)
+ *   6-11: flip phase 0 (sprite squeezing)
+ *   12-17: flip phase 1 (sprite turned)
+ *   18:   mid-flip reveal (value-specific edge-on sprite)
+ *   19+:  fully settled value sprite (Explosion layer handles the cloud)
  */
 function tileSprite(tile: TileData): string {
   if (!tile.flipped) return `${ASSETS}/tile/blank.png`;
@@ -35,9 +42,11 @@ function tileSprite(tile: TileData): string {
       ? `${ASSETS}/tile/voltorb_flip.png`
       : `${ASSETS}/tile/${tile.value}_flip.png`;
   }
-  if (tile.value !== 0) return `${ASSETS}/tile/${tile.value}.png`;
-  const explodeFrame = Math.min(8, Math.floor((f - 19) / 7));
-  return `${ASSETS}/tile/explode_${explodeFrame}.png`;
+  // 19+: settled tile face. The Explosion overlay (rendered separately)
+  // animates on top for voltorbs.
+  return tile.value === 0
+    ? `${ASSETS}/tile/voltorb.png`
+    : `${ASSETS}/tile/${tile.value}.png`;
 }
 
 export function Tile({
@@ -109,6 +118,9 @@ export function Tile({
             ),
           )}
         </div>
+      )}
+      {tile.value === 0 && tile.flipped && tile.animFrame !== null && (
+        <Explosion animFrame={tile.animFrame} />
       )}
     </button>
   );
