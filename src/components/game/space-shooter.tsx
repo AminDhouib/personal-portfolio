@@ -1921,35 +1921,107 @@ class SoundManager {
   // Melodies use rests (0 = silent step), wider intervals, and distinctive
   // motifs so the soundtrack is recognizable rather than generic arpeggios.
 
-  // 0 = rest (silence on that step — creates rhythmic breathing room).
-  private static GAMEPLAY_SECTIONS: { lead: number[]; bass: number[]; leadType: OscillatorType }[] = [
-    // "Launch" motif — signature ascending 5th leap then fall-back
-    { lead: [440, 0, 659.25, 880, 0, 659.25, 0, 880], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 98, 98], leadType: "triangle" },
-    // "Drift" — slow wide intervals, spacey and eerie
-    { lead: [329.63, 0, 0, 659.25, 493.88, 0, 329.63, 0], bass: [82.41, 82.41, 98, 98, 73.42, 73.42, 82.41, 82.41], leadType: "sine" },
-    // "Pulse" — syncopated rhythm, octave jumps
-    { lead: [0, 587.33, 293.66, 0, 587.33, 0, 440, 880], bass: [146.83, 146.83, 130.81, 130.81, 110, 110, 98, 98], leadType: "triangle" },
-    // "Nebula" — high shimmering, tritone tension
-    { lead: [783.99, 0, 554.37, 783.99, 0, 0, 1046.5, 783.99], bass: [98, 98, 123.47, 123.47, 87.31, 87.31, 98, 98], leadType: "sine" },
-    // "Comet" — fast descending run then silence
-    { lead: [1318.5, 1046.5, 880, 659.25, 0, 0, 0, 440], bass: [87.31, 87.31, 110, 110, 130.81, 130.81, 87.31, 87.31], leadType: "triangle" },
-    // "Supernova" — the signature motif returns an octave higher (climax)
-    { lead: [880, 0, 1318.5, 1760, 0, 1318.5, 0, 1760], bass: [110, 110, 130.81, 130.81, 146.83, 146.83, 98, 98], leadType: "triangle" },
-    // "Resolve" — descending 4ths, calming
-    { lead: [1046.5, 0, 783.99, 0, 523.25, 0, 392, 523.25], bass: [130.81, 130.81, 110, 110, 87.31, 87.31, 98, 98], leadType: "sine" },
-    // "Echo" — the launch motif low and quiet, then rest (reset)
-    { lead: [220, 0, 329.63, 440, 0, 0, 0, 0], bass: [110, 110, 87.31, 87.31, 73.42, 73.42, 98, 98], leadType: "triangle" },
+  // Synthwave progression in A minor. Each section is a chord region; the arp
+  // runs continuous 16th-notes through the chord tones (the "fast travel" pulse)
+  // while the lead plays sparse spacey melodic phrases on top. 0 = rest.
+  private static GAMEPLAY_SECTIONS: {
+    lead: number[];
+    arp: number[];
+    bass: number[];
+    leadType: OscillatorType;
+  }[] = [
+    // "Hyperdrive" — Am, establish pulse
+    {
+      lead: [440, 0, 659.25, 880, 0, 659.25, 0, 440],
+      arp:  [440, 659.25, 880, 1318.5, 880, 659.25, 523.25, 329.63],
+      bass: [55, 55, 55, 55, 55, 55, 55, 55],
+      leadType: "sawtooth",
+    },
+    // "Event Horizon" — F
+    {
+      lead: [349.23, 0, 523.25, 698.46, 0, 523.25, 0, 349.23],
+      arp:  [349.23, 523.25, 698.46, 1046.5, 698.46, 523.25, 440, 261.63],
+      bass: [43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65],
+      leadType: "sawtooth",
+    },
+    // "Wormhole" — G
+    {
+      lead: [392, 0, 587.33, 784, 0, 587.33, 0, 392],
+      arp:  [392, 587.33, 784, 1174.66, 784, 587.33, 493.88, 293.66],
+      bass: [49, 49, 49, 49, 49, 49, 49, 49],
+      leadType: "sawtooth",
+    },
+    // "Gravity Well" — Em
+    {
+      lead: [329.63, 0, 493.88, 659.25, 0, 493.88, 0, 329.63],
+      arp:  [329.63, 493.88, 659.25, 987.77, 659.25, 493.88, 392, 246.94],
+      bass: [41.2, 41.2, 41.2, 41.2, 41.2, 41.2, 41.2, 41.2],
+      leadType: "sawtooth",
+    },
+    // "Starfield Rush" — C, bright major uplift
+    {
+      lead: [523.25, 0, 784, 1046.5, 0, 784, 0, 523.25],
+      arp:  [523.25, 659.25, 784, 1046.5, 784, 659.25, 523.25, 392],
+      bass: [32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7],
+      leadType: "sawtooth",
+    },
+    // "Reentry" — Dm
+    {
+      lead: [293.66, 0, 440, 587.33, 0, 440, 0, 293.66],
+      arp:  [293.66, 440, 587.33, 880, 587.33, 440, 349.23, 220],
+      bass: [36.71, 36.71, 36.71, 36.71, 36.71, 36.71, 36.71, 36.71],
+      leadType: "sawtooth",
+    },
+    // "Pulsar" — Am climax, lead octave up
+    {
+      lead: [880, 0, 1318.5, 1760, 0, 1318.5, 0, 880],
+      arp:  [880, 1046.5, 1318.5, 1760, 1318.5, 1046.5, 880, 659.25],
+      bass: [55, 55, 65.41, 65.41, 73.42, 73.42, 82.41, 82.41],
+      leadType: "sawtooth",
+    },
+    // "Afterburner" — G → Am resolve
+    {
+      lead: [392, 440, 587.33, 659.25, 784, 880, 1318.5, 880],
+      arp:  [440, 523.25, 659.25, 880, 659.25, 523.25, 440, 329.63],
+      bass: [49, 49, 49, 49, 55, 55, 55, 55],
+      leadType: "sawtooth",
+    },
   ];
 
-  private static LEADERBOARD_SECTIONS: { lead: number[]; bass: number[]; leadType: OscillatorType }[] = [
-    // "Aftermath" — sparse, wide intervals
-    { lead: [329.63, 0, 0, 659.25, 0, 493.88, 0, 246.94], bass: [82.41, 82.41, 110, 110, 73.42, 73.42, 98, 98], leadType: "sine" },
-    // "Memory" — gentle stepwise with pauses
-    { lead: [220, 261.63, 0, 329.63, 0, 0, 220, 0], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 110, 110], leadType: "sine" },
-    // "Stars" — rising hope with held high note
-    { lead: [293.66, 0, 440, 0, 587.33, 587.33, 0, 0], bass: [146.83, 146.83, 110, 110, 123.47, 123.47, 146.83, 146.83], leadType: "triangle" },
-    // "Home" — the launch motif low and gentle, nostalgic
-    { lead: [220, 0, 329.63, 440, 0, 329.63, 0, 220], bass: [98, 98, 82.41, 82.41, 73.42, 73.42, 98, 98], leadType: "sine" },
+  private static LEADERBOARD_SECTIONS: {
+    lead: number[];
+    arp: number[];
+    bass: number[];
+    leadType: OscillatorType;
+  }[] = [
+    // "Aftermath" — Am, slow synth pad
+    {
+      lead: [440, 0, 0, 659.25, 0, 523.25, 0, 440],
+      arp:  [440, 659.25, 880, 659.25, 0, 523.25, 440, 329.63],
+      bass: [55, 55, 55, 55, 55, 55, 55, 55],
+      leadType: "sawtooth",
+    },
+    // "Memory" — F
+    {
+      lead: [349.23, 0, 0, 523.25, 0, 440, 0, 349.23],
+      arp:  [349.23, 523.25, 698.46, 523.25, 0, 440, 349.23, 261.63],
+      bass: [43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65],
+      leadType: "sawtooth",
+    },
+    // "Stars" — C, bright hopeful
+    {
+      lead: [523.25, 0, 0, 784, 0, 659.25, 0, 523.25],
+      arp:  [523.25, 659.25, 784, 659.25, 0, 523.25, 392, 261.63],
+      bass: [32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7],
+      leadType: "sawtooth",
+    },
+    // "Home" — G → Am resolve
+    {
+      lead: [392, 0, 440, 0, 523.25, 0, 659.25, 440],
+      arp:  [392, 493.88, 587.33, 784, 587.33, 493.88, 392, 293.66],
+      bass: [49, 49, 49, 49, 55, 55, 55, 55],
+      leadType: "sawtooth",
+    },
   ];
 
   // Drone pad node — a sustained low hum under the music
@@ -1958,23 +2030,23 @@ class SoundManager {
   startGameplayMusic() {
     if (!this.musicEnabled) return;
     this.startMusicLoop("gameplay", {
-      bpm: 130,
+      bpm: 128,
       sections: SoundManager.GAMEPLAY_SECTIONS,
       stepsPerSection: 16,
-      bassType: "sine",
-      masterTarget: 0.10,
+      masterTarget: 0.085,
       drums: true,
+      arp: true,
     });
   }
 
   startLeaderboardMusic() {
     if (!this.musicEnabled) return;
     this.startMusicLoop("leaderboard", {
-      bpm: 84,
+      bpm: 92,
       sections: SoundManager.LEADERBOARD_SECTIONS,
       stepsPerSection: 16,
-      bassType: "triangle",
-      masterTarget: 0.11,
+      masterTarget: 0.09,
+      arp: true,
     });
   }
 
@@ -2062,6 +2134,31 @@ class SoundManager {
     src.start(t);
   }
 
+  // Star whoosh — high-to-mid falling saw glide through a bandpass. The
+  // sound of a star flying past the cockpit. Used mid-section to reinforce
+  // the "fast travel" sensation without stepping on the musical groove.
+  private playStarWhoosh(dest: AudioNode) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filt = ctx.createBiquadFilter();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(4200, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.42);
+    filt.type = "bandpass";
+    filt.Q.value = 8;
+    filt.frequency.setValueAtTime(5000, t);
+    filt.frequency.exponentialRampToValueAtTime(800, t + 0.42);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.06, t + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    osc.connect(filt).connect(gain).connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.48);
+  }
+
   private playDeepRumble(dest: AudioNode) {
     if (!this.ctx) return;
     const ctx = this.ctx;
@@ -2083,11 +2180,11 @@ class SoundManager {
     track: "gameplay" | "leaderboard",
     cfg: {
       bpm: number;
-      sections: { lead: number[]; bass: number[]; leadType: OscillatorType }[];
+      sections: { lead: number[]; arp: number[]; bass: number[]; leadType: OscillatorType }[];
       stepsPerSection: number;
-      bassType: OscillatorType;
       masterTarget: number;
       drums?: boolean;
+      arp?: boolean;
     },
   ) {
     if (!this.enabled) return;
@@ -2114,27 +2211,39 @@ class SoundManager {
       const leadF = sec.lead[sectionStep % sec.lead.length];
       const bassF = sec.bass[sectionStep % sec.bass.length];
       const dur = beatMs / 1000;
-      // Lead voice (skip if 0 = rest)
+      // Lead — supersaw (3 detuned sawtooths) through a lowpass filter sweep.
+      // Classic synthwave lead: bright attack → mellow tail, detuning gives
+      // the chorus-y "retro-future" width.
       if (leadF > 0) {
-        const leadOsc = this.ctx.createOscillator();
+        const sustain = dur * 1.9;
+        const leadFilt = this.ctx.createBiquadFilter();
+        leadFilt.type = "lowpass";
+        leadFilt.Q.value = 6;
+        leadFilt.frequency.setValueAtTime(Math.min(leadF * 10, 12000), now);
+        leadFilt.frequency.exponentialRampToValueAtTime(Math.max(leadF * 2.2, 600), now + sustain * 0.6);
         const leadGain = this.ctx.createGain();
-        leadOsc.type = sec.leadType;
-        leadOsc.frequency.value = leadF;
-        leadGain.gain.setValueAtTime(0.34, now);
-        leadGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.85);
-        leadOsc.connect(leadGain).connect(masterGain);
-        leadOsc.start(now);
-        leadOsc.stop(now + dur);
-        // Shimmer: detuned copy ~6 cents sharp creates a chorus/space-pad
-        const shimOsc = this.ctx.createOscillator();
-        const shimGain = this.ctx.createGain();
-        shimOsc.type = "sine";
-        shimOsc.frequency.value = leadF * 1.0035; // ~6 cents sharp
-        shimGain.gain.setValueAtTime(0.12, now);
-        shimGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.9);
-        shimOsc.connect(shimGain).connect(masterGain);
-        shimOsc.start(now);
-        shimOsc.stop(now + dur);
+        leadGain.gain.setValueAtTime(0, now);
+        leadGain.gain.linearRampToValueAtTime(0.24, now + 0.01);
+        leadGain.gain.exponentialRampToValueAtTime(0.001, now + sustain * 0.95);
+        leadFilt.connect(leadGain).connect(masterGain);
+        for (const d of [0.9935, 1.0, 1.0065]) {
+          const o = this.ctx.createOscillator();
+          o.type = "sawtooth";
+          o.frequency.value = leadF * d;
+          o.connect(leadFilt);
+          o.start(now);
+          o.stop(now + sustain);
+        }
+        // Octave sparkle on top — the "high-frequency stars" layer
+        const sparkle = this.ctx.createOscillator();
+        const sparkleGain = this.ctx.createGain();
+        sparkle.type = "sine";
+        sparkle.frequency.value = leadF * 2;
+        sparkleGain.gain.setValueAtTime(0.08, now);
+        sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + sustain * 0.7);
+        sparkle.connect(sparkleGain).connect(masterGain);
+        sparkle.start(now);
+        sparkle.stop(now + sustain * 0.75);
       }
       // Harmony: every 4th step add a fifth above
       if (leadF > 0 && step % 4 === 2) {
@@ -2147,6 +2256,33 @@ class SoundManager {
         harmOsc.connect(harmGain).connect(masterGain);
         harmOsc.start(now);
         harmOsc.stop(now + dur * 0.7);
+      }
+      // Arpeggio — continuous 16th-note sawtooth blips through the chord
+      // tones. This is the "fast travel through stars" engine of the track:
+      // two arp notes per 8th-step, each a short filtered saw pluck.
+      if (cfg.arp) {
+        const arpLen = sec.arp.length;
+        const playArp = (freq: number, at: number) => {
+          if (freq <= 0 || !this.ctx) return;
+          const o = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          const f = this.ctx.createBiquadFilter();
+          o.type = "sawtooth";
+          o.frequency.value = freq;
+          f.type = "lowpass";
+          f.Q.value = 3;
+          f.frequency.setValueAtTime(freq * 6, at);
+          f.frequency.exponentialRampToValueAtTime(Math.max(freq * 2, 500), at + dur * 0.4);
+          g.gain.setValueAtTime(0.13, at);
+          g.gain.exponentialRampToValueAtTime(0.001, at + dur * 0.5);
+          o.connect(f).connect(g).connect(masterGain);
+          o.start(at);
+          o.stop(at + dur * 0.55);
+        };
+        const a1 = sec.arp[(step * 2) % arpLen];
+        const a2 = sec.arp[(step * 2 + 1) % arpLen];
+        playArp(a1, now);
+        playArp(a2, now + dur * 0.5);
       }
       // Drums — kick every quarter (4-on-the-floor), snare on backbeat, closed hat every 8th
       if (cfg.drums) {
@@ -2203,22 +2339,46 @@ class SoundManager {
         hatSrc.connect(hatFilt).connect(hatGain).connect(masterGain);
         hatSrc.start(now);
       }
-      // Bass — quarter notes (every other 8th)
-      if (step % 2 === 0) {
-        const bassOsc = this.ctx.createOscillator();
+      // Bass — detuned sawtooth pair through a lowpass + a sine sub an octave
+      // below. Quarter notes with a fast-up/slow-down "pumping" envelope that
+      // echoes the synthwave sidechain-duck feel.
+      if (step % 2 === 0 && bassF > 0) {
+        const bassFilt = this.ctx.createBiquadFilter();
+        bassFilt.type = "lowpass";
+        bassFilt.frequency.value = Math.min(bassF * 10, 900);
+        bassFilt.Q.value = 2;
         const bassGain = this.ctx.createGain();
-        bassOsc.type = cfg.bassType;
-        bassOsc.frequency.value = bassF;
-        bassGain.gain.setValueAtTime(0.45, now);
-        bassGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.6);
-        bassOsc.connect(bassGain).connect(masterGain);
-        bassOsc.start(now);
-        bassOsc.stop(now + dur * 1.7);
+        bassGain.gain.setValueAtTime(0.12, now);
+        bassGain.gain.linearRampToValueAtTime(0.5, now + 0.08);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.7);
+        bassFilt.connect(bassGain).connect(masterGain);
+        for (const d of [0.997, 1.003]) {
+          const bo = this.ctx.createOscillator();
+          bo.type = "sawtooth";
+          bo.frequency.value = bassF * d;
+          bo.connect(bassFilt);
+          bo.start(now);
+          bo.stop(now + dur * 1.8);
+        }
+        // Sub-octave sine for weight
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = "sine";
+        sub.frequency.value = bassF * 0.5;
+        subGain.gain.setValueAtTime(0.3, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.6);
+        sub.connect(subGain).connect(masterGain);
+        sub.start(now);
+        sub.stop(now + dur * 1.7);
       }
       // ---- Space texture events (periodic) ----
       // Scanner ping every ~4s (every section start)
       if (step > 0 && step % cfg.stepsPerSection === 0) {
         this.playScannerPing(masterGain);
+      }
+      // Star whoosh mid-section — "flying past stars" reinforcement
+      if (step > 0 && step % cfg.stepsPerSection === Math.floor(cfg.stepsPerSection / 2)) {
+        this.playStarWhoosh(masterGain);
       }
       // Radio crackle burst every ~8s
       if (step > 0 && step % (cfg.stepsPerSection * 2) === 8) {
