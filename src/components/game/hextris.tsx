@@ -28,7 +28,16 @@ class HextrisSounds {
   private nextNoteTime = 0;
   private currentStep = 0;
   private tempo = 110;
-  private static readonly PATTERN_LEN = 32; // 2 bars × 16 sixteenth-notes
+  private static readonly PATTERN_LEN = 64; // 4 bars × 16 sixteenth-notes
+  // i - VI - VII - i chord progression in A minor (Am - F - G - Am).
+  // Each entry gives the sub-bass octave, bass root, and triad third/fifth
+  // for the bar so we can build bass lines + lead lines with harmonic shape.
+  private static readonly CHORD_PROGRESSION = [
+    { sub: 55, root: 110, third: 130.81, fifth: 164.81 },   // Am (A2, A2, C3, E3)
+    { sub: 43.65, root: 87.31, third: 110, fifth: 130.81 }, // F  (F1, F2, A2, C3)
+    { sub: 49, root: 98, third: 123.47, fifth: 146.83 },    // G  (G1, G2, B2, D3)
+    { sub: 55, root: 110, third: 130.81, fifth: 164.81 },   // Am return
+  ];
 
   setEnabled(v: boolean) {
     this.enabled = v;
@@ -96,14 +105,51 @@ class HextrisSounds {
   }
 
   match(comboLevel: number) {
-    const base = 440 + Math.min(comboLevel, 8) * 55;
+    // Each combo level raises the pitch by ~1 semitone (×1.06), so even combo
+    // 30 has a unique tone. Capped high enough to stay satisfying.
+    const steps = Math.min(comboLevel, 36);
+    const base = 440 * Math.pow(1.06, steps);
     this.playTone(base, 140, "sine", 0.22);
     this.playTone(base * 1.5, 180, "sine", 0.12);
   }
 
   combo(n: number) {
-    const base = 660 + Math.min(n, 8) * 80;
+    const steps = Math.min(n, 36);
+    const base = 660 * Math.pow(1.06, steps);
     this.playTone(base, 80, "triangle", 0.18);
+  }
+
+  cleanSweep() {
+    if (!this.enabled) return;
+    this.ensureCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    // Ascending C major arpeggio + octave shimmer — triumphant fanfare.
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    notes.forEach((f, i) => {
+      const osc = this.ctx!.createOscillator();
+      const env = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = f;
+      const start = now + i * 0.08;
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(0.22, start + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+      osc.connect(env).connect(this.sfxGain!);
+      osc.start(start);
+      osc.stop(start + 0.5);
+    });
+    // Low-octave shimmer pad for richness.
+    const pad = this.ctx.createOscillator();
+    const padEnv = this.ctx.createGain();
+    pad.type = "sine";
+    pad.frequency.value = 261.63;
+    padEnv.gain.setValueAtTime(0, now);
+    padEnv.gain.linearRampToValueAtTime(0.1, now + 0.05);
+    padEnv.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+    pad.connect(padEnv).connect(this.sfxGain);
+    pad.start(now);
+    pad.stop(now + 0.95);
   }
 
   gameOver() {
@@ -157,6 +203,14 @@ class HextrisSounds {
     if (this.schedulerTimer !== null) {
       window.clearTimeout(this.schedulerTimer);
       this.schedulerTimer = null;
+    }
+  }
+
+  destroy() {
+    this.stopMusic();
+    if (this.ctx) {
+      try { this.ctx.close(); } catch { /* ignore */ }
+      this.ctx = null;
     }
   }
 
@@ -273,48 +327,68 @@ class HextrisSounds {
     }
   }
 
-  // Gameplay: driving synth — pulse bass, kick, hat, triangle lead
+  // Gameplay: 4-bar progression. Each bar has a chord; bass walks through
+  // root/fifth/sub-octave, lead outlines the chord tones.
   private scheduleGameplay(step: number, time: number) {
     if (!this.ctx || !this.musicGain) return;
 
-    // Bass pattern (32 steps). A minor — root walks A → F → G → E.
-    const bass = [
-      // Bar 1
-      110, 0, 0, 110, 0, 110, 0, 0,
-      87.31, 0, 110, 0, 98, 0, 82.41, 98,
-      // Bar 2
-      110, 0, 0, 110, 0, 87.31, 110, 0,
-      98, 0, 82.41, 0, 110, 0, 98, 82.41,
+    const bar = Math.floor(step / 16);
+    const inBar = step % 16;
+    const chord = HextrisSounds.CHORD_PROGRESSION[bar];
+
+    // Bass rhythm per bar. 1 = play root, 2 = play fifth (adds motion).
+    const bassPatterns = [
+      // Bar 1 Am — anchor bar
+      [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0],
+      // Bar 2 F — darker
+      [1, 0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 0, 1, 0, 2, 0],
+      // Bar 3 G — lift
+      [1, 0, 2, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 1, 0],
+      // Bar 4 Am — resolve with walk-down fill
+      [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 2, 0, 1, 1, 0, 1],
     ];
-    if (bass[step] > 0) {
-      this.playMusicNote(bass[step], time, 0.16, "square", 0.12);
-      // Sub-bass octave down for weight
-      this.playMusicNote(bass[step] / 2, time, 0.12, "sine", 0.08);
+    const b = bassPatterns[bar][inBar];
+    if (b > 0) {
+      const freq = b === 2 ? chord.fifth : chord.root;
+      this.playMusicNote(freq, time, 0.16, "square", 0.12);
+      this.playMusicNote(chord.sub, time, 0.12, "sine", 0.08);
     }
 
-    // Kick on beats 1 & 3 of each bar
-    if (step === 0 || step === 8 || step === 16 || step === 24) {
+    // Kick on beats 1 & 3 of every bar
+    if (inBar === 0 || inBar === 8) {
       this.playMusicKick(time);
     }
 
-    // Closed hi-hat on every 2nd 16th (off-beat shuffle)
-    if (step % 2 === 1) {
+    // Closed hat on every off-beat 16th
+    if (inBar % 2 === 1) {
       this.playMusicHat(time, 0.04);
     }
-    // Open hat every 8th on the 'and' of beat 2/4 for groove
-    if (step === 6 || step === 14 || step === 22 || step === 30) {
+    // Open hat on 'and' of beat 2/4
+    if (inBar === 6 || inBar === 14) {
       this.playMusicHat(time, 0.08);
     }
 
-    // Lead — A minor pentatonic melody
-    const lead = [
-      0, 0, 440, 0, 523.25, 0, 0, 587.33,
-      0, 659.25, 0, 587.33, 523.25, 0, 440, 0,
-      0, 0, 523.25, 0, 659.25, 0, 0, 784,
-      0, 659.25, 0, 587.33, 523.25, 0, 440, 329.63,
+    // Lead melody per bar — outline chord tones with pentatonic fills.
+    // Frequencies: E4=329.63 G4=392 A4=440 B4=493.88 C5=523.25 D5=587.33
+    //              E5=659.25 F5=698.46 G5=784
+    const leadPatterns = [
+      // Bar 1 Am: A – C – E noodle
+      [0, 0, 440, 0, 523.25, 0, 0, 587.33, 0, 659.25, 0, 587.33, 523.25, 0, 440, 0],
+      // Bar 2 F: F – A – C with C as peak
+      [0, 0, 523.25, 0, 440, 0, 0, 349.23, 0, 440, 0, 523.25, 440, 0, 349.23, 0],
+      // Bar 3 G: G – B – D climb
+      [0, 0, 493.88, 0, 587.33, 0, 0, 392, 0, 493.88, 0, 587.33, 493.88, 0, 392, 0],
+      // Bar 4 Am: A – C – E climax + E4 resolve
+      [0, 0, 523.25, 0, 659.25, 0, 0, 784, 0, 659.25, 0, 587.33, 523.25, 0, 440, 329.63],
     ];
-    if (lead[step] > 0) {
-      this.playMusicNote(lead[step], time, 0.11, "triangle", 0.07);
+    const lead = leadPatterns[bar][inBar];
+    if (lead > 0) {
+      this.playMusicNote(lead, time, 0.11, "triangle", 0.07);
+    }
+
+    // Drum fill on the last half-beat of the loop (bar 4, last 2 steps)
+    if (step === 62 || step === 63) {
+      this.playMusicHat(time, 0.03);
     }
   }
 
@@ -383,6 +457,8 @@ interface Point {
   y: number;
 }
 
+type SpecialKind = "bomb" | "rainbow" | null;
+
 interface Block {
   settled: number;
   height: number;
@@ -404,6 +480,7 @@ interface Block {
   distFromHex: number;
   width: number;
   widthWide: number;
+  special: SpecialKind;
 }
 
 interface TextObj {
@@ -502,6 +579,8 @@ export function HextrisGame() {
   const destroyedRef = useRef(false);
   const [uiState, setUiState] = useState<"menu" | "playing" | "paused" | "gameover">("menu");
   const [uiScore, setUiScore] = useState(0);
+  const [uiMomentum, setUiMomentum] = useState(0);
+  const [uiShrinkWarn, setUiShrinkWarn] = useState<number | null>(null);
   const [uiHigh, setUiHigh] = useState(0);
   const [uiCombo, setUiCombo] = useState(1);
   const [uiStats, setUiStats] = useState({
@@ -522,6 +601,8 @@ export function HextrisGame() {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Fallback "fixed inset-0" fullscreen for mobile where the native API is flaky (iOS Safari).
+  const [mobileImmersive, setMobileImmersive] = useState(false);
   const [showTutorial, setShowTutorial] = useState(true);
   // Combo milestone text (e.g., "×5 COMBO!") displayed briefly on crossing thresholds
   const [milestone, setMilestone] = useState<{ id: number; text: string; color: string } | null>(null);
@@ -547,6 +628,7 @@ export function HextrisGame() {
 
   const restartRef = useRef<() => void>(() => {});
   const pauseRef = useRef<() => void>(() => {});
+  const panicRef = useRef<() => void>(() => {});
 
   // Sync sound enabled state to the manager + persist
   useEffect(() => {
@@ -575,18 +657,71 @@ export function HextrisGame() {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const toggleFullscreen = async () => {
+  // Try native fullscreen first; on mobile where it's unreliable (iOS Safari),
+  // fall back to CSS "fixed inset-0" so the game still fills the viewport.
+  const enterImmersive = async () => {
     if (typeof document === "undefined") return;
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else if (containerRef.current) {
-        await containerRef.current.requestFullscreen();
+    const canNative =
+      !!document.fullscreenEnabled && !!containerRef.current?.requestFullscreen;
+    if (canNative) {
+      try {
+        await containerRef.current!.requestFullscreen();
+        return;
+      } catch {
+        /* fall through to pseudo-fullscreen */
       }
-    } catch {
-      /* fullscreen denied (Safari, embedded contexts) — silent */
+    }
+    setMobileImmersive(true);
+  };
+
+  const exitImmersive = async () => {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        /* ignore */
+      }
+    }
+    setMobileImmersive(false);
+  };
+
+  const toggleFullscreen = async () => {
+    if (isFullscreen || mobileImmersive) {
+      await exitImmersive();
+    } else {
+      await enterImmersive();
     }
   };
+
+  // Auto-enter immersive on touch devices when gameplay begins — that's when
+  // every pixel matters. Exit is explicit (via the fullscreen button).
+  useEffect(() => {
+    if (!isTouchDevice) return;
+    if (uiState === "playing" && !isFullscreen && !mobileImmersive) {
+      enterImmersive();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uiState, isTouchDevice]);
+
+  // Lock page scroll while the game fills the viewport.
+  useEffect(() => {
+    if (!mobileImmersive && !isFullscreen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileImmersive, isFullscreen]);
+
+  // Nudge a resize event when pseudo-fullscreen toggles. The container's
+  // bounding box changes dramatically (inline → fixed-inset-0) and the
+  // ResizeObserver normally catches it, but dispatching window.resize is
+  // belt-and-suspenders for any edge cases.
+  useEffect(() => {
+    const t = window.setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
+    return () => window.clearTimeout(t);
+  }, [mobileImmersive]);
 
   // Unlock audio on first user interaction (browser autoplay policy)
   useEffect(() => {
@@ -740,7 +875,7 @@ export function HextrisGame() {
       hexWidth: 87,
       baseBlockHeight: 20,
       blockHeight: 20,
-      rows: 8,
+      rows: 12,
       speedModifier: 0.65,
       speedUpKeyHeld: false,
       creationSpeedModifier: 0.65,
@@ -772,6 +907,21 @@ export function HextrisGame() {
     let gameStartMs = Date.now();
     let lastSyncedCombo = 1;
     let lastTempoSync = 0;
+    let lastCleanSweepMs = 0;
+    // Shrinking boundary: outer ring tightens by one row each 60s. Floor at 4
+    // rows so late-game stays playable instead of impossible.
+    const INITIAL_ROWS = 12;
+    const MIN_ROWS = 4;
+    const SHRINK_WARN_MS = 10000;
+    let nextShrinkMs = Date.now() + 60000;
+    let lastShrinkTickSec = -1;
+    let lastSyncedShrinkWarn: number | null = null;
+    // Shockwaves — expanding rings emitted when bombs detonate.
+    const shockwaves: { x: number; y: number; age: number; maxAge: number; color: string }[] = [];
+    // Momentum meter: fills with matches, press F (or tap button) at 100 to
+    // purge the board for score. Strategic oh-shit button for tight spots.
+    let momentum = 0;
+    let lastSyncedMomentum = 0;
     const sounds = soundsRef.current;
 
     // Haptic feedback helper — no-op on desktop / unsupported devices.
@@ -803,6 +953,45 @@ export function HextrisGame() {
           color,
         });
       }
+    }
+
+    function emitShockwave(x: number, y: number, color: string) {
+      shockwaves.push({ x, y, age: 0, maxAge: 45, color });
+    }
+
+    function updateAndDrawShockwaves(dt: number) {
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const s = shockwaves[i];
+        s.age += dt;
+        if (s.age >= s.maxAge) {
+          shockwaves.splice(i, 1);
+          continue;
+        }
+        const t = s.age / s.maxAge;
+        const radius = 10 + t * 140 * settings.scale;
+        const alpha = (1 - t) * 0.9;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = (6 - t * 4) * settings.scale;
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = 18 * settings.scale;
+        ctx.beginPath();
+        ctx.arc(s.x + gdx, s.y + gdy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        // Second inner ring, slightly delayed
+        if (t > 0.15) {
+          const r2 = 10 + (t - 0.15) * 100 * settings.scale;
+          ctx.globalAlpha = alpha * 0.6;
+          ctx.lineWidth = (4 - t * 3) * settings.scale;
+          ctx.beginPath();
+          ctx.arc(s.x + gdx, s.y + gdy, r2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
     }
 
     function updateAndDrawParticles(dt: number) {
@@ -837,6 +1026,7 @@ export function HextrisGame() {
       color: string,
       iter: number,
       distFromHex?: number,
+      special: SpecialKind = null,
     ): Block {
       return {
         settled: 0,
@@ -859,6 +1049,7 @@ export function HextrisGame() {
         distFromHex: distFromHex ?? settings.startDist * settings.scale,
         width: 0,
         widthWide: 0,
+        special,
       };
     }
 
@@ -1110,7 +1301,15 @@ export function HextrisGame() {
       distFromHex?: number,
     ) {
       iter *= settings.speedModifier;
-      blocks.push(createBlock(blocklane, color, iter, distFromHex));
+      // Specials unlock by skill: bombs at combo ≥3, rainbows at combo ≥5.
+      // Also gated behind a short warmup so the very-early game stays clean.
+      let special: SpecialKind = null;
+      if (mainHex.ct > 900 && gameState === 1) {
+        const roll = Math.random();
+        if (roll < 0.025 && maxComboSeen >= 3) special = "bomb";
+        else if (roll < 0.04 && maxComboSeen >= 5) special = "rainbow";
+      }
+      blocks.push(createBlock(blocklane, color, iter, distFromHex, special));
     }
 
     function wgRandomGeneration() {
@@ -1306,9 +1505,9 @@ export function HextrisGame() {
       side: number,
       index: number,
       deleting: number[][],
+      targetColor: string,
     ) {
       if (!mainHex.blocks[side] || !mainHex.blocks[side][index]) return;
-      const color = mainHex.blocks[side][index].color;
 
       for (let x = -1; x < 2; x++) {
         for (let y = -1; y < 2; y++) {
@@ -1317,15 +1516,16 @@ export function HextrisGame() {
             ((side + x) % mainHex.sides + mainHex.sides) % mainHex.sides;
           const curIndex = index + y;
           if (!mainHex.blocks[curSide]) continue;
-          if (mainHex.blocks[curSide][curIndex] !== undefined) {
-            if (
-              mainHex.blocks[curSide][curIndex].color === color &&
-              !floodSearch(deleting, [curSide, curIndex]) &&
-              mainHex.blocks[curSide][curIndex].deleted === 0
-            ) {
-              deleting.push([curSide, curIndex]);
-              floodFill(curSide, curIndex, deleting);
-            }
+          const neighbor = mainHex.blocks[curSide][curIndex];
+          if (neighbor === undefined) continue;
+          if (neighbor.deleted !== 0) continue;
+          if (floodSearch(deleting, [curSide, curIndex])) continue;
+          // Rainbow is a wildcard — it matches any chain color.
+          const colorMatch =
+            neighbor.color === targetColor || neighbor.special === "rainbow";
+          if (colorMatch) {
+            deleting.push([curSide, curIndex]);
+            floodFill(curSide, curIndex, deleting, targetColor);
           }
         }
       }
@@ -1353,11 +1553,63 @@ export function HextrisGame() {
     }
 
     function consolidateBlocks(side: number, index: number) {
-      const deleting: number[][] = [];
-      deleting.push([side, index]);
-      floodFill(side, index, deleting);
+      const startBlock = mainHex.blocks[side][index];
+      // If the chain-start is a rainbow block, try each color and pick
+      // whichever produces the biggest match group.
+      let deleting: number[][] = [];
+      if (startBlock.special === "rainbow") {
+        for (const c of colors) {
+          const candidate: number[][] = [[side, index]];
+          floodFill(side, index, candidate, c);
+          if (candidate.length > deleting.length) deleting = candidate;
+        }
+      } else {
+        deleting.push([side, index]);
+        floodFill(side, index, deleting, startBlock.color);
+      }
 
       if (deleting.length < 3) return;
+
+      // Bomb explosions: if ANY block in the matched group is a bomb, add
+      // every other non-deleted block on that bomb's side to the deletion set.
+      const bombsToExplode: number[] = [];
+      for (const [s, i] of deleting) {
+        if (mainHex.blocks[s][i]?.special === "bomb") {
+          if (!bombsToExplode.includes(s)) bombsToExplode.push(s);
+        }
+      }
+      for (const s of bombsToExplode) {
+        const laneBlocks = mainHex.blocks[s];
+        // Find the first bomb on this side to anchor the shockwave + extra particles.
+        let bombAnchor: Block | null = null;
+        for (const b of laneBlocks) {
+          if (b.special === "bomb" && b.deleted === 0) {
+            bombAnchor = b;
+            break;
+          }
+        }
+        if (bombAnchor) {
+          const ang = (bombAnchor.angle * Math.PI) / 180;
+          const ax =
+            trueCanvas.width / 2 +
+            Math.sin(ang) * (bombAnchor.distFromHex + bombAnchor.height / 2);
+          const ay =
+            trueCanvas.height / 2 -
+            Math.cos(ang) * (bombAnchor.distFromHex + bombAnchor.height / 2);
+          emitShockwave(ax, ay, "#fbbf24");
+          // Dense radial particle burst in warm colors.
+          emitParticles(ax, ay, "#fbbf24", 24);
+          emitParticles(ax, ay, "#ef4444", 18);
+        }
+        for (let i = 0; i < laneBlocks.length; i++) {
+          if (
+            laneBlocks[i].deleted === 0 &&
+            !floodSearch(deleting, [s, i])
+          ) {
+            deleting.push([s, i]);
+          }
+        }
+      }
 
       const deletedBlocks: Block[] = [];
       for (const arr of deleting) {
@@ -1367,14 +1619,19 @@ export function HextrisGame() {
         }
       }
 
-      // Scoring with combo
+      // Scoring with combo. A match within ~30 ticks of the previous one is a
+      // "chain reaction" from settling blocks (not player-driven) — it gives an
+      // extra +1 on the combo so cascades escalate the multiplier faster.
       const now = mainHex.ct;
-      if (now - mainHex.lastCombo < settings.comboTime) {
+      const deltaTicks = now - mainHex.lastCombo;
+      const isChain =
+        deltaTicks > 0 && deltaTicks < 30 && mainHex.comboMultiplier >= 1;
+      if (deltaTicks < settings.comboTime) {
         settings.comboTime =
           (1 / settings.creationSpeedModifier) *
           (waveGen.nextGen / 16.666667) *
           3;
-        mainHex.comboMultiplier += 1;
+        mainHex.comboMultiplier += isChain ? 2 : 1;
         mainHex.lastCombo = now;
         const coords = findCenterOfBlocks(deletedBlocks);
         mainHex.texts.push({
@@ -1385,6 +1642,16 @@ export function HextrisGame() {
           opacity: 1,
           alive: 1,
         });
+        if (isChain) {
+          mainHex.texts.push({
+            x: coords.x,
+            y: coords.y - 24,
+            text: "CHAIN!",
+            color: "#fde047",
+            opacity: 1,
+            alive: 1,
+          });
+        }
         sounds.combo(mainHex.comboMultiplier);
       } else {
         settings.comboTime = 240;
@@ -1403,10 +1670,94 @@ export function HextrisGame() {
         opacity: 1,
         alive: 1,
       });
-      mainHex.lastColorScored = deletedBlocks[0].color;
+      // Prefer a non-special block's color for the combo timer. If the only
+      // blocks in the group were special (rainbow/bomb), fall back to their
+      // backing color.
+      const chainColorBlock =
+        deletedBlocks.find((b) => !b.special) ?? deletedBlocks[0];
+      mainHex.lastColorScored = chainColorBlock.color;
       score += adder;
-      // Match haptic — stronger for bigger combos
-      haptic(mainHex.comboMultiplier >= 3 ? [30, 20, 30] : [20]);
+      // Momentum: earn ~1.5 per block cleared, plus combo bonus. Caps at 100.
+      momentum = Math.min(
+        100,
+        momentum + deleting.length * 1.5 + mainHex.comboMultiplier,
+      );
+      // Match haptic — stronger for bigger combos, extra punch for bombs.
+      const bombExploded = deletedBlocks.some((b) => b.special === "bomb");
+      if (bombExploded) haptic([50, 30, 80]);
+      else if (mainHex.comboMultiplier >= 3) haptic([30, 20, 30]);
+      else haptic([20]);
+
+      // Clean sweep: every side cleared to zero (all living blocks just got
+      // tagged deleted). Needs at least one block to have existed on the hex
+      // pre-match so an empty board isn't a false positive.
+      let livingCount = 0;
+      for (let s = 0; s < 6; s++) {
+        for (const b of mainHex.blocks[s]) {
+          if (b.deleted === 0) {
+            livingCount++;
+            break;
+          }
+        }
+        if (livingCount > 0) break;
+      }
+      // Requires a substantial match to qualify — wiping a near-empty early-game
+      // board shouldn't count as a "CLEAN SWEEP". 10+ blocks implies real density.
+      if (livingCount === 0 && deleting.length >= 10) {
+        const bonus = 1000 * mainHex.comboMultiplier;
+        score += bonus;
+        mainHex.texts.push({
+          x: mainHex.x,
+          y: mainHex.y + 30,
+          text: "CLEAN SWEEP +" + bonus,
+          color: "#fde047",
+          opacity: 1,
+          alive: 1,
+        });
+        setMilestone({
+          id: Date.now() + 1,
+          text: "CLEAN SWEEP!",
+          color: "#fde047",
+        });
+        lastCleanSweepMs = performance.now();
+        sounds.cleanSweep();
+        haptic([80, 40, 80, 40, 120]);
+      }
+    }
+
+    // ─── PANIC CLEAR ─────────────────────────────────────────
+
+    function panicClear() {
+      if (momentum < 100 || gameState !== 1) return;
+      let purged = 0;
+      for (let s = 0; s < 6; s++) {
+        for (const b of mainHex.blocks[s]) {
+          if (b.deleted === 0) {
+            b.deleted = 1;
+            purged++;
+          }
+        }
+      }
+      if (purged === 0) return;
+      const bonus = purged * 30;
+      score += bonus;
+      mainHex.texts.push({
+        x: mainHex.x,
+        y: mainHex.y,
+        text: "PANIC CLEAR +" + bonus,
+        color: "#a78bfa",
+        opacity: 1,
+        alive: 1,
+      });
+      setMilestone({
+        id: Date.now() + 6,
+        text: "PANIC CLEAR",
+        color: "#a78bfa",
+      });
+      lastCleanSweepMs = performance.now();
+      sounds.cleanSweep();
+      haptic([100, 40, 100, 40, 100]);
+      momentum = 0;
     }
 
     // ─── FLOATING TEXT ───────────────────────────────────────
@@ -1561,13 +1912,6 @@ export function HextrisGame() {
         p4 = rotatePoint(-block.widthWide / 2, -block.height / 2, block.angle);
       }
 
-      // Block color (use tinted on start screen)
-      if (gameState === 0 && TINTED[block.color]) {
-        ctx.fillStyle = TINTED[block.color];
-      } else {
-        ctx.fillStyle = block.color;
-      }
-
       ctx.globalAlpha = block.opacity;
       const angleRad = (block.angle * Math.PI) / 180;
       const baseX =
@@ -1579,19 +1923,64 @@ export function HextrisGame() {
         Math.cos(angleRad) * (block.distFromHex + block.height / 2) +
         gdy;
 
-      // Soft glow under the block
-      if (gameState !== 0 && GLOW[block.color]) {
-        ctx.shadowColor = GLOW[block.color];
-        ctx.shadowBlur = 12 * settings.scale;
+      // Build the trapezoid path once — we reuse it for fill + any overlay.
+      const drawTrapezoid = () => {
+        ctx.beginPath();
+        ctx.moveTo(baseX + p1.x, baseY + p1.y);
+        ctx.lineTo(baseX + p2.x, baseY + p2.y);
+        ctx.lineTo(baseX + p3.x, baseY + p3.y);
+        ctx.lineTo(baseX + p4.x, baseY + p4.y);
+        ctx.closePath();
+      };
+
+      // Choose fill + glow per block kind
+      if (block.special === "rainbow") {
+        // Animated gradient across all 4 game colors, cycles slowly.
+        const shift = (mainHex.ct * 0.02) % 1;
+        const grad = ctx.createLinearGradient(
+          baseX - block.widthWide / 2,
+          baseY,
+          baseX + block.widthWide / 2,
+          baseY,
+        );
+        grad.addColorStop(((0 + shift) % 1), "#ec4899");
+        grad.addColorStop(((0.25 + shift) % 1), "#f59e0b");
+        grad.addColorStop(((0.5 + shift) % 1), "#22c55e");
+        grad.addColorStop(((0.75 + shift) % 1), "#6366f1");
+        grad.addColorStop(((1 + shift) % 1 || 1), "#ec4899");
+        ctx.fillStyle = grad;
+        ctx.shadowColor = "rgba(255,255,255,0.7)";
+        ctx.shadowBlur = 16 * settings.scale;
+      } else if (block.special === "bomb") {
+        // Bright white core; pulsing red glow
+        const pulse = 0.5 + Math.sin(mainHex.ct * 0.25) * 0.5;
+        ctx.fillStyle = "#fafafa";
+        ctx.shadowColor = `rgba(239,68,68,${0.5 + pulse * 0.4})`;
+        ctx.shadowBlur = (18 + pulse * 8) * settings.scale;
+      } else {
+        // Normal: use tinted on the start-screen, glow during play
+        if (gameState === 0 && TINTED[block.color]) {
+          ctx.fillStyle = TINTED[block.color];
+        } else {
+          ctx.fillStyle = block.color;
+        }
+        if (gameState !== 0 && GLOW[block.color]) {
+          ctx.shadowColor = GLOW[block.color];
+          ctx.shadowBlur = 12 * settings.scale;
+        }
       }
 
-      ctx.beginPath();
-      ctx.moveTo(baseX + p1.x, baseY + p1.y);
-      ctx.lineTo(baseX + p2.x, baseY + p2.y);
-      ctx.lineTo(baseX + p3.x, baseY + p3.y);
-      ctx.lineTo(baseX + p4.x, baseY + p4.y);
-      ctx.closePath();
+      drawTrapezoid();
       ctx.fill();
+
+      // Bomb decoration: draw a red dot in the center as a visual marker.
+      if (block.special === "bomb" && !block.initializing) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.arc(baseX, baseY, 3 * settings.scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Clear shadow so subsequent draws aren't affected
       ctx.shadowBlur = 0;
@@ -1883,10 +2272,13 @@ export function HextrisGame() {
         if (op < 1) op += 0.01;
         ctx.globalAlpha = op;
 
-        // Outer boundary hexagon
+        // Outer boundary hexagon. During the shrink countdown, stroke pulses
+        // red and thicker so the player sees the ring that's about to vanish.
         const outerRadius =
           settings.rows * settings.blockHeight * (2 / Math.sqrt(3)) +
           settings.hexWidth;
+        const warnActive = lastSyncedShrinkWarn !== null;
+        const pulse = warnActive ? 0.5 + 0.5 * Math.sin(Date.now() / 120) : 0;
         drawPolygon(
           trueCanvas.width / 2,
           trueCanvas.height / 2,
@@ -1894,8 +2286,10 @@ export function HextrisGame() {
           outerRadius,
           30,
           boundaryColor,
-          1,
-          "rgba(255,255,255,0.1)",
+          warnActive ? 2 + 2 * pulse : 1,
+          warnActive
+            ? `rgba(239,68,68,${0.5 + 0.5 * pulse})`
+            : "rgba(255,255,255,0.1)",
         );
 
         // Combo timer
@@ -1914,6 +2308,11 @@ export function HextrisGame() {
       // Draw falling blocks
       for (let i = 0; i < blocks.length; i++) {
         drawBlock(blocks[i]);
+      }
+
+      // Draw shockwaves under particles (so particles read on top)
+      if (shockwaves.length > 0) {
+        updateAndDrawShockwaves(mainHex.dt || 1);
       }
 
       // Draw particle bursts
@@ -2060,33 +2459,87 @@ export function HextrisGame() {
         currentCombo = 1;
       }
       if (currentCombo !== lastSyncedCombo) {
-        // Fire a milestone toast on crossing key thresholds.
-        const thresholds = [3, 5, 10, 15, 20];
-        for (const t of thresholds) {
-          if (currentCombo >= t && lastSyncedCombo < t) {
-            const color =
-              t >= 20
-                ? "#ec4899"
-                : t >= 10
-                ? "#f59e0b"
-                : t >= 5
-                ? "#22c55e"
-                : "#6366f1";
-            setMilestone({ id: Date.now(), text: `×${t} COMBO!`, color });
-          }
+        // Fire a milestone burst on EVERY combo increase (from 2 onward).
+        // Color steps through 6 accents so every new combo feels distinct.
+        // Skip if a CLEAN SWEEP just fired this frame — it should dominate.
+        const sweepRecent = performance.now() - lastCleanSweepMs < 200;
+        if (
+          currentCombo > lastSyncedCombo &&
+          currentCombo >= 2 &&
+          !sweepRecent
+        ) {
+          const palette = [
+            "#6366f1", // blue
+            "#22c55e", // green
+            "#06b6d4", // cyan
+            "#f59e0b", // amber
+            "#a78bfa", // purple
+            "#ec4899", // pink
+          ];
+          const color = palette[(currentCombo - 2) % palette.length];
+          setMilestone({
+            id: Date.now(),
+            text: `×${currentCombo} COMBO!`,
+            color,
+          });
         }
         lastSyncedCombo = currentCombo;
         setUiCombo(currentCombo);
       }
 
-      // Scale music tempo with difficulty (~every 1s). Base 110 → ~175 BPM
-      // at max difficulty 35. Also bumps to x4 when rush/speed-up is held.
+      // Sync momentum to React state. Round to integer to avoid jittery re-renders.
+      const displayMomentum = Math.floor(momentum);
+      if (displayMomentum !== lastSyncedMomentum) {
+        lastSyncedMomentum = displayMomentum;
+        setUiMomentum(displayMomentum);
+      }
+
+      // Scale music tempo with game difficulty only (~every 1s). Base 105 →
+      // ~175 BPM at max difficulty 35. The player-controlled rush key must NOT
+      // affect tempo — the music is its own thing, driven by the game itself.
       if (gameState === 1 && now - lastTempoSync > 1000) {
         lastTempoSync = now;
         const difficulty = Math.min(35, waveGen.difficulty);
-        const base = 105 + difficulty * 2; // 107 → 175
-        const rushBoost = rush > 1 ? 1.25 : 1;
-        sounds.setMusicTempo(base * rushBoost);
+        sounds.setMusicTempo(105 + difficulty * 2);
+      }
+
+      // Shrinking boundary — every 60s of play, reduce rows by one until floor.
+      // Show a 5-second countdown warning before each shrink so players can
+      // evacuate the outer ring instead of losing to a sudden wall.
+      if (gameState === 1 && settings.rows > MIN_ROWS) {
+        const untilShrink = nextShrinkMs - now;
+        const warning =
+          untilShrink <= SHRINK_WARN_MS && untilShrink > 0
+            ? Math.max(1, Math.ceil(untilShrink / 1000))
+            : null;
+        if (warning !== lastSyncedShrinkWarn) {
+          lastSyncedShrinkWarn = warning;
+          setUiShrinkWarn(warning);
+        }
+        // Tick sound on each second of the countdown.
+        if (warning !== null && warning !== lastShrinkTickSec) {
+          lastShrinkTickSec = warning;
+          sounds.rotate();
+          haptic([15]);
+        }
+        if (untilShrink <= 0) {
+          settings.rows -= 1;
+          nextShrinkMs = now + 60000;
+          lastShrinkTickSec = -1;
+          lastSyncedShrinkWarn = null;
+          setUiShrinkWarn(null);
+          setMilestone({
+            id: Date.now() + 5,
+            text: "BOUNDARY TIGHTENS",
+            color: "#f59e0b",
+          });
+          lastCleanSweepMs = performance.now();
+          sounds.gameOver();
+          haptic([40, 20, 40]);
+        }
+      } else if (lastSyncedShrinkWarn !== null) {
+        lastSyncedShrinkWarn = null;
+        setUiShrinkWarn(null);
       }
 
       lastTime = now;
@@ -2103,16 +2556,19 @@ export function HextrisGame() {
       if (!container || !canvas) return;
       const rect = container.getBoundingClientRect();
       const w = Math.floor(rect.width);
-      // Fullscreen: use available container height directly.
-      // Portrait (mobile): prefer near-square canvas to maximize play area.
+      // Native fullscreen or pseudo-fullscreen: use the full container rect.
+      // Portrait (mobile inline): tall canvas makes better use of the screen.
       // Landscape/desktop: cap at 75vh so page remains scrollable.
       let h: number;
-      if (document.fullscreenElement === container) {
+      const isImmersive =
+        document.fullscreenElement === container ||
+        container.classList.contains("hextris-immersive");
+      if (isImmersive) {
         h = Math.floor(rect.height);
       } else {
         const isPortrait = window.innerHeight > window.innerWidth;
         if (isPortrait) {
-          h = Math.floor(Math.min(w * 1.05, window.innerHeight * 0.75));
+          h = Math.floor(Math.min(w * 1.3, window.innerHeight * 0.85));
         } else {
           h = Math.floor(Math.min(w * 0.7, window.innerHeight * 0.75));
         }
@@ -2179,7 +2635,16 @@ export function HextrisGame() {
       maxComboSeen = 0;
       piecesCleared = 0;
       gameStartMs = Date.now();
+      settings.rows = INITIAL_ROWS;
+      nextShrinkMs = Date.now() + 60000;
+      lastShrinkTickSec = -1;
+      lastSyncedShrinkWarn = null;
+      setUiShrinkWarn(null);
+      momentum = 0;
+      lastSyncedMomentum = 0;
+      setUiMomentum(0);
       particles.length = 0;
+      shockwaves.length = 0;
       lastSyncedCombo = 1;
       sounds.resume(); // Audio contexts require a user gesture to start
       setUiState("playing");
@@ -2194,6 +2659,7 @@ export function HextrisGame() {
     // Expose restart + togglePause to React JSX
     restartRef.current = () => restartGame();
     pauseRef.current = () => togglePause();
+    panicRef.current = () => panicClear();
 
     function togglePause() {
       if (gameState === 1) {
@@ -2238,6 +2704,10 @@ export function HextrisGame() {
         e.preventDefault();
         togglePause();
       }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        if (gameState === 1) panicClear();
+      }
     }
 
     function handleKeyUp(e: KeyboardEvent) {
@@ -2249,8 +2719,19 @@ export function HextrisGame() {
       }
     }
 
+    let lastTouchMs = 0;
+
     function handleCanvasClick(e: MouseEvent | TouchEvent) {
       e.preventDefault();
+
+      // Suppress the synthesized click that follows a touchstart — otherwise
+      // every tap on mobile fires rotation twice. preventDefault on touchstart
+      // is unreliable across browsers, so debounce explicitly.
+      if (!("touches" in e)) {
+        if (Date.now() - lastTouchMs < 500) return;
+      } else {
+        lastTouchMs = Date.now();
+      }
 
       if (gameState === 0) {
         startGame();
@@ -2318,6 +2799,13 @@ export function HextrisGame() {
       requestAnimationFrame(() => scaleCanvas());
     };
     document.addEventListener("fullscreenchange", onFsChange);
+    // Also listen to window resize as a safety net for orientation changes
+    // and pseudo-fullscreen toggles (keyboard opening, rotation, etc.).
+    const onWindowResize = () => {
+      requestAnimationFrame(() => scaleCanvas());
+    };
+    window.addEventListener("resize", onWindowResize);
+    window.addEventListener("orientationchange", onWindowResize);
 
     // Window blur = auto-pause
     function handleBlur() {
@@ -2336,15 +2824,22 @@ export function HextrisGame() {
       canvas.removeEventListener("touchstart", handleCanvasClick);
       resizeObserver.disconnect();
       document.removeEventListener("fullscreenchange", onFsChange);
+      window.removeEventListener("resize", onWindowResize);
+      window.removeEventListener("orientationchange", onWindowResize);
       window.removeEventListener("blur", handleBlur);
+      if (soundsRef.current) soundsRef.current.destroy();
     };
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden border border-white/10 bg-[#050505] ${
-        isFullscreen ? "h-screen w-screen rounded-none" : "rounded-xl"
+      className={`relative overflow-hidden border border-white/10 bg-[#050505] ${
+        isFullscreen
+          ? "h-screen w-screen rounded-none"
+          : mobileImmersive
+          ? "hextris-immersive fixed inset-0 z-50 w-screen h-[100dvh] rounded-none"
+          : "w-full rounded-xl"
       }`}
     >
       <canvas
@@ -2381,6 +2876,42 @@ export function HextrisGame() {
         )}
       </div>
 
+      {/* Momentum meter — bottom-center. At 100% the entire bar becomes a large
+          tappable button (thumb-friendly on mobile). */}
+      {uiState === "playing" && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-none w-[min(80%,320px)]">
+          {uiMomentum >= 100 ? (
+            <button
+              type="button"
+              onClick={() => panicRef.current()}
+              className="pointer-events-auto flex w-full items-center justify-center gap-2 rounded-lg border-2 border-accent-purple bg-gradient-to-r from-accent-purple/40 via-accent-pink/40 to-accent-purple/40 px-4 py-3 text-sm font-mono text-white hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-accent-purple/50 hextris-score-pulse"
+              title="Purge the board (F)"
+              aria-label="Panic Clear"
+            >
+              <span className="font-bold tracking-wider">PANIC CLEAR</span>
+              <kbd className="hidden sm:inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded border border-white/40 bg-white/10 px-1 text-[10px]">
+                F
+              </kbd>
+            </button>
+          ) : (
+            <>
+              <div className="relative h-3 w-48 rounded-full overflow-hidden border border-white/15 bg-black/50 backdrop-blur">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-150"
+                  style={{
+                    width: `${uiMomentum}%`,
+                    background: "linear-gradient(90deg, #6366f1, #a78bfa)",
+                  }}
+                />
+              </div>
+              <span className="text-[10px] font-mono uppercase text-white/50 tracking-wider">
+                Momentum {uiMomentum}%
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Top-right: pause, sound, fullscreen, status badge */}
       <div className="absolute top-3 right-3 flex items-center gap-2">
         {(uiState === "playing" || uiState === "paused") && (
@@ -2415,10 +2946,10 @@ export function HextrisGame() {
           type="button"
           onClick={toggleFullscreen}
           className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 hover:bg-black/60 px-2 py-1.5 text-white/60 hover:text-white backdrop-blur transition-colors"
-          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          aria-label={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
+          title={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
         >
-          {isFullscreen ? (
+          {isFullscreen || mobileImmersive ? (
             <Minimize2 className="h-3.5 w-3.5" />
           ) : (
             <Maximize2 className="h-3.5 w-3.5" />
@@ -2567,17 +3098,48 @@ export function HextrisGame() {
         </div>
       )}
 
-      {/* Combo milestone burst */}
+      {/* Shrink countdown banner — top-center, visible only during the 5s warning. */}
+      {uiShrinkWarn !== null && uiState === "playing" && (
+        <div
+          key={`shrink-${uiShrinkWarn}`}
+          className="absolute top-14 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-md border border-accent-red/60 bg-accent-red/15 px-3 py-1.5 text-xs font-mono text-accent-red backdrop-blur hextris-combo-pop z-20"
+        >
+          <span className="uppercase tracking-wider font-bold">Boundary shrinks</span>
+          <span className="text-white tabular-nums text-sm font-bold">{uiShrinkWarn}s</span>
+        </div>
+      )}
+
+      {/* Combo milestone burst — size + glow scale with combo strength */}
       {milestone && (
         <div
           key={milestone.id}
           className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 hextris-milestone-burst"
         >
           <div
-            className="font-display text-5xl sm:text-6xl font-black tracking-tight text-center"
+            className="font-display font-black tracking-tight text-center"
             style={{
               color: milestone.color,
-              textShadow: `0 0 20px ${milestone.color}55, 0 0 40px ${milestone.color}33`,
+              // Combo bursts ("×N COMBO!") scale with N. Special events (CLEAN
+              // SWEEP, UNLOCKED announcements) render at fixed sizes — they
+              // have no N for the scaler to read.
+              fontSize: (() => {
+                if (milestone.text.startsWith("CLEAN")) return "calc(2.5rem * 2.6)";
+                if (!milestone.text.startsWith("×")) return "calc(2.5rem * 1.4)";
+                const n = parseInt(milestone.text.match(/\d+/)?.[0] || "2", 10);
+                const scale = 1 + Math.min(n - 2, 18) * 0.07;
+                return `calc(2.5rem * ${scale})`;
+              })(),
+              textShadow: (() => {
+                if (milestone.text.startsWith("CLEAN")) {
+                  return `0 0 80px ${milestone.color}88, 0 0 160px ${milestone.color}44`;
+                }
+                if (!milestone.text.startsWith("×")) {
+                  return `0 0 40px ${milestone.color}88, 0 0 80px ${milestone.color}33`;
+                }
+                const n = parseInt(milestone.text.match(/\d+/)?.[0] || "2", 10);
+                const blur = 20 + Math.min(n, 20) * 3;
+                return `0 0 ${blur}px ${milestone.color}66, 0 0 ${blur * 2}px ${milestone.color}33`;
+              })(),
             }}
           >
             {milestone.text}
