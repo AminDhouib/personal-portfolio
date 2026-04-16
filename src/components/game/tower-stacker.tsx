@@ -179,6 +179,29 @@ export default function TowerStacker() {
   const [uiHp, setUiHp] = useState(3);
   const [uiCombo, setUiCombo] = useState(0);
 
+  function spawnBlock() {
+    const r = refs.current;
+    const { w, h } = viewportRef.current;
+    const prev = r.floors[r.floors.length - 1];
+    const prevWidth = prev ? prev.width : BASE_BLOCK_WIDTH_PX;
+    const floorIdx = r.floors.length;
+    const hue = (HUE_BASE + floorIdx * HUE_STEP) % 360;
+    const fromLeft = (floorIdx % 2) === 0;
+    const y = prev ? prev.y - BASE_BLOCK_HEIGHT - 2 : h - 80 - BASE_BLOCK_HEIGHT;
+    const speed = Math.min(MAX_BLOCK_SPEED, BASE_BLOCK_SPEED + r.score * SPEED_FACTOR * 0.1);
+    r.activeBlock = {
+      x: fromLeft ? 0 : w - prevWidth,
+      y,
+      width: prevWidth,
+      height: BASE_BLOCK_HEIGHT,
+      hue,
+      direction: fromLeft ? 1 : -1,
+      speed,
+      isGolden: false,
+    };
+    r.droppingLock = false;
+  }
+
   function startRun() {
     const r = refs.current;
     const { w, h } = viewportRef.current;
@@ -219,6 +242,7 @@ export default function TowerStacker() {
     setUiScore(0);
     setUiHp(r.hp);
     setUiCombo(0);
+    spawnBlock();
   }
 
   useEffect(() => {
@@ -278,9 +302,26 @@ export default function TowerStacker() {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
-      ctx.fillStyle = "rgba(239,68,68,0.9)";
-      ctx.font = "600 22px system-ui, sans-serif";
-      ctx.fillText(`state: ${r.state}  dt: ${dt.toFixed(3)}`, 16, 32);
+      // update active block
+      if (r.state === "playing" && r.activeBlock) {
+        const a = r.activeBlock;
+        a.x += a.direction * a.speed * dt;
+        if (a.x <= 0) { a.x = 0; a.direction = 1; }
+        if (a.x + a.width >= w) { a.x = w - a.width; a.direction = -1; }
+      }
+
+      // draw floors
+      for (const f of r.floors) {
+        ctx.fillStyle = `hsl(${f.hue} 80% 55%)`;
+        ctx.fillRect(f.x, f.y, f.width, f.height);
+      }
+
+      // draw active block
+      if (r.activeBlock) {
+        const a = r.activeBlock;
+        ctx.fillStyle = `hsl(${a.hue} 80% 55%)`;
+        ctx.fillRect(a.x, a.y, a.width, a.height);
+      }
 
       rafId = requestAnimationFrame(frame);
     };
