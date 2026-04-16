@@ -13,6 +13,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,minimal-ui">
 <title>Tower Stacker</title>
 <link rel="icon" type="image/x-icon" href="./assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Caveat:wght@700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0}
 img{width:100%}
@@ -68,6 +71,19 @@ li,ol,ul{list-style-type:none;padding:0;margin:0}
 .modal .over-button-b{width:70%;margin:.1rem auto 0;cursor:pointer}
 @font-face{font-family:wenxue;src:url(assets/wenxue.eot);src:url(assets/wenxue.eot),url(assets/wenxue.woff),url(assets/wenxue.ttf),url(assets/wenxue.svg)}
 .font-wenxue{font-family:wenxue}
+
+/* ── Hand-drawn title treatment ─────────────────────────────── */
+.tower-title-wrap{position:relative;display:inline-block;padding:.15rem .35rem;transform-origin:top center}
+.tower-title{font-family:"Bagel Fat One",system-ui,cursive;color:#fef6e4;font-size:.98rem;line-height:.92;letter-spacing:.015em;margin:0;text-shadow:-4px -4px 0 #b91c1c,4px -4px 0 #b91c1c,-4px 4px 0 #b91c1c,4px 4px 0 #b91c1c,-4px 0 0 #b91c1c,4px 0 0 #b91c1c,0 -4px 0 #b91c1c,0 4px 0 #b91c1c,0 8px 0 rgba(0,0,0,.32),0 1px 0 #b91c1c}
+.tower-title .tl{display:inline-block}
+.tower-title .tl:nth-child(3n+1){transform:rotate(-3deg)}
+.tower-title .tl:nth-child(3n+2){transform:rotate(2deg)}
+.tower-title .tl:nth-child(3n+3){transform:rotate(-1.5deg) translateY(-2px)}
+.tower-doodle{position:absolute;pointer-events:none;color:#fef6e4}
+.doodle-1{top:-.15rem;left:-.2rem;width:.28rem;height:.28rem;transform:rotate(-18deg)}
+.doodle-2{top:.05rem;right:-.22rem;width:.22rem;height:.22rem;transform:rotate(22deg)}
+.doodle-3{bottom:-.1rem;left:.1rem;width:.18rem;height:.18rem;transform:rotate(12deg)}
+.tower-annotation{font-family:"Caveat",cursive;color:#fef6e4;font-size:.24rem;font-weight:700;letter-spacing:.06em;margin-bottom:.08rem;text-shadow:0 2px 4px rgba(0,0,0,.35),0 0 1px rgba(185,28,28,.6)}
 </style>
 </head>
 <body>
@@ -84,8 +100,23 @@ li,ol,ul{list-style-type:none;padding:0;margin:0}
     </div>
   </div>
   <div class="landing hide">
-    <div class="action-1"><img src="./assets/main-index-title.png" class="title swing"></div>
-    <div class="action-2"><img id="start" src="./assets/main-index-start.png" class="start"></div>
+    <div class="action-1">
+      <div class="swing tower-title-wrap">
+        <div class="tower-title">
+          <span class="tl">T</span><span class="tl">O</span><span class="tl">W</span><span class="tl">E</span><span class="tl">R</span>
+        </div>
+        <div class="tower-title" style="margin-top:.02rem">
+          <span class="tl">S</span><span class="tl">T</span><span class="tl">A</span><span class="tl">C</span><span class="tl">K</span><span class="tl">E</span><span class="tl">R</span>
+        </div>
+        <svg class="tower-doodle doodle-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L14 10 L21 11 L15.5 14.5 L17 21 L12 17 L7 21 L8.5 14.5 L3 11 L10 10 Z"/></svg>
+        <svg class="tower-doodle doodle-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 4 L12 20 M4 12 L20 12 M6 6 L18 18 M18 6 L6 18"/></svg>
+        <svg class="tower-doodle doodle-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L13.5 10.5 L21 12 L13.5 13.5 L12 21 L10.5 13.5 L3 12 L10.5 10.5 Z"/></svg>
+      </div>
+    </div>
+    <div class="action-2">
+      <div class="tower-annotation">↓ tap to play! ↓</div>
+      <img id="start" src="./assets/main-index-start.png" class="start">
+    </div>
   </div>
   <div id="modal" class="modal hide">
     <div class="mask"></div>
