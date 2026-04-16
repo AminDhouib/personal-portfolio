@@ -5,6 +5,7 @@ import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
 import { NAMED_COLORS } from "../../../../data/password-game/colors";
+import { CODE_SNIPPETS } from "../../../../data/password-game/code-snippets";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -205,4 +206,32 @@ const hexColor: RuleDef = {
   },
 };
 
-export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement, foreignWord, capitalCity, hexColor];
+const codeSnippet: RuleDef = {
+  id: "code-snippet",
+  tier: 2,
+  create(rng) {
+    const entry = pickOne(rng, CODE_SNIPPETS);
+    return {
+      id: "code-snippet",
+      tier: 2,
+      description: `Your password must name the language of this snippet:\n\n${entry.snippet}`,
+      params: { language: entry.language, snippet: entry.snippet },
+      validate(state) {
+        return {
+          passed: state.password.toLowerCase().includes(entry.language.toLowerCase()),
+        };
+      },
+    };
+  },
+};
+
+export const TIER_2_RULES: readonly RuleDef[] = [
+  natoPhonetic,
+  mathEquation,
+  romanRange,
+  periodicElement,
+  foreignWord,
+  capitalCity,
+  hexColor,
+  codeSnippet,
+];

@@ -6,6 +6,7 @@ import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
 import { NAMED_COLORS } from "../../../../data/password-game/colors";
+import { CODE_SNIPPETS } from "../../../../data/password-game/code-snippets";
 
 function makeState(password: string, rule: Rule): GameState {
   return {
@@ -214,6 +215,41 @@ describe("Tier 2 — hex color rule", () => {
   it("fails without the name", () => {
     const rule = def.create(mulberry32(29));
     expect(rule.validate(makeState("12345", rule)).passed).toBe(false);
+  });
+});
+
+describe("Tier 2 — code snippet rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "code-snippet")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params reference a real snippet and language from the pool", () => {
+    const rule = def.create(mulberry32(31));
+    const entry = CODE_SNIPPETS.find(
+      (s) => s.language === rule.params.language && s.snippet === rule.params.snippet
+    );
+    expect(entry).toBeDefined();
+  });
+
+  it("passes when password contains the language name (case-insensitive)", () => {
+    const rule = def.create(mulberry32(31));
+    const lang = rule.params.language as string;
+    expect(rule.validate(makeState(`abc${lang}xyz`, rule)).passed).toBe(true);
+    expect(rule.validate(makeState(`abc${lang.toLowerCase()}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails without the language name", () => {
+    const rule = def.create(mulberry32(31));
+    expect(rule.validate(makeState("abc123", rule)).passed).toBe(false);
+  });
+
+  it("description starts with a prompt and includes the snippet", () => {
+    const rule = def.create(mulberry32(31));
+    const snippet = rule.params.snippet as string;
+    expect(rule.description).toContain("language");
+    expect(rule.description).toContain(snippet);
   });
 });
 
