@@ -686,7 +686,7 @@ git commit -m "feat(orbital-dodge): apply purchased upgrades at run start (coins
 
 **Why:** Returning players need a UI to see their wallet and spend coins. Modal is rendered inside the canvas container so the game scene stays alive behind it.
 
-- [ ] **Step 1: Import icons + state**
+- [x] **Step 1: Import icons + state**
 
 Top of file, extend lucide imports:
 
@@ -699,7 +699,7 @@ import {
 } from "lucide-react";
 ```
 
-- [ ] **Step 2: Add shop-open state + helper**
+- [x] **Step 2: Add shop-open state + helper**
 
 Inside the `SpaceShooterGame` component, near the other useState calls:
 
@@ -709,13 +709,13 @@ Inside the `SpaceShooterGame` component, near the other useState calls:
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
 ```
 
-- [ ] **Step 3: Add `isReturningPlayer` computed**
+- [x] **Step 3: Add `isReturningPlayer` computed**
 
 ```ts
   const isReturningPlayer = profile.firstRunCompleted;
 ```
 
-- [ ] **Step 4: Add purchase handler**
+- [x] **Step 4: Add purchase handler**
 
 ```ts
   const buyUpgrade = useCallback((id: string) => {
@@ -740,7 +740,7 @@ Add `spendCoins` + `setUpgradeLevel` to the top import:
 import { addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile, setUpgradeLevel, spendCoins } from "./profile";
 ```
 
-- [ ] **Step 5: Render shop modal**
+- [x] **Step 5: Render shop modal**
 
 Add to the canvas container's JSX, alongside other overlays:
 
@@ -824,13 +824,13 @@ Add to the canvas container's JSX, alongside other overlays:
         </AnimatePresence>
 ```
 
-- [ ] **Step 6: Lint + tsc**
+- [x] **Step 6: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -846,7 +846,7 @@ git commit -m "feat(orbital-dodge): shop modal with 5 upgrade tiles, purchase fl
 
 **Why:** First-timers keep the current minimal "move to start" experience. Returning players see explicit Play and Shop buttons instead, with wallet indicator.
 
-- [ ] **Step 1: Replace the armed overlay with conditional content**
+- [x] **Step 1: Replace the armed overlay with conditional content**
 
 Find the existing armed-state overlay (starts with `{ui.status === "armed" && (`):
 
@@ -940,7 +940,7 @@ Replace the entire block with a branching version:
         </AnimatePresence>
 ```
 
-- [ ] **Step 2: Also expose shop from death overlay (returning players)**
+- [x] **Step 2: Also expose shop from death overlay (returning players)**
 
 In the death overlay, add next to the existing Fly Again button:
 
@@ -971,7 +971,7 @@ In the death overlay, add next to the existing Fly Again button:
 
 Replace the existing single-button group with the above.
 
-- [ ] **Step 3: Refresh profile state after death**
+- [x] **Step 3: Refresh profile state after death**
 
 In `onDeath`, at the end (after `fetchLeaderboard().then(setLeaderboard);`):
 
@@ -979,13 +979,13 @@ In `onDeath`, at the end (after `fetchLeaderboard().then(setLeaderboard);`):
     refreshProfile();
 ```
 
-- [ ] **Step 4: Lint + tsc**
+- [x] **Step 4: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1001,7 +1001,7 @@ git commit -m "feat(orbital-dodge): Play/Shop buttons for returning players (fir
 
 **Why:** After the first run, players need to see they earned coins — this is what hooks them into the loop. For returning players, show an explicit `+N coins` line with animation.
 
-- [ ] **Step 1: Extend UiState with `coinsThisRun`**
+- [x] **Step 1: Extend UiState with `coinsThisRun`**
 
 Add to UiState:
 
@@ -1033,7 +1033,7 @@ In `launch` reset:
     setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, coinsThisRun: 0, active: [] });
 ```
 
-- [ ] **Step 2: Add coins line to death overlay**
+- [x] **Step 2: Add coins line to death overlay**
 
 In the death overlay, directly above the stats grid, add:
 
@@ -1051,13 +1051,13 @@ In the death overlay, directly above the stats grid, add:
                 )}
 ```
 
-- [ ] **Step 3: Lint + tsc**
+- [x] **Step 3: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1071,7 +1071,7 @@ git commit -m "feat(orbital-dodge): death overlay shows +coins earned this run"
 **Files:**
 - No file changes. Scripted verification against the running dev server.
 
-- [ ] **Step 1: Clear any existing profile, play a run, verify coins persist**
+- [x] **Step 1: Clear any existing profile, play a run, verify coins persist**
 
 Evaluate in the page:
 
@@ -1103,7 +1103,9 @@ async () => {
 }
 ```
 
-- [ ] **Step 2: Interpret**
+- [x] **Step 2: Interpret**
+
+Result observed: `walletCoins: 511, totalCoinsEarned: 11, firstRunCompleted: true, totalRunsPlayed: 1` — PASSED.
 
 Expected: `firstRunCompleted: true`, `totalRunsPlayed: 1`, `walletCoins > 500` (started at 500 + earned during run), `totalCoinsEarned > 0`.
 
@@ -1111,7 +1113,7 @@ If `walletCoins === 500` exactly, coins weren't being collected. Debug:
 - Confirm `spawnCoin` fires on asteroid kill (add console.log temporarily)
 - Confirm collection proximity check triggers
 
-- [ ] **Step 3: Shop purchase verification**
+- [x] **Step 3: Shop purchase verification**
 
 After the run dies, click the Shop button, buy "Coin Value" L1 (cost 100), then start a new run. Compare coin drops — with `coinValueBonus = 1`, each pickup should show `+2` instead of `+1`.
 
@@ -1131,7 +1133,7 @@ Evaluate:
 
 Start a new run by reloading. Collect coins. Confirm `+2` popups instead of `+1`.
 
-- [ ] **Step 4: No commit — verification only**
+- [x] **Step 4: No commit — verification only**
 
 ---
 
@@ -1140,7 +1142,9 @@ Start a new run by reloading. Collect coins. Confirm `+2` popups instead of `+1`
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx` only if needed
 
-- [ ] **Step 1: If coin drops feel too rare**
+> Skipped — Task 9 verification PASSED. Coins dropped and collected, wallet persisted 500 → 511. No tuning required.
+
+- [x] **Step 1: If coin drops feel too rare**
 
 Drop coins from power-ups too (not just asteroids). In the power-up collect block, after existing activation, add:
 
@@ -1148,11 +1152,11 @@ Drop coins from power-ups too (not just asteroids). In the power-up collect bloc
         spawnCoin(g, p.x, p.y, p.z, 3);
 ```
 
-- [ ] **Step 2: If magnet radius feels ineffective at L0**
+- [x] **Step 2: If magnet radius feels ineffective at L0**
 
 Bump the baseline pickup radius in the `Coins` movement block from `0.6` to `0.9`.
 
-- [ ] **Step 3: Commit any tuning**
+- [x] **Step 3: Commit any tuning**
 
 ```bash
 git add src/components/game/space-shooter.tsx

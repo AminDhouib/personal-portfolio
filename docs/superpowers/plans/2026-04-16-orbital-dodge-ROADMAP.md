@@ -155,7 +155,7 @@ If any of these move up in priority, spin a new plan off this roadmap.
 | Plan | Status | Completed |
 |---|---|---|
 | 1 — Combo + Near-miss | COMPLETED | 2026-04-16 |
-| 2 — Shop Phase 1 | NOT STARTED | — |
+| 2 — Shop Phase 1 | COMPLETED | 2026-04-16 |
 | 3 — Shop Phase 2 | NOT STARTED | — |
 | 4 — Bosses | NOT STARTED | — |
 | 5 — Polish | NOT STARTED | — |
