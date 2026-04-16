@@ -1,76 +1,77 @@
 "use client";
 
 /**
- * Glass-crack overlays. Each crack is a localized impact point with radiating
- * fractures, positioned in a specific corner of the container. Higher chaos
- * levels reveal additional cracks.
+ * Destruction overlay — renders "broken chips" that appear as if pieces of
+ * the container were physically knocked off. Each chip has:
+ *   - A dark fill matching the page background (looks like a hole)
+ *   - A jagged inner edge drawn as a thin light line to mimic a glass fracture
+ *   - Hairline fractures radiating from the chip into the container
  *
- * No red tint, no color overlay — the effect should feel like the glass over
- * the game has been struck, not that the game itself is in error.
- *
- * Each crack is wrapped in a container with a data attribute so CSS can show
- * them progressively based on the parent's data-chaos.
+ * Positioned at specific corners/edges so they don't obscure interactive
+ * elements. Higher chaos levels reveal additional chips. No red tint, no
+ * color overlay — the effect is purely structural.
  */
 export function CracksOverlay() {
   return (
     <>
-      {/* Crack 1: top-right corner. Appears at chaos 3. */}
-      <div className="pg-crack pg-crack-1" data-chaos-min="3">
-        <GlassCrack />
+      <div className="pg-chip pg-chip-1" data-chaos-min="3">
+        <ChipShape flipX={true} flipY={true} />
       </div>
-      {/* Crack 2: bottom-left corner. Appears at chaos 4. */}
-      <div className="pg-crack pg-crack-2" data-chaos-min="4">
-        <GlassCrack />
+      <div className="pg-chip pg-chip-2" data-chaos-min="4">
+        <ChipShape flipX={true} flipY={false} />
       </div>
-      {/* Crack 3: center-right edge. Appears at chaos 5. */}
-      <div className="pg-crack pg-crack-3" data-chaos-min="5">
-        <GlassCrack />
+      <div className="pg-chip pg-chip-3" data-chaos-min="5">
+        <ChipShape flipX={false} flipY={false} />
       </div>
     </>
   );
 }
 
 /**
- * A single glass-crack impact pattern. Rendered as a small SVG (viewBox 100x100)
- * that's positioned and scaled by the parent container's CSS. Strokes are
- * white + dark shadow to simulate depth against either dark or light themes.
+ * A single "broken chip" shape. Rendered as inline SVG so the polygon and
+ * stroke are drawn as one unit.
+ *
+ * Anatomy:
+ *  - <polygon fill="var(--background)"> : the missing piece (dark hole).
+ *  - <polyline stroke="..."> : the jagged glass-edge highlight.
+ *  - <path stroke="..."> : hairline fractures extending from the chip.
  */
-function GlassCrack() {
+function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
+  // The chip occupies the bottom-left corner of the SVG viewBox (100x100),
+  // with jagged teeth along its exposed edge. flipX / flipY mirror it so we
+  // can reuse the same geometry for the opposite corners.
+  const transform = `${flipX ? "scale(-1 1) translate(-100 0)" : ""} ${flipY ? "scale(1 -1) translate(0 -100)" : ""}`.trim();
   return (
     <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden>
-      <defs>
-        <filter id="pg-crack-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0.5" dy="0.5" stdDeviation="0.4" floodColor="#000" floodOpacity="0.6" />
-        </filter>
-      </defs>
-      <g filter="url(#pg-crack-shadow)" fill="none" strokeLinecap="round">
-        {/* Impact point (tiny dark spot). */}
-        <circle cx="50" cy="50" r="1.2" fill="#0008" stroke="none" />
-        {/* Primary radiating fractures from impact. */}
-        <g stroke="#fff" strokeWidth="0.7">
-          <path d="M 50 50 L 18 14" />
-          <path d="M 50 50 L 78 20" />
-          <path d="M 50 50 L 90 55" />
-          <path d="M 50 50 L 70 88" />
-          <path d="M 50 50 L 20 86" />
-          <path d="M 50 50 L 8 55" />
-        </g>
-        {/* Secondary hairline fractures — shorter, branching off primaries. */}
-        <g stroke="#fff" strokeWidth="0.35" opacity="0.75">
-          <path d="M 34 32 L 26 22" />
-          <path d="M 66 34 L 72 24" />
-          <path d="M 74 62 L 82 68" />
-          <path d="M 60 72 L 66 82" />
-          <path d="M 32 68 L 24 74" />
-          <path d="M 26 50 L 16 48" />
-          <path d="M 40 24 L 34 12" />
-          <path d="M 74 46 L 84 40" />
-        </g>
-        {/* Concentric micro-cracks around impact — tiny arcs. */}
-        <g stroke="#fff" strokeWidth="0.25" opacity="0.55">
-          <path d="M 46 46 Q 50 43 54 46" />
-          <path d="M 44 54 Q 50 57 56 54" />
-          <path d="M 44 50 Q 44 47 46 45" />
+      <g transform={transform || undefined}>
+        {/* The "hole" — filled with the page background color so it blends. */}
+        <polygon
+          points="0,100 0,0 10,18 26,12 34,26 48,20 56,38 72,30 78,48 96,42 100,100"
+          fill="var(--background, #0a0a0f)"
+        />
+        {/* Thin crack edge along the broken boundary. */}
+        <polyline
+          points="0,0 10,18 26,12 34,26 48,20 56,38 72,30 78,48 96,42"
+          fill="none"
+          stroke="rgba(255,255,255,0.55)"
+          strokeWidth="0.8"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {/* Inner highlight for depth. */}
+        <polyline
+          points="2,3 11,19 27,13 35,27 49,21 57,39 73,31 79,49 95,43"
+          fill="none"
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth="0.3"
+          strokeLinejoin="round"
+        />
+        {/* Hairline fractures extending into the surviving container surface. */}
+        <g fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.3" strokeLinecap="round">
+          <path d="M 34 26 L 42 38 L 50 50" />
+          <path d="M 56 38 L 66 52 L 74 68" />
+          <path d="M 78 48 L 86 62" />
+          <path d="M 48 20 L 52 8" />
         </g>
       </g>
     </svg>

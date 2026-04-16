@@ -72,57 +72,88 @@
 }
 
 /*
- * Localized glass cracks — each .pg-crack is a small area (~80-120px square)
- * placed at a specific corner/edge of the container. They animate in with a
- * scale+fade when their chaos threshold is reached.
+ * Broken chips — each .pg-chip overlays a corner/edge of the container and
+ * fills its own jagged polygon area with the page background color, making
+ * that region appear physically removed. Thin white strokes trace the
+ * broken edge for a glass-fracture highlight.
  */
-.pg-crack {
+.pg-chip {
   position: absolute;
   pointer-events: none;
   opacity: 0;
-  transform: scale(0.3) rotate(0);
+  transform: scale(0.4);
   transform-origin: 50% 50%;
-  transition: opacity 500ms ease-out, transform 700ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: opacity 400ms ease-out, transform 500ms cubic-bezier(0.2, 0.9, 0.3, 1);
   z-index: 3;
-  width: 110px;
-  height: 110px;
 }
 
-/* Position each crack in a different spot so they don't overlap. */
-.pg-crack-1 { top: -14px; right: 32px; transform-origin: 50% 50%; }
-.pg-crack-2 { bottom: -10px; left: 40px; transform-origin: 50% 50%; }
-.pg-crack-3 { top: 40%; right: -18px; width: 90px; height: 90px; transform-origin: 50% 50%; }
-
-/* Reveal thresholds. Each crack appears at its chaos-min and stays. */
-.pg-chaos-root[data-chaos="3"] .pg-crack-1,
-.pg-chaos-root[data-chaos="4"] .pg-crack-1,
-.pg-chaos-root[data-chaos="5"] .pg-crack-1 {
-  opacity: 0.9;
-  transform: scale(1) rotate(-8deg);
+/* Position each chip so it eats a small corner without covering rule text. */
+.pg-chip-1 {
+  /* Top-right corner — bites into the card edge near the header buttons. */
+  top: -2px;
+  right: -2px;
+  width: 58px;
+  height: 58px;
+  transform-origin: 100% 0%;
+}
+.pg-chip-2 {
+  /* Bottom-right corner — small chip. */
+  bottom: -2px;
+  right: -2px;
+  width: 64px;
+  height: 64px;
+  transform-origin: 100% 100%;
+}
+.pg-chip-3 {
+  /* Left edge, lower — breaks into the rule list area from the left side. */
+  bottom: 20%;
+  left: -2px;
+  width: 72px;
+  height: 72px;
+  transform-origin: 0% 50%;
 }
 
-.pg-chaos-root[data-chaos="4"] .pg-crack-2,
-.pg-chaos-root[data-chaos="5"] .pg-crack-2 {
-  opacity: 0.85;
-  transform: scale(1) rotate(14deg);
+/* Reveal thresholds. */
+.pg-chaos-root[data-chaos="3"] .pg-chip-1,
+.pg-chaos-root[data-chaos="4"] .pg-chip-1,
+.pg-chaos-root[data-chaos="5"] .pg-chip-1 {
+  opacity: 1;
+  transform: scale(1);
 }
 
-.pg-chaos-root[data-chaos="5"] .pg-crack-3 {
-  opacity: 0.9;
-  transform: scale(1) rotate(-22deg);
+.pg-chaos-root[data-chaos="4"] .pg-chip-2,
+.pg-chaos-root[data-chaos="5"] .pg-chip-2 {
+  opacity: 1;
+  transform: scale(1);
 }
 
-/* Flash pulse on first appearance — chained with the transition above. */
-@keyframes pg-crack-flash {
-  0% { filter: brightness(3) blur(1px); }
-  40% { filter: brightness(1.4) blur(0); }
-  100% { filter: brightness(1) blur(0); }
+.pg-chaos-root[data-chaos="5"] .pg-chip-3 {
+  opacity: 1;
+  transform: scale(1);
 }
 
-.pg-chaos-root[data-chaos="3"] .pg-crack-1,
-.pg-chaos-root[data-chaos="4"] .pg-crack-2,
-.pg-chaos-root[data-chaos="5"] .pg-crack-3 {
-  animation: pg-crack-flash 900ms ease-out;
+/* Flash + scale-in animation when a chip first appears. */
+@keyframes pg-chip-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+    filter: brightness(2.5);
+  }
+  35% {
+    opacity: 1;
+    filter: brightness(1.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.pg-chaos-root[data-chaos="3"] .pg-chip-1,
+.pg-chaos-root[data-chaos="4"] .pg-chip-2,
+.pg-chaos-root[data-chaos="5"] .pg-chip-3 {
+  animation: pg-chip-appear 650ms cubic-bezier(0.25, 0.8, 0.4, 1);
 }
 
 /* Reveal pulse — one-shot shake when a new rule appears. */
