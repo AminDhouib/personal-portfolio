@@ -171,7 +171,7 @@ function GameScreen({
   }, [state.board, state.speedMode, dispatch]);
 
   return (
-    <>
+    <div className="w-full mx-auto max-w-xl px-2 sm:px-0">
     <div
       className="w-full rounded-xl border border-(--border) overflow-hidden relative"
       style={{
@@ -197,8 +197,8 @@ function GameScreen({
         />
       </div>
       <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="flex gap-4 items-start w-full max-w-2xl">
-          <div className="flex-1">
+        <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start w-full max-w-2xl">
+          <div className="flex-1 w-full">
             <Board
               board={state.board}
               rowHints={state.rowHints}
@@ -217,23 +217,25 @@ function GameScreen({
               }}
             />
           </div>
-          <Scoreboard
-            level={state.level}
-            currentCoins={state.currentCoins}
-            totalCoins={state.totalCoins}
-          />
-          <MemoPanel
-            open={state.phase === "memo"}
-            selectedMemos={
-              state.selectedMemoTile
-                ? state.board[state.selectedMemoTile.row][state.selectedMemoTile.col].memos
-                : [false, false, false, false]
-            }
-            copyMode={state.memoCopyMode}
-            onToggle={() => dispatch({ type: "toggleMemo" })}
-            onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
-            onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
-          />
+          <div className="flex flex-row sm:flex-col gap-3 items-center">
+            <Scoreboard
+              level={state.level}
+              currentCoins={state.currentCoins}
+              totalCoins={state.totalCoins}
+            />
+            <MemoPanel
+              open={state.phase === "memo"}
+              selectedMemos={
+                state.selectedMemoTile
+                  ? state.board[state.selectedMemoTile.row][state.selectedMemoTile.col].memos
+                  : [false, false, false, false]
+              }
+              copyMode={state.memoCopyMode}
+              onToggle={() => dispatch({ type: "toggleMemo" })}
+              onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
+              onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
+            />
+          </div>
         </div>
       </div>
       {(state.phase === "won" || state.phase === "lost") && (
@@ -328,7 +330,7 @@ function GameScreen({
         </div>
       </div>
     )}
-    </>
+    </div>
   );
 }
 
