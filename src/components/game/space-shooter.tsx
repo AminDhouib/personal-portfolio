@@ -1688,8 +1688,8 @@ function runTick(
             const points = Math.round(basePoints * comboMul);
             g.score += points;
             g.kills += 1;
-            // Drop coins scaled by current combo. 1 baseline + 1 per 5 combo.
-            const coinValue = 1 + Math.floor(g.combo / 5);
+            // Drop coins scaled by current combo + coin-value upgrade.
+            const coinValue = Math.max(1, 1 + Math.floor(g.combo / 5) + g.coinValueBonus);
             spawnCoin(g, o.x, o.y, o.z, coinValue);
             spawnScorePopup(g, o.x, o.y, o.z, points);
             sounds.play("boom");
@@ -1723,9 +1723,8 @@ function runTick(
       }
       const pickupR = 0.6 + magnetBonusRadius * 0.3;
       if (Math.abs(c.z - g.shipZ) < 1.2 && dist2d < pickupR) {
-        const effectiveValue = c.value + g.coinValueBonus;
-        g.coinsThisRun += effectiveValue;
-        spawnScorePopup(g, c.x, c.y, c.z, effectiveValue);
+        g.coinsThisRun += c.value;
+        spawnScorePopup(g, c.x, c.y, c.z, c.value);
         sounds.play("chime");
         g.coins.splice(i, 1);
       }
