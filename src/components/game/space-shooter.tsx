@@ -324,6 +324,48 @@ const BOSS_DISPLAY_NAMES: Record<BossId, string> = {
   "void-tyrant": "VOID TYRANT",
 };
 
+function normalizeVec3(v: [number, number, number]): [number, number, number] {
+  const len = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+function runSentinelBehavior(g: GameRefs, boss: BossState, now: number): void {
+  const phaseAge = now - boss.phaseStartAt;
+  boss.position[0] = Math.sin(phaseAge * 0.0008) * 3.5;
+  const shotInterval = 1200 / boss.difficultyMult;
+  if (now - boss.lastShotAt >= shotInterval) {
+    const angleRad = boss.patternIndex * (Math.PI / 4);
+    const gap = 1.4;
+    const perpX = Math.cos(angleRad);
+    const perpY = Math.sin(angleRad);
+    const dir = normalizeVec3([
+      g.shipX - boss.position[0],
+      g.shipY - boss.position[1],
+      g.shipZ - boss.position[2],
+    ]);
+    const speed = 12;
+    for (let k = -1; k <= 1; k += 2) {
+      g.bossProjectiles.push({
+        id: g.nextBossProjectileId++,
+        position: [
+          boss.position[0] + perpX * gap * k,
+          boss.position[1] + perpY * gap * k,
+          boss.position[2],
+        ],
+        velocity: [dir[0] * speed, dir[1] * speed, dir[2] * speed],
+        radius: 0.35,
+        color: "#ef4444",
+        spawnedAt: now,
+        ttlMs: 4000,
+        homing: false,
+        shielded: true,
+      });
+    }
+    boss.lastShotAt = now;
+    boss.patternIndex = (boss.patternIndex + 1) % 8;
+  }
+}
+
 function spawnBoss(state: GameRefs, bossId: BossId, recycleCount: number): void {
   const tier = BOSS_TIERS[bossId];
   const difficultyMult = Math.pow(1.3, recycleCount);
@@ -1729,7 +1771,7 @@ function runTick(
   if (bossIsActive) {
     g.normalSpawningPausedUntil = now + 100;
   }
-  // Boss intro phase: ease from z=-40 to z=-15 over 1500ms
+  // Boss lifecycle
   if (g.boss) {
     const b = g.boss;
     const phaseAge = now - b.phaseStartAt;
@@ -1742,6 +1784,72 @@ function runTick(
         b.phase = "fighting";
         b.phaseStartAt = now;
       }
+    } else if (b.phase === "fighting") {
+      if (b.id === "sentinel") runSentinelBehavior(g, b, now);
+      // other boss behaviors added in later tasks
+    } else if (b.phase === "dying") {
+      const dyingAge = now - b.phaseStartAt;
+      b.position[1] += 0.02;
+      if (dyingAge >= 1200) {
+        b.phase = "defeated";
+        b.phaseStartAt = now;
+        g.bossesDefeatedThisRun += 1;
+        // Score bonus + guaranteed power-up drop
+        const bonus = 500 * b.tier;
+        g.score += bonus;
+        spawnScorePopup(g, b.position[0], b.position[1], b.position[2], bonus);
+        spawnExplosion(g, b.position[0], b.position[1], b.position[2], "#ef4444", 900, 0.9);
+        // Defer power-up: force lastPowerUpSpawn so one appears soon
+        g.lastPowerUpSpawn = now - POWERUP_SPAWN_INTERVAL_MS + 500;
+      }
+    } else if (b.phase === "defeated") {
+      // Let remaining projectiles fade, then clear the boss
+      if (now - b.phaseStartAt > 500) {
+        g.boss = null;
+        g.bossProjectiles.length = 0;
+      }
+    }
+  }
+
+  // Update + collide boss projectiles each frame
+  for (let i = g.bossProjectiles.length - 1; i >= 0; i--) {
+    const p = g.bossProjectiles[i];
+    if (p.homing) {
+      const dx0 = g.shipX - p.position[0];
+      const dy0 = g.shipY - p.position[1];
+      const dz0 = g.shipZ - p.position[2];
+      const len = Math.hypot(dx0, dy0, dz0) || 1;
+      const sp = Math.hypot(p.velocity[0], p.velocity[1], p.velocity[2]);
+      p.velocity[0] = (dx0 / len) * sp;
+      p.velocity[1] = (dy0 / len) * sp;
+      p.velocity[2] = (dz0 / len) * sp;
+    }
+    p.position[0] += p.velocity[0] * step;
+    p.position[1] += p.velocity[1] * step;
+    p.position[2] += p.velocity[2] * step;
+    const dx = p.position[0] - g.shipX;
+    const dy = p.position[1] - g.shipY;
+    const dz = p.position[2] - g.shipZ;
+    const hitDist = p.radius + SHIP_RADIUS + 0.1;
+    const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
+    if (now > g.invulnUntil && !shieldedShip &&
+        dx * dx + dy * dy + dz * dz < hitDist * hitDist) {
+      g.status = "dying";
+      g.dyingAt = now;
+      g.deathVelX = (dx / (Math.hypot(dx, dy) || 1)) * 7;
+      g.deathVelY = (dy / (Math.hypot(dx, dy) || 1)) * 7 + 3.5;
+      g.deathVelZ = 2.5;
+      g.deathAngVel = (Math.random() - 0.5) * 10;
+      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 500, 0.45);
+      spawnShipDebris(g);
+      sounds.play("crash");
+      sounds.stopMusic(0.4);
+      sounds.playLosingJingle();
+      g.bossProjectiles.splice(i, 1);
+      continue;
+    }
+    if (now - p.spawnedAt > p.ttlMs || p.position[2] > 10) {
+      g.bossProjectiles.splice(i, 1);
     }
   }
 
@@ -1786,6 +1894,24 @@ function runTick(
     b.x += b.vx * step;
     b.y += b.vy * step;
     b.z += b.vz * step;
+    // Bullet-vs-boss: fighting phase only
+    if (g.boss && g.boss.phase === "fighting") {
+      const bo = g.boss;
+      const dx = b.x - bo.position[0];
+      const dy = b.y - bo.position[1];
+      const dz = b.z - bo.position[2];
+      const hitR = 1.5;
+      if (dx * dx + dy * dy + dz * dz < hitR * hitR) {
+        bo.hp -= b.damage;
+        spawnExplosion(g, b.x, b.y, b.z, b.color, 240, 0.2);
+        g.bullets.splice(i, 1);
+        if (bo.hp <= 0) {
+          bo.phase = "dying";
+          bo.phaseStartAt = now;
+        }
+        continue;
+      }
+    }
     if (b.z < SPAWN_Z - 5 || Math.abs(b.x) > ARENA_W || Math.abs(b.y) > ARENA_H) {
       g.bullets.splice(i, 1);
     }
@@ -2382,6 +2508,84 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
   );
 }
 
+function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(() => {
+    const b = gameRefs.current?.boss;
+    if (!groupRef.current || !b) return;
+    groupRef.current.position.set(b.position[0], b.position[1], b.position[2]);
+    groupRef.current.rotation.y += b.phase === "dying" ? 0.2 : 0.02;
+    if (b.phase === "dying") {
+      const t = Math.min(1, (performance.now() - b.phaseStartAt) / 1200);
+      groupRef.current.scale.setScalar(Math.max(0, 1 - t));
+    } else {
+      groupRef.current.scale.setScalar(1);
+    }
+  });
+  const boss = gameRefs.current?.boss;
+  if (!boss || boss.phase === "defeated") return null;
+  if (boss.id === "sentinel") {
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <cylinderGeometry args={[1.2, 1.2, 0.4, 6]} />
+          <meshStandardMaterial color="#1e293b" emissive="#ef4444" emissiveIntensity={0.4} />
+        </mesh>
+        <mesh position={[0, 0, 0.3]}>
+          <torusGeometry args={[0.8, 0.15, 8, 16]} />
+          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.6} />
+        </mesh>
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
+  // Fallback placeholder for other bosses until their meshes ship
+  return (
+    <group ref={groupRef}>
+      <mesh>
+        <icosahedronGeometry args={[1.3, 0]} />
+        <meshStandardMaterial color="#475569" emissive="#ef4444" emissiveIntensity={0.35} wireframe />
+      </mesh>
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function BossProjectiles({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const list = gameRefs.current?.bossProjectiles ?? [];
+  const geo = useMemo(() => new THREE.SphereGeometry(1, 10, 8), []);
+  useEffect(() => () => geo.dispose(), [geo]);
+  const refs = useRef<Map<number, THREE.Mesh>>(new Map());
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (const p of g.bossProjectiles) {
+      const m = refs.current.get(p.id);
+      if (m) {
+        m.position.set(p.position[0], p.position[1], p.position[2]);
+        m.scale.setScalar(p.radius);
+      }
+    }
+  });
+  return (
+    <group>
+      {list.map((p) => (
+        <mesh
+          key={p.id}
+          geometry={geo}
+          ref={(el) => {
+            if (el) refs.current.set(p.id, el);
+            else refs.current.delete(p.id);
+          }}
+        >
+          <meshBasicMaterial color={p.color} />
+        </mesh>
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
 function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
   const list = gameRefs.current?.coins ?? [];
   const geo = useMemo(() => new THREE.SphereGeometry(0.18, 12, 10), []);
@@ -2724,6 +2928,8 @@ function Scene({
       <Obstacles gameRefs={gameRefs} env={env} tick={tick} />
       <PowerUps gameRefs={gameRefs} tick={tick} />
       <Coins gameRefs={gameRefs} tick={tick} />
+      <BossMesh gameRefs={gameRefs} tick={tick} />
+      <BossProjectiles gameRefs={gameRefs} tick={tick} />
       <Bullets gameRefs={gameRefs} tick={tick} />
       <Explosions gameRefs={gameRefs} tick={tick} />
       <ScorePopups gameRefs={gameRefs} tick={tick} />
@@ -3434,6 +3640,20 @@ export function SpaceShooterGame() {
             <div className="text-xs tracking-[0.4em] text-red-400 animate-pulse">INCOMING</div>
             <div className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
               {BOSS_DISPLAY_NAMES[gameRefs.current.boss.id]}
+            </div>
+          </div>
+        )}
+        {/* Boss HP bar */}
+        {gameRefs.current.boss && gameRefs.current.boss.phase === "fighting" && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none z-30">
+            <div className="text-[10px] tracking-[0.3em] text-red-300">
+              {BOSS_DISPLAY_NAMES[gameRefs.current.boss.id]}
+            </div>
+            <div className="w-48 sm:w-64 h-2 bg-black/60 border border-red-500/50 overflow-hidden rounded-sm">
+              <div
+                className="h-full bg-linear-to-r from-red-600 to-red-400 transition-[width] duration-100"
+                style={{ width: `${Math.max(0, (gameRefs.current.boss.hp / gameRefs.current.boss.hpMax) * 100)}%` }}
+              />
             </div>
           </div>
         )}
