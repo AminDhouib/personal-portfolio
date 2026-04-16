@@ -257,12 +257,13 @@ function HextrisBanner() {
     { angleDeg: 210, color: GREEN },
   ];
 
-  // Stack radii from center: slot 0 = innermost (first to land), slot 2 =
-  // outermost. The inner hex face sits at radius ~14; a block sits "on" the
-  // face (outside the inner hex), so slot 0 centers at ~20, stepping by the
-  // block height (~8) for each outer slot.
-  const SLOT_R = [20, 28, 36];
-  const START_R = 62; // past the outer hex boundary
+  // Inner hex is flat-top (flat edges at top and bottom, vertex pointing
+  // right/left). Its vertex-radius is 14, so its apothem (distance from
+  // center to face midpoint) is 14·cos(30°) ≈ 12.12. Blocks sit flush on
+  // the apothem — slot 0 is the block closest to the face, slot 2 the
+  // outermost.
+  const SLOT_R = [16, 23, 30]; // apothem + N·blockHeight
+  const START_R = 52; // past the outer hex apothem (~40)
   const BLOCK_W = 22;
   const BLOCK_H = 7;
 
@@ -355,17 +356,19 @@ function HextrisBanner() {
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="xMidYMid meet"
       >
-        {/* Outer hex boundary — vertex-up orientation (flat top & bottom
-            edges). Stroked so the whole card reads as the Hextris board. */}
+        {/* Outer hex boundary — flat-top orientation (flat edges at top/
+            bottom, vertex points on left and right). Matches the real game
+            layout so blocks sit ON faces at -90/-30/30/90/150/210. Outer
+            vertex-radius 46, apothem 40. */}
         <polygon
-          points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23"
+          points="46,0 23,-40 -23,-40 -46,0 -23,40 23,40"
           fill="rgba(255,255,255,0.02)"
           stroke="rgba(255,255,255,0.14)"
           strokeWidth={1}
         />
-        {/* Inner score hex */}
+        {/* Inner score hex — flat-top, vertex-radius 14, apothem ~12.12 */}
         <polygon
-          points="0,-14 12,-7 12,7 0,14 -12,7 -12,-7"
+          points="14,0 7,-12 -7,-12 -14,0 -7,12 7,12"
           fill="#111114"
           stroke="rgba(255,255,255,0.1)"
           strokeWidth={0.5}
