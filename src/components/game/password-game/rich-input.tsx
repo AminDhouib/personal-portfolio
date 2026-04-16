@@ -95,7 +95,7 @@ export function RichInput({ value, formatting, onChange, placeholder }: Props) {
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 px-4 py-3 font-mono text-base whitespace-pre-wrap break-words"
+          className="pg-formatted-text pointer-events-none absolute inset-0 px-4 py-3 font-mono text-base whitespace-pre-wrap break-words"
         >
           <FormattedText value={value} formatting={formatting} />
         </div>
