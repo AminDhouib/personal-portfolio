@@ -166,6 +166,14 @@ const HUE_STEP = 6;
 const HUE_BASE = 340;
 const LS_PREFIX = "tower_stacker_";
 
+function formatTime(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  const cs = String(Math.floor((ms % 1000) / 10)).padStart(2, "0");
+  return `${mm}:${ss}.${cs}`;
+}
+
 export default function TowerStacker() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -500,6 +508,12 @@ export default function TowerStacker() {
   }, []);
 
   useEffect(() => {
+    if (uiState !== "playing" || refs.current.mode !== "speedrun") return;
+    const id = window.setInterval(() => forceTick((n) => (n + 1) % 1_000_000), 100);
+    return () => window.clearInterval(id);
+  }, [uiState]);
+
+  useEffect(() => {
     try {
       const m = localStorage.getItem(LS_PREFIX + "mode") as GameMode | null;
       if (m === "classic" || m === "sudden" || m === "speedrun") refs.current.mode = m;
@@ -538,6 +552,36 @@ export default function TowerStacker() {
         className="block w-full touch-none select-none"
         style={{ touchAction: "manipulation" }}
       />
+
+      {(uiState === "playing" || uiState === "paused") && (
+        <div className="pointer-events-none absolute inset-0 p-4 flex flex-col gap-2 text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-3xl font-bold leading-none tracking-tight font-mono">
+                {refs.current.mode === "speedrun"
+                  ? formatTime(performance.now() - refs.current.runStartMs)
+                  : uiScore.toLocaleString()}
+              </div>
+              {uiCombo >= 2 && (
+                <div className={`text-sm mt-1 font-semibold ${uiCombo >= 5 ? "text-red-400 animate-pulse" : "text-amber-300"}`}>
+                  {uiCombo}× COMBO
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {refs.current.mode === "classic" && (
+                <div className="flex gap-1">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <svg key={i} width="22" height="22" viewBox="0 0 24 24" fill={i < uiHp ? "#ef4444" : "#4b5563"}>
+                      <path d="M12 21s-7-5.2-9.3-9.1C1 8.5 2.5 4.5 6 4c2 0 3.5 1 4 2 .5-1 2-2 4-2 3.5.5 5 4.5 3.3 7.9C19 15.8 12 21 12 21z" />
+                    </svg>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {uiState === "menu" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm p-6">
