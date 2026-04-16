@@ -50,9 +50,16 @@ Touch events use pointer events; canvas gets `touch-action: manipulation` to pre
   - `highscore` — best score number
   - `highfloors` — best floor count
   - `sound` — boolean
-  - `mode` — "classic" | "sudden"
+  - `mode` — "classic" | "sudden" | "speedrun"
   - `hints` — boolean (landing shadow)
   - `player_name` — last used leaderboard name
+  - `theme` — active block theme ID
+  - `themes` — JSON array of unlocked theme IDs
+  - `achievements` — JSON array of unlocked achievement IDs
+  - `daily_dates` — JSON array of "YYYY-MM-DD" strings (for Daily Devotee tracking)
+  - `ghost` — JSON array of recorded floor placements from best run
+  - `total_runs` — integer counter (unlocks Pixel theme at 50)
+  - `speedrun_best` — best speedrun time in ms
 - **Leaderboard API** for global top 25 (see §7).
 
 ## 4. Game mechanics
@@ -110,7 +117,8 @@ Touch events use pointer events; canvas gets `touch-action: manipulation` to pre
 ### Modes
 - **Classic (3 HP):** 3 hearts shown. Each full miss costs 1 HP.
 - **Sudden Death:** one miss ends the run. No HP UI.
-Both persist independently — the leaderboard shows a combined list but the entry record includes mode (stored as part of score? → see §7 for resolution).
+- **Speedrun:** reach floor 50 in minimum time. One miss = run over and time invalidated. See §10.K.
+Leaderboard uses `region` field to tag mode (`"classic"` / `"sudden"` / `"speedrun"`). Daily runs use a separate `game` slug (see §10.A).
 
 ## 5. Visual system
 
@@ -201,16 +209,16 @@ Shift from `MAX_ENTRIES = 100` globally to 100 per game. Sort and trim is filter
 | Leaderboard field | Tower-stacker meaning |
 |---|---|
 | `name` | Player-entered, 12 char max |
-| `score` | Total points |
+| `score` | Total points (for Speedrun: `1_000_000 - durationMs` so ascending-by-time sorts naturally via the existing descending-by-score sort) |
 | `level` | Floor count reached |
-| `seconds` | Run duration |
+| `seconds` | Run duration in seconds |
 | `kills` | Perfects count (reuses existing validation) |
-| `distance` | — (unused) |
-| `region` | — (unused) |
-| `game` | `"tower-stacker"` |
+| `distance` | Golden blocks landed |
+| `region` | Mode: `"classic"` / `"sudden"` / `"speedrun"` |
+| `game` | `"tower-stacker"` for normal runs, `"tower-stacker-daily-YYYY-MM-DD"` for daily runs, `"tower-stacker-seeded"` for shared-seed runs |
 
 ### Modes and leaderboard
-Single combined leaderboard for tower-stacker; mode tag embedded into `region` field (set to `"classic"` or `"sudden"`). GET filters at render time if a mode toggle is shown. Acceptable compromise to avoid multi-field keys in a 100-line JSON API.
+Single combined main-leaderboard for tower-stacker; mode tag embedded into `region` field. UI can filter by mode client-side after fetch. Daily and seeded runs are segregated via separate `game` slugs to preserve fairness. For Speedrun's ascending-time sort: the `score` field is set to `1_000_000 - durationMs` so the server's existing descending-score sort naturally produces the right order; UI formats as time.
 
 ## 8. HUD & UI chrome
 
@@ -222,28 +230,34 @@ Single combined leaderboard for tower-stacker; mode tag embedded into `region` f
 
 ### Start screen (state === 'menu')
 - Centered card, title "Tower Stacker" with red accent glow.
-- Mode toggle: "Classic (3 HP)" / "Sudden Death".
+- Mode toggle: "Classic (3 HP)" / "Sudden Death" / "Speedrun".
+- Theme picker (unlocked themes shown as clickable swatches; locked shown greyed with unlock hint).
 - Hints toggle.
 - Big red "START" button.
-- "High Score: XXXX" below.
+- Side panel: "Today's Challenge" card (Daily seeded run button + countdown to reset).
+- Below: "High Score: XXXX" and "Speedrun Best: XX.XXs".
+- Achievements badge strip (icons for unlocked; greyed for locked — tap to see criterion).
 - Collapsible "How to Play" panel.
 
 ### Pause screen (state === 'paused')
 - Dim overlay; "Paused" text; Resume / Restart / Quit buttons.
 
 ### Game-over screen (state === 'game-over')
-After cinematic pull-back completes, summary card slides in with:
-- Final score
+After cinematic pull-back AND post-game replay fast-forward (§10.H) complete, summary card slides in with:
+- Final score (or time, for Speedrun)
 - Floors reached
 - Highest combo
 - Perfects count
+- Golden blocks landed
 - Biomes visited (list)
+- Achievement unlock notifications (for anything earned this run)
 - New-high-score badge (if applicable)
-- Leaderboard rank (if top 25)
-- Buttons: "Save Tower" (PNG export), "Play Again", "Submit to Leaderboard" (opens name-input modal if qualifying)
+- "Ghost passed" badge (if applicable)
+- Leaderboard rank (if top 25 for current mode)
+- Buttons: "Share Tower" (generates & shares/downloads PNG card, §10.I), "Play Again", "Submit to Leaderboard" (opens name-input modal if qualifying)
 
 ### Shareable tower PNG
-`canvas.toDataURL('image/png')` rendered to a hidden offscreen canvas containing the full tower (not viewport-cropped). Downloaded as `tower-stacker-{score}.png`.
+See §10.I — the Share Tower button generates a branded 1200×630 social card (not a plain screenshot). Uses `navigator.share()` on mobile where available, falls back to download.
 
 ### Mobile responsive
 - Canvas auto-resizes to container width, maintains aspect ratio.
@@ -262,7 +276,97 @@ After cinematic pull-back completes, summary card slides in with:
 7. Milestone camera pull-back at floors 50 and 100.
 8. Shareable tower PNG export.
 
-## 10. Testing & verification
+## 10. Engagement & viral systems
+
+These features transform a one-time play into sharable, habit-forming engagement.
+
+### A. Daily seeded run
+- **Seed source:** `YYYY-MM-DD` (UTC) hashed to 32-bit seed via FNV-1a.
+- **What the seed controls:** active block spawn side, starting speed offset, golden block positions (which floor numbers roll golden), biome palette hue rotation for that day.
+- **Menu UI:** "Today's Challenge" card showing today's date, countdown to next reset (UTC midnight), a "Daily" button that launches with the day's seed.
+- **Leaderboard:** separate `GET /api/leaderboard?game=tower-stacker-daily-YYYY-MM-DD` entries. Resets visually each day (old entries still stored, just filtered by today's slug).
+- **Visual cue:** a small gold "DAILY" tag in HUD during daily runs.
+
+### B. Ghost run (personal best)
+- **Recording:** during every run, append `{ floorIndex, x, width, timeMs }` to an in-memory array. On game over, if the run beat localStorage `highscore`, persist the array as `tower_stacker_ghost` (JSON).
+- **Playback:** on run start (Classic/Sudden only — not Speedrun), spawn a translucent "ghost" column to the side of the main playfield (~30% alpha). Ghost floors appear at their recorded `timeMs` offsets from run start.
+- **Passing moment:** when active floor count exceeds ghost floor count, play a three-note fanfare + camera brief flash + banner ("GHOST PASSED").
+
+### C. Named achievements
+Tracked in `localStorage.tower_stacker_achievements` as a `Set<string>`. Mid-run toast notification on unlock (slide-in top-right, 3s).
+
+| ID | Name | Criterion |
+|---|---|---|
+| `first_tower` | First Tower | Complete any run |
+| `architect` | The Architect | Reach floor 50 |
+| `atlas` | Atlas | Reach floor 100 |
+| `perfectionist` | Perfectionist | 10 consecutive perfect stacks in one run |
+| `virtuoso` | Virtuoso | 20 consecutive perfect stacks in one run |
+| `daily_devotee` | Daily Devotee | Play daily runs on 7 different dates |
+| `golden_touch` | Golden Touch | Land 5 golden blocks in one run |
+| `void_walker` | Void Walker | Reach the Void biome (floor 90) |
+| `speed_demon` | Speed Demon | Complete a speedrun (floor 50) in < 60s |
+| `ghost_buster` | Ghost Buster | Pass your ghost run |
+
+### D. Unlockable block themes
+Tracked in `localStorage.tower_stacker_themes` as an array of unlocked theme IDs. User selects active theme in menu.
+
+| ID | Unlock | Rendering |
+|---|---|---|
+| `classic` | Default | Rainbow hue progression (spec §5) |
+| `neon` | 3000 score in one run | Bright saturated colors with 8px outer glow (`shadowBlur`) |
+| `gold` | 8000 score in one run | Warm palette (gold→copper→bronze gradient), metallic specular highlight |
+| `crystal` | 15000 score in one run | Translucent fill (40% alpha), bright edge stroke |
+| `pixel` | 50 total runs completed (counter in localStorage) | 8-bit chunky rendering, 4px grid snap, no interpolation |
+
+### E. Milestone visual spectacles
+At specific floor counts, a brief one-shot visual event fires (independent of biome transitions):
+- **Floor 40:** lightning fork splits the sky (2 zig-zag strokes, fade over 600ms). Thunder sound (low noise burst).
+- **Floor 60:** whole tower pulses white light for 800ms.
+- **Floor 80:** screen "shatters" — brief radial crack overlay (6 lines from center), fades over 1s.
+
+### F. Near-miss slo-mo
+- Trigger: on normal stack drop where `overlapW > 0` and `chopWidth / activeBlock.width > 0.88` (i.e., near-miss — 88%+ overhang).
+- Effect: scale `dt` by 0.4× for 300ms after the drop. Camera zoom-in by 5% during slo-mo, ease back after.
+- Feels like: the block teeters on a sliver, debris drifts down in slow motion, dramatic.
+
+### G. Extreme-combo crescendo
+Independent of landing-feedback (which already scales per combo). Global visual state when combo ≥ 10:
+- **10–19:** rainbow aura around active block (additive glow, hue-rotates).
+- **20–29:** lightning trails behind each new landed block (fading jagged lines).
+- **30+:** aurora wash across entire background (animated gradient overlay, 20% alpha).
+
+Effects fade within 400ms when combo breaks.
+
+### H. Post-game replay fast-forward
+- Block placements were already recorded for ghost system (§B).
+- On game over, before summary card: 3s fast-forward animation showing entire tower building up from base to top, camera auto-panning. Each floor appears at `recordedTime * (3000 / runDurationMs)`.
+- Replay uses active-run floor data (no ghost), rendered at current camera height (starts zoomed out showing whole tower).
+
+### I. Share card PNG auto-generator
+- **Trigger:** "Share Tower" button on game-over summary (replaces the prior "Save Tower" button — merged).
+- **Rendering:** offscreen canvas (1200×630, OG-image aspect ratio for social previews).
+- **Layout:**
+  - Top: dark gradient background matching final biome
+  - Center-left: rendered tower silhouette (full tower, scaled to fit)
+  - Center-right: score (huge), floor count, highest combo, achievement badges earned this run (as icons)
+  - Bottom: "Tower Stacker" logo + "amin.dev/games" watermark + date/seed tag
+- **Output:** PNG blob → native `navigator.share({ files: [...] })` if available (mobile), else `a.download` link.
+
+### J. Seed-share URL
+- On share card, include "Seed: ABC123" text and a short URL: `amin.dev/games?tower-seed=ABC123`.
+- `src/app/games/page.tsx` reads the URL param and forwards it to the game component.
+- On game start with a supplied seed: menu shows "Playing shared seed: ABC123", leaderboard submission uses `game=tower-stacker-seeded` (keeps shared-seed runs out of the main leaderboard to preserve fairness).
+- Seeds are 6-char base32 alphanumeric, converted via FNV-1a to a 32-bit PRNG seed.
+
+### K. Speedrun mode
+- Third mode option alongside Classic and Sudden Death.
+- Objective: reach floor 50 in minimum time. No HP (one miss = run over, time doesn't count).
+- HUD shows large running timer (MM:SS.ms) instead of score.
+- Leaderboard tag: `region="speedrun"`. Sorted ascending by `seconds`.
+- Banner on floor 50 reach: "FINISHED — X.XX s".
+
+## 11. Testing & verification
 
 Before claiming done:
 
@@ -291,12 +395,37 @@ Before claiming done:
    - First run (empty localStorage): defaults apply
    - Network failure on leaderboard submit: graceful error, no crash
 
-## 11. Workflow
+## 12. Workflow
 
 - Work directly on `main` branch (user preference, no worktree).
 - Commit in logical chunks (scaffold, mechanics, visuals, audio, UI, leaderboard integration).
 - No feature flags; ship-as-you-build.
 
-## 12. Open questions
+## 13. Open questions
 
 None. All clarifications resolved during brainstorming.
+
+## 14. Scope summary
+
+Total feature set:
+- Core mechanic (sliding, dropping, overlap, debris, perfect detection, combo)
+- 3 game modes (Classic HP, Sudden Death, Speedrun)
+- Full HUD + menu + pause + game-over screens
+- 5 altitude-based biomes with parallax, transitions, ambient events
+- Per-block color progression with 5 unlockable themes
+- Web Audio synthesis for all sounds with pitch-combo system
+- Particle system (dust, sparkle, debris, combo trail, aurora, danger)
+- Dynamic camera (lerp, zoom-out progression, milestone pull-back)
+- Juice: landing shadow, danger pulse, near-miss slo-mo, extreme-combo crescendo, golden blocks, milestone spectacles
+- Post-game replay fast-forward
+- 10 named achievements
+- Daily seeded runs with own leaderboard
+- Shared seed URLs
+- Ghost run (personal best playback)
+- Speedrun mode with timer
+- Share card PNG generator with social-share integration
+- Haptic feedback on mobile
+- Leaderboard API backward-compatible extension
+- Mobile responsive
+
+Estimated component size: ~2200–2600 lines in `tower-stacker.tsx`. Compare: `space-shooter.tsx` at 2924 lines.
