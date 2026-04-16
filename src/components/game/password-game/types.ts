@@ -54,5 +54,7 @@ export interface Rule {
 export interface RuleDef {
   id: string;
   tier: Tier;
+  /** Other rule ids this rule conflicts with. Mutual — listed on either side. */
+  conflictsWith?: readonly string[];
   create(rng: Rng): Rule;
 }

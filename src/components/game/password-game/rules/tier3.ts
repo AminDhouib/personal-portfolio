@@ -45,6 +45,7 @@ function nth(n: number): string {
 const alternatingCase: RuleDef = {
   id: "alternating-case",
   tier: 3,
+  conflictsWith: ["every-nth-upper"],
   create() {
     return {
       id: "alternating-case",
@@ -71,6 +72,7 @@ const alternatingCase: RuleDef = {
 const wordCountStrict: RuleDef = {
   id: "word-count-strict",
   tier: 3,
+  conflictsWith: ["word-count"],
   create(rng) {
     const n = rangeInt(rng, 5, 8);
     return {

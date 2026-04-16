@@ -15,6 +15,7 @@ export function selectRulesForRun(
   pools: RulePoolsPerTier
 ): Rule[] {
   const out: Rule[] = [];
+  const pickedIds = new Set<string>();
   const tiers: Tier[] = [1, 2, 3, 4, 5];
   for (const tier of tiers) {
     const count = counts[tier] ?? 0;
@@ -22,11 +23,20 @@ export function selectRulesForRun(
     if (count === 0 || pool.length === 0) continue;
     const tierSeed = (seed ^ (tier * 0x9e3779b1)) >>> 0;
     const selectionRng = mulberry32(tierSeed);
-    const defs = pickN(selectionRng, pool, count);
-    defs.forEach((def, i) => {
-      const paramRng = mulberry32((tierSeed + (i + 1) * 0x85ebca6b) >>> 0);
+    // Pick more than `count` candidates so we have spares to swap in when a
+    // conflict filter drops one. Capped at pool length.
+    const candidates = pickN(selectionRng, pool, pool.length);
+    let kept = 0;
+    for (let i = 0; i < candidates.length && kept < count; i++) {
+      const def = candidates[i];
+      const conflicts = def.conflictsWith ?? [];
+      const hasConflict = conflicts.some((id) => pickedIds.has(id));
+      if (hasConflict) continue;
+      const paramRng = mulberry32((tierSeed + (kept + 1) * 0x85ebca6b) >>> 0);
       out.push(def.create(paramRng));
-    });
+      pickedIds.add(def.id);
+      kept++;
+    }
   }
   return out;
 }
