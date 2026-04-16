@@ -362,6 +362,69 @@ const HUE_STEP = 6;
 const HUE_BASE = 340;
 const LS_PREFIX = "tower_stacker_";
 
+function drawBlockWithTheme(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, bw: number, bh: number,
+  hue: number, theme: ThemeId, isGolden: boolean,
+) {
+  if (isGolden) {
+    const g = ctx.createLinearGradient(x, y, x, y + bh);
+    g.addColorStop(0, "#fde047"); g.addColorStop(1, "#b45309");
+    ctx.fillStyle = g;
+    ctx.shadowBlur = 16; ctx.shadowColor = "#fbbf24";
+    ctx.fillRect(x, y, bw, bh);
+    ctx.shadowBlur = 0;
+    return;
+  }
+  switch (theme) {
+    case "neon": {
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = `hsl(${hue} 90% 60%)`;
+      ctx.fillStyle = `hsl(${hue} 95% 55%)`;
+      ctx.fillRect(x, y, bw, bh);
+      ctx.shadowBlur = 0;
+      return;
+    }
+    case "gold": {
+      const g = ctx.createLinearGradient(x, y, x, y + bh);
+      g.addColorStop(0, "#fef3c7"); g.addColorStop(0.4, "#facc15"); g.addColorStop(1, "#92400e");
+      ctx.fillStyle = g; ctx.fillRect(x, y, bw, bh);
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.fillRect(x, y + 2, bw, 3);
+      return;
+    }
+    case "crystal": {
+      ctx.fillStyle = `hsla(${hue}, 85%, 70%, 0.45)`;
+      ctx.fillRect(x, y, bw, bh);
+      ctx.strokeStyle = `hsla(${hue}, 90%, 85%, 0.9)`;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 0.5, y + 0.5, bw - 1, bh - 1);
+      return;
+    }
+    case "pixel": {
+      const grid = 6;
+      for (let gx = 0; gx < bw; gx += grid) {
+        for (let gy = 0; gy < bh; gy += grid) {
+          const jitter = ((gx * 17 + gy * 31) % 8) - 4;
+          ctx.fillStyle = `hsl(${hue + jitter} 80% ${50 + (gy / bh) * 10}%)`;
+          ctx.fillRect(x + gx, y + gy, grid, grid);
+        }
+      }
+      return;
+    }
+    case "classic":
+    default: {
+      const g = ctx.createLinearGradient(x, y, x, y + bh);
+      g.addColorStop(0, `hsl(${hue} 85% 65%)`);
+      g.addColorStop(1, `hsl(${hue} 80% 45%)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, bw, bh);
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.fillRect(x, y + bh - 3, bw, 3);
+    }
+  }
+}
+
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
@@ -752,8 +815,7 @@ export default function TowerStacker() {
 
       // draw floors
       for (const f of r.floors) {
-        ctx.fillStyle = `hsl(${f.hue} 80% 55%)`;
-        ctx.fillRect(f.x, f.y, f.width, f.height);
+        drawBlockWithTheme(ctx, f.x, f.y, f.width, f.height, f.hue, r.theme, f.isGolden);
       }
 
       drawParticles(r, ctx);
@@ -761,8 +823,7 @@ export default function TowerStacker() {
       // draw active block
       if (r.activeBlock) {
         const a = r.activeBlock;
-        ctx.fillStyle = `hsl(${a.hue} 80% 55%)`;
-        ctx.fillRect(a.x, a.y, a.width, a.height);
+        drawBlockWithTheme(ctx, a.x, a.y, a.width, a.height, a.hue, r.theme, a.isGolden);
       }
 
       ctx.restore();
