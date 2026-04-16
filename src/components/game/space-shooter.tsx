@@ -336,6 +336,68 @@ interface TractorBeam {
   shipOverlapAccum: number;
 }
 
+interface BossWallSegment {
+  gridIndex: number;
+  position: [number, number, number];
+  velocity: [number, number, number];
+  isGap: boolean;
+  createdAt: number;
+  wallGroupId: number;
+}
+
+function runWardenBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+  boss.position[0] = 0;
+  boss.position[1] = 4;
+  boss.position[2] = -15;
+  const holder = boss as unknown as { wallSegments?: BossWallSegment[] };
+  if (!holder.wallSegments) holder.wallSegments = [];
+  const segs = holder.wallSegments;
+  const shotInterval = 4000 / boss.difficultyMult;
+  if (now - boss.lastShotAt >= shotInterval) {
+    const wallGroupId = Math.floor(now);
+    const gapIdx = Math.floor(boss.rng() * 5);
+    for (let k = 0; k < 5; k++) {
+      segs.push({
+        gridIndex: k,
+        position: [(k - 2) * 2, 2, -8],
+        velocity: [0, 0, 5],
+        isGap: k === gapIdx,
+        createdAt: now,
+        wallGroupId,
+      });
+    }
+    boss.lastShotAt = now;
+  }
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const s = segs[i];
+    s.position[0] += s.velocity[0] * step;
+    s.position[1] += s.velocity[1] * step;
+    s.position[2] += s.velocity[2] * step;
+    if (!s.isGap) {
+      const dx = g.shipX - s.position[0];
+      const dy = g.shipY - s.position[1];
+      const dz = g.shipZ - s.position[2];
+      const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
+      if (now > g.invulnUntil && !shieldedShip &&
+          Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dz) < 1) {
+        g.status = "dying";
+        g.dyingAt = now;
+        g.deathVelX = (dx / (Math.hypot(dx, dy) || 1)) * 7;
+        g.deathVelY = (dy / (Math.hypot(dx, dy) || 1)) * 7 + 3.5;
+        g.deathVelZ = 2.5;
+        g.deathAngVel = (Math.random() - 0.5) * 10;
+        spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 500, 0.45);
+        spawnShipDebris(g);
+        sounds.play("crash");
+        sounds.stopMusic(0.4);
+        sounds.playLosingJingle();
+        s.isGap = true;
+      }
+    }
+    if (s.position[2] > 10) segs.splice(i, 1);
+  }
+}
+
 function runHarvesterBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0004) * 4;
   boss.position[1] = 5;
@@ -1998,6 +2060,7 @@ function runTick(
       else if (b.id === "mirror") runMirrorBehavior(g, b, now);
       else if (b.id === "pulsar") runPulsarBehavior(g, b, now);
       else if (b.id === "harvester") runHarvesterBehavior(g, b, now, step);
+      else if (b.id === "warden") runWardenBehavior(g, b, now, step);
       // other boss behaviors added in later tasks
       if (now - g.lastBossPulseAt > 700) {
         sounds.bossPulse();
@@ -2878,6 +2941,21 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
       </group>
     );
   }
+  if (boss.id === "warden") {
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <boxGeometry args={[3.5, 2.5, 1]} />
+          <meshStandardMaterial color="#dc2626" emissive="#991b1b" emissiveIntensity={0.4} />
+        </mesh>
+        <mesh position={[0, 0, 0.51]}>
+          <ringGeometry args={[0.6, 0.9, 4]} />
+          <meshBasicMaterial color="#fca5a5" side={THREE.DoubleSide} />
+        </mesh>
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
   // Fallback placeholder for other bosses until their meshes ship
   return (
     <group ref={groupRef}>
@@ -2885,6 +2963,28 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
         <icosahedronGeometry args={[1.3, 0]} />
         <meshStandardMaterial color="#475569" emissive="#ef4444" emissiveIntensity={0.35} wireframe />
       </mesh>
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function BossWalls({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const boss = gameRefs.current?.boss;
+  if (!boss || boss.id !== "warden") return null;
+  const segs = (boss as unknown as { wallSegments?: BossWallSegment[] }).wallSegments ?? [];
+  return (
+    <group>
+      {segs.map((s) =>
+        s.isGap ? null : (
+          <mesh
+            key={`wall-${s.wallGroupId}-${s.gridIndex}`}
+            position={s.position}
+          >
+            <boxGeometry args={[1.8, 1.8, 0.3]} />
+            <meshStandardMaterial color="#991b1b" emissive="#ef4444" emissiveIntensity={0.3} />
+          </mesh>
+        )
+      )}
       <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
     </group>
   );
@@ -3295,6 +3395,7 @@ function Scene({
       <BossMesh gameRefs={gameRefs} tick={tick} />
       <BossProjectiles gameRefs={gameRefs} tick={tick} />
       <BossSubEntities gameRefs={gameRefs} tick={tick} />
+      <BossWalls gameRefs={gameRefs} tick={tick} />
       <Bullets gameRefs={gameRefs} tick={tick} />
       <Explosions gameRefs={gameRefs} tick={tick} />
       <ScorePopups gameRefs={gameRefs} tick={tick} />
