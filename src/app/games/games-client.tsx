@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket, Hexagon, Key, Zap, Layers } from "lucide-react";
 
 const GeometricFlowGame = dynamic(
@@ -189,6 +190,8 @@ function ExternalOrTabButton({
 
 export function GamesClient() {
   const [activeGame, setActiveGame] = useState("space-shooter");
+  const searchParams = useSearchParams();
+  const towerSeed = searchParams?.get("tower-seed") ?? undefined;
 
   return (
     <div className="space-y-8">
@@ -293,7 +296,7 @@ export function GamesClient() {
               Stack blocks. Miss a sliver, lose width. Perfect stacks ring higher. How tall can you build?
             </p>
           </div>
-          <TowerStacker />
+          <TowerStacker initialSeed={towerSeed} />
         </div>
       )}
     </div>

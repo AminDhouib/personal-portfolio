@@ -342,6 +342,41 @@ const BIOMES: BiomeDef[] = [
   },
 ];
 
+function fnv1a(str: string): number {
+  let h = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+  };
+}
+const BASE32 = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+function seedToShort(seed: number): string {
+  let s = "";
+  let n = seed >>> 0;
+  for (let i = 0; i < 6; i++) { s += BASE32[n & 0x1f]; n >>>= 5; }
+  return s;
+}
+function shortToSeed(short: string): number {
+  let n = 0;
+  for (let i = short.length - 1; i >= 0; i--) {
+    const idx = BASE32.indexOf(short[i]);
+    if (idx < 0) return 1;
+    n = (n << 5) | idx;
+  }
+  return n >>> 0;
+}
+
 const BASE_BLOCK_HEIGHT = 28;
 const BASE_BLOCK_WIDTH_PX = 220;
 const BASE_BLOCK_SPEED = 260;
@@ -564,7 +599,7 @@ function AchievementsStrip() {
   );
 }
 
-export default function TowerStacker() {
+export default function TowerStacker({ initialSeed }: { initialSeed?: string } = {}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<ViewportSize>({ w: 800, h: 600, dpr: 1 });
@@ -926,6 +961,11 @@ export default function TowerStacker() {
 
   function startRun() {
     const r = refs.current;
+    if (r.isDailyRun || r.isSeededRun) {
+      r.prng = mulberry32(r.seed);
+    } else {
+      r.prng = Math.random;
+    }
     const { w, h } = viewportRef.current;
     r.state = "playing";
     r.score = 0;
@@ -1176,6 +1216,10 @@ export default function TowerStacker() {
   }, [uiState]);
 
   useEffect(() => {
+    if (initialSeed) {
+      refs.current.seed = shortToSeed(initialSeed);
+      refs.current.isSeededRun = true;
+    }
     try {
       const m = localStorage.getItem(LS_PREFIX + "mode") as GameMode | null;
       if (m === "classic" || m === "sudden" || m === "speedrun") refs.current.mode = m;
@@ -1343,10 +1387,29 @@ export default function TowerStacker() {
             </div>
 
             <button
-              onClick={() => { playUi(); startRun(); }}
+              onClick={() => {
+                refs.current.isDailyRun = false;
+                refs.current.isSeededRun = false;
+                playUi();
+                startRun();
+              }}
               className="w-full rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold py-3 text-lg shadow-lg shadow-red-900/30 transition"
             >
               START
+            </button>
+
+            <button
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10);
+                refs.current.seed = fnv1a(today);
+                refs.current.isDailyRun = true;
+                refs.current.isSeededRun = false;
+                playUi();
+                startRun();
+              }}
+              className="w-full mt-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold py-3 text-base"
+            >
+              TODAY&apos;S CHALLENGE — {new Date().toISOString().slice(0, 10)}
             </button>
 
             <p className="text-xs text-neutral-500 mt-4 text-center">
