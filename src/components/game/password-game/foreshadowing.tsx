@@ -12,11 +12,12 @@ export function pickForeshadow(seed: number): ForeshadowKind {
 
 /** Triggers an effect once after the player has satisfied N rules. */
 export function useForeshadowTrigger(satisfiedCount: number, triggerAt: number) {
-  const [fired, setFired] = useState(false);
-  useEffect(() => {
-    if (!fired && satisfiedCount >= triggerAt) setFired(true);
-  }, [satisfiedCount, triggerAt, fired]);
-  return fired;
+  const [latched, setLatched] = useState(false);
+  // React 19 supports setState during render to derive state from props.
+  if (!latched && satisfiedCount >= triggerAt) {
+    setLatched(true);
+  }
+  return latched;
 }
 
 /** Renders the active foreshadowing overlay once triggered. */

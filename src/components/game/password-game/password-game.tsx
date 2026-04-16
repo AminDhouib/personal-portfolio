@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Key } from "lucide-react";
 import { selectRulesForRun, validateRules, computeActiveRuleIndex } from "./engine";
 import { TIER_1_RULES } from "./rules/tier1";
@@ -15,8 +15,16 @@ function makeSeed(): number {
 export function PasswordGame() {
   const [seed, setSeed] = useState<number>(() => makeSeed());
   const [password, setPassword] = useState<string>("");
-  const [startedAt] = useState<number>(() => Date.now());
+  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
 
   const rules: Rule[] = useMemo(
     () =>
@@ -31,12 +39,12 @@ export function PasswordGame() {
   const state: GameState = useMemo(
     () => ({
       password,
-      elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      elapsedSeconds,
       activeRuleIndex: 0,
       rules,
       seed,
     }),
-    [password, rules, seed, startedAt]
+    [password, elapsedSeconds, rules, seed]
   );
 
   const results = useMemo(() => validateRules(state), [state]);
@@ -53,6 +61,8 @@ export function PasswordGame() {
   const reset = useCallback(() => {
     setSeed(makeSeed());
     setPassword("");
+    setStartedAt(Date.now());
+    setElapsedSeconds(0);
   }, []);
 
   const allPassed = activeIdx === -1 && rules.length > 0;
