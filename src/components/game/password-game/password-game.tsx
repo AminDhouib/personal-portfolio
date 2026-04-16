@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Key, CalendarDays, Volume2, VolumeX } from "lucide-react";
-import { selectRulesForRun, validateRules, computeActiveRuleIndex } from "./engine";
+import { selectRulesForRun, validateRules, computeActiveRuleIndex, runTicks } from "./engine";
 import { dailySeed, todayDateString } from "./daily";
 import { setSoundEnabled, isSoundEnabled, play as playSfx } from "./sound";
 import { TIER_1_RULES } from "./rules/tier1";
@@ -83,6 +83,7 @@ export function PasswordGame() {
   const prevActive = useRef(-1);
   const prevChaos = useRef(0);
   const winAnnounced = useRef(false);
+  const ruleStatesRef = useRef<Record<string, unknown>>({});
 
   const rules: Rule[] = useMemo(
     () =>
@@ -240,6 +241,25 @@ export function PasswordGame() {
     setSoundOn(next);
   }, []);
 
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = window.setInterval(() => {
+      const currentState: GameState = {
+        password,
+        formatting,
+        elapsedSeconds,
+        activeRuleIndex: activeIdx,
+        rules,
+        seed,
+      };
+      const result = runTicks(currentState, 100, ruleStatesRef.current);
+      ruleStatesRef.current = result.ruleStates;
+      if (result.password !== password) setPassword(result.password);
+      if (result.formatting !== formatting) setFormatting(result.formatting);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [timerRunning, password, formatting, elapsedSeconds, activeIdx, rules, seed]);
+
   // High-tier surprise moments — random one-shot effects at chaos 4+. Fires
   // once per 20-40 seconds so players feel watched, not overwhelmed.
   useEffect(() => {
@@ -269,6 +289,7 @@ export function PasswordGame() {
     setElapsedSeconds(0);
     setTimerRunning(false);
     setShowResult(false);
+    ruleStatesRef.current = {};
   }, []);
 
   const startDaily = useCallback(() => {
@@ -278,6 +299,7 @@ export function PasswordGame() {
     setElapsedSeconds(0);
     setTimerRunning(false);
     setShowResult(false);
+    ruleStatesRef.current = {};
   }, []);
 
   return (
