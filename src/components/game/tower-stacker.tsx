@@ -686,6 +686,7 @@ function AchievementsStrip() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_PREFIX + "achievements");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOwned(new Set(raw ? JSON.parse(raw) : []));
     } catch {}
   }, []);
@@ -724,6 +725,7 @@ function ThemePicker({ active, onChange }: { active: ThemeId; onChange: (t: Them
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_PREFIX + "themes");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOwned(new Set(raw ? JSON.parse(raw) : ["classic"]));
     } catch {}
   }, []);
@@ -1034,7 +1036,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
         kind: "debris",
         x: a.x + a.width / 2, y: a.y + a.height / 2,
         vx: a.direction * 120, vy: -40,
-        rot: 0, rotSpeed: (Math.random() - 0.5) * 6,
+        rot: 0, rotSpeed: (r.prng() - 0.5) * 6,
         life: 3, maxLife: 3,
         color: `hsl(${a.hue} 80% 55%)`,
         width: a.width, height: a.height,
@@ -1094,9 +1096,9 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
       for (let i = 0; i < 7; i++) {
         spawnParticle(r, {
           kind: "dust",
-          x: newX + Math.random() * newWidth,
+          x: newX + r.prng() * newWidth,
           y: a.y,
-          vx: (Math.random() - 0.5) * 100, vy: -Math.random() * 120,
+          vx: (r.prng() - 0.5) * 100, vy: -r.prng() * 120,
           life: 0.5, maxLife: 0.5, size: 2, color: "rgba(255,255,255,0.6)",
         });
       }
@@ -1544,7 +1546,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
       }
     } catch {}
     forceTick((n) => (n + 1) % 1_000_000);
-  }, []);
+  }, [initialSeed]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1558,6 +1560,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
