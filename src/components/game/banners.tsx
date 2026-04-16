@@ -226,89 +226,141 @@ function SpaceShooterBanner() {
 }
 
 // ---------- Hextris ----------
-// Actual game: dark bg, central hex outline, six face colors falling inward.
+// Matched to actual gameplay: #0d0d0d bg, outer hex boundary with soft white
+// stroke, central hex, and the real 4-color portfolio palette (pink/amber/
+// indigo/green — matches COLORS in hextris.tsx). Blocks fall inward from the
+// outer edges and stack on the 6 inner faces.
 
 function HextrisBanner() {
-  const colors = ["#a78bfa", "#22d3ee", "#f472b6", "#fbbf24", "#34d399", "#f87171"];
+  // Exact palette from src/components/game/hextris.tsx
+  const PINK = "#ec4899";
+  const AMBER = "#f59e0b";
+  const INDIGO = "#6366f1";
+  const GREEN = "#22c55e";
+  // Six stacked blocks — one per face of the inner hex. Ordered around the
+  // perimeter so adjacent faces rarely share a color (like real gameplay).
+  const stack = [PINK, AMBER, GREEN, INDIGO, PINK, INDIGO];
+  // Falling blocks — approach from different outer edges at different times.
+  const falling = [
+    { colorIdx: 0, startAng: -90, delay: 0 },
+    { colorIdx: 3, startAng: -30, delay: 0.6 },
+    { colorIdx: 1, startAng: 30, delay: 1.2 },
+    { colorIdx: 2, startAng: 90, delay: 1.8 },
+    { colorIdx: 0, startAng: 150, delay: 2.4 },
+    { colorIdx: 3, startAng: 210, delay: 3.0 },
+  ];
+  const palette = [PINK, AMBER, GREEN, INDIGO];
   return (
-    <div className="absolute inset-0 overflow-hidden" style={{ background: "#111" }}>
-      {/* Subtle hex grid pattern */}
-      <svg className="absolute inset-0 w-full h-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="hex-pat" width="56" height="100" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)">
-            <path d="M28,2 L54,18 L54,50 L28,66 L2,50 L2,18 Z" fill="none" stroke="white" strokeWidth="1" />
-            <path d="M28,34 L54,50 L54,82 L28,98 L2,82 L2,50 Z" fill="none" stroke="white" strokeWidth="1" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#hex-pat)" />
-      </svg>
-      {/* Central hex with stepping rotation */}
+    <div className="absolute inset-0 overflow-hidden" style={{ background: "#0d0d0d" }}>
+      {/* Outer-hex vignette: thin radial darkening at corners, like the
+          boundary fade in the real canvas. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 55%, #050505 100%)",
+        }}
+      />
       <motion.svg
-        viewBox="-50 -50 100 100"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[50%]"
+        viewBox="-60 -60 120 120"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] h-[85%]"
+        preserveAspectRatio="xMidYMid meet"
         animate={{ rotate: [0, 60, 60, 120, 120, 180, 180, 240, 240, 300, 300, 360] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Hex outline */}
+        {/* Outer hex boundary — thin white stroke, barely filled */}
         <polygon
-          points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15"
-          fill="none"
-          stroke="white"
-          strokeWidth="2"
-          opacity="0.4"
+          points="0,-52 45,-26 45,26 0,52 -45,26 -45,-26"
+          fill="rgba(255,255,255,0.02)"
+          stroke="rgba(255,255,255,0.14)"
+          strokeWidth="1.2"
         />
-        {/* Inner hex */}
-        <polygon
-          points="0,-16 14,-8 14,8 0,16 -14,8 -14,-8"
-          fill="none"
-          stroke="white"
-          strokeWidth="1"
-          opacity="0.2"
-        />
-        {/* Colored blocks on faces */}
-        {colors.map((c, i) => {
+        {/* Stacked colored blocks on the 6 inner-hex faces. Each face sits
+            at radius ~19 around the origin; a rotate() keeps the block
+            edge-aligned to its face. */}
+        {stack.map((c, i) => {
           const ang = (Math.PI / 3) * i - Math.PI / 2;
-          const mx = Math.cos(ang) * 24;
-          const my = Math.sin(ang) * 24;
+          const mx = Math.cos(ang) * 19;
+          const my = Math.sin(ang) * 19;
           return (
             <g key={i} transform={`rotate(${60 * i} ${mx} ${my})`}>
-              <rect x={mx - 7} y={my - 3.5} width="14" height="7" rx="1" fill={c} opacity="0.9" />
-              <rect x={mx - 7} y={my - 3.5} width="14" height="7" rx="1" fill="none" stroke={c} strokeWidth="0.5" />
+              <rect
+                x={mx - 10}
+                y={my - 4}
+                width="20"
+                height="8"
+                rx="1"
+                fill={c}
+                style={{ filter: `drop-shadow(0 0 5px ${c}cc)` }}
+              />
+              <rect
+                x={mx - 10}
+                y={my - 4}
+                width="20"
+                height="8"
+                rx="1"
+                fill="none"
+                stroke="rgba(255,255,255,0.22)"
+                strokeWidth="0.4"
+              />
             </g>
           );
         })}
+        {/* Inner hex outline (center score area) */}
+        <polygon
+          points="0,-14 12,-7 12,7 0,14 -12,7 -12,-7"
+          fill="#111114"
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth="0.5"
+        />
       </motion.svg>
-      {/* Falling blocks approaching from edges */}
-      {colors.map((c, i) => {
-        const ang = (Math.PI / 3) * i - Math.PI / 2;
-        const startX = 50 + Math.cos(ang) * 55;
-        const startY = 50 + Math.sin(ang) * 55;
-        const endX = 50 + Math.cos(ang) * 20;
-        const endY = 50 + Math.sin(ang) * 20;
+      {/* Falling blocks — slide from outer edge toward center along their
+          angle. Independent of the rotating hex so they read as "incoming
+          pieces" rather than locked-in stacks. */}
+      {falling.map((b, i) => {
+        const rad = (b.startAng * Math.PI) / 180;
+        const startX = 50 + Math.cos(rad) * 48;
+        const startY = 50 + Math.sin(rad) * 48;
+        const endX = 50 + Math.cos(rad) * 20;
+        const endY = 50 + Math.sin(rad) * 20;
+        const c = palette[b.colorIdx];
         return (
           <motion.div
             key={i}
-            className="absolute w-4 h-2.5 rounded-sm"
+            className="absolute rounded-sm"
             style={{
+              width: 22,
+              height: 8,
               background: c,
-              boxShadow: `0 0 14px ${c}88`,
-              rotate: `${60 * i}deg`,
+              boxShadow: `0 0 12px ${c}aa`,
+              rotate: `${b.startAng + 90}deg`,
+              marginLeft: -11,
+              marginTop: -4,
             }}
             animate={{
               left: [`${startX}%`, `${endX}%`],
               top: [`${startY}%`, `${endY}%`],
-              opacity: [0, 1, 1, 0],
-              scale: [0.5, 1, 1, 0.6],
+              opacity: [0, 1, 1, 0.3],
             }}
             transition={{
-              duration: 2.5,
+              duration: 1.8,
               repeat: Infinity,
-              delay: i * 0.5,
-              ease: "easeIn",
+              delay: b.delay,
+              ease: "linear",
+              times: [0, 0.15, 0.85, 1],
             }}
           />
         );
       })}
+      {/* Score pop — matches the "+9" combo indicator that flashes over the
+          inner hex when you clear a match. */}
+      <motion.div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-accent-amber font-mono text-xs font-bold"
+        style={{ textShadow: "0 0 8px #f59e0b88" }}
+        animate={{ opacity: [0, 1, 1, 0], y: [-4, -16, -24, -32], scale: [0.8, 1.1, 1.1, 0.9] }}
+        transition={{ duration: 2, repeat: Infinity, delay: 1.2, times: [0, 0.15, 0.6, 1] }}
+      >
+        +9
+      </motion.div>
     </div>
   );
 }
