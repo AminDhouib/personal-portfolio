@@ -658,8 +658,19 @@ async function generateShareCard(r: GameRefs): Promise<Blob | null> {
   });
 }
 
+function haptic(pattern: number | number[]) {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(pattern);
+    }
+  } catch {}
+}
+
 function SpeakerOn() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm12 2a4 4 0 0 0-2-3.5v7a4 4 0 0 0 2-3.5z"/></svg>; }
 function SpeakerOff() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2l2.5 2.5-1 1-2.5-2.5-2.5 2.5-1-1 2.5-2.5-2.5-2.5 1-1 2.5 2.5 2.5-2.5 1 1-2.5 2.5z"/></svg>; }
+function PlayIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>; }
+function PauseIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>; }
+function FullscreenIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/></svg>; }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -1015,6 +1026,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
 
     // Complete miss
     if (overlapW <= 0) {
+      haptic([40, 30, 40]);
       r.shake = 0.6;
       r.hp -= 1;
       setUiHp(r.hp);
@@ -1046,6 +1058,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
     let newWidth: number;
     let newX: number;
     if (isPerfect) {
+      haptic(8);
       newWidth = prev.width;
       newX = prev.x;
       r.perfectCombo += 1;
@@ -1228,6 +1241,15 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
     const r = refs.current;
     if (r.state === "playing") { r.state = "paused"; setUiState("paused"); }
     else if (r.state === "paused") { r.state = "playing"; setUiState("playing"); }
+  }
+
+  function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) el.requestFullscreen();
+      else document.exitFullscreen();
+    } catch {}
   }
 
   function startRun() {
@@ -1580,6 +1602,20 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
               >
                 {soundOn ? <SpeakerOn /> : <SpeakerOff />}
               </button>
+              <button
+                onClick={togglePause}
+                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-10 h-10 flex items-center justify-center"
+                aria-label={uiState === "paused" ? "Resume" : "Pause"}
+              >
+                {uiState === "paused" ? <PlayIcon /> : <PauseIcon />}
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-10 h-10 flex items-center justify-center"
+                aria-label="Toggle fullscreen"
+              >
+                <FullscreenIcon />
+              </button>
               {refs.current.mode === "classic" && (
                 <div className="flex gap-1">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -1589,6 +1625,28 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uiState === "paused" && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60">
+          <div className="rounded-xl bg-neutral-900/95 border border-red-500/40 p-6 text-center">
+            <div className="text-xl font-bold text-white mb-3">Paused</div>
+            <div className="flex gap-2">
+              <button onClick={togglePause} className="rounded-lg bg-red-600 hover:bg-red-500 text-white px-4 py-2">
+                Resume
+              </button>
+              <button
+                onClick={() => {
+                  refs.current.state = "menu";
+                  setUiState("menu");
+                }}
+                className="rounded-lg bg-neutral-700 text-white px-4 py-2"
+              >
+                Quit
+              </button>
             </div>
           </div>
         </div>
