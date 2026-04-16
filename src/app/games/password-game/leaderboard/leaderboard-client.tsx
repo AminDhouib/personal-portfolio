@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Trophy, RefreshCw } from "lucide-react";
 import { formatTime } from "@/components/game/password-game/result-card-util";
+import { dailySeed, todayDateString } from "@/components/game/password-game/daily";
 
 interface Entry {
   name: string;
@@ -16,6 +17,7 @@ export function LeaderboardClient() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [seedFilter, setSeedFilter] = useState("");
+  const [tab, setTab] = useState<"all" | "daily">("all");
   const [error, setError] = useState<string | null>(null);
 
   const fetchEntries = async (seed: string) => {
@@ -40,9 +42,42 @@ export function LeaderboardClient() {
     fetchEntries("");
   }, []);
 
+  useEffect(() => {
+    if (tab === "daily") {
+      fetchEntries(String(dailySeed(todayDateString())));
+    } else {
+      fetchEntries("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   return (
     <div className="w-full rounded-xl border border-(--border) bg-(--card) p-5 sm:p-6">
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setTab("all")}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+            tab === "all"
+              ? "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
+              : "border-(--border) text-(--muted) hover:text-(--foreground)"
+          }`}
+        >
+          All time
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("daily")}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+            tab === "daily"
+              ? "border-accent-amber/50 bg-accent-amber/10 text-accent-amber"
+              : "border-(--border) text-(--muted) hover:text-(--foreground)"
+          }`}
+        >
+          Today's Daily
+        </button>
+      </div>
+      {tab === "all" && <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <input
           type="text"
           placeholder="Filter by seed (optional)"
@@ -59,7 +94,7 @@ export function LeaderboardClient() {
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </button>
-      </div>
+      </div>}
 
       {error && (
         <div className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
