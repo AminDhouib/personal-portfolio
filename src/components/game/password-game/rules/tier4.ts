@@ -1,5 +1,25 @@
 import type { RuleDef } from "../types";
-import { rangeInt } from "../prng";
+import { rangeInt, pickOne } from "../prng";
+
+const VOWELS = ["a", "e", "i", "o", "u"] as const;
+
+const forbiddenVowel: RuleDef = {
+  id: "forbidden-vowel",
+  tier: 4,
+  create(rng) {
+    const vowel = pickOne(rng, VOWELS);
+    return {
+      id: "forbidden-vowel",
+      tier: 4,
+      description: `Your password cannot contain the letter "${vowel}" (uppercase or lowercase).`,
+      params: { vowel },
+      validate(state) {
+        const lower = state.password.toLowerCase();
+        return { passed: !lower.includes(vowel) };
+      },
+    };
+  },
+};
 
 function currentTimeString(): string {
   const now = new Date();
@@ -42,4 +62,4 @@ const lengthBomb: RuleDef = {
   },
 };
 
-export const TIER_4_RULES: readonly RuleDef[] = [lengthBomb, clockRule];
+export const TIER_4_RULES: readonly RuleDef[] = [lengthBomb, clockRule, forbiddenVowel];

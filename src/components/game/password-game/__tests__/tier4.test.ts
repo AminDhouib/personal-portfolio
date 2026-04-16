@@ -64,3 +64,29 @@ describe("Tier 4 — clock rule", () => {
     expect(rule.validate(makeState("no time", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 4 — forbidden vowel rule", () => {
+  const def = TIER_4_RULES.find((r) => r.id === "forbidden-vowel")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params include a single vowel", () => {
+    const rule = def.create(mulberry32(1));
+    const vowel = rule.params.vowel as string;
+    expect(["a", "e", "i", "o", "u"]).toContain(vowel);
+  });
+
+  it("fails when the forbidden vowel is present (case-insensitive)", () => {
+    const rule = def.create(mulberry32(1));
+    const v = (rule.params.vowel as string).toUpperCase();
+    expect(rule.validate(makeState(`abc${v}xyz`, rule)).passed).toBe(false);
+  });
+
+  it("passes when the vowel is absent", () => {
+    const rule = def.create(mulberry32(1));
+    const allowedVowels = "aeiou".replace(rule.params.vowel as string, "");
+    expect(rule.validate(makeState(`bcdf${allowedVowels[0]}gh`, rule)).passed).toBe(true);
+  });
+});
