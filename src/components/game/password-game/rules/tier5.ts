@@ -20,4 +20,23 @@ const mirrorInput: RuleDef = {
   },
 };
 
-export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput];
+const BLUR_WORDS = ["clarity", "focused", "sharpen", "vision", "crystal", "defined"];
+
+const blurredInput: RuleDef = {
+  id: "blurred-input",
+  tier: 5,
+  create(rng) {
+    const target = pickOne(rng, BLUR_WORDS);
+    return {
+      id: "blurred-input",
+      tier: 5,
+      description: `Through the blur, spell "${target}" somewhere in your password.`,
+      params: { target },
+      validate(state) {
+        return { passed: state.password.toLowerCase().includes(target) };
+      },
+    };
+  },
+};
+
+export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput, blurredInput];

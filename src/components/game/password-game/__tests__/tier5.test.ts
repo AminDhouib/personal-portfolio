@@ -38,3 +38,17 @@ describe("Tier 5 — mirror input rule", () => {
     expect(rule.validate(makeState("qqqq", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 5 — blurred input rule", () => {
+  const def = TIER_5_RULES.find((r) => r.id === "blurred-input")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("passes when password contains the target phrase", () => {
+    const rule = def.create(mulberry32(1));
+    const target = rule.params.target as string;
+    expect(rule.validate(makeState(`xx${target}yy`, rule)).passed).toBe(true);
+  });
+});
