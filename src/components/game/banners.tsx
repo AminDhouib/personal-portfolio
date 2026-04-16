@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useMotionTemplate, animate } from "framer-motion";
+import { useEffect } from "react";
 import type { GameSlug } from "@/app/games/games-meta";
 
 // ---------- shared ----------
@@ -287,9 +288,16 @@ function HextrisBanner() {
 
   // Rotation: once per CYCLE the whole canvas snaps 60° (6 steps = one full
   // revolution, so the outer animation cycle = 6·CYCLE seconds and loops
-  // seamlessly at 360° = 0°). Inside each sub-cycle the hex holds still
-  // until the drops clear (t < 0.70), then does an overshoot-and-snap to
-  // the next step during the buffer.
+  // seamlessly at 360° = 0°). The rotation is fast — the hex holds still
+  // through the drops and then does a quick sweep with an overshoot that
+  // snaps back near-instantly to the target step.
+  //
+  // We drive this via a MotionValue + SVG transform attribute (not CSS
+  // transform) so rotation pivots around the viewBox origin (0,0 user
+  // coords = center of our -60..60 viewBox) regardless of the group's
+  // bounding box. CSS transform-origin gets resolved against the bbox
+  // (which changes as blocks move) and caused the whole hex to wobble
+  // off-screen under rotation.
   const ROT_STEPS = 6;
   const rotDuration = CYCLE * ROT_STEPS;
   const rotKeyframes: number[] = [0];
@@ -299,19 +307,32 @@ function HextrisBanner() {
     const next = (k + 1) * 60;
     const subStart = k / ROT_STEPS;
     const subLen = 1 / ROT_STEPS;
-    // Hold at base through the drop+clear phases
+    // Hold at base through drop + clear (0 → 0.82 of sub-cycle)
     rotKeyframes.push(base);
-    rotTimes.push(subStart + 0.70 * subLen);
-    // Overshoot past next by 12°
-    rotKeyframes.push(next + 12);
-    rotTimes.push(subStart + 0.88 * subLen);
-    // Snap back to next
+    rotTimes.push(subStart + 0.82 * subLen);
+    // Fast sweep to overshoot (0.82 → 0.93 of sub-cycle)
+    rotKeyframes.push(next + 10);
+    rotTimes.push(subStart + 0.93 * subLen);
+    // Immediate snap back (0.93 → 0.95 of sub-cycle)
     rotKeyframes.push(next);
     rotTimes.push(subStart + 0.95 * subLen);
-    // Settle at next for the remainder of this sub-cycle
+    // Settle until the sub-cycle ends
     rotKeyframes.push(next);
     rotTimes.push(subStart + subLen);
   }
+
+  const rotate = useMotionValue(0);
+  useEffect(() => {
+    const controls = animate(rotate, rotKeyframes, {
+      duration: rotDuration,
+      repeat: Infinity,
+      times: rotTimes,
+      ease: "easeOut",
+    });
+    return () => controls.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const rotateTransform = useMotionTemplate`rotate(${rotate})`;
 
   // All animated geometry lives inside the same SVG viewBox so a block's
   // position is expressed in viewBox units — aspect-ratio-invariant. The
@@ -399,16 +420,11 @@ function HextrisBanner() {
       >
         {/* Rotating canvas — the outer hex, inner hex, blocks, fillers and
             pop texts are all children so the whole board snaps 60° between
-            drop cycles (matching the real game's rotate-between-moves). */}
-        <motion.g
-          animate={{ rotate: rotKeyframes }}
-          transition={{
-            duration: rotDuration,
-            repeat: Infinity,
-            times: rotTimes,
-            ease: "easeOut",
-          }}
-        >
+            drop cycles (matching the real game's rotate-between-moves).
+            Uses the SVG transform attribute (not CSS transform) so the
+            rotation pivot is the element's local (0, 0) = viewBox center,
+            not the bbox center which shifts as blocks animate. */}
+        <motion.g transform={rotateTransform}>
         {/* Outer hex boundary — flat-top orientation (flat edges at top/
             bottom, vertex points on left and right). Matches the real game
             layout so blocks sit ON faces at -90/-30/30/90/150/210. Outer
