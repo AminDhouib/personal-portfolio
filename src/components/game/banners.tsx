@@ -276,13 +276,15 @@ function HextrisBanner() {
   ];
   const START_R = 55; // well past the outer hex apothem
 
-  // Keyframe times normalized to CYCLE (3s). No resting/dead time — the
-  // third block lands and the face clears immediately, so blocks feel like
-  // they're streaming through rather than alighting and pausing.
-  //   release → fall → land → (3rd block lands = match pop) → clear → loop
-  const t_release = [0.00, 0.22, 0.44];
-  const t_landed = [0.22, 0.44, 0.66];
-  const t_pop = 0.72;
+  // Keyframe times normalized to CYCLE. Three blocks fall sequentially,
+  // land in order, then pop+clear together at the end. Scale is held at 1
+  // through the rest period (t_landed → t_rest_end) so earlier-landing
+  // blocks don't slowly grow while waiting for the third to arrive —
+  // only a tiny 1→1.12 pop fires at t_pop.
+  const t_release = [0.001, 0.22, 0.44];
+  const t_landed = [0.22, 0.44, 0.64];
+  const t_rest_end = 0.70;
+  const t_pop = 0.73;
   const t_clear = 0.82;
 
   // All animated geometry lives inside the same SVG viewBox so a block's
@@ -309,17 +311,25 @@ function HextrisBanner() {
       <motion.g
         key={key}
         animate={{
-          x: [startX, startX, landX, landX, landX, startX],
-          y: [startY, startY, landY, landY, landY, startY],
-          opacity: [0, 0, 1, 1, 0, 0],
-          scale: [1, 1, 1, 1.3, 0.3, 1],
+          x: [startX, startX, landX, landX, landX, landX, startX],
+          y: [startY, startY, landY, landY, landY, landY, startY],
+          opacity: [0, 0, 1, 1, 1, 0, 0],
+          scale: [1, 1, 1, 1, 1.12, 1, 1],
         }}
         transition={{
           duration: CYCLE,
           repeat: Infinity,
           delay,
           ease: "linear",
-          times: [0, t_release[slot], t_landed[slot], t_pop, t_clear, 1],
+          times: [
+            0,
+            t_release[slot],
+            t_landed[slot],
+            t_rest_end,
+            t_pop,
+            t_clear,
+            1,
+          ],
         }}
       >
         <rect
