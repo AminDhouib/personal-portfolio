@@ -1553,23 +1553,75 @@ class SoundManager {
     }
   }
 
-  // Low triangle pulse during boss fights — driven from runTick every ~700ms.
-  bossPulse() {
+  // Boss pulse — tier-aware percussion layer stacked on top of gameplay music.
+  // Driven from runTick on a ~700ms cadence. Higher-tier bosses get richer
+  // stacks: low triangle → + tom → + saw-bass stab → + snare crack.
+  bossPulse(tier = 1) {
     if (!this.enabled || !this.musicEnabled) return;
     this.ensure();
     if (!this.ctx) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(55, t);
-    gain.gain.setValueAtTime(0.0, t);
-    gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.45);
+    // Layer 1 (all tiers): low triangle thump, pitch scales with tier
+    const baseFreq = 44 + tier * 2.5; // 46.5 → 64 Hz across T1-T8
+    const o1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    o1.type = "triangle";
+    o1.frequency.setValueAtTime(baseFreq, t);
+    g1.gain.setValueAtTime(0.0, t);
+    g1.gain.linearRampToValueAtTime(0.22, t + 0.02);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    o1.connect(g1).connect(ctx.destination);
+    o1.start(t);
+    o1.stop(t + 0.45);
+    // Layer 2 (tier 3+): tom hit — descending sine with short envelope
+    if (tier >= 3) {
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = "sine";
+      o2.frequency.setValueAtTime(160, t);
+      o2.frequency.exponentialRampToValueAtTime(80, t + 0.15);
+      g2.gain.setValueAtTime(0.24, t);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      o2.connect(g2).connect(ctx.destination);
+      o2.start(t);
+      o2.stop(t + 0.2);
+    }
+    // Layer 3 (tier 5+): sawtooth bass stab — "heavy machinery" drone
+    if (tier >= 5) {
+      const o3 = ctx.createOscillator();
+      const f3 = ctx.createBiquadFilter();
+      const g3 = ctx.createGain();
+      o3.type = "sawtooth";
+      o3.frequency.value = 55 + tier * 2;
+      f3.type = "lowpass";
+      f3.frequency.setValueAtTime(200, t);
+      f3.frequency.exponentialRampToValueAtTime(800, t + 0.08);
+      g3.gain.setValueAtTime(0.18, t);
+      g3.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o3.connect(f3).connect(g3).connect(ctx.destination);
+      o3.start(t);
+      o3.stop(t + 0.28);
+    }
+    // Layer 4 (tier 7+): snare crack — highpass noise burst on top
+    if (tier >= 7) {
+      const dur = 0.1;
+      const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 12);
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const filt = ctx.createBiquadFilter();
+      filt.type = "highpass";
+      filt.frequency.value = 2000;
+      const gg = ctx.createGain();
+      gg.gain.setValueAtTime(0.3, t);
+      gg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+      src.connect(filt).connect(gg).connect(ctx.destination);
+      src.start(t);
+    }
   }
 
   // Soft sine pulse, easy on the ears since it fires constantly.
@@ -2449,7 +2501,7 @@ function runTick(
       else if (b.id === "warden") runWardenBehavior(g, b, now, step);
       else if (b.id === "void-tyrant") runVoidTyrantBehavior(g, b, now, step);
       if (now - g.lastBossPulseAt > 700) {
-        sounds.bossPulse();
+        sounds.bossPulse(b.tier);
         g.lastBossPulseAt = now;
       }
     } else if (b.phase === "dying") {
