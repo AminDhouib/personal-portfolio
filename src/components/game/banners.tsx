@@ -226,10 +226,11 @@ function SpaceShooterBanner() {
 }
 
 // ---------- Hextris ----------
-// Matched to actual gameplay: #0d0d0d bg, outer hex boundary with soft white
-// stroke, central hex, and the real 4-color portfolio palette (pink/amber/
-// indigo/green — matches COLORS in hextris.tsx). Blocks fall inward from the
-// outer edges and stack on the 6 inner faces.
+// Matched to actual gameplay: #0d0d0d bg, outer hex boundary, and the real
+// 4-color palette (#ec4899 / #f59e0b / #6366f1 / #22c55e — matches COLORS
+// in hextris.tsx). Full match-and-clear simulation on three faces: blocks
+// fall from outside, land in stack order (inner → middle → outer), and when
+// three of the same color are on a face they flash and clear. Loops.
 
 function HextrisBanner() {
   // Exact palette from src/components/game/hextris.tsx
@@ -237,130 +238,171 @@ function HextrisBanner() {
   const AMBER = "#f59e0b";
   const INDIGO = "#6366f1";
   const GREEN = "#22c55e";
-  // Six stacked blocks — one per face of the inner hex. Ordered around the
-  // perimeter so adjacent faces rarely share a color (like real gameplay).
-  const stack = [PINK, AMBER, GREEN, INDIGO, PINK, INDIGO];
-  // Falling blocks — approach from different outer edges at different times.
-  const falling = [
-    { colorIdx: 0, startAng: -90, delay: 0 },
-    { colorIdx: 3, startAng: -30, delay: 0.6 },
-    { colorIdx: 1, startAng: 30, delay: 1.2 },
-    { colorIdx: 2, startAng: 90, delay: 1.8 },
-    { colorIdx: 0, startAng: 150, delay: 2.4 },
-    { colorIdx: 3, startAng: 210, delay: 3.0 },
+
+  // Cycle length per face, in seconds: fall-stack-match-clear-empty-loop.
+  const CYCLE = 4.8;
+
+  // Three active faces run the same loop with a stagger. Faces not listed
+  // stay empty — the real game rarely has all 6 faces firing at once either.
+  const faces = [
+    { angleDeg: -90, color: PINK, delay: 0 },
+    { angleDeg: 30, color: GREEN, delay: 1.6 },
+    { angleDeg: 150, color: INDIGO, delay: 3.2 },
   ];
-  const palette = [PINK, AMBER, GREEN, INDIGO];
+  // Extra one-off filler blocks on the remaining faces — these never match
+  // (stay at slot 0) so the hex doesn't look half-empty between clears.
+  const fillers = [
+    { angleDeg: -30, color: AMBER },
+    { angleDeg: 90, color: AMBER },
+    { angleDeg: 210, color: GREEN },
+  ];
+
+  // Stack radii from center: slot 0 = innermost (first to land), slot 2 =
+  // outermost. The inner hex faces sit at radius ~16; each block is ~8 units
+  // tall in the 120-unit viewBox space, so slots step by ~8.5.
+  const SLOT_R = [16, 24.5, 33];
+  const START_R = 58; // just outside the outer hex — spawn point
+  const BLOCK_W = 20;
+  const BLOCK_H = 8;
+
+  // Normalized (0-1) keyframe times within one CYCLE:
+  //   stage 0: off-screen / waiting
+  //   stage 1: block N released
+  //   stage 2: block N landed
+  //   stage 3: rest (all three present)
+  //   stage 4: match flash — scale up
+  //   stage 5: clear — opacity 0
+  //   stage 6: loop boundary
+  const t_release = [0.00, 0.16, 0.32]; // per slot
+  const t_landed = [0.10, 0.26, 0.42];
+  const t_match = 0.70;
+  const t_pop = 0.74;
+  const t_clear = 0.80;
+
+  // Render one falling-match-clear block
+  const renderBlock = (
+    angleDeg: number,
+    slot: number,
+    color: string,
+    delay: number,
+    key: string,
+  ) => {
+    const rad = (angleDeg * Math.PI) / 180;
+    const ux = Math.cos(rad);
+    const uy = Math.sin(rad);
+    const landX = 50 + ((ux * SLOT_R[slot]) / 120) * 100;
+    const landY = 50 + ((uy * SLOT_R[slot]) / 120) * 100;
+    const startX = 50 + ((ux * START_R) / 120) * 100;
+    const startY = 50 + ((uy * START_R) / 120) * 100;
+
+    return (
+      <motion.div
+        key={key}
+        className="absolute rounded-sm"
+        style={{
+          width: `${(BLOCK_W / 120) * 100}%`,
+          aspectRatio: `${BLOCK_W} / ${BLOCK_H}`,
+          marginLeft: `${(-BLOCK_W / 2 / 120) * 100}%`,
+          marginTop: `${(-BLOCK_H / 2 / 120) * 100}%`,
+          background: color,
+          boxShadow: `0 0 10px ${color}aa, inset 0 0 0 1px rgba(255,255,255,0.25)`,
+          rotate: `${angleDeg + 90}deg`,
+        }}
+        animate={{
+          left: [`${startX}%`, `${startX}%`, `${landX}%`, `${landX}%`, `${landX}%`, `${landX}%`, `${startX}%`],
+          top: [`${startY}%`, `${startY}%`, `${landY}%`, `${landY}%`, `${landY}%`, `${landY}%`, `${startY}%`],
+          opacity: [0, 0, 1, 1, 1, 0, 0],
+          scale: [1, 1, 1, 1, 1.25, 0.4, 1],
+        }}
+        transition={{
+          duration: CYCLE,
+          repeat: Infinity,
+          delay,
+          ease: "linear",
+          times: [0, t_release[slot], t_landed[slot], t_match, t_pop, t_clear, 1],
+        }}
+      />
+    );
+  };
+
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0d0d0d" }}>
-      {/* Outer-hex vignette: thin radial darkening at corners, like the
-          boundary fade in the real canvas. */}
+      {/* Outer-hex vignette — matches the boundary fade in the real canvas */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 55%, #050505 100%)",
         }}
       />
-      <motion.svg
+      {/* Outer hex boundary + inner score hex — static so the player's eye
+          reads the falling blocks as the moving element. */}
+      <svg
         viewBox="-60 -60 120 120"
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] h-[85%]"
         preserveAspectRatio="xMidYMid meet"
-        animate={{ rotate: [0, 60, 60, 120, 120, 180, 180, 240, 240, 300, 300, 360] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Outer hex boundary — thin white stroke, barely filled */}
         <polygon
           points="0,-52 45,-26 45,26 0,52 -45,26 -45,-26"
           fill="rgba(255,255,255,0.02)"
           stroke="rgba(255,255,255,0.14)"
           strokeWidth="1.2"
         />
-        {/* Stacked colored blocks on the 6 inner-hex faces. Each face sits
-            at radius ~19 around the origin; a rotate() keeps the block
-            edge-aligned to its face. */}
-        {stack.map((c, i) => {
-          const ang = (Math.PI / 3) * i - Math.PI / 2;
-          const mx = Math.cos(ang) * 19;
-          const my = Math.sin(ang) * 19;
-          return (
-            <g key={i} transform={`rotate(${60 * i} ${mx} ${my})`}>
-              <rect
-                x={mx - 10}
-                y={my - 4}
-                width="20"
-                height="8"
-                rx="1"
-                fill={c}
-                style={{ filter: `drop-shadow(0 0 5px ${c}cc)` }}
-              />
-              <rect
-                x={mx - 10}
-                y={my - 4}
-                width="20"
-                height="8"
-                rx="1"
-                fill="none"
-                stroke="rgba(255,255,255,0.22)"
-                strokeWidth="0.4"
-              />
-            </g>
-          );
-        })}
-        {/* Inner hex outline (center score area) */}
         <polygon
           points="0,-14 12,-7 12,7 0,14 -12,7 -12,-7"
           fill="#111114"
           stroke="rgba(255,255,255,0.1)"
           strokeWidth="0.5"
         />
-      </motion.svg>
-      {/* Falling blocks — slide from outer edge toward center along their
-          angle. Independent of the rotating hex so they read as "incoming
-          pieces" rather than locked-in stacks. */}
-      {falling.map((b, i) => {
-        const rad = (b.startAng * Math.PI) / 180;
-        const startX = 50 + Math.cos(rad) * 48;
-        const startY = 50 + Math.sin(rad) * 48;
-        const endX = 50 + Math.cos(rad) * 20;
-        const endY = 50 + Math.sin(rad) * 20;
-        const c = palette[b.colorIdx];
+      </svg>
+      {/* Three matching faces — each runs the full stack-and-clear cycle */}
+      {faces.flatMap((f) =>
+        [0, 1, 2].map((slot) =>
+          renderBlock(f.angleDeg, slot, f.color, f.delay, `${f.angleDeg}-${slot}`),
+        ),
+      )}
+      {/* Non-matching filler blocks on other faces (slot 0 only, never clear) */}
+      {fillers.map((f) => {
+        const rad = (f.angleDeg * Math.PI) / 180;
+        const x = 50 + ((Math.cos(rad) * SLOT_R[0]) / 120) * 100;
+        const y = 50 + ((Math.sin(rad) * SLOT_R[0]) / 120) * 100;
         return (
-          <motion.div
-            key={i}
+          <div
+            key={`filler-${f.angleDeg}`}
             className="absolute rounded-sm"
             style={{
-              width: 22,
-              height: 8,
-              background: c,
-              boxShadow: `0 0 12px ${c}aa`,
-              rotate: `${b.startAng + 90}deg`,
-              marginLeft: -11,
-              marginTop: -4,
-            }}
-            animate={{
-              left: [`${startX}%`, `${endX}%`],
-              top: [`${startY}%`, `${endY}%`],
-              opacity: [0, 1, 1, 0.3],
-            }}
-            transition={{
-              duration: 1.8,
-              repeat: Infinity,
-              delay: b.delay,
-              ease: "linear",
-              times: [0, 0.15, 0.85, 1],
+              left: `${x}%`,
+              top: `${y}%`,
+              width: `${(BLOCK_W / 120) * 100}%`,
+              aspectRatio: `${BLOCK_W} / ${BLOCK_H}`,
+              marginLeft: `${(-BLOCK_W / 2 / 120) * 100}%`,
+              marginTop: `${(-BLOCK_H / 2 / 120) * 100}%`,
+              background: f.color,
+              boxShadow: `0 0 8px ${f.color}88, inset 0 0 0 1px rgba(255,255,255,0.2)`,
+              rotate: `${f.angleDeg + 90}deg`,
+              opacity: 0.85,
             }}
           />
         );
       })}
-      {/* Score pop — matches the "+9" combo indicator that flashes over the
-          inner hex when you clear a match. */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-accent-amber font-mono text-xs font-bold"
-        style={{ textShadow: "0 0 8px #f59e0b88" }}
-        animate={{ opacity: [0, 1, 1, 0], y: [-4, -16, -24, -32], scale: [0.8, 1.1, 1.1, 0.9] }}
-        transition={{ duration: 2, repeat: Infinity, delay: 1.2, times: [0, 0.15, 0.6, 1] }}
-      >
-        +9
-      </motion.div>
+      {/* Score pop — matches the "+9" combo indicator that flashes when a
+          face clears. Timed to each face's clear moment. */}
+      {faces.map((f) => (
+        <motion.div
+          key={`pop-${f.angleDeg}`}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-xs font-bold"
+          style={{ color: f.color, textShadow: `0 0 8px ${f.color}aa` }}
+          animate={{ opacity: [0, 0, 1, 0], y: [0, 0, -18, -30], scale: [0.8, 0.8, 1.2, 1] }}
+          transition={{
+            duration: CYCLE,
+            repeat: Infinity,
+            delay: f.delay,
+            ease: "easeOut",
+            times: [0, t_pop - 0.01, t_pop + 0.02, t_clear + 0.05],
+          }}
+        >
+          +9
+        </motion.div>
+      ))}
     </div>
   );
 }
