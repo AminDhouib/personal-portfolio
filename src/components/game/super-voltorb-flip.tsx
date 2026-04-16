@@ -13,7 +13,7 @@ import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
 import { ThemeSwitcher } from "./super-voltorb-flip/ThemeSwitcher";
 import { Atmosphere } from "./super-voltorb-flip/Atmosphere";
 import { THEMES } from "./super-voltorb-flip/theme";
-import { BgmPlayer } from "./super-voltorb-flip/audio";
+import { BgmPlayer, synthStinger, synthExplosion } from "./super-voltorb-flip/audio";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -89,6 +89,34 @@ function GameScreen({
     bgmRef.current?.setVolume(save.musicVolume);
   }, [save.musicVolume]);
 
+  const prevPhaseRef = useRef(state.phase);
+  const prevCoinsRef = useRef(state.currentCoins);
+
+  useEffect(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) {
+      prevPhaseRef.current = state.phase;
+      prevCoinsRef.current = state.currentCoins;
+      return;
+    }
+    const vol = save.sfxVolume;
+    if (prevPhaseRef.current !== state.phase) {
+      if (state.phase === "won") synthStinger(ctx, "win", vol);
+      if (state.phase === "lost") {
+        if (state.shieldedLoss) synthStinger(ctx, "shieldAbsorb", vol);
+        else synthExplosion(ctx, vol);
+      }
+      if (prevPhaseRef.current === "won" && state.phase === "ready") {
+        synthStinger(ctx, "levelUp", vol);
+      }
+    }
+    if (state.currentCoins > prevCoinsRef.current) {
+      synthStinger(ctx, "coinTick", vol);
+    }
+    prevPhaseRef.current = state.phase;
+    prevCoinsRef.current = state.currentCoins;
+  }, [state.phase, state.currentCoins, state.shieldedLoss, save.sfxVolume]);
+
   useEffect(() => {
     let raf = 0;
     let running = true;
@@ -146,9 +174,13 @@ function GameScreen({
               colHints={state.colHints}
               onTileClick={(r, c) => {
                 ensureAudio();
+                const ctx = audioCtxRef.current;
                 if (state.phase === "memo") {
                   dispatch({ type: "selectMemoTile", row: r, col: c });
                 } else {
+                  if (!state.board[r][c].flipped && ctx) {
+                    synthStinger(ctx, "tileFlip", save.sfxVolume);
+                  }
                   dispatch({ type: "flip", row: r, col: c });
                 }
               }}
@@ -208,8 +240,18 @@ function GameScreen({
         shieldArmed={state.shieldArmed}
         voltorbRevealsUsed={state.voltorbRevealsUsed}
         currentCoins={state.currentCoins}
-        onArmShield={() => dispatch({ type: "armShield" })}
-        onUseReveal={() => dispatch({ type: "useVoltorbReveal" })}
+        onArmShield={() => {
+          ensureAudio();
+          const ctx = audioCtxRef.current;
+          if (ctx) synthStinger(ctx, "shieldAbsorb", save.sfxVolume);
+          dispatch({ type: "armShield" });
+        }}
+        onUseReveal={() => {
+          ensureAudio();
+          const ctx = audioCtxRef.current;
+          if (ctx) synthStinger(ctx, "voltorbReveal", save.sfxVolume);
+          dispatch({ type: "useVoltorbReveal" });
+        }}
         onCashOut={() => dispatch({ type: "cashOut" })}
       />
     )}
