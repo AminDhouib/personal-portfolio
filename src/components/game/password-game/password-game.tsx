@@ -50,6 +50,7 @@ export function PasswordGame() {
   const state: GameState = useMemo(
     () => ({
       password,
+      formatting: [],
       elapsedSeconds,
       activeRuleIndex: 0,
       rules,

@@ -6,6 +6,7 @@ import type { GameState, Rule } from "../types";
 function makeState(password: string, rule: Rule): GameState {
   return {
     password,
+    formatting: [],
     elapsedSeconds: 0,
     activeRuleIndex: 0,
     rules: [rule],

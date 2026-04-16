@@ -11,6 +11,7 @@ import { CODE_SNIPPETS } from "../../../../data/password-game/code-snippets";
 function makeState(password: string, rule: Rule): GameState {
   return {
     password,
+    formatting: [],
     elapsedSeconds: 0,
     activeRuleIndex: 0,
     rules: [rule],
