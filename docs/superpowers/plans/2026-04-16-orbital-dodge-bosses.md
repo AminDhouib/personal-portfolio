@@ -55,7 +55,7 @@ When this plan is complete:
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Add boss type definitions**
+- [x] **Step 1: Add boss type definitions**
 
 Above `interface GameRefs` (search for `interface GameRefs`), add:
 
@@ -113,7 +113,7 @@ interface BossProjectile {
 }
 ```
 
-- [ ] **Step 2: Add boss manager state to GameRefs**
+- [x] **Step 2: Add boss manager state to GameRefs**
 
 Inside the `interface GameRefs { ... }` block, add these fields (near where obstacles / bullets are declared):
 
@@ -128,7 +128,7 @@ Inside the `interface GameRefs { ... }` block, add these fields (near where obst
   devHotkeyArmed: boolean;   // tracks Shift held for Shift+B
 ```
 
-- [ ] **Step 3: Initialize boss fields in the game-reset path**
+- [x] **Step 3: Initialize boss fields in the game-reset path**
 
 Find the block that resets `refs` at run start (search for `obstacles: []` or the function/method that resets gameplay state at the start of a run). In the same block, add:
 
@@ -162,7 +162,7 @@ function buildBossSchedule(): { distance: number; bossId: BossId }[] {
 }
 ```
 
-- [ ] **Step 4: Add seeded RNG helper**
+- [x] **Step 4: Add seeded RNG helper**
 
 Near the top of the file with other utilities, add (if not already present — check first):
 
@@ -178,7 +178,7 @@ function mulberry32(seed: number): () => number {
 }
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -192,7 +192,7 @@ git commit -m "feat(orbital-dodge): add boss type definitions and manager state"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Add spawn check in the game tick**
+- [x] **Step 1: Add spawn check in the game tick**
 
 Find the main per-frame tick function (search for `runTick` or the useFrame body — there's likely one top-level game tick). After the `distanceTraveled` gets updated each frame but **before** normal obstacle spawning, add:
 
@@ -222,7 +222,7 @@ if (performance.now() > refs.current.normalSpawningPausedUntil) {
 }
 ```
 
-- [ ] **Step 2: Implement `spawnBoss`**
+- [x] **Step 2: Implement `spawnBoss`**
 
 Add above the tick function:
 
@@ -273,7 +273,7 @@ const BOSS_DISPLAY_NAMES: Record<BossId, string> = {
 };
 ```
 
-- [ ] **Step 3: Intro phase behavior (1.5s scripted)**
+- [x] **Step 3: Intro phase behavior (1.5s scripted)**
 
 In the tick, after the spawn check, add:
 
@@ -297,7 +297,7 @@ if (boss) {
 }
 ```
 
-- [ ] **Step 4: Intro UI overlay**
+- [x] **Step 4: Intro UI overlay**
 
 Find the JSX return body of the Game component. Add near other overlays (search for existing overlay JSX like the score HUD):
 
@@ -314,7 +314,7 @@ Find the JSX return body of the Game component. Add near other overlays (search 
 
 Note: `refs.current` access in render requires a subscribed re-render. If the existing game uses a `tick` counter or `useState` for HUD updates, reuse that mechanism. If not, introduce a `uiTick` state that bumps every ~100ms via `setInterval` on mount — don't force a 60fps re-render.
 
-- [ ] **Step 5: Dev hotkey (Shift+B)**
+- [x] **Step 5: Dev hotkey (Shift+B)**
 
 Find the existing keyboard handler (search for `addEventListener("keydown"`). Add:
 
@@ -334,11 +334,11 @@ if (process.env.NODE_ENV !== "production" && e.shiftKey && e.key.toLowerCase() =
 }
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run dev server, open game, start run. Press Shift+B. Expected: arena darkens (will add in Task 4), "INCOMING: SENTINEL" text appears, sentinel drifts in from top. After 1.5s, text disappears and boss enters fighting phase (will render black cube for now — actual geometry in Task 3).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -354,7 +354,7 @@ git commit -m "feat(orbital-dodge): boss spawn trigger and intro sequence"
 
 **Sentinel design:** A hexagonal core with two rotating laser emitters. Fires 2 parallel "shielded" (bullet-immune) projectiles every 1200ms, with the emitter angle rotating 45° between shots. Player must predict next angle and move through the gap. HP 8. The easy boss — teaches "dodge instead of shoot."
 
-- [ ] **Step 1: Render the Sentinel mesh**
+- [x] **Step 1: Render the Sentinel mesh**
 
 Inside the game's scene JSX (search for where obstacles are rendered, e.g. `{refs.current.obstacles.map(...)}`), add:
 
@@ -389,7 +389,7 @@ function SentinelMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Implement Sentinel shooting pattern**
+- [x] **Step 2: Implement Sentinel shooting pattern**
 
 In the tick, inside the `if (boss)` block from Task 2, after the `if (boss.phase === "intro")` handler, add:
 
@@ -454,7 +454,7 @@ function normalize(v: [number, number, number]): [number, number, number] {
 
 Also add `nextProjectileId: 0` to the GameRefs init block in Task 1, and to the interface.
 
-- [ ] **Step 3: Render + update boss projectiles**
+- [x] **Step 3: Render + update boss projectiles**
 
 In the scene JSX:
 
@@ -508,7 +508,7 @@ for (let i = refs.current.bossProjectiles.length - 1; i >= 0; i--) {
 
 **Note:** `applyShipDamage` already exists in the game — find the existing damage handler and call it. If it's inline, extract it into a named function in this task so bosses + obstacles share one damage path.
 
-- [ ] **Step 4: Bullet-vs-boss collision**
+- [x] **Step 4: Bullet-vs-boss collision**
 
 In the existing auto-fire bullet update loop, **before** the obstacle-collision block, add a boss-collision check:
 
@@ -533,7 +533,7 @@ if (refs.current.boss && refs.current.boss.phase === "fighting") {
 }
 ```
 
-- [ ] **Step 5: HP bar UI**
+- [x] **Step 5: HP bar UI**
 
 Add to the overlay JSX:
 
@@ -553,7 +553,7 @@ Add to the overlay JSX:
 )}
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Launch via Shift+B → Sentinel. Observe:
 - Sentinel drifts in, enters fighting phase, starts strafing x.
@@ -561,7 +561,7 @@ Launch via Shift+B → Sentinel. Observe:
 - Bullets damage the Sentinel (HP bar shrinks).
 - After 8 hits, Sentinel enters "dying" phase (no visuals yet — Task 5 adds death).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -575,7 +575,7 @@ git commit -m "feat(orbital-dodge): implement Sentinel boss"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Darken the arena during boss**
+- [x] **Step 1: Darken the arena during boss**
 
 Find the Scene's ambient lighting or background color. Add a ref-driven tint multiplier. At the top of the render (or in the lighting JSX), compute:
 
@@ -587,7 +587,7 @@ const pointLightColor = bossActive ? "#7f1d1d" : "#ffffff";
 
 Apply to the existing `<ambientLight />` and `<pointLight />` (or equivalent).
 
-- [ ] **Step 2: Boss music pulse**
+- [x] **Step 2: Boss music pulse**
 
 Find the existing `scheduleAudioBeat` or music generator. Add a boss layer:
 
@@ -609,11 +609,11 @@ function playBossPulse(audioCtx: AudioContext, now: number) {
 
 In the tick, when a boss is in fighting phase, every 700ms call `playBossPulse`. Track `lastBossPulseAt` on `GameRefs`.
 
-- [ ] **Step 3: Manual verification**
+- [x] **Step 3: Manual verification**
 
 Spawn Sentinel via Shift+B. Observe arena darkens; pulsing low-frequency thump plays every ~700ms. Defeat boss; arena returns to normal brightness and pulse stops.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -627,7 +627,7 @@ git commit -m "feat(orbital-dodge): darken arena and pulse music during boss fig
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Dying phase handler**
+- [x] **Step 1: Dying phase handler**
 
 In the `if (boss)` block:
 
@@ -644,7 +644,7 @@ if (boss.phase === "dying") {
 }
 ```
 
-- [ ] **Step 2: Dying visual effect**
+- [x] **Step 2: Dying visual effect**
 
 In `SentinelMesh`, read boss phase. When `dying`, shrink the mesh:
 
@@ -663,7 +663,7 @@ useFrame(() => {
 });
 ```
 
-- [ ] **Step 3: Defeat rewards**
+- [x] **Step 3: Defeat rewards**
 
 ```typescript
 function onBossDefeated(state: GameRefs, boss: BossState, now: number): void {
@@ -735,7 +735,7 @@ function onBossDefeated(state: GameRefs, boss: BossState, now: number): void {
 
 `powerUpForceDropAt` and `cameraShakeUntil` / `cameraShakeMagnitude` may already exist. If not, add them to GameRefs and wire into existing power-up spawn + camera shake logic (the latter likely exists for explosion shake).
 
-- [ ] **Step 4: Cleanup on defeated**
+- [x] **Step 4: Cleanup on defeated**
 
 At the top of the tick, after the spawn check:
 
@@ -750,7 +750,7 @@ if (refs.current.boss && refs.current.boss.phase === "defeated") {
 }
 ```
 
-- [ ] **Step 5: Manual verification**
+- [x] **Step 5: Manual verification**
 
 Spawn Sentinel, kill it. Observe:
 - Shrinks + spins faster over ~1.2s
@@ -762,7 +762,7 @@ Spawn Sentinel, kill it. Observe:
 - Normal asteroid spawning resumes
 - `refs.current.bossesDefeatedThisRun` is 1 (check via devtools console)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -778,7 +778,7 @@ git commit -m "feat(orbital-dodge): boss defeat animation, rewards, and cleanup"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Drifter mesh component**
+- [x] **Step 1: Drifter mesh component**
 
 ```tsx
 function DrifterMesh({ boss }: { boss: BossState }) {
@@ -820,7 +820,7 @@ Add to the rendering block:
 {refs.current.boss?.id === "drifter" && <DrifterMesh boss={refs.current.boss} />}
 ```
 
-- [ ] **Step 2: Drifter behavior**
+- [x] **Step 2: Drifter behavior**
 
 ```typescript
 function runDrifterBehavior(state: GameRefs, boss: BossState, now: number): void {
@@ -859,7 +859,7 @@ function runDrifterBehavior(state: GameRefs, boss: BossState, now: number): void
 
 Add `boss.id === "drifter"` dispatch in the fighting handler.
 
-- [ ] **Step 3: Bullet-vs-projectile for non-shielded projectiles**
+- [x] **Step 3: Bullet-vs-projectile for non-shielded projectiles**
 
 In the bullet update loop (before obstacle collision), after the boss-collision check:
 
@@ -880,7 +880,7 @@ for (let p = refs.current.bossProjectiles.length - 1; p >= 0; p--) {
 }
 ```
 
-- [ ] **Step 4: Manual verification**
+- [x] **Step 4: Manual verification**
 
 Shift+B → Drifter (press twice from Sentinel). Observe:
 - Crystalline blue octahedron patrols slowly
@@ -888,7 +888,7 @@ Shift+B → Drifter (press twice from Sentinel). Observe:
 - Mines gently home — quick lateral dodge evades them
 - Auto-fire destroys mines
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -904,7 +904,7 @@ git commit -m "feat(orbital-dodge): implement Drifter boss"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Mother mesh**
+- [x] **Step 1: Mother mesh**
 
 ```tsx
 function SwarmMotherMesh({ boss }: { boss: BossState }) {
@@ -931,7 +931,7 @@ function SwarmMotherMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Drone sub-entity + shooting**
+- [x] **Step 2: Drone sub-entity + shooting**
 
 ```typescript
 function runSwarmMotherBehavior(state: GameRefs, boss: BossState, now: number): void {
@@ -993,7 +993,7 @@ function runSwarmMotherBehavior(state: GameRefs, boss: BossState, now: number): 
 
 Add `state.lastDeltaMs` (frame delta in ms) to GameRefs if not already; set it at the top of each tick.
 
-- [ ] **Step 3: Drone rendering**
+- [x] **Step 3: Drone rendering**
 
 ```tsx
 {refs.current.boss?.id === "swarm-mother" && refs.current.boss.subEntities.map((d, i) =>
@@ -1006,7 +1006,7 @@ Add `state.lastDeltaMs` (frame delta in ms) to GameRefs if not already; set it a
 )}
 ```
 
-- [ ] **Step 4: Drone auto-fire damage**
+- [x] **Step 4: Drone auto-fire damage**
 
 In the auto-fire bullet loop, add drone collision:
 
@@ -1029,7 +1029,7 @@ if (refs.current.boss?.id === "swarm-mother") {
 }
 ```
 
-- [ ] **Step 5: Mother damage gated on drone count**
+- [x] **Step 5: Mother damage gated on drone count**
 
 Modify the boss-hit block from Task 3 Step 4:
 
@@ -1061,7 +1061,7 @@ if (refs.current.boss && refs.current.boss.phase === "fighting") {
 }
 ```
 
-- [ ] **Step 6: "CLEAR DRONES" hint overlay**
+- [x] **Step 6: "CLEAR DRONES" hint overlay**
 
 In the HP bar JSX, add:
 
@@ -1074,11 +1074,11 @@ In the HP bar JSX, add:
 )}
 ```
 
-- [ ] **Step 7: Manual verification**
+- [x] **Step 7: Manual verification**
 
 Shift+B → Swarm Mother. Expected: purple orb spawns 2 purple tetrahedron drones every 1.5s. Drones home toward ship. Mother takes 0 damage while drones alive; after clearing drones, mother takes damage. HUD shows "CLEAR DRONES" when drones present.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1094,7 +1094,7 @@ git commit -m "feat(orbital-dodge): implement Swarm Mother boss with drone spawn
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Mirror mesh**
+- [x] **Step 1: Mirror mesh**
 
 ```tsx
 function MirrorMesh({ boss }: { boss: BossState }) {
@@ -1119,7 +1119,7 @@ function MirrorMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Mirror behavior**
+- [x] **Step 2: Mirror behavior**
 
 ```typescript
 function runMirrorBehavior(state: GameRefs, boss: BossState, now: number): void {
@@ -1155,11 +1155,11 @@ function runMirrorBehavior(state: GameRefs, boss: BossState, now: number): void 
 
 Note: the "mirror your shots" gimmick is tuned down to a simpler "fire-at-ship cadence" to avoid runaway bullet counts from the player's rapid auto-fire. The visual theme (chrome disc at inverted X) is what sells the concept.
 
-- [ ] **Step 3: Manual verification**
+- [x] **Step 3: Manual verification**
 
 Shift+B → Mirror. Observe: chrome disc matches player's X as a mirror image. Fires silver bullets toward ship every ~0.8s. Auto-fire destroys the disc after ~18 hits. Disc fires even if you don't (simpler rule).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1175,7 +1175,7 @@ git commit -m "feat(orbital-dodge): implement Mirror boss"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Pulsar mesh**
+- [x] **Step 1: Pulsar mesh**
 
 ```tsx
 function PulsarMesh({ boss }: { boss: BossState }) {
@@ -1203,7 +1203,7 @@ function PulsarMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Pulsar behavior**
+- [x] **Step 2: Pulsar behavior**
 
 ```typescript
 function runPulsarBehavior(state: GameRefs, boss: BossState, now: number): void {
@@ -1236,11 +1236,11 @@ function runPulsarBehavior(state: GameRefs, boss: BossState, now: number): void 
 }
 ```
 
-- [ ] **Step 3: Manual verification**
+- [x] **Step 3: Manual verification**
 
 Shift+B → Pulsar. Expected: white-hot sphere emits 12-bullet ring every 3s. Ring rotates slightly each pulse. Ship can thread between bullets or duck through center.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1256,7 +1256,7 @@ git commit -m "feat(orbital-dodge): implement Pulsar boss"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Harvester mesh**
+- [x] **Step 1: Harvester mesh**
 
 ```tsx
 function HarvesterMesh({ boss }: { boss: BossState }) {
@@ -1281,7 +1281,7 @@ function HarvesterMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Tractor beam behavior**
+- [x] **Step 2: Tractor beam behavior**
 
 ```typescript
 interface TractorBeam {
@@ -1358,7 +1358,7 @@ function runHarvesterBehavior(state: GameRefs, boss: BossState, now: number): vo
 }
 ```
 
-- [ ] **Step 3: Render tractor beam**
+- [x] **Step 3: Render tractor beam**
 
 ```tsx
 {refs.current.boss?.id === "harvester" && (refs.current.boss as any).tractorBeam?.active && (
@@ -1375,11 +1375,11 @@ function runHarvesterBehavior(state: GameRefs, boss: BossState, now: number): vo
 )}
 ```
 
-- [ ] **Step 4: Manual verification**
+- [x] **Step 4: Manual verification**
 
 Shift+B → Harvester. Expected: dark mechanical block drifts at z=-14. Every 4s, a translucent amber column appears under it for 2s. If ship stays in the column for >500ms, coin counter decreases by 20 (or score by 50 if Plan 2 not shipped). Lateral movement escapes the beam.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1395,7 +1395,7 @@ git commit -m "feat(orbital-dodge): implement Harvester boss with tractor beam"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Warden mesh**
+- [x] **Step 1: Warden mesh**
 
 ```tsx
 function WardenMesh({ boss }: { boss: BossState }) {
@@ -1420,7 +1420,7 @@ function WardenMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Warden wall segments**
+- [x] **Step 2: Warden wall segments**
 
 ```typescript
 interface WallSegment {
@@ -1485,7 +1485,7 @@ function runWardenBehavior(state: GameRefs, boss: BossState, now: number): void 
 }
 ```
 
-- [ ] **Step 3: Render wall segments**
+- [x] **Step 3: Render wall segments**
 
 ```tsx
 {refs.current.boss?.id === "warden" && ((refs.current.boss as any).wallSegments ?? []).map(
@@ -1499,11 +1499,11 @@ function runWardenBehavior(state: GameRefs, boss: BossState, now: number): void 
 )}
 ```
 
-- [ ] **Step 4: Manual verification**
+- [x] **Step 4: Manual verification**
 
 Shift+B → Warden. Expected: red enforcer at back; every 4s, a row of 4 red wall segments + 1 gap slides forward at z=-8. Player must navigate to the gap to survive. Auto-fire does NOT destroy walls (bullet-immune via `isGap` / non-projectile type).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1524,7 +1524,7 @@ git commit -m "feat(orbital-dodge): implement Warden boss with segmented gap-wal
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Void Tyrant mesh**
+- [x] **Step 1: Void Tyrant mesh**
 
 ```tsx
 function VoidTyrantMesh({ boss }: { boss: BossState }) {
@@ -1559,7 +1559,7 @@ function VoidTyrantMesh({ boss }: { boss: BossState }) {
 }
 ```
 
-- [ ] **Step 2: Void Tyrant behavior**
+- [x] **Step 2: Void Tyrant behavior**
 
 ```typescript
 function runVoidTyrantBehavior(state: GameRefs, boss: BossState, now: number): void {
@@ -1704,7 +1704,7 @@ function updateDronesGeneric(state: GameRefs, boss: BossState, now: number): voi
 
 Refactor the swarm-mother drone update to call `updateDronesGeneric` too.
 
-- [ ] **Step 3: Extra-dark arena for Void Tyrant**
+- [x] **Step 3: Extra-dark arena for Void Tyrant**
 
 In the ambient light logic from Task 4, add a specific override:
 
@@ -1714,7 +1714,7 @@ const voidFight = refs.current.boss?.id === "void-tyrant" && bossActive;
 const ambientIntensity = voidFight ? 0.02 : bossActive ? 0.08 : 0.25;
 ```
 
-- [ ] **Step 4: Extra rewards on Void Tyrant defeat**
+- [x] **Step 4: Extra rewards on Void Tyrant defeat**
 
 In `onBossDefeated`:
 
@@ -1731,7 +1731,7 @@ if (boss.id === "void-tyrant") {
 
 For simplicity, leave `100 * tier` (= 800 for tier 8). If desired, add a special flag.
 
-- [ ] **Step 5: Manual verification**
+- [x] **Step 5: Manual verification**
 
 Shift+B 7 times to reach Void Tyrant. Expected:
 - Arena almost pure black
@@ -1741,7 +1741,7 @@ Shift+B 7 times to reach Void Tyrant. Expected:
 - At 33%–0% HP: color shifts amber, homing+ring combos + 2 drones
 - On defeat: big particle burst + score popup
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1755,7 +1755,9 @@ git commit -m "feat(orbital-dodge): implement Void Tyrant multi-phase final boss
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Wire all boss behaviors into dispatch**
+- [x] **Step 1: Wire all boss behaviors into dispatch**
+
+Implemented as if/else chain in the fighting-phase handler (equivalent to a switch, and already shipped with each boss task).
 
 Replace the single `if (boss.id === "sentinel")` dispatch in the tick with:
 
@@ -1774,7 +1776,7 @@ if (boss.phase === "fighting") {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -1788,7 +1790,9 @@ git commit -m "refactor(orbital-dodge): dispatch all boss behaviors via switch"
 **Files:**
 - Modify: `src/components/game/space-shooter.tsx`
 
-- [ ] **Step 1: Single boss-rendering component**
+- [x] **Step 1: Single boss-rendering component**
+
+Implemented as the unified `BossMesh` component which internally dispatches by `boss.id` (no need for a separate `BossRenderer` wrapper).
 
 Consolidate the per-id `{refs.current.boss?.id === "X"}` checks into a single dispatch:
 
@@ -1811,7 +1815,7 @@ function BossRenderer({ boss }: { boss: BossState | null }) {
 
 Use `<BossRenderer boss={refs.current.boss} />` in the scene.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx

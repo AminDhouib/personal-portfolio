@@ -4449,6 +4449,12 @@ export function SpaceShooterGame() {
                     <div className="font-mono text-white tabular-nums" style={{ color: comboColor(ui.comboPeak) }}>{"\u00d7"}{ui.comboPeak}</div>
                   </div>
                 </div>
+                {gameRefs.current.bossesDefeatedThisRun > 0 && (
+                  <div className="mt-2 flex items-center justify-center gap-1.5 text-red-300 font-mono text-sm">
+                    <span>Bosses Defeated:</span>
+                    <span className="text-white font-bold">{gameRefs.current.bossesDefeatedThisRun}</span>
+                  </div>
+                )}
               </motion.div>
 
               <div className="w-full max-w-md flex items-center gap-2">
