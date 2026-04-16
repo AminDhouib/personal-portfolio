@@ -17,6 +17,7 @@ import { diceRule } from "./tier2-dice";
 import { phoneKeypadRule } from "./tier2-phone";
 import { brailleRule } from "./tier2-braille";
 import { base64Rule } from "./tier2-base64";
+import { rhymeRule } from "./tier2-rhyme";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -259,4 +260,5 @@ export const TIER_2_RULES: readonly RuleDef[] = [
   phoneKeypadRule,
   brailleRule,
   base64Rule,
+  rhymeRule,
 ];

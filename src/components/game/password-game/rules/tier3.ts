@@ -13,6 +13,9 @@ import { bracketBalanceRule } from "./tier3-brackets";
 import { countryBordersRule } from "./tier3-borders";
 import { physicsFactRule } from "./tier3-physics";
 import { fibonacciRule } from "./tier3-fibonacci";
+import { sequenceRule } from "./tier3-sequence";
+import { scrabbleRule } from "./tier3-scrabble";
+import { magicSquareRule } from "./tier3-magic-square";
 
 function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
   let n = 0;
@@ -176,4 +179,7 @@ export const TIER_3_RULES: readonly RuleDef[] = [
   countryBordersRule,
   physicsFactRule,
   fibonacciRule,
+  sequenceRule,
+  scrabbleRule,
+  magicSquareRule,
 ];

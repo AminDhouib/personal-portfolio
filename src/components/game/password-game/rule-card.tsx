@@ -203,6 +203,18 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     );
   }
 
+  const magicMatch = text.match(/\[\[MAGIC:([0-9?,]+)\]\]/);
+  if (magicMatch) {
+    const before = text.slice(0, magicMatch.index);
+    const cells = magicMatch[1].split(",");
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <MagicSquare cells={cells} />
+      </>
+    );
+  }
+
   const brailleMatch = text.match(/\[\[BRAILLE:([\u2800-\u28FF ]+)\]\]/);
   if (brailleMatch) {
     const before = text.slice(0, brailleMatch.index);
@@ -266,6 +278,27 @@ function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
         background,
       }}
     />
+  );
+}
+
+/** 3×3 magic square grid where one cell is shown as "?". */
+function MagicSquare({ cells }: { cells: readonly string[] }) {
+  return (
+    <div className="mt-2 inline-grid grid-cols-3 gap-0.5 rounded-md bg-(--background) border border-(--border) p-2">
+      {cells.map((cell, i) => {
+        const isBlank = cell === "?";
+        return (
+          <div
+            key={i}
+            className={`flex items-center justify-center w-8 h-8 font-mono text-lg border border-(--border) ${
+              isBlank ? "bg-accent-amber/20 text-accent-amber font-bold" : "text-(--foreground)"
+            }`}
+          >
+            {cell}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
