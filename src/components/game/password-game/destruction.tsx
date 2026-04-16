@@ -263,94 +263,172 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
     flipX ? "scale(-1 1) translate(-200 0)" : "",
     flipY ? "scale(1 -1) translate(0 -200)" : "",
   ].filter(Boolean).join(" ");
+  const BG = "var(--background, #0a0a0f)";
   return (
     <svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden preserveAspectRatio="none">
       <g transform={transform || undefined}>
         {/*
-         * Main crack polygon.
-         * Two parallel zig-zag paths (the crack's two edges), joined to form
-         * a thin slit that cuts from (0, 0) through the container to
-         * roughly (180, 180). The polygon is ~4-8px wide at SVG scale.
-         *
-         * Tracing clockwise, upper edge first, then lower edge reversed:
-         *   upper edge: along the crack's "top" side
-         *   lower edge: along the crack's "bottom" side, returning
+         * Impact point: a small jagged puncture near the crack's origin.
+         * This is where the hit happened; primary cracks radiate from here.
+         */}
+        <polygon
+          points="2,0 10,4 8,10 14,8 16,16 6,14 0,18 4,8"
+          fill={BG}
+          stroke="rgba(255,255,255,0.65)"
+          strokeWidth="0.7"
+        />
+
+        {/*
+         * Primary crack — thin slit running from impact to ~(190, 100).
+         * Narrower than before (max 3px wide) so it reads as a hairline
+         * fissure rather than a gap.
          */}
         <polygon
           points="
-            0,0
-            18,10
-            34,4
-            52,22
-            70,16
-            86,38
-            104,30
-            120,52
-            134,46
-            152,72
-            168,64
-            186,92
-            200,100
-            200,108
-            190,108
-            172,80
-            156,86
-            138,60
-            124,66
-            108,42
-            90,50
-            74,28
-            58,32
+            8,8
+            22,14
+            38,8
+            54,22
+            72,18
+            88,34
+            106,30
+            122,50
+            136,48
+            154,68
+            170,66
+            188,88
+            196,100
+            192,102
+            172,72
+            158,74
+            138,54
+            124,56
+            108,36
+            92,40
+            74,26
+            56,28
             40,14
-            22,20
-            6,8
+            24,20
+            10,12
           "
-          fill="var(--background, #0a0a0f)"
+          fill={BG}
         />
-
-        {/* Upper white highlight edge — thin stroke showing the glass fracture. */}
         <polyline
-          points="0,0 18,10 34,4 52,22 70,16 86,38 104,30 120,52 134,46 152,72 168,64 186,92 200,100"
+          points="8,8 22,14 38,8 54,22 72,18 88,34 106,30 122,50 136,48 154,68 170,66 188,88 196,100"
           fill="none"
-          stroke="rgba(255,255,255,0.55)"
-          strokeWidth="0.8"
+          stroke="rgba(255,255,255,0.7)"
+          strokeWidth="0.6"
           strokeLinejoin="miter"
           strokeLinecap="round"
         />
-        {/* Lower highlight edge. */}
         <polyline
-          points="6,8 22,20 40,14 58,32 74,28 90,50 108,42 124,66 138,60 156,86 172,80 190,108"
+          points="10,12 24,20 40,14 56,28 74,26 92,40 108,36 124,56 138,54 158,74 172,72 192,102"
           fill="none"
           stroke="rgba(255,255,255,0.3)"
-          strokeWidth="0.5"
+          strokeWidth="0.35"
           strokeLinejoin="miter"
         />
 
-        {/* Secondary branching cracks — shorter thin slits veering off at angles. */}
+        {/*
+         * Secondary branch — radiates from impact in a different direction.
+         * Creates the spider-web shatter look when paired with the primary.
+         */}
         <polygon
-          points="70,16 66,4 72,3 78,14 74,15"
-          fill="var(--background, #0a0a0f)"
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth="0.4"
+          points="
+            10,10
+            28,30
+            22,46
+            38,60
+            30,78
+            48,90
+            40,108
+            58,122
+            48,138
+            60,154
+            56,170
+            68,188
+            74,196
+            82,194
+            74,172
+            80,158
+            68,142
+            74,126
+            58,112
+            66,96
+            52,82
+            60,66
+            42,52
+            48,38
+            32,24
+          "
+          fill={BG}
         />
-        <polygon
-          points="120,52 132,42 135,46 124,56"
-          fill="var(--background, #0a0a0f)"
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth="0.4"
+        <polyline
+          points="10,10 28,30 22,46 38,60 30,78 48,90 40,108 58,122 48,138 60,154 56,170 68,188 74,196"
+          fill="none"
+          stroke="rgba(255,255,255,0.6)"
+          strokeWidth="0.5"
+          strokeLinejoin="miter"
+          strokeLinecap="round"
         />
-        <polygon
-          points="86,38 82,52 86,54 92,40"
-          fill="var(--background, #0a0a0f)"
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth="0.4"
-        />
-        <polygon
-          points="152,72 162,86 166,84 156,70"
-          fill="var(--background, #0a0a0f)"
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth="0.4"
-        />
+
+        {/*
+         * Minor branches — short fractures forking off primary cracks at
+         * sharp angles. These create the "web" feeling without widening the
+         * visible destruction.
+         */}
+        <g fill={BG} stroke="rgba(255,255,255,0.5)" strokeWidth="0.35" strokeLinejoin="miter">
+          {/* Fork up from primary ~(38, 8) */}
+          <polygon points="38,8 44,2 46,4 40,10" />
+          {/* Fork up-right from (72, 18) */}
+          <polygon points="72,18 86,6 88,8 74,20" />
+          {/* Fork down from (88, 34) */}
+          <polygon points="88,34 92,48 94,48 90,35" />
+          {/* Fork up-right from (122, 50) */}
+          <polygon points="122,50 136,38 138,40 124,52" />
+          {/* Fork down from (154, 68) */}
+          <polygon points="154,68 160,82 162,82 156,68" />
+          {/* Fork off secondary at (38, 60) */}
+          <polygon points="38,60 52,58 52,60 40,62" />
+          {/* Fork off secondary at (48, 90) */}
+          <polygon points="48,90 62,88 62,90 50,92" />
+        </g>
+
+        {/*
+         * Tiny "shattered" triangular pieces — near crack intersections
+         * where the card material is completely dislodged. Black fill so
+         * they look truly missing.
+         */}
+        <g fill={BG} stroke="rgba(255,255,255,0.4)" strokeWidth="0.3">
+          <polygon points="54,22 60,20 58,26" />
+          <polygon points="106,30 110,30 108,36" />
+          <polygon points="138,48 142,46 140,52" />
+          <polygon points="40,108 44,106 44,110" />
+          <polygon points="60,154 64,152 62,156" />
+        </g>
+
+        {/*
+         * Surface hairline fractures — thin white lines NOT filled with
+         * background (these are stress marks on the glass, not through-cracks).
+         */}
+        <g fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="0.25" strokeLinecap="round">
+          <path d="M 30 10 L 42 18 L 50 16" />
+          <path d="M 100 40 L 112 44 L 118 40" />
+          <path d="M 160 80 L 172 86 L 180 82" />
+          <path d="M 14 38 L 26 42 L 34 40" />
+          <path d="M 36 70 L 48 74 L 56 72" />
+          <path d="M 54 122 L 68 118 L 76 122" />
+        </g>
+
+        {/*
+         * Micro-debris around the impact point — tiny bright specks.
+         */}
+        <g fill="rgba(255,255,255,0.55)">
+          <circle cx="20" cy="22" r="0.7" />
+          <circle cx="28" cy="14" r="0.5" />
+          <circle cx="12" cy="24" r="0.5" />
+          <circle cx="40" cy="26" r="0.4" />
+        </g>
       </g>
     </svg>
   );
