@@ -594,6 +594,12 @@ export default function TowerStacker() {
           life: 0.5, maxLife: 0.5, size: 2, color: "rgba(255,255,255,0.6)",
         });
       }
+      const chopRatio = (a.width - overlapW) / a.width;
+      if (chopRatio > NEAR_MISS_RATIO) {
+        r.slowMo = 300;
+        r.cameraTargetScale *= 0.95;
+        setTimeout(() => { r.cameraTargetScale /= 0.95; }, 320);
+      }
       r.perfectCombo = 0;
     }
 
@@ -820,10 +826,34 @@ export default function TowerStacker() {
 
       drawParticles(r, ctx);
 
+      // landing shadow hint
+      if (r.hintsOn && r.activeBlock && r.floors.length > 0 && r.state === "playing") {
+        const a = r.activeBlock;
+        const top = r.floors[r.floors.length - 1];
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = `hsla(${a.hue}, 90%, 70%, 0.4)`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(a.x + 1, top.y - 1, a.width - 2, 2);
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
       // draw active block
       if (r.activeBlock) {
         const a = r.activeBlock;
         drawBlockWithTheme(ctx, a.x, a.y, a.width, a.height, a.hue, r.theme, a.isGolden);
+      }
+
+      // danger pulse when block is very narrow
+      if (r.activeBlock && r.activeBlock.width < BASE_BLOCK_WIDTH_PX * 0.2 && r.state === "playing") {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 100);
+        const a = r.activeBlock;
+        ctx.save();
+        ctx.strokeStyle = `rgba(239,68,68,${pulse})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(a.x - 2, a.y - 2, a.width + 4, a.height + 4);
+        ctx.restore();
       }
 
       ctx.restore();
