@@ -93,3 +93,26 @@ describe("Tier 1 — uppercase rule", () => {
     expect(rule.validate(makeState("Abc123", rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 1 — special char rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "special-char")!;
+
+  it("picks a random subset of special chars", () => {
+    const rule = def.create(mulberry32(1));
+    const allowed = rule.params.chars as string;
+    expect(typeof allowed).toBe("string");
+    expect(allowed.length).toBeGreaterThan(0);
+  });
+
+  it("fails without special char from subset", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("Abc123", rule)).passed).toBe(false);
+  });
+
+  it("passes when password contains an allowed special char", () => {
+    const rule = def.create(mulberry32(1));
+    const chars = rule.params.chars as string;
+    const pw = "Abc" + chars[0] + "123";
+    expect(rule.validate(makeState(pw, rule)).passed).toBe(true);
+  });
+});

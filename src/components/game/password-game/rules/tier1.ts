@@ -56,4 +56,26 @@ const uppercase: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase];
+const SPECIAL_POOL = "!@#$%^&*";
+
+const specialChar: RuleDef = {
+  id: "special-char",
+  tier: 1,
+  create(rng) {
+    const subset = pickN(rng, SPECIAL_POOL.split(""), 3).join("");
+    return {
+      id: "special-char",
+      tier: 1,
+      description: `Your password must include a special character from: ${subset}`,
+      params: { chars: subset },
+      validate(state) {
+        for (const ch of subset) {
+          if (state.password.includes(ch)) return { passed: true };
+        }
+        return { passed: false };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar];
