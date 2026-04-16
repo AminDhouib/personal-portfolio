@@ -7,6 +7,7 @@ import { FLAGS } from "../../../data/password-game/flags";
 import { CHESS_PUZZLES, getDailyChessPuzzle } from "../../../data/password-game/chess";
 import { PIANO_KEYS } from "../../../data/password-game/piano";
 import { ASCII_ART } from "../../../data/password-game/ascii-art";
+import { ZODIAC_SIGNS } from "../../../data/password-game/zodiac";
 
 interface Props {
   rule: Rule;
@@ -61,6 +62,54 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
         <GlitchText text={before} chaos={chaos} />
         {flag && <FlagBadge flag={flag} />}
       </span>
+    );
+  }
+
+  const zodiacMatch = text.match(/\[\[ZODIAC:([A-Za-z]+)\]\]/);
+  if (zodiacMatch) {
+    const sign = ZODIAC_SIGNS.find((s) => s.name === zodiacMatch[1]);
+    const before = text.slice(0, zodiacMatch.index);
+    return (
+      <span className="inline-flex items-center gap-2 flex-wrap">
+        <GlitchText text={before} chaos={chaos} />
+        {sign && (
+          <span
+            aria-label={`zodiac ${sign.name}`}
+            role="img"
+            className="inline-block align-middle text-2xl leading-none font-normal"
+            style={{ fontVariantEmoji: "text" as const, color: "var(--foreground)" }}
+          >
+            {sign.glyph}
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  const binaryMatch = text.match(/\[\[BINARY:([01]{8})\]\]/);
+  if (binaryMatch) {
+    const before = text.slice(0, binaryMatch.index);
+    const bits = binaryMatch[1];
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-(--background) border border-(--border) px-3 py-2 font-mono">
+          {[...bits].map((b, i) => (
+            <span
+              key={i}
+              className="inline-block"
+              aria-label={`bit ${i}: ${b}`}
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: "50%",
+                background: b === "1" ? "#22c55e" : "transparent",
+                border: "1.5px solid #22c55e",
+              }}
+            />
+          ))}
+        </div>
+      </>
     );
   }
 

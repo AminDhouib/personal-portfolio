@@ -2,6 +2,7 @@ import type { RuleDef } from "../types";
 import { rangeInt, pickOne } from "../prng";
 import { paulRule } from "../hazards/paul";
 import { fireRule } from "../hazards/fire";
+import { sacrificeRule } from "./tier4-sacrifice";
 
 const VOWELS = ["a", "e", "i", "o", "u"] as const;
 
@@ -91,4 +92,4 @@ const mysteryRule: RuleDef = {
   },
 };
 
-export const TIER_4_RULES: readonly RuleDef[] = [lengthBomb, clockRule, forbiddenVowel, mysteryRule, paulRule, fireRule];
+export const TIER_4_RULES: readonly RuleDef[] = [lengthBomb, clockRule, forbiddenVowel, mysteryRule, paulRule, fireRule, sacrificeRule];

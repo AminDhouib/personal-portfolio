@@ -5,6 +5,8 @@ import { emojiMathRule } from "./tier3-emoji-math";
 import { primeRule } from "./tier3-prime";
 import { moonPhaseRule } from "./tier3-moon";
 import { clockRule } from "./tier3-clock";
+import { zodiacRule } from "./tier3-zodiac";
+import { binaryDecodeRule } from "./tier3-binary";
 
 function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
   let n = 0;
@@ -160,4 +162,6 @@ export const TIER_3_RULES: readonly RuleDef[] = [
   primeRule,
   moonPhaseRule,
   clockRule,
+  zodiacRule,
+  binaryDecodeRule,
 ];
