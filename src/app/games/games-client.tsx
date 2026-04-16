@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
-import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket, Hexagon, Key } from "lucide-react";
+import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket, Hexagon, Key, Zap } from "lucide-react";
 
 const GeometricFlowGame = dynamic(
   () =>
@@ -34,6 +34,14 @@ const SpaceShooterGame = dynamic(
 const HextrisGame = dynamic(
   () =>
     import("@/components/game/hextris").then((m) => m.HextrisGame),
+  { ssr: false, loading: () => <GameSkeleton /> }
+);
+
+const SuperVoltorbFlipGame = dynamic(
+  () =>
+    import("@/components/game/super-voltorb-flip").then(
+      (m) => m.SuperVoltorbFlipGame
+    ),
   { ssr: false, loading: () => <GameSkeleton /> }
 );
 
@@ -108,6 +116,15 @@ const GAMES: GameEntry[] = [
     available: true,
     external: true,
     href: "/games/password-game",
+  },
+  {
+    id: "super-voltorb-flip",
+    title: "Super Voltorb Flip",
+    description: "A faithful recreation of the HGSS classic — with modern upgrades. Deduce, flip, multiply your coins. Don't hit the Voltorb.",
+    icon: Zap,
+    iconColor: "text-accent-amber",
+    available: true,
+    controls: "Click tiles to flip. Open memo mode to mark possibilities. Spend coins on Shields & Reveals.",
   },
 ];
 
@@ -248,6 +265,9 @@ export function GamesClient() {
           <HextrisGame />
         </div>
       )}
+
+      {/* Super Voltorb Flip */}
+      {activeGame === "super-voltorb-flip" && <SuperVoltorbFlipGame />}
     </div>
   );
 }
