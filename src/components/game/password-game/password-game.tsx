@@ -16,6 +16,9 @@ import { CracksOverlay } from "./destruction";
 import { ChaosDebugPanel } from "./chaos-debug-panel";
 import { ResultModal } from "./result-modal";
 import { RichInput } from "./rich-input";
+import { setTodayWord } from "../../../data/password-game/wordle";
+import { setDailyChessPuzzle } from "../../../data/password-game/chess";
+import { setExtendedCapitals } from "../../../data/password-game/capitals";
 import type { GameState, Rule, FormattingMap } from "./types";
 
 function makeSeed(): number {
@@ -78,6 +81,7 @@ export function PasswordGame() {
   const [showResult, setShowResult] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
+  const [wordleVersion, setWordleVersion] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const prevSatisfied = useRef(0);
   const prevActive = useRef(-1);
@@ -104,7 +108,9 @@ export function PasswordGame() {
           5: TIER_5_RULES,
         }
       ),
-    [seed]
+    // wordleVersion bumps when the real NYT word resolves — re-memo so the
+    // Wordle rule picks up the authoritative answer instead of the fallback.
+    [seed, wordleVersion]
   );
 
   const state: GameState = useMemo(
@@ -155,6 +161,50 @@ export function PasswordGame() {
     const id = window.setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
     return () => window.clearInterval(id);
   }, [timerRunning]);
+
+  // Fetch the authoritative Wordle answer + Lichess daily puzzle once on
+  // mount. When either resolves, bump wordleVersion so the rules memo
+  // refreshes and the rules pick up the real data. Falls back silently if
+  // the APIs are unreachable.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.allSettled([
+        fetch("/api/password-game/wordle").then((r) => r.json()),
+        fetch("/api/password-game/chess-puzzle").then((r) => r.json()),
+        fetch("/api/password-game/countries").then((r) => r.json()),
+      ]);
+      if (cancelled) return;
+      let changed = false;
+
+      const wordle = results[0];
+      if (wordle.status === "fulfilled" && typeof wordle.value?.word === "string") {
+        setTodayWord(wordle.value.word);
+        changed = true;
+      }
+
+      const chess = results[1];
+      if (chess.status === "fulfilled" && chess.value?.puzzle) {
+        setDailyChessPuzzle(chess.value.puzzle);
+        changed = true;
+      }
+
+      const countries = results[2];
+      if (
+        countries.status === "fulfilled" &&
+        Array.isArray(countries.value?.capitals) &&
+        countries.value.capitals.length > 0
+      ) {
+        setExtendedCapitals(countries.value.capitals);
+        changed = true;
+      }
+
+      if (changed) setWordleVersion((v) => v + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (allPassed && timerRunning) {

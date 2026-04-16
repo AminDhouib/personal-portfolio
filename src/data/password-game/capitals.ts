@@ -45,3 +45,16 @@ export const COUNTRY_CAPITALS: readonly CountryCapital[] = Object.freeze([
   { country: "Croatia", capital: "Zagreb" },
   { country: "Romania", capital: "Bucharest" },
 ]);
+
+// Injected from /api/password-game/countries when REST Countries responds.
+// When present, the capital-city rule picks from this (much larger) list
+// instead of the static fallback above.
+let _extended: readonly CountryCapital[] | null = null;
+
+export function setExtendedCapitals(list: readonly CountryCapital[] | null): void {
+  _extended = list && list.length > 0 ? list : null;
+}
+
+export function getCapitals(): readonly CountryCapital[] {
+  return _extended ?? COUNTRY_CAPITALS;
+}

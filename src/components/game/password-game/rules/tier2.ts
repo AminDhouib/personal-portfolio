@@ -3,7 +3,7 @@ import { pickOne, rangeInt } from "../prng";
 import { NATO_ALPHABET, NATO_LETTERS } from "../../../../data/password-game/nato";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
-import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
+import { getCapitals } from "../../../../data/password-game/capitals";
 import { NAMED_COLORS } from "../../../../data/password-game/colors";
 import { CODE_SNIPPETS } from "../../../../data/password-game/code-snippets";
 import { morseRule, binaryRule, mathWordsRule, captchaRule } from "./tier2-pack";
@@ -176,7 +176,7 @@ const capitalCity: RuleDef = {
   id: "capital-city",
   tier: 2,
   create(rng) {
-    const entry = pickOne(rng, COUNTRY_CAPITALS);
+    const entry = pickOne(rng, getCapitals());
     return {
       id: "capital-city",
       tier: 2,

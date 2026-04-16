@@ -121,4 +121,122 @@ const puzzle5: ChessPuzzle = {
   hint: "Promote the pawn.",
 };
 
-export const CHESS_PUZZLES: readonly ChessPuzzle[] = [puzzle1, puzzle2, puzzle3, puzzle4, puzzle5];
+// Queen mate in the corner, supported by king: Qh7#.
+const puzzle6: ChessPuzzle = {
+  id: "queen-corner",
+  board: [
+    `.......${R.bK}`,
+    `........`,
+    `......${R.wK}${R.wQ}`,
+    `........`,
+    `........`,
+    `........`,
+    `........`,
+    `........`,
+  ],
+  toMove: "white",
+  bestMove: "Qh7#",
+  accept: ["Qh7", "Qh7#", "Qh7+"],
+  hint: "Queen finishes it in the corner — the king defends.",
+};
+
+// Smothered mate: Nf7# — Black king is boxed in by its own pieces.
+const puzzle7: ChessPuzzle = {
+  id: "smothered",
+  board: [
+    `......${R.bR}${R.bK}`,
+    `......${R.bP}${R.bP}`,
+    `...${R.wN}....`,
+    `........`,
+    `........`,
+    `........`,
+    `........`,
+    `.......${R.wK}`,
+  ],
+  toMove: "white",
+  bestMove: "Nf7#",
+  accept: ["Nf7", "Nf7#", "Nf7+"],
+  hint: "The classic smothered mate — the king can't escape its own pieces.",
+};
+
+// Knight fork in the corner: Nc7+ hits king and rook.
+const puzzle8: ChessPuzzle = {
+  id: "fork-corner",
+  board: [
+    `${R.bK}...${R.bR}...`,
+    `........`,
+    `........`,
+    `.${R.wN}......`,
+    `........`,
+    `........`,
+    `........`,
+    `.......${R.wK}`,
+  ],
+  toMove: "white",
+  bestMove: "Nc7+",
+  accept: ["Nc7+", "Nc7"],
+  hint: "A knight lands on one square and attacks both the king and the rook.",
+};
+
+// Pin exploit — the queen is pinned to the king on the d-file.
+const puzzle9: ChessPuzzle = {
+  id: "pin-queen",
+  board: [
+    `...${R.bK}....`,
+    `........`,
+    `........`,
+    `...${R.bQ}....`,
+    `........`,
+    `........`,
+    `........`,
+    `...${R.wR}.${R.wK}..`,
+  ],
+  toMove: "white",
+  bestMove: "Rxd5",
+  accept: ["Rxd5", "Rxd5+"],
+  hint: "The queen is pinned against the king — just take it.",
+};
+
+// King-and-rook mate on the a-file against h8 — king on g6 seals escape squares.
+const puzzle10: ChessPuzzle = {
+  id: "king-and-rook",
+  board: [
+    `.......${R.bK}`,
+    `........`,
+    `......${R.wK}.`,
+    `........`,
+    `........`,
+    `........`,
+    `........`,
+    `${R.wR}.......`,
+  ],
+  toMove: "white",
+  bestMove: "Ra8#",
+  accept: ["Ra8", "Ra8#", "Ra8+"],
+  hint: "The king on g6 seals the escape squares — the rook delivers.",
+};
+
+export const CHESS_PUZZLES: readonly ChessPuzzle[] = [
+  puzzle1,
+  puzzle2,
+  puzzle3,
+  puzzle4,
+  puzzle5,
+  puzzle6,
+  puzzle7,
+  puzzle8,
+  puzzle9,
+  puzzle10,
+];
+
+// Authoritative daily puzzle injected from /api/password-game/chess-puzzle.
+// When set, the chess rule prefers this over the static pool.
+let _dailyPuzzle: ChessPuzzle | null = null;
+
+export function setDailyChessPuzzle(p: ChessPuzzle | null): void {
+  _dailyPuzzle = p;
+}
+
+export function getDailyChessPuzzle(): ChessPuzzle | null {
+  return _dailyPuzzle;
+}

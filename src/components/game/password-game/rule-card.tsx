@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Rule, ValidationResult } from "./types";
 import { CheckCircle, XCircle } from "lucide-react";
 import { FLAGS } from "../../../data/password-game/flags";
-import { CHESS_PUZZLES } from "../../../data/password-game/chess";
+import { CHESS_PUZZLES, getDailyChessPuzzle } from "../../../data/password-game/chess";
 
 interface Props {
   rule: Rule;
@@ -64,7 +64,9 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
 
   const chessMatch = text.match(/\[\[CHESS:([\w-]+)\]\]/);
   if (chessMatch) {
-    const puzzle = CHESS_PUZZLES.find((p) => p.id === chessMatch[1]);
+    const id = chessMatch[1];
+    const daily = getDailyChessPuzzle();
+    const puzzle = daily && daily.id === id ? daily : CHESS_PUZZLES.find((p) => p.id === id);
     const before = text.slice(0, chessMatch.index);
     return (
       <>
