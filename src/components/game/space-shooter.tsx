@@ -15,7 +15,7 @@ import {
   addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile,
   setUpgradeLevel, spendCoins,
 } from "./profile";
-import { UPGRADES, upgradeById } from "./shop-data";
+import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
 
 // ---------- constants ----------
 
@@ -797,6 +797,16 @@ interface GameRefs {
   powerUps: PowerUp[];
   coins: Coin[];
   coinsThisRun: number;
+  // Ship-derived run modifiers (set at startRun from equipped ship)
+  shipFireRateMul: number;
+  shipDamageMul: number;
+  shipAgilityMul: number;
+  shipCoinMagnetMul: number;
+  shipHullTint: string;
+  startShieldCharges: number;
+  coinBoostMul: number;
+  reviveAvailable: boolean;
+  reviveUsed: boolean;
   // Player preferences (mirrored from React state for per-frame access)
   prefs: {
     reducedMotion: boolean;
@@ -896,6 +906,9 @@ function createRefs(): GameRefs {
     powerUps: [], coins: [], coinsThisRun: 0,
     coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
     comboWindowMs: 0, shieldDurationMs: 0,
+    shipFireRateMul: 1, shipDamageMul: 1, shipAgilityMul: 1, shipCoinMagnetMul: 1,
+    shipHullTint: "#60a5fa", startShieldCharges: 0, coinBoostMul: 1,
+    reviveAvailable: false, reviveUsed: false,
     prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
     gyroTilt: { x: 0, y: 0 },
     boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
@@ -958,6 +971,63 @@ function startRun(g: GameRefs): boolean {
   g.scoreMultiplier = scoreDef ? scoreDef.effectAtLevel(getLevel("score-multiplier")) : 1;
   g.comboWindowMs = comboDef ? comboDef.effectAtLevel(getLevel("combo-window")) * 1000 : 0;
   g.shieldDurationMs = shieldDef ? shieldDef.effectAtLevel(getLevel("shield-duration")) : 0;
+
+  // Equipped ship stats
+  const ship = shipById(profile.equippedShip) ?? SHIPS[0];
+  g.shipFireRateMul = ship.fireRateMul;
+  g.shipDamageMul = ship.damageMul;
+  g.shipAgilityMul = ship.moveAgilityMul;
+  g.shipCoinMagnetMul = ship.coinMagnetMul;
+  g.shipHullTint = ship.hullTint;
+  g.startShieldCharges = ship.startShieldCharges;
+  if (g.startShieldCharges > 0) {
+    const effShieldMs = g.shieldDurationMs > 0 ? g.shieldDurationMs : POWERUP_DURATION_MS;
+    g.activePowerUps.push({ type: "shield", expiresAt: now + effShieldMs * g.startShieldCharges });
+  }
+
+  // Consume queued pre-run consumables (each one is one-shot)
+  g.coinBoostMul = 1;
+  g.reviveAvailable = false;
+  g.reviveUsed = false;
+  try {
+    const inv = profile.consumableInventory;
+    if ((inv["coin-boost-2x"] ?? 0) > 0) {
+      g.coinBoostMul = 2;
+      const p2 = loadProfile();
+      p2.consumableInventory["coin-boost-2x"] = (p2.consumableInventory["coin-boost-2x"] ?? 0) - 1;
+      saveProfile(p2);
+    }
+    if ((inv["revive"] ?? 0) > 0) {
+      g.reviveAvailable = true;
+      const p2 = loadProfile();
+      p2.consumableInventory["revive"] = (p2.consumableInventory["revive"] ?? 0) - 1;
+      saveProfile(p2);
+    }
+    if ((inv["head-start-2000"] ?? 0) > 0) {
+      g.distance = 2000;
+      const p2 = loadProfile();
+      p2.consumableInventory["head-start-2000"] = (p2.consumableInventory["head-start-2000"] ?? 0) - 1;
+      saveProfile(p2);
+    } else if ((inv["head-start-1000"] ?? 0) > 0) {
+      g.distance = 1000;
+      const p2 = loadProfile();
+      p2.consumableInventory["head-start-1000"] = (p2.consumableInventory["head-start-1000"] ?? 0) - 1;
+      saveProfile(p2);
+    } else if ((inv["head-start-500"] ?? 0) > 0) {
+      g.distance = 500;
+      const p2 = loadProfile();
+      p2.consumableInventory["head-start-500"] = (p2.consumableInventory["head-start-500"] ?? 0) - 1;
+      saveProfile(p2);
+    }
+    if ((inv["lucky-start"] ?? 0) > 0) {
+      const p2 = loadProfile();
+      p2.consumableInventory["lucky-start"] = (p2.consumableInventory["lucky-start"] ?? 0) - 1;
+      saveProfile(p2);
+      const luckyTypes: PowerUpType[] = ["shield", "triple", "rapid", "mega", "warp"];
+      const pick = luckyTypes[Math.floor(Math.random() * luckyTypes.length)];
+      g.activePowerUps.push({ type: pick, expiresAt: now + POWERUP_DURATION_MS });
+    }
+  } catch { /* noop */ }
 
   sounds.startGameplayMusic();
   return true;
@@ -2516,8 +2586,9 @@ function runTick(
       }
       const pickupR = 0.6 + magnetBonusRadius * 0.3;
       if (Math.abs(c.z - g.shipZ) < 1.2 && dist2d < pickupR) {
-        g.coinsThisRun += c.value;
-        spawnScorePopup(g, c.x, c.y, c.z, c.value);
+        const val = Math.round(c.value * g.coinBoostMul);
+        g.coinsThisRun += val;
+        spawnScorePopup(g, c.x, c.y, c.z, val);
         sounds.play("chime");
         g.coins.splice(i, 1);
       }
