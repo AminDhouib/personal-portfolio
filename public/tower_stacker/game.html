@@ -145,6 +145,16 @@ li,ol,ul{list-style-type:none;padding:0;margin:0}
 <script src="./assets/zepto-1.1.6.min.js"></script>
 <script>
 var domReady, loadFinish, canvasReady, loadError, gameStart, game, score = 0, successCount = 0;
+var blocks = 0, perfects = 0, bestStreak = 0;
+var MILESTONES = [10, 25, 50, 100, 200, 500, 1000];
+
+function postParent(type, data) {
+  try {
+    var payload = { type: type };
+    if (data) for (var k in data) payload[k] = data[k];
+    window.parent.postMessage(payload, '*');
+  } catch (e) {}
+}
 
 // Size the game to fill the iframe viewport, preserving a 3:2 portrait ratio.
 var gameWidth = window.innerWidth;
@@ -163,6 +173,7 @@ function hideLoading() {
     setTimeout(function () {
       $('.loading').hide();
       $('.landing').show();
+      postParent('ts:ready');
     }, 1000);
   }
 }
@@ -420,12 +431,22 @@ var option = {
     var delta = s - prevScore;
     prevScore = s;
     score = s;
-    if (delta > 0 && audioUnlocked) {
+    if (delta > 0) {
       // Defer so setGameSuccess (which may fire in the same tick) updates first.
       setTimeout(function () {
-        if (successCount > prevSuccess) playPerfect();
-        else playDrop();
+        var wasPerfect = successCount > prevSuccess;
         prevSuccess = successCount;
+        if (audioUnlocked) { if (wasPerfect) playPerfect(); else playDrop(); }
+        blocks++;
+        if (wasPerfect) perfects++;
+        if (successCount > bestStreak) bestStreak = successCount;
+        postParent('ts:score', {
+          score: s, blocks: blocks, streak: successCount,
+          bestStreak: bestStreak, perfects: perfects, perfect: wasPerfect
+        });
+        if (MILESTONES.indexOf(blocks) !== -1) {
+          postParent('ts:milestone', { blocks: blocks });
+        }
       }, 0);
     }
   },
@@ -433,9 +454,14 @@ var option = {
   setGameFailed: function (f) {
     $('#score').text(score);
     if (audioUnlocked) playFail();
+    postParent('ts:fail', { fails: f });
     if (f >= 3) {
       stopBgm(1.0);
-      overShowOver();
+      postParent('ts:gameover', {
+        score: score, blocks: blocks,
+        bestStreak: bestStreak, perfects: perfects
+      });
+      // Upstream modal suppressed — parent renders its own game-over card.
     }
   }
 };
@@ -461,6 +487,7 @@ $('#start').on('click', function () {
   unlockAudio();
   startBgm();
   indexHide();
+  postParent('ts:started');
   setTimeout(game.start, 400);
 });
 
