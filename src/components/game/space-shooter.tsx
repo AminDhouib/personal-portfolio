@@ -18,6 +18,7 @@ import {
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
 import { activeMissions, claimMissionReward, rollMissionsIfNewDay } from "./missions";
 import { ACHIEVEMENTS, checkAchievements, grantAchievements, type Achievement } from "./achievements";
+import { TUTORIAL_STEPS } from "./tutorial";
 
 // ---------- constants ----------
 
@@ -4067,6 +4068,44 @@ export function SpaceShooterGame() {
     window.addEventListener("deviceorientation", handler);
     return () => window.removeEventListener("deviceorientation", handler);
   }, [gyroSupported, prefs.gyroEnabled, gyroPermission]);
+  const [tutorialActive, setTutorialActive] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [tutorialStepStart, setTutorialStepStart] = useState(0);
+  useEffect(() => {
+    // Start tutorial on first-ever run if profile.tutorialComplete is false
+    if (profile.tutorialComplete) return;
+    if (ui.status === "playing" && !tutorialActive) {
+      setTutorialActive(true);
+      setTutorialStep(0);
+      setTutorialStepStart(performance.now());
+    }
+  }, [ui.status, profile.tutorialComplete, tutorialActive]);
+  useEffect(() => {
+    if (!tutorialActive) return;
+    const id = setInterval(() => {
+      const now = performance.now();
+      const step = TUTORIAL_STEPS[tutorialStep];
+      if (!step) {
+        setTutorialActive(false);
+        try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
+        return;
+      }
+      if (now - tutorialStepStart >= step.durationMs) {
+        if (tutorialStep + 1 >= TUTORIAL_STEPS.length) {
+          setTutorialActive(false);
+          try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
+        } else {
+          setTutorialStep(tutorialStep + 1);
+          setTutorialStepStart(now);
+        }
+      }
+    }, 100);
+    return () => clearInterval(id);
+  }, [tutorialActive, tutorialStep, tutorialStepStart, refreshProfile]);
+  const skipTutorial = useCallback(() => {
+    setTutorialActive(false);
+    try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
+  }, [refreshProfile]);
   const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
@@ -5002,6 +5041,32 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Tutorial banner */}
+        {tutorialActive && TUTORIAL_STEPS[tutorialStep] && (
+          <div className="absolute inset-x-0 top-[20%] flex flex-col items-center pointer-events-none z-40">
+            <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-6 py-4 max-w-sm text-center">
+              <div className="text-xl sm:text-2xl font-bold text-white mb-1">
+                {TUTORIAL_STEPS[tutorialStep].headline}
+              </div>
+              <div className="text-sm text-slate-300">
+                {TUTORIAL_STEPS[tutorialStep].subtext}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-wider">
+                Step {tutorialStep + 1} / {TUTORIAL_STEPS.length}
+              </div>
+            </div>
+          </div>
+        )}
+        {tutorialActive && (
+          <button
+            onClick={skipTutorial}
+            className="absolute bottom-4 right-4 text-xs text-slate-400 hover:text-white px-3 py-1 bg-black/40 rounded border border-white/10 z-40"
+            type="button"
+          >
+            Skip Tutorial
+          </button>
+        )}
 
         {/* Achievement toasts */}
         {achievementToasts.length > 0 && (
