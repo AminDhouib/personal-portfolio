@@ -1205,14 +1205,22 @@ function spawnObstacle(g: GameRefs): Obstacle {
   // neighborhood (±3 X, ±2 Y), 65% uniform across the arena. The wider band
   // means aim-at-player no longer concentrates on the auto-fire lane so
   // camping at any single point no longer guarantees clean kills.
+  // Spawn bounds factor in asteroid body radius + a safety margin so no part of
+  // the obstacle ever sits outside the visible arena (especially on narrow mobile
+  // viewports). Aim-at-player offsets also scale to the current arena size.
+  const maxBodyHalf = 0.8;
+  const spawnHalfW = Math.max(0.1, ARENA_W / 2 - maxBodyHalf);
+  const spawnHalfH = Math.max(0.1, ARENA_H / 2 - maxBodyHalf);
+  const aimOffsetX = Math.min(3, spawnHalfW * 1.2);
+  const aimOffsetY = Math.min(2, spawnHalfH * 1.2);
   const aimAtPlayer = Math.random() < 0.35;
   let x: number, y: number;
   if (aimAtPlayer) {
-    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * 6, -ARENA_W / 2, ARENA_W / 2);
-    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * 4, -ARENA_H / 2, ARENA_H / 2);
+    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * aimOffsetX * 2, -spawnHalfW, spawnHalfW);
+    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * aimOffsetY * 2, -spawnHalfH, spawnHalfH);
   } else {
-    x = (Math.random() - 0.5) * ARENA_W;
-    y = (Math.random() - 0.5) * ARENA_H;
+    x = (Math.random() - 0.5) * 2 * spawnHalfW;
+    y = (Math.random() - 0.5) * 2 * spawnHalfH;
   }
 
   const baseSpeed = 9 + difficulty(g) * 4;
@@ -1832,6 +1840,7 @@ class SoundManager {
       stepsPerSection: 16,
       bassType: "sine",
       masterTarget: 0.10,
+      drums: true,
     });
   }
 
@@ -1955,6 +1964,7 @@ class SoundManager {
       stepsPerSection: number;
       bassType: OscillatorType;
       masterTarget: number;
+      drums?: boolean;
     },
   ) {
     if (!this.enabled) return;
@@ -2014,6 +2024,61 @@ class SoundManager {
         harmOsc.connect(harmGain).connect(masterGain);
         harmOsc.start(now);
         harmOsc.stop(now + dur * 0.7);
+      }
+      // Drums — kick every quarter (4-on-the-floor), snare on backbeat, closed hat every 8th
+      if (cfg.drums) {
+        const isQuarter = step % 4 === 0;
+        const isBackbeat = step % 8 === 4;
+        if (isQuarter) {
+          // Kick: sine 130Hz → 40Hz sweep + short click
+          const k = this.ctx.createOscillator();
+          const kg = this.ctx.createGain();
+          k.type = "sine";
+          k.frequency.setValueAtTime(130, now);
+          k.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+          kg.gain.setValueAtTime(0.55, now);
+          kg.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          k.connect(kg).connect(masterGain);
+          k.start(now);
+          k.stop(now + 0.22);
+        }
+        if (isBackbeat) {
+          // Snare: short noise burst + highpass
+          const dur2 = 0.11;
+          const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur2, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < data.length; i++) {
+            data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 10);
+          }
+          const src = this.ctx.createBufferSource();
+          src.buffer = buf;
+          const filt = this.ctx.createBiquadFilter();
+          filt.type = "highpass";
+          filt.frequency.value = 1800;
+          const sg = this.ctx.createGain();
+          sg.gain.setValueAtTime(0.38, now);
+          sg.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          src.connect(filt).connect(sg).connect(masterGain);
+          src.start(now);
+        }
+        // Closed hi-hat every 8th for motion
+        const hatDur = 0.04;
+        const hatBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * hatDur, this.ctx.sampleRate);
+        const hatData = hatBuf.getChannelData(0);
+        for (let i = 0; i < hatData.length; i++) {
+          hatData[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / hatData.length) * 18);
+        }
+        const hatSrc = this.ctx.createBufferSource();
+        hatSrc.buffer = hatBuf;
+        const hatFilt = this.ctx.createBiquadFilter();
+        hatFilt.type = "highpass";
+        hatFilt.frequency.value = 6500;
+        const hatGain = this.ctx.createGain();
+        // Accent off-beats (odd steps) a bit louder for groove
+        hatGain.gain.setValueAtTime(step % 2 === 1 ? 0.14 : 0.08, now);
+        hatGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        hatSrc.connect(hatFilt).connect(hatGain).connect(masterGain);
+        hatSrc.start(now);
       }
       // Bass — quarter notes (every other 8th)
       if (step % 2 === 0) {
