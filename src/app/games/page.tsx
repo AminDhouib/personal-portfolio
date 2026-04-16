@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { GamesClient } from "./games-client";
 
@@ -26,7 +27,9 @@ export default function GamesPage() {
           Mini-games using the same wireframe shapes from this site. Click / tap to play.
         </p>
 
-        <GamesClient />
+        <Suspense fallback={null}>
+          <GamesClient />
+        </Suspense>
       </div>
     </div>
   );

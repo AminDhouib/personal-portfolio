@@ -280,7 +280,7 @@ export function GamesClient() {
               Match 3 hexagon blocks to score points. Rotate hexagon and stack blocks strategically.
             </p>
           </div>
-          <HextrisGame />
+          <HextrisGame key="hextris" />
         </div>
       )}
 

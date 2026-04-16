@@ -8,6 +8,8 @@ import {
   Minimize2,
   ArrowLeftRight,
   Hand,
+  Pause,
+  Play,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════
@@ -544,6 +546,7 @@ export function HextrisGame() {
   if (!soundsRef.current) soundsRef.current = new HextrisSounds();
 
   const restartRef = useRef<() => void>(() => {});
+  const pauseRef = useRef<() => void>(() => {});
 
   // Sync sound enabled state to the manager + persist
   useEffect(() => {
@@ -623,10 +626,17 @@ export function HextrisGame() {
     setShowTutorial(false);
   }
 
-  // Auto-dismiss tutorial as soon as gameplay begins.
+  // Show tutorial DURING the first few seconds of gameplay (the first block
+  // is mostly cosmetic anyway — perfect teaching moment). Hide on menu / pause /
+  // gameover. Auto-fades after ~6s; user can also tap to dismiss earlier.
   useEffect(() => {
-    if (uiState === "playing") setShowTutorial(false);
-    if (uiState === "menu") setShowTutorial(true);
+    if (uiState !== "playing") {
+      setShowTutorial(false);
+      return;
+    }
+    setShowTutorial(true);
+    const t = window.setTimeout(() => setShowTutorial(false), 6500);
+    return () => window.clearTimeout(t);
   }, [uiState]);
 
   // Auto-clear combo milestone overlay after its animation
@@ -763,6 +773,18 @@ export function HextrisGame() {
     let lastSyncedCombo = 1;
     let lastTempoSync = 0;
     const sounds = soundsRef.current;
+
+    // Haptic feedback helper — no-op on desktop / unsupported devices.
+    // We silently swallow failures since some browsers (iOS Safari) throw.
+    function haptic(pattern: number | number[]) {
+      try {
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(pattern);
+        }
+      } catch {
+        /* some browsers throw when not in response to a user gesture */
+      }
+    }
 
     // ─── PARTICLES ──────────────────────────────────────────
     const particles: Particle[] = [];
@@ -981,6 +1003,9 @@ export function HextrisGame() {
         }
       }
       sounds.rotate();
+      haptic(8); // quick click
+      // First rotation = tutorial dismissable signal
+      setShowTutorial(false);
     }
 
     function hexDraw() {
@@ -1380,6 +1405,8 @@ export function HextrisGame() {
       });
       mainHex.lastColorScored = deletedBlocks[0].color;
       score += adder;
+      // Match haptic — stronger for bigger combos
+      haptic(mainHex.comboMultiplier >= 3 ? [30, 20, 30] : [20]);
     }
 
     // ─── FLOATING TEXT ───────────────────────────────────────
@@ -1933,26 +1960,12 @@ export function HextrisGame() {
 
       // Beginning instructions are now rendered in React (device-aware tutorial overlay).
 
-      // Pause overlay
+      // Pause dim: canvas gets dimmed; the card is rendered by React.
       if (gameState === -1) {
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = "rgba(5,5,5,0.95)";
+        ctx.globalAlpha = 0.65;
+        ctx.fillStyle = "rgba(5,5,5,0.9)";
         ctx.fillRect(0, 0, trueCanvas.width, trueCanvas.height);
         ctx.globalAlpha = 1;
-        renderText(
-          trueCanvas.width / 2,
-          trueCanvas.height / 2 - 30 * settings.scale,
-          60,
-          THEME.heading,
-          "PAUSED",
-        );
-        renderText(
-          trueCanvas.width / 2,
-          trueCanvas.height / 2 + 30 * settings.scale,
-          22,
-          THEME.muted,
-          "Press Space to resume",
-        );
       }
 
       // Game over: dim canvas only (the React overlay handles the card)
@@ -2015,6 +2028,7 @@ export function HextrisGame() {
 
         if (checkGameOver()) {
           gameState = 2;
+          haptic([80, 40, 80, 40, 80]); // game-over rumble
           // Game-over music jingle is triggered by the uiState effect
           setUiState("gameover");
           setUiScore(score);
@@ -2085,7 +2099,9 @@ export function HextrisGame() {
     // ─── SCALING ─────────────────────────────────────────────
 
     function scaleCanvas() {
-      const rect = container!.getBoundingClientRect();
+      // ResizeObserver can fire during unmount or rapid tab switches — guard.
+      if (!container || !canvas) return;
+      const rect = container.getBoundingClientRect();
       const w = Math.floor(rect.width);
       // Fullscreen: use available container height directly.
       // Portrait (mobile): prefer near-square canvas to maximize play area.
@@ -2175,8 +2191,9 @@ export function HextrisGame() {
       startGame();
     }
 
-    // Expose restart to the React JSX (for the bottom button)
+    // Expose restart + togglePause to React JSX
     restartRef.current = () => restartGame();
+    pauseRef.current = () => togglePause();
 
     function togglePause() {
       if (gameState === 1) {
@@ -2260,7 +2277,8 @@ export function HextrisGame() {
         clientX = e.clientX;
       }
 
-      const rect = canvas!.getBoundingClientRect();
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
       const mid = rect.left + rect.width / 2;
       if (clientX < mid) {
         hexRotate(1);
@@ -2363,8 +2381,23 @@ export function HextrisGame() {
         )}
       </div>
 
-      {/* Top-right: sound toggle, fullscreen, status badge */}
+      {/* Top-right: pause, sound, fullscreen, status badge */}
       <div className="absolute top-3 right-3 flex items-center gap-2">
+        {(uiState === "playing" || uiState === "paused") && (
+          <button
+            type="button"
+            onClick={() => pauseRef.current()}
+            className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 hover:bg-black/60 px-2 py-1.5 text-white/60 hover:text-white backdrop-blur transition-colors"
+            aria-label={uiState === "paused" ? "Resume" : "Pause"}
+            title={uiState === "paused" ? "Resume" : "Pause"}
+          >
+            {uiState === "paused" ? (
+              <Play className="h-3.5 w-3.5" />
+            ) : (
+              <Pause className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setSoundEnabled((v) => !v)}
@@ -2449,8 +2482,9 @@ export function HextrisGame() {
         )}
       </div>
 
-      {/* Unified tutorial overlay — device-aware, icon-based. Shows on the menu screen only. */}
-      {showTutorial && uiState === "menu" && (
+      {/* Unified tutorial overlay — device-aware, icon-based. Shows DURING
+          the first ~6s of gameplay (the first block is a freebie anyway). */}
+      {showTutorial && uiState === "playing" && (
         <button
           type="button"
           onClick={dismissTutorial}
@@ -2504,6 +2538,33 @@ export function HextrisGame() {
             </span>
           </div>
         </button>
+      )}
+
+      {/* Pause overlay — React card with clickable Resume (mobile-friendly) */}
+      {uiState === "paused" && (
+        <div className="absolute inset-0 flex items-center justify-center px-4 pointer-events-none z-25">
+          <div className="pointer-events-auto rounded-2xl border border-white/10 bg-black/85 backdrop-blur-md px-8 py-6 shadow-2xl hextris-gameover-in text-center">
+            <div className="text-[11px] uppercase tracking-widest text-accent-amber mb-2 font-mono">
+              Paused
+            </div>
+            <div className="font-display text-3xl font-black text-white mb-4">
+              Take a breath
+            </div>
+            <button
+              type="button"
+              onClick={() => pauseRef.current()}
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/10 hover:bg-accent-green/20 px-4 py-2 text-sm font-medium text-accent-green transition-colors"
+            >
+              <Play className="h-4 w-4" />
+              Resume
+            </button>
+            {!isTouchDevice && (
+              <div className="text-[10px] text-white/40 font-mono mt-3">
+                or press Space
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Combo milestone burst */}
