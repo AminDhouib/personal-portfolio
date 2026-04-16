@@ -210,3 +210,28 @@ describe("Tier 1 — palindrome rule", () => {
     expect(rule.validate(makeState("abcdefg", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 1 — word count rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "word-count")!;
+
+  it("target word count is between 2 and 4", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const n = rule.params.n as number;
+      expect(n).toBeGreaterThanOrEqual(2);
+      expect(n).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it("passes with correct word count", () => {
+    const rule = def.create(mulberry32(1));
+    const n = rule.params.n as number;
+    const words = Array.from({ length: n }, (_, i) => `word${i + 1}`).join(" ");
+    expect(rule.validate(makeState(words, rule)).passed).toBe(true);
+  });
+
+  it("fails with wrong word count", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("oneword", rule)).passed).toBe(false);
+  });
+});
