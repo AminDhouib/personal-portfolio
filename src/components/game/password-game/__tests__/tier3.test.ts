@@ -115,3 +115,39 @@ describe("Tier 3 — alternating case rule", () => {
     expect(rule.validate(makeState("aB", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 3 — bold count rule", () => {
+  const def = TIER_3_RULES.find((r) => r.id === "bold-count")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("target n is 3-6", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const n = rule.params.n as number;
+      expect(n).toBeGreaterThanOrEqual(3);
+      expect(n).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("passes when enough chars are bold", () => {
+    const rule = def.create(mulberry32(1));
+    const n = rule.params.n as number;
+    const state: GameState = {
+      password: "xxxxxx",
+      formatting: Array.from({ length: 6 }, (_, i) => (i < n ? { bold: true } : {})),
+      elapsedSeconds: 0,
+      activeRuleIndex: 0,
+      rules: [rule],
+      seed: 1,
+    };
+    expect(rule.validate(state).passed).toBe(true);
+  });
+
+  it("fails when not enough bold", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("hello", rule)).passed).toBe(false);
+  });
+});

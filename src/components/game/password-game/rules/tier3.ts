@@ -1,5 +1,11 @@
-import type { RuleDef } from "../types";
+import type { RuleDef, FormattingMap } from "../types";
 import { rangeInt } from "../prng";
+
+function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
+  let n = 0;
+  for (const f of fmt) if (f[attr]) n++;
+  return n;
+}
 
 const everyNthUpper: RuleDef = {
   id: "every-nth-upper",
@@ -80,4 +86,22 @@ const wordCountStrict: RuleDef = {
   },
 };
 
-export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase];
+const boldCount: RuleDef = {
+  id: "bold-count",
+  tier: 3,
+  create(rng) {
+    const n = rangeInt(rng, 3, 6);
+    return {
+      id: "bold-count",
+      tier: 3,
+      description: `At least ${n} characters of your password must be bold.`,
+      params: { n },
+      validate(state) {
+        const c = countFmt(state.formatting, "bold");
+        return { passed: c >= n, message: `${c} / ${n}` };
+      },
+    };
+  },
+};
+
+export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase, boldCount];
