@@ -3762,6 +3762,36 @@ export function SpaceShooterGame() {
     musicEnabled: true,
     sfxEnabled: true,
   });
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startRecording = useCallback(() => {
+    try {
+      const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+      if (!canvas) return;
+      const stream = canvas.captureStream(30);
+      let mimeType = "video/webm;codecs=vp9";
+      if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        setRecordingBlob(new Blob(chunksRef.current, { type: "video/webm" }));
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingBlob(null);
+    } catch (err) {
+      console.warn("Recording failed to start:", err);
+    }
+  }, []);
+  const stopRecording = useCallback(() => {
+    const r = recorderRef.current;
+    if (r && r.state !== "inactive") r.stop();
+    setIsRecording(false);
+  }, []);
   const [gyroSupported, setGyroSupported] = useState(false);
   const [gyroPermission, setGyroPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   useEffect(() => {
@@ -3910,6 +3940,12 @@ export function SpaceShooterGame() {
     sounds.setMusicEnabled(prefs.musicEnabled);
     sounds.setSfxEnabled(prefs.sfxEnabled);
   }, [prefs.musicEnabled, prefs.sfxEnabled]);
+  // Auto-stop recording when the player dies
+  useEffect(() => {
+    if (ui.status === "dying" && isRecording) {
+      stopRecording();
+    }
+  }, [ui.status, isRecording, stopRecording]);
 
   const env = useMemo(() => envForTime(ui.seconds), [ui.seconds]);
 
@@ -4409,6 +4445,17 @@ export function SpaceShooterGame() {
           )}
         </AnimatePresence>
 
+        {/* Record toggle (armed only) */}
+        {ui.status === "armed" && (
+          <button
+            onClick={() => (isRecording ? stopRecording() : startRecording())}
+            className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-md bg-black/50 border border-white/20 text-xs text-white hover:bg-black/70 z-30"
+            type="button"
+          >
+            <span className={`inline-block w-2 h-2 rounded-full ${isRecording ? "bg-red-500 animate-pulse" : "bg-white/50"}`} />
+            {isRecording ? "Stop" : "Record"}
+          </button>
+        )}
         {/* Settings gear (idle or dead only) */}
         {(ui.status === "armed" || ui.status === "dead") && (
           <button
@@ -4736,6 +4783,23 @@ export function SpaceShooterGame() {
                   >
                     <ShoppingCart className="h-4 w-4" />
                     Shop
+                  </motion.button>
+                )}
+                {recordingBlob && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      const url = URL.createObjectURL(recordingBlob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `orbital-dodge-run-${Date.now()}.webm`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-500/20 border border-blue-400/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-blue-300"
+                  >
+                    Download Replay
                   </motion.button>
                 )}
               </div>
