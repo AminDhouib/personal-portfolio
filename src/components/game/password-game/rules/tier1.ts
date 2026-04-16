@@ -78,4 +78,26 @@ const specialChar: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar];
+const digitSum: RuleDef = {
+  id: "digit-sum",
+  tier: 1,
+  create(rng) {
+    const target = rangeInt(rng, 15, 30);
+    return {
+      id: "digit-sum",
+      tier: 1,
+      description: `The digits in your password must add up to ${target}.`,
+      params: { target },
+      validate(state) {
+        let sum = 0;
+        for (const ch of state.password) {
+          const n = Number(ch);
+          if (Number.isInteger(n) && ch.trim() !== "") sum += n;
+        }
+        return { passed: sum === target, message: `${sum} / ${target}` };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum];

@@ -116,3 +116,30 @@ describe("Tier 1 — special char rule", () => {
     expect(rule.validate(makeState(pw, rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 1 — digit sum rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "digit-sum")!;
+
+  it("target sum is between 15 and 30", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const target = rule.params.target as number;
+      expect(target).toBeGreaterThanOrEqual(15);
+      expect(target).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it("fails when digit sum doesn't match", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("a1b2", rule)).passed).toBe(false);
+  });
+
+  it("passes when digits sum to target", () => {
+    const rule = def.create(mulberry32(1));
+    const target = rule.params.target as number;
+    const nines = Math.floor(target / 9);
+    const remainder = target % 9;
+    const pw = "A!" + "9".repeat(nines) + (remainder > 0 ? remainder.toString() : "");
+    expect(rule.validate(makeState(pw, rule)).passed).toBe(true);
+  });
+});
