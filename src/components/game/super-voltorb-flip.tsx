@@ -4,9 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Shield, Sparkles } from "lucide-react";
 import { useSave } from "./super-voltorb-flip/use-save";
 import { useGame } from "./super-voltorb-flip/use-game";
-import { Board } from "./super-voltorb-flip/GameBoard";
-import { Scoreboard } from "./super-voltorb-flip/Scoreboard";
-import { MemoPanel } from "./super-voltorb-flip/MemoPanel";
+import { DsCanvas } from "./super-voltorb-flip/DsCanvas";
 import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
 import { SettingsMenu } from "./super-voltorb-flip/SettingsMenu";
 import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
@@ -63,7 +61,10 @@ function GameScreen({
   const ensureAudio = useCallback(() => {
     if (typeof window === "undefined") return null;
     if (!audioCtxRef.current) {
-      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const Ctor =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       if (!Ctor) return null;
       audioCtxRef.current = new Ctor();
       bgmRef.current = new BgmPlayer(audioCtxRef.current, save.musicVolume);
@@ -157,7 +158,10 @@ function GameScreen({
       let hasAnimating = false;
       for (const row of state.board) {
         for (const t of row) {
-          if (t.animFrame !== null) { hasAnimating = true; break; }
+          if (t.animFrame !== null) {
+            hasAnimating = true;
+            break;
+          }
         }
         if (hasAnimating) break;
       }
@@ -167,169 +171,158 @@ function GameScreen({
       raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
-    return () => { running = false; cancelAnimationFrame(raf); };
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
   }, [state.board, state.speedMode, dispatch]);
 
+  const handleTileClick = (r: number, c: number) => {
+    ensureAudio();
+    const ctx = audioCtxRef.current;
+    if (state.phase === "memo") {
+      dispatch({ type: "selectMemoTile", row: r, col: c });
+    } else {
+      if (!state.board[r][c].flipped && ctx) {
+        synthStinger(ctx, "tileFlip", save.sfxVolume);
+      }
+      dispatch({ type: "flip", row: r, col: c });
+    }
+  };
+
   return (
-    <div className="w-full mx-auto max-w-xl px-2 sm:px-0">
-    <div
-      className="w-full rounded-xl border border-(--border) overflow-hidden relative"
-      style={{
-        aspectRatio: "4 / 3",
-        minHeight: 420,
-        backgroundImage: THEMES[state.activeTheme].bgUrl,
-        backgroundSize: "cover",
-        imageRendering: "pixelated" as const,
-      }}
-    >
-      <Atmosphere timeOfDay={state.timeOfDay} weather={state.weather} />
-      <div className="absolute top-3 right-3 z-20">
-        <SettingsMenu
-          mode={state.mode}
-          autoMemoEnabled={state.autoMemoEnabled}
-          speedMode={state.speedMode}
-          musicVolume={save.musicVolume}
-          sfxVolume={save.sfxVolume}
-          onToggleAutoMemo={() => dispatch({ type: "toggleAutoMemo" })}
-          onToggleSpeed={() => dispatch({ type: "toggleSpeed" })}
-          onMusicVolume={(v) => updateSave({ musicVolume: v })}
-          onSfxVolume={(v) => updateSave({ sfxVolume: v })}
-        />
-      </div>
-      <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start w-full max-w-2xl">
-          <div className="flex-1 w-full">
-            <Board
-              board={state.board}
-              rowHints={state.rowHints}
-              colHints={state.colHints}
-              onTileClick={(r, c) => {
-                ensureAudio();
-                const ctx = audioCtxRef.current;
-                if (state.phase === "memo") {
-                  dispatch({ type: "selectMemoTile", row: r, col: c });
-                } else {
-                  if (!state.board[r][c].flipped && ctx) {
-                    synthStinger(ctx, "tileFlip", save.sfxVolume);
-                  }
-                  dispatch({ type: "flip", row: r, col: c });
-                }
-              }}
-            />
-          </div>
-          <div className="flex flex-row sm:flex-col gap-3 items-center">
-            <Scoreboard
-              level={state.level}
-              currentCoins={state.currentCoins}
-              totalCoins={state.totalCoins}
-            />
-            <MemoPanel
-              open={state.phase === "memo"}
-              selectedMemos={
-                state.selectedMemoTile
-                  ? state.board[state.selectedMemoTile.row][state.selectedMemoTile.col].memos
-                  : [false, false, false, false]
-              }
-              copyMode={state.memoCopyMode}
-              onToggle={() => dispatch({ type: "toggleMemo" })}
-              onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
-              onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
-            />
-          </div>
+    <div className="w-full mx-auto max-w-3xl px-2 sm:px-0">
+      <div
+        className="w-full rounded-xl border border-(--border) overflow-hidden relative flex items-start justify-center py-6"
+        style={{
+          backgroundImage: THEMES[state.activeTheme].bgUrl,
+          backgroundSize: "cover",
+        }}
+      >
+        <Atmosphere timeOfDay={state.timeOfDay} weather={state.weather} />
+
+        <div className="absolute top-3 right-3 z-20">
+          <SettingsMenu
+            mode={state.mode}
+            autoMemoEnabled={state.autoMemoEnabled}
+            speedMode={state.speedMode}
+            musicVolume={save.musicVolume}
+            sfxVolume={save.sfxVolume}
+            onToggleAutoMemo={() => dispatch({ type: "toggleAutoMemo" })}
+            onToggleSpeed={() => dispatch({ type: "toggleSpeed" })}
+            onMusicVolume={(v) => updateSave({ musicVolume: v })}
+            onSfxVolume={(v) => updateSave({ sfxVolume: v })}
+          />
         </div>
+
+        <DsCanvas
+          state={state}
+          scale={2}
+          onTileClick={handleTileClick}
+          onMemoToggle={() => dispatch({ type: "toggleMemo" })}
+          onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
+          onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
+        />
+
+        {(state.phase === "won" || state.phase === "lost") && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+            <div className="bg-white/95 dark:bg-(--card) rounded-lg p-6 text-center max-w-sm border border-(--border)">
+              <div className="text-xl font-bold mb-2">
+                {state.phase === "won"
+                  ? `Level ${state.level} Cleared!`
+                  : state.shieldedLoss
+                  ? "Shield Absorbed! Coins Saved."
+                  : "Voltorb! Coins Lost."}
+              </div>
+              <div className="text-sm text-(--muted) mb-4">
+                {state.phase === "won"
+                  ? `+${state.currentCoins} coins`
+                  : state.shieldedLoss
+                  ? `Kept ${state.currentCoins} coins`
+                  : ""}
+              </div>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "continue" })}
+                className="px-4 py-2 bg-accent-pink text-white rounded font-medium"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      {(state.phase === "won" || state.phase === "lost") && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-          <div className="bg-white/95 dark:bg-(--card) rounded-lg p-6 text-center max-w-sm border border-(--border)">
-            <div className="text-xl font-bold mb-2">
-              {state.phase === "won"
-                ? `Level ${state.level} Cleared!`
-                : state.shieldedLoss
-                ? "Shield Absorbed! Coins Saved."
-                : "Voltorb! Coins Lost."}
+
+      {state.mode === "super" && (
+        <AbilityBar
+          level={state.level}
+          totalCoins={state.totalCoins}
+          shieldArmed={state.shieldArmed}
+          voltorbRevealsUsed={state.voltorbRevealsUsed}
+          currentCoins={state.currentCoins}
+          onArmShield={() => {
+            ensureAudio();
+            const ctx = audioCtxRef.current;
+            if (ctx) synthStinger(ctx, "shieldAbsorb", save.sfxVolume);
+            dispatch({ type: "armShield" });
+          }}
+          onUseReveal={() => {
+            ensureAudio();
+            const ctx = audioCtxRef.current;
+            if (ctx) synthStinger(ctx, "voltorbReveal", save.sfxVolume);
+            dispatch({ type: "useVoltorbReveal" });
+          }}
+          onCashOut={() => dispatch({ type: "cashOut" })}
+        />
+      )}
+
+      <StatsPanel stats={state.stats} />
+      <ThemeSwitcher
+        unlocked={state.unlockedThemes}
+        active={state.activeTheme}
+        totalCoins={state.totalCoins}
+        onSelect={(id) => dispatch({ type: "unlockTheme", theme: id })}
+      />
+
+      {pendingSubmit !== null && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-(--card) p-6 rounded-lg max-w-sm w-full text-center border border-(--border)">
+            <h4 className="font-bold mb-2">
+              New Personal Best: {pendingSubmit} coins!
+            </h4>
+            <p className="text-(--muted) text-sm mb-4">
+              Submit your score to the leaderboard?
+            </p>
+            <input
+              type="text"
+              maxLength={12}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Your name (optional)"
+              className="w-full px-3 py-2 rounded border border-(--border) bg-(--bg) mb-3"
+            />
+            <div className="flex gap-2 justify-center">
+              <button
+                type="button"
+                onClick={submitScore}
+                className="px-4 py-2 rounded bg-accent-pink text-white font-medium"
+              >
+                Submit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingSubmit(null);
+                  setNameInput("");
+                }}
+                className="px-4 py-2 rounded border border-(--border)"
+              >
+                Skip
+              </button>
             </div>
-            <div className="text-sm text-(--muted) mb-4">
-              {state.phase === "won"
-                ? `+${state.currentCoins} coins`
-                : state.shieldedLoss
-                ? `Kept ${state.currentCoins} coins`
-                : ""}
-            </div>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "continue" })}
-              className="px-4 py-2 bg-accent-pink text-white rounded font-medium"
-            >
-              Continue
-            </button>
           </div>
         </div>
       )}
-    </div>
-    {state.mode === "super" && (
-      <AbilityBar
-        level={state.level}
-        totalCoins={state.totalCoins}
-        shieldArmed={state.shieldArmed}
-        voltorbRevealsUsed={state.voltorbRevealsUsed}
-        currentCoins={state.currentCoins}
-        onArmShield={() => {
-          ensureAudio();
-          const ctx = audioCtxRef.current;
-          if (ctx) synthStinger(ctx, "shieldAbsorb", save.sfxVolume);
-          dispatch({ type: "armShield" });
-        }}
-        onUseReveal={() => {
-          ensureAudio();
-          const ctx = audioCtxRef.current;
-          if (ctx) synthStinger(ctx, "voltorbReveal", save.sfxVolume);
-          dispatch({ type: "useVoltorbReveal" });
-        }}
-        onCashOut={() => dispatch({ type: "cashOut" })}
-      />
-    )}
-    <StatsPanel stats={state.stats} />
-    <ThemeSwitcher
-      unlocked={state.unlockedThemes}
-      active={state.activeTheme}
-      totalCoins={state.totalCoins}
-      onSelect={(id) => dispatch({ type: "unlockTheme", theme: id })}
-    />
-    {pendingSubmit !== null && (
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-        <div className="bg-(--card) p-6 rounded-lg max-w-sm w-full text-center border border-(--border)">
-          <h4 className="font-bold mb-2">New Personal Best: {pendingSubmit} coins!</h4>
-          <p className="text-(--muted) text-sm mb-4">Submit your score to the leaderboard?</p>
-          <input
-            type="text"
-            maxLength={12}
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            placeholder="Your name (optional)"
-            className="w-full px-3 py-2 rounded border border-(--border) bg-(--bg) mb-3"
-          />
-          <div className="flex gap-2 justify-center">
-            <button
-              type="button"
-              onClick={submitScore}
-              className="px-4 py-2 rounded bg-accent-pink text-white font-medium"
-            >
-              Submit
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPendingSubmit(null);
-                setNameInput("");
-              }}
-              className="px-4 py-2 rounded border border-(--border)"
-            >
-              Skip
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </div>
   );
 }
@@ -350,7 +343,10 @@ function ModeSelect({ onPick }: { onPick: (m: GameMode) => void }) {
     >
       <div className="text-center">
         <h3 className="text-2xl font-bold mb-2">Choose your mode</h3>
-        <p className="text-(--muted) text-sm">This choice is permanent. Both modes share stats; leaderboards are separate.</p>
+        <p className="text-(--muted) text-sm">
+          This choice is permanent. Both modes share stats; leaderboards are
+          separate.
+        </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
         <button
