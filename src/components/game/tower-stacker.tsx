@@ -146,6 +146,143 @@ function drawParticles(r: GameRefs, ctx: CanvasRenderingContext2D) {
   }
 }
 
+interface BiomeDef {
+  id: BiomeId;
+  unlockFloor: number;
+  gradient: [string, string];
+  label: string;
+  parallax: ParallaxLayer[];
+}
+
+interface ParallaxLayer {
+  speed: number;
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number, offsetY: number) => void;
+}
+
+function drawClouds(alpha: number, size: number) {
+  return (ctx: CanvasRenderingContext2D, w: number, h: number, oy: number) => {
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * w / 6) + (oy * 0.3) % w + w) % w;
+      const y = ((i * 80 + oy) % h + h) % h;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.arc(x + size * 0.6, y + 10, size * 0.7, 0, Math.PI * 2);
+      ctx.arc(x - size * 0.6, y + 10, size * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+}
+
+function drawStars(count: number) {
+  const seedArr: { x: number; y: number; s: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    const xr = (Math.sin(i * 127.1) * 43758.5453) % 1;
+    const yr = (Math.sin(i * 311.7) * 43758.5453) % 1;
+    seedArr.push({
+      x: xr < 0 ? xr + 1 : xr,
+      y: yr < 0 ? yr + 1 : yr,
+      s: Math.abs((Math.sin(i * 71.3) * 100)) % 2 + 0.5,
+    });
+  }
+  return (ctx: CanvasRenderingContext2D, w: number, h: number, oy: number) => {
+    ctx.fillStyle = "white";
+    for (const s of seedArr) {
+      const x = s.x * w;
+      const y = ((s.y * h + oy * 0.5) % h + h) % h;
+      ctx.fillRect(x, y, s.s, s.s);
+    }
+  };
+}
+
+const BIOMES: BiomeDef[] = [
+  {
+    id: "surface",
+    unlockFloor: 0,
+    gradient: ["#7dd3fc", "#4ade80"],
+    label: "SURFACE",
+    parallax: [
+      { speed: 0.1, draw: (ctx, w, h, oy) => {
+          ctx.fillStyle = "rgba(30,58,138,0.4)";
+          ctx.beginPath();
+          const y = h * 0.65 + oy;
+          ctx.moveTo(0, y);
+          for (let i = 0; i <= 8; i++) ctx.lineTo(i * w / 8, y - 50 + Math.sin(i * 1.7) * 30);
+          ctx.lineTo(w, h); ctx.lineTo(0, h);
+          ctx.fill();
+        } },
+      { speed: 0.3, draw: (ctx, w, h, oy) => {
+          ctx.fillStyle = "rgba(15,23,42,0.7)";
+          const y = h * 0.75 + oy;
+          for (let i = 0; i < 12; i++) {
+            const x = (i * w / 12);
+            const bh = 40 + ((i * 37) % 60);
+            ctx.fillRect(x, y - bh, w / 12 - 4, bh);
+          }
+        } },
+      { speed: 0.6, draw: (ctx, w, h, oy) => {
+          ctx.fillStyle = "#166534";
+          ctx.fillRect(0, h * 0.9 + oy, w, h * 0.1);
+        } },
+    ],
+  },
+  {
+    id: "clouds",
+    unlockFloor: 15,
+    gradient: ["#c7d2fe", "#a5b4fc"],
+    label: "CLOUDS",
+    parallax: [
+      { speed: 0.1, draw: drawClouds(0.4, 40) },
+      { speed: 0.3, draw: drawClouds(0.6, 60) },
+      { speed: 0.6, draw: drawClouds(0.8, 80) },
+    ],
+  },
+  {
+    id: "atmosphere",
+    unlockFloor: 35,
+    gradient: ["#4c1d95", "#1e1b4b"],
+    label: "ATMOSPHERE",
+    parallax: [
+      { speed: 0.1, draw: (ctx, w, h, oy) => {
+          ctx.strokeStyle = "rgba(56,189,248,0.3)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(w / 2, h + 800 + oy, 900, 0, Math.PI * 2);
+          ctx.stroke();
+        } },
+      { speed: 0.3, draw: drawStars(40) },
+      { speed: 0.6, draw: drawStars(20) },
+    ],
+  },
+  {
+    id: "space",
+    unlockFloor: 60,
+    gradient: ["#0c0a1e", "#1e0a2e"],
+    label: "SPACE",
+    parallax: [
+      { speed: 0.1, draw: drawStars(120) },
+      { speed: 0.3, draw: drawStars(60) },
+      { speed: 0.6, draw: drawStars(30) },
+    ],
+  },
+  {
+    id: "void",
+    unlockFloor: 90,
+    gradient: ["#000000", "#0a0014"],
+    label: "VOID",
+    parallax: [
+      { speed: 0.1, draw: (ctx, w, h, oy) => {
+          const grd = ctx.createRadialGradient(w / 2, h / 2 + oy, 0, w / 2, h / 2 + oy, w);
+          grd.addColorStop(0, "rgba(168,85,247,0.3)");
+          grd.addColorStop(1, "transparent");
+          ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+        } },
+      { speed: 0.3, draw: drawStars(80) },
+      { speed: 0.6, draw: drawStars(40) },
+    ],
+  },
+];
+
 const BASE_BLOCK_HEIGHT = 28;
 const BASE_BLOCK_WIDTH_PX = 220;
 const BASE_BLOCK_SPEED = 260;
@@ -485,11 +622,17 @@ export default function TowerStacker() {
       r.lastFrame = now;
 
       const { w, h } = viewportRef.current;
+      // biome transition crossfade is added in Task 10
+      const biome = BIOMES[r.biomeIdx];
       const grad = ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, "#0b1220");
-      grad.addColorStop(1, "#1f2937");
+      grad.addColorStop(0, biome.gradient[0]);
+      grad.addColorStop(1, biome.gradient[1]);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
+
+      for (const layer of biome.parallax) {
+        layer.draw(ctx, w, h, -r.cameraY * layer.speed);
+      }
 
       // update active block
       if (r.state === "playing" && r.activeBlock) {
