@@ -4176,6 +4176,26 @@ export function SpaceShooterGame() {
     addRunStats({ asteroidsDestroyed: g.kills, distance: Math.floor(g.distance) });
     incrementRunsPlayed();
     markFirstRunCompleted();
+    // Update mission progress using this run's stats (max-of so multi-run peaks count)
+    try {
+      const p = loadProfile();
+      const seconds = Math.floor(((g.dyingAt || performance.now()) - g.startedAt) / 1000);
+      for (const m of p.missionsToday) {
+        if (m.claimed) continue;
+        // Bump by the greater of existing progress and this run's stat
+        const nextVal =
+          m.id === "kill-20-heavies" ? Math.max(m.progress, g.kills)
+          : m.id === "kill-50" ? Math.max(m.progress, g.kills)
+          : m.id === "reach-2km" ? Math.max(m.progress, Math.floor(g.distance))
+          : m.id === "reach-5km" ? Math.max(m.progress, Math.floor(g.distance))
+          : m.id === "score-5k" ? Math.max(m.progress, Math.floor(g.score))
+          : m.id === "score-10k" ? Math.max(m.progress, Math.floor(g.score))
+          : m.id === "survive-180-clean" ? Math.max(m.progress, seconds)
+          : m.progress;
+        m.progress = nextVal;
+      }
+      saveProfile(p);
+    } catch { /* noop */ }
     const final = Math.floor(g.score * g.scoreMultiplier);
     // Compare against the current state value synchronously so the celebration
     // flag is correct in the same render cycle.
