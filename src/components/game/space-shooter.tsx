@@ -3959,7 +3959,7 @@ export function SpaceShooterGame() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
-  const [shopTab, setShopTab] = useState<"upgrades" | "consumables" | "ships" | "cosmetics" | "missions">("upgrades");
+  const [shopTab, setShopTab] = useState<"upgrades" | "consumables" | "ships" | "cosmetics" | "missions" | "achievements">("upgrades");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefs, setPrefs] = useState({
     reducedMotion: false,
@@ -4624,7 +4624,7 @@ export function SpaceShooterGame() {
                   </div>
                   {/* Tabs row */}
                   <div className="flex items-center gap-1 mb-3 max-w-3xl mx-auto w-full overflow-x-auto">
-                    {(["upgrades", "consumables", "ships", "cosmetics", "missions"] as const).map((t) => (
+                    {(["upgrades", "consumables", "ships", "cosmetics", "missions", "achievements"] as const).map((t) => (
                       <button
                         key={t}
                         type="button"
@@ -4856,6 +4856,41 @@ export function SpaceShooterGame() {
                   )}
                   {shopTab === "missions" && (
                     <MissionsPanel refreshProfile={refreshProfile} />
+                  )}
+                  {shopTab === "achievements" && (
+                    <div className="flex flex-col gap-2 max-w-3xl mx-auto w-full">
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-white/50 font-bold">
+                        {profile.unlockedAchievements.length} / {ACHIEVEMENTS.length} unlocked
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {ACHIEVEMENTS.map((a) => {
+                          const owned = profile.unlockedAchievements.includes(a.id);
+                          return (
+                            <div
+                              key={a.id}
+                              className={`flex items-start gap-3 rounded-lg border p-3 ${
+                                owned ? "border-amber-500/50 bg-amber-900/20" : "border-white/10 bg-white/5 opacity-70"
+                              }`}
+                            >
+                              <div className={`flex items-center justify-center w-9 h-9 rounded font-black text-xs shrink-0 ${
+                                owned ? "bg-amber-400 text-amber-900" : "bg-slate-700 text-slate-500"
+                              }`}>
+                                {a.icon}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`font-bold text-sm ${owned ? "text-white" : "text-slate-400"}`}>
+                                  {a.name}
+                                </div>
+                                <div className="text-xs text-slate-400">{a.description}</div>
+                                {a.unlocksCosmeticId && owned && (
+                                  <div className="text-[10px] text-emerald-400 mt-1">Unlocked cosmetic: {a.unlocksCosmeticId}</div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </motion.div>
               )}
