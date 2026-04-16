@@ -498,6 +498,18 @@ export default function TowerStacker() {
       }, 1500);
     }
 
+    const floorsCount = r.floors.length - 1;
+    for (let i = BIOME_ORDER.length - 1; i > r.biomeIdx; i--) {
+      const b = BIOMES[i];
+      if (floorsCount >= b.unlockFloor) {
+        r.biomeIdx = i;
+        r.biomeTransition = 0;
+        r.bannerText = `${b.label} REACHED`;
+        r.bannerTime = 2.0;
+        break;
+      }
+    }
+
     r.runRecord.floors.push({
       floorIndex: r.floors.length - 1, x: newX, width: newWidth,
       timeMs: performance.now() - r.runStartMs,
@@ -622,13 +634,25 @@ export default function TowerStacker() {
       r.lastFrame = now;
 
       const { w, h } = viewportRef.current;
-      // biome transition crossfade is added in Task 10
       const biome = BIOMES[r.biomeIdx];
+      if (r.biomeTransition < 1 && r.biomeIdx > 0) {
+        const prevB = BIOMES[r.biomeIdx - 1];
+        const prevGrad = ctx.createLinearGradient(0, 0, 0, h);
+        prevGrad.addColorStop(0, prevB.gradient[0]);
+        prevGrad.addColorStop(1, prevB.gradient[1]);
+        ctx.fillStyle = prevGrad;
+        ctx.fillRect(0, 0, w, h);
+        ctx.save();
+        ctx.globalAlpha = r.biomeTransition;
+      }
       const grad = ctx.createLinearGradient(0, 0, 0, h);
       grad.addColorStop(0, biome.gradient[0]);
       grad.addColorStop(1, biome.gradient[1]);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
+      if (r.biomeTransition < 1 && r.biomeIdx > 0) {
+        ctx.restore();
+      }
 
       for (const layer of biome.parallax) {
         layer.draw(ctx, w, h, -r.cameraY * layer.speed);
@@ -647,6 +671,9 @@ export default function TowerStacker() {
       // camera lerp
       r.cameraY += (r.cameraTargetY - r.cameraY) * Math.min(1, dt * 6);
       r.cameraScale += (r.cameraTargetScale - r.cameraScale) * Math.min(1, dt * 4);
+
+      r.biomeTransition = Math.min(1, r.biomeTransition + dt / 1.2);
+      if (r.bannerTime > 0) r.bannerTime = Math.max(0, r.bannerTime - dt);
 
       ctx.save();
       const shakeX = r.shake > 0 ? (Math.random() - 0.5) * r.shake * 20 : 0;
@@ -672,6 +699,20 @@ export default function TowerStacker() {
       }
 
       ctx.restore();
+
+      if (r.bannerTime > 0) {
+        const alpha = Math.min(1, r.bannerTime / 0.4);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, 60, w, 56);
+        ctx.fillStyle = "white";
+        ctx.font = "700 24px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(r.bannerText, w / 2, 96);
+        ctx.textAlign = "start";
+        ctx.restore();
+      }
 
       rafId = requestAnimationFrame(frame);
     };
