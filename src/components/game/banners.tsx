@@ -258,28 +258,32 @@ function HextrisBanner() {
   ];
 
   // Stack radii from center: slot 0 = innermost (first to land), slot 2 =
-  // outermost. The inner hex faces sit at radius ~16; each block is ~8 units
-  // tall in the 120-unit viewBox space, so slots step by ~8.5.
-  const SLOT_R = [16, 24.5, 33];
-  const START_R = 58; // just outside the outer hex — spawn point
-  const BLOCK_W = 20;
-  const BLOCK_H = 8;
+  // outermost. The inner hex face sits at radius ~14; a block sits "on" the
+  // face (outside the inner hex), so slot 0 centers at ~20, stepping by the
+  // block height (~8) for each outer slot.
+  const SLOT_R = [20, 28, 36];
+  const START_R = 62; // past the outer hex boundary
+  const BLOCK_W = 22;
+  const BLOCK_H = 7;
 
   // Normalized (0-1) keyframe times within one CYCLE:
-  //   stage 0: off-screen / waiting
-  //   stage 1: block N released
-  //   stage 2: block N landed
-  //   stage 3: rest (all three present)
-  //   stage 4: match flash — scale up
-  //   stage 5: clear — opacity 0
-  //   stage 6: loop boundary
-  const t_release = [0.00, 0.16, 0.32]; // per slot
+  //   0: waiting (pre-release)   release → fall begins
+  //   landed: block rests on its slot
+  //   match: hold
+  //   pop: face clears, scale spike
+  //   clear: opacity 0
+  //   1: loop boundary
+  const t_release = [0.00, 0.16, 0.32];
   const t_landed = [0.10, 0.26, 0.42];
   const t_match = 0.70;
   const t_pop = 0.74;
   const t_clear = 0.80;
 
-  // Render one falling-match-clear block
+  // All animated geometry lives inside the same SVG viewBox so a block's
+  // position is expressed in viewBox units — aspect-ratio-invariant. The
+  // rect inside each <motion.g> keeps a fixed rotate() matching its face
+  // tangent while framer-motion drives translate/opacity/scale via CSS
+  // transform on the group.
   const renderBlock = (
     angleDeg: number,
     slot: number,
@@ -290,27 +294,17 @@ function HextrisBanner() {
     const rad = (angleDeg * Math.PI) / 180;
     const ux = Math.cos(rad);
     const uy = Math.sin(rad);
-    const landX = 50 + ((ux * SLOT_R[slot]) / 120) * 100;
-    const landY = 50 + ((uy * SLOT_R[slot]) / 120) * 100;
-    const startX = 50 + ((ux * START_R) / 120) * 100;
-    const startY = 50 + ((uy * START_R) / 120) * 100;
+    const landX = ux * SLOT_R[slot];
+    const landY = uy * SLOT_R[slot];
+    const startX = ux * START_R;
+    const startY = uy * START_R;
 
     return (
-      <motion.div
+      <motion.g
         key={key}
-        className="absolute rounded-sm"
-        style={{
-          width: `${(BLOCK_W / 120) * 100}%`,
-          aspectRatio: `${BLOCK_W} / ${BLOCK_H}`,
-          marginLeft: `${(-BLOCK_W / 2 / 120) * 100}%`,
-          marginTop: `${(-BLOCK_H / 2 / 120) * 100}%`,
-          background: color,
-          boxShadow: `0 0 10px ${color}aa, inset 0 0 0 1px rgba(255,255,255,0.25)`,
-          rotate: `${angleDeg + 90}deg`,
-        }}
         animate={{
-          left: [`${startX}%`, `${startX}%`, `${landX}%`, `${landX}%`, `${landX}%`, `${landX}%`, `${startX}%`],
-          top: [`${startY}%`, `${startY}%`, `${landY}%`, `${landY}%`, `${landY}%`, `${landY}%`, `${startY}%`],
+          x: [startX, startX, landX, landX, landX, landX, startX],
+          y: [startY, startY, landY, landY, landY, landY, startY],
           opacity: [0, 0, 1, 1, 1, 0, 0],
           scale: [1, 1, 1, 1, 1.25, 0.4, 1],
         }}
@@ -321,7 +315,29 @@ function HextrisBanner() {
           ease: "linear",
           times: [0, t_release[slot], t_landed[slot], t_match, t_pop, t_clear, 1],
         }}
-      />
+      >
+        <rect
+          x={-BLOCK_W / 2}
+          y={-BLOCK_H / 2}
+          width={BLOCK_W}
+          height={BLOCK_H}
+          rx={0.8}
+          fill={color}
+          transform={`rotate(${angleDeg + 90})`}
+          style={{ filter: `drop-shadow(0 0 3px ${color})` }}
+        />
+        <rect
+          x={-BLOCK_W / 2}
+          y={-BLOCK_H / 2}
+          width={BLOCK_W}
+          height={BLOCK_H}
+          rx={0.8}
+          fill="none"
+          stroke="rgba(255,255,255,0.25)"
+          strokeWidth={0.4}
+          transform={`rotate(${angleDeg + 90})`}
+        />
+      </motion.g>
     );
   };
 
@@ -334,75 +350,95 @@ function HextrisBanner() {
           background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 55%, #050505 100%)",
         }}
       />
-      {/* Outer hex boundary + inner score hex — static so the player's eye
-          reads the falling blocks as the moving element. */}
       <svg
         viewBox="-60 -60 120 120"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] h-[85%]"
+        className="absolute inset-0 w-full h-full"
         preserveAspectRatio="xMidYMid meet"
       >
+        {/* Outer hex boundary — vertex-up orientation (flat top & bottom
+            edges). Stroked so the whole card reads as the Hextris board. */}
         <polygon
-          points="0,-52 45,-26 45,26 0,52 -45,26 -45,-26"
+          points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23"
           fill="rgba(255,255,255,0.02)"
           stroke="rgba(255,255,255,0.14)"
-          strokeWidth="1.2"
+          strokeWidth={1}
         />
+        {/* Inner score hex */}
         <polygon
           points="0,-14 12,-7 12,7 0,14 -12,7 -12,-7"
           fill="#111114"
           stroke="rgba(255,255,255,0.1)"
-          strokeWidth="0.5"
+          strokeWidth={0.5}
         />
+        {/* Three faces running the full match-and-clear cycle */}
+        {faces.flatMap((f) =>
+          [0, 1, 2].map((slot) =>
+            renderBlock(f.angleDeg, slot, f.color, f.delay, `${f.angleDeg}-${slot}`),
+          ),
+        )}
+        {/* Non-matching filler blocks on other faces (slot 0, static) so
+            the hex never looks half-empty between clears. */}
+        {fillers.map((f) => {
+          const rad = (f.angleDeg * Math.PI) / 180;
+          const cx = Math.cos(rad) * SLOT_R[0];
+          const cy = Math.sin(rad) * SLOT_R[0];
+          return (
+            <g key={`filler-${f.angleDeg}`} transform={`translate(${cx} ${cy})`} opacity={0.85}>
+              <rect
+                x={-BLOCK_W / 2}
+                y={-BLOCK_H / 2}
+                width={BLOCK_W}
+                height={BLOCK_H}
+                rx={0.8}
+                fill={f.color}
+                transform={`rotate(${f.angleDeg + 90})`}
+                style={{ filter: `drop-shadow(0 0 2.5px ${f.color})` }}
+              />
+              <rect
+                x={-BLOCK_W / 2}
+                y={-BLOCK_H / 2}
+                width={BLOCK_W}
+                height={BLOCK_H}
+                rx={0.8}
+                fill="none"
+                stroke="rgba(255,255,255,0.2)"
+                strokeWidth={0.4}
+                transform={`rotate(${f.angleDeg + 90})`}
+              />
+            </g>
+          );
+        })}
+        {/* Score pop — "+9" that appears centered on the cleared face, rises
+            toward center. Positioned in viewBox units so it stays aligned. */}
+        {faces.map((f) => {
+          const rad = (f.angleDeg * Math.PI) / 180;
+          const popX = Math.cos(rad) * 8;
+          const popY = Math.sin(rad) * 8;
+          return (
+            <motion.text
+              key={`pop-${f.angleDeg}`}
+              x={popX}
+              y={popY}
+              textAnchor="middle"
+              fontFamily="ui-monospace, monospace"
+              fontSize={7}
+              fontWeight={700}
+              fill={f.color}
+              style={{ filter: `drop-shadow(0 0 3px ${f.color})` }}
+              animate={{ opacity: [0, 0, 1, 0], scale: [0.6, 0.6, 1.2, 1] }}
+              transition={{
+                duration: CYCLE,
+                repeat: Infinity,
+                delay: f.delay,
+                ease: "easeOut",
+                times: [0, t_pop - 0.01, t_pop + 0.02, t_clear + 0.05],
+              }}
+            >
+              +9
+            </motion.text>
+          );
+        })}
       </svg>
-      {/* Three matching faces — each runs the full stack-and-clear cycle */}
-      {faces.flatMap((f) =>
-        [0, 1, 2].map((slot) =>
-          renderBlock(f.angleDeg, slot, f.color, f.delay, `${f.angleDeg}-${slot}`),
-        ),
-      )}
-      {/* Non-matching filler blocks on other faces (slot 0 only, never clear) */}
-      {fillers.map((f) => {
-        const rad = (f.angleDeg * Math.PI) / 180;
-        const x = 50 + ((Math.cos(rad) * SLOT_R[0]) / 120) * 100;
-        const y = 50 + ((Math.sin(rad) * SLOT_R[0]) / 120) * 100;
-        return (
-          <div
-            key={`filler-${f.angleDeg}`}
-            className="absolute rounded-sm"
-            style={{
-              left: `${x}%`,
-              top: `${y}%`,
-              width: `${(BLOCK_W / 120) * 100}%`,
-              aspectRatio: `${BLOCK_W} / ${BLOCK_H}`,
-              marginLeft: `${(-BLOCK_W / 2 / 120) * 100}%`,
-              marginTop: `${(-BLOCK_H / 2 / 120) * 100}%`,
-              background: f.color,
-              boxShadow: `0 0 8px ${f.color}88, inset 0 0 0 1px rgba(255,255,255,0.2)`,
-              rotate: `${f.angleDeg + 90}deg`,
-              opacity: 0.85,
-            }}
-          />
-        );
-      })}
-      {/* Score pop — matches the "+9" combo indicator that flashes when a
-          face clears. Timed to each face's clear moment. */}
-      {faces.map((f) => (
-        <motion.div
-          key={`pop-${f.angleDeg}`}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-xs font-bold"
-          style={{ color: f.color, textShadow: `0 0 8px ${f.color}aa` }}
-          animate={{ opacity: [0, 0, 1, 0], y: [0, 0, -18, -30], scale: [0.8, 0.8, 1.2, 1] }}
-          transition={{
-            duration: CYCLE,
-            repeat: Infinity,
-            delay: f.delay,
-            ease: "easeOut",
-            times: [0, t_pop - 0.01, t_pop + 0.02, t_clear + 0.05],
-          }}
-        >
-          +9
-        </motion.div>
-      ))}
     </div>
   );
 }
