@@ -23,7 +23,45 @@ export function CracksOverlay() {
       <div className="pg-chip pg-chip-3" data-chaos-min="5">
         <ChipShape flipX={false} flipY={false} />
       </div>
+      <FloatingDebris />
     </>
+  );
+}
+
+/**
+ * A cluster of small particles that drift slowly across the container.
+ * Visible only at high chaos levels via CSS opacity toggles. Each particle
+ * is an SVG rect with its own randomized drift animation (offset by delay).
+ */
+function FloatingDebris() {
+  // Pre-compute particle positions so the React tree is stable across renders.
+  // Deterministic by using a simple seed.
+  const particles = Array.from({ length: 14 }, (_, i) => {
+    const seed = i * 0.618;
+    const left = (seed * 100) % 100;
+    const top = ((seed * 73) % 100);
+    const delay = (i * 0.7) % 6;
+    const duration = 6 + ((i * 1.3) % 5);
+    const size = 1.5 + ((i * 0.4) % 2);
+    return { left, top, delay, duration, size, i };
+  });
+  return (
+    <div className="pg-debris-field" aria-hidden>
+      {particles.map((p) => (
+        <span
+          key={p.i}
+          className="pg-debris"
+          style={{
+            left: `${p.left}%`,
+            top: `${p.top}%`,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 

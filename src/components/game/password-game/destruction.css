@@ -17,9 +17,44 @@
 
 /* Level 1-2: pristine. No effects beyond baseline. */
 
-/* Level 3: hairline fractures, no hue shift. */
+/* Level 3: hairline fractures, no hue shift. Faint scanlines kick in. */
 .pg-chaos-root[data-chaos="3"] {
   animation: pg-drift 14s ease-in-out infinite;
+}
+
+/* Scanlines overlay — thin horizontal lines that subtly drift vertically,
+   layered on top of the container via a pseudo element on .pg-chaos-root. */
+.pg-chaos-root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0) 2px,
+    rgba(255, 255, 255, 0.035) 2px,
+    rgba(255, 255, 255, 0.035) 3px
+  );
+  opacity: 0;
+  transition: opacity 1s ease-out;
+  z-index: 4;
+  mix-blend-mode: overlay;
+}
+
+.pg-chaos-root[data-chaos="3"]::after { opacity: 0.5; }
+.pg-chaos-root[data-chaos="4"]::after {
+  opacity: 0.75;
+  animation: pg-scanline-drift 8s linear infinite;
+}
+.pg-chaos-root[data-chaos="5"]::after {
+  opacity: 1;
+  animation: pg-scanline-drift 5s linear infinite;
+}
+
+@keyframes pg-scanline-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 3px; }
 }
 
 /* Level 4: structural damage, very slight desaturation. */
@@ -32,6 +67,57 @@
 .pg-chaos-root[data-chaos="5"] {
   --pg-saturate: 0.88;
   animation: pg-drift 6s ease-in-out infinite, pg-flicker 9s steps(1) infinite;
+}
+
+/* Horizontal glitch bands — the container occasionally splits into slivers
+   that slide laterally. Uses ::before pseudo-element that displays the same
+   content via clip-path. Kicks in at chaos 4+. */
+.pg-chaos-root[data-chaos="4"] .pg-container,
+.pg-chaos-root[data-chaos="5"] .pg-container {
+  position: relative;
+}
+
+.pg-chaos-root[data-chaos="4"] .pg-container::before,
+.pg-chaos-root[data-chaos="5"] .pg-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  z-index: 4;
+  animation: pg-glitch-slice 7s steps(1) infinite;
+  opacity: 0;
+}
+
+.pg-chaos-root[data-chaos="5"] .pg-container::before {
+  animation-duration: 4.2s;
+}
+
+@keyframes pg-glitch-slice {
+  0%, 96%, 100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+  97% {
+    opacity: 0.5;
+    clip-path: inset(18% 0 70% 0);
+    transform: translateX(6px);
+    background: rgba(255, 0, 60, 0.08);
+  }
+  98% {
+    opacity: 0.6;
+    clip-path: inset(55% 0 25% 0);
+    transform: translateX(-10px);
+    background: rgba(0, 220, 255, 0.1);
+  }
+  99% {
+    opacity: 0.4;
+    clip-path: inset(78% 0 8% 0);
+    transform: translateX(4px);
+    background: rgba(255, 255, 255, 0.06);
+  }
 }
 
 @keyframes pg-drift {
@@ -59,16 +145,43 @@
   50% { transform: translate(0.5px, -0.5px) rotate(-0.15deg); }
 }
 
-/* Text glitch overlay for level 5 on rule descriptions */
-.pg-chaos-root[data-chaos="5"] .pg-rule-description {
-  position: relative;
-  animation: pg-glitch-color 4s steps(1) infinite;
+/* Chromatic aberration on text — constant at high chaos levels. */
+.pg-chaos-root[data-chaos="4"] .pg-rule-description {
+  text-shadow:
+    -0.5px 0 rgba(255, 0, 60, 0.6),
+    0.5px 0 rgba(0, 220, 255, 0.6);
 }
 
-@keyframes pg-glitch-color {
-  0%, 97%, 100% { text-shadow: none; }
-  98% { text-shadow: 1px 0 #ff003c, -1px 0 #00f0ff; }
-  99% { text-shadow: -1px 0 #ff003c, 1px 0 #00f0ff; }
+.pg-chaos-root[data-chaos="5"] .pg-rule-description {
+  text-shadow:
+    -1.2px 0 rgba(255, 0, 60, 0.75),
+    1.2px 0 rgba(0, 220, 255, 0.75);
+  animation: pg-glitch-pulse 3.1s steps(1) infinite;
+}
+
+@keyframes pg-glitch-pulse {
+  0%, 95%, 100% {
+    text-shadow:
+      -1.2px 0 rgba(255, 0, 60, 0.75),
+      1.2px 0 rgba(0, 220, 255, 0.75);
+  }
+  96% {
+    text-shadow:
+      -3px 0 rgba(255, 0, 60, 0.9),
+      3px 0 rgba(0, 220, 255, 0.9);
+    transform: translateX(1px);
+  }
+  97% {
+    text-shadow:
+      2px 0 rgba(255, 0, 60, 0.95),
+      -2px 0 rgba(0, 220, 255, 0.95);
+    transform: translateX(-1px);
+  }
+  98% {
+    text-shadow:
+      -3px 0 rgba(255, 0, 60, 0.9),
+      3px 0 rgba(0, 220, 255, 0.9);
+  }
 }
 
 /*
@@ -132,6 +245,41 @@
   transform: scale(1);
 }
 
+/* Floating debris — tiny specks that drift. Hidden until chaos >= 3. */
+.pg-debris-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 900ms ease-out;
+  overflow: hidden;
+}
+
+.pg-chaos-root[data-chaos="3"] .pg-debris-field { opacity: 0.35; }
+.pg-chaos-root[data-chaos="4"] .pg-debris-field { opacity: 0.55; }
+.pg-chaos-root[data-chaos="5"] .pg-debris-field { opacity: 0.8; }
+
+.pg-debris {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 1px;
+  animation: pg-debris-drift 8s linear infinite;
+}
+
+@keyframes pg-debris-drift {
+  0% {
+    transform: translate(0, 0) rotate(0);
+    opacity: 0;
+  }
+  10% { opacity: 0.9; }
+  90% { opacity: 0.9; }
+  100% {
+    transform: translate(22px, 40px) rotate(180deg);
+    opacity: 0;
+  }
+}
+
 /* Flash + scale-in animation when a chip first appears. */
 @keyframes pg-chip-appear {
   0% {
@@ -190,6 +338,32 @@
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),
     0 0 0 1px rgba(255, 255, 255, 0.03);
+  animation: pg-heartbeat 2.4s ease-in-out infinite;
+}
+
+/* Slow heartbeat — very subtle scale pulse. Unsettling without being
+   distracting; like the UI is breathing. */
+@keyframes pg-heartbeat {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  8% {
+    transform: scale(1.003);
+    filter: brightness(1.04);
+  }
+  16% {
+    transform: scale(0.999);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.002);
+    filter: brightness(1.02);
+  }
+  45%, 65% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 
 /* Tier 5 rule-specific hazards. Applied by adding a data attribute to the input wrapper. */

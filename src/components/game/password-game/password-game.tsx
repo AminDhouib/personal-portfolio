@@ -267,6 +267,7 @@ export function PasswordGame() {
               result={visibleResults[i]}
               index={i}
               isActive={i === activeIdx}
+              chaos={chaosLevel}
             />
           </div>
         ))}

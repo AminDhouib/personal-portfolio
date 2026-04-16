@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Rule, ValidationResult } from "./types";
 import { CheckCircle, XCircle } from "lucide-react";
 
@@ -8,9 +9,10 @@ interface Props {
   result: ValidationResult;
   index: number;
   isActive: boolean;
+  chaos?: number;
 }
 
-export function RuleCard({ rule, result, index, isActive }: Props) {
+export function RuleCard({ rule, result, index, isActive, chaos = 0 }: Props) {
   const passed = result.passed;
   return (
     <div
@@ -33,7 +35,7 @@ export function RuleCard({ rule, result, index, isActive }: Props) {
         <div className="min-w-0 flex-1">
           <div className="text-xs text-(--muted) mb-1">Rule {index + 1}</div>
           <div className={`pg-rule-description text-sm ${passed ? "text-(--muted) line-through" : "text-(--foreground)"}`}>
-            <RuleDescription text={rule.description} />
+            <RuleDescription text={rule.description} chaos={chaos} />
           </div>
           {result.message && !passed && (
             <div className="mt-1 text-xs text-accent-amber">{result.message}</div>
@@ -44,19 +46,54 @@ export function RuleCard({ rule, result, index, isActive }: Props) {
   );
 }
 
-function RuleDescription({ text }: { text: string }) {
+function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const idx = text.indexOf("\n\n");
   if (idx === -1) {
-    return <span>{text}</span>;
+    return <GlitchText text={text} chaos={chaos} />;
   }
   const prose = text.slice(0, idx);
   const code = text.slice(idx + 2);
   return (
     <>
-      <span>{prose}</span>
+      <GlitchText text={prose} chaos={chaos} />
       <pre className="mt-2 rounded-md bg-(--background) border border-(--border) p-3 text-xs font-mono overflow-x-auto whitespace-pre text-(--foreground)">
         {code}
       </pre>
     </>
   );
+}
+
+/**
+ * Renders text that occasionally corrupts a random character to a glitch
+ * glyph. Corruption frequency and duration scale with chaos level; at chaos
+ * < 4 nothing happens. Corrupted chars flash back to normal after ~80ms.
+ */
+const GLITCH_GLYPHS = "▓▒░█▄▀■▪◆◇◈◊⚠⚡✦✧∎⋈⧖⨯⊗⊘∷";
+
+function GlitchText({ text, chaos }: { text: string; chaos: number }) {
+  const [display, setDisplay] = useState(text);
+
+  useEffect(() => {
+    // Reset when text or chaos changes.
+    setDisplay(text);
+    if (chaos < 4) return;
+    const tickMs = chaos >= 5 ? 1200 : 2600;
+    const id = window.setInterval(() => {
+      if (text.length === 0) return;
+      // Replace 1-2 random characters with glitch glyphs briefly.
+      const count = chaos >= 5 ? 2 : 1;
+      const chars = [...text];
+      for (let i = 0; i < count; i++) {
+        const pos = Math.floor(Math.random() * chars.length);
+        if (chars[pos] !== " " && chars[pos] !== "\n") {
+          chars[pos] = GLITCH_GLYPHS[Math.floor(Math.random() * GLITCH_GLYPHS.length)];
+        }
+      }
+      setDisplay(chars.join(""));
+      window.setTimeout(() => setDisplay(text), 90);
+    }, tickMs);
+    return () => window.clearInterval(id);
+  }, [text, chaos]);
+
+  return <span>{display}</span>;
 }
