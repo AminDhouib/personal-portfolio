@@ -1345,6 +1345,8 @@ type SoundType = "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff"
 class SoundManager {
   private ctx: AudioContext | null = null;
   private enabled = false;
+  private sfxEnabled = true;
+  private musicEnabled = true;
   private lastPlay: Record<SoundType, number> = {
     laser: 0, boom: 0, chime: 0, crash: 0, shieldOn: 0, shieldOff: 0, warp: 0,
   };
@@ -1384,8 +1386,14 @@ class SoundManager {
     }
   }
 
+  setSfxEnabled(v: boolean) { this.sfxEnabled = v; }
+  setMusicEnabled(v: boolean) {
+    this.musicEnabled = v;
+    if (!v) this.stopMusic(0.2);
+  }
+
   play(type: SoundType) {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.sfxEnabled) return;
     this.ensure();
     if (!this.ctx) return;
     // throttle laser to avoid clipping when rapid-fire
@@ -1405,7 +1413,7 @@ class SoundManager {
 
   // Low triangle pulse during boss fights — driven from runTick every ~700ms.
   bossPulse() {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.musicEnabled) return;
     this.ensure();
     if (!this.ctx) return;
     const ctx = this.ctx;
@@ -1689,6 +1697,7 @@ class SoundManager {
   private dronePad: { osc1: OscillatorNode; osc2: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
 
   startGameplayMusic() {
+    if (!this.musicEnabled) return;
     this.startMusicLoop("gameplay", {
       bpm: 130,
       sections: SoundManager.GAMEPLAY_SECTIONS,
@@ -1699,6 +1708,7 @@ class SoundManager {
   }
 
   startLeaderboardMusic() {
+    if (!this.musicEnabled) return;
     this.startMusicLoop("leaderboard", {
       bpm: 84,
       sections: SoundManager.LEADERBOARD_SECTIONS,
@@ -3849,6 +3859,11 @@ export function SpaceShooterGame() {
   useEffect(() => {
     sounds.setEnabled(soundEnabled);
   }, [soundEnabled]);
+  // granular prefs → SoundManager (music toggle + SFX toggle)
+  useEffect(() => {
+    sounds.setMusicEnabled(prefs.musicEnabled);
+    sounds.setSfxEnabled(prefs.sfxEnabled);
+  }, [prefs.musicEnabled, prefs.sfxEnabled]);
 
   const env = useMemo(() => envForTime(ui.seconds), [ui.seconds]);
 
