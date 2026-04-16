@@ -80,3 +80,30 @@ export const mathWordsRule: RuleDef = {
     };
   },
 };
+
+const CAPTCHA_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/0/1
+
+export const captchaRule: RuleDef = {
+  id: "captcha",
+  tier: 2,
+  create(rng) {
+    const len = 4;
+    const chars = Array.from({ length: len }, () =>
+      CAPTCHA_ALPHABET[Math.floor(rng() * CAPTCHA_ALPHABET.length)]
+    );
+    // Randomly upper/lowercase each character.
+    const code = chars
+      .map((c) => (Math.floor(rng() * 2) === 0 ? c : c.toLowerCase()))
+      .join("");
+    const display = `▓${code.split("").join("░")}▓`;
+    return {
+      id: "captcha",
+      tier: 2,
+      description: `Your password must include this CAPTCHA (case-sensitive): ${display}`,
+      params: { code, display },
+      validate(state) {
+        return { passed: state.password.includes(code) };
+      },
+    };
+  },
+};

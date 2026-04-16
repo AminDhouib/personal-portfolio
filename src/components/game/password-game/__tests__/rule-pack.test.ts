@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
-import { morseRule, binaryRule, mathWordsRule } from "../rules/tier2-pack";
+import { morseRule, binaryRule, mathWordsRule, captchaRule } from "../rules/tier2-pack";
 import { MORSE_WORDS, toMorse } from "../../../../data/password-game/morse";
 import type { GameState, Rule } from "../types";
 
@@ -106,5 +106,49 @@ describe("rule pack — math-words rule", () => {
   it("fails when password does not contain the word form", () => {
     const rule = mathWordsRule.create(mulberry32(13));
     expect(rule.validate(makeState("random text", rule)).passed).toBe(false);
+  });
+});
+
+describe("rule pack — captcha rule", () => {
+  it("exists and is tier 2", () => {
+    expect(captchaRule).toBeDefined();
+    expect(captchaRule.id).toBe("captcha");
+    expect(captchaRule.tier).toBe(2);
+  });
+
+  it("produces a 4-character code and a display string", () => {
+    const rule = captchaRule.create(mulberry32(19));
+    const code = rule.params.code as string;
+    const display = rule.params.display as string;
+    expect(code.length).toBe(4);
+    expect(display).toContain(code.split("").join("░"));
+  });
+
+  it("code uses the captcha alphabet (no I/O/0/1)", () => {
+    const rule = captchaRule.create(mulberry32(21));
+    const code = rule.params.code as string;
+    for (const ch of code) {
+      expect("IO01".includes(ch)).toBe(false);
+      expect("io".includes(ch)).toBe(false);
+    }
+  });
+
+  it("passes when password contains the exact case-sensitive code", () => {
+    const rule = captchaRule.create(mulberry32(19));
+    const code = rule.params.code as string;
+    expect(rule.validate(makeState(`pre${code}post`, rule)).passed).toBe(true);
+  });
+
+  it("fails when password is case-mismatched or missing code", () => {
+    const rule = captchaRule.create(mulberry32(19));
+    const code = rule.params.code as string;
+    // Flip the case of the entire code — should fail (case-sensitive).
+    const flipped = [...code]
+      .map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()))
+      .join("");
+    if (flipped !== code) {
+      expect(rule.validate(makeState(`pre${flipped}post`, rule)).passed).toBe(false);
+    }
+    expect(rule.validate(makeState("no captcha", rule)).passed).toBe(false);
   });
 });
