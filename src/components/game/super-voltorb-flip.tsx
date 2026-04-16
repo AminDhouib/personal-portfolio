@@ -5,6 +5,7 @@ import { Shield, Sparkles } from "lucide-react";
 import { useSave } from "./super-voltorb-flip/use-save";
 import { useGame } from "./super-voltorb-flip/use-game";
 import { Board } from "./super-voltorb-flip/GameBoard";
+import { Scoreboard } from "./super-voltorb-flip/Scoreboard";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -56,8 +57,15 @@ function GameScreen({
       }}
     >
       <div className="absolute inset-0 flex items-center justify-center p-6">
-        <div className="w-full max-w-lg">
-          <Board board={state.board} rowHints={state.rowHints} colHints={state.colHints} />
+        <div className="flex gap-4 items-start w-full max-w-2xl">
+          <div className="flex-1">
+            <Board board={state.board} rowHints={state.rowHints} colHints={state.colHints} />
+          </div>
+          <Scoreboard
+            level={state.level}
+            currentCoins={state.currentCoins}
+            totalCoins={state.totalCoins}
+          />
         </div>
       </div>
     </div>
