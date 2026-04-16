@@ -122,4 +122,22 @@ const italicCount: RuleDef = {
   },
 };
 
-export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase, boldCount, italicCount];
+const boldItalicParity: RuleDef = {
+  id: "bold-italic-parity",
+  tier: 3,
+  create() {
+    return {
+      id: "bold-italic-parity",
+      tier: 3,
+      description: "Your password must have the same number of bold and italic characters (at least 1 of each).",
+      params: {},
+      validate(state) {
+        const b = countFmt(state.formatting, "bold");
+        const i = countFmt(state.formatting, "italic");
+        return { passed: b === i && b >= 1, message: `bold ${b} / italic ${i}` };
+      },
+    };
+  },
+};
+
+export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase, boldCount, italicCount, boldItalicParity];

@@ -173,3 +173,44 @@ describe("Tier 3 — italic count rule", () => {
     expect(rule.validate(state).passed).toBe(true);
   });
 });
+
+describe("Tier 3 — bold/italic parity rule", () => {
+  const def = TIER_3_RULES.find((r) => r.id === "bold-italic-parity")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("passes when bold and italic counts match (both >= 1)", () => {
+    const rule = def.create(mulberry32(1));
+    const state: GameState = {
+      password: "xxxxxx",
+      formatting: [
+        { bold: true }, { bold: true }, { italic: true }, { italic: true }, {}, {},
+      ],
+      elapsedSeconds: 0,
+      activeRuleIndex: 0,
+      rules: [rule],
+      seed: 1,
+    };
+    expect(rule.validate(state).passed).toBe(true);
+  });
+
+  it("fails when counts differ", () => {
+    const rule = def.create(mulberry32(1));
+    const state: GameState = {
+      password: "xxx",
+      formatting: [{ bold: true }, { italic: true }, { italic: true }],
+      elapsedSeconds: 0,
+      activeRuleIndex: 0,
+      rules: [rule],
+      seed: 1,
+    };
+    expect(rule.validate(state).passed).toBe(false);
+  });
+
+  it("fails when both are zero", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("abc", rule)).passed).toBe(false);
+  });
+});
