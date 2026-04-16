@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import type { Rule, ValidationResult } from "./types";
 import { CheckCircle, XCircle } from "lucide-react";
+import { FLAGS } from "../../../data/password-game/flags";
+import { CHESS_PUZZLES } from "../../../data/password-game/chess";
 
 interface Props {
   rule: Rule;
@@ -47,6 +49,32 @@ export function RuleCard({ rule, result, index, isActive, chaos = 0 }: Props) {
 }
 
 function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
+  // Extract media markers before normal text processing.
+  const flagMatch = text.match(/\[\[FLAG:([A-Za-z ]+)\]\]/);
+  if (flagMatch) {
+    const flag = FLAGS.find((f) => f.country === flagMatch[1].trim());
+    const before = text.slice(0, flagMatch.index);
+    return (
+      <span className="inline-flex items-center gap-2 flex-wrap">
+        <GlitchText text={before} chaos={chaos} />
+        {flag && <FlagBadge flag={flag} />}
+      </span>
+    );
+  }
+
+  const chessMatch = text.match(/\[\[CHESS:([\w-]+)\]\]/);
+  if (chessMatch) {
+    const puzzle = CHESS_PUZZLES.find((p) => p.id === chessMatch[1]);
+    const before = text.slice(0, chessMatch.index);
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        {puzzle && <ChessBoard board={puzzle.board} toMove={puzzle.toMove} hint={puzzle.hint} />}
+      </>
+    );
+  }
+
+  // Fallback to existing behavior: split on blank line for code snippets.
   const idx = text.indexOf("\n\n");
   if (idx === -1) {
     return <GlitchText text={text} chaos={chaos} />;
@@ -60,6 +88,60 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
         {code}
       </pre>
     </>
+  );
+}
+
+/** Rendered flag — CSS linear-gradient tricolor, inline with the text. */
+function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
+  const direction = flag.orientation === "h" ? "to bottom" : "to right";
+  const background = `linear-gradient(${direction}, ${flag.colors[0]} 0 33.33%, ${flag.colors[1]} 33.33% 66.66%, ${flag.colors[2]} 66.66% 100%)`;
+  return (
+    <span
+      role="img"
+      aria-label={`flag of ${flag.country}`}
+      className="inline-block align-middle rounded-sm border border-black/20"
+      style={{
+        width: 40,
+        height: 28,
+        background,
+      }}
+    />
+  );
+}
+
+/** 8×8 Unicode chess board rendered in a monospace grid. */
+function ChessBoard({
+  board,
+  toMove,
+  hint,
+}: {
+  board: readonly string[];
+  toMove: "white" | "black";
+  hint: string;
+}) {
+  return (
+    <div className="mt-2">
+      <div className="inline-grid grid-cols-8 rounded-md border border-(--border) overflow-hidden bg-(--background) text-2xl leading-none font-mono">
+        {board.flatMap((row, r) =>
+          [...row].map((cell, c) => {
+            const light = (r + c) % 2 === 0;
+            return (
+              <span
+                key={`${r}-${c}`}
+                className="flex items-center justify-center w-6 h-6"
+                style={{
+                  background: light ? "#e0e0c8" : "#7a8b50",
+                  color: "#1a1a1a",
+                }}
+              >
+                {cell === "." ? "" : cell}
+              </span>
+            );
+          })
+        )}
+      </div>
+      <div className="mt-1 text-xs text-(--muted)">{toMove} to move · {hint}</div>
+    </div>
   );
 }
 

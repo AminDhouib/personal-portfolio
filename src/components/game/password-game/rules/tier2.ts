@@ -7,6 +7,9 @@ import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
 import { NAMED_COLORS } from "../../../../data/password-game/colors";
 import { CODE_SNIPPETS } from "../../../../data/password-game/code-snippets";
 import { morseRule, binaryRule, mathWordsRule, captchaRule } from "./tier2-pack";
+import { wordleRule } from "./tier2-wordle";
+import { flagRule } from "./tier2-flag";
+import { chessRule } from "./tier2-chess";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -239,4 +242,7 @@ export const TIER_2_RULES: readonly RuleDef[] = [
   binaryRule,
   mathWordsRule,
   captchaRule,
+  wordleRule,
+  flagRule,
+  chessRule,
 ];
