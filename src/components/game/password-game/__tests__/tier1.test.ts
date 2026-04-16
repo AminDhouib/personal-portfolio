@@ -45,3 +45,32 @@ describe("Tier 1 — min length rule", () => {
     expect(def.tier).toBe(1);
   });
 });
+
+describe("Tier 1 — digit count rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "digit-count")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("fails if too few digits", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("abc", rule)).passed).toBe(false);
+  });
+
+  it("passes when digit count matches", () => {
+    const rule = def.create(mulberry32(1));
+    const n = rule.params.n as number;
+    const pw = "a" + "1".repeat(n);
+    expect(rule.validate(makeState(pw, rule)).passed).toBe(true);
+  });
+
+  it("n is between 1 and 3", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const n = rule.params.n as number;
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(3);
+    }
+  });
+});

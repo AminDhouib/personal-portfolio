@@ -22,4 +22,22 @@ const minLength: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength];
+const digitCount: RuleDef = {
+  id: "digit-count",
+  tier: 1,
+  create(rng) {
+    const n = rangeInt(rng, 1, 3);
+    return {
+      id: "digit-count",
+      tier: 1,
+      description: `Your password must include at least ${n} digit${n === 1 ? "" : "s"}.`,
+      params: { n },
+      validate(state) {
+        const count = (state.password.match(/\d/g) ?? []).length;
+        return { passed: count >= n, message: `${count} / ${n}` };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount];
