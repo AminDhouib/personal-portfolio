@@ -27,6 +27,13 @@ export interface Profile {
   missionsToday: { id: string; progress: number; claimed: boolean }[];
   missionsResetDate: string;
   tutorialComplete: boolean;
+  preferences?: {
+    reducedMotion?: boolean;
+    gyroEnabled?: boolean;
+    bloomEnabled?: boolean;
+    musicEnabled?: boolean;
+    sfxEnabled?: boolean;
+  };
 }
 
 function defaultProfile(): Profile {

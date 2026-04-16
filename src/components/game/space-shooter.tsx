@@ -12,7 +12,7 @@ import {
   ShoppingCart, Magnet, Coins as CoinsIcon, Timer, X as XIcon,
 } from "lucide-react";
 import {
-  addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted,
+  addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile,
   setUpgradeLevel, spendCoins,
 } from "./profile";
 import { UPGRADES, upgradeById } from "./shop-data";
@@ -2974,6 +2974,24 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
   );
 }
 
+function SettingsToggle({ label, checked, onChange }: {
+  label: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 text-sm text-slate-200 cursor-pointer">
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative w-10 h-6 rounded-full transition ${checked ? "bg-emerald-500" : "bg-slate-600"}`}
+        aria-pressed={checked}
+      >
+        <span className={`block w-5 h-5 bg-white rounded-full transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`} />
+      </button>
+    </label>
+  );
+}
+
 function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
   const groupRef = useRef<THREE.Group>(null);
   useFrame(() => {
@@ -3703,6 +3721,14 @@ export function SpaceShooterGame() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefs, setPrefs] = useState({
+    reducedMotion: false,
+    gyroEnabled: false,
+    bloomEnabled: true,
+    musicEnabled: true,
+    sfxEnabled: true,
+  });
   const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
@@ -3710,6 +3736,28 @@ export function SpaceShooterGame() {
   const [profile, setProfile] = useState(() => loadProfile());
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
   const isReturningPlayer = profile.firstRunCompleted;
+  // Load player prefs from profile (or localStorage fallback)
+  useEffect(() => {
+    try {
+      const p = loadProfile();
+      if (p.preferences) {
+        setPrefs((prev) => ({ ...prev, ...p.preferences }));
+        return;
+      }
+      const raw = localStorage.getItem("orbital-dodge-prefs");
+      if (raw) setPrefs((prev) => ({ ...prev, ...JSON.parse(raw) }));
+    } catch { /* noop */ }
+  }, []);
+  // Save on change
+  useEffect(() => {
+    try {
+      const p = loadProfile();
+      p.preferences = { ...p.preferences, ...prefs };
+      saveProfile(p);
+    } catch {
+      try { localStorage.setItem("orbital-dodge-prefs", JSON.stringify(prefs)); } catch { /* noop */ }
+    }
+  }, [prefs]);
   // Persist "first boss seen" flag when boss enters fighting phase
   useEffect(() => {
     if (firstBossSeen) return;
@@ -4276,6 +4324,50 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Settings gear (idle or dead only) */}
+        {(ui.status === "armed" || ui.status === "dead") && (
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="absolute top-3 right-3 p-2 rounded bg-black/40 border border-white/20 hover:bg-black/60 transition z-30 text-white"
+            aria-label="Settings"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+        )}
+        {settingsOpen && (
+          <div
+            className="absolute inset-0 bg-black/80 flex items-center justify-center z-40"
+            onClick={() => setSettingsOpen(false)}
+          >
+            <div
+              className="bg-slate-900 border border-white/20 rounded-lg p-5 min-w-[260px] max-w-[90%]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-white">Settings</h3>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(false)}
+                  className="text-slate-400 hover:text-white"
+                  aria-label="Close settings"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <SettingsToggle label="Reduced motion" checked={prefs.reducedMotion} onChange={(v) => setPrefs((p) => ({ ...p, reducedMotion: v }))} />
+                <SettingsToggle label="Bloom / glow" checked={prefs.bloomEnabled} onChange={(v) => setPrefs((p) => ({ ...p, bloomEnabled: v }))} />
+                <SettingsToggle label="Music" checked={prefs.musicEnabled} onChange={(v) => setPrefs((p) => ({ ...p, musicEnabled: v }))} />
+                <SettingsToggle label="SFX" checked={prefs.sfxEnabled} onChange={(v) => setPrefs((p) => ({ ...p, sfxEnabled: v }))} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Boss intro banner */}
         {gameRefs.current.boss && gameRefs.current.boss.phase === "intro" && (
