@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Shield, Sparkles } from "lucide-react";
 import { useSave } from "./super-voltorb-flip/use-save";
+import { useGame } from "./super-voltorb-flip/use-game";
+import { Board } from "./super-voltorb-flip/GameBoard";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -21,17 +23,41 @@ export function SuperVoltorbFlipGame() {
     return <ModeSelect onPick={(mode) => updateSave({ mode })} />;
   }
 
+  return <GameScreen save={save} updateSave={updateSave} />;
+}
+
+function GameScreen({
+  save,
+  updateSave,
+}: {
+  save: ReturnType<typeof useSave>[0];
+  updateSave: ReturnType<typeof useSave>[1];
+}) {
+  const { state } = useGame({
+    mode: save.mode!,
+    initialTheme: save.activeTheme,
+    unlockedThemes: save.unlockedThemes,
+    autoMemoEnabled: save.autoMemoEnabled,
+    speedMode: save.speedMode,
+    totalCoins: save.totalCoins,
+    initialStats: save.stats,
+    onPersist: updateSave,
+  });
+
   return (
     <div
-      className="w-full rounded-xl border border-(--border) bg-(--card) overflow-hidden"
-      style={{ aspectRatio: "4 / 3", minHeight: 420 }}
+      className="w-full rounded-xl border border-(--border) overflow-hidden relative"
+      style={{
+        aspectRatio: "4 / 3",
+        minHeight: 420,
+        backgroundImage: `url(/games/super-voltorb-flip/sprites/background.png)`,
+        backgroundSize: "cover",
+        imageRendering: "pixelated" as const,
+      }}
     >
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center text-(--muted)">
-          <div className="text-lg font-semibold mb-2">
-            Playing in {save.mode === "classic" ? "Classic" : "Super"} Mode
-          </div>
-          <div className="text-sm">Board rendering comes in the next task.</div>
+      <div className="absolute inset-0 flex items-center justify-center p-6">
+        <div className="w-full max-w-lg">
+          <Board board={state.board} rowHints={state.rowHints} colHints={state.colHints} />
         </div>
       </div>
     </div>
