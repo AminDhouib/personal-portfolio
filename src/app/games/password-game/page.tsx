@@ -48,7 +48,7 @@ export default function PasswordGamePage() {
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-(--muted) mb-4">
             Other games you can play
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {others.map((g) => (
               <GameCard key={g.slug} game={g} size="sm" />
             ))}

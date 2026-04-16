@@ -16,10 +16,6 @@ const TypingSpeedGame = dynamic(
   () => import("./typing-speed").then((m) => m.TypingSpeedGame),
   { ssr: false, loading: () => <GameSkeleton /> },
 );
-const CodePuzzleGame = dynamic(
-  () => import("./code-puzzle").then((m) => m.CodePuzzleGame),
-  { ssr: false, loading: () => <GameSkeleton /> },
-);
 const SpaceShooterGame = dynamic(
   () => import("./space-shooter").then((m) => m.SpaceShooterGame),
   { ssr: false, loading: () => <GameSkeleton /> },
@@ -44,8 +40,6 @@ export function GameLoader({ slug }: { slug: GameSlug }) {
   switch (slug) {
     case "typing-speed":
       return <TypingSpeedGame />;
-    case "code-puzzle":
-      return <CodePuzzleGame />;
     case "space-shooter":
       return <SpaceShooterGame />;
     case "hextris":

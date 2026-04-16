@@ -7,7 +7,6 @@ export type GameSlug =
   | "hextris"
   | "tower-stacker"
   | "typing-speed"
-  | "code-puzzle"
   | "super-voltorb-flip"
   | "password-game";
 
@@ -62,16 +61,6 @@ export const GAMES: GameMeta[] = [
     controls: "Type the highlighted text. Don't make mistakes.",
     accent: "#60a5fa",
     accentTailwind: "accent-blue",
-  },
-  {
-    slug: "code-puzzle",
-    title: "Code Puzzle",
-    tagline: "Spot the bug in six real-world snippets",
-    description:
-      "Six multiple-choice bugs ranging from JavaScript gotchas to SQL injection. Instant explanation after every pick.",
-    controls: "Read the code, pick the buggy line.",
-    accent: "#fbbf24",
-    accentTailwind: "accent-amber",
   },
   {
     slug: "super-voltorb-flip",
