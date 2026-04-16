@@ -463,6 +463,57 @@ function drawRift(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.restore();
 }
 
+interface AchievementDef {
+  id: string;
+  name: string;
+  description: string;
+  check: (r: GameRefs) => boolean;
+}
+
+const ACHIEVEMENTS: AchievementDef[] = [
+  { id: "first_tower", name: "First Tower", description: "Complete any run", check: () => true },
+  { id: "architect", name: "The Architect", description: "Reach floor 50", check: (r) => r.floors.length - 1 >= 50 },
+  { id: "atlas", name: "Atlas", description: "Reach floor 100", check: (r) => r.floors.length - 1 >= 100 },
+  { id: "perfectionist", name: "Perfectionist", description: "10 consecutive perfects", check: (r) => r.maxCombo >= 10 },
+  { id: "virtuoso", name: "Virtuoso", description: "20 consecutive perfects", check: (r) => r.maxCombo >= 20 },
+  { id: "golden_touch", name: "Golden Touch", description: "Land 5 golden blocks in one run", check: (r) => r.goldenCount >= 5 },
+  { id: "void_walker", name: "Void Walker", description: "Reach the Void biome (floor 90)", check: (r) => r.biomeIdx >= 4 },
+  { id: "daily_devotee", name: "Daily Devotee", description: "Play daily runs on 7 different days", check: () => false },
+  { id: "ghost_buster", name: "Ghost Buster", description: "Pass your ghost run", check: (r) => r.ghostPassed },
+  { id: "speed_demon", name: "Speed Demon", description: "Finish Speedrun in < 60s", check: (r) =>
+      r.mode === "speedrun" && r.floors.length - 1 >= 50 && r.runRecord.durationMs < 60_000 },
+];
+
+function checkAchievements(r: GameRefs): string[] {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + "achievements");
+    const owned = new Set<string>(raw ? JSON.parse(raw) : []);
+    const newlyUnlocked: string[] = [];
+    for (const a of ACHIEVEMENTS) {
+      if (!owned.has(a.id) && a.check(r)) {
+        owned.add(a.id);
+        newlyUnlocked.push(a.id);
+      }
+    }
+    // Daily Devotee — tracked separately
+    if (r.isDailyRun) {
+      const datesRaw = localStorage.getItem(LS_PREFIX + "daily_dates");
+      const dates = new Set<string>(datesRaw ? JSON.parse(datesRaw) : []);
+      const today = new Date().toISOString().slice(0, 10);
+      dates.add(today);
+      localStorage.setItem(LS_PREFIX + "daily_dates", JSON.stringify([...dates]));
+      if (dates.size >= 7 && !owned.has("daily_devotee")) {
+        owned.add("daily_devotee");
+        newlyUnlocked.push("daily_devotee");
+      }
+    }
+    localStorage.setItem(LS_PREFIX + "achievements", JSON.stringify([...owned]));
+    return newlyUnlocked;
+  } catch {
+    return [];
+  }
+}
+
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
@@ -479,6 +530,36 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-xs text-neutral-500 uppercase">{label}</div>
       <div className="text-xl font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+function AchievementsStrip() {
+  const [owned, setOwned] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_PREFIX + "achievements");
+      setOwned(new Set(raw ? JSON.parse(raw) : []));
+    } catch {}
+  }, []);
+  return (
+    <div className="mt-5">
+      <div className="text-xs uppercase tracking-wider text-neutral-500 mb-2">Achievements</div>
+      <div className="grid grid-cols-5 gap-2">
+        {ACHIEVEMENTS.map((a) => (
+          <div
+            key={a.id}
+            title={`${a.name}\n${a.description}`}
+            className={`aspect-square rounded-lg border flex items-center justify-center text-[10px] text-center px-1 ${
+              owned.has(a.id)
+                ? "border-amber-500 bg-amber-500/10 text-amber-300"
+                : "border-neutral-700 bg-neutral-800/60 text-neutral-600"
+            }`}
+          >
+            {a.name.split(" ")[0]}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -537,6 +618,7 @@ export default function TowerStacker() {
   const [uiScore, setUiScore] = useState(0);
   const [uiHp, setUiHp] = useState(3);
   const [uiCombo, setUiCombo] = useState(0);
+  const [toasts, setToasts] = useState<string[]>([]);
 
   interface AudioHandle {
     ctx: AudioContext;
@@ -828,6 +910,12 @@ export default function TowerStacker() {
       const floors = r.floors.length - 1;
       if (floors > hf) localStorage.setItem(LS_PREFIX + "highfloors", String(floors));
     } catch {}
+    const newlyUnlocked = checkAchievements(r);
+    r.achievementsUnlockedThisRun = newlyUnlocked;
+    if (newlyUnlocked.length > 0) {
+      setToasts(newlyUnlocked.map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.name || "Achievement"));
+      setTimeout(() => setToasts([]), 3500);
+    }
   }
 
   function togglePause() {
@@ -1196,6 +1284,20 @@ export default function TowerStacker() {
         </div>
       )}
 
+      {toasts.length > 0 && (
+        <div className="absolute top-4 right-4 z-30 flex flex-col gap-2 pointer-events-none">
+          {toasts.map((t, i) => (
+            <div
+              key={i}
+              className="rounded-lg bg-gradient-to-r from-amber-500 to-red-500 text-white px-4 py-2 shadow-lg"
+            >
+              <div className="text-xs uppercase opacity-80">Achievement</div>
+              <div className="font-semibold">{t}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {uiState === "menu" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm p-6">
           <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-neutral-900/90 p-6 shadow-[0_0_60px_-10px_rgba(239,68,68,0.5)]">
@@ -1250,6 +1352,8 @@ export default function TowerStacker() {
             <p className="text-xs text-neutral-500 mt-4 text-center">
               Tap, click, or press Space / Enter to drop.
             </p>
+
+            <AchievementsStrip />
           </div>
         </div>
       )}
