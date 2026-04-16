@@ -16,6 +16,7 @@ import {
   setUpgradeLevel, spendCoins,
 } from "./profile";
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
+import { activeMissions, claimMissionReward, rollMissionsIfNewDay } from "./missions";
 
 // ---------- constants ----------
 
@@ -1136,7 +1137,8 @@ function fireIntervalMs(g: GameRefs): number {
 }
 
 function bulletDamage(g: GameRefs): number {
-  return 1 + (isPowerUpActive(g, "mega") ? 3 : 0);
+  const base = 1 + (isPowerUpActive(g, "mega") ? 3 : 0);
+  return base * g.shipDamageMul;
 }
 
 // ---------- spawning ----------
@@ -2578,13 +2580,13 @@ function runTick(
       const dx = g.shipX - c.x;
       const dy = g.shipY - c.y;
       const dist2d = Math.sqrt(dx * dx + dy * dy);
-      const pullRadius = 1.5 + magnetBonusRadius;
+      const pullRadius = (1.5 + magnetBonusRadius) * g.shipCoinMagnetMul;
       if (dist2d < pullRadius) {
         const pull = step * 6;
         c.x += (dx / (dist2d || 1)) * pull;
         c.y += (dy / (dist2d || 1)) * pull;
       }
-      const pickupR = 0.6 + magnetBonusRadius * 0.3;
+      const pickupR = (0.6 + magnetBonusRadius * 0.3) * g.shipCoinMagnetMul;
       if (Math.abs(c.z - g.shipZ) < 1.2 && dist2d < pickupR) {
         const val = Math.round(c.value * g.coinBoostMul);
         g.coinsThisRun += val;
@@ -3075,6 +3077,56 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
       })}
       <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
     </group>
+  );
+}
+
+function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
+  const [version, setVersion] = useState(0);
+  const list = useMemo(() => activeMissions(), [version]);
+  return (
+    <div className="flex flex-col gap-2 max-w-3xl mx-auto w-full">
+      {list.map(({ def, progress }) => {
+        const pct = Math.min(100, (progress.progress / def.target) * 100);
+        const ready = progress.progress >= def.target && !progress.claimed;
+        return (
+          <div
+            key={def.id}
+            className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white text-sm">{def.label}</span>
+                <span className="text-[10px] text-accent-amber font-mono">{def.reward} coins</span>
+              </div>
+              <div className="text-xs text-slate-400">{def.description}</div>
+              <div className="mt-1 h-1 rounded bg-black/60 overflow-hidden">
+                <div className="h-full bg-accent-blue" style={{ width: `${pct}%` }} />
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{progress.progress} / {def.target}</div>
+            </div>
+            {progress.claimed ? (
+              <span className="px-3 py-1 rounded text-xs font-bold uppercase bg-slate-600/30 border border-slate-500/40 text-slate-400">Claimed</span>
+            ) : (
+              <button
+                type="button"
+                disabled={!ready}
+                onClick={() => {
+                  const r = claimMissionReward(def.id);
+                  if (r.ok) {
+                    sounds.play("chime");
+                    refreshProfile();
+                    setVersion((v) => v + 1);
+                  }
+                }}
+                className={`px-3 py-1 rounded text-xs font-bold uppercase ${ready ? "bg-accent-amber/20 border border-accent-amber/50 text-accent-amber" : "bg-white/5 border border-white/10 text-slate-500"}`}
+              >
+                Claim
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -3825,6 +3877,7 @@ export function SpaceShooterGame() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
+  const [shopTab, setShopTab] = useState<"upgrades" | "consumables" | "ships" | "cosmetics" | "missions">("upgrades");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefs, setPrefs] = useState({
     reducedMotion: false,
@@ -3931,6 +3984,10 @@ export function SpaceShooterGame() {
   const [profile, setProfile] = useState(() => loadProfile());
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
   const isReturningPlayer = profile.firstRunCompleted;
+  // Roll daily missions on mount (no-op if already rolled today)
+  useEffect(() => {
+    try { rollMissionsIfNewDay(); } catch { /* noop */ }
+  }, []);
   // Load player prefs from profile (or localStorage fallback)
   useEffect(() => {
     try {
@@ -4424,6 +4481,22 @@ export function SpaceShooterGame() {
                       <XIcon className="h-4 w-4" />
                     </button>
                   </div>
+                  {/* Tabs row */}
+                  <div className="flex items-center gap-1 mb-3 max-w-3xl mx-auto w-full overflow-x-auto">
+                    {(["upgrades", "consumables", "ships", "cosmetics", "missions"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setShopTab(t)}
+                        className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded border ${
+                          shopTab === t ? "bg-accent-blue/25 border-accent-blue/60 text-white" : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  {shopTab === "upgrades" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto w-full">
                     {UPGRADES.map((u) => {
                       const level = profile.ownedUpgrades[u.id] ?? 0;
@@ -4471,6 +4544,178 @@ export function SpaceShooterGame() {
                       );
                     })}
                   </div>
+                  )}
+                  {shopTab === "consumables" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto w-full">
+                      {CONSUMABLES.map((c) => {
+                        const owned = profile.consumableInventory[c.id] ?? 0;
+                        const affordable = profile.walletCoins >= c.cost;
+                        return (
+                          <div
+                            key={c.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-semibold text-white text-sm">{c.label} <span className="text-xs text-slate-400">x{owned}</span></div>
+                              <div className="text-xs text-slate-400">{c.description}</div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!affordable}
+                              onClick={() => {
+                                if (!affordable) return;
+                                const r = spendCoins(c.cost);
+                                if (r.ok) {
+                                  const p = loadProfile();
+                                  p.consumableInventory[c.id] = (p.consumableInventory[c.id] ?? 0) + 1;
+                                  saveProfile(p);
+                                  sounds.play("chime");
+                                  refreshProfile();
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wide ${affordable ? "bg-accent-amber/20 border border-accent-amber/50 text-accent-amber" : "bg-white/5 border border-white/10 text-slate-500"}`}
+                            >
+                              Buy · {c.cost}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {shopTab === "ships" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto w-full">
+                      {SHIPS.map((s) => {
+                        const owned = s.id === "falcon" || profile.ownedCosmetics.includes(`ship:${s.id}`);
+                        const equipped = profile.equippedShip === s.id;
+                        const affordable = profile.walletCoins >= s.unlockCost;
+                        return (
+                          <div
+                            key={s.id}
+                            className={`flex flex-col gap-1 rounded-lg border p-3 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-white text-sm">{s.label}</span>
+                              <span className="inline-block w-4 h-4 rounded border border-white/20" style={{ background: s.hullTint }} />
+                            </div>
+                            <div className="text-xs text-slate-400">{s.description}</div>
+                            <div className="mt-1 flex items-center gap-2">
+                              {owned ? (
+                                <button
+                                  type="button"
+                                  disabled={equipped}
+                                  onClick={() => {
+                                    const p = loadProfile();
+                                    p.equippedShip = s.id;
+                                    saveProfile(p);
+                                    refreshProfile();
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs font-bold uppercase ${equipped ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300" : "bg-accent-blue/20 border border-accent-blue/40 text-accent-blue"}`}
+                                >
+                                  {equipped ? "Equipped" : "Equip"}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={!affordable}
+                                  onClick={() => {
+                                    if (!affordable) return;
+                                    const r = spendCoins(s.unlockCost);
+                                    if (r.ok) {
+                                      const p = loadProfile();
+                                      const key = `ship:${s.id}`;
+                                      if (!p.ownedCosmetics.includes(key)) p.ownedCosmetics.push(key);
+                                      saveProfile(p);
+                                      sounds.play("chime");
+                                      refreshProfile();
+                                    }
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs font-bold uppercase ${affordable ? "bg-accent-amber/20 border border-accent-amber/50 text-accent-amber" : "bg-white/5 border border-white/10 text-slate-500"}`}
+                                >
+                                  Unlock · {s.unlockCost}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {shopTab === "cosmetics" && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-3xl mx-auto w-full">
+                      {COSMETICS.map((c) => {
+                        const owned = profile.ownedCosmetics.includes(c.id);
+                        const cond = c.unlockCondition;
+                        let locked = false;
+                        if (cond && cond !== "always") {
+                          const val = cond.stat === "totalAsteroidsDestroyed" ? profile.totalAsteroidsDestroyed
+                                    : cond.stat === "totalDistance" ? profile.totalDistance
+                                    : profile.totalRunsPlayed;
+                          locked = val < cond.atLeast;
+                        }
+                        const equippedId = c.slot === "hull" ? profile.equippedHull
+                                         : c.slot === "engine" ? profile.equippedEngine
+                                         : profile.equippedDeathFx;
+                        const equipped = equippedId === c.id;
+                        const affordable = profile.walletCoins >= c.cost;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`flex flex-col items-start gap-1 rounded-lg border p-2 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"} ${locked ? "opacity-60" : ""}`}
+                          >
+                            <div className="flex items-center gap-2 w-full">
+                              {c.slot !== "deathFx" ? (
+                                <span className="inline-block w-4 h-4 rounded border border-white/20" style={{ background: c.value }} />
+                              ) : (
+                                <span className="inline-block w-4 h-4 rounded border border-white/20 bg-black/40 text-[10px] text-white flex items-center justify-center">FX</span>
+                              )}
+                              <span className="text-xs text-white font-semibold flex-1 truncate">{c.label}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">{c.slot}</div>
+                            {locked ? (
+                              <div className="text-[10px] text-slate-500">Locked</div>
+                            ) : owned ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const p = loadProfile();
+                                  if (c.slot === "hull") p.equippedHull = equipped ? null : c.id;
+                                  else if (c.slot === "engine") p.equippedEngine = equipped ? null : c.id;
+                                  else p.equippedDeathFx = equipped ? null : c.id;
+                                  saveProfile(p);
+                                  refreshProfile();
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${equipped ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300" : "bg-accent-blue/20 border border-accent-blue/40 text-accent-blue"}`}
+                              >
+                                {equipped ? "Equipped" : "Equip"}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={!affordable}
+                                onClick={() => {
+                                  if (!affordable) return;
+                                  const r = spendCoins(c.cost);
+                                  if (r.ok) {
+                                    const p = loadProfile();
+                                    if (!p.ownedCosmetics.includes(c.id)) p.ownedCosmetics.push(c.id);
+                                    saveProfile(p);
+                                    sounds.play("chime");
+                                    refreshProfile();
+                                  }
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${affordable ? "bg-accent-amber/20 border border-accent-amber/50 text-accent-amber" : "bg-white/5 border border-white/10 text-slate-500"}`}
+                              >
+                                Buy · {c.cost}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {shopTab === "missions" && (
+                    <MissionsPanel refreshProfile={refreshProfile} />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
