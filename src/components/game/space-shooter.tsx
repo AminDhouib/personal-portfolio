@@ -408,12 +408,15 @@ function spawnObstacle(g: GameRefs): Obstacle {
   const variants = unlockedVariants(seconds);
   const variant = variants[Math.floor(Math.random() * variants.length)];
 
-  // Anti-cheese: 60% spawn near player; 40% random
-  const aimAtPlayer = Math.random() < 0.6;
+  // Anti-camp: 35% of asteroids are loosely aimed at the player's wider
+  // neighborhood (±3 X, ±2 Y), 65% uniform across the arena. The wider band
+  // means aim-at-player no longer concentrates on the auto-fire lane so
+  // camping at any single point no longer guarantees clean kills.
+  const aimAtPlayer = Math.random() < 0.35;
   let x: number, y: number;
   if (aimAtPlayer) {
-    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * 3.2, -ARENA_W / 2, ARENA_W / 2);
-    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * 2.4, -ARENA_H / 2, ARENA_H / 2);
+    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * 6, -ARENA_W / 2, ARENA_W / 2);
+    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * 4, -ARENA_H / 2, ARENA_H / 2);
   } else {
     x = (Math.random() - 0.5) * ARENA_W;
     y = (Math.random() - 0.5) * ARENA_H;
@@ -2082,13 +2085,21 @@ function SpeedLines({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRef
   useFrame(() => {
     const g = gameRefs.current;
     if (!g) return;
+    // Dark-on-light (invertedArmed) needs higher opacity to register vs.
+    // light-on-dark which can stay subtle.
+    const opacityScale = g.invertedArmed ? 1.0 : 0.7;
     for (let i = 0; i < g.speedLines.length; i++) {
       const m = refs.current[i];
       const l = g.speedLines[i];
       if (m && l) {
         m.position.set(l.x, l.y, l.z);
         m.scale.set(1, l.length, 1);
-        (m.material as THREE.MeshBasicMaterial).opacity = l.life * 0.7;
+        const mat = m.material as THREE.MeshBasicMaterial;
+        mat.opacity = l.life * opacityScale;
+        // Follow the lerped star color so speed lines stay visible against
+        // the current background — dark lines in light mode, light lines
+        // in dark mode.
+        mat.color.copy(g.starColor);
       }
     }
   });
