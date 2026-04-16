@@ -329,6 +329,32 @@ function normalizeVec3(v: [number, number, number]): [number, number, number] {
   return [v[0] / len, v[1] / len, v[2] / len];
 }
 
+function runDrifterBehavior(g: GameRefs, boss: BossState, now: number): void {
+  const phaseAge = now - boss.phaseStartAt;
+  boss.position[0] = Math.sin(phaseAge * 0.0005) * 4;
+  boss.position[1] = 2 + Math.cos(phaseAge * 0.0008) * 1.5;
+  boss.position[2] = -12;
+  const shotInterval = 2000 / boss.difficultyMult;
+  if (now - boss.lastShotAt >= shotInterval) {
+    for (let k = 0; k < 4; k++) {
+      const angle = (k - 1.5) * 0.35;
+      const dir = normalizeVec3([Math.sin(angle), -0.2, 1]);
+      g.bossProjectiles.push({
+        id: g.nextBossProjectileId++,
+        position: [boss.position[0], boss.position[1] - 0.5, boss.position[2] + 0.5],
+        velocity: [dir[0] * 4, dir[1] * 4, dir[2] * 4],
+        radius: 0.45,
+        color: "#0ea5e9",
+        spawnedAt: now,
+        ttlMs: 5000,
+        homing: true,
+        shielded: false,
+      });
+    }
+    boss.lastShotAt = now;
+  }
+}
+
 function runSentinelBehavior(g: GameRefs, boss: BossState, now: number): void {
   const phaseAge = now - boss.phaseStartAt;
   boss.position[0] = Math.sin(phaseAge * 0.0008) * 3.5;
@@ -1806,6 +1832,7 @@ function runTick(
       }
     } else if (b.phase === "fighting") {
       if (b.id === "sentinel") runSentinelBehavior(g, b, now);
+      else if (b.id === "drifter") runDrifterBehavior(g, b, now);
       // other boss behaviors added in later tasks
       if (now - g.lastBossPulseAt > 700) {
         sounds.bossPulse();
@@ -1936,6 +1963,24 @@ function runTick(
         continue;
       }
     }
+    // Bullet-vs-boss-projectile: destroy non-shielded projectiles (e.g. Drifter mines)
+    let bulletConsumed = false;
+    for (let pi = g.bossProjectiles.length - 1; pi >= 0; pi--) {
+      const p = g.bossProjectiles[pi];
+      if (p.shielded) continue;
+      const dx = b.x - p.position[0];
+      const dy = b.y - p.position[1];
+      const dz = b.z - p.position[2];
+      const hitR = p.radius + 0.3;
+      if (dx * dx + dy * dy + dz * dz < hitR * hitR) {
+        g.bossProjectiles.splice(pi, 1);
+        g.bullets.splice(i, 1);
+        spawnExplosion(g, b.x, b.y, b.z, p.color, 220, 0.18);
+        bulletConsumed = true;
+        break;
+      }
+    }
+    if (bulletConsumed) continue;
     if (b.z < SPAWN_Z - 5 || Math.abs(b.x) > ARENA_W || Math.abs(b.y) > ARENA_H) {
       g.bullets.splice(i, 1);
     }
@@ -2558,6 +2603,21 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
         <mesh position={[0, 0, 0.3]}>
           <torusGeometry args={[0.8, 0.15, 8, 16]} />
           <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.6} />
+        </mesh>
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
+  if (boss.id === "drifter") {
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <octahedronGeometry args={[1.4, 0]} />
+          <meshStandardMaterial color="#0ea5e9" emissive="#0284c7" emissiveIntensity={0.5} flatShading />
+        </mesh>
+        <mesh scale={[0.6, 0.6, 0.6]}>
+          <octahedronGeometry args={[1.4, 0]} />
+          <meshBasicMaterial color="#7dd3fc" transparent opacity={0.4} />
         </mesh>
         <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
       </group>
