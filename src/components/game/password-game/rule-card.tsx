@@ -32,7 +32,7 @@ export function RuleCard({ rule, result, index, isActive }: Props) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-xs text-(--muted) mb-1">Rule {index + 1}</div>
-          <div className={`text-sm ${passed ? "text-(--muted) line-through" : "text-(--foreground)"}`}>
+          <div className={`pg-rule-description text-sm ${passed ? "text-(--muted) line-through" : "text-(--foreground)"}`}>
             <RuleDescription text={rule.description} />
           </div>
           {result.message && !passed && (
