@@ -39,3 +39,44 @@ export const binaryRule: RuleDef = {
     };
   },
 };
+
+const NUM_WORDS = [
+  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+  "seventeen", "eighteen", "nineteen", "twenty",
+];
+const TENS_WORDS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+
+function numberToWords(n: number): string {
+  if (n < 0) return "minus" + numberToWords(-n);
+  if (n <= 20) return NUM_WORDS[n] ?? "";
+  if (n < 100) {
+    const tens = Math.floor(n / 10);
+    const ones = n % 10;
+    return ones === 0 ? TENS_WORDS[tens] : TENS_WORDS[tens] + NUM_WORDS[ones];
+  }
+  if (n === 100) return "onehundred";
+  return String(n);
+}
+
+export const mathWordsRule: RuleDef = {
+  id: "math-words",
+  tier: 2,
+  create(rng) {
+    const ops = ["+", "*"] as const;
+    const op = ops[Math.floor(rng() * ops.length)];
+    const a = op === "*" ? rangeInt(rng, 2, 9) : rangeInt(rng, 5, 40);
+    const b = op === "*" ? rangeInt(rng, 2, 9) : rangeInt(rng, 5, 40);
+    const answer = op === "*" ? a * b : a + b;
+    const answerWord = numberToWords(answer);
+    return {
+      id: "math-words",
+      tier: 2,
+      description: `Your password must include the word form of ${a} ${op} ${b} (e.g. "twentyone" = 21).`,
+      params: { a, b, op, answer, answerWord },
+      validate(state) {
+        return { passed: state.password.toLowerCase().includes(answerWord) };
+      },
+    };
+  },
+};

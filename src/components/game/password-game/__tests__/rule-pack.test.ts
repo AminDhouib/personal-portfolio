@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
-import { morseRule, binaryRule } from "../rules/tier2-pack";
+import { morseRule, binaryRule, mathWordsRule } from "../rules/tier2-pack";
 import { MORSE_WORDS, toMorse } from "../../../../data/password-game/morse";
 import type { GameState, Rule } from "../types";
 
@@ -74,5 +74,37 @@ describe("rule pack — binary rule", () => {
   it("fails when password does not contain the binary", () => {
     const rule = binaryRule.create(mulberry32(7));
     expect(rule.validate(makeState("no digits here", rule)).passed).toBe(false);
+  });
+});
+
+describe("rule pack — math-words rule", () => {
+  it("exists and is tier 2", () => {
+    expect(mathWordsRule).toBeDefined();
+    expect(mathWordsRule.id).toBe("math-words");
+    expect(mathWordsRule.tier).toBe(2);
+  });
+
+  it("computes the correct answer and word form", () => {
+    const rule = mathWordsRule.create(mulberry32(13));
+    const a = rule.params.a as number;
+    const b = rule.params.b as number;
+    const op = rule.params.op as "+" | "*";
+    const answer = rule.params.answer as number;
+    const expected = op === "*" ? a * b : a + b;
+    expect(answer).toBe(expected);
+    expect(typeof rule.params.answerWord).toBe("string");
+    expect((rule.params.answerWord as string).length).toBeGreaterThan(0);
+  });
+
+  it("passes when password contains the word form (case-insensitive)", () => {
+    const rule = mathWordsRule.create(mulberry32(13));
+    const aw = rule.params.answerWord as string;
+    expect(rule.validate(makeState(`abc${aw}xyz`, rule)).passed).toBe(true);
+    expect(rule.validate(makeState(`abc${aw.toUpperCase()}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails when password does not contain the word form", () => {
+    const rule = mathWordsRule.create(mulberry32(13));
+    expect(rule.validate(makeState("random text", rule)).passed).toBe(false);
   });
 });
