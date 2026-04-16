@@ -550,6 +550,20 @@ const ACHIEVEMENTS: AchievementDef[] = [
       r.mode === "speedrun" && r.floors.length - 1 >= 50 && r.runRecord.durationMs < 60_000 },
 ];
 
+function unlockThemes(r: GameRefs) {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + "themes");
+    const owned = new Set<ThemeId>(raw ? JSON.parse(raw) : ["classic"]);
+    owned.add("classic");
+    if (r.score >= 3000) owned.add("neon");
+    if (r.score >= 8000) owned.add("gold");
+    if (r.score >= 15000) owned.add("crystal");
+    const runs = Number(localStorage.getItem(LS_PREFIX + "total_runs") || "0");
+    if (runs >= 50) owned.add("pixel");
+    localStorage.setItem(LS_PREFIX + "themes", JSON.stringify([...owned]));
+  } catch {}
+}
+
 function checkAchievements(r: GameRefs): string[] {
   try {
     const raw = localStorage.getItem(LS_PREFIX + "achievements");
@@ -625,6 +639,49 @@ function AchievementsStrip() {
             {a.name.split(" ")[0]}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const THEMES: { id: ThemeId; name: string; requirement: string }[] = [
+  { id: "classic", name: "Classic", requirement: "Default" },
+  { id: "neon", name: "Neon", requirement: "Score 3000" },
+  { id: "gold", name: "Gold", requirement: "Score 8000" },
+  { id: "crystal", name: "Crystal", requirement: "Score 15000" },
+  { id: "pixel", name: "Pixel", requirement: "50 runs" },
+];
+
+function ThemePicker({ active, onChange }: { active: ThemeId; onChange: (t: ThemeId) => void }) {
+  const [owned, setOwned] = useState<Set<ThemeId>>(new Set(["classic"]));
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_PREFIX + "themes");
+      setOwned(new Set(raw ? JSON.parse(raw) : ["classic"]));
+    } catch {}
+  }, []);
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wider text-neutral-500 mb-1">Theme</div>
+      <div className="grid grid-cols-5 gap-2">
+        {THEMES.map((t) => {
+          const unlocked = owned.has(t.id);
+          return (
+            <button
+              key={t.id}
+              disabled={!unlocked}
+              onClick={() => unlocked && onChange(t.id)}
+              title={unlocked ? t.name : `Locked: ${t.requirement}`}
+              className={`rounded-lg px-2 py-3 text-xs border ${
+                active === t.id ? "border-red-500 bg-red-500/15 text-red-200"
+                : unlocked ? "border-neutral-600 bg-neutral-800/60 text-neutral-300 hover:border-neutral-400"
+                : "border-neutral-800 bg-neutral-900 text-neutral-600 cursor-not-allowed"
+              }`}
+            >
+              {t.name}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -976,6 +1033,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
       const floors = r.floors.length - 1;
       if (floors > hf) localStorage.setItem(LS_PREFIX + "highfloors", String(floors));
     } catch {}
+    unlockThemes(r);
     const newlyUnlocked = checkAchievements(r);
     r.achievementsUnlockedThisRun = newlyUnlocked;
     if (newlyUnlocked.length > 0) {
@@ -1417,6 +1475,15 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
                   ))}
                 </div>
               </div>
+
+              <ThemePicker
+                active={refs.current.theme}
+                onChange={(t) => {
+                  refs.current.theme = t;
+                  try { localStorage.setItem(LS_PREFIX + "theme", t); } catch {}
+                  forceTick((n) => (n + 1) % 1_000_000);
+                }}
+              />
 
               <label className="flex items-center gap-2 text-sm text-neutral-300">
                 <input
