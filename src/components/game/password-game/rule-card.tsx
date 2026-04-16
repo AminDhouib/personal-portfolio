@@ -86,6 +86,34 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     );
   }
 
+  const shapesMatch = text.match(/\[\[SHAPES:([TCS]{16}):([TCS])\]\]/);
+  if (shapesMatch) {
+    const before = text.slice(0, shapesMatch.index);
+    const cells = [...shapesMatch[1]] as ReadonlyArray<"T" | "C" | "S">;
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <ShapeGrid cells={cells} />
+      </>
+    );
+  }
+
+  const diceMatch = text.match(/\[\[DICE:(\d+(?:,\d+)*)\]\]/);
+  if (diceMatch) {
+    const before = text.slice(0, diceMatch.index);
+    const faces = diceMatch[1].split(",").map(Number).filter((n) => n >= 1 && n <= 6);
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <div className="mt-2 inline-flex items-center gap-2">
+          {faces.map((v, i) => (
+            <DieFace key={i} value={v} />
+          ))}
+        </div>
+      </>
+    );
+  }
+
   const binaryMatch = text.match(/\[\[BINARY:([01]{8})\]\]/);
   if (binaryMatch) {
     const before = text.slice(0, binaryMatch.index);
@@ -221,6 +249,63 @@ function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
         background,
       }}
     />
+  );
+}
+
+/** 4×4 grid of mixed shapes (triangle / circle / square) for the count rule. */
+function ShapeGrid({ cells }: { cells: ReadonlyArray<"T" | "C" | "S"> }) {
+  const COLORS: Record<"T" | "C" | "S", string> = {
+    T: "#f97316",
+    C: "#22d3ee",
+    S: "#a78bfa",
+  };
+  return (
+    <div className="mt-2 inline-grid grid-cols-4 gap-1 rounded-md bg-(--background) border border-(--border) p-2">
+      {cells.map((shape, i) => (
+        <svg key={i} width={24} height={24} viewBox="0 0 24 24" aria-hidden>
+          {shape === "T" && (
+            <polygon points="12,4 22,20 2,20" fill={COLORS.T} />
+          )}
+          {shape === "C" && (
+            <circle cx={12} cy={12} r={9} fill={COLORS.C} />
+          )}
+          {shape === "S" && (
+            <rect x={4} y={4} width={16} height={16} fill={COLORS.S} />
+          )}
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+/** 6-sided die face, rendered with pip patterns for values 1..6. */
+function DieFace({ value }: { value: number }) {
+  // Pip grid: 3×3 cells. For each value, which cells are lit.
+  const PIPS: Record<number, readonly [number, number][]> = {
+    1: [[1, 1]],
+    2: [[0, 0], [2, 2]],
+    3: [[0, 0], [1, 1], [2, 2]],
+    4: [[0, 0], [0, 2], [2, 0], [2, 2]],
+    5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+    6: [[0, 0], [1, 0], [2, 0], [0, 2], [1, 2], [2, 2]],
+  };
+  const size = 36;
+  const padding = 5;
+  const cell = (size - padding * 2) / 3;
+  const lit = PIPS[value] ?? [];
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`die showing ${value}`} role="img">
+      <rect x={1} y={1} width={size - 2} height={size - 2} rx={5} fill="#f8fafc" stroke="#0f172a" strokeWidth={1.5} />
+      {lit.map(([r, c], i) => (
+        <circle
+          key={i}
+          cx={padding + c * cell + cell / 2}
+          cy={padding + r * cell + cell / 2}
+          r={cell / 4}
+          fill="#0f172a"
+        />
+      ))}
+    </svg>
   );
 }
 

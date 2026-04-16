@@ -7,6 +7,7 @@ import { moonPhaseRule } from "./tier3-moon";
 import { clockRule } from "./tier3-clock";
 import { zodiacRule } from "./tier3-zodiac";
 import { binaryDecodeRule } from "./tier3-binary";
+import { shapeCountRule } from "./tier3-shape-count";
 
 function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
   let n = 0;
@@ -164,4 +165,5 @@ export const TIER_3_RULES: readonly RuleDef[] = [
   clockRule,
   zodiacRule,
   binaryDecodeRule,
+  shapeCountRule,
 ];
