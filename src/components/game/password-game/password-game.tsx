@@ -8,6 +8,7 @@ import { TIER_2_RULES } from "./rules/tier2";
 import { RuleCard } from "./rule-card";
 import { pickForeshadow, useForeshadowTrigger, ForeshadowOverlay } from "./foreshadowing";
 import { CracksOverlay } from "./destruction";
+import { ResultModal } from "./result-modal";
 import type { GameState, Rule } from "./types";
 
 function makeSeed(): number {
@@ -17,16 +18,10 @@ function makeSeed(): number {
 export function PasswordGame() {
   const [seed, setSeed] = useState<number>(() => makeSeed());
   const [password, setPassword] = useState<string>("");
-  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const [timerRunning, setTimerRunning] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [startedAt]);
 
   const rules: Rule[] = useMemo(
     () =>
@@ -52,6 +47,7 @@ export function PasswordGame() {
   const results = useMemo(() => validateRules(state), [state]);
   const activeIdx = useMemo(() => computeActiveRuleIndex(state), [state]);
   const satisfiedCount = results.filter((r) => r.passed).length;
+  const allPassed = activeIdx === -1 && rules.length > 0;
 
   // Chaos level = the highest tier the player has unlocked, bumped by 1 per
   // fully cleared tier. We floor at 0 and cap at 5 to keep CSS contracts stable.
@@ -69,6 +65,19 @@ export function PasswordGame() {
     return Math.min(5, Math.max(0, max));
   }, [rules, results]);
 
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = window.setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [timerRunning]);
+
+  useEffect(() => {
+    if (allPassed && timerRunning) {
+      setTimerRunning(false);
+      setShowResult(true);
+    }
+  }, [allPassed, timerRunning]);
+
   const foreshadowKind = useMemo(() => pickForeshadow(seed), [seed]);
   const foreshadowFired = useForeshadowTrigger(satisfiedCount, 2);
 
@@ -79,11 +88,10 @@ export function PasswordGame() {
   const reset = useCallback(() => {
     setSeed(makeSeed());
     setPassword("");
-    setStartedAt(Date.now());
     setElapsedSeconds(0);
+    setTimerRunning(false);
+    setShowResult(false);
   }, []);
-
-  const allPassed = activeIdx === -1 && rules.length > 0;
 
   return (
     <div
@@ -98,6 +106,10 @@ export function PasswordGame() {
           <Key className="h-4 w-4 text-accent-pink" />
           <span className="text-xs font-medium text-(--muted)">
             Seed: <span className="font-mono text-(--foreground)">{seed}</span>
+            {" • "}
+            <span className="font-mono text-(--foreground)">
+              {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
+            </span>
           </span>
         </div>
         <button
@@ -116,7 +128,10 @@ export function PasswordGame() {
       <textarea
         id="pg-input"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => {
+          setPassword(e.target.value);
+          if (!timerRunning && e.target.value.length > 0) setTimerRunning(true);
+        }}
         rows={3}
         className="w-full rounded-lg border border-(--border) bg-(--background) px-4 py-3 font-mono text-base text-(--foreground) focus:outline-none focus:border-accent-pink/60 resize-none"
         spellCheck={false}
@@ -145,9 +160,18 @@ export function PasswordGame() {
 
       {allPassed && (
         <div className="mt-5 rounded-lg border border-accent-green/40 bg-accent-green/10 px-4 py-3 text-sm text-accent-green">
-          Tiers 1-2 cleared. (Tiers 3-5 coming soon.)
+          All rules cleared in {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}!
         </div>
       )}
+
+      <ResultModal
+        open={showResult}
+        seed={seed}
+        timeSeconds={elapsedSeconds}
+        rulesCleared={rules.length}
+        tiers={rules.map((r) => r.tier)}
+        onClose={() => setShowResult(false)}
+      />
 
       <ForeshadowOverlay
         kind={foreshadowKind}
