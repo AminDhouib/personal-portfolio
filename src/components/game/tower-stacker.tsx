@@ -471,6 +471,9 @@ function formatTime(ms: number): string {
   return `${mm}:${ss}.${cs}`;
 }
 
+function SpeakerOn() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm12 2a4 4 0 0 0-2-3.5v7a4 4 0 0 0 2-3.5z"/></svg>; }
+function SpeakerOff() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2l2.5 2.5-1 1-2.5-2.5-2.5 2.5-1-1 2.5-2.5-2.5-2.5 1-1 2.5 2.5 2.5-2.5 1 1-2.5 2.5z"/></svg>; }
+
 export default function TowerStacker() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -526,6 +529,78 @@ export default function TowerStacker() {
   const [uiHp, setUiHp] = useState(3);
   const [uiCombo, setUiCombo] = useState(0);
 
+  interface AudioHandle {
+    ctx: AudioContext;
+    master: GainNode;
+  }
+  const audioRef = useRef<AudioHandle | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
+
+  function ensureAudio(): AudioHandle | null {
+    if (audioRef.current) return audioRef.current;
+    try {
+      const AC: typeof AudioContext = window.AudioContext
+        || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AC();
+      const master = ctx.createGain();
+      master.gain.value = soundOn ? 0.4 : 0;
+      master.connect(ctx.destination);
+      audioRef.current = { ctx, master };
+      return audioRef.current;
+    } catch { return null; }
+  }
+
+  function playTone(freq: number, wave: OscillatorType, duration: number, gain = 1, attack = 0.01) {
+    const h = ensureAudio();
+    if (!h) return;
+    const t = h.ctx.currentTime;
+    const o = h.ctx.createOscillator();
+    const g = h.ctx.createGain();
+    o.type = wave;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    o.connect(g); g.connect(h.master);
+    o.start(t); o.stop(t + duration + 0.02);
+  }
+
+  function playNoise(duration: number, gain = 0.6) {
+    const h = ensureAudio();
+    if (!h) return;
+    const bufferSize = Math.floor(h.ctx.sampleRate * duration);
+    const buffer = h.ctx.createBuffer(1, bufferSize, h.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const src = h.ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = h.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g); g.connect(h.master);
+    src.start();
+  }
+
+  function playLand() { playTone(131, "triangle", 0.15, 0.5); }
+  function playPerfect(combo: number) {
+    const semi = Math.min(combo, 24);
+    const freq = 261.63 * Math.pow(2, semi / 12);
+    playTone(freq, "sine", 0.25, 0.5);
+  }
+  function playMiss() {
+    playTone(110, "sawtooth", 0.3, 0.45);
+    playTone(82, "sawtooth", 0.3, 0.35);
+  }
+  function playGolden() {
+    playTone(523, "sine", 0.3, 0.5);
+    setTimeout(() => playTone(784, "sine", 0.4, 0.5), 80);
+  }
+  function playBiome() {
+    playTone(261, "sine", 0.5, 0.35);
+    playTone(349, "sine", 0.5, 0.35);
+    playTone(392, "sine", 0.5, 0.35);
+  }
+  function playUi() { playTone(440, "square", 0.04, 0.3); }
+
   function spawnBlock() {
     const r = refs.current;
     const { w, h } = viewportRef.current;
@@ -575,6 +650,7 @@ export default function TowerStacker() {
         color: `hsl(${a.hue} 80% 55%)`,
         width: a.width, height: a.height,
       });
+      playMiss(); playNoise(0.08, 0.3);
       r.perfectCombo = 0;
       setUiCombo(0);
       r.activeBlock = null;
@@ -607,6 +683,7 @@ export default function TowerStacker() {
           size: 3, color: "#fde047",
         });
       }
+      playPerfect(r.perfectCombo);
     } else {
       newWidth = overlapW;
       newX = overlapL;
@@ -640,6 +717,7 @@ export default function TowerStacker() {
         setTimeout(() => { r.cameraTargetScale /= 0.95; }, 320);
       }
       r.perfectCombo = 0;
+      playLand();
     }
 
     r.floors.push({
@@ -673,6 +751,7 @@ export default function TowerStacker() {
         r.biomeTransition = 0;
         r.bannerText = `${b.label} REACHED`;
         r.bannerTime = 2.0;
+        playBiome();
         break;
       }
     }
@@ -705,6 +784,7 @@ export default function TowerStacker() {
           color: "#fde047",
         });
       }
+      playGolden();
     }
 
     r.activeBlock = null;
@@ -986,6 +1066,11 @@ export default function TowerStacker() {
       if (t === "classic" || t === "neon" || t === "gold" || t === "crystal" || t === "pixel") {
         refs.current.theme = t;
       }
+      const s = localStorage.getItem(LS_PREFIX + "sound");
+      if (s !== null) {
+        const on = s === "true";
+        setSoundOn(on);
+      }
     } catch {}
     forceTick((n) => (n + 1) % 1_000_000);
   }, []);
@@ -1032,6 +1117,20 @@ export default function TowerStacker() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSoundOn((s) => {
+                    const next = !s;
+                    try { localStorage.setItem(LS_PREFIX + "sound", String(next)); } catch {}
+                    if (audioRef.current) audioRef.current.master.gain.value = next ? 0.4 : 0;
+                    return next;
+                  });
+                }}
+                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-10 h-10 flex items-center justify-center"
+                aria-label="Toggle sound"
+              >
+                {soundOn ? <SpeakerOn /> : <SpeakerOff />}
+              </button>
               {refs.current.mode === "classic" && (
                 <div className="flex gap-1">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -1091,7 +1190,7 @@ export default function TowerStacker() {
             </div>
 
             <button
-              onClick={() => startRun()}
+              onClick={() => { playUi(); startRun(); }}
               className="w-full rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold py-3 text-lg shadow-lg shadow-red-900/30 transition"
             >
               START
