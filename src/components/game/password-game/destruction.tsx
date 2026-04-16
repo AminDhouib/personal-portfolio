@@ -313,17 +313,9 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
           "
           fill={BG}
         />
-        {/* Very subtle lighter edge on the "sunlit" side of the crack.
-            Barely visible — just enough to suggest depth where light catches
-            the broken edge. */}
-        <polyline
-          points="8,8 22,14 38,8 54,22 72,18 88,34 106,30 122,50 136,48 154,68 170,66 188,88 196,100"
-          fill="none"
-          stroke="rgba(255,255,255,0.18)"
-          strokeWidth="0.4"
-          strokeLinejoin="miter"
-          strokeLinecap="round"
-        />
+        {/* Strokes removed entirely — the crack reads as pure void.
+            The contrast between the card fill and the page-background
+            polygon fill is enough to define the shape. */}
 
         {/*
          * Secondary branch — radiates from impact in a different direction.
@@ -358,14 +350,6 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
             32,24
           "
           fill={BG}
-        />
-        <polyline
-          points="10,10 28,30 22,46 38,60 30,78 48,90 40,108 58,122 48,138 60,154 56,170 68,188 74,196"
-          fill="none"
-          stroke="rgba(255,255,255,0.15)"
-          strokeWidth="0.35"
-          strokeLinejoin="miter"
-          strokeLinecap="round"
         />
 
         {/*
@@ -407,14 +391,7 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
          * Surface hairline fractures — thin white lines NOT filled with
          * background (these are stress marks on the glass, not through-cracks).
          */}
-        <g fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.2" strokeLinecap="round">
-          <path d="M 30 10 L 42 18 L 50 16" />
-          <path d="M 100 40 L 112 44 L 118 40" />
-          <path d="M 160 80 L 172 86 L 180 82" />
-          <path d="M 14 38 L 26 42 L 34 40" />
-          <path d="M 36 70 L 48 74 L 56 72" />
-          <path d="M 54 122 L 68 118 L 76 122" />
-        </g>
+        {/* Surface hairline strokes removed — were reading as drawn lines. */}
       </g>
     </svg>
   );
