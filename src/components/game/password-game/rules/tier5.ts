@@ -59,4 +59,27 @@ const noLetter: RuleDef = {
   },
 };
 
-export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput, blurredInput, noLetter];
+const lastWordLength: RuleDef = {
+  id: "last-word-length",
+  tier: 5,
+  create(rng) {
+    const length = rangeInt(rng, 4, 7);
+    return {
+      id: "last-word-length",
+      tier: 5,
+      description: `The final word of your password must be exactly ${length} characters long.`,
+      params: { length },
+      validate(state) {
+        const words = state.password.trim().split(/\s+/).filter((w) => w.length > 0);
+        const last = words[words.length - 1];
+        if (!last) return { passed: false };
+        return {
+          passed: [...last].length === length,
+          message: last ? `${[...last].length} / ${length}` : undefined,
+        };
+      },
+    };
+  },
+};
+
+export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput, blurredInput, noLetter, lastWordLength];

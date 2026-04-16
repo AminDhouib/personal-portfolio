@@ -79,3 +79,32 @@ describe("Tier 5 — no-letter rule", () => {
     expect(rule.validate(makeState(clean, rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 5 — last word length rule", () => {
+  const def = TIER_5_RULES.find((r) => r.id === "last-word-length")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params include a target length 4-7", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const n = rule.params.length as number;
+      expect(n).toBeGreaterThanOrEqual(4);
+      expect(n).toBeLessThanOrEqual(7);
+    }
+  });
+
+  it("passes when the final word has the required length", () => {
+    const rule = def.create(mulberry32(1));
+    const n = rule.params.length as number;
+    const last = "x".repeat(n);
+    expect(rule.validate(makeState(`hello world ${last}`, rule)).passed).toBe(true);
+  });
+
+  it("fails when the final word has the wrong length", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("hello world ab", rule)).passed).toBe(false);
+  });
+});
