@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
-import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket, Hexagon, Key, Zap } from "lucide-react";
+import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket, Hexagon, Key, Zap, Layers } from "lucide-react";
 
 const GeometricFlowGame = dynamic(
   () =>
@@ -44,6 +44,11 @@ const SuperVoltorbFlipGame = dynamic(
     ),
   { ssr: false, loading: () => <GameSkeleton /> }
 );
+
+const TowerStacker = dynamic(() => import("@/components/game/tower-stacker"), {
+  ssr: false,
+  loading: () => <GameSkeleton />,
+});
 
 function GameSkeleton() {
   return (
@@ -126,6 +131,14 @@ const GAMES: GameEntry[] = [
     available: true,
     controls: "Click tiles to flip. Open memo mode to mark possibilities. Spend coins on Shields & Reveals.",
   },
+  {
+    id: "tower-stacker",
+    title: "Tower Stacker",
+    description: "Stack blocks. Miss a sliver, lose width. Perfect stacks ring higher. How tall can you build?",
+    icon: Layers,
+    iconColor: "text-accent-red",
+    available: true,
+  },
 ];
 
 function ExternalOrTabButton({
@@ -149,6 +162,8 @@ function ExternalOrTabButton({
         ? "border-accent-amber/50 bg-accent-amber/10 text-accent-amber"
         : game.id === "hextris"
         ? "border-purple-400/50 bg-purple-400/10 text-purple-400"
+        : game.id === "tower-stacker"
+        ? "border-accent-red/50 bg-accent-red/10 text-accent-red"
         : "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
       : "border-(--border) text-(--muted) hover:border-(--muted)/40 hover:text-(--foreground)"
   }`;
@@ -268,6 +283,19 @@ export function GamesClient() {
 
       {/* Super Voltorb Flip */}
       {activeGame === "super-voltorb-flip" && <SuperVoltorbFlipGame />}
+
+      {/* Tower Stacker */}
+      {activeGame === "tower-stacker" && (
+        <div>
+          <div className="mb-4">
+            <h2 className="font-display text-xl font-bold">Tower Stacker</h2>
+            <p className="text-sm text-(--muted) mt-0.5">
+              Stack blocks. Miss a sliver, lose width. Perfect stacks ring higher. How tall can you build?
+            </p>
+          </div>
+          <TowerStacker />
+        </div>
+      )}
     </div>
   );
 }
