@@ -95,6 +95,26 @@ function GameScreen({
   }, [save.musicVolume]);
 
   useEffect(() => {
+    return () => {
+      try {
+        bgmRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      bgmRef.current = null;
+      const ctx = audioCtxRef.current;
+      if (ctx) {
+        try {
+          ctx.close();
+        } catch {
+          /* ignore */
+        }
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (state.stats.highestSingleRoundCoins > lastSubmittedRef.current) {
       setPendingSubmit(state.stats.highestSingleRoundCoins);
     }
