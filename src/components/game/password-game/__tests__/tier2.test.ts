@@ -40,3 +40,31 @@ describe("Tier 2 — NATO phonetic rule", () => {
     expect(rule.validate(makeState("abc", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 2 — math equation rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "math-equation")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("description contains the equation and the expected answer type is a number", () => {
+    const rule = def.create(mulberry32(3));
+    expect(typeof rule.params.answer).toBe("number");
+    expect(rule.description).toMatch(/[0-9]+\s*[+\-*]\s*[0-9]+/);
+  });
+
+  it("passes when password contains the correct answer", () => {
+    const rule = def.create(mulberry32(3));
+    const ans = rule.params.answer as number;
+    expect(rule.validate(makeState(`start${ans}end`, rule)).passed).toBe(true);
+  });
+
+  it("fails without the correct answer (also rejects adjacent digits on either side)", () => {
+    const rule = def.create(mulberry32(3));
+    const ans = rule.params.answer as number;
+    expect(rule.validate(makeState(`${ans}0`, rule)).passed).toBe(false);
+    expect(rule.validate(makeState(`9${ans}`, rule)).passed).toBe(false);
+    expect(rule.validate(makeState("abc", rule)).passed).toBe(false);
+  });
+});
