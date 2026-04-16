@@ -59,7 +59,7 @@ const NEAR_MISS_POINTS = 15;
 // hasn't started — waiting for the player's first mouse/touch/key input.
 type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
 type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp" | "magnet";
-type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter";
+type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter" | "zapper";
 type BulletStyle = "sprite" | "bolt" | "plasma";
 
 interface Environment {
@@ -1186,6 +1186,7 @@ function unlockedVariants(seconds: number): ObstacleVariant[] {
   if (seconds > 25) list.push("heavy");
   if (seconds > 50) list.push("speeder");
   if (seconds > 90) list.push("shooter");
+  if (seconds > 130) list.push("zapper");
   return list;
 }
 
@@ -1251,6 +1252,10 @@ function spawnObstacle(g: GameRefs): Obstacle {
     size = 0.7 + Math.random() * 0.2;
     hp = 2;
     speed = baseSpeed * 0.55; // slow — gives the player time to dodge its shots
+  } else if (variant === "zapper") {
+    size = 0.6 + Math.random() * 0.2;
+    hp = 3;                   // tougher than shooter, incentivizes dodging
+    speed = baseSpeed * 0.6;
   }
 
   // ~25% of basic asteroids get a lateral drift so even a stationary player
@@ -2763,6 +2768,43 @@ function runTick(
       if (d < o.closestApproach) o.closestApproach = d;
     }
 
+    // Zapper variant: a 1.1s vertical electric column fires every 2.5s while on
+    // screen. Ship dies if in the column's X band during the beam-on phase.
+    if (o.variant === "zapper" && g.status === "playing" && o.z > -25 && o.z < 2) {
+      const CYCLE_MS = 2500;
+      const BEAM_MS = 1100;
+      const cycleAge = ((now - g.startedAt) + o.id * 317) % CYCLE_MS; // desync per-zapper
+      const beamOn = cycleAge < BEAM_MS;
+      if (beamOn) {
+        const dx = g.shipX - o.x;
+        const dz = g.shipZ - o.z;
+        const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
+        if (Math.abs(dx) < 0.6 && Math.abs(dz) < 2.5 &&
+            now > g.invulnUntil && !shieldedShip) {
+          if (g.reviveAvailable && !g.reviveUsed) {
+            g.reviveAvailable = false;
+            g.reviveUsed = true;
+            g.invulnUntil = now + 2500;
+            spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#22d3ee", 900, 0.9);
+            sounds.play("shieldOn");
+          } else {
+            g.damageTakenThisRun += 1;
+            g.status = "dying";
+            g.dyingAt = now;
+            g.deathVelX = (Math.random() - 0.5) * 6;
+            g.deathVelY = 4;
+            g.deathVelZ = 2;
+            g.deathAngVel = (Math.random() - 0.5) * 10;
+            spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#06b6d4", 500, 0.5);
+            spawnShipDebris(g);
+            sounds.play("crash");
+            sounds.stopMusic(0.4);
+            sounds.playLosingJingle();
+          }
+        }
+      }
+    }
+
     // Shooter variant: fire aimed projectiles every 1.6s while in visible Z band
     if (o.variant === "shooter" && g.status === "playing" && o.z > -25 && o.z < 2) {
       const SHOOT_INTERVAL_MS = 1600;
@@ -3200,12 +3242,18 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     emissive: "#b45309",
     emissiveIntensity: 0.7,
   }), []);
+  const zapperMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: "#06b6d4",          // cyan — "electric"
+    emissive: "#0e7490",
+    emissiveIntensity: 0.8,
+  }), []);
   useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
   useEffect(() => () => baseMat.dispose(), [baseMat]);
   useEffect(() => () => heavyMat.dispose(), [heavyMat]);
   useEffect(() => () => speederMat.dispose(), [speederMat]);
   useEffect(() => () => wallMat.dispose(), [wallMat]);
   useEffect(() => () => shooterMat.dispose(), [shooterMat]);
+  useEffect(() => () => zapperMat.dispose(), [zapperMat]);
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -3225,6 +3273,7 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     : v === "speeder" ? speederMat
     : v === "wall" ? wallMat
     : v === "shooter" ? shooterMat
+    : v === "zapper" ? zapperMat
     : baseMat;
 
   return (
@@ -3495,6 +3544,187 @@ function ShipPreview({ color }: { color: string }) {
   );
 }
 
+type UpgradeIcon = "magnet" | "coins" | "trophy" | "timer" | "shield";
+
+function SpinningUpgradeMesh({ icon }: { icon: UpgradeIcon }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => {
+    if (ref.current) {
+      ref.current.rotation.y += dt * 1.4;
+      ref.current.rotation.x = Math.sin(performance.now() * 0.001) * 0.2;
+    }
+  });
+  if (icon === "magnet") {
+    return (
+      <group ref={ref}>
+        <mesh rotation={[0, 0, Math.PI]}>
+          <torusGeometry args={[0.3, 0.09, 10, 22, Math.PI]} />
+          <meshStandardMaterial color="#10b981" emissive="#064e3b" emissiveIntensity={0.6} />
+        </mesh>
+        <mesh position={[-0.3, -0.08, 0]}>
+          <boxGeometry args={[0.13, 0.13, 0.13]} />
+          <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+        </mesh>
+        <mesh position={[0.3, -0.08, 0]}>
+          <boxGeometry args={[0.13, 0.13, 0.13]} />
+          <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+        </mesh>
+      </group>
+    );
+  }
+  if (icon === "coins") {
+    return (
+      <group ref={ref}>
+        {[0, 0.1, 0.2].map((y, i) => (
+          <mesh key={i} position={[0, y - 0.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.3, 0.3, 0.06, 24]} />
+            <meshStandardMaterial color="#fde047" emissive="#ca8a04" emissiveIntensity={0.5} metalness={0.6} roughness={0.3} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+  if (icon === "trophy") {
+    return (
+      <group ref={ref}>
+        <mesh position={[0, 0.15, 0]}>
+          <cylinderGeometry args={[0.26, 0.18, 0.36, 16]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#78350f" emissiveIntensity={0.4} metalness={0.7} roughness={0.25} />
+        </mesh>
+        <mesh position={[0, -0.12, 0]}>
+          <boxGeometry args={[0.35, 0.08, 0.35]} />
+          <meshStandardMaterial color="#7c2d12" emissive="#451a03" emissiveIntensity={0.3} />
+        </mesh>
+      </group>
+    );
+  }
+  if (icon === "timer") {
+    return (
+      <group ref={ref}>
+        <mesh>
+          <torusGeometry args={[0.28, 0.05, 10, 24]} />
+          <meshStandardMaterial color="#22d3ee" emissive="#0e7490" emissiveIntensity={0.6} />
+        </mesh>
+        {/* Clock hand */}
+        <mesh position={[0.1, 0, 0.01]}>
+          <boxGeometry args={[0.18, 0.04, 0.03]} />
+          <meshStandardMaterial color="#06b6d4" emissive="#0e7490" emissiveIntensity={0.6} />
+        </mesh>
+      </group>
+    );
+  }
+  // shield
+  return (
+    <group ref={ref}>
+      <mesh>
+        <sphereGeometry args={[0.3, 18, 12]} />
+        <meshStandardMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.5} wireframe />
+      </mesh>
+      <mesh scale={[0.75, 0.75, 0.75]}>
+        <sphereGeometry args={[0.3, 14, 10]} />
+        <meshStandardMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.4} transparent opacity={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+function UpgradePreview({ icon }: { icon: UpgradeIcon }) {
+  return (
+    <div className="w-12 h-12 shrink-0 rounded-md bg-black/40 border border-white/10 overflow-hidden">
+      <Canvas camera={{ position: [0, 0, 1.5], fov: 40 }} dpr={[1, 1.5]}>
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[2, 3, 2]} intensity={0.5} />
+        <SpinningUpgradeMesh icon={icon} />
+      </Canvas>
+    </div>
+  );
+}
+
+type ConsumableIcon = "rocket" | "coins" | "heart" | "sparkles";
+
+function SpinningConsumableMesh({ icon }: { icon: ConsumableIcon }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => {
+    if (ref.current) {
+      ref.current.rotation.y += dt * 1.4;
+      ref.current.rotation.x = Math.sin(performance.now() * 0.001) * 0.2;
+    }
+  });
+  if (icon === "rocket") {
+    return (
+      <group ref={ref}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.16, 0.6, 12]} />
+          <meshStandardMaterial color="#ec4899" emissive="#831843" emissiveIntensity={0.55} />
+        </mesh>
+        <mesh position={[0, -0.28, 0]}>
+          <sphereGeometry args={[0.12, 10, 10]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+  if (icon === "coins") {
+    return (
+      <group ref={ref}>
+        {[0, 0.08, 0.16].map((y, i) => (
+          <mesh key={i} position={[0, y - 0.08, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.26, 0.26, 0.05, 20]} />
+            <meshStandardMaterial color="#fde047" emissive="#ca8a04" emissiveIntensity={0.55} metalness={0.6} roughness={0.3} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+  if (icon === "heart") {
+    return (
+      <group ref={ref}>
+        <mesh position={[-0.12, 0.06, 0]}>
+          <sphereGeometry args={[0.16, 10, 10]} />
+          <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+        </mesh>
+        <mesh position={[0.12, 0.06, 0]}>
+          <sphereGeometry args={[0.16, 10, 10]} />
+          <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+        </mesh>
+        <mesh position={[0, -0.14, 0]} rotation={[0, 0, Math.PI / 4]}>
+          <boxGeometry args={[0.28, 0.28, 0.16]} />
+          <meshStandardMaterial color="#ef4444" emissive="#7f1d1d" emissiveIntensity={0.5} />
+        </mesh>
+      </group>
+    );
+  }
+  // sparkles
+  return (
+    <group ref={ref}>
+      <mesh>
+        <octahedronGeometry args={[0.28, 0]} />
+        <meshStandardMaterial color="#a78bfa" emissive="#6d28d9" emissiveIntensity={0.7} />
+      </mesh>
+      <mesh scale={0.55} position={[0.25, 0.2, 0]}>
+        <octahedronGeometry args={[0.28, 0]} />
+        <meshStandardMaterial color="#fef08a" emissive="#ca8a04" emissiveIntensity={0.8} />
+      </mesh>
+      <mesh scale={0.4} position={[-0.25, -0.15, 0]}>
+        <octahedronGeometry args={[0.28, 0]} />
+        <meshStandardMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
+function ConsumablePreview({ icon }: { icon: ConsumableIcon }) {
+  return (
+    <div className="w-11 h-11 shrink-0 rounded-md bg-black/40 border border-white/10 overflow-hidden">
+      <Canvas camera={{ position: [0, 0, 1.4], fov: 40 }} dpr={[1, 1.5]}>
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[2, 3, 2]} intensity={0.5} />
+        <SpinningConsumableMesh icon={icon} />
+      </Canvas>
+    </div>
+  );
+}
+
 function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
   const [version, setVersion] = useState(0);
   const list = useMemo(() => activeMissions(), [version]);
@@ -3542,6 +3772,52 @@ function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
         );
       })}
     </div>
+  );
+}
+
+function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const meshRefs = useRef<Map<number, THREE.Mesh>>(new Map());
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    const now = performance.now();
+    const CYCLE_MS = 2500;
+    const BEAM_MS = 1100;
+    for (const o of g.obstacles) {
+      if (o.variant !== "zapper") continue;
+      const mesh = meshRefs.current.get(o.id);
+      if (!mesh) continue;
+      const cycleAge = ((now - g.startedAt) + o.id * 317) % CYCLE_MS;
+      const beamOn = cycleAge < BEAM_MS;
+      mesh.visible = beamOn && o.z > -25 && o.z < 2;
+      if (mesh.visible) {
+        mesh.position.set(o.x, o.y, o.z);
+        // Flicker opacity for "electric" feel
+        const mat = mesh.material as THREE.MeshBasicMaterial;
+        const flicker = 0.55 + Math.sin(now * 0.05) * 0.25 + (Math.random() - 0.5) * 0.1;
+        mat.opacity = Math.max(0.25, Math.min(1, flicker));
+      }
+    }
+  });
+  const zappers = (gameRefs.current?.obstacles ?? []).filter((o) => o.variant === "zapper");
+  return (
+    <group ref={groupRef}>
+      {zappers.map((o) => (
+        <mesh
+          key={`zap-${o.id}`}
+          ref={(el) => {
+            if (el) meshRefs.current.set(o.id, el);
+            else meshRefs.current.delete(o.id);
+          }}
+          visible={false}
+        >
+          <boxGeometry args={[0.45, 6, 0.45]} />
+          <meshBasicMaterial color="#22d3ee" transparent opacity={0.7} />
+        </mesh>
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
   );
 }
 
@@ -4141,6 +4417,7 @@ function Scene({
       <SpeedLines gameRefs={gameRefs} env={env} tick={tick} />
       <Ship gameRefs={gameRefs} env={env} />
       <Obstacles gameRefs={gameRefs} env={env} tick={tick} />
+      <ZapperBeams gameRefs={gameRefs} tick={tick} />
       <PowerUps gameRefs={gameRefs} tick={tick} />
       <Coins gameRefs={gameRefs} tick={tick} />
       <BossMesh gameRefs={gameRefs} tick={tick} />
@@ -5017,18 +5294,12 @@ export function SpaceShooterGame() {
                       const maxed = level >= u.maxLevel;
                       const nextCost = maxed ? 0 : u.costAtLevel(level + 1);
                       const affordable = profile.walletCoins >= nextCost;
-                      const Icon =
-                        u.iconKey === "magnet" ? Magnet :
-                        u.iconKey === "coins" ? CoinsIcon :
-                        u.iconKey === "trophy" ? Trophy :
-                        u.iconKey === "timer" ? Timer :
-                        Shield;
                       return (
                         <button
                           key={u.id}
                           onClick={() => !maxed && affordable && buyUpgrade(u.id)}
                           disabled={maxed || !affordable}
-                          className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
+                          className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
                             maxed
                               ? "border-emerald-500/40 bg-emerald-500/10"
                               : affordable
@@ -5036,23 +5307,25 @@ export function SpaceShooterGame() {
                               : "border-white/10 bg-white/5 opacity-50"
                           }`}
                         >
-                          <div className="flex items-center gap-2 w-full">
-                            <Icon className="h-4 w-4 text-accent-blue" />
-                            <span className="font-semibold text-white flex-1">{u.label}</span>
-                            <span className="text-xs font-mono text-white/60">
-                              L{level}/{u.maxLevel}
-                            </span>
-                          </div>
-                          <div className="text-xs text-white/70">{u.description}</div>
-                          <div className="flex items-center gap-1.5 mt-1 text-xs font-mono">
-                            {maxed ? (
-                              <span className="text-emerald-400">MAXED</span>
-                            ) : (
-                              <>
-                                <CoinsIcon className="h-3 w-3 text-accent-amber" />
-                                <span className={affordable ? "text-accent-amber" : "text-white/40"}>{nextCost}</span>
-                              </>
-                            )}
+                          <UpgradePreview icon={u.iconKey} />
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 w-full">
+                              <span className="font-semibold text-white flex-1 truncate">{u.label}</span>
+                              <span className="text-xs font-mono text-white/60">
+                                L{level}/{u.maxLevel}
+                              </span>
+                            </div>
+                            <div className="text-xs text-white/70">{u.description}</div>
+                            <div className="flex items-center gap-1.5 mt-1 text-xs font-mono">
+                              {maxed ? (
+                                <span className="text-emerald-400">MAXED</span>
+                              ) : (
+                                <>
+                                  <CoinsIcon className="h-3 w-3 text-accent-amber" />
+                                  <span className={affordable ? "text-accent-amber" : "text-white/40"}>{nextCost}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </button>
                       );
@@ -5069,7 +5342,8 @@ export function SpaceShooterGame() {
                             key={c.id}
                             className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
                           >
-                            <div className="min-w-0">
+                            <ConsumablePreview icon={c.icon} />
+                            <div className="min-w-0 flex-1">
                               <div className="font-semibold text-white text-sm">{c.label} <span className="text-xs text-slate-400">x{owned}</span></div>
                               <div className="text-xs text-slate-400">{c.description}</div>
                             </div>
