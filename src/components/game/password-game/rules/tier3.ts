@@ -1,5 +1,6 @@
 import type { RuleDef, FormattingMap } from "../types";
 import { rangeInt } from "../prng";
+import { anagramRule, reverseRule } from "./tier3-pack";
 
 function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
   let n = 0;
@@ -142,4 +143,13 @@ const boldItalicParity: RuleDef = {
   },
 };
 
-export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase, boldCount, italicCount, boldItalicParity];
+export const TIER_3_RULES: readonly RuleDef[] = [
+  everyNthUpper,
+  wordCountStrict,
+  alternatingCase,
+  boldCount,
+  italicCount,
+  boldItalicParity,
+  anagramRule,
+  reverseRule,
+];
