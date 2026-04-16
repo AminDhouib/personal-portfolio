@@ -45,15 +45,15 @@ function BorderWobbleFilter() {
     <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
       <defs>
         <filter id="pg-border-wobble" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="2" seed="3">
+          <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="3">
             <animate
               attributeName="baseFrequency"
-              dur="8s"
-              values="0.015 0.02;0.02 0.015;0.015 0.02"
+              dur="10s"
+              values="0.008 0.012;0.012 0.008;0.008 0.012"
               repeatCount="indefinite"
             />
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" scale="2.5" />
+          <feDisplacementMap in="SourceGraphic" scale="1" />
         </filter>
       </defs>
     </svg>

@@ -65,14 +65,14 @@
   mix-blend-mode: overlay;
 }
 
-.pg-chaos-root[data-chaos="3"]::after { opacity: calc(0.5 * var(--fx-scanlines)); }
+.pg-chaos-root[data-chaos="3"]::after { opacity: calc(0.35 * var(--fx-scanlines)); }
 .pg-chaos-root[data-chaos="4"]::after {
-  opacity: calc(0.75 * var(--fx-scanlines));
-  animation: pg-scanline-drift 8s linear infinite;
+  opacity: calc(0.5 * var(--fx-scanlines));
+  animation: pg-scanline-drift 10s linear infinite;
 }
 .pg-chaos-root[data-chaos="5"]::after {
-  opacity: calc(1 * var(--fx-scanlines));
-  animation: pg-scanline-drift 5s linear infinite;
+  opacity: calc(0.65 * var(--fx-scanlines));
+  animation: pg-scanline-drift 7s linear infinite;
 }
 
 @keyframes pg-scanline-drift {
@@ -123,28 +123,24 @@
 }
 
 @keyframes pg-glitch-slice {
-  0%, 96%, 100% {
+  /* Only one brief slice at a time — 1% per cycle (~70ms every 7s). Thin
+     horizontal strips feel like a video tearing, not a full UI overlay. */
+  0%, 97%, 100% {
     opacity: 0;
     clip-path: inset(0 0 0 0);
     transform: translateX(0);
   }
-  97% {
-    opacity: 0.5;
-    clip-path: inset(18% 0 70% 0);
-    transform: translateX(6px);
-    background: rgba(255, 0, 60, 0.08);
-  }
   98% {
-    opacity: 0.6;
-    clip-path: inset(55% 0 25% 0);
-    transform: translateX(-10px);
-    background: rgba(0, 220, 255, 0.1);
+    opacity: 0.75;
+    clip-path: inset(30% 0 64% 0);
+    transform: translateX(calc(6px * var(--fx-glitch)));
+    background: rgba(255, 0, 60, calc(0.12 * var(--fx-glitch)));
   }
-  99% {
-    opacity: 0.4;
-    clip-path: inset(78% 0 8% 0);
-    transform: translateX(4px);
-    background: rgba(255, 255, 255, 0.06);
+  98.5% {
+    opacity: 0.7;
+    clip-path: inset(60% 0 32% 0);
+    transform: translateX(calc(-8px * var(--fx-glitch)));
+    background: rgba(0, 220, 255, calc(0.12 * var(--fx-glitch)));
   }
 }
 
@@ -213,32 +209,30 @@
 }
 
 @keyframes pg-glitch-pulse {
+  /* Resting state (95% of the cycle) keeps the same light chromatic look as
+     the static rule. Only the rare flicker frames (96-98%) ramp up briefly. */
   0%, 95%, 100% {
     text-shadow:
-      calc(-1.2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.75 * var(--fx-chromatic))),
-      calc(1.2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.75 * var(--fx-chromatic))),
-      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext))),
-      calc(1px * var(--fx-ghosttext)) calc(-2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.14 * var(--fx-ghosttext)));
+      calc(-0.7px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.55 * var(--fx-chromatic))),
+      calc(0.7px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.55 * var(--fx-chromatic))),
+      0 calc(1.5px * var(--fx-ghosttext)) calc(2.5px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.1 * var(--fx-ghosttext)));
   }
   96% {
     text-shadow:
-      calc(-3px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.9 * var(--fx-chromatic))),
-      calc(3px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.9 * var(--fx-chromatic))),
-      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext)));
+      calc(-2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.8 * var(--fx-chromatic))),
+      calc(2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.8 * var(--fx-chromatic)));
     transform: translateX(1px);
   }
   97% {
     text-shadow:
-      calc(2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.95 * var(--fx-chromatic))),
-      calc(-2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.95 * var(--fx-chromatic))),
-      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext)));
+      calc(1.5px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.85 * var(--fx-chromatic))),
+      calc(-1.5px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.85 * var(--fx-chromatic)));
     transform: translateX(-1px);
   }
   98% {
     text-shadow:
-      calc(-3px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.9 * var(--fx-chromatic))),
-      calc(3px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.9 * var(--fx-chromatic))),
-      0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext)));
+      calc(-2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.8 * var(--fx-chromatic))),
+      calc(2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.8 * var(--fx-chromatic)));
   }
 }
 
@@ -424,23 +418,18 @@
 .pg-chaos-root[data-chaos="5"] .pg-container {
   background-image:
     radial-gradient(
-      ellipse 80px 16px at 18% 0%,
-      rgba(0, 0, 0, calc(0.35 * var(--fx-burn))) 0%,
-      transparent 100%
-    ),
-    radial-gradient(
-      ellipse 50px 20px at 100% 38%,
-      rgba(0, 0, 0, calc(0.25 * var(--fx-burn))) 0%,
-      transparent 100%
-    ),
-    radial-gradient(
-      ellipse 60px 14px at 72% 100%,
-      rgba(0, 0, 0, calc(0.3 * var(--fx-burn))) 0%,
-      transparent 100%
-    ),
-    radial-gradient(
-      ellipse 40px 30px at 0% 62%,
+      ellipse 60px 10px at 18% 0%,
       rgba(0, 0, 0, calc(0.22 * var(--fx-burn))) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 40px 14px at 100% 38%,
+      rgba(0, 0, 0, calc(0.15 * var(--fx-burn))) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 50px 10px at 72% 100%,
+      rgba(0, 0, 0, calc(0.2 * var(--fx-burn))) 0%,
       transparent 100%
     );
   background-blend-mode: multiply;
@@ -589,28 +578,22 @@
 }
 
 .pg-chaos-root[data-chaos="5"] .pg-rule-description {
+  /* At chaos 5 the RULE TEXT is the player's lifeline — keep it readable.
+     Only the chromatic layer is on by default; ghost/wave/desync wait for
+     the debug panel to opt in. */
   text-shadow:
-    calc(-1.2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.75 * var(--fx-chromatic))),
-    calc(1.2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.75 * var(--fx-chromatic))),
-    0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext))),
-    calc(1px * var(--fx-ghosttext)) calc(-2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.14 * var(--fx-ghosttext)));
-  /* All three text animations play together — individual intensity vars
-     scale their respective visual contributions to 0 when disabled. */
-  animation:
-    pg-glitch-pulse 3.1s steps(1) infinite,
-    pg-text-wave 6s ease-in-out infinite,
-    pg-color-desync 5s ease-in-out infinite;
+    calc(-0.7px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.55 * var(--fx-chromatic))),
+    calc(0.7px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.55 * var(--fx-chromatic))),
+    0 calc(1.5px * var(--fx-ghosttext)) calc(2.5px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.1 * var(--fx-ghosttext)));
+  animation: pg-glitch-pulse 4.5s steps(1) infinite;
 }
 
-/* Border wobble — inline SVG filter creates a turbulent displacement along
-   the container edges, making the border look like it's rippling/melting. */
-.pg-chaos-root[data-chaos="5"] .pg-container {
-  /* referenced from destruction.tsx where the filter is injected */
+/* Border wobble — disabled as ambient effect because feDisplacementMap
+   smears text when applied to the container. Still available if a debug
+   user dials up --fx-borderwobble to 1+. */
+.pg-chaos-root[style*="--fx-borderwobble: 1"] .pg-container,
+.pg-chaos-root[style*="--fx-borderwobble: 2"] .pg-container {
   filter: url(#pg-border-wobble);
-}
-
-.pg-chaos-root[style*="--fx-borderwobble: 0"] .pg-container {
-  filter: none;
 }
 
 /* Screen tear — two pseudo elements overlay the container and clip to
@@ -671,8 +654,8 @@
   color: rgba(180, 255, 180, 0.45);
 }
 
-.pg-chaos-root[data-chaos="4"] .pg-matrix-rain { opacity: calc(0.35 * var(--fx-rain)); }
-.pg-chaos-root[data-chaos="5"] .pg-matrix-rain { opacity: calc(0.6 * var(--fx-rain)); }
+.pg-chaos-root[data-chaos="4"] .pg-matrix-rain { opacity: calc(0.18 * var(--fx-rain)); }
+.pg-chaos-root[data-chaos="5"] .pg-matrix-rain { opacity: calc(0.28 * var(--fx-rain)); }
 
 .pg-rain-col {
   position: absolute;
@@ -706,17 +689,17 @@
   pointer-events: none;
   z-index: 7;
   opacity: 0;
-  animation: pg-connection-lost 17s steps(1) infinite;
+  animation: pg-connection-lost 42s steps(1) infinite;
 }
 
 .pg-chaos-root[style*="--fx-connlost: 0"]::before { display: none; }
 
 @keyframes pg-connection-lost {
-  0%, 88%, 100% { opacity: 0; }
-  89% { opacity: calc(0.9 * var(--fx-connlost)); }
-  90% { opacity: 0; }
-  91% { opacity: calc(0.9 * var(--fx-connlost)); }
-  92% { opacity: 0; }
+  0%, 96%, 100% { opacity: 0; }
+  97% { opacity: calc(0.85 * var(--fx-connlost)); }
+  97.5% { opacity: 0; }
+  98% { opacity: calc(0.85 * var(--fx-connlost)); }
+  98.5% { opacity: 0; }
 }
 
 /* Text color desync — hue-rotate animation on rule description. The
