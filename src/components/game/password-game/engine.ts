@@ -1,5 +1,6 @@
 import { mulberry32, pickN } from "./prng";
-import type { GameState, Rule, RuleDef, Tier, ValidationResult } from "./types";
+import type { FormattingMap, GameState, Rule, RuleDef, Tier, ValidationResult } from "./types";
+import type { TickResult } from "./types";
 
 export type RuleCountsPerTier = Partial<Record<Tier, number>>;
 export type RulePoolsPerTier = Partial<Record<Tier, readonly RuleDef[]>>;
@@ -54,4 +55,35 @@ export function computeActiveRuleIndex(state: GameState): number {
     if (!state.rules[i].validate(state).passed) return i;
   }
   return -1;
+}
+
+export interface TickedState {
+  password: string;
+  formatting: FormattingMap;
+  ruleStates: Record<string, unknown>;
+}
+
+/**
+ * Run onTick on every rule that has one. Applied in rule order so later
+ * rules see the password mutations from earlier ticks this frame. Rule
+ * state is threaded back in for the next tick.
+ */
+export function runTicks(
+  state: GameState,
+  deltaMs: number,
+  ruleStates: Record<string, unknown>
+): TickedState {
+  let password = state.password;
+  let formatting = state.formatting;
+  const nextStates: Record<string, unknown> = { ...ruleStates };
+  for (const rule of state.rules) {
+    if (!rule.onTick) continue;
+    const current = { ...state, password, formatting };
+    const result: TickResult | null = rule.onTick(current, deltaMs, ruleStates[rule.id]);
+    if (!result) continue;
+    if (result.password !== undefined) password = result.password;
+    if (result.formatting !== undefined) formatting = result.formatting;
+    if (result.ruleState !== undefined) nextStates[rule.id] = result.ruleState;
+  }
+  return { password, formatting, ruleStates: nextStates };
 }
