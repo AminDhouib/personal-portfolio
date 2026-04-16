@@ -13,13 +13,12 @@ import {
 } from "lucide-react";
 import {
   addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile,
-  setUpgradeLevel, spendCoins, markTutorialComplete, type Profile,
+  setUpgradeLevel, spendCoins, type Profile,
 } from "./profile";
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
 import { activeMissions, claimMissionReward, rollMissionsIfNewDay } from "./missions";
 import { PostFx } from "./post-fx";
 import { ACHIEVEMENTS, checkAchievements, grantAchievements, type Achievement } from "./achievements";
-import { TUTORIAL_STEPS } from "./tutorial";
 
 // ---------- constants ----------
 
@@ -4094,10 +4093,6 @@ export function SpaceShooterGame() {
     window.addEventListener("deviceorientation", handler);
     return () => window.removeEventListener("deviceorientation", handler);
   }, [gyroSupported, prefs.gyroEnabled, gyroPermission]);
-  const [tutorialActive, setTutorialActive] = useState(false);
-  const [tutorialStep, setTutorialStep] = useState(0);
-  const [tutorialStepStart, setTutorialStepStart] = useState(0);
-  const [tutorialInputSatisfied, setTutorialInputSatisfied] = useState(false);
   const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
@@ -4109,72 +4104,7 @@ export function SpaceShooterGame() {
   useEffect(() => {
     try { rollMissionsIfNewDay(); } catch { /* noop */ }
   }, []);
-  // Tutorial FSM — only for players who never finished it
-  useEffect(() => {
-    if (profile.tutorialComplete) return;
-    if (ui.status === "playing" && !tutorialActive) {
-      setTutorialActive(true);
-      setTutorialStep(0);
-      setTutorialStepStart(performance.now());
-    }
-  }, [ui.status, profile.tutorialComplete, tutorialActive]);
-  useEffect(() => {
-    if (!tutorialActive) return;
-    const id = setInterval(() => {
-      const now = performance.now();
-      const step = TUTORIAL_STEPS[tutorialStep];
-      if (!step) {
-        setTutorialActive(false);
-        try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
-        return;
-      }
-      const inputWaitDone = !step.waitForInput || tutorialInputSatisfied;
-      if (now - tutorialStepStart >= step.durationMs && inputWaitDone) {
-        if (tutorialStep + 1 >= TUTORIAL_STEPS.length) {
-          setTutorialActive(false);
-          try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
-        } else {
-          setTutorialStep(tutorialStep + 1);
-          setTutorialStepStart(now);
-          setTutorialInputSatisfied(false);
-        }
-      }
-    }, 100);
-    return () => clearInterval(id);
-  }, [tutorialActive, tutorialStep, tutorialStepStart, tutorialInputSatisfied, refreshProfile]);
-  // Poll for tutorial input satisfaction each frame (when a waitForInput step is active)
-  useEffect(() => {
-    if (!tutorialActive) return;
-    const step = TUTORIAL_STEPS[tutorialStep];
-    if (!step?.waitForInput) return;
-    if (tutorialInputSatisfied) return;
-    const g = gameRefs.current;
-    const startX = g.shipX;
-    const startY = g.shipY;
-    const dashAt = g.dash.cooldownUntil;
-    const id = setInterval(() => {
-      if (step.waitForInput === "move") {
-        if (Math.abs(g.shipX - startX) > 0.4 || Math.abs(g.shipY - startY) > 0.4) {
-          setTutorialInputSatisfied(true);
-        }
-      } else if (step.waitForInput === "dash") {
-        if (g.dash.cooldownUntil > dashAt) {
-          setTutorialInputSatisfied(true);
-        }
-      } else if (step.waitForInput === "dodge") {
-        // Treat any survival past the min duration as "they moved out of the way"
-        if (performance.now() - tutorialStepStart > 2000) {
-          setTutorialInputSatisfied(true);
-        }
-      }
-    }, 150);
-    return () => clearInterval(id);
-  }, [tutorialActive, tutorialStep, tutorialStepStart, tutorialInputSatisfied]);
-
-  const skipTutorial = useCallback(() => {
-    setTutorialActive(false);
-    try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
-  }, [refreshProfile]);
+  // Tutorial removed — players learn the game by playing it.
   // Load player prefs from profile (or localStorage fallback)
   useEffect(() => {
     try {
@@ -4584,31 +4514,28 @@ export function SpaceShooterGame() {
     el.addEventListener("touchmove", onTouch, { passive: false });
     el.addEventListener("touchstart", onTouch, { passive: false });
 
-    // Mobile dash: detect quick left/right swipes on the canvas.
-    let swipeStartX = 0;
-    let swipeStartAt = 0;
-    const onSwipeStart = (e: TouchEvent) => {
-      if (e.touches.length === 0) return;
-      swipeStartX = e.touches[0].clientX;
-      swipeStartAt = performance.now();
-    };
-    const onSwipeEnd = (e: TouchEvent) => {
-      const touch = e.changedTouches[0];
+    // Mobile dash: a tap landing FAR from the ship's current screen position
+    // triggers a dash toward that tap. Tapping near the ship just steers.
+    const onFarTap = (e: TouchEvent) => {
+      const touch = e.touches[0] ?? e.changedTouches[0];
       if (!touch) return;
-      const dtouch = performance.now() - swipeStartAt;
-      const dxSwipe = touch.clientX - swipeStartX;
-      if (dtouch < 250 && Math.abs(dxSwipe) > 60) {
-        const dir: "left" | "right" = dxSwipe < 0 ? "left" : "right";
-        const g = gameRefs.current;
-        // Swipe bypasses double-tap: prime and trigger in sequence
-        const now = performance.now();
-        if (dir === "left") g.dash.lastLeftTapAt = now;
-        else g.dash.lastRightTapAt = now;
-        tryDash(g, dir, now + 10);
-      }
+      const rect = el.getBoundingClientRect();
+      const g = gameRefs.current;
+      // Map the tap's X into world-arena X using the same math updateTarget uses
+      const nx = (touch.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+      const tapWorldX = nx * (ARENA_W / 2);
+      const dxWorld = tapWorldX - g.shipX;
+      // "Far" threshold: > 35% of the arena half-width
+      const farThreshold = (ARENA_W / 2) * 0.35;
+      if (Math.abs(dxWorld) < farThreshold) return;
+      const dir: "left" | "right" = dxWorld < 0 ? "left" : "right";
+      const now = performance.now();
+      // Bypass the double-tap window by priming the last-tap slot
+      if (dir === "left") g.dash.lastLeftTapAt = now;
+      else g.dash.lastRightTapAt = now;
+      tryDash(g, dir, now + 10);
     };
-    el.addEventListener("touchstart", onSwipeStart, { passive: true });
-    el.addEventListener("touchend", onSwipeEnd, { passive: true });
+    el.addEventListener("touchstart", onFarTap, { passive: true });
 
     const keys = new Set<string>();
     const onKey = (e: KeyboardEvent) => {
@@ -5129,37 +5056,6 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Tutorial banner */}
-        {tutorialActive && TUTORIAL_STEPS[tutorialStep] && (
-          <div className="absolute inset-x-0 top-[20%] flex flex-col items-center pointer-events-none z-40">
-            <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-6 py-4 max-w-sm text-center">
-              <div className="text-xl sm:text-2xl font-bold text-white mb-1">
-                {TUTORIAL_STEPS[tutorialStep].headline}
-              </div>
-              <div className="text-sm text-slate-300">
-                {TUTORIAL_STEPS[tutorialStep].subtext}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-wider">
-                Step {tutorialStep + 1} / {TUTORIAL_STEPS.length}
-              </div>
-              {TUTORIAL_STEPS[tutorialStep]?.waitForInput && !tutorialInputSatisfied && (
-                <div className="text-[10px] text-emerald-400 animate-pulse mt-1">
-                  waiting for {TUTORIAL_STEPS[tutorialStep].waitForInput}…
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        {tutorialActive && (
-          <button
-            onClick={skipTutorial}
-            className="absolute bottom-4 right-4 text-xs text-slate-400 hover:text-white px-3 py-1 bg-black/40 rounded border border-white/10 z-40"
-            type="button"
-          >
-            Skip Tutorial
-          </button>
-        )}
 
         {/* Achievement toasts */}
         {achievementToasts.length > 0 && (
