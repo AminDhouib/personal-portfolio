@@ -7,6 +7,7 @@ import { TIER_1_RULES } from "./rules/tier1";
 import { TIER_2_RULES } from "./rules/tier2";
 import { RuleCard } from "./rule-card";
 import { pickForeshadow, useForeshadowTrigger, ForeshadowOverlay } from "./foreshadowing";
+import { CracksOverlay } from "./destruction";
 import type { GameState, Rule } from "./types";
 
 function makeSeed(): number {
@@ -52,6 +53,22 @@ export function PasswordGame() {
   const activeIdx = useMemo(() => computeActiveRuleIndex(state), [state]);
   const satisfiedCount = results.filter((r) => r.passed).length;
 
+  // Chaos level = the highest tier the player has unlocked, bumped by 1 per
+  // fully cleared tier. We floor at 0 and cap at 5 to keep CSS contracts stable.
+  const chaosLevel = useMemo(() => {
+    let max = 0;
+    for (const rule of rules) {
+      // A tier's effect kicks in as soon as one rule from that tier is revealed
+      // (i.e. any prior rule was satisfied). Revealed = earlier rule passed.
+      const idx = rules.indexOf(rule);
+      const earlierAllPassed = idx === 0 || results.slice(0, idx).every((r) => r.passed);
+      if (earlierAllPassed) {
+        max = Math.max(max, rule.tier);
+      }
+    }
+    return Math.min(5, Math.max(0, max));
+  }, [rules, results]);
+
   const foreshadowKind = useMemo(() => pickForeshadow(seed), [seed]);
   const foreshadowFired = useForeshadowTrigger(satisfiedCount, 2);
 
@@ -71,8 +88,11 @@ export function PasswordGame() {
   return (
     <div
       ref={containerRef}
-      className="w-full rounded-xl border border-(--border) bg-(--card) p-5 sm:p-6"
+      className="pg-chaos-root w-full relative"
+      data-chaos={chaosLevel}
     >
+      <CracksOverlay />
+      <div className="pg-container relative rounded-xl border border-(--border) bg-(--card) p-5 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Key className="h-4 w-4 text-accent-pink" />
@@ -108,13 +128,18 @@ export function PasswordGame() {
 
       <div className="mt-5 space-y-2">
         {visibleRules.map((rule, i) => (
-          <RuleCard
+          <div
             key={`${rule.id}-${i}`}
-            rule={rule}
-            result={visibleResults[i]}
-            index={i}
-            isActive={i === activeIdx}
-          />
+            className="pg-rule-card"
+            style={{ ["--pg-card-idx" as string]: i }}
+          >
+            <RuleCard
+              rule={rule}
+              result={visibleResults[i]}
+              index={i}
+              isActive={i === activeIdx}
+            />
+          </div>
         ))}
       </div>
 
@@ -129,6 +154,7 @@ export function PasswordGame() {
         active={foreshadowFired}
         containerRef={containerRef}
       />
+      </div>
     </div>
   );
 }
