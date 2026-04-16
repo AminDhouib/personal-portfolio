@@ -2,6 +2,9 @@ import type { RuleDef, FormattingMap } from "../types";
 import { rangeInt } from "../prng";
 import { anagramRule, reverseRule } from "./tier3-pack";
 import { emojiMathRule } from "./tier3-emoji-math";
+import { primeRule } from "./tier3-prime";
+import { moonPhaseRule } from "./tier3-moon";
+import { clockRule } from "./tier3-clock";
 
 function countFmt(fmt: FormattingMap, attr: "bold" | "italic"): number {
   let n = 0;
@@ -154,4 +157,7 @@ export const TIER_3_RULES: readonly RuleDef[] = [
   anagramRule,
   reverseRule,
   emojiMathRule,
+  primeRule,
+  moonPhaseRule,
+  clockRule,
 ];

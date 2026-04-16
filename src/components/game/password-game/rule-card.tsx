@@ -64,6 +64,40 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     );
   }
 
+  const clockMatch = text.match(/\[\[CLOCK:(\d{2}):(\d{2})\]\]/);
+  if (clockMatch) {
+    const before = text.slice(0, clockMatch.index);
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <SevenSegClock hh={clockMatch[1]} mm={clockMatch[2]} />
+      </>
+    );
+  }
+
+  const mixMatch = text.match(/\[\[MIX:([a-z]+):([a-z]+)\]\]/);
+  if (mixMatch) {
+    const before = text.slice(0, mixMatch.index);
+    return (
+      <span className="inline-flex items-center gap-2 flex-wrap">
+        <GlitchText text={before} chaos={chaos} />
+        <ColorMixBadge a={mixMatch[1]} b={mixMatch[2]} />
+      </span>
+    );
+  }
+
+  const moonMatch = text.match(/\[\[MOON:([0-9.]+)\]\]/);
+  if (moonMatch) {
+    const fraction = Number(moonMatch[1]);
+    const before = text.slice(0, moonMatch.index);
+    return (
+      <span className="inline-flex items-center gap-2 flex-wrap">
+        <GlitchText text={before} chaos={chaos} />
+        <MoonBadge fraction={fraction} />
+      </span>
+    );
+  }
+
   const asciiMatch = text.match(/\[\[ASCII:([\w-]+)\]\]/);
   if (asciiMatch) {
     const entry = ASCII_ART.find((a) => a.id === asciiMatch[1]);
@@ -138,6 +172,148 @@ function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
         background,
       }}
     />
+  );
+}
+
+/** LED-style 7-segment HH:MM clock display. */
+function SevenSegClock({ hh, mm }: { hh: string; mm: string }) {
+  return (
+    <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-[#0a0a0a] border border-(--border) px-3 py-2">
+      <SevenSegDigit value={Number(hh[0])} />
+      <SevenSegDigit value={Number(hh[1])} />
+      <span className="text-red-500 text-2xl font-bold leading-none" style={{ letterSpacing: 2 }}>:</span>
+      <SevenSegDigit value={Number(mm[0])} />
+      <SevenSegDigit value={Number(mm[1])} />
+    </div>
+  );
+}
+
+// Segments a..g lit for each digit 0..9
+const SEG_MAP: Record<number, string> = {
+  0: "abcdef",
+  1: "bc",
+  2: "abged",
+  3: "abgcd",
+  4: "fgbc",
+  5: "afgcd",
+  6: "afgedc",
+  7: "abc",
+  8: "abcdefg",
+  9: "abcdfg",
+};
+
+function SevenSegDigit({ value }: { value: number }) {
+  const lit = SEG_MAP[value] ?? "";
+  const on = (seg: string) => (lit.includes(seg) ? "#ef4444" : "#2a0b0b");
+  // Canvas 30×50; each segment is a rounded rect.
+  return (
+    <svg width={30} height={50} viewBox="0 0 30 50" aria-label={`digit ${value}`} role="img">
+      {/* a: top */}
+      <rect x={6} y={2}  width={18} height={4} rx={1.5} fill={on("a")} />
+      {/* f: top-left */}
+      <rect x={2} y={6}  width={4}  height={16} rx={1.5} fill={on("f")} />
+      {/* b: top-right */}
+      <rect x={24} y={6} width={4}  height={16} rx={1.5} fill={on("b")} />
+      {/* g: middle */}
+      <rect x={6} y={22} width={18} height={4}  rx={1.5} fill={on("g")} />
+      {/* e: bottom-left */}
+      <rect x={2} y={28} width={4}  height={16} rx={1.5} fill={on("e")} />
+      {/* c: bottom-right */}
+      <rect x={24} y={28} width={4} height={16} rx={1.5} fill={on("c")} />
+      {/* d: bottom */}
+      <rect x={6} y={44} width={18} height={4}  rx={1.5} fill={on("d")} />
+    </svg>
+  );
+}
+
+/** Inline "A + B = ?" color mix badge with two filled circles and a question mark. */
+function ColorMixBadge({ a, b }: { a: string; b: string }) {
+  const COLORS: Record<string, string> = {
+    red: "#ef4444",
+    yellow: "#eab308",
+    blue: "#3b82f6",
+    white: "#f8fafc",
+    black: "#0f172a",
+  };
+  const colorA = COLORS[a] ?? "#888";
+  const colorB = COLORS[b] ?? "#888";
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      <span
+        aria-label={`color ${a}`}
+        role="img"
+        className="inline-block rounded-full border border-black/30"
+        style={{ width: 22, height: 22, background: colorA }}
+      />
+      <span className="text-sm font-bold text-(--foreground)">+</span>
+      <span
+        aria-label={`color ${b}`}
+        role="img"
+        className="inline-block rounded-full border border-black/30"
+        style={{ width: 22, height: 22, background: colorB }}
+      />
+      <span className="text-sm font-bold text-(--foreground)">= ?</span>
+    </span>
+  );
+}
+
+/**
+ * Render a moon phase as SVG. The full moon is a light circle against a dark
+ * background; other phases use an overlay ellipse to carve out the shadow.
+ *
+ * For phases <0.5 (waxing), the shadow is on the left; for >0.5 (waning),
+ * on the right. The overlay's x-radius is a function of how far from half
+ * we are — 0 at quarter, full width at new/full.
+ */
+function MoonBadge({ fraction }: { fraction: number }) {
+  const size = 40;
+  const r = size / 2 - 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const MOON = "#f8fafc";
+  const SHADOW = "#0f172a";
+
+  // Normalize to [-1, 1] where 0 = new, ±1 = full, 0.5 = first quarter.
+  // Amount of lit area grows 0 → 1 → 0 over the cycle.
+  const f = fraction % 1;
+  const isNew = f < 0.03 || f > 0.97;
+  const isFull = f > 0.47 && f < 0.53;
+  const waxing = f < 0.5;
+  // rx ∈ [0, r]: 0 at quarter (straight terminator), r at new/full (full circle overlay)
+  const distFromHalf = Math.abs(f - (waxing ? 0.25 : 0.75));
+  const rx = Math.min(r, (distFromHalf / 0.25) * r);
+  const overlayX = waxing ? cx - rx / 2 : cx + rx / 2;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label="moon phase" role="img">
+      {/* Dark disc — sky + shadow side */}
+      <circle cx={cx} cy={cy} r={r} fill={SHADOW} />
+      {/* Full moon special case */}
+      {isFull && <circle cx={cx} cy={cy} r={r} fill={MOON} />}
+      {/* Anything but new or full: draw the lit portion */}
+      {!isFull && !isNew && (
+        <>
+          {/* Lit half — covers either left (waning) or right (waxing) half */}
+          <path
+            d={
+              waxing
+                ? `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r} Z`
+                : `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r} Z`
+            }
+            fill={MOON}
+          />
+          {/* Terminator ellipse — carves shadow or light depending on gibbous/crescent */}
+          <ellipse
+            cx={overlayX}
+            cy={cy}
+            rx={rx / 2}
+            ry={r}
+            fill={f < 0.25 || (f > 0.5 && f < 0.75) ? SHADOW : MOON}
+          />
+        </>
+      )}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0006" strokeWidth={1} />
+    </svg>
   );
 }
 
