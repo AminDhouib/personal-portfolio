@@ -8,6 +8,7 @@ import { Board } from "./super-voltorb-flip/GameBoard";
 import { Scoreboard } from "./super-voltorb-flip/Scoreboard";
 import { MemoPanel } from "./super-voltorb-flip/MemoPanel";
 import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
+import { SettingsMenu } from "./super-voltorb-flip/SettingsMenu";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -81,6 +82,19 @@ function GameScreen({
         imageRendering: "pixelated" as const,
       }}
     >
+      <div className="absolute top-3 right-3 z-20">
+        <SettingsMenu
+          mode={state.mode}
+          autoMemoEnabled={state.autoMemoEnabled}
+          speedMode={state.speedMode}
+          musicVolume={save.musicVolume}
+          sfxVolume={save.sfxVolume}
+          onToggleAutoMemo={() => dispatch({ type: "toggleAutoMemo" })}
+          onToggleSpeed={() => dispatch({ type: "toggleSpeed" })}
+          onMusicVolume={(v) => updateSave({ musicVolume: v })}
+          onSfxVolume={(v) => updateSave({ sfxVolume: v })}
+        />
+      </div>
       <div className="absolute inset-0 flex items-center justify-center p-6">
         <div className="flex gap-4 items-start w-full max-w-2xl">
           <div className="flex-1">
