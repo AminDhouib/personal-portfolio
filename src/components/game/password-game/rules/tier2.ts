@@ -10,6 +10,8 @@ import { morseRule, binaryRule, mathWordsRule, captchaRule } from "./tier2-pack"
 import { wordleRule } from "./tier2-wordle";
 import { flagRule } from "./tier2-flag";
 import { chessRule } from "./tier2-chess";
+import { pianoRule } from "./tier2-piano";
+import { asciiRule } from "./tier2-ascii";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -245,4 +247,6 @@ export const TIER_2_RULES: readonly RuleDef[] = [
   wordleRule,
   flagRule,
   chessRule,
+  pianoRule,
+  asciiRule,
 ];

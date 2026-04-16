@@ -34,7 +34,8 @@ type FxKey =
   | "rain"
   | "revealshake"
   | "connlost"
-  | "desync";
+  | "desync"
+  | "crackweb";
 
 const ALL_FX: { key: FxKey; label: string }[] = [
   { key: "chips", label: "Broken chips" },
@@ -58,6 +59,7 @@ const ALL_FX: { key: FxKey; label: string }[] = [
   { key: "revealshake", label: "Reveal shake" },
   { key: "connlost", label: "NO SIGNAL flash" },
   { key: "desync", label: "Color desync" },
+  { key: "crackweb", label: "Fracture web" },
 ];
 
 function applyToRoot(fx: Record<FxKey, number>, chaosOverride: number | null) {

@@ -25,6 +25,7 @@ export function CracksOverlay({ seed = 0 }: { seed?: number }) {
   const v1 = variant(1);
   const v2 = variant(2);
   const v3 = variant(3);
+  const v4 = variant(4);
   return (
     <>
       <BorderWobbleFilter />
@@ -50,6 +51,14 @@ export function CracksOverlay({ seed = 0 }: { seed?: number }) {
       >
         <ChipShape flipX={false} flipY={false} />
       </div>
+      <div
+        className="pg-chip pg-chip-4"
+        data-chaos-min="5"
+        style={{ ["--chip-rot" as string]: v4.rotate, ["--chip-scale" as string]: v4.scale }}
+      >
+        <ChipShape flipX={true} flipY={false} />
+      </div>
+      <FractureWeb seed={seed} />
       <FloatingDebris />
       <CursorTrail />
       <VhsTrackingBars />
@@ -281,6 +290,55 @@ function FloatingDebris() {
  * top-left to the bottom-right as a thin zig-zag polygon. flipX/flipY
  * orient the crack for each corner so the lines come from the edge inward.
  */
+/**
+ * Full-container fracture web — hairline polylines tracing from corners
+ * toward the center, giving a sense that the whole UI has fractured. Visible
+ * only at chaos 5 and gated by --fx-crackweb. The fractures are thin and
+ * drawn in the background color so they read as structural voids, not lines.
+ */
+function FractureWeb({ seed }: { seed: number }) {
+  // Three polyline paths, seeded-perturbed so each run has its own pattern.
+  const jitter = (n: number) => {
+    const h = ((seed ^ (n * 0x9e3779b1)) * 0x85ebca6b) >>> 0;
+    return ((h % 1000) / 1000 - 0.5) * 8; // ±4% jitter
+  };
+  const j = [jitter(1), jitter(2), jitter(3), jitter(4), jitter(5), jitter(6)];
+  const BG = "var(--background, #0a0a0f)";
+  return (
+    <svg
+      className="pg-fracture-web"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      {/* Top-right chip → midway diagonal toward center-left */}
+      <polyline
+        points={`96,4 ${72 + j[0]},${22 + j[1]} ${55 + j[2]},${38 + j[3]} ${38 + j[4]},${50 + j[5]}`}
+        fill="none"
+        stroke={BG}
+        strokeWidth="0.35"
+        strokeLinejoin="miter"
+      />
+      {/* Bottom-right chip → up-left branching */}
+      <polyline
+        points={`95,95 ${78 + j[1]},${82 + j[0]} ${65 + j[3]},${70 + j[2]} ${50 + j[5]},${60 + j[4]}`}
+        fill="none"
+        stroke={BG}
+        strokeWidth="0.35"
+        strokeLinejoin="miter"
+      />
+      {/* Left-edge chip → down-right into the center */}
+      <polyline
+        points={`4,45 ${22 + j[2]},${52 + j[3]} ${40 + j[4]},${60 + j[5]} ${55 + j[0]},${68 + j[1]}`}
+        fill="none"
+        stroke={BG}
+        strokeWidth="0.35"
+        strokeLinejoin="miter"
+      />
+    </svg>
+  );
+}
+
 function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
   const transform = [
     flipX ? "scale(-1 1) translate(-200 0)" : "",

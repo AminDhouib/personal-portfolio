@@ -5,6 +5,8 @@ import type { Rule, ValidationResult } from "./types";
 import { CheckCircle, XCircle } from "lucide-react";
 import { FLAGS } from "../../../data/password-game/flags";
 import { CHESS_PUZZLES, getDailyChessPuzzle } from "../../../data/password-game/chess";
+import { PIANO_KEYS } from "../../../data/password-game/piano";
+import { ASCII_ART } from "../../../data/password-game/ascii-art";
 
 interface Props {
   rule: Rule;
@@ -62,6 +64,34 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     );
   }
 
+  const asciiMatch = text.match(/\[\[ASCII:([\w-]+)\]\]/);
+  if (asciiMatch) {
+    const entry = ASCII_ART.find((a) => a.id === asciiMatch[1]);
+    const before = text.slice(0, asciiMatch.index);
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        {entry && (
+          <pre className="mt-2 inline-block rounded-md bg-(--background) border border-(--border) p-3 text-xs font-mono leading-tight whitespace-pre text-(--foreground)">
+            {entry.art.join("\n")}
+          </pre>
+        )}
+      </>
+    );
+  }
+
+  const pianoMatch = text.match(/\[\[PIANO:(\d+)\]\]/);
+  if (pianoMatch) {
+    const highlight = Number(pianoMatch[1]);
+    const before = text.slice(0, pianoMatch.index);
+    return (
+      <>
+        <GlitchText text={before} chaos={chaos} />
+        <PianoKeyboard highlight={highlight} />
+      </>
+    );
+  }
+
   const chessMatch = text.match(/\[\[CHESS:([\w-]+)\]\]/);
   if (chessMatch) {
     const id = chessMatch[1];
@@ -108,6 +138,59 @@ function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
         background,
       }}
     />
+  );
+}
+
+/** One-octave piano keyboard with a single highlighted key. */
+function PianoKeyboard({ highlight }: { highlight: number }) {
+  const whiteKeys = PIANO_KEYS.filter((k) => k.kind === "white");
+  const blackKeys = PIANO_KEYS.filter((k) => k.kind === "black");
+  const whiteW = 22;
+  const whiteH = 70;
+  const blackW = 14;
+  const blackH = 44;
+  const svgW = whiteKeys.length * whiteW;
+  const whiteIndexByOrder: Record<number, number> = {};
+  whiteKeys.forEach((k, i) => (whiteIndexByOrder[k.order] = i));
+  return (
+    <div className="mt-2">
+      <svg width={svgW} height={whiteH} viewBox={`0 0 ${svgW} ${whiteH}`} aria-label="piano keyboard" role="img">
+        {whiteKeys.map((k, i) => {
+          const isHi = k.order === highlight;
+          return (
+            <rect
+              key={`w-${i}`}
+              x={i * whiteW}
+              y={0}
+              width={whiteW}
+              height={whiteH}
+              fill={isHi ? "#facc15" : "#f8fafc"}
+              stroke="#1a1a1a"
+              strokeWidth={1}
+            />
+          );
+        })}
+        {blackKeys.map((k) => {
+          const prevWhiteOrder = k.order - 1;
+          const whiteIdx = whiteIndexByOrder[prevWhiteOrder];
+          if (whiteIdx === undefined) return null;
+          const x = (whiteIdx + 1) * whiteW - blackW / 2;
+          const isHi = k.order === highlight;
+          return (
+            <rect
+              key={`b-${k.order}`}
+              x={x}
+              y={0}
+              width={blackW}
+              height={blackH}
+              fill={isHi ? "#f59e0b" : "#0f172a"}
+              stroke="#1a1a1a"
+              strokeWidth={1}
+            />
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 
