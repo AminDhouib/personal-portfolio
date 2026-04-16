@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { morseRule, binaryRule, mathWordsRule, captchaRule } from "../rules/tier2-pack";
+import { anagramRule } from "../rules/tier3-pack";
 import { MORSE_WORDS, toMorse } from "../../../../data/password-game/morse";
+import { ANAGRAM_WORDS } from "../../../../data/password-game/anagrams";
 import type { GameState, Rule } from "../types";
 
 function makeState(password: string, rule: Rule): GameState {
@@ -150,5 +152,34 @@ describe("rule pack — captcha rule", () => {
       expect(rule.validate(makeState(`pre${flipped}post`, rule)).passed).toBe(false);
     }
     expect(rule.validate(makeState("no captcha", rule)).passed).toBe(false);
+  });
+});
+
+describe("rule pack — anagram rule", () => {
+  it("exists and is tier 3", () => {
+    expect(anagramRule).toBeDefined();
+    expect(anagramRule.id).toBe("anagram");
+    expect(anagramRule.tier).toBe(3);
+  });
+
+  it("picks a word from ANAGRAM_WORDS and scrambled uppercase", () => {
+    const rule = anagramRule.create(mulberry32(25));
+    const word = rule.params.word as string;
+    const scrambled = rule.params.scrambled as string;
+    expect(ANAGRAM_WORDS).toContain(word);
+    expect(scrambled).toBe(scrambled.toUpperCase());
+    expect(scrambled.length).toBe(word.length);
+  });
+
+  it("passes when password contains the original word (case-insensitive)", () => {
+    const rule = anagramRule.create(mulberry32(25));
+    const word = rule.params.word as string;
+    expect(rule.validate(makeState(`abc${word}xyz`, rule)).passed).toBe(true);
+    expect(rule.validate(makeState(`abc${word.toUpperCase()}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails when password does not contain the word", () => {
+    const rule = anagramRule.create(mulberry32(25));
+    expect(rule.validate(makeState("zzzz", rule)).passed).toBe(false);
   });
 });
