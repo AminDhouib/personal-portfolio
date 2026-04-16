@@ -98,6 +98,15 @@ export function spendCoins(n: number): { ok: boolean; profile: Profile } {
   return { ok: true, profile: p };
 }
 
+export function markTutorialComplete(): Profile {
+  const p = loadProfile();
+  if (!p.tutorialComplete) {
+    p.tutorialComplete = true;
+    saveProfile(p);
+  }
+  return p;
+}
+
 export function markFirstRunCompleted(): Profile {
   const p = loadProfile();
   if (!p.firstRunCompleted) {
