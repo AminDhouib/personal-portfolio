@@ -3972,6 +3972,41 @@ export function SpaceShooterGame() {
       stopRecording();
     }
   }, [ui.status, isRecording, stopRecording]);
+  // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
+  const [devFps, setDevFps] = useState(60);
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    let raf = 0;
+    let last = performance.now();
+    let ema = 60;
+    const loop = (t: number) => {
+      const dt = t - last; last = t;
+      if (dt > 0) ema = ema * 0.92 + (1000 / dt) * 0.08;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    const poll = setInterval(() => setDevFps(Math.round(ema)), 500);
+    return () => { cancelAnimationFrame(raf); clearInterval(poll); };
+  }, []);
+  // Screen wake lock while actively playing (mobile); release when not
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    type WakeLockSentinel = { release: () => Promise<void> };
+    type WakeLockAPI = { request: (t: "screen") => Promise<WakeLockSentinel> };
+    const nav = navigator as Navigator & { wakeLock?: WakeLockAPI };
+    if (!nav.wakeLock || ui.status !== "playing") return;
+    let lock: WakeLockSentinel | null = null;
+    (async () => {
+      try { lock = await nav.wakeLock!.request("screen"); } catch { /* ignore */ }
+    })();
+    return () => { try { lock?.release(); } catch { /* ignore */ } };
+  }, [ui.status]);
+  // Haptic feedback on damage / boss defeat
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("vibrate" in navigator)) return;
+    if (prefs.reducedMotion) return;
+    if (ui.status === "dying") (navigator as Navigator & { vibrate: (p: number | number[]) => boolean }).vibrate([60, 30, 60]);
+  }, [ui.status, prefs.reducedMotion]);
 
   const env = useMemo(() => envForTime(ui.seconds), [ui.seconds]);
 
@@ -4475,6 +4510,13 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Dev-only FPS + object counts */}
+        {process.env.NODE_ENV !== "production" && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/60 text-[10px] font-mono text-white z-30 rounded">
+            {devFps} fps · obs {gameRefs.current.obstacles.length} · proj {gameRefs.current.bossProjectiles.length} · exp {gameRefs.current.explosions.length}
+          </div>
+        )}
 
         {/* Record toggle (armed only) */}
         {ui.status === "armed" && (
