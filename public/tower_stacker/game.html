@@ -30,7 +30,7 @@ body{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,mon
 @media screen and (min-height:1040px){html{font-size:180px}}
 @media screen and (min-height:1200px){html{font-size:200px}}
 html{font-size:17.6vh}
-#canvas{position:fixed;left:0;top:0;right:0;bottom:0;margin:auto}
+#canvas{position:fixed;left:0;top:0;right:0;bottom:0;margin:auto;filter:grayscale(1) brightness(0.62) contrast(1.42)}
 a{text-decoration:none}
 li,ol,ul{list-style-type:none;padding:0;margin:0}
 .hide{display:none}
@@ -49,9 +49,9 @@ li,ol,ul{list-style-type:none;padding:0;margin:0}
 .loading .logo{position:absolute;bottom:.3rem;left:0;right:0}
 .loading .logo img{width:1rem}
 .content{height:100vh;margin:0 auto;position:relative}
-.landing{display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:.4rem .2rem;position:relative}
-.landing .action-1{display:flex;flex-direction:column;align-items:center;margin-top:.35rem}
-.landing .action-2{position:absolute;bottom:.35rem;left:0;right:0;display:flex;justify-content:center}
+.landing{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:.4rem .2rem;gap:.4rem;z-index:20;background:linear-gradient(rgba(148,163,184,0.06) 1px,transparent 1px) 0 0/24px 24px,linear-gradient(90deg,rgba(148,163,184,0.06) 1px,transparent 1px) 0 0/24px 24px,radial-gradient(ellipse 80% 60% at 50% 40%,#0f1624 0%,#05070d 100%)}
+.landing .action-1{display:flex;flex-direction:column;align-items:center}
+.landing .action-2{display:flex;justify-content:center;margin-top:.3rem}
 .slideTop{-webkit-animation:st 1s ease-in-out;animation:st 1s ease-in-out}
 @-webkit-keyframes st{0%{transform:translateZ(0)}100%{transform:translate3d(0,-100%,0)}}
 @keyframes st{0%{transform:translateZ(0)}100%{transform:translate3d(0,-100%,0)}}

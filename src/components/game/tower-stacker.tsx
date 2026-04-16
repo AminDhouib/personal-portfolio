@@ -34,6 +34,7 @@ type GameState = {
   streak: number;
   bestStreak: number;
   perfects: number;
+  fails: number;
   started: boolean;
   gameOver: boolean;
 };
@@ -44,9 +45,12 @@ const INITIAL: GameState = {
   streak: 0,
   bestStreak: 0,
   perfects: 0,
+  fails: 0,
   started: false,
   gameOver: false,
 };
+
+const MAX_LIVES = 3;
 
 export default function TowerStacker(_props: { initialSeed?: string } = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +117,9 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
           }, 1400);
           break;
         }
+        case "ts:fail":
+          setState((s) => ({ ...s, fails: d.fails }));
+          break;
         case "ts:gameover":
           setState((s) => ({
             ...s,
@@ -213,30 +220,77 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
         />
 
         {showHud && (
-          <div className="pointer-events-none absolute left-0 right-0 top-3 z-20 flex flex-col items-center gap-1">
-            <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-foreground/45">
-              Height
-            </div>
+          <>
             <div
-              key={scorePulseKey}
-              className="ts-score-pulse font-mono text-5xl font-bold leading-none tabular-nums text-foreground"
+              className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[96px] bg-[#05070d]"
               style={{
-                textShadow:
-                  "0 2px 12px rgba(0,0,0,0.7), 0 0 24px rgba(239,68,68,0.2)",
+                borderBottom: "1px solid rgba(239,68,68,0.28)",
+                boxShadow: "0 6px 16px -4px rgba(5,7,13,0.95)",
               }}
-            >
-              {state.score}
-            </div>
-            {state.streak >= 2 && (
-              <div
-                key={streakPopKey}
-                className="ts-streak-pop inline-flex items-center gap-1.5 border border-accent-red/60 bg-accent-red/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-accent-red backdrop-blur-sm"
-              >
-                <span className="tabular-nums">×{state.streak}</span>
-                <span className="text-foreground/70">Perfect</span>
+            />
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-[52px] bg-[#05070d]"
+              style={{
+                borderTop: "1px solid rgba(239,68,68,0.28)",
+                boxShadow: "0 -6px 16px -4px rgba(5,7,13,0.95)",
+              }}
+            />
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[96px] items-center justify-between px-4">
+              <div className="flex flex-col items-start leading-none">
+                <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-foreground/70">
+                  Height
+                </div>
+                <div
+                  key={scorePulseKey}
+                  className="ts-score-pulse mt-1 font-mono text-[34px] font-bold leading-none tabular-nums text-foreground"
+                  style={{
+                    textShadow:
+                      "0 2px 10px rgba(0,0,0,0.9), 0 0 16px rgba(239,68,68,0.35)",
+                  }}
+                >
+                  {state.score}
+                </div>
               </div>
-            )}
-          </div>
+              {state.streak >= 2 ? (
+                <div
+                  key={streakPopKey}
+                  className="ts-streak-pop inline-flex items-center gap-1.5 border border-accent-red/70 bg-accent-red/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-accent-red"
+                >
+                  <span className="tabular-nums">×{state.streak}</span>
+                  <span className="text-foreground/80">Perfect</span>
+                </div>
+              ) : (
+                <div className="font-mono text-[9px] font-bold uppercase tracking-[0.4em] text-foreground/35">
+                  Stack
+                </div>
+              )}
+              <div className="flex flex-col items-end leading-none">
+                <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-foreground/70">
+                  Lives
+                </div>
+                <div className="mt-2 flex items-center gap-1.5">
+                  {Array.from({ length: MAX_LIVES }).map((_, i) => {
+                    const alive = i < MAX_LIVES - state.fails;
+                    return (
+                      <span
+                        key={i}
+                        className="block h-3 w-3"
+                        style={{
+                          background: alive ? "rgb(239,68,68)" : "transparent",
+                          border: alive
+                            ? "1px solid rgb(239,68,68)"
+                            : "1px solid rgba(239,68,68,0.35)",
+                          boxShadow: alive
+                            ? "0 0 10px rgba(239,68,68,0.55)"
+                            : "none",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {showHud && (
