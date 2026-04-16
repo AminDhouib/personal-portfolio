@@ -36,4 +36,22 @@ function nth(n: number): string {
   return `${n}th`;
 }
 
-export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper];
+const wordCountStrict: RuleDef = {
+  id: "word-count-strict",
+  tier: 3,
+  create(rng) {
+    const n = rangeInt(rng, 5, 8);
+    return {
+      id: "word-count-strict",
+      tier: 3,
+      description: `Your password must contain exactly ${n} space-separated words.`,
+      params: { n },
+      validate(state) {
+        const words = state.password.trim().split(/\s+/).filter((w) => w.length > 0);
+        return { passed: words.length === n, message: `${words.length} / ${n}` };
+      },
+    };
+  },
+};
+
+export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict];

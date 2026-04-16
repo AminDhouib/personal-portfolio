@@ -63,3 +63,27 @@ describe("Tier 3 — every-nth-uppercase rule", () => {
     expect(rule.validate(makeState(s, rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 3 — strict word count rule", () => {
+  const def = TIER_3_RULES.find((r) => r.id === "word-count-strict")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("target n is 5-8 (higher than tier 1)", () => {
+    for (let seed = 1; seed < 50; seed++) {
+      const rule = def.create(mulberry32(seed));
+      const n = rule.params.n as number;
+      expect(n).toBeGreaterThanOrEqual(5);
+      expect(n).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it("passes with exact count of words", () => {
+    const rule = def.create(mulberry32(1));
+    const n = rule.params.n as number;
+    const words = Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+    expect(rule.validate(makeState(words, rule)).passed).toBe(true);
+  });
+});
