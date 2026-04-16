@@ -56,6 +56,10 @@ function GameScreen({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const bgmRef = useRef<BgmPlayer | null>(null);
 
+  const lastSubmittedRef = useRef(save.stats.highestSingleRoundCoins);
+  const [pendingSubmit, setPendingSubmit] = useState<number | null>(null);
+  const [nameInput, setNameInput] = useState("");
+
   const ensureAudio = useCallback(() => {
     if (typeof window === "undefined") return null;
     if (!audioCtxRef.current) {
@@ -88,6 +92,33 @@ function GameScreen({
   useEffect(() => {
     bgmRef.current?.setVolume(save.musicVolume);
   }, [save.musicVolume]);
+
+  useEffect(() => {
+    if (state.stats.highestSingleRoundCoins > lastSubmittedRef.current) {
+      setPendingSubmit(state.stats.highestSingleRoundCoins);
+    }
+    lastSubmittedRef.current = state.stats.highestSingleRoundCoins;
+  }, [state.stats.highestSingleRoundCoins]);
+
+  async function submitScore() {
+    if (pendingSubmit === null) return;
+    try {
+      await fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: nameInput.slice(0, 12) || "Anonymous",
+          score: pendingSubmit,
+          level: state.level,
+          region: state.mode,
+        }),
+      });
+    } catch {
+      // network failures shouldn't break gameplay
+    }
+    setPendingSubmit(null);
+    setNameInput("");
+  }
 
   const prevPhaseRef = useRef(state.phase);
   const prevCoinsRef = useRef(state.currentCoins);
@@ -262,6 +293,41 @@ function GameScreen({
       totalCoins={state.totalCoins}
       onSelect={(id) => dispatch({ type: "unlockTheme", theme: id })}
     />
+    {pendingSubmit !== null && (
+      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+        <div className="bg-(--card) p-6 rounded-lg max-w-sm w-full text-center border border-(--border)">
+          <h4 className="font-bold mb-2">New Personal Best: {pendingSubmit} coins!</h4>
+          <p className="text-(--muted) text-sm mb-4">Submit your score to the leaderboard?</p>
+          <input
+            type="text"
+            maxLength={12}
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            placeholder="Your name (optional)"
+            className="w-full px-3 py-2 rounded border border-(--border) bg-(--bg) mb-3"
+          />
+          <div className="flex gap-2 justify-center">
+            <button
+              type="button"
+              onClick={submitScore}
+              className="px-4 py-2 rounded bg-accent-pink text-white font-medium"
+            >
+              Submit
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingSubmit(null);
+                setNameInput("");
+              }}
+              className="px-4 py-2 rounded border border-(--border)"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
