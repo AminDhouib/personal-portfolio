@@ -58,7 +58,7 @@ const NEAR_MISS_POINTS = 15;
 // hasn't started — waiting for the player's first mouse/touch/key input.
 type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
 type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp" | "magnet";
-type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall";
+type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter";
 type BulletStyle = "sprite" | "bolt" | "plasma";
 
 interface Environment {
@@ -159,6 +159,7 @@ interface Obstacle {
   shape: 0 | 1 | 2;
   closestApproach: number;  // closest 3D distance the ship came to this obstacle, tracked per-frame
   brushed: boolean;         // true if the obstacle came within near-miss range but not collision
+  lastShotAt?: number;      // shooter variant: timestamp of last bullet fired at the player
 }
 
 interface Bullet {
@@ -1175,6 +1176,7 @@ function unlockedVariants(seconds: number): ObstacleVariant[] {
   const list: ObstacleVariant[] = ["basic"];
   if (seconds > 25) list.push("heavy");
   if (seconds > 50) list.push("speeder");
+  if (seconds > 90) list.push("shooter");
   return list;
 }
 
@@ -1236,6 +1238,10 @@ function spawnObstacle(g: GameRefs): Obstacle {
     size = 0.4 + Math.random() * 0.2;
     hp = 1;
     speed = baseSpeed * 1.6;
+  } else if (variant === "shooter") {
+    size = 0.7 + Math.random() * 0.2;
+    hp = 2;
+    speed = baseSpeed * 0.55; // slow — gives the player time to dodge its shots
   }
 
   // ~25% of basic asteroids get a lateral drift so even a stationary player
@@ -2643,6 +2649,30 @@ function runTick(
       if (d < o.closestApproach) o.closestApproach = d;
     }
 
+    // Shooter variant: fire aimed projectiles every 1.6s while in visible Z band
+    if (o.variant === "shooter" && g.status === "playing" && o.z > -25 && o.z < 2) {
+      const SHOOT_INTERVAL_MS = 1600;
+      if (!o.lastShotAt || now - o.lastShotAt >= SHOOT_INTERVAL_MS) {
+        o.lastShotAt = now;
+        const dx = g.shipX - o.x;
+        const dy = g.shipY - o.y;
+        const dz = g.shipZ - o.z;
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        const speed = 9;
+        g.bossProjectiles.push({
+          id: g.nextBossProjectileId++,
+          position: [o.x, o.y, o.z],
+          velocity: [(dx / len) * speed, (dy / len) * speed, (dz / len) * speed],
+          radius: 0.28,
+          color: "#f59e0b",
+          spawnedAt: now,
+          ttlMs: 4000,
+          homing: false,
+          shielded: false,
+        });
+      }
+    }
+
     if (o.z > DESPAWN_Z) {
       // Near-miss: obstacle came within brush radius but never collided. Only
       // award for non-wall variants (walls are always meant to be dodged wide).
@@ -3051,11 +3081,17 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     emissive: "#dc2626",
     emissiveIntensity: 0.6,
   }), []);
+  const shooterMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: "#f59e0b",          // amber — "this one shoots back"
+    emissive: "#b45309",
+    emissiveIntensity: 0.7,
+  }), []);
   useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
   useEffect(() => () => baseMat.dispose(), [baseMat]);
   useEffect(() => () => heavyMat.dispose(), [heavyMat]);
   useEffect(() => () => speederMat.dispose(), [speederMat]);
   useEffect(() => () => wallMat.dispose(), [wallMat]);
+  useEffect(() => () => shooterMat.dispose(), [shooterMat]);
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -3074,6 +3110,7 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     v === "heavy" ? heavyMat
     : v === "speeder" ? speederMat
     : v === "wall" ? wallMat
+    : v === "shooter" ? shooterMat
     : baseMat;
 
   return (
