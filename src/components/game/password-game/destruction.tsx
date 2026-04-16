@@ -249,73 +249,108 @@ function FloatingDebris() {
 }
 
 /**
- * A realistic radial crack. Rendered as a small dark impact point with
- * several thin white lines radiating outward and branching. No jagged
- * polygon, no chipped chunk — this reads as glass fractured by an impact.
+ * A jagged crack that cuts THROUGH the container — the fill is the page
+ * background color, so it looks like the card material physically split
+ * open and you can see through to the dark page behind. Thin white
+ * highlights on the edges sell the glass-fracture look.
  *
- * The SVG viewBox is 100x100 with the impact point at (50, 50). flipX/flipY
- * mirror the geometry so the same crack asset works at any corner.
+ * Each crack SVG covers a 200x200 area with the crack running from the
+ * top-left to the bottom-right as a thin zig-zag polygon. flipX/flipY
+ * orient the crack for each corner so the lines come from the edge inward.
  */
 function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
   const transform = [
-    flipX ? "scale(-1 1) translate(-100 0)" : "",
-    flipY ? "scale(1 -1) translate(0 -100)" : "",
+    flipX ? "scale(-1 1) translate(-200 0)" : "",
+    flipY ? "scale(1 -1) translate(0 -200)" : "",
   ].filter(Boolean).join(" ");
   return (
-    <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden>
-      <defs>
-        <filter id="pg-crack-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="0.5" />
-        </filter>
-      </defs>
+    <svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden preserveAspectRatio="none">
       <g transform={transform || undefined}>
-        {/* Impact point — small dark crater with a halo. */}
-        <circle cx="50" cy="50" r="4" fill="rgba(0,0,0,0.75)" />
-        <circle cx="50" cy="50" r="2" fill="#000" />
-        <circle cx="50" cy="50" r="5.5" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.4" />
+        {/*
+         * Main crack polygon.
+         * Two parallel zig-zag paths (the crack's two edges), joined to form
+         * a thin slit that cuts from (0, 0) through the container to
+         * roughly (180, 180). The polygon is ~4-8px wide at SVG scale.
+         *
+         * Tracing clockwise, upper edge first, then lower edge reversed:
+         *   upper edge: along the crack's "top" side
+         *   lower edge: along the crack's "bottom" side, returning
+         */}
+        <polygon
+          points="
+            0,0
+            18,10
+            34,4
+            52,22
+            70,16
+            86,38
+            104,30
+            120,52
+            134,46
+            152,72
+            168,64
+            186,92
+            200,100
+            200,108
+            190,108
+            172,80
+            156,86
+            138,60
+            124,66
+            108,42
+            90,50
+            74,28
+            58,32
+            40,14
+            22,20
+            6,8
+          "
+          fill="var(--background, #0a0a0f)"
+        />
 
-        {/* Primary radiating fractures — 7 lines fanning from impact. Each
-            line tapers: starts thick near impact, thin at the tip. */}
-        <g stroke="#ffffff" strokeLinecap="round" fill="none">
-          {/* Upper-left long crack */}
-          <path d="M 50 50 L 42 42 L 30 28 L 18 14 L 8 6" strokeWidth="1.1" opacity="0.9" />
-          <path d="M 30 28 L 22 22" strokeWidth="0.5" opacity="0.6" />
-          <path d="M 18 14 L 10 18" strokeWidth="0.4" opacity="0.5" />
+        {/* Upper white highlight edge — thin stroke showing the glass fracture. */}
+        <polyline
+          points="0,0 18,10 34,4 52,22 70,16 86,38 104,30 120,52 134,46 152,72 168,64 186,92 200,100"
+          fill="none"
+          stroke="rgba(255,255,255,0.55)"
+          strokeWidth="0.8"
+          strokeLinejoin="miter"
+          strokeLinecap="round"
+        />
+        {/* Lower highlight edge. */}
+        <polyline
+          points="6,8 22,20 40,14 58,32 74,28 90,50 108,42 124,66 138,60 156,86 172,80 190,108"
+          fill="none"
+          stroke="rgba(255,255,255,0.3)"
+          strokeWidth="0.5"
+          strokeLinejoin="miter"
+        />
 
-          {/* Upper-right medium */}
-          <path d="M 50 50 L 56 40 L 66 28 L 78 14 L 94 4" strokeWidth="0.9" opacity="0.85" />
-          <path d="M 66 28 L 74 28" strokeWidth="0.4" opacity="0.5" />
-
-          {/* Upper short */}
-          <path d="M 50 50 L 50 36 L 46 22 L 44 8" strokeWidth="0.7" opacity="0.7" />
-
-          {/* Right horizontal */}
-          <path d="M 50 50 L 62 52 L 76 54 L 90 58" strokeWidth="0.8" opacity="0.8" />
-          <path d="M 76 54 L 82 48" strokeWidth="0.35" opacity="0.5" />
-
-          {/* Lower-right long */}
-          <path d="M 50 50 L 58 58 L 66 72 L 78 88 L 92 98" strokeWidth="1" opacity="0.9" />
-          <path d="M 66 72 L 72 70" strokeWidth="0.45" opacity="0.55" />
-          <path d="M 78 88 L 84 84" strokeWidth="0.35" opacity="0.5" />
-
-          {/* Lower short */}
-          <path d="M 50 50 L 48 60 L 46 72 L 44 88" strokeWidth="0.7" opacity="0.75" />
-
-          {/* Lower-left medium */}
-          <path d="M 50 50 L 42 56 L 30 66 L 16 78 L 6 90" strokeWidth="0.85" opacity="0.85" />
-          <path d="M 30 66 L 26 74" strokeWidth="0.4" opacity="0.55" />
-
-          {/* Left horizontal */}
-          <path d="M 50 50 L 38 50 L 22 48 L 6 44" strokeWidth="0.8" opacity="0.8" />
-          <path d="M 22 48 L 16 54" strokeWidth="0.35" opacity="0.5" />
-        </g>
-
-        {/* A few concentric micro-arcs near the impact for the "stressed glass" look. */}
-        <g stroke="rgba(255,255,255,0.45)" strokeWidth="0.3" fill="none">
-          <path d="M 44 48 Q 50 44 56 48" />
-          <path d="M 44 52 Q 50 56 56 52" />
-          <path d="M 43 50 Q 45 45 50 44" />
-        </g>
+        {/* Secondary branching cracks — shorter thin slits veering off at angles. */}
+        <polygon
+          points="70,16 66,4 72,3 78,14 74,15"
+          fill="var(--background, #0a0a0f)"
+          stroke="rgba(255,255,255,0.4)"
+          strokeWidth="0.4"
+        />
+        <polygon
+          points="120,52 132,42 135,46 124,56"
+          fill="var(--background, #0a0a0f)"
+          stroke="rgba(255,255,255,0.4)"
+          strokeWidth="0.4"
+        />
+        <polygon
+          points="86,38 82,52 86,54 92,40"
+          fill="var(--background, #0a0a0f)"
+          stroke="rgba(255,255,255,0.4)"
+          strokeWidth="0.4"
+        />
+        <polygon
+          points="152,72 162,86 166,84 156,70"
+          fill="var(--background, #0a0a0f)"
+          stroke="rgba(255,255,255,0.4)"
+          strokeWidth="0.4"
+        />
       </g>
     </svg>
   );

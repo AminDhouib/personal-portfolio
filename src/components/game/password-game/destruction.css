@@ -254,27 +254,27 @@
 
 /* Position each chip so it eats a small corner without covering rule text. */
 .pg-chip-1 {
-  /* Top-right — impact point sits just inside the corner; lines radiate. */
-  top: 8px;
-  right: 12px;
-  width: 86px;
-  height: 86px;
+  /* Top-right — crack cuts down-left from the top edge. */
+  top: -4px;
+  right: -4px;
+  width: 160px;
+  height: 160px;
   transform-origin: 50% 50%;
 }
 .pg-chip-2 {
-  /* Bottom-right — impact slightly up from the corner, lines fan up-left. */
-  bottom: 12px;
-  right: 18px;
-  width: 90px;
-  height: 90px;
+  /* Bottom-right — crack travels up-left across lower third. */
+  bottom: -4px;
+  right: -4px;
+  width: 180px;
+  height: 130px;
   transform-origin: 50% 50%;
 }
 .pg-chip-3 {
-  /* Left edge — impact near the rule list area. */
-  top: 42%;
-  left: 8px;
-  width: 74px;
-  height: 74px;
+  /* Left edge — crack runs down-right from left side into the middle. */
+  top: 30%;
+  left: -4px;
+  width: 150px;
+  height: 120px;
   transform-origin: 50% 50%;
 }
 
