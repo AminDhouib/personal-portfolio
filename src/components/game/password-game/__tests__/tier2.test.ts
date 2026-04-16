@@ -4,6 +4,7 @@ import { TIER_2_RULES } from "../rules/tier2";
 import type { GameState, Rule } from "../types";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
+import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
 
 function makeState(password: string, rule: Rule): GameState {
   return {
@@ -157,6 +158,34 @@ describe("Tier 2 — foreign word rule", () => {
   it("fails without the translation", () => {
     const rule = def.create(mulberry32(17));
     expect(rule.validate(makeState("qqqqqqq", rule)).passed).toBe(false);
+  });
+});
+
+describe("Tier 2 — capital city rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "capital-city")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params reference a known country and capital", () => {
+    const rule = def.create(mulberry32(23));
+    const entry = COUNTRY_CAPITALS.find(
+      (c) => c.country === rule.params.country && c.capital === rule.params.capital
+    );
+    expect(entry).toBeDefined();
+  });
+
+  it("passes when password contains the capital (case-insensitive)", () => {
+    const rule = def.create(mulberry32(23));
+    const cap = rule.params.capital as string;
+    expect(rule.validate(makeState(`xx${cap}yy`, rule)).passed).toBe(true);
+    expect(rule.validate(makeState(`xx${cap.toLowerCase()}yy`, rule)).passed).toBe(true);
+  });
+
+  it("fails without the capital", () => {
+    const rule = def.create(mulberry32(23));
+    expect(rule.validate(makeState("no capital here", rule)).passed).toBe(false);
   });
 });
 

@@ -3,6 +3,7 @@ import { pickOne, rangeInt } from "../prng";
 import { NATO_ALPHABET, NATO_LETTERS } from "../../../../data/password-game/nato";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
+import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -165,4 +166,23 @@ const foreignWord: RuleDef = {
   },
 };
 
-export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement, foreignWord];
+const capitalCity: RuleDef = {
+  id: "capital-city",
+  tier: 2,
+  create(rng) {
+    const entry = pickOne(rng, COUNTRY_CAPITALS);
+    return {
+      id: "capital-city",
+      tier: 2,
+      description: `Your password must include the capital city of ${entry.country}.`,
+      params: { country: entry.country, capital: entry.capital },
+      validate(state) {
+        return {
+          passed: state.password.toLowerCase().includes(entry.capital.toLowerCase()),
+        };
+      },
+    };
+  },
+};
+
+export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement, foreignWord, capitalCity];
