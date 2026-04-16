@@ -329,6 +329,53 @@ function normalizeVec3(v: [number, number, number]): [number, number, number] {
   return [v[0] / len, v[1] / len, v[2] / len];
 }
 
+interface TractorBeam {
+  active: boolean;
+  startAt: number;
+  durationMs: number;
+  shipOverlapAccum: number;
+}
+
+function runHarvesterBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+  boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0004) * 4;
+  boss.position[1] = 5;
+  boss.position[2] = -14;
+  const beamHolder = boss as unknown as { tractorBeam?: TractorBeam };
+  if (!beamHolder.tractorBeam) {
+    beamHolder.tractorBeam = { active: false, startAt: 0, durationMs: 2000, shipOverlapAccum: 0 };
+  }
+  const beam = beamHolder.tractorBeam;
+  const CYCLE_MS = 4000 / boss.difficultyMult;
+  const cycleAge = (now - boss.phaseStartAt) % CYCLE_MS;
+  const deltaMs = step * 1000;
+  if (cycleAge < beam.durationMs) {
+    if (!beam.active) {
+      beam.active = true;
+      beam.startAt = now;
+      beam.shipOverlapAccum = 0;
+    }
+    const dx = g.shipX - boss.position[0];
+    const dz = g.shipZ - boss.position[2];
+    if (Math.abs(dx) < 0.8 && Math.abs(dz) < 2.5) {
+      beam.shipOverlapAccum += deltaMs;
+      if (beam.shipOverlapAccum >= 500) {
+        // Drain coins if available, else score
+        const profile = loadProfile();
+        if (profile.walletCoins >= 20) {
+          spendCoins(20);
+        } else {
+          g.score = Math.max(0, g.score - 50);
+        }
+        beam.shipOverlapAccum = 0;
+      }
+    } else {
+      beam.shipOverlapAccum = Math.max(0, beam.shipOverlapAccum - deltaMs * 0.5);
+    }
+  } else {
+    beam.active = false;
+  }
+}
+
 function runMirrorBehavior(g: GameRefs, boss: BossState, now: number): void {
   boss.position[0] = -g.shipX;
   boss.position[1] = g.shipY + 2;
@@ -1950,6 +1997,7 @@ function runTick(
       else if (b.id === "swarm-mother") runSwarmMotherBehavior(g, b, now, step);
       else if (b.id === "mirror") runMirrorBehavior(g, b, now);
       else if (b.id === "pulsar") runPulsarBehavior(g, b, now);
+      else if (b.id === "harvester") runHarvesterBehavior(g, b, now, step);
       // other boss behaviors added in later tasks
       if (now - g.lastBossPulseAt > 700) {
         sounds.bossPulse();
@@ -2804,6 +2852,28 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
           <meshStandardMaterial color="#ffffff" emissive="#fef08a" emissiveIntensity={1.5} />
         </mesh>
         <pointLight intensity={3} distance={20} color="#fef08a" />
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
+  if (boss.id === "harvester") {
+    const beam = (boss as unknown as { tractorBeam?: { active: boolean } }).tractorBeam;
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <boxGeometry args={[2.5, 1.2, 2.5]} />
+          <meshStandardMaterial color="#292524" emissive="#78350f" emissiveIntensity={0.3} />
+        </mesh>
+        <mesh position={[0, -0.8, 0]}>
+          <coneGeometry args={[1.0, 0.8, 4]} />
+          <meshStandardMaterial color="#44403c" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {beam?.active && (
+          <mesh position={[0, -5, 0]}>
+            <boxGeometry args={[1.6, 10, 5]} />
+            <meshBasicMaterial color="#f59e0b" transparent opacity={0.3} />
+          </mesh>
+        )}
         <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
       </group>
     );
