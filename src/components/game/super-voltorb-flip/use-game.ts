@@ -342,9 +342,70 @@ export function applyAction(
       return s;
     }
 
+    case "armShield": {
+      if (s.mode !== "super" || s.shieldArmed) return s;
+      const cost = 200 * s.level;
+      if (s.totalCoins < cost) return s;
+      const newTotal = s.totalCoins - cost;
+      opts.onPersist({ totalCoins: newTotal });
+      return { ...s, shieldArmed: true, totalCoins: newTotal };
+    }
+
+    case "useVoltorbReveal": {
+      if (s.mode !== "super") return s;
+      if (s.voltorbRevealsUsed >= 2) return s;
+      const cost = 500 * s.level;
+      if (s.totalCoins < cost) return s;
+      const hidden: Array<[number, number]> = [];
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (!s.board[r][c].flipped && s.board[r][c].value === 0) hidden.push([r, c]);
+        }
+      }
+      if (hidden.length === 0) return s;
+      const [rr, cc] = hidden[Math.floor(Math.random() * hidden.length)];
+      const board = s.board.map((row, r) =>
+        row.map((t, c) =>
+          r === rr && c === cc ? { ...t, flipped: true, animFrame: null } : t,
+        ),
+      );
+      const newTotal = s.totalCoins - cost;
+      opts.onPersist({ totalCoins: newTotal });
+      return {
+        ...s, board,
+        totalCoins: newTotal,
+        voltorbRevealsUsed: s.voltorbRevealsUsed + 1,
+      };
+    }
+
+    case "cashOut": {
+      if (s.mode !== "super") return s;
+      if (s.phase !== "playing" && s.phase !== "memo") return s;
+      if (s.currentCoins === 0) return s;
+      const totalGain = s.currentCoins;
+      const newTotal = Math.min(99999, s.totalCoins + totalGain);
+      const newStats = {
+        ...s.stats,
+        gamesPlayed: s.stats.gamesPlayed + 1,
+        highestSingleRoundCoins: Math.max(s.stats.highestSingleRoundCoins, totalGain),
+        lifetimeCoins: s.stats.lifetimeCoins + totalGain,
+      };
+      opts.onPersist({ totalCoins: newTotal, stats: newStats });
+      const { board, maxCoins, twos, threes } = generateBoard(s.level);
+      const { rowHints, colHints } = computeHints(board);
+      return {
+        ...s, phase: "ready",
+        board, rowHints, colHints,
+        maxCoins, currentCoins: 0, totalCoins: newTotal,
+        weather: pickWeather(), timeOfDay: getTimeOfDay(),
+        shieldArmed: false, shieldedLoss: false, voltorbRevealsUsed: 0,
+        successfulFlipsThisRound: 0,
+        requiredFlipsThisRound: twos + threes,
+        stats: newStats,
+      };
+    }
+
     default:
-      // armShield, useVoltorbReveal, cashOut
-      // are added in later tasks (20).
       return s;
   }
 }

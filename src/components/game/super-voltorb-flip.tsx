@@ -7,6 +7,7 @@ import { useGame } from "./super-voltorb-flip/use-game";
 import { Board } from "./super-voltorb-flip/GameBoard";
 import { Scoreboard } from "./super-voltorb-flip/Scoreboard";
 import { MemoPanel } from "./super-voltorb-flip/MemoPanel";
+import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -69,6 +70,7 @@ function GameScreen({
   }, [state.board, state.speedMode, dispatch]);
 
   return (
+    <>
     <div
       className="w-full rounded-xl border border-(--border) overflow-hidden relative"
       style={{
@@ -142,6 +144,19 @@ function GameScreen({
         </div>
       )}
     </div>
+    {state.mode === "super" && (
+      <AbilityBar
+        level={state.level}
+        totalCoins={state.totalCoins}
+        shieldArmed={state.shieldArmed}
+        voltorbRevealsUsed={state.voltorbRevealsUsed}
+        currentCoins={state.currentCoins}
+        onArmShield={() => dispatch({ type: "armShield" })}
+        onUseReveal={() => dispatch({ type: "useVoltorbReveal" })}
+        onCashOut={() => dispatch({ type: "cashOut" })}
+      />
+    )}
+    </>
   );
 }
 
