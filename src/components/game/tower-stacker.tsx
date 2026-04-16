@@ -131,7 +131,14 @@ function drawParticles(r: GameRefs, ctx: CanvasRenderingContext2D) {
     const alpha = Math.min(1, p.life / p.maxLife);
     ctx.save();
     ctx.globalAlpha = alpha;
-    if (p.kind === "debris" && p.width && p.height) {
+    if (p.kind === "ambient") {
+      const radius = p.size * (p.life / p.maxLife);
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+      grd.addColorStop(0, p.color);
+      grd.addColorStop(1, "transparent");
+      ctx.fillStyle = grd;
+      ctx.fillRect(p.x - radius, p.y - radius, radius * 2, radius * 2);
+    } else if (p.kind === "debris" && p.width && p.height) {
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       ctx.fillStyle = p.color;
@@ -143,6 +150,58 @@ function drawParticles(r: GameRefs, ctx: CanvasRenderingContext2D) {
       ctx.fill();
     }
     ctx.restore();
+  }
+}
+
+function spawnAmbient(r: GameRefs, w: number, h: number) {
+  const biome = BIOMES[r.biomeIdx].id;
+  switch (biome) {
+    case "surface":
+      spawnParticle(r, {
+        kind: "ambient",
+        x: -20, y: 80 + r.prng() * 80,
+        vx: 40 + r.prng() * 30, vy: 0,
+        life: (w + 40) / 60, maxLife: (w + 40) / 60,
+        size: 4, color: "#1f2937",
+      });
+      break;
+    case "clouds":
+      spawnParticle(r, {
+        kind: "ambient",
+        x: -60, y: 120 + r.prng() * 100,
+        vx: 120, vy: 0,
+        life: (w + 60) / 120, maxLife: (w + 60) / 120,
+        size: 12, color: "#374151",
+        width: 50, height: 10,
+      });
+      break;
+    case "atmosphere":
+      spawnParticle(r, {
+        kind: "ambient",
+        x: w / 2, y: h * 0.3,
+        vx: 0, vy: 0,
+        life: 3, maxLife: 3, size: 120,
+        color: "rgba(56,189,248,0.3)",
+      });
+      break;
+    case "space":
+      spawnParticle(r, {
+        kind: "ambient",
+        x: r.prng() * w, y: -10,
+        vx: -200 + r.prng() * -100,
+        vy: 400 + r.prng() * 200,
+        life: 1.2, maxLife: 1.2, size: 3,
+        color: "#fef3c7",
+      });
+      break;
+    case "void":
+      spawnParticle(r, {
+        kind: "ambient",
+        x: r.prng() * w, y: r.prng() * h,
+        vx: 0, vy: 0, life: 4, maxLife: 4, size: 80,
+        color: "rgba(168,85,247,0.25)",
+      });
+      break;
   }
 }
 
@@ -664,6 +723,14 @@ export default function TowerStacker() {
         a.x += a.direction * a.speed * dt;
         if (a.x <= 0) { a.x = 0; a.direction = 1; }
         if (a.x + a.width >= w) { a.x = w - a.width; a.direction = -1; }
+      }
+
+      if (r.state === "playing") {
+        r.ambientCooldown -= dt;
+        if (r.ambientCooldown <= 0) {
+          r.ambientCooldown = 5 + r.prng() * 6;
+          spawnAmbient(r, w, h);
+        }
       }
 
       updateParticles(r, dt);
