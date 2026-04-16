@@ -2518,6 +2518,8 @@ interface UiState {
   seconds: number;
   kills: number;
   distance: number;
+  combo: number;
+  comboPeak: number;
   active: { type: PowerUpType; remainingMs: number }[];
 }
 
@@ -2544,7 +2546,7 @@ export function SpaceShooterGame() {
   const gameRefs = useRef<GameRefs>(createRefs());
   const containerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
-  const [ui, setUi] = useState<UiState>({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, active: [] });
+  const [ui, setUi] = useState<UiState>({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, active: [] });
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
   const [region, setRegion] = useState<string>("");
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
@@ -2631,6 +2633,8 @@ export function SpaceShooterGame() {
       seconds,
       kills: g.kills,
       distance: Math.floor(g.distance),
+      combo: g.combo,
+      comboPeak: g.comboPeak,
       active: g.activePowerUps.map((p) => ({ type: p.type, remainingMs: Math.max(0, p.expiresAt - now) })),
     });
     setTick((t) => (t + 1) % 1_000_000);
@@ -2708,7 +2712,7 @@ export function SpaceShooterGame() {
     g.cameraTargetX = 0;
     g.cameraTargetY = 0;
     g.cameraTargetZ = 5;
-    setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, active: [] });
+    setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, active: [] });
     setSubmitted(false);
     setCelebration(null);
     setShowInstructions(true);
@@ -2902,6 +2906,18 @@ export function SpaceShooterGame() {
                 </span>
                 <span className="font-mono tabular-nums text-white/80">{ui.distance}m</span>
                 <span className="font-mono tabular-nums text-white/80">{ui.kills} kills</span>
+                {ui.combo > 1 && (
+                  <motion.span
+                    key={ui.combo}
+                    initial={{ scale: 0.7, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                    className="font-mono font-bold tabular-nums"
+                    style={{ color: comboColor(ui.combo) }}
+                  >
+                    {"\u00d7"}{ui.combo}
+                  </motion.span>
+                )}
                 <span className="font-mono tabular-nums text-white/50">{ui.seconds.toFixed(0)}s</span>
               </div>
               {/* Active power-ups */}
@@ -3079,7 +3095,7 @@ export function SpaceShooterGame() {
                     Personal Best
                   </motion.div>
                 )}
-                <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-white/75 max-w-sm mx-auto">
+                <div className="mt-3 grid grid-cols-4 gap-2 text-xs text-white/75 max-w-md mx-auto">
                   <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
                     <div className="text-white/50 uppercase tracking-wider text-[10px]">Survived</div>
                     <div className="font-mono text-white tabular-nums">{ui.seconds.toFixed(0)}s</div>
@@ -3091,6 +3107,10 @@ export function SpaceShooterGame() {
                   <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
                     <div className="text-white/50 uppercase tracking-wider text-[10px]">Kills</div>
                     <div className="font-mono text-white tabular-nums">{ui.kills}</div>
+                  </div>
+                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
+                    <div className="text-white/50 uppercase tracking-wider text-[10px]">Peak Combo</div>
+                    <div className="font-mono text-white tabular-nums" style={{ color: comboColor(ui.comboPeak) }}>{"\u00d7"}{ui.comboPeak}</div>
                   </div>
                 </div>
               </motion.div>
