@@ -9,9 +9,11 @@ import {
   Rocket, Trophy, Shield, RotateCcw, Send,
   Volume2, VolumeX, Crosshair, Zap, Target,
   Maximize2, Minimize2, Pause, Play,
+  ShoppingCart, Magnet, Coins as CoinsIcon, Timer, X as XIcon,
 } from "lucide-react";
 import {
   addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted,
+  setUpgradeLevel, spendCoins,
 } from "./profile";
 import { UPGRADES, upgradeById } from "./shop-data";
 
@@ -2699,6 +2701,23 @@ export function SpaceShooterGame() {
   });
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [profile, setProfile] = useState(() => loadProfile());
+  const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
+  const isReturningPlayer = profile.firstRunCompleted;
+  const buyUpgrade = useCallback((id: string) => {
+    const def = upgradeById(id as "coin-magnet" | "coin-value" | "score-multiplier" | "combo-window" | "shield-duration");
+    if (!def) return;
+    const currentLevel = profile.ownedUpgrades[id] ?? 0;
+    if (currentLevel >= def.maxLevel) return;
+    const cost = def.costAtLevel(currentLevel + 1);
+    if (profile.walletCoins < cost) return;
+    const spend = spendCoins(cost);
+    if (!spend.ok) return;
+    setUpgradeLevel(id, currentLevel + 1);
+    sounds.play("chime");
+    refreshProfile();
+  }, [profile, refreshProfile]);
 
   const togglePause = useCallback(() => {
     const g = gameRefs.current;
@@ -3035,6 +3054,83 @@ export function SpaceShooterGame() {
         {(ui.status === "playing" || ui.status === "paused") && (
           <>
             {/* Top-left: score + distance + kills — styled to match game aesthetic */}
+            {/* Shop modal — only reachable for returning players */}
+            <AnimatePresence>
+              {shopOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex flex-col bg-black/80 backdrop-blur-md p-4 overflow-y-auto z-10"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <ShoppingCart className="h-5 w-5 text-accent-amber" />
+                      <h3 className="text-lg font-bold text-white">Shop</h3>
+                      <div className="flex items-center gap-1.5 rounded-md bg-accent-amber/20 border border-accent-amber/40 px-2 py-1 text-sm font-mono text-accent-amber">
+                        <CoinsIcon className="h-3.5 w-3.5" />
+                        {profile.walletCoins}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShopOpen(false)}
+                      className="rounded-lg bg-white/10 border border-white/20 p-1.5 text-white hover:bg-white/20 transition-colors"
+                      aria-label="Close shop"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl mx-auto w-full">
+                    {UPGRADES.map((u) => {
+                      const level = profile.ownedUpgrades[u.id] ?? 0;
+                      const maxed = level >= u.maxLevel;
+                      const nextCost = maxed ? 0 : u.costAtLevel(level + 1);
+                      const affordable = profile.walletCoins >= nextCost;
+                      const Icon =
+                        u.iconKey === "magnet" ? Magnet :
+                        u.iconKey === "coins" ? CoinsIcon :
+                        u.iconKey === "trophy" ? Trophy :
+                        u.iconKey === "timer" ? Timer :
+                        Shield;
+                      return (
+                        <button
+                          key={u.id}
+                          onClick={() => !maxed && affordable && buyUpgrade(u.id)}
+                          disabled={maxed || !affordable}
+                          className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
+                            maxed
+                              ? "border-emerald-500/40 bg-emerald-500/10"
+                              : affordable
+                              ? "border-accent-blue/50 bg-white/5 hover:bg-white/10"
+                              : "border-white/10 bg-white/5 opacity-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 w-full">
+                            <Icon className="h-4 w-4 text-accent-blue" />
+                            <span className="font-semibold text-white flex-1">{u.label}</span>
+                            <span className="text-xs font-mono text-white/60">
+                              L{level}/{u.maxLevel}
+                            </span>
+                          </div>
+                          <div className="text-xs text-white/70">{u.description}</div>
+                          <div className="flex items-center gap-1.5 mt-1 text-xs font-mono">
+                            {maxed ? (
+                              <span className="text-emerald-400">MAXED</span>
+                            ) : (
+                              <>
+                                <CoinsIcon className="h-3 w-3 text-accent-amber" />
+                                <span className={affordable ? "text-accent-amber" : "text-white/40"}>{nextCost}</span>
+                              </>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="pointer-events-none absolute top-3 left-3 flex flex-col gap-1.5 text-xs sm:text-sm">
               <div className="flex items-center gap-4 rounded-lg bg-black/50 backdrop-blur-sm px-3 py-1.5 border border-white/10">
                 <span className="flex items-center gap-1.5 font-mono font-bold tabular-nums text-accent-blue">
