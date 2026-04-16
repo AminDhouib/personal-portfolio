@@ -3575,7 +3575,7 @@ function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick
           return (
             <group key={b.id} ref={setRef}>
               <mesh geometry={sphGeo} scale={b.size * 1.8}>
-                <meshBasicMaterial color={b.color} />
+                <meshBasicMaterial color={b.color} toneMapped={false} />
               </mesh>
               <mesh geometry={sphGeo} scale={b.size * 3}>
                 <meshBasicMaterial color={b.color} transparent opacity={0.35} />
@@ -3588,10 +3588,10 @@ function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick
         }
         return (
           <group key={b.id} ref={setRef}>
-            <mesh geometry={cylGeo} scale={[b.size, 1.1, b.size]}>
-              <meshBasicMaterial color={b.color} />
+            <mesh geometry={sphGeo} scale={b.size * 1.35}>
+              <meshBasicMaterial color={b.color} toneMapped={false} />
             </mesh>
-            <mesh geometry={sphGeo} scale={b.size * 2.2}>
+            <mesh geometry={sphGeo} scale={b.size * 2.4}>
               <meshBasicMaterial color={b.color} transparent opacity={0.4} />
             </mesh>
           </group>
@@ -4418,7 +4418,7 @@ function BossProjectiles({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
             else refs.current.delete(p.id);
           }}
         >
-          <meshBasicMaterial color={p.color} />
+          <meshBasicMaterial color={p.color} toneMapped={false} />
         </mesh>
       ))}
       <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
@@ -4495,7 +4495,7 @@ function Explosions({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; t
           }}
           geometry={sphGeo}
         >
-          <meshBasicMaterial color={e.color} transparent opacity={e.opacity} />
+          <meshBasicMaterial color={e.color} transparent opacity={e.opacity} toneMapped={false} />
         </mesh>
       ))}
       <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
