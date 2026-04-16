@@ -3,9 +3,8 @@
 import { Tile } from "./Tile";
 import { RowInfoDigits, ColInfoDigits } from "./InfoDigits";
 import { MemoControls } from "./MemoControls";
-import type { GameState, MemoMarks } from "../types";
-
-const ASSETS = "/games/super-voltorb-flip/sprites";
+import { themedAsset } from "../theme";
+import type { GameState, MemoMarks, ThemeId } from "../types";
 
 export const BOARD_SECTION_HEIGHT = 219;
 
@@ -21,12 +20,14 @@ export function BoardSection({
   onMemoToggle,
   onMarkChange,
   onToggleCopy,
+  themeId,
 }: {
   state: GameState;
   onTileClick: (row: number, col: number) => void;
   onMemoToggle: () => void;
   onMarkChange: (idx: 0 | 1 | 2 | 3) => void;
   onToggleCopy: () => void;
+  themeId: ThemeId;
 }) {
   const selectedMemos: MemoMarks = state.selectedMemoTile
     ? state.board[state.selectedMemoTile.row][state.selectedMemoTile.col].memos
@@ -38,7 +39,7 @@ export function BoardSection({
         position: "relative",
         width: 262,
         height: BOARD_SECTION_HEIGHT,
-        backgroundImage: `url(${ASSETS}/chrome/board-section.png)`,
+        backgroundImage: `url(${themedAsset(themeId, "chrome/board-section.png")})`,
         imageRendering: "pixelated",
       }}
     >
@@ -53,6 +54,7 @@ export function BoardSection({
             x={12 + c * 32}
             y={24 + r * 32}
             onClick={onTileClick}
+            themeId={themeId}
           />
         )),
       )}
@@ -75,6 +77,7 @@ export function BoardSection({
         onToggle={onMemoToggle}
         onMarkChange={onMarkChange}
         onToggleCopy={onToggleCopy}
+        themeId={themeId}
       />
     </div>
   );

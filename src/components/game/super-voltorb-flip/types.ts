@@ -27,7 +27,12 @@ export type GamePhase =
   | "lost"
   | "transition";
 
-export type ThemeId = "classic" | "meadow" | "twilight";
+export type ThemeId =
+  | "classic"
+  | "meadow"
+  | "twilight"
+  | "thunder"
+  | "rainbow";
 
 export type WeatherKind =
   | "clear"

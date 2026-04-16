@@ -45,7 +45,9 @@ export function DsCanvas({
   onMarkChange: (idx: 0 | 1 | 2 | 3) => void;
   onToggleCopy: () => void;
 }) {
-  const labels = THEMES[state.activeTheme].labels;
+  const theme = THEMES[state.activeTheme];
+  const labels = theme.labels;
+  const themeId = state.activeTheme;
   return (
     <div
       style={{
@@ -71,17 +73,27 @@ export function DsCanvas({
           level={state.level}
           title={labels.headerTitle}
           subtitle={labels.headerSubtitle}
+          themeId={themeId}
         />
-        <Legend multipliers={labels.legendMultipliers} />
-        <VoltorbMessage message={labels.voltorbMessage} />
-        <TotalScoreboard value={state.totalCoins} label={labels.totalScoreboard} />
-        <CurrentScoreboard value={state.currentCoins} label={labels.currentScoreboard} />
+        <Legend multipliers={labels.legendMultipliers} themeId={themeId} />
+        <VoltorbMessage message={labels.voltorbMessage} themeId={themeId} />
+        <TotalScoreboard
+          value={state.totalCoins}
+          label={labels.totalScoreboard}
+          themeId={themeId}
+        />
+        <CurrentScoreboard
+          value={state.currentCoins}
+          label={labels.currentScoreboard}
+          themeId={themeId}
+        />
         <BoardSection
           state={state}
           onTileClick={onTileClick}
           onMemoToggle={onMemoToggle}
           onMarkChange={onMarkChange}
           onToggleCopy={onToggleCopy}
+          themeId={themeId}
         />
       </div>
     </div>

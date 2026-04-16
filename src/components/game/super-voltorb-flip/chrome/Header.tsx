@@ -2,8 +2,8 @@
 
 import { Digit } from "./Digits";
 import { dsFont } from "./ds-font";
-
-const ASSETS = "/games/super-voltorb-flip/sprites";
+import { themedAsset } from "../theme";
+import type { ThemeId } from "../types";
 
 export const HEADER_HEIGHT = 40;
 
@@ -20,10 +20,12 @@ export function Header({
   level,
   title,
   subtitle,
+  themeId,
 }: {
   level: number;
   title: string;
   subtitle: string;
+  themeId: ThemeId;
 }) {
   return (
     <div
@@ -31,7 +33,7 @@ export function Header({
         position: "relative",
         width: 262,
         height: HEADER_HEIGHT,
-        backgroundImage: `url(${ASSETS}/chrome/header-frame.png)`,
+        backgroundImage: `url(${themedAsset(themeId, "chrome/header-frame.png")})`,
         imageRendering: "pixelated",
       }}
     >
@@ -54,11 +56,13 @@ export function Header({
           letterSpacing: "0.5px",
           textShadow: "1px 1px 0 rgba(0,0,0,0.35)",
           userSelect: "none",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
         }}
       >
         <span>{title}</span>
         {/* Level digit still from the thin sprite sheet for pixel-perfect match */}
-        <span style={{ position: "relative", width: 6, height: 10 }}>
+        <span style={{ position: "relative", width: 6, height: 10, flexShrink: 0 }}>
           <Digit n={level} variant="thin" x={0} y={0} />
         </span>
       </div>
@@ -81,6 +85,8 @@ export function Header({
           letterSpacing: "0.5px",
           textShadow: "1px 1px 0 rgba(0,0,0,0.35)",
           userSelect: "none",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
         }}
       >
         {subtitle}

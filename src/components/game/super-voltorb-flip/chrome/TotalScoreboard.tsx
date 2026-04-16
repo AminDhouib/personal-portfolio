@@ -2,8 +2,8 @@
 
 import { CoinDigits } from "./Digits";
 import { dsFont } from "./ds-font";
-
-const ASSETS = "/games/super-voltorb-flip/sprites";
+import { themedAsset } from "../theme";
+import type { ThemeId } from "../types";
 
 export const SCOREBOARD_HEIGHT = 40;
 
@@ -16,9 +16,11 @@ export const SCOREBOARD_HEIGHT = 40;
 export function TotalScoreboard({
   value,
   label,
+  themeId,
 }: {
   value: number;
   label: readonly [string, string];
+  themeId: ThemeId;
 }) {
   return (
     <div
@@ -26,7 +28,7 @@ export function TotalScoreboard({
         position: "relative",
         width: 262,
         height: SCOREBOARD_HEIGHT,
-        backgroundImage: `url(${ASSETS}/chrome/scoreboard-total-frame.png)`,
+        backgroundImage: `url(${themedAsset(themeId, "chrome/scoreboard-total-frame.png")})`,
         imageRendering: "pixelated",
       }}
     >

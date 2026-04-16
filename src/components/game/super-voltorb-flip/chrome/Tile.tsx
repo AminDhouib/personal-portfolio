@@ -1,6 +1,7 @@
 "use client";
 
-import type { Tile as TileData } from "../types";
+import type { Tile as TileData, ThemeId } from "../types";
+import { themedAsset } from "../theme";
 import { Explosion } from "./Explosion";
 
 const ASSETS = "/games/super-voltorb-flip/sprites";
@@ -35,6 +36,7 @@ export function Tile({
   x,
   y,
   onClick,
+  themeId,
 }: {
   tile: TileData;
   row: number;
@@ -42,6 +44,7 @@ export function Tile({
   x: number;
   y: number;
   onClick: (row: number, col: number) => void;
+  themeId: ThemeId;
 }) {
   return (
     <button
@@ -75,9 +78,9 @@ export function Tile({
           transition: "transform 320ms cubic-bezier(0.4, 0.0, 0.2, 1)",
         }}
       >
-        {/* Front face: blank tile */}
+        {/* Front face: blank tile (per-theme tinted) */}
         <img
-          src={`${ASSETS}/tile/blank.png`}
+          src={themedAsset(themeId, "tile/blank.png")}
           alt=""
           draggable={false}
           style={{

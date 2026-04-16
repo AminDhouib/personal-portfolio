@@ -1,8 +1,7 @@
 "use client";
 
-import type { MemoMarks } from "../types";
-
-const ASSETS = "/games/super-voltorb-flip/sprites";
+import type { MemoMarks, ThemeId } from "../types";
+import { themedAsset } from "../theme";
 
 const PIXEL: React.CSSProperties = {
   imageRendering: "pixelated",
@@ -26,6 +25,7 @@ export function MemoControls({
   onToggle,
   onMarkChange,
   onToggleCopy,
+  themeId,
 }: {
   memoOpen: boolean;
   copyMode: boolean;
@@ -33,6 +33,7 @@ export function MemoControls({
   onToggle: () => void;
   onMarkChange: (idx: 0 | 1 | 2 | 3) => void;
   onToggleCopy: () => void;
+  themeId: ThemeId;
 }) {
   return (
     <>
@@ -52,7 +53,7 @@ export function MemoControls({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${ASSETS}/button/memo/${memoOpen ? "close" : "open"}.png`}
+          src={themedAsset(themeId, `button/memo/${memoOpen ? "close" : "open"}.png`)}
           alt=""
           draggable={false}
           style={PIXEL}
@@ -63,7 +64,7 @@ export function MemoControls({
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`${ASSETS}/memo/frame.png`}
+            src={themedAsset(themeId, "memo/frame.png")}
             alt=""
             draggable={false}
             style={{ ...PIXEL, position: "absolute", left: 200, top: 92 }}
@@ -90,7 +91,7 @@ export function MemoControls({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`${ASSETS}/button/memo/${i}_${on ? "on" : "off"}.png`}
+                  src={themedAsset(themeId, `button/memo/${i}_${on ? "on" : "off"}.png`)}
                   alt=""
                   draggable={false}
                   style={PIXEL}
@@ -114,7 +115,7 @@ export function MemoControls({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`${ASSETS}/button/memo/s_${copyMode ? "on" : "off"}.png`}
+              src={themedAsset(themeId, `button/memo/s_${copyMode ? "on" : "off"}.png`)}
               alt=""
               draggable={false}
               style={PIXEL}
