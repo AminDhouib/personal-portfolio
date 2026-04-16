@@ -329,6 +329,60 @@ function normalizeVec3(v: [number, number, number]): [number, number, number] {
   return [v[0] / len, v[1] / len, v[2] / len];
 }
 
+function runMirrorBehavior(g: GameRefs, boss: BossState, now: number): void {
+  boss.position[0] = -g.shipX;
+  boss.position[1] = g.shipY + 2;
+  boss.position[2] = -16;
+  const shotInterval = 800 / boss.difficultyMult;
+  if (now - boss.lastShotAt >= shotInterval) {
+    const dir = normalizeVec3([
+      g.shipX - boss.position[0],
+      g.shipY - boss.position[1],
+      g.shipZ - boss.position[2],
+    ]);
+    g.bossProjectiles.push({
+      id: g.nextBossProjectileId++,
+      position: [boss.position[0], boss.position[1], boss.position[2]],
+      velocity: [dir[0] * 10, dir[1] * 10, dir[2] * 10],
+      radius: 0.3,
+      color: "#cbd5e1",
+      spawnedAt: now,
+      ttlMs: 3000,
+      homing: false,
+      shielded: false,
+    });
+    boss.lastShotAt = now;
+  }
+}
+
+function runPulsarBehavior(g: GameRefs, boss: BossState, now: number): void {
+  boss.position[0] = 0;
+  boss.position[1] = 3;
+  boss.position[2] = -18;
+  const shotInterval = 3000 / boss.difficultyMult;
+  if (now - boss.lastShotAt >= shotInterval) {
+    const count = 12;
+    for (let k = 0; k < count; k++) {
+      const angle = (k / count) * Math.PI * 2;
+      const offsetAngle = boss.patternIndex * 0.15;
+      const a = angle + offsetAngle;
+      g.bossProjectiles.push({
+        id: g.nextBossProjectileId++,
+        position: [boss.position[0], boss.position[1], boss.position[2]],
+        velocity: [Math.cos(a) * 8, Math.sin(a) * 8, 2],
+        radius: 0.3,
+        color: "#fef08a",
+        spawnedAt: now,
+        ttlMs: 4000,
+        homing: false,
+        shielded: false,
+      });
+    }
+    boss.lastShotAt = now;
+    boss.patternIndex += 1;
+  }
+}
+
 function runSwarmMotherBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2;
   boss.position[1] = 3;
@@ -1894,6 +1948,8 @@ function runTick(
       if (b.id === "sentinel") runSentinelBehavior(g, b, now);
       else if (b.id === "drifter") runDrifterBehavior(g, b, now);
       else if (b.id === "swarm-mother") runSwarmMotherBehavior(g, b, now, step);
+      else if (b.id === "mirror") runMirrorBehavior(g, b, now);
+      else if (b.id === "pulsar") runPulsarBehavior(g, b, now);
       // other boss behaviors added in later tasks
       if (now - g.lastBossPulseAt > 700) {
         sounds.bossPulse();
@@ -2721,6 +2777,33 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
           <torusKnotGeometry args={[0.9, 0.2, 32, 8]} />
           <meshStandardMaterial color="#d946ef" emissive="#d946ef" emissiveIntensity={0.6} />
         </mesh>
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
+  if (boss.id === "mirror") {
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <cylinderGeometry args={[1.4, 1.4, 0.2, 16]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={1} roughness={0.1} />
+        </mesh>
+        <mesh position={[0, 0, 0.15]}>
+          <ringGeometry args={[1.0, 1.3, 32]} />
+          <meshBasicMaterial color="#e2e8f0" transparent opacity={0.6} side={THREE.DoubleSide} />
+        </mesh>
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
+  if (boss.id === "pulsar") {
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <sphereGeometry args={[1.2, 32, 24]} />
+          <meshStandardMaterial color="#ffffff" emissive="#fef08a" emissiveIntensity={1.5} />
+        </mesh>
+        <pointLight intensity={3} distance={20} color="#fef08a" />
         <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
       </group>
     );
