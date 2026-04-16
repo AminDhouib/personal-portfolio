@@ -9,6 +9,7 @@ import { Scoreboard } from "./super-voltorb-flip/Scoreboard";
 import { MemoPanel } from "./super-voltorb-flip/MemoPanel";
 import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
 import { SettingsMenu } from "./super-voltorb-flip/SettingsMenu";
+import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -170,6 +171,7 @@ function GameScreen({
         onCashOut={() => dispatch({ type: "cashOut" })}
       />
     )}
+    <StatsPanel stats={state.stats} />
     </>
   );
 }
