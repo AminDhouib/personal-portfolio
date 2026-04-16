@@ -2652,6 +2652,7 @@ interface UiState {
   distance: number;
   combo: number;
   comboPeak: number;
+  coinsThisRun: number;
   active: { type: PowerUpType; remainingMs: number }[];
 }
 
@@ -2678,7 +2679,7 @@ export function SpaceShooterGame() {
   const gameRefs = useRef<GameRefs>(createRefs());
   const containerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
-  const [ui, setUi] = useState<UiState>({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, active: [] });
+  const [ui, setUi] = useState<UiState>({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, coinsThisRun: 0, active: [] });
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
   const [region, setRegion] = useState<string>("");
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
@@ -2784,6 +2785,7 @@ export function SpaceShooterGame() {
       distance: Math.floor(g.distance),
       combo: g.combo,
       comboPeak: g.comboPeak,
+      coinsThisRun: g.coinsThisRun,
       active: g.activePowerUps.map((p) => ({ type: p.type, remainingMs: Math.max(0, p.expiresAt - now) })),
     });
     setTick((t) => (t + 1) % 1_000_000);
@@ -2869,7 +2871,7 @@ export function SpaceShooterGame() {
     g.cameraTargetX = 0;
     g.cameraTargetY = 0;
     g.cameraTargetZ = 5;
-    setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, active: [] });
+    setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, coinsThisRun: 0, active: [] });
     setSubmitted(false);
     setCelebration(null);
     setShowInstructions(true);
@@ -3365,6 +3367,17 @@ export function SpaceShooterGame() {
                   >
                     <Trophy className="h-3.5 w-3.5" />
                     Personal Best
+                  </motion.div>
+                )}
+                {ui.coinsThisRun > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-2 flex items-center justify-center gap-1.5 text-accent-amber font-mono text-sm"
+                  >
+                    <CoinsIcon className="h-4 w-4" />
+                    +{ui.coinsThisRun} coins
                   </motion.div>
                 )}
                 <div className="mt-3 grid grid-cols-4 gap-2 text-xs text-white/75 max-w-md mx-auto">
