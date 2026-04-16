@@ -4800,28 +4800,29 @@ export function SpaceShooterGame() {
       g.targetY = ny * (ARENA_H / 2);
     };
 
-    const tryStart = () => {
+    // Input no longer auto-starts the run — the player must explicitly click
+    // PLAY. We still use this to unpause, though, so mouse/touch wake the
+    // paused game.
+    const tryUnpause = () => {
       const g = gameRefs.current;
-      if (g.status === "armed") startRun(g);
-      // Unpause on movement
       if (g.status === "paused") g.status = "playing";
     };
 
     const onMove = (e: PointerEvent) => {
       ensureAudio();
-      tryStart();
+      tryUnpause();
       updateTarget(e.clientX, e.clientY);
     };
     const onDown = (e: PointerEvent) => {
       ensureAudio();
-      tryStart();
+      tryUnpause();
       updateTarget(e.clientX, e.clientY);
     };
     const onTouch = (e: TouchEvent) => {
       if (e.touches.length > 0) {
         e.preventDefault();
         ensureAudio();
-        tryStart();
+        tryUnpause();
         updateTarget(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
@@ -4873,7 +4874,7 @@ export function SpaceShooterGame() {
       }
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {
         if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) e.preventDefault();
-        tryStart();
+        tryUnpause();
       }
       // Dash: double-tap A / ArrowLeft or D / ArrowRight
       if ((k === "a" || k === "arrowleft") && !keys.has(k)) {
@@ -5542,24 +5543,22 @@ export function SpaceShooterGame() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.4 }}
-              className="pointer-events-none absolute inset-x-0 bottom-6 flex flex-col items-center gap-2"
+              className="absolute inset-x-0 bottom-6 flex flex-col items-center gap-3"
             >
-              <motion.div
-                animate={{ scale: [1, 1.05, 1], opacity: [0.85, 1, 0.85] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                className="relative"
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  const g = gameRefs.current;
+                  if (g.status === "armed") startRun(g);
+                }}
+                className="rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-10 py-3 text-lg font-bold uppercase tracking-wider text-white shadow-lg shadow-accent-blue/30"
+                type="button"
               >
-                <motion.span
-                  className="absolute inset-0 rounded-full bg-accent-blue/15 blur-xl"
-                  animate={{ scale: [1, 1.4, 1] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                />
-                <div className="relative rounded-full border-2 border-accent-blue/60 bg-black/75 backdrop-blur-md px-7 py-3 text-base font-semibold text-white shadow-lg shadow-accent-blue/20">
-                  {isTouch ? "Drag your finger to start" : "Move your mouse or press WASD to start"}
-                </div>
-              </motion.div>
-              <div className="text-xs uppercase tracking-[0.25em] text-white/60">
-                Cannons fire automatically
+                Play
+              </motion.button>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-white/50">
+                Cannons fire automatically · {isTouch ? "drag to steer" : "mouse or WASD"}
               </div>
             </motion.div>
           )}
@@ -5598,7 +5597,7 @@ export function SpaceShooterGame() {
                 </motion.button>
               </div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-white/50">
-                {isTouch ? "Or drag finger" : "Or move mouse / press WASD"}
+                {isTouch ? "Drag to steer · cannons auto-fire" : "Mouse or WASD to steer · cannons auto-fire"}
               </div>
             </motion.div>
           )}
