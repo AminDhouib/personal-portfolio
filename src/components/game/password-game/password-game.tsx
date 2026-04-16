@@ -15,8 +15,21 @@ function makeSeed(): number {
   return Math.floor(Math.random() * 0xffffffff) >>> 0;
 }
 
+function initialSeed(): number {
+  if (typeof window === "undefined") return makeSeed();
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get("seed");
+  if (fromUrl) {
+    const parsed = Number(fromUrl);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 0xffffffff) {
+      return parsed >>> 0;
+    }
+  }
+  return makeSeed();
+}
+
 export function PasswordGame() {
-  const [seed, setSeed] = useState<number>(() => makeSeed());
+  const [seed, setSeed] = useState<number>(() => initialSeed());
   const [password, setPassword] = useState<string>("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showResult, setShowResult] = useState(false);
