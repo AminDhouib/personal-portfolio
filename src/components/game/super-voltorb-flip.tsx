@@ -11,6 +11,7 @@ import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
 import { SettingsMenu } from "./super-voltorb-flip/SettingsMenu";
 import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
 import { ThemeSwitcher } from "./super-voltorb-flip/ThemeSwitcher";
+import { Atmosphere } from "./super-voltorb-flip/Atmosphere";
 import { THEMES } from "./super-voltorb-flip/theme";
 import type { GameMode } from "./super-voltorb-flip/types";
 
@@ -85,6 +86,7 @@ function GameScreen({
         imageRendering: "pixelated" as const,
       }}
     >
+      <Atmosphere timeOfDay={state.timeOfDay} weather={state.weather} />
       <div className="absolute top-3 right-3 z-20">
         <SettingsMenu
           mode={state.mode}
