@@ -4071,8 +4071,19 @@ export function SpaceShooterGame() {
   const [tutorialActive, setTutorialActive] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialStepStart, setTutorialStepStart] = useState(0);
+  const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
+  });
+  const [profile, setProfile] = useState(() => loadProfile());
+  const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
+  const isReturningPlayer = profile.firstRunCompleted;
+  // Roll daily missions on mount (no-op if already rolled today)
   useEffect(() => {
-    // Start tutorial on first-ever run if profile.tutorialComplete is false
+    try { rollMissionsIfNewDay(); } catch { /* noop */ }
+  }, []);
+  // Tutorial FSM — only for players who never finished it
+  useEffect(() => {
     if (profile.tutorialComplete) return;
     if (ui.status === "playing" && !tutorialActive) {
       setTutorialActive(true);
@@ -4106,17 +4117,6 @@ export function SpaceShooterGame() {
     setTutorialActive(false);
     try { markTutorialComplete(); refreshProfile(); } catch { /* noop */ }
   }, [refreshProfile]);
-  const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
-  });
-  const [profile, setProfile] = useState(() => loadProfile());
-  const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
-  const isReturningPlayer = profile.firstRunCompleted;
-  // Roll daily missions on mount (no-op if already rolled today)
-  useEffect(() => {
-    try { rollMissionsIfNewDay(); } catch { /* noop */ }
-  }, []);
   // Load player prefs from profile (or localStorage fallback)
   useEffect(() => {
     try {
