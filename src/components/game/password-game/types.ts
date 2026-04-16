@@ -1,0 +1,45 @@
+import type { Rng } from "./prng";
+
+export type Tier = 1 | 2 | 3 | 4 | 5;
+
+/** Result of validating a password against a rule. */
+export interface ValidationResult {
+  passed: boolean;
+  /** Optional message shown to the player (e.g. current progress, hint). */
+  message?: string;
+}
+
+/** Runtime state that rules can inspect or mutate (e.g. timers). */
+export interface GameState {
+  /** Current password value. */
+  password: string;
+  /** Elapsed seconds since game start. */
+  elapsedSeconds: number;
+  /** Index of the currently active (unsatisfied) rule, or -1 if none. */
+  activeRuleIndex: number;
+  /** Ordered rules for this run. */
+  rules: Rule[];
+  /** Seed used for this run. */
+  seed: number;
+}
+
+/** A rule definition drawn from the pool and parameterized by the seed. */
+export interface Rule {
+  /** Stable id (e.g. "min-length"). Used for analytics and debugging. */
+  id: string;
+  /** Tier this rule belongs to. */
+  tier: Tier;
+  /** Human-readable description shown to the player. */
+  description: string;
+  /** Rule parameters resolved from the seed (e.g. { n: 7 }). */
+  params: Record<string, unknown>;
+  /** Pure validator. Must not mutate inputs. */
+  validate(state: GameState): ValidationResult;
+}
+
+/** Factory that produces a Rule using the RNG for parameterization. */
+export interface RuleDef {
+  id: string;
+  tier: Tier;
+  create(rng: Rng): Rule;
+}
