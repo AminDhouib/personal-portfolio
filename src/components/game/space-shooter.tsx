@@ -41,6 +41,9 @@ const POWERUP_PICKUP_RADIUS = 1.15; // generous — easier to grab on the move
 const POWERUP_DURATION_MS = 8000;
 const POWERUP_SPAWN_INTERVAL_MS = 11000;
 const START_INVULN_MS = 2500;
+const COMBO_WINDOW_MS = 4000; // combo resets if no new kill within this window
+const NEAR_MISS_RADIUS = 1.2; // ship surface + this much = "brushed"
+const NEAR_MISS_POINTS = 15;
 
 // `armed` = scene is alive (ship visible, speed lines flowing) but the run
 // hasn't started — waiting for the player's first mouse/touch/key input.
@@ -212,6 +215,9 @@ interface GameRefs {
   score: number;
   kills: number;
   distance: number;       // units travelled, ~10/sec base
+  combo: number;          // consecutive-kill multiplier (starts at 1)
+  comboLastAt: number;    // performance.now() of last combo increment
+  comboPeak: number;      // highest combo this run (for leaderboard stat)
   obstacles: Obstacle[];
   bullets: Bullet[];
   explosions: Explosion[];
@@ -286,6 +292,7 @@ function createRefs(): GameRefs {
   return {
     status: "armed",
     score: 0, kills: 0, distance: 0,
+    combo: 1, comboLastAt: 0, comboPeak: 1,
     obstacles: [], bullets: [], explosions: [], speedLines: [],
     powerUps: [], activePowerUps: [], debris: [], scorePopups: [],
     targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
@@ -388,6 +395,23 @@ function difficulty(g: GameRefs): number {
 
 function elapsedSeconds(g: GameRefs): number {
   return (performance.now() - g.startedAt) / 1000;
+}
+
+function comboMultiplier(combo: number): number {
+  if (combo < 3) return 1;
+  if (combo < 5) return 1.5;
+  if (combo < 10) return 2;
+  if (combo < 20) return 3;
+  if (combo < 40) return 5;
+  return 10;
+}
+
+function comboColor(combo: number): string {
+  if (combo >= 40) return "#f472b6";
+  if (combo >= 20) return "#fb923c";
+  if (combo >= 10) return "#facc15";
+  if (combo >= 5) return "#22d3ee";
+  return "#a3e635";
 }
 
 // NOTE: "wall" is intentionally excluded from this list. Wall pieces are
@@ -1464,6 +1488,11 @@ function runTick(
     if (g.activePowerUps[i].expiresAt <= now) g.activePowerUps.splice(i, 1);
   }
 
+  // Combo decay: if no new kill within COMBO_WINDOW_MS, drop to 1
+  if (g.combo > 1 && now - g.comboLastAt > COMBO_WINDOW_MS) {
+    g.combo = 1;
+  }
+
   // Shield edge detection — play sound when activating or expiring
   const shieldNow = isPowerUpActive(g, "shield");
   if (shieldNow !== g.shieldActiveLast) {
@@ -1568,7 +1597,12 @@ function runTick(
           if (o.hp <= 0) {
             spawnExplosion(g, o.x, o.y, o.z, "#fb923c", 600, 0.35);
             g.obstacles.splice(i, 1);
-            const points = 12 + Math.floor(o.size * 8);
+            const basePoints = 12 + Math.floor(o.size * 8);
+            g.combo = Math.min(g.combo + 1, 99);
+            g.comboLastAt = now;
+            if (g.combo > g.comboPeak) g.comboPeak = g.combo;
+            const comboMul = comboMultiplier(g.combo);
+            const points = Math.round(basePoints * comboMul);
             g.score += points;
             g.kills += 1;
             spawnScorePopup(g, o.x, o.y, o.z, points);
@@ -2605,6 +2639,9 @@ export function SpaceShooterGame() {
     g.score = 0;
     g.kills = 0;
     g.distance = 0;
+    g.combo = 1;
+    g.comboLastAt = 0;
+    g.comboPeak = 1;
     g.obstacles.length = 0;
     g.bullets.length = 0;
     g.explosions.length = 0;
