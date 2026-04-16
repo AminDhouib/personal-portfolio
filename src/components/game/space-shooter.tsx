@@ -234,11 +234,12 @@ interface GameRefs {
   powerUps: PowerUp[];
   coins: Coin[];
   coinsThisRun: number;
-  coinMagnetRadius: number;   // set from profile at run start (1.0 baseline, up to ~3.0)
-  coinValueBonus: number;     // additive per-coin value from upgrade
-  scoreMultEndRun: number;    // applied to final score on death
-  comboWindowMs: number;      // runtime copy of COMBO_WINDOW_MS after upgrade
-  shieldDurationMs: number;   // runtime copy of POWERUP_DURATION_MS for shield
+  // Upgrade-derived run modifiers, set at startRun from profile.ownedUpgrades.
+  coinMagnetExtra: number;    // world units added to coin pickup radius
+  coinValueBonus: number;     // added to each coin's base value
+  scoreMultiplier: number;    // multiplies final score
+  comboWindowMs: number;      // overrides COMBO_WINDOW_MS when > 0
+  shieldDurationMs: number;   // overrides POWERUP_DURATION_MS for shield when > 0
   activePowerUps: ActivePowerUp[];
   debris: Debris[];
   scorePopups: ScorePopup[];
@@ -311,8 +312,8 @@ function createRefs(): GameRefs {
     combo: 1, comboLastAt: 0, comboPeak: 1,
     obstacles: [], bullets: [], explosions: [], speedLines: [],
     powerUps: [], coins: [], coinsThisRun: 0,
-    coinMagnetRadius: 1, coinValueBonus: 0, scoreMultEndRun: 1,
-    comboWindowMs: COMBO_WINDOW_MS, shieldDurationMs: POWERUP_DURATION_MS,
+    coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
+    comboWindowMs: 0, shieldDurationMs: 0,
     activePowerUps: [], debris: [], scorePopups: [],
     targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
     fogColor: new THREE.Color(initEnv.fog),
@@ -1672,6 +1673,38 @@ function runTick(
     }
   }
 
+  // Coins: drift toward camera, get pulled by magnet, collect on proximity
+  const magnetBonusRadius = g.coinMagnetExtra;
+  for (let i = g.coins.length - 1; i >= 0; i--) {
+    const c = g.coins[i];
+    c.z += 8 * step * obstacleSpeedMul;
+    c.rx += step * 2;
+    c.ry += step * 2.5;
+    if (c.z > DESPAWN_Z) {
+      g.coins.splice(i, 1);
+      continue;
+    }
+    if (c.z > -4 && c.z < 4) {
+      const dx = g.shipX - c.x;
+      const dy = g.shipY - c.y;
+      const dist2d = Math.sqrt(dx * dx + dy * dy);
+      const pullRadius = 1.5 + magnetBonusRadius;
+      if (dist2d < pullRadius) {
+        const pull = step * 6;
+        c.x += (dx / (dist2d || 1)) * pull;
+        c.y += (dy / (dist2d || 1)) * pull;
+      }
+      const pickupR = 0.6 + magnetBonusRadius * 0.3;
+      if (Math.abs(c.z - g.shipZ) < 1.2 && dist2d < pickupR) {
+        const effectiveValue = c.value + g.coinValueBonus;
+        g.coinsThisRun += effectiveValue;
+        spawnScorePopup(g, c.x, c.y, c.z, effectiveValue);
+        sounds.play("chime");
+        g.coins.splice(i, 1);
+      }
+    }
+  }
+
   // Move power-ups + collect
   for (let i = g.powerUps.length - 1; i >= 0; i--) {
     const p = g.powerUps[i];
@@ -2155,6 +2188,45 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
   );
 }
 
+function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const list = gameRefs.current?.coins ?? [];
+  const geo = useMemo(() => new THREE.SphereGeometry(0.18, 12, 10), []);
+  useEffect(() => () => geo.dispose(), [geo]);
+  const refs = useRef<Map<number, THREE.Group>>(new Map());
+
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (const c of g.coins) {
+      const grp = refs.current.get(c.id);
+      if (grp) {
+        grp.position.set(c.x, c.y, c.z);
+        grp.rotation.set(c.rx, c.ry, c.rz);
+      }
+    }
+  });
+
+  return (
+    <group>
+      {list.map((c) => (
+        <group
+          key={c.id}
+          ref={(el) => {
+            if (el) refs.current.set(c.id, el);
+            else refs.current.delete(c.id);
+          }}
+        >
+          <mesh geometry={geo} scale={1.2}>
+            <meshToonMaterial color="#fde047" emissive="#ca8a04" emissiveIntensity={0.6} />
+          </mesh>
+          <pointLight color="#fde047" intensity={0.4} distance={1.5} />
+        </group>
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
 function Explosions({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
   const explosions = gameRefs.current?.explosions ?? [];
   const sphGeo = useMemo(() => new THREE.SphereGeometry(0.5, 12, 10), []);
@@ -2457,6 +2529,7 @@ function Scene({
       <Ship gameRefs={gameRefs} env={env} />
       <Obstacles gameRefs={gameRefs} env={env} tick={tick} />
       <PowerUps gameRefs={gameRefs} tick={tick} />
+      <Coins gameRefs={gameRefs} tick={tick} />
       <Bullets gameRefs={gameRefs} tick={tick} />
       <Explosions gameRefs={gameRefs} tick={tick} />
       <ScorePopups gameRefs={gameRefs} tick={tick} />
