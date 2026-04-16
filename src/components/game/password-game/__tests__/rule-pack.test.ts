@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { morseRule, binaryRule, mathWordsRule, captchaRule } from "../rules/tier2-pack";
-import { anagramRule } from "../rules/tier3-pack";
+import { anagramRule, reverseRule } from "../rules/tier3-pack";
 import { MORSE_WORDS, toMorse } from "../../../../data/password-game/morse";
 import { ANAGRAM_WORDS } from "../../../../data/password-game/anagrams";
 import type { GameState, Rule } from "../types";
@@ -181,5 +181,32 @@ describe("rule pack — anagram rule", () => {
   it("fails when password does not contain the word", () => {
     const rule = anagramRule.create(mulberry32(25));
     expect(rule.validate(makeState("zzzz", rule)).passed).toBe(false);
+  });
+});
+
+describe("rule pack — reverse-word rule", () => {
+  it("exists and is tier 3", () => {
+    expect(reverseRule).toBeDefined();
+    expect(reverseRule.id).toBe("word-reverse");
+    expect(reverseRule.tier).toBe(3);
+  });
+
+  it("reversed param is the reverse of word", () => {
+    const rule = reverseRule.create(mulberry32(33));
+    const word = rule.params.word as string;
+    const reversed = rule.params.reversed as string;
+    expect(reversed).toBe([...word].reverse().join(""));
+  });
+
+  it("passes when password contains the reversed word (case-insensitive)", () => {
+    const rule = reverseRule.create(mulberry32(33));
+    const reversed = rule.params.reversed as string;
+    expect(rule.validate(makeState(`abc${reversed}xyz`, rule)).passed).toBe(true);
+    expect(rule.validate(makeState(`abc${reversed.toUpperCase()}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails when password does not contain the reversed word", () => {
+    const rule = reverseRule.create(mulberry32(33));
+    expect(rule.validate(makeState("nothing matching", rule)).passed).toBe(false);
   });
 });
