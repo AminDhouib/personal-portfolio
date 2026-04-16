@@ -5672,7 +5672,7 @@ export function SpaceShooterGame() {
                     +{ui.coinsThisRun} coins
                   </motion.div>
                 )}
-                <div className="mt-3 grid grid-cols-4 gap-2 text-xs text-white/75 max-w-md mx-auto">
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-white/75 max-w-md mx-auto px-2">
                   <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
                     <div className="text-white/50 uppercase tracking-wider text-[10px]">Survived</div>
                     <div className="font-mono text-white tabular-nums">{ui.seconds.toFixed(0)}s</div>
@@ -5742,12 +5742,12 @@ export function SpaceShooterGame() {
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap px-2">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={launch}
-                  className="inline-flex items-center gap-2 rounded-xl bg-accent-blue/20 border border-accent-blue/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-accent-blue"
+                  className="inline-flex items-center gap-2 rounded-xl bg-accent-blue/20 border border-accent-blue/50 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-accent-blue"
                 >
                   <RotateCcw className="h-4 w-4" />
                   Fly again
@@ -5757,7 +5757,7 @@ export function SpaceShooterGame() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShopOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-accent-amber/20 border border-accent-amber/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-accent-amber"
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent-amber/20 border border-accent-amber/50 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-accent-amber"
                   >
                     <ShoppingCart className="h-4 w-4" />
                     Shop
@@ -5775,7 +5775,7 @@ export function SpaceShooterGame() {
                       a.click();
                       setTimeout(() => URL.revokeObjectURL(url), 1000);
                     }}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-500/20 border border-blue-400/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-blue-300"
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-500/20 border border-blue-400/50 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-300"
                   >
                     Download Replay
                   </motion.button>
@@ -5805,7 +5805,7 @@ export function SpaceShooterGame() {
                     a.click();
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/20 border border-emerald-400/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-emerald-300"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/20 border border-emerald-400/50 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-300"
                 >
                   <Share2 className="h-4 w-4" />
                   Share
