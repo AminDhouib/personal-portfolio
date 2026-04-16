@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile,
-  setUpgradeLevel, spendCoins,
+  setUpgradeLevel, spendCoins, markTutorialComplete, type Profile,
 } from "./profile";
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
 import { activeMissions, claimMissionReward, rollMissionsIfNewDay } from "./missions";
@@ -325,6 +325,37 @@ const BOSS_DISPLAY_NAMES: Record<BossId, string> = {
   warden: "WARDEN",
   "void-tyrant": "VOID TYRANT",
 };
+
+function tryDash(g: GameRefs, direction: "left" | "right", now: number): boolean {
+  const DASH_WINDOW = 300;
+  const DASH_COOLDOWN = 2000;
+  const DASH_DURATION = 300;
+  const DASH_DISTANCE = 3.0;
+  if (now < g.dash.cooldownUntil) return false;
+  const lastKey: "lastLeftTapAt" | "lastRightTapAt" = direction === "left" ? "lastLeftTapAt" : "lastRightTapAt";
+  const lastTap = g.dash[lastKey];
+  if (now - lastTap <= DASH_WINDOW && lastTap > 0) {
+    g.dash.activeUntil = now + DASH_DURATION;
+    g.dash.direction = direction;
+    g.dash.startedAt = now;
+    g.dash.startX = g.shipX;
+    g.dash.targetX = g.shipX + (direction === "left" ? -DASH_DISTANCE : DASH_DISTANCE);
+    g.dash.cooldownUntil = now + DASH_COOLDOWN;
+    g.invulnUntil = Math.max(g.invulnUntil, g.dash.activeUntil);
+    g.dash.lastLeftTapAt = 0;
+    g.dash.lastRightTapAt = 0;
+    // Lifetime dash counter (additive schema — stored under (p as any).totalDashes)
+    try {
+      const p = loadProfile();
+      const pp = p as Profile & { totalDashes?: number };
+      pp.totalDashes = (pp.totalDashes ?? 0) + 1;
+      saveProfile(p);
+    } catch { /* noop */ }
+    return true;
+  }
+  g.dash[lastKey] = now;
+  return false;
+}
 
 function normalizeVec3(v: [number, number, number]): [number, number, number] {
   const len = Math.hypot(v[0], v[1], v[2]) || 1;
@@ -825,6 +856,19 @@ interface GameRefs {
   bossScheduleIdx: number;
   bossesDefeatedThisRun: number;
   damageTakenThisRun: number;
+  // Dash
+  dash: {
+    lastLeftTapAt: number;
+    lastRightTapAt: number;
+    activeUntil: number;
+    direction: "left" | "right" | null;
+    cooldownUntil: number;
+    startedAt: number;
+    startX: number;
+    targetX: number;
+  };
+  dashAfterimages: { pos: [number, number, number]; createdAt: number }[];
+  lastAfterimageAt: number;
   normalSpawningPausedUntil: number;
   devHotkeyArmed: boolean;
   nextBossProjectileId: number;
@@ -916,6 +960,8 @@ function createRefs(): GameRefs {
     gyroTilt: { x: 0, y: 0 },
     boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
     bossScheduleIdx: 0, bossesDefeatedThisRun: 0, damageTakenThisRun: 0,
+    dash: { lastLeftTapAt: 0, lastRightTapAt: 0, activeUntil: 0, direction: null, cooldownUntil: 0, startedAt: 0, startX: 0, targetX: 0 },
+    dashAfterimages: [], lastAfterimageAt: 0,
     normalSpawningPausedUntil: 0, devHotkeyArmed: false,
     nextBossProjectileId: 0, lastBossPulseAt: 0,
     activePowerUps: [], debris: [], scorePopups: [],
@@ -2219,6 +2265,19 @@ function runTick(
     }
   }
 
+  // Dash: if active, override ship X with an ease-out toward target and spawn afterimages
+  if (now < g.dash.activeUntil) {
+    const progress = Math.min(1, (now - g.dash.startedAt) / 300);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    g.shipX = g.dash.startX + (g.dash.targetX - g.dash.startX) * eased;
+    g.targetX = g.shipX;
+    if (now - g.lastAfterimageAt > 30) {
+      g.dashAfterimages.push({ pos: [g.shipX, g.shipY, g.shipZ], createdAt: now });
+      g.lastAfterimageAt = now;
+    }
+  }
+  g.dashAfterimages = g.dashAfterimages.filter((a) => now - a.createdAt < 400);
+
   // Gyro influence: blend tilt into the target if the player enabled gyro.
   // Gamma/beta are already normalized to -1..1 on gameRefs.gyroTilt. Apply a
   // 60% influence so mouse/touch can still override.
@@ -3083,6 +3142,25 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
   );
 }
 
+function DashAfterimages({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const list = gameRefs.current?.dashAfterimages ?? [];
+  return (
+    <group>
+      {list.map((a, i) => {
+        const age = performance.now() - a.createdAt;
+        const fade = Math.max(0, 1 - age / 400);
+        return (
+          <mesh key={`ai-${i}-${a.createdAt}`} position={a.pos}>
+            <sphereGeometry args={[0.4, 8, 8]} />
+            <meshBasicMaterial color="#06b6d4" transparent opacity={fade * 0.5} />
+          </mesh>
+        );
+      })}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
 function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
   const [version, setVersion] = useState(0);
   const list = useMemo(() => activeMissions(), [version]);
@@ -3735,6 +3813,7 @@ function Scene({
       <BossProjectiles gameRefs={gameRefs} tick={tick} />
       <BossSubEntities gameRefs={gameRefs} tick={tick} />
       <BossWalls gameRefs={gameRefs} tick={tick} />
+      <DashAfterimages gameRefs={gameRefs} tick={tick} />
       <Bullets gameRefs={gameRefs} tick={tick} />
       <Explosions gameRefs={gameRefs} tick={tick} />
       <ScorePopups gameRefs={gameRefs} tick={tick} />
@@ -4430,6 +4509,13 @@ export function SpaceShooterGame() {
         if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) e.preventDefault();
         tryStart();
       }
+      // Dash: double-tap A / ArrowLeft or D / ArrowRight
+      if ((k === "a" || k === "arrowleft") && !keys.has(k)) {
+        tryDash(gameRefs.current, "left", performance.now());
+      }
+      if ((k === "d" || k === "arrowright") && !keys.has(k)) {
+        tryDash(gameRefs.current, "right", performance.now());
+      }
       keys.add(k);
     };
     const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
@@ -4909,6 +4995,25 @@ export function SpaceShooterGame() {
             {devFps} fps · obs {gameRefs.current.obstacles.length} · proj {gameRefs.current.bossProjectiles.length} · exp {gameRefs.current.explosions.length}
           </div>
         )}
+
+        {/* Dash cooldown indicator (playing only) */}
+        {ui.status === "playing" && (() => {
+          const now = performance.now();
+          const cd = gameRefs.current.dash.cooldownUntil;
+          const onCd = now < cd;
+          const pct = onCd ? Math.max(0, 1 - (cd - now) / 2000) : 1;
+          return (
+            <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20 pointer-events-none">
+              <div className="text-[10px] tracking-[0.2em] text-slate-400">DASH</div>
+              <div className="w-16 h-1.5 bg-black/40 rounded overflow-hidden">
+                <div
+                  className={`h-full transition-[width] duration-100 ${onCd ? "bg-slate-400" : "bg-cyan-400"}`}
+                  style={{ width: `${pct * 100}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Record toggle (armed only) */}
         {ui.status === "armed" && (
