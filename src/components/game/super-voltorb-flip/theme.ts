@@ -21,7 +21,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
     name: "Game Corner Classic",
     description: "The faithful HGSS recreation. Green DS background, pixel tiles.",
     cost: 0,
-    bgUrl: `url(${ASSETS}/sprites/background.png)`,
+    bgUrl: `linear-gradient(180deg, #5ab859 0%, #3f8a3f 100%)`,
     bgmUrl: `${ASSETS}/music/theme-classic.mp3`,
   },
   meadow: {
