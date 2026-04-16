@@ -2487,6 +2487,15 @@ class SoundManager {
       osc.stop(start + 0.35);
     });
   }
+  destroy() {
+    this.stopWarpLoop();
+    this.stopMusic(0);
+    if (this.ctx) {
+      try { this.ctx.close(); } catch { /* ignore */ }
+      this.ctx = null;
+    }
+    this.enabled = false;
+  }
 }
 
 // Module-level singleton — survives React StrictMode double-mounts
@@ -5167,6 +5176,7 @@ export function SpaceShooterGame() {
     if (typeof window === "undefined") return true;
     return window.localStorage.getItem(SOUND_KEY) !== "0";
   });
+  useEffect(() => () => { sounds.destroy(); }, []);
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
