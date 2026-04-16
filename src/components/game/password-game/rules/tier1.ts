@@ -100,4 +100,30 @@ const digitSum: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum];
+const COLOR_NAMES = [
+  "red", "blue", "green", "yellow", "purple", "orange", "pink",
+  "violet", "indigo", "coral", "teal", "cyan", "magenta", "lime",
+  "gold", "silver", "black", "white", "brown", "gray",
+];
+
+const colorName: RuleDef = {
+  id: "color-name",
+  tier: 1,
+  create() {
+    return {
+      id: "color-name",
+      tier: 1,
+      description: "Your password must include a color name.",
+      params: { colors: COLOR_NAMES },
+      validate(state) {
+        const lower = state.password.toLowerCase();
+        for (const c of COLOR_NAMES) {
+          if (lower.includes(c)) return { passed: true };
+        }
+        return { passed: false };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName];

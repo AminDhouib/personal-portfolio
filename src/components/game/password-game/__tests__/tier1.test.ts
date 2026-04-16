@@ -143,3 +143,17 @@ describe("Tier 1 — digit sum rule", () => {
     expect(rule.validate(makeState(pw, rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 1 — color name rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "color-name")!;
+
+  it("passes when password contains a color name (case-insensitive)", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("myPasswordRED!", rule)).passed).toBe(true);
+  });
+
+  it("fails without a color name", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("xyz", rule)).passed).toBe(false);
+  });
+});
