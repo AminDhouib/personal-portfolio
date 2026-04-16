@@ -342,6 +342,25 @@ export default function TowerStacker() {
       x: newX, y: a.y, width: newWidth, height: a.height,
       hue: a.hue, isPerfect, isGolden: a.isGolden,
     });
+
+    const top = r.floors[r.floors.length - 1];
+    const { h: vh } = viewportRef.current;
+    r.cameraTargetY = Math.max(0, (vh - 80) - (top.y + top.height * 0.5) - vh * 0.1);
+    const tProg = Math.min(1, r.floors.length / 50);
+    r.cameraTargetScale = 1 - 0.25 * tProg;
+
+    const fc = r.floors.length - 1;
+    if ((fc === 50 || fc === 100) && !r.milestonesFired.has(fc)) {
+      r.milestonesFired.add(fc);
+      r.cameraTargetScale = 0.3;
+      r.bannerText = fc === 50 ? "HALFWAY — floor 50!" : "APEX — floor 100!";
+      r.bannerTime = 1.5;
+      setTimeout(() => {
+        const tProg2 = Math.min(1, r.floors.length / 50);
+        r.cameraTargetScale = 1 - 0.25 * tProg2;
+      }, 1500);
+    }
+
     r.runRecord.floors.push({
       floorIndex: r.floors.length - 1, x: newX, width: newWidth,
       timeMs: performance.now() - r.runStartMs,
@@ -482,6 +501,18 @@ export default function TowerStacker() {
 
       updateParticles(r, dt);
 
+      // camera lerp
+      r.cameraY += (r.cameraTargetY - r.cameraY) * Math.min(1, dt * 6);
+      r.cameraScale += (r.cameraTargetScale - r.cameraScale) * Math.min(1, dt * 4);
+
+      ctx.save();
+      const shakeX = r.shake > 0 ? (Math.random() - 0.5) * r.shake * 20 : 0;
+      const shakeY = r.shake > 0 ? (Math.random() - 0.5) * r.shake * 20 : 0;
+      if (r.shake > 0) r.shake = Math.max(0, r.shake - dt * 2);
+      ctx.translate(w / 2 + shakeX, h / 2 + shakeY);
+      ctx.scale(r.cameraScale, r.cameraScale);
+      ctx.translate(-w / 2, -h / 2 - r.cameraY);
+
       // draw floors
       for (const f of r.floors) {
         ctx.fillStyle = `hsl(${f.hue} 80% 55%)`;
@@ -496,6 +527,8 @@ export default function TowerStacker() {
         ctx.fillStyle = `hsl(${a.hue} 80% 55%)`;
         ctx.fillRect(a.x, a.y, a.width, a.height);
       }
+
+      ctx.restore();
 
       rafId = requestAnimationFrame(frame);
     };
