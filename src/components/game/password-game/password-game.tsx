@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RotateCcw, Key } from "lucide-react";
+import { RotateCcw, Key, CalendarDays } from "lucide-react";
 import { selectRulesForRun, validateRules, computeActiveRuleIndex } from "./engine";
+import { dailySeed, todayDateString } from "./daily";
 import { TIER_1_RULES } from "./rules/tier1";
 import { TIER_2_RULES } from "./rules/tier2";
 import { RuleCard } from "./rule-card";
@@ -106,6 +107,14 @@ export function PasswordGame() {
     setShowResult(false);
   }, []);
 
+  const startDaily = useCallback(() => {
+    setSeed(dailySeed(todayDateString()));
+    setPassword("");
+    setElapsedSeconds(0);
+    setTimerRunning(false);
+    setShowResult(false);
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -125,14 +134,24 @@ export function PasswordGame() {
             </span>
           </span>
         </div>
-        <button
-          type="button"
-          onClick={reset}
-          className="inline-flex items-center gap-1 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          New seed
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={startDaily}
+            className="inline-flex items-center gap-1 text-xs text-accent-amber hover:text-accent-amber/80 transition-colors"
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            Daily
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            className="inline-flex items-center gap-1 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            New seed
+          </button>
+        </div>
       </div>
 
       <label htmlFor="pg-input" className="block text-sm text-(--muted) mb-2">
