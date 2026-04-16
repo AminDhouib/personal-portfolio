@@ -1,28 +1,90 @@
 "use client";
 
 import { Digit } from "./Digits";
+import { dsFont } from "./ds-font";
 
 const ASSETS = "/games/super-voltorb-flip/sprites";
 
 export const HEADER_HEIGHT = 40;
 
 /**
- * Top banner: "VOLTORB Flip Lv. X / Flip the Cards and Collect Coins!".
- * Background asset is the sliced header.png; the level number is overlaid
- * at the same pixel position the original game uses (x=173, y=11).
+ * Top banner: shows the theme's title + level digit on line 1, subtitle on
+ * line 2. Frame art comes from the textless header-frame.png so the text is
+ * fully React-rendered and per-theme configurable.
+ *
+ * The level digit uses the original thin-digit sprite sheet to match the
+ * baked-in glyph style; the rest of the text is rendered via the Silkscreen
+ * pixel font so it can be any string the theme wants.
  */
-export function Header({ level }: { level: number }) {
+export function Header({
+  level,
+  title,
+  subtitle,
+}: {
+  level: number;
+  title: string;
+  subtitle: string;
+}) {
   return (
     <div
       style={{
         position: "relative",
         width: 262,
         height: HEADER_HEIGHT,
-        backgroundImage: `url(${ASSETS}/chrome/header.png)`,
+        backgroundImage: `url(${ASSETS}/chrome/header-frame.png)`,
         imageRendering: "pixelated",
       }}
     >
-      <Digit n={level} variant="thin" x={173} y={11} />
+      {/* Title row */}
+      <div
+        className={dsFont.className}
+        style={{
+          position: "absolute",
+          left: 8,
+          top: 5,
+          width: 246,
+          height: 12,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 3,
+          color: "#ffffff",
+          fontSize: 7,
+          lineHeight: "10px",
+          letterSpacing: "0.5px",
+          textShadow: "1px 1px 0 rgba(0,0,0,0.35)",
+          userSelect: "none",
+        }}
+      >
+        <span>{title}</span>
+        {/* Level digit still from the thin sprite sheet for pixel-perfect match */}
+        <span style={{ position: "relative", width: 6, height: 10 }}>
+          <Digit n={level} variant="thin" x={0} y={0} />
+        </span>
+      </div>
+      {/* Subtitle row */}
+      <div
+        className={dsFont.className}
+        aria-label={subtitle}
+        style={{
+          position: "absolute",
+          left: 8,
+          top: 21,
+          width: 246,
+          height: 12,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          color: "#ffffff",
+          fontSize: 7,
+          lineHeight: "10px",
+          letterSpacing: "0.5px",
+          textShadow: "1px 1px 0 rgba(0,0,0,0.35)",
+          userSelect: "none",
+        }}
+      >
+        {subtitle}
+      </div>
     </div>
   );
 }

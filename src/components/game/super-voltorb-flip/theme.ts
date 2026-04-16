@@ -3,6 +3,9 @@ import type { ThemeId } from "./types";
 export type ThemeLabels = {
   totalScoreboard: [string, string]; // two lines
   currentScoreboard: [string, string];
+  headerTitle: string;               // shown before the level digit, e.g. "VOLTORB Flip Lv."
+  headerSubtitle: string;            // second row of the header banner
+  voltorbMessage: string;            // right-of-voltorb-icon tagline
 };
 
 export type ThemeDef = {
@@ -32,6 +35,9 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
     labels: {
       totalScoreboard: ["Total", "Collected Coins"],
       currentScoreboard: ["Coins Collected in", "Current Game"],
+      headerTitle: "VOLTORB Flip Lv.",
+      headerSubtitle: "Flip the Cards and Collect Coins!",
+      voltorbMessage: "Game Over! 0!",
     },
   },
   meadow: {
@@ -45,6 +51,9 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
     labels: {
       totalScoreboard: ["Meadow", "Fortune"],
       currentScoreboard: ["This", "Meadow Run"],
+      headerTitle: "MEADOW Flip Lv.",
+      headerSubtitle: "Flip through the tall grass!",
+      voltorbMessage: "Pollen burst! Run over.",
     },
   },
   twilight: {
@@ -58,6 +67,9 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
     labels: {
       totalScoreboard: ["Twilight", "Hoard"],
       currentScoreboard: ["Evening's", "Haul"],
+      headerTitle: "TWILIGHT Flip Lv.",
+      headerSubtitle: "Sunset gambit — play before nightfall.",
+      voltorbMessage: "Dusk bomb! Round lost.",
     },
   },
 };
