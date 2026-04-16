@@ -813,7 +813,7 @@ function LeaderboardModal({ runRefs, onClose }: { runRefs: GameRefs; onClose: ()
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-red-500/40 bg-neutral-900/95 p-5">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-red-500/40 bg-neutral-900/95 p-5">
         <h3 className="text-xl font-bold text-red-400 mb-3">
           Leaderboard — {gameSlug.replace(/^tower-stacker-?/, "") || "All-Time"}
         </h3>
@@ -1563,7 +1563,8 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-xl border border-border bg-card"
+      className="relative w-full overflow-hidden rounded-xl border border-border bg-card select-none"
+      style={{ overscrollBehavior: "contain" }}
     >
       <canvas
         ref={canvasRef}
@@ -1597,21 +1598,21 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
                     return next;
                   });
                 }}
-                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-10 h-10 flex items-center justify-center"
+                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center"
                 aria-label="Toggle sound"
               >
                 {soundOn ? <SpeakerOn /> : <SpeakerOff />}
               </button>
               <button
                 onClick={togglePause}
-                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-10 h-10 flex items-center justify-center"
+                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center"
                 aria-label={uiState === "paused" ? "Resume" : "Pause"}
               >
                 {uiState === "paused" ? <PlayIcon /> : <PauseIcon />}
               </button>
               <button
                 onClick={toggleFullscreen}
-                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-10 h-10 flex items-center justify-center"
+                className="pointer-events-auto rounded-lg bg-black/50 hover:bg-black/70 text-white w-11 h-11 sm:w-10 sm:h-10 flex items-center justify-center"
                 aria-label="Toggle fullscreen"
               >
                 <FullscreenIcon />
@@ -1654,7 +1655,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
 
       {uiState === "game-over" && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur p-6">
-          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-neutral-900/95 p-6">
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-red-500/40 bg-neutral-900/95 p-6">
             <h3 className="text-2xl font-bold text-red-400 mb-3">Run Complete</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-neutral-200 mb-5">
               <Stat label="Score" value={refs.current.score.toLocaleString()} />
@@ -1729,7 +1730,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
 
       {uiState === "menu" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm p-6">
-          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-neutral-900/90 p-6 shadow-[0_0_60px_-10px_rgba(239,68,68,0.5)]">
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-red-500/40 bg-neutral-900/90 p-6 shadow-[0_0_60px_-10px_rgba(239,68,68,0.5)]">
             <h2 className="text-3xl font-bold text-red-400 mb-1">Tower Stacker</h2>
             <p className="text-sm text-neutral-400 mb-5">Time the drop. Keep the tower alive.</p>
 
