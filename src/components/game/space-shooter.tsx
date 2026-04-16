@@ -5271,8 +5271,8 @@ export function SpaceShooterGame() {
               )}
             </AnimatePresence>
 
-            <div className="pointer-events-none absolute top-3 left-3 flex flex-col gap-1.5 text-xs sm:text-sm">
-              <div className="flex items-center gap-4 rounded-lg bg-black/50 backdrop-blur-sm px-3 py-1.5 border border-white/10">
+            <div className="pointer-events-none absolute top-3 left-3 right-3 sm:right-auto flex flex-col gap-1.5 text-[10px] sm:text-sm">
+              <div className="flex items-center gap-2 sm:gap-4 rounded-lg bg-black/50 backdrop-blur-sm px-2.5 sm:px-3 py-1.5 border border-white/10 flex-wrap">
                 <span className="flex items-center gap-1.5 font-mono font-bold tabular-nums text-accent-blue">
                   <Rocket className="h-3.5 w-3.5" />
                   {ui.score}
@@ -5636,7 +5636,7 @@ export function SpaceShooterGame() {
                 <div className="text-xs uppercase tracking-[0.3em] text-red-400 font-bold">
                   Ship destroyed
                 </div>
-                <div className="mt-1 text-5xl font-black font-display text-white tabular-nums">
+                <div className="mt-1 text-4xl sm:text-5xl font-black font-display text-white tabular-nums">
                   {ui.score}
                 </div>
                 {celebration === "world" && (
