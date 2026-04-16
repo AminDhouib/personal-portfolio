@@ -162,6 +162,13 @@ interface Bullet {
   style: BulletStyle;
 }
 
+interface Coin {
+  id: number;
+  x: number; y: number; z: number;
+  rx: number; ry: number; rz: number;
+  value: number; // how many coins this token is worth (scales with combo)
+}
+
 interface Explosion {
   id: number;
   x: number; y: number; z: number;
@@ -225,6 +232,13 @@ interface GameRefs {
   explosions: Explosion[];
   speedLines: SpeedLine[];
   powerUps: PowerUp[];
+  coins: Coin[];
+  coinsThisRun: number;
+  coinMagnetRadius: number;   // set from profile at run start (1.0 baseline, up to ~3.0)
+  coinValueBonus: number;     // additive per-coin value from upgrade
+  scoreMultEndRun: number;    // applied to final score on death
+  comboWindowMs: number;      // runtime copy of COMBO_WINDOW_MS after upgrade
+  shieldDurationMs: number;   // runtime copy of POWERUP_DURATION_MS for shield
   activePowerUps: ActivePowerUp[];
   debris: Debris[];
   scorePopups: ScorePopup[];
@@ -296,7 +310,10 @@ function createRefs(): GameRefs {
     score: 0, kills: 0, distance: 0,
     combo: 1, comboLastAt: 0, comboPeak: 1,
     obstacles: [], bullets: [], explosions: [], speedLines: [],
-    powerUps: [], activePowerUps: [], debris: [], scorePopups: [],
+    powerUps: [], coins: [], coinsThisRun: 0,
+    coinMagnetRadius: 1, coinValueBonus: 0, scoreMultEndRun: 1,
+    comboWindowMs: COMBO_WINDOW_MS, shieldDurationMs: POWERUP_DURATION_MS,
+    activePowerUps: [], debris: [], scorePopups: [],
     targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
     fogColor: new THREE.Color(initEnv.fog),
     ambientColor: new THREE.Color(initEnv.ambient),
@@ -587,6 +604,17 @@ function spawnWall(g: GameRefs) {
       });
     }
   }
+}
+
+// Coins drop from destroyed asteroids. Value scales with combo so skilled
+// play earns more currency.
+function spawnCoin(g: GameRefs, x: number, y: number, z: number, value: number) {
+  g.coins.push({
+    id: nextId(g),
+    x, y, z,
+    rx: 0, ry: 0, rz: 0,
+    value,
+  });
 }
 
 function spawnPowerUp(g: GameRefs): PowerUp {
@@ -1632,6 +1660,9 @@ function runTick(
             const points = Math.round(basePoints * comboMul);
             g.score += points;
             g.kills += 1;
+            // Drop coins scaled by current combo. 1 baseline + 1 per 5 combo.
+            const coinValue = 1 + Math.floor(g.combo / 5);
+            spawnCoin(g, o.x, o.y, o.z, coinValue);
             spawnScorePopup(g, o.x, o.y, o.z, points);
             sounds.play("boom");
             break;
@@ -2678,6 +2709,8 @@ export function SpaceShooterGame() {
     g.explosions.length = 0;
     g.speedLines.length = 0;
     g.powerUps.length = 0;
+    g.coins.length = 0;
+    g.coinsThisRun = 0;
     g.activePowerUps.length = 0;
     g.debris.length = 0;
     g.scorePopups.length = 0;
