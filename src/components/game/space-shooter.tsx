@@ -478,6 +478,67 @@ function spawnObstacle(g: GameRefs): Obstacle {
   };
 }
 
+// Pick a gap X position for a wall. The gap is placed at least MIN_GAP_DIST
+// units from the player's current X so the player has to physically cross
+// the arena to reach it — breaking the edge-camping strategy.
+function pickWallGapX(playerX: number, arenaW: number): number {
+  const MIN_GAP_DIST = 3;
+  const half = arenaW / 2;
+  // Try candidates; pick the one farthest from the player, subject to the
+  // minimum-distance rule.
+  let best = -playerX; // mirror is always guaranteed far
+  let bestDist = Math.abs(best - playerX);
+  for (let i = 0; i < 5; i++) {
+    const candidate = (Math.random() - 0.5) * (arenaW - 2);
+    const dist = Math.abs(candidate - playerX);
+    if (dist >= MIN_GAP_DIST && dist > bestDist) {
+      best = candidate;
+      bestDist = dist;
+    }
+  }
+  // Safety: if every candidate failed, step MIN_GAP_DIST away from the player
+  // toward the nearest edge.
+  if (bestDist < MIN_GAP_DIST) {
+    best = playerX > 0 ? playerX - MIN_GAP_DIST : playerX + MIN_GAP_DIST;
+  }
+  // Clamp inside arena so the gap isn't cut off by the edge.
+  return THREE.MathUtils.clamp(best, -half + 1, half - 1);
+}
+
+// Spawn a wall: a line of asteroids across the full arena width at the same
+// Z with a single gap. Forces the player to move into the gap — breaks the
+// "camp at the edge and let auto-fire clear everything" exploit.
+function spawnWall(g: GameRefs) {
+  const GAP_WIDTH = 2.5;          // world units — about one ship-radius each side of center
+  const WALL_COUNT = 6;           // 6 asteroid slots evenly spaced across ARENA_W
+  const gapX = pickWallGapX(g.shipX, ARENA_W);
+  const slotWidth = ARENA_W / WALL_COUNT;
+  const baseSpeed = 10 + difficulty(g) * 3;
+  for (let i = 0; i < WALL_COUNT; i++) {
+    const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
+    // Skip slots that fall inside the gap zone
+    if (Math.abs(x - gapX) < GAP_WIDTH / 2 + 0.4) continue;
+    g.obstacles.push({
+      id: nextId(g),
+      variant: "basic",
+      x,
+      y: (Math.random() - 0.5) * 1.5, // slight vertical variation per wall piece
+      z: SPAWN_Z,
+      rx: Math.random() * Math.PI,
+      ry: Math.random() * Math.PI,
+      rz: Math.random() * Math.PI,
+      rsx: (Math.random() - 0.5) * 1.8,
+      rsy: (Math.random() - 0.5) * 1.8,
+      rsz: (Math.random() - 0.5) * 1.8,
+      vx: 0, vy: 0, // walls stay in-line; no drift, they must remain a wall
+      vz: baseSpeed,
+      size: 0.8,
+      hp: 2, // walls are beefier so auto-fire can't clear one piece before it arrives
+      shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
+    });
+  }
+}
+
 function spawnPowerUp(g: GameRefs): PowerUp {
   const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
   return {
@@ -1419,6 +1480,19 @@ function runTick(
       g.obstacles.push(spawnObstacle(g));
       g.obstacles.push(spawnObstacle(g));
     }
+  }
+
+  // Wall spawn — every 25-40s, a line of asteroids forces the player to move
+  // to a specific gap position. Only while playing (not during warp) so the
+  // wall has time to arrive under normal physics before warp trivializes it.
+  if (
+    g.status === "playing" &&
+    wi < 0.1 &&
+    g.nextWallAt > 0 &&
+    now >= g.nextWallAt
+  ) {
+    spawnWall(g);
+    g.nextWallAt = nextWallTimeMs(now);
   }
 
   // Spawn power-ups
