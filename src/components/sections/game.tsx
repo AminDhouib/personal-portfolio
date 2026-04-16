@@ -2,14 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { Gamepad2, Trophy, RotateCcw, ArrowRight } from "lucide-react";
+import { Gamepad2, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
 
-const GeometricFlowGame = dynamic(
+const SpaceShooterGame = dynamic(
   () =>
-    import("@/components/game/geometric-flow").then(
-      (m) => m.GeometricFlowGame
+    import("@/components/game/space-shooter").then(
+      (m) => m.SpaceShooterGame
     ),
   { ssr: false }
 );
@@ -33,23 +33,20 @@ export function Game() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-display text-xl font-bold">
-                Geometric Flow
+                Orbital Dodge
               </h3>
               <p className="text-sm text-(--muted) mt-1">
-                The shapes decorating this page just became obstacles. Navigate through. Click / tap to switch lanes.
+                Endless 3D dodge-em-up. Auto-fire cannons, grab power-ups, beat the leaderboard.
               </p>
             </div>
             <div className="hidden sm:flex items-center gap-4 text-xs text-(--muted)">
               <span className="flex items-center gap-1">
-                <Trophy className="h-3.5 w-3.5 text-accent-amber" /> High score saved
-              </span>
-              <span className="flex items-center gap-1">
-                <RotateCcw className="h-3.5 w-3.5" /> Tap to restart
+                <Trophy className="h-3.5 w-3.5 text-accent-amber" /> Personal best saved
               </span>
             </div>
           </div>
 
-          <GeometricFlowGame />
+          <SpaceShooterGame />
 
           <div className="flex items-center justify-center mt-4">
             <Link
@@ -57,7 +54,7 @@ export function Game() {
               className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) hover:text-(--foreground) transition-colors"
             >
               <Gamepad2 className="h-4 w-4 text-accent-pink" />
-              Want more?
+              Try the other games
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -66,4 +63,3 @@ export function Game() {
     </section>
   );
 }
-

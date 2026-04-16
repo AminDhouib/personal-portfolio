@@ -42,3 +42,4 @@ next-env.d.ts
 
 # superpowers brainstorm files
 .superpowers/
+/.data

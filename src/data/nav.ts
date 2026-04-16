@@ -9,7 +9,11 @@ export const navItems: NavItem[] = [
   { label: "Work", href: "#work", sectionId: "work" },
   { label: "Services", href: "#services", sectionId: "services" },
   { label: "Blog", href: "#blog", sectionId: "blog" },
-  { label: "Games", href: "#game", sectionId: "game" },
+  // Games is a full route now (not an in-page anchor), so this opens
+  // /games directly instead of scrolling to the embedded game on the home
+  // page. sectionId is kept so the scroll-spy still highlights the embedded
+  // section while you scroll past it.
+  { label: "Games", href: "/games", sectionId: "game" },
 ];
 
 export const CALENDLY_URL = "https://calendly.com/amindhouib";

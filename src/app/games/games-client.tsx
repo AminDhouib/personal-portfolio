@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { Gamepad2, Keyboard, Trophy, RotateCcw } from "lucide-react";
+import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket } from "lucide-react";
 
 const GeometricFlowGame = dynamic(
   () =>
@@ -21,6 +21,12 @@ const TypingSpeedGame = dynamic(
 const CodePuzzleGame = dynamic(
   () =>
     import("@/components/game/code-puzzle").then((m) => m.CodePuzzleGame),
+  { ssr: false, loading: () => <GameSkeleton /> }
+);
+
+const SpaceShooterGame = dynamic(
+  () =>
+    import("@/components/game/space-shooter").then((m) => m.SpaceShooterGame),
   { ssr: false, loading: () => <GameSkeleton /> }
 );
 
@@ -45,9 +51,17 @@ const GAMES = [
   {
     id: "typing-speed",
     title: "Typing Speed",
-    description: "Code snippets from real projects. How fast can you type?",
+    description: "Type flowing sentences as fast as you can. Animated feedback, combo bursts.",
     icon: Keyboard,
     iconColor: "text-accent-blue",
+    available: true,
+  },
+  {
+    id: "space-shooter",
+    title: "Orbital Dodge",
+    description: "3D ship shooter. Dodge asteroids, auto-fire, level up for deadlier guns.",
+    icon: Rocket,
+    iconColor: "text-accent-green",
     available: true,
   },
   {
@@ -61,7 +75,7 @@ const GAMES = [
 ];
 
 export function GamesClient() {
-  const [activeGame, setActiveGame] = useState("geometric-flow");
+  const [activeGame, setActiveGame] = useState("space-shooter");
 
   return (
     <div className="space-y-8">
@@ -77,6 +91,8 @@ export function GamesClient() {
                   ? "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
                   : game.id === "typing-speed"
                   ? "border-accent-blue/50 bg-accent-blue/10 text-accent-blue"
+                  : game.id === "space-shooter"
+                  ? "border-accent-green/50 bg-accent-green/10 text-accent-green"
                   : "border-accent-amber/50 bg-accent-amber/10 text-accent-amber"
                 : "border-(--border) text-(--muted) hover:border-(--muted)/40 hover:text-(--foreground)"
             }`}
@@ -118,10 +134,23 @@ export function GamesClient() {
           <div className="mb-4">
             <h2 className="font-display text-xl font-bold">Typing Speed</h2>
             <p className="text-sm text-(--muted) mt-0.5">
-              Real code snippets. Click "Start typing" then type the snippet exactly.
+              Flowing sentences, animated feedback, streak bursts. Click Start and go.
             </p>
           </div>
           <TypingSpeedGame />
+        </div>
+      )}
+
+      {/* Space Shooter */}
+      {activeGame === "space-shooter" && (
+        <div>
+          <div className="mb-4">
+            <h2 className="font-display text-xl font-bold">Orbital Dodge</h2>
+            <p className="text-sm text-(--muted) mt-0.5">
+              3D ship shooter. Move with mouse / touch / WASD. Auto-fire destroys asteroids; dodge the rest to level up.
+            </p>
+          </div>
+          <SpaceShooterGame />
         </div>
       )}
 

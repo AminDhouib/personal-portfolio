@@ -1,0 +1,2707 @@
+"use client";
+
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Rocket, Trophy, Shield, RotateCcw, Send,
+  Volume2, VolumeX, Crosshair, Zap, Target,
+  Maximize2, Minimize2,
+} from "lucide-react";
+
+// ---------- constants ----------
+
+const HS_KEY = "space-shooter-hs";
+const NAME_KEY = "space-shooter-name";
+const SOUND_KEY = "space-shooter-sound";
+// World-space arena bounds. The visible canvas may be wider, but the ship
+// never gets more sideways room than this — prevents cheating by stretching
+// the browser window to ultrawide.
+const ARENA_W_DESKTOP = 9;
+const ARENA_H_DESKTOP = 5.4;
+const ARENA_W_MOBILE = 6.5;
+const ARENA_H_MOBILE = 6.0;
+// Default values used by spawn helpers; overridden per-frame by the runtime
+// based on viewport in runTick.
+let ARENA_W = ARENA_W_DESKTOP;
+let ARENA_H = ARENA_H_DESKTOP;
+function setArena(w: number, h: number) {
+  ARENA_W = w;
+  ARENA_H = h;
+}
+const SPAWN_Z = -42;
+const DESPAWN_Z = 6;
+const MAX_OBSTACLES = 32;
+const MAX_BULLETS = 70;
+const MAX_POWERUPS = 4;
+const SHIP_RADIUS = 0.34;
+const POWERUP_PICKUP_RADIUS = 1.15; // generous — easier to grab on the move
+const POWERUP_DURATION_MS = 8000;
+const POWERUP_SPAWN_INTERVAL_MS = 11000;
+const START_INVULN_MS = 2500;
+
+// `armed` = scene is alive (ship visible, speed lines flowing) but the run
+// hasn't started — waiting for the player's first mouse/touch/key input.
+type GameStatus = "armed" | "playing" | "dying" | "dead";
+type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp";
+type ObstacleVariant = "basic" | "heavy" | "speeder";
+type BulletStyle = "sprite" | "bolt" | "plasma";
+
+interface Environment {
+  name: string;
+  fog: string;
+  ambient: string;
+  asteroidColor: string;
+  asteroidEmissive: string;
+  bg: string;
+  starColor: string;
+}
+
+const ENVIRONMENTS: Environment[] = [
+  {
+    name: "Deep Space",
+    fog: "#0a0a1a",
+    ambient: "#202040",
+    asteroidColor: "#a78bfa",
+    asteroidEmissive: "#4c1d95",
+    bg: "radial-gradient(ellipse at center, #0f172a 0%, #020617 70%, #000 100%)",
+    starColor: "#cbd5e1",
+  },
+  {
+    name: "Crimson Nebula",
+    fog: "#3d1d3f",
+    ambient: "#4a1d4a",
+    asteroidColor: "#f0abfc",
+    asteroidEmissive: "#a21caf",
+    bg: "radial-gradient(ellipse at 30% 30%, #4a1d4a 0%, #1e0a2c 60%, #000 100%)",
+    starColor: "#fbcfe8",
+  },
+  {
+    name: "Glacier Belt",
+    fog: "#1a3a4a",
+    ambient: "#3a5a6a",
+    asteroidColor: "#7dd3fc",
+    asteroidEmissive: "#0369a1",
+    bg: "radial-gradient(ellipse at 70% 40%, #0c4a6e 0%, #082f49 60%, #000 100%)",
+    starColor: "#bae6fd",
+  },
+  {
+    name: "Plasma Storm",
+    fog: "#5a2410",
+    ambient: "#5a2a1a",
+    asteroidColor: "#fb923c",
+    asteroidEmissive: "#9a3412",
+    bg: "radial-gradient(ellipse at 50% 60%, #7c2d12 0%, #431407 60%, #000 100%)",
+    starColor: "#fed7aa",
+  },
+];
+
+// Switch biome every 35 seconds of play time
+function envForTime(seconds: number): Environment {
+  return ENVIRONMENTS[Math.floor(seconds / 35) % ENVIRONMENTS.length];
+}
+
+interface PowerUpDef {
+  color: string;
+  emissive: string;
+  label: string;
+}
+
+const POWERUP_DEFS: Record<PowerUpType, PowerUpDef> = {
+  shield: { color: "#60a5fa", emissive: "#1e3a8a", label: "Shield" },
+  triple: { color: "#f472b6", emissive: "#9d174d", label: "Triple Shot" },
+  rapid: { color: "#facc15", emissive: "#854d0e", label: "Rapid Fire" },
+  mega: { color: "#a78bfa", emissive: "#4c1d95", label: "Plasma" },
+  warp: { color: "#22d3ee", emissive: "#0e7490", label: "Warp Drive" },
+};
+
+const POWERUP_TYPES: PowerUpType[] = ["shield", "triple", "rapid", "mega", "warp"];
+
+// ---------- entity types ----------
+
+interface Obstacle {
+  id: number;
+  variant: ObstacleVariant;
+  x: number; y: number; z: number;
+  rx: number; ry: number; rz: number;
+  rsx: number; rsy: number; rsz: number;
+  vz: number; // forward speed
+  size: number;
+  hp: number;
+  shape: 0 | 1 | 2;
+}
+
+interface Bullet {
+  id: number;
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  size: number;
+  damage: number;
+  color: string;
+  hp: number;
+  style: BulletStyle;
+}
+
+interface Explosion {
+  id: number;
+  x: number; y: number; z: number;
+  startedAt: number;
+  color: string;
+  scale: number;
+  opacity: number;
+  duration: number;
+}
+
+interface SpeedLine {
+  x: number; y: number; z: number;
+  length: number;
+  life: number;
+}
+
+interface PowerUp {
+  id: number;
+  type: PowerUpType;
+  x: number; y: number; z: number;
+  rx: number; ry: number; rz: number;
+}
+
+interface ActivePowerUp {
+  type: PowerUpType;
+  expiresAt: number;
+}
+
+// Floating "+N" point label that drifts up from a destroyed asteroid.
+interface ScorePopup {
+  id: number;
+  x: number; y: number; z: number;
+  amount: number;
+  spawnedAt: number;
+  ttl: number;
+}
+
+// Bits of the ship that detach on collision and tumble away.
+interface Debris {
+  id: number;
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  rx: number; ry: number; rz: number;
+  rsx: number; rsy: number; rsz: number;
+  size: [number, number, number];
+  color: string;
+  spawnedAt: number;
+  ttl: number; // ms — fades out and despawns
+}
+
+interface GameRefs {
+  status: GameStatus;
+  score: number;
+  kills: number;
+  distance: number;       // units travelled, ~10/sec base
+  obstacles: Obstacle[];
+  bullets: Bullet[];
+  explosions: Explosion[];
+  speedLines: SpeedLine[];
+  powerUps: PowerUp[];
+  activePowerUps: ActivePowerUp[];
+  debris: Debris[];
+  scorePopups: ScorePopup[];
+  targetX: number; targetY: number;
+  shipX: number; shipY: number; shipZ: number;
+  shipRotZ: number;
+  // Death physics
+  deathVelX: number;
+  deathVelY: number;
+  deathVelZ: number;
+  deathAngVel: number;
+  // Smooth biome lerp — current rendered colors interpolate toward env target
+  fogColor: THREE.Color;
+  ambientColor: THREE.Color;
+  asteroidColor: THREE.Color;
+  asteroidEmissive: THREE.Color;
+  starColor: THREE.Color;
+  // Track shield + warp state edges so we can play on/off SFX
+  shieldActiveLast: boolean;
+  warpActiveLast: boolean;
+  // Mobile flag — affects spawn rates / difficulty so the smaller arena
+  // remains playable.
+  isMobile: boolean;
+  // Distance-based biome system (replaces the fixed time-based cycle)
+  currentEnv: Environment;
+  nextBiomeAt: number; // distance in metres at which to swap biomes
+  lastBullet: number;
+  lastSpawn: number;
+  lastPowerUpSpawn: number;
+  lastUiSync: number;
+  nextId: number;
+  startedAt: number;
+  invulnUntil: number;
+  dyingAt: number;
+  shipFallSpeed: number;
+  cameraTargetX: number;
+  cameraTargetY: number;
+  cameraTargetZ: number;
+}
+
+// Random distance until next biome change — keeps transitions unpredictable.
+function pickNextBiomeDistance(currentDist: number): number {
+  return currentDist + 700 + Math.random() * 900; // 700–1600m further
+}
+
+function pickRandomBiome(exclude: Environment | null): Environment {
+  if (!exclude) return ENVIRONMENTS[Math.floor(Math.random() * ENVIRONMENTS.length)];
+  const others = ENVIRONMENTS.filter((e) => e !== exclude);
+  return others[Math.floor(Math.random() * others.length)];
+}
+
+function createRefs(): GameRefs {
+  // Status starts as "armed" — the run begins on the player's first input.
+  const initEnv = ENVIRONMENTS[0];
+  return {
+    status: "armed",
+    score: 0, kills: 0, distance: 0,
+    obstacles: [], bullets: [], explosions: [], speedLines: [],
+    powerUps: [], activePowerUps: [], debris: [], scorePopups: [],
+    targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
+    fogColor: new THREE.Color(initEnv.fog),
+    ambientColor: new THREE.Color(initEnv.ambient),
+    asteroidColor: new THREE.Color(initEnv.asteroidColor),
+    asteroidEmissive: new THREE.Color(initEnv.asteroidEmissive),
+    starColor: new THREE.Color(initEnv.starColor),
+    shieldActiveLast: false,
+    warpActiveLast: false,
+    isMobile: typeof window !== "undefined" &&
+      (matchMedia("(pointer: coarse)").matches || window.innerWidth < 640),
+    currentEnv: initEnv,
+    nextBiomeAt: pickNextBiomeDistance(0),
+    lastBullet: 0, lastSpawn: 0, lastPowerUpSpawn: 0, lastUiSync: 0,
+    nextId: 1, startedAt: 0,
+    invulnUntil: 0,
+    dyingAt: 0, shipFallSpeed: 0,
+    deathVelX: 0, deathVelY: 0, deathVelZ: 0, deathAngVel: 0,
+    cameraTargetX: 0, cameraTargetY: 0, cameraTargetZ: 5,
+  };
+}
+
+// Called when the player's first input is detected. Idempotent — only
+// transitions `armed` → `playing`.
+function startRun(g: GameRefs): boolean {
+  if (g.status !== "armed") return false;
+  const now = performance.now();
+  g.status = "playing";
+  g.startedAt = now;
+  g.invulnUntil = now + START_INVULN_MS;
+  g.lastSpawn = now;
+  g.lastPowerUpSpawn = now;
+  g.lastUiSync = 0;
+  sounds.startGameplayMusic();
+  return true;
+}
+
+function nextId(g: GameRefs): number {
+  const id = g.nextId;
+  g.nextId = id + 1;
+  return id;
+}
+
+function isPowerUpActive(g: GameRefs, t: PowerUpType): boolean {
+  const now = performance.now();
+  return g.activePowerUps.some((p) => p.type === t && p.expiresAt > now);
+}
+
+// Cached THREE.Color targets per environment (avoids per-frame allocation)
+const ENV_COLOR_CACHE = new WeakMap<Environment, {
+  fog: THREE.Color;
+  ambient: THREE.Color;
+  asteroidColor: THREE.Color;
+  asteroidEmissive: THREE.Color;
+  starColor: THREE.Color;
+}>();
+
+function envColors(env: Environment) {
+  let c = ENV_COLOR_CACHE.get(env);
+  if (!c) {
+    c = {
+      fog: new THREE.Color(env.fog),
+      ambient: new THREE.Color(env.ambient),
+      asteroidColor: new THREE.Color(env.asteroidColor),
+      asteroidEmissive: new THREE.Color(env.asteroidEmissive),
+      starColor: new THREE.Color(env.starColor),
+    };
+    ENV_COLOR_CACHE.set(env, c);
+  }
+  return c;
+}
+
+function activatePowerUp(g: GameRefs, t: PowerUpType): void {
+  const now = performance.now();
+  const expiresAt = now + POWERUP_DURATION_MS;
+  const existing = g.activePowerUps.find((p) => p.type === t);
+  if (existing) {
+    existing.expiresAt = expiresAt;
+  } else {
+    g.activePowerUps.push({ type: t, expiresAt });
+  }
+}
+
+// ---------- difficulty ----------
+
+// `difficulty` ramps from 0 to ~1.5 over the first 90 seconds, then keeps
+// growing slowly. Drives spawn rate, asteroid speed, and unlock thresholds.
+function difficulty(g: GameRefs): number {
+  const t = (performance.now() - g.startedAt) / 1000;
+  const base = Math.min(0.2 + t * 0.012, 2.5);
+  return g.isMobile ? base * 0.85 : base; // 15% softer on mobile
+}
+
+function elapsedSeconds(g: GameRefs): number {
+  return (performance.now() - g.startedAt) / 1000;
+}
+
+function unlockedVariants(seconds: number): ObstacleVariant[] {
+  const list: ObstacleVariant[] = ["basic"];
+  if (seconds > 25) list.push("heavy");
+  if (seconds > 50) list.push("speeder");
+  return list;
+}
+
+function spawnIntervalMs(g: GameRefs): number {
+  const d = difficulty(g);
+  return Math.max(280, 900 - d * 280);
+}
+
+function fireIntervalMs(g: GameRefs): number {
+  const base = isPowerUpActive(g, "rapid") ? 95 : 220;
+  const d = difficulty(g);
+  return Math.max(70, base - d * 30);
+}
+
+function bulletDamage(g: GameRefs): number {
+  return 1 + (isPowerUpActive(g, "mega") ? 3 : 0);
+}
+
+// ---------- spawning ----------
+
+function spawnObstacle(g: GameRefs): Obstacle {
+  const seconds = elapsedSeconds(g);
+  const variants = unlockedVariants(seconds);
+  const variant = variants[Math.floor(Math.random() * variants.length)];
+
+  // Anti-cheese: 60% spawn near player; 40% random
+  const aimAtPlayer = Math.random() < 0.6;
+  let x: number, y: number;
+  if (aimAtPlayer) {
+    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * 3.2, -ARENA_W / 2, ARENA_W / 2);
+    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * 2.4, -ARENA_H / 2, ARENA_H / 2);
+  } else {
+    x = (Math.random() - 0.5) * ARENA_W;
+    y = (Math.random() - 0.5) * ARENA_H;
+  }
+
+  const baseSpeed = 9 + difficulty(g) * 4;
+  let size = 0.55 + Math.random() * 0.45;
+  let hp = 1;
+  let speed = baseSpeed;
+
+  if (variant === "heavy") {
+    size = 0.95 + Math.random() * 0.4;
+    hp = 3;
+    speed = baseSpeed * 0.7;
+  } else if (variant === "speeder") {
+    size = 0.4 + Math.random() * 0.2;
+    hp = 1;
+    speed = baseSpeed * 1.6;
+  }
+
+  return {
+    id: nextId(g),
+    variant,
+    x, y,
+    z: SPAWN_Z - Math.random() * 8,
+    rx: Math.random() * Math.PI,
+    ry: Math.random() * Math.PI,
+    rz: Math.random() * Math.PI,
+    rsx: (Math.random() - 0.5) * 1.8,
+    rsy: (Math.random() - 0.5) * 1.8,
+    rsz: (Math.random() - 0.5) * 1.8,
+    vz: speed,
+    size, hp,
+    shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
+  };
+}
+
+function spawnPowerUp(g: GameRefs): PowerUp {
+  const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+  return {
+    id: nextId(g),
+    type,
+    x: (Math.random() - 0.5) * (ARENA_W * 0.7),
+    y: (Math.random() - 0.5) * (ARENA_H * 0.7),
+    z: SPAWN_Z - 4,
+    rx: 0, ry: 0, rz: 0,
+  };
+}
+
+function styleForBullet(g: GameRefs): BulletStyle {
+  if (isPowerUpActive(g, "mega")) return "plasma";
+  if (isPowerUpActive(g, "triple")) return "bolt";
+  return "sprite";
+}
+
+function bulletColor(g: GameRefs): string {
+  if (isPowerUpActive(g, "mega")) return "#a78bfa";
+  if (isPowerUpActive(g, "triple")) return "#f472b6";
+  if (isPowerUpActive(g, "rapid")) return "#22d3ee";
+  return "#fde047";
+}
+
+function fireBullets(g: GameRefs, now: number, sounds: SoundManager) {
+  if (g.bullets.length >= MAX_BULLETS) return;
+  const style = styleForBullet(g);
+  const color = bulletColor(g);
+  const dmg = bulletDamage(g);
+  const baseSize = 0.07;
+  const make = (vx: number, sx: number, sizeMul = 1, hp = 1) => {
+    g.bullets.push({
+      id: nextId(g),
+      x: g.shipX + sx, y: g.shipY + 0.05, z: 1.5,
+      vx, vy: 0, vz: -55,
+      size: baseSize * sizeMul,
+      damage: dmg, color, hp, style,
+    });
+  };
+  if (isPowerUpActive(g, "mega")) {
+    make(0, 0, 2.6, 3);
+  } else if (isPowerUpActive(g, "triple")) {
+    make(0, 0);
+    make(-2.2, -0.32);
+    make(2.2, 0.32);
+  } else {
+    make(0, 0);
+  }
+  g.lastBullet = now;
+  sounds.play("laser");
+}
+
+function spawnExplosion(g: GameRefs, x: number, y: number, z: number, color: string, duration = 600, scale = 0.3) {
+  g.explosions.push({
+    id: nextId(g), x, y, z,
+    startedAt: performance.now(),
+    color, scale, opacity: 1, duration,
+  });
+}
+
+function spawnScorePopup(g: GameRefs, x: number, y: number, z: number, amount: number) {
+  g.scorePopups.push({
+    id: nextId(g), x, y, z, amount,
+    spawnedAt: performance.now(),
+    ttl: 1100,
+  });
+}
+
+// Spawn the chunks that fly off when the ship is destroyed: two red wing
+// tips and a cyan cockpit shard. Each gets the ship's death impulse plus a
+// random kick so they fan out instead of moving in formation.
+function spawnShipDebris(g: GameRefs) {
+  const baseVx = g.deathVelX;
+  const baseVy = g.deathVelY;
+  const baseVz = g.deathVelZ;
+  const now = performance.now();
+  const make = (
+    offsetX: number, offsetY: number, offsetZ: number,
+    color: string,
+    sx: number, sy: number, sz: number,
+    kickX: number, kickY: number,
+  ) => {
+    g.debris.push({
+      id: nextId(g),
+      x: g.shipX + offsetX,
+      y: g.shipY + offsetY,
+      z: g.shipZ + offsetZ,
+      vx: baseVx + kickX,
+      vy: baseVy + kickY,
+      vz: baseVz * 0.7 + (Math.random() - 0.5) * 2,
+      rx: 0, ry: 0, rz: 0,
+      rsx: (Math.random() - 0.5) * 8,
+      rsy: (Math.random() - 0.5) * 8,
+      rsz: (Math.random() - 0.5) * 8,
+      size: [sx, sy, sz],
+      color,
+      spawnedAt: now,
+      ttl: 1800,
+    });
+  };
+  // Right wing tip (red)
+  make(0.55, -0.03, 0.28, "#dc2626", 0.18, 0.05, 0.16, 4, 1.5);
+  // Left wing tip (red)
+  make(-0.55, -0.03, 0.28, "#dc2626", 0.18, 0.05, 0.16, -4, 1.5);
+  // Cockpit shard (cyan)
+  make(0, 0.1, -0.18, "#22d3ee", 0.16, 0.12, 0.16, (Math.random() - 0.5) * 3, 2.5);
+}
+
+// ---------- sound (Web Audio synth, no asset files) ----------
+
+type SoundType = "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff" | "warp";
+
+class SoundManager {
+  private ctx: AudioContext | null = null;
+  private enabled = false;
+  private lastPlay: Record<SoundType, number> = {
+    laser: 0, boom: 0, chime: 0, crash: 0, shieldOn: 0, shieldOff: 0, warp: 0,
+  };
+  // Sustained warp whoosh that loops while warp power-up is active
+  private warpLoop: { src: AudioBufferSourceNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode } | null = null;
+  // Music subsystem — only one track at a time, with crossfades.
+  private music: {
+    track: "gameplay" | "leaderboard";
+    masterGain: GainNode;
+    interval: ReturnType<typeof setInterval>;
+    step: number;
+  } | null = null;
+
+  setEnabled(v: boolean) {
+    this.enabled = v;
+    if (v) this.ensure();
+    else {
+      this.stopWarpLoop();
+      this.stopMusic(0);
+    }
+  }
+
+  isEnabled() {
+    return this.enabled;
+  }
+
+  private ensure() {
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") this.ctx.resume();
+      return;
+    }
+    try {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.ctx = new Ctor();
+    } catch {
+      this.ctx = null;
+    }
+  }
+
+  play(type: SoundType) {
+    if (!this.enabled) return;
+    this.ensure();
+    if (!this.ctx) return;
+    // throttle laser to avoid clipping when rapid-fire
+    const now = performance.now();
+    if (type === "laser" && now - this.lastPlay.laser < 70) return;
+    this.lastPlay[type] = now;
+    switch (type) {
+      case "laser": this.playLaser(); break;
+      case "boom": this.playBoom(); break;
+      case "chime": this.playChime(); break;
+      case "crash": this.playCrash(); break;
+      case "shieldOn": this.playShieldOn(); break;
+      case "shieldOff": this.playShieldOff(); break;
+      case "warp": this.playWarp(); break;
+    }
+  }
+
+  // Soft sine pulse, easy on the ears since it fires constantly.
+  private playLaser() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(720, t);
+    osc.frequency.exponentialRampToValueAtTime(420, t + 0.06);
+    gain.gain.setValueAtTime(0.025, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+  }
+
+  // Meteor explosion — three layers stacked for body + crunch + rumble:
+  //  1. Sharp filtered-noise crack (the initial hit, lasts ~0.15s)
+  //  2. Pitched-down sub-bass thump (the deep body, ~0.35s)
+  //  3. Long rumbling debris tail (low-passed noise, ~0.7s) so the explosion
+  //     decays into space rather than ending abruptly.
+  private playBoom() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+
+    // Layer 1: sharp noise crack
+    const crackDur = 0.15;
+    const crackBuf = ctx.createBuffer(1, ctx.sampleRate * crackDur, ctx.sampleRate);
+    const crackData = crackBuf.getChannelData(0);
+    for (let i = 0; i < crackData.length; i++) {
+      const env = Math.exp((-i / crackData.length) * 8);
+      crackData[i] = (Math.random() - 0.5) * 2 * env;
+    }
+    const crackSrc = ctx.createBufferSource();
+    crackSrc.buffer = crackBuf;
+    const crackFilt = ctx.createBiquadFilter();
+    crackFilt.type = "highpass";
+    crackFilt.frequency.value = 1500;
+    const crackGain = ctx.createGain();
+    crackGain.gain.setValueAtTime(0.10, t);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, t + crackDur);
+    crackSrc.connect(crackFilt).connect(crackGain).connect(ctx.destination);
+    crackSrc.start(t);
+
+    // Layer 2: deep sub-bass thump (the "thoom" of the meteor)
+    const sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(110, t);
+    sub.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+    subGain.gain.setValueAtTime(0.18, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    sub.connect(subGain).connect(ctx.destination);
+    sub.start(t);
+    sub.stop(t + 0.5);
+
+    // Layer 3: long low-passed rumble tail (debris falling apart)
+    const tailDur = 0.75;
+    const tailBuf = ctx.createBuffer(1, ctx.sampleRate * tailDur, ctx.sampleRate);
+    const tailData = tailBuf.getChannelData(0);
+    for (let i = 0; i < tailData.length; i++) {
+      const env = Math.exp((-i / tailData.length) * 3);
+      const grit = Math.sin(i * 0.012) * 0.3;
+      tailData[i] = ((Math.random() - 0.5) * 2 + grit) * env;
+    }
+    const tailSrc = ctx.createBufferSource();
+    tailSrc.buffer = tailBuf;
+    const tailFilt = ctx.createBiquadFilter();
+    tailFilt.type = "lowpass";
+    tailFilt.frequency.setValueAtTime(700, t);
+    tailFilt.frequency.exponentialRampToValueAtTime(80, t + tailDur);
+    const tailGain = ctx.createGain();
+    tailGain.gain.setValueAtTime(0.15, t + 0.05);
+    tailGain.gain.exponentialRampToValueAtTime(0.001, t + tailDur);
+    tailSrc.connect(tailFilt).connect(tailGain).connect(ctx.destination);
+    tailSrc.start(t);
+  }
+
+  private playChime() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const freqs = [659.25, 987.77]; // E5 + B5
+    for (const f of freqs) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(f, t);
+      gain.gain.setValueAtTime(0.07, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    }
+  }
+
+  private playCrash() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 1.0, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 4);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.setValueAtTime(700, t);
+    filt.frequency.exponentialRampToValueAtTime(80, t + 0.8);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.22, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1);
+    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.start(t);
+  }
+
+  // Rising sweep — shield activating
+  private playShieldOn() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.35);
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.42);
+  }
+
+  // Falling sweep — shield depleting
+  private playShieldOff() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.exponentialRampToValueAtTime(180, t + 0.35);
+    gain.gain.setValueAtTime(0.05, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.42);
+  }
+
+  // Warp jump — sharp transient swoosh on activation
+  private playWarp() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const dur = 0.55;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 3);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.Q.setValueAtTime(8, t);
+    filt.frequency.setValueAtTime(200, t);
+    filt.frequency.exponentialRampToValueAtTime(3000, t + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.16, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.start(t);
+  }
+
+  // Looping wind-rushing whoosh that plays for the duration of the warp.
+  // Multi-band: a high screaming whistle layered over deep low-pass roar to
+  // really sell the speed.
+  startWarpLoop() {
+    if (!this.enabled) return;
+    this.ensure();
+    if (!this.ctx) return;
+    this.stopWarpLoop();
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const dur = 1.0;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    // High whistle band — gives the "screaming through space" character
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.Q.setValueAtTime(4, t);
+    filt.frequency.setValueAtTime(2800, t);
+    // LFO wobbles the bandpass center to create a "rushing" tonality
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 7;
+    lfoGain.gain.value = 1100;
+    lfo.connect(lfoGain).connect(filt.frequency);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.22, t + 0.12);
+    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.start(t);
+    lfo.start(t);
+    this.warpLoop = { src, gain, lfo, lfoGain };
+  }
+
+  stopWarpLoop() {
+    if (!this.warpLoop || !this.ctx) return;
+    const { src, gain, lfo } = this.warpLoop;
+    const t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(gain.gain.value, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.18);
+    setTimeout(() => {
+      try { src.stop(); } catch { /* ignore */ }
+      try { lfo?.stop(); } catch { /* ignore */ }
+    }, 220);
+    this.warpLoop = null;
+  }
+
+  // -------- Music (procedurally generated, no asset files) --------
+  // Multi-section sequencer: each "track" (gameplay / leaderboard) cycles
+  // through several chord-progression sections so the music doesn't feel
+  // like a 2-bar loop. Every section has its own lead + bass pattern and
+  // lasts 16 8th-note steps before advancing.
+
+  private static GAMEPLAY_SECTIONS: { lead: number[]; bass: number[]; leadType: OscillatorType }[] = [
+    // A-minor rising arpeggio — driving energy
+    { lead: [440, 523.25, 659.25, 880, 659.25, 523.25, 440, 880], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 98, 98], leadType: "triangle" },
+    // E-minor ascending — tension
+    { lead: [329.63, 392, 493.88, 659.25, 493.88, 392, 329.63, 659.25], bass: [82.41, 82.41, 98, 98, 73.42, 73.42, 82.41, 82.41], leadType: "triangle" },
+    // D-minor descending — moody
+    { lead: [587.33, 523.25, 440, 349.23, 440, 523.25, 587.33, 698.46], bass: [146.83, 146.83, 130.81, 130.81, 110, 110, 98, 98], leadType: "sine" },
+    // G-major bright lift — contrast
+    { lead: [392, 493.88, 587.33, 783.99, 587.33, 493.88, 392, 783.99], bass: [98, 98, 123.47, 123.47, 146.83, 146.83, 98, 98], leadType: "triangle" },
+    // F-major suspended — floating
+    { lead: [349.23, 440, 523.25, 698.46, 523.25, 440, 349.23, 523.25], bass: [87.31, 87.31, 110, 110, 130.81, 130.81, 87.31, 87.31], leadType: "sine" },
+    // A-minor high octave variation — climax
+    { lead: [880, 1046.5, 1318.5, 880, 1046.5, 1318.5, 1760, 1318.5], bass: [110, 110, 130.81, 130.81, 146.83, 146.83, 98, 98], leadType: "triangle" },
+    // C-major resolving — release
+    { lead: [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 523.25, 659.25], bass: [130.81, 130.81, 110, 110, 87.31, 87.31, 98, 98], leadType: "sine" },
+    // Return to Am with octave drop — reset
+    { lead: [220, 261.63, 329.63, 440, 329.63, 261.63, 220, 440], bass: [110, 110, 87.31, 87.31, 73.42, 73.42, 98, 98], leadType: "triangle" },
+  ];
+
+  private static LEADERBOARD_SECTIONS: { lead: number[]; bass: number[]; leadType: OscillatorType }[] = [
+    // E-minor reflective
+    { lead: [329.63, 415.30, 493.88, 659.25, 493.88, 415.30, 329.63, 246.94], bass: [82.41, 82.41, 110, 110, 73.42, 73.42, 98, 98], leadType: "sine" },
+    // A-minor gentle
+    { lead: [220, 261.63, 329.63, 440, 329.63, 261.63, 220, 329.63], bass: [110, 110, 130.81, 130.81, 87.31, 87.31, 110, 110], leadType: "sine" },
+    // D-major hopeful
+    { lead: [293.66, 369.99, 440, 587.33, 440, 369.99, 293.66, 440], bass: [146.83, 146.83, 110, 110, 123.47, 123.47, 146.83, 146.83], leadType: "triangle" },
+    // G-major warm resolve
+    { lead: [392, 493.88, 587.33, 392, 493.88, 587.33, 783.99, 587.33], bass: [98, 98, 82.41, 82.41, 73.42, 73.42, 98, 98], leadType: "sine" },
+  ];
+
+  startGameplayMusic() {
+    this.startMusicLoop("gameplay", {
+      bpm: 130,
+      sections: SoundManager.GAMEPLAY_SECTIONS,
+      stepsPerSection: 16,
+      bassType: "sine",
+      masterTarget: 0.10,
+    });
+  }
+
+  startLeaderboardMusic() {
+    this.startMusicLoop("leaderboard", {
+      bpm: 84,
+      sections: SoundManager.LEADERBOARD_SECTIONS,
+      stepsPerSection: 16,
+      bassType: "triangle",
+      masterTarget: 0.11,
+    });
+  }
+
+  private startMusicLoop(
+    track: "gameplay" | "leaderboard",
+    cfg: {
+      bpm: number;
+      sections: { lead: number[]; bass: number[]; leadType: OscillatorType }[];
+      stepsPerSection: number;
+      bassType: OscillatorType;
+      masterTarget: number;
+    },
+  ) {
+    if (!this.enabled) return;
+    this.ensure();
+    if (!this.ctx) return;
+    if (this.music?.track === track) return;
+    this.stopMusic(0.6);
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0, t);
+    masterGain.gain.linearRampToValueAtTime(cfg.masterTarget, t + 0.8);
+    masterGain.connect(ctx.destination);
+    const beatMs = 60000 / cfg.bpm / 2; // 8th notes
+    let step = 0;
+    let sectionIdx = 0;
+    const fire = () => {
+      if (!this.ctx || !this.music || this.music.track !== track) return;
+      const now = this.ctx.currentTime;
+      const sec = cfg.sections[sectionIdx % cfg.sections.length];
+      const sectionStep = step % cfg.stepsPerSection;
+      const leadF = sec.lead[sectionStep % sec.lead.length];
+      const bassF = sec.bass[sectionStep % sec.bass.length];
+      // Lead voice
+      const leadOsc = this.ctx.createOscillator();
+      const leadGain = this.ctx.createGain();
+      leadOsc.type = sec.leadType;
+      leadOsc.frequency.value = leadF;
+      leadGain.gain.setValueAtTime(0.36, now);
+      leadGain.gain.exponentialRampToValueAtTime(0.001, now + (beatMs / 1000) * 0.85);
+      leadOsc.connect(leadGain).connect(masterGain);
+      leadOsc.start(now);
+      leadOsc.stop(now + (beatMs / 1000));
+      // Harmony: every 4th step add a fifth above for richness
+      if (step % 4 === 2) {
+        const harmOsc = this.ctx.createOscillator();
+        const harmGain = this.ctx.createGain();
+        harmOsc.type = "sine";
+        harmOsc.frequency.value = leadF * 1.5;
+        harmGain.gain.setValueAtTime(0.12, now);
+        harmGain.gain.exponentialRampToValueAtTime(0.001, now + (beatMs / 1000) * 0.6);
+        harmOsc.connect(harmGain).connect(masterGain);
+        harmOsc.start(now);
+        harmOsc.stop(now + (beatMs / 1000) * 0.7);
+      }
+      // Bass — quarter notes (every other 8th)
+      if (step % 2 === 0) {
+        const bassOsc = this.ctx.createOscillator();
+        const bassGain = this.ctx.createGain();
+        bassOsc.type = cfg.bassType;
+        bassOsc.frequency.value = bassF;
+        bassGain.gain.setValueAtTime(0.48, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + (beatMs / 1000) * 1.6);
+        bassOsc.connect(bassGain).connect(masterGain);
+        bassOsc.start(now);
+        bassOsc.stop(now + (beatMs / 1000) * 1.7);
+      }
+      step++;
+      // Advance section every N steps so the progression evolves
+      if (step % cfg.stepsPerSection === 0) sectionIdx++;
+    };
+    const interval = setInterval(fire, beatMs);
+    this.music = { track, masterGain, interval, step: 0 };
+    fire();
+  }
+
+  // Crossfade the current music out over `fadeSec` seconds (default 0.5).
+  stopMusic(fadeSec = 0.5) {
+    if (!this.music || !this.ctx) {
+      this.music = null;
+      return;
+    }
+    const { masterGain, interval } = this.music;
+    clearInterval(interval);
+    const t = this.ctx.currentTime;
+    masterGain.gain.cancelScheduledValues(t);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, t);
+    masterGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
+    const g = masterGain;
+    setTimeout(() => {
+      try { g.disconnect(); } catch { /* ignore */ }
+    }, Math.max(40, fadeSec * 1000 + 60));
+    this.music = null;
+  }
+
+  // Short descending three-note jingle on death.
+  playLosingJingle() {
+    if (!this.enabled) return;
+    this.ensure();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const notes = [493.88, 392.00, 311.13]; // B4 → G4 → D#4 (sad descent)
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      const start = t + i * 0.18;
+      gain.gain.setValueAtTime(0.12, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.35);
+    });
+  }
+}
+
+// Module-level singleton — survives React StrictMode double-mounts
+const sounds = new SoundManager();
+
+// ---------- game tick ----------
+
+interface Viewport { width: number; height: number }
+
+function runTick(
+  g: GameRefs,
+  dt: number,
+  viewport: Viewport,
+  onDeath: () => void,
+  onUiSync: () => void,
+) {
+  const now = performance.now();
+  const step = Math.min(dt, 0.05);
+
+  // Sync world arena dimensions to the visible viewport but cap at the
+  // configured maximums so ultrawide canvases don't grant extra play space.
+  // On portrait/touch, switch to a taller-but-narrower mobile arena.
+  const aspect = viewport.width / Math.max(0.001, viewport.height);
+  const portraitOrMobile = g.isMobile || aspect < 1.05;
+  const maxW = portraitOrMobile ? ARENA_W_MOBILE : ARENA_W_DESKTOP;
+  const maxH = portraitOrMobile ? ARENA_H_MOBILE : ARENA_H_DESKTOP;
+  setArena(
+    Math.min(maxW, viewport.width - 1),
+    Math.min(maxH, viewport.height - 1),
+  );
+
+  // Distance-based biome roll — random next env every 700–1600m so the
+  // transitions feel organic instead of clockwork.
+  if (g.distance >= g.nextBiomeAt && g.status === "playing") {
+    g.currentEnv = pickRandomBiome(g.currentEnv);
+    g.nextBiomeAt = pickNextBiomeDistance(g.distance);
+  }
+  // Smooth biome lerp toward current env's colors.
+  const tc = envColors(g.currentEnv);
+  const colorLerp = Math.min(1, dt * 1.5);
+  g.fogColor.lerp(tc.fog, colorLerp);
+  g.ambientColor.lerp(tc.ambient, colorLerp);
+  g.asteroidColor.lerp(tc.asteroidColor, colorLerp);
+  g.asteroidEmissive.lerp(tc.asteroidEmissive, colorLerp);
+  g.starColor.lerp(tc.starColor, colorLerp);
+
+  // Always advance explosions
+  for (let i = g.explosions.length - 1; i >= 0; i--) {
+    const e = g.explosions[i];
+    const age = (now - e.startedAt) / e.duration;
+    if (age >= 1) {
+      g.explosions.splice(i, 1);
+    } else {
+      e.scale = 0.3 + age * 2.6;
+      e.opacity = Math.max(0, 1 - age);
+    }
+  }
+
+  // Always advance score popups (drift up, fade out)
+  for (let i = g.scorePopups.length - 1; i >= 0; i--) {
+    const p = g.scorePopups[i];
+    if (now - p.spawnedAt > p.ttl) g.scorePopups.splice(i, 1);
+    else {
+      const ageS = (now - p.spawnedAt) / 1000;
+      p.y += step * 1.8;
+      p.z += step * 6 + ageS * 1.5; // slight forward drift toward camera
+    }
+  }
+
+  // Dying animation: ship retains the impulse from where it got hit, tumbles
+  // along that vector with gravity dragging it down, then explodes. Camera
+  // tightens onto the wreck and speed lines redirect along the death vector.
+  if (g.status === "dying") {
+    const elapsed = (now - g.dyingAt) / 1000;
+    // Velocity integration + gravity on Y
+    g.deathVelY -= step * 6.5;
+    g.shipX += g.deathVelX * step;
+    g.shipY += g.deathVelY * step;
+    g.shipZ += g.deathVelZ * step;
+    g.shipRotZ += g.deathAngVel * step;
+
+    // Camera locks onto the falling ship for a cinematic close-up
+    g.cameraTargetX = g.shipX * 0.55;
+    g.cameraTargetY = g.shipY * 0.6 + 0.4;
+    g.cameraTargetZ = THREE.MathUtils.lerp(g.cameraTargetZ, 3.6, Math.min(1, dt * 2.5));
+
+    // Speed lines redirect along the ship's flight vector — drift them sideways
+    // as well as forward so they no longer look like the ship is still on rails.
+    const driftX = g.deathVelX * step * 0.6;
+    const driftY = g.deathVelY * step * 0.6;
+    for (const l of g.speedLines) {
+      l.x += driftX;
+      l.y += driftY;
+      l.z += step * 65;
+      const t = THREE.MathUtils.clamp((l.z + 40) / 44, 0, 1);
+      l.life = (t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1) * 0.7;
+      if (l.z > 6 || Math.abs(l.x) > 18 || Math.abs(l.y) > 12) {
+        l.x = (Math.random() - 0.5) * 14;
+        l.y = (Math.random() - 0.5) * 8;
+        l.z = -40 - Math.random() * 4;
+        l.length = 1.4 + Math.random() * 2.6;
+        l.life = 0;
+      }
+    }
+
+    if (elapsed > 0.6 && elapsed < 0.65) {
+      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#fbbf24", 350, 0.25);
+    }
+    if (elapsed > 1.4 && elapsed < 1.45) {
+      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 700, 0.6);
+      spawnExplosion(g, g.shipX + 0.4, g.shipY + 0.2, g.shipZ, "#fbbf24", 600, 0.5);
+      spawnExplosion(g, g.shipX - 0.3, g.shipY - 0.3, g.shipZ, "#f97316", 650, 0.5);
+    }
+    if (elapsed > 2.2) {
+      g.status = "dead";
+      onDeath();
+    }
+    // Update debris while dying
+    for (let i = g.debris.length - 1; i >= 0; i--) {
+      const d = g.debris[i];
+      d.vy -= step * 6.5;
+      d.x += d.vx * step;
+      d.y += d.vy * step;
+      d.z += d.vz * step;
+      d.rx += d.rsx * step;
+      d.ry += d.rsy * step;
+      d.rz += d.rsz * step;
+      if (now - d.spawnedAt > d.ttl) g.debris.splice(i, 1);
+    }
+    onUiSync();
+    return;
+  }
+
+  // Always-on: ship lerp, camera, speed lines. During warp the ship LURCHES
+  // forward — instant input response + everything in the world rushes past
+  // many times faster. ~10× perceived speed.
+  const warpActive = g.status === "playing" && isPowerUpActive(g, "warp");
+  const lerpFactor = warpActive ? dt * 90 : dt * 11;
+  const lerp = Math.min(1, lerpFactor);
+  g.shipX += (g.targetX - g.shipX) * lerp;
+  g.shipY += (g.targetY - g.shipY) * lerp;
+  const targetBank = THREE.MathUtils.clamp(-(g.targetX - g.shipX) * 0.22, -0.45, 0.45);
+  g.shipRotZ = THREE.MathUtils.lerp(g.shipRotZ, targetBank, 0.18);
+  g.cameraTargetX = g.shipX * 0.18;
+  g.cameraTargetY = g.shipY * 0.12;
+  // Camera Z respects portrait so the wider FOV setup isn't overridden.
+  const baseCamZ = portraitOrMobile ? 7.5 : 5;
+  const warpCamZ = portraitOrMobile ? 6.0 : 3.9;
+  g.cameraTargetZ = warpActive ? warpCamZ : baseCamZ;
+
+  const desiredLines = warpActive ? 60 : 32;
+  while (g.speedLines.length < desiredLines) {
+    g.speedLines.push({
+      x: (Math.random() - 0.5) * 14,
+      y: (Math.random() - 0.5) * 8,
+      z: -8 - Math.random() * 32,
+      length: warpActive ? 4 + Math.random() * 4 : 1.4 + Math.random() * 2.6,
+      life: 0,
+    });
+  }
+  const lineSpeed = warpActive ? 360 : 65; // ~5× during warp
+  for (const l of g.speedLines) {
+    l.z += step * lineSpeed;
+    const t = THREE.MathUtils.clamp((l.z + 40) / 44, 0, 1);
+    l.life = t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1;
+    if (l.z > 4) {
+      l.x = (Math.random() - 0.5) * 14;
+      l.y = (Math.random() - 0.5) * 8;
+      l.z = -40 - Math.random() * 4;
+      l.length = warpActive ? 4 + Math.random() * 4 : 1.4 + Math.random() * 2.6;
+      l.life = 0;
+    }
+  }
+
+  // Arena clamp every frame (works for armed too — clamps ship preview)
+  const hw = Math.min(ARENA_W / 2, viewport.width / 2 - 0.5);
+  const hh = Math.min(ARENA_H / 2, viewport.height / 2 - 0.5);
+  g.targetX = Math.max(-hw, Math.min(hw, g.targetX));
+  g.targetY = Math.max(-hh, Math.min(hh, g.targetY));
+
+  if (g.status !== "playing") {
+    // Throttled UI sync even while armed so the HUD render stays alive
+    if (now - g.lastUiSync > 200) {
+      g.lastUiSync = now;
+      onUiSync();
+    }
+    return;
+  }
+
+  // Expire active power-ups
+  for (let i = g.activePowerUps.length - 1; i >= 0; i--) {
+    if (g.activePowerUps[i].expiresAt <= now) g.activePowerUps.splice(i, 1);
+  }
+
+  // Shield edge detection — play sound when activating or expiring
+  const shieldNow = isPowerUpActive(g, "shield");
+  if (shieldNow !== g.shieldActiveLast) {
+    sounds.play(shieldNow ? "shieldOn" : "shieldOff");
+    g.shieldActiveLast = shieldNow;
+  }
+
+  // Warp edge detection — sustained whoosh starts on activation, fades on expire
+  const warpNow = isPowerUpActive(g, "warp");
+  if (warpNow !== g.warpActiveLast) {
+    if (warpNow) sounds.startWarpLoop();
+    else sounds.stopWarpLoop();
+    g.warpActiveLast = warpNow;
+  }
+
+  // Score: time alive ramps slowly, asteroid kills give chunks
+  g.score += step * 8;
+  // Distance: matches forward asteroid speed so the score "feels" like flight.
+  // Warp turbo-charges the distance counter to match the visible speed.
+  const distMultiplier = warpActive ? 6 : 1;
+  g.distance += step * (10 + difficulty(g) * 4) * distMultiplier;
+
+  // Auto-fire
+  if (now - g.lastBullet > fireIntervalMs(g)) {
+    fireBullets(g, now, sounds);
+  }
+
+  // Spawn obstacles
+  if (now - g.lastSpawn > spawnIntervalMs(g) && g.obstacles.length < MAX_OBSTACLES) {
+    g.lastSpawn = now;
+    g.obstacles.push(spawnObstacle(g));
+    // After ~60s, occasionally spawn clusters of 3
+    if (elapsedSeconds(g) > 60 && Math.random() < 0.15 && g.obstacles.length + 2 < MAX_OBSTACLES) {
+      g.obstacles.push(spawnObstacle(g));
+      g.obstacles.push(spawnObstacle(g));
+    }
+  }
+
+  // Spawn power-ups
+  if (now - g.lastPowerUpSpawn > POWERUP_SPAWN_INTERVAL_MS && g.powerUps.length < MAX_POWERUPS) {
+    g.lastPowerUpSpawn = now;
+    g.powerUps.push(spawnPowerUp(g));
+  }
+
+  // Move bullets
+  for (let i = g.bullets.length - 1; i >= 0; i--) {
+    const b = g.bullets[i];
+    b.x += b.vx * step;
+    b.y += b.vy * step;
+    b.z += b.vz * step;
+    if (b.z < SPAWN_Z - 5 || Math.abs(b.x) > ARENA_W || Math.abs(b.y) > ARENA_H) {
+      g.bullets.splice(i, 1);
+    }
+  }
+
+  // Move + collide obstacles. Warp multiplies forward velocity so they whip
+  // past the ship dramatically.
+  const obstacleSpeedMul = warpActive ? 5 : 1;
+  for (let i = g.obstacles.length - 1; i >= 0; i--) {
+    const o = g.obstacles[i];
+    o.z += o.vz * step * obstacleSpeedMul;
+    o.rx += o.rsx * step;
+    o.ry += o.rsy * step;
+    o.rz += o.rsz * step;
+
+    if (o.z > DESPAWN_Z) {
+      g.obstacles.splice(i, 1);
+      g.score += 4;
+      continue;
+    }
+
+    // Bullet vs obstacle
+    for (let j = g.bullets.length - 1; j >= 0; j--) {
+      const b = g.bullets[j];
+      const dx = b.x - o.x;
+      const dy = b.y - o.y;
+      const dz = b.z - o.z;
+      const r = o.size + b.size + 0.18;
+      if (dx * dx + dy * dy + dz * dz < r * r) {
+        o.hp -= b.damage;
+        b.hp -= 1;
+        spawnExplosion(g, b.x, b.y, b.z, b.color, 240, 0.18);
+        if (b.hp <= 0) g.bullets.splice(j, 1);
+        if (o.hp <= 0) {
+          spawnExplosion(g, o.x, o.y, o.z, "#fb923c", 600, 0.35);
+          g.obstacles.splice(i, 1);
+          const points = 12 + Math.floor(o.size * 8);
+          g.score += points;
+          g.kills += 1;
+          spawnScorePopup(g, o.x, o.y, o.z, points);
+          sounds.play("boom");
+          break;
+        }
+      }
+    }
+  }
+
+  // Move power-ups + collect
+  for (let i = g.powerUps.length - 1; i >= 0; i--) {
+    const p = g.powerUps[i];
+    p.z += 9 * step;
+    p.rx += step * 1.4;
+    p.ry += step * 1.6;
+    if (p.z > DESPAWN_Z) {
+      g.powerUps.splice(i, 1);
+      continue;
+    }
+    if (p.z > 0.5 && p.z < 3.2) {
+      const dx = g.shipX - p.x;
+      const dy = g.shipY - p.y;
+      const dz = 2 - p.z;
+      if (dx * dx + dy * dy + dz * dz < POWERUP_PICKUP_RADIUS * POWERUP_PICKUP_RADIUS) {
+        activatePowerUp(g, p.type);
+        spawnExplosion(g, p.x, p.y, p.z, POWERUP_DEFS[p.type].color, 500, 0.4);
+        g.powerUps.splice(i, 1);
+        if (p.type === "warp") sounds.play("warp");
+        else sounds.play("chime");
+        g.score += 25;
+        spawnScorePopup(g, p.x, p.y, p.z, 25);
+      }
+    }
+  }
+
+  // Collision with ship — start invuln + shield + warp grant immunity
+  const shielded = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
+  if (now > g.invulnUntil && !shielded) {
+    for (const o of g.obstacles) {
+      if (o.z > 0.5 && o.z < 3.2) {
+        const dx = g.shipX - o.x;
+        const dy = g.shipY - o.y;
+        const dz = g.shipZ - o.z;
+        const r = o.size + SHIP_RADIUS;
+        if (dx * dx + dy * dy + dz * dz < r * r) {
+          g.status = "dying";
+          g.dyingAt = now;
+          // Death impulse: ship is knocked AWAY from the asteroid's center
+          // (along the contact normal) plus the obstacle's forward velocity
+          // pushes the wreck toward the camera.
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const knock = 7;
+          g.deathVelX = (dx / dist) * knock;
+          g.deathVelY = (dy / dist) * knock + 3.5;
+          g.deathVelZ = Math.max(2, o.vz * 0.45); // wreck tumbles toward camera
+          g.deathAngVel = (Math.random() - 0.5) * 10;
+          spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 500, 0.45);
+          spawnShipDebris(g);
+          sounds.play("crash");
+          // Fade gameplay music + play short losing jingle. Leaderboard
+          // music is started later in the React onDeath handler so the
+          // jingle has room to play first.
+          sounds.stopMusic(0.4);
+          sounds.playLosingJingle();
+          break;
+        }
+      }
+    }
+  }
+
+  // (Arena clamp + UI sync done above in the always-on block)
+  if (now - g.lastUiSync > 100) {
+    g.lastUiSync = now;
+    onUiSync();
+  }
+}
+
+// Module-level mutation helper — keeps eslint react-hooks/immutability happy
+// when applying camera lerp inside useFrame
+function applyCameraLerp(camera: THREE.Camera, tx: number, ty: number, tz: number, lookX: number, lookY: number) {
+  camera.position.x = THREE.MathUtils.lerp(camera.position.x, tx, 0.06);
+  camera.position.y = THREE.MathUtils.lerp(camera.position.y, ty, 0.06);
+  camera.position.z = THREE.MathUtils.lerp(camera.position.z, tz, 0.06);
+  camera.lookAt(lookX, lookY, 0);
+}
+
+// Deterministic star spread (no Math.random during render)
+function buildStarPoints(): Float32Array {
+  const COUNT = 2400;
+  const pts = new Float32Array(COUNT * 3);
+  const phi = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < COUNT; i++) {
+    const r = 30 + ((i * 31) % 70);
+    const y = 1 - (i / (COUNT - 1)) * 2;
+    const radius = Math.sqrt(1 - y * y);
+    const theta = phi * i;
+    pts[i * 3 + 0] = r * radius * Math.cos(theta);
+    pts[i * 3 + 1] = r * y;
+    pts[i * 3 + 2] = r * radius * Math.sin(theta);
+  }
+  return pts;
+}
+
+// ---------- 3D components ----------
+
+function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Environment }) {
+  const grpRef = useRef<THREE.Group>(null);
+  const shieldRef = useRef<THREE.Mesh>(null);
+  const engineRef = useRef<THREE.Mesh>(null);
+  const engineCoreRef = useRef<THREE.Mesh>(null);
+  const engineTrailRef = useRef<THREE.Mesh>(null);
+  const warpAuraRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g || !grpRef.current) return;
+    const now = performance.now();
+    grpRef.current.position.set(g.shipX, g.shipY, g.shipZ);
+    grpRef.current.rotation.z = g.shipRotZ;
+    if (g.status === "dying") {
+      grpRef.current.rotation.x += 0.05;
+      grpRef.current.rotation.y += 0.07;
+      grpRef.current.visible = (now - g.dyingAt) < 1500;
+    } else {
+      const targetPitch = THREE.MathUtils.clamp((g.targetY - g.shipY) * 0.18, -0.25, 0.25);
+      grpRef.current.rotation.x = THREE.MathUtils.lerp(grpRef.current.rotation.x, targetPitch, 0.18);
+      grpRef.current.rotation.y *= 0.9;
+      grpRef.current.visible = true;
+    }
+
+    // Warp = ghost-out the ship slightly + show aura
+    const isWarping = isPowerUpActive(g, "warp");
+    grpRef.current.children.forEach((child) => {
+      if (child === warpAuraRef.current) return;
+      const mat = (child as THREE.Mesh).material as THREE.Material | undefined;
+      if (mat && "opacity" in mat) {
+        (mat as THREE.MeshBasicMaterial).opacity = isWarping ? 0.45 : 1;
+        (mat as THREE.MeshBasicMaterial).transparent = isWarping || (mat as THREE.MeshBasicMaterial).transparent;
+      }
+    });
+
+    // Engine flame — main ball pulses, trail elongates
+    if (engineRef.current) {
+      const mat = engineRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.55 + Math.sin(now * 0.018) * 0.25;
+    }
+    if (engineCoreRef.current) {
+      const pulse = 0.8 + Math.sin(now * 0.04) * 0.2;
+      engineCoreRef.current.scale.setScalar(pulse);
+    }
+    if (engineTrailRef.current) {
+      // Plume length is capped so it never reaches the camera plane.
+      // Cone height = 0.7 (in local Y after rotation = world Z). With scale,
+      // total length = 0.7 * stretch. Position the cone so its BASE sits at
+      // the engine and the tip extends backwards (toward camera) but stops
+      // well short of the camera regardless of FOV/orientation.
+      const stretch = isWarping ? 3.4 + Math.sin(now * 0.05) * 0.4 : 1.6 + Math.sin(now * 0.025) * 0.4;
+      const widen = isWarping ? 2.0 : 0.9;
+      engineTrailRef.current.scale.set(widen, widen, stretch);
+      // Offset so the cone's base stays at the engine and only the tip extends
+      engineTrailRef.current.position.z = 0.55 + (0.7 * stretch * 0.5);
+      const mat = engineTrailRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = isWarping ? 0.95 : 0.5;
+    }
+    if (warpAuraRef.current) {
+      warpAuraRef.current.visible = isWarping;
+      if (isWarping) {
+        const aurascale = 1 + Math.sin(now * 0.03) * 0.15;
+        warpAuraRef.current.scale.setScalar(aurascale);
+        warpAuraRef.current.rotation.z += 0.15;
+      }
+    }
+
+    if (shieldRef.current) {
+      const isShielded = isPowerUpActive(g, "shield") || now < g.invulnUntil;
+      shieldRef.current.visible = isShielded;
+      if (isShielded) {
+        // Activation pop: brief expand from 0.2 → 1 in first 200ms after pickup
+        const shield = g.activePowerUps.find((p) => p.type === "shield");
+        const ageMs = shield ? POWERUP_DURATION_MS - (shield.expiresAt - now) : 0;
+        const popT = Math.min(1, ageMs / 220);
+        const pop = 0.2 + popT * 0.8;
+        const pulse = pop + Math.sin(now * 0.01) * 0.06;
+        shieldRef.current.scale.setScalar(pulse);
+        const mat = shieldRef.current.material as THREE.MeshBasicMaterial;
+        mat.opacity = isPowerUpActive(g, "shield") ? 0.42 : 0.25;
+      }
+    }
+  });
+
+  return (
+    <group ref={grpRef}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.22, 1.0, 8]} />
+        <meshToonMaterial color="#60a5fa" emissive="#1e3a8a" emissiveIntensity={0.45} />
+      </mesh>
+      <mesh position={[0, -0.03, 0.15]}>
+        <boxGeometry args={[1.1, 0.06, 0.32]} />
+        <meshToonMaterial color="#1d4ed8" emissive="#3b82f6" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[0.55, -0.03, 0.28]}>
+        <boxGeometry args={[0.18, 0.05, 0.16]} />
+        <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
+      </mesh>
+      <mesh position={[-0.55, -0.03, 0.28]}>
+        <boxGeometry args={[0.18, 0.05, 0.16]} />
+        <meshToonMaterial color="#dc2626" emissive="#b91c1c" emissiveIntensity={0.5} />
+      </mesh>
+      <mesh position={[0, 0.1, -0.18]} scale={[1, 0.7, 1]}>
+        <sphereGeometry args={[0.13, 14, 12]} />
+        <meshToonMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.7} />
+      </mesh>
+      <mesh ref={engineRef} position={[0, 0, 0.55]}>
+        <sphereGeometry args={[0.13, 12, 10]} />
+        <meshBasicMaterial color={env.starColor} transparent opacity={0.75} />
+      </mesh>
+      {/* Bright inner core that pulses */}
+      <mesh ref={engineCoreRef} position={[0, 0, 0.55]}>
+        <sphereGeometry args={[0.07, 8, 6]} />
+        <meshBasicMaterial color="#fff7ed" />
+      </mesh>
+      {/* Long stretched plume — extra long during warp */}
+      <mesh ref={engineTrailRef} position={[0, 0, 0.85]} rotation={[Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.12, 0.7, 8, 1, true]} />
+        <meshBasicMaterial color="#22d3ee" transparent opacity={0.5} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Warp aura — only visible when warp power-up is active */}
+      <mesh ref={warpAuraRef} visible={false}>
+        <torusGeometry args={[0.85, 0.04, 12, 28]} />
+        <meshBasicMaterial color="#22d3ee" transparent opacity={0.6} />
+      </mesh>
+      <mesh position={[0.36, -0.03, 0.36]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshBasicMaterial color={env.starColor} transparent opacity={0.65} />
+      </mesh>
+      <mesh position={[-0.36, -0.03, 0.36]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshBasicMaterial color={env.starColor} transparent opacity={0.65} />
+      </mesh>
+      <mesh ref={shieldRef} visible={false}>
+        <sphereGeometry args={[0.85, 22, 18]} />
+        <meshBasicMaterial color="#60a5fa" transparent opacity={0.2} wireframe />
+      </mesh>
+      <pointLight position={[0, 0, 0.7]} color={env.starColor} intensity={0.9} distance={3} />
+    </group>
+  );
+}
+
+function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs>; env: Environment; tick: number }) {
+  const obstacles = gameRefs.current?.obstacles ?? [];
+  const meshRefs = useRef<Map<number, THREE.Mesh>>(new Map());
+  const geos = useMemo(() => [
+    new THREE.IcosahedronGeometry(1, 0),
+    new THREE.DodecahedronGeometry(1, 0),
+    new THREE.OctahedronGeometry(1, 0),
+  ], []);
+  const baseMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: env.asteroidColor,
+    emissive: env.asteroidEmissive,
+    emissiveIntensity: 0.45,
+  }), [env]);
+  const heavyMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: "#475569",
+    emissive: env.asteroidEmissive,
+    emissiveIntensity: 0.3,
+  }), [env]);
+
+  // Smooth biome lerp — base + heavy materials inherit env target each frame.
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    baseMat.color.copy(g.asteroidColor);
+    baseMat.emissive.copy(g.asteroidEmissive);
+    heavyMat.emissive.copy(g.asteroidEmissive);
+  });
+  const speederMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: "#fbbf24",
+    emissive: "#92400e",
+    emissiveIntensity: 0.55,
+  }), []);
+  useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
+  useEffect(() => () => baseMat.dispose(), [baseMat]);
+  useEffect(() => () => heavyMat.dispose(), [heavyMat]);
+  useEffect(() => () => speederMat.dispose(), [speederMat]);
+
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (const o of g.obstacles) {
+      const m = meshRefs.current.get(o.id);
+      if (m) {
+        m.position.set(o.x, o.y, o.z);
+        m.rotation.set(o.rx, o.ry, o.rz);
+        m.scale.setScalar(o.size);
+      }
+    }
+  });
+
+  const matFor = (v: ObstacleVariant) =>
+    v === "heavy" ? heavyMat : v === "speeder" ? speederMat : baseMat;
+
+  return (
+    <group>
+      {obstacles.map((o) => (
+        <mesh
+          key={o.id}
+          ref={(el) => {
+            if (el) meshRefs.current.set(o.id, el);
+            else meshRefs.current.delete(o.id);
+          }}
+          geometry={geos[o.shape]}
+          material={matFor(o.variant)}
+        />
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const bullets = gameRefs.current?.bullets ?? [];
+  const cylGeo = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 8), []);
+  const sphGeo = useMemo(() => new THREE.SphereGeometry(1, 12, 10), []);
+  const ringGeo = useMemo(() => new THREE.RingGeometry(0.6, 1, 16), []);
+  useEffect(() => () => { cylGeo.dispose(); sphGeo.dispose(); ringGeo.dispose(); }, [cylGeo, sphGeo, ringGeo]);
+
+  const refs = useRef<Map<number, THREE.Object3D>>(new Map());
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (const b of g.bullets) {
+      const o = refs.current.get(b.id);
+      if (o) o.position.set(b.x, b.y, b.z);
+    }
+  });
+
+  return (
+    <group>
+      {bullets.map((b) => {
+        const setRef = (el: THREE.Object3D | null) => {
+          if (el) refs.current.set(b.id, el);
+          else refs.current.delete(b.id);
+        };
+        if (b.style === "sprite") {
+          const w = b.size * 1.6;
+          const h = b.size * 5;
+          return (
+            <sprite key={b.id} ref={setRef} scale={[w, h, 1]}>
+              <spriteMaterial color={b.color} transparent opacity={0.95} />
+            </sprite>
+          );
+        }
+        if (b.style === "plasma") {
+          return (
+            <group key={b.id} ref={setRef}>
+              <mesh geometry={sphGeo} scale={b.size * 1.8}>
+                <meshBasicMaterial color={b.color} />
+              </mesh>
+              <mesh geometry={sphGeo} scale={b.size * 3}>
+                <meshBasicMaterial color={b.color} transparent opacity={0.35} />
+              </mesh>
+              <mesh geometry={ringGeo} scale={b.size * 4} rotation={[Math.PI / 2, 0, 0]}>
+                <meshBasicMaterial color={b.color} transparent opacity={0.5} side={THREE.DoubleSide} />
+              </mesh>
+            </group>
+          );
+        }
+        return (
+          <group key={b.id} ref={setRef}>
+            <mesh geometry={cylGeo} scale={[b.size, 1.1, b.size]}>
+              <meshBasicMaterial color={b.color} />
+            </mesh>
+            <mesh geometry={sphGeo} scale={b.size * 2.2}>
+              <meshBasicMaterial color={b.color} transparent opacity={0.4} />
+            </mesh>
+          </group>
+        );
+      })}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const list = gameRefs.current?.powerUps ?? [];
+  const sphereGeo = useMemo(() => new THREE.SphereGeometry(1, 16, 12), []);
+  const octaGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), []);
+  const torusKnotGeo = useMemo(() => new THREE.TorusKnotGeometry(0.6, 0.18, 32, 6), []);
+  const coneGeo = useMemo(() => new THREE.ConeGeometry(0.5, 1, 6), []);
+  const refs = useRef<Map<number, THREE.Group>>(new Map());
+  useEffect(() => () => {
+    sphereGeo.dispose();
+    octaGeo.dispose();
+    torusKnotGeo.dispose();
+    coneGeo.dispose();
+  }, [sphereGeo, octaGeo, torusKnotGeo, coneGeo]);
+
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (const p of g.powerUps) {
+      const grp = refs.current.get(p.id);
+      if (grp) {
+        grp.position.set(p.x, p.y, p.z);
+        grp.rotation.set(p.rx, p.ry, p.rz);
+      }
+    }
+  });
+
+  return (
+    <group>
+      {list.map((p) => {
+        const def = POWERUP_DEFS[p.type];
+        return (
+          <group
+            key={p.id}
+            ref={(el) => {
+              if (el) refs.current.set(p.id, el);
+              else refs.current.delete(p.id);
+            }}
+          >
+            {/* Per-type 3D model so the player can recognize the pickup */}
+            {p.type === "shield" && (
+              <>
+                {/* Wireframe shield bubble */}
+                <mesh geometry={sphereGeo} scale={0.4}>
+                  <meshBasicMaterial color={def.color} transparent opacity={0.45} wireframe />
+                </mesh>
+                <mesh geometry={sphereGeo} scale={0.28}>
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.8} />
+                </mesh>
+              </>
+            )}
+            {p.type === "triple" && (
+              <>
+                {/* Three small orbs in a triangle */}
+                <mesh geometry={sphereGeo} scale={0.13} position={[0, 0.22, 0]}>
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.7} />
+                </mesh>
+                <mesh geometry={sphereGeo} scale={0.13} position={[-0.22, -0.13, 0]}>
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.7} />
+                </mesh>
+                <mesh geometry={sphereGeo} scale={0.13} position={[0.22, -0.13, 0]}>
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.7} />
+                </mesh>
+              </>
+            )}
+            {p.type === "rapid" && (
+              <mesh geometry={torusKnotGeo} scale={0.45}>
+                <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.8} />
+              </mesh>
+            )}
+            {p.type === "mega" && (
+              <>
+                {/* Big crystal core + halo */}
+                <mesh geometry={octaGeo} scale={0.42}>
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.85} />
+                </mesh>
+                <mesh geometry={sphereGeo} scale={0.65}>
+                  <meshBasicMaterial color={def.color} transparent opacity={0.15} />
+                </mesh>
+              </>
+            )}
+            {p.type === "warp" && (
+              <>
+                {/* Forward-pointing chevron + halo ring suggesting speed */}
+                <mesh geometry={coneGeo} scale={[0.35, 0.55, 0.35]} rotation={[Math.PI / 2, 0, 0]}>
+                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.85} />
+                </mesh>
+                <mesh geometry={sphereGeo} scale={0.5}>
+                  <meshBasicMaterial color={def.color} transparent opacity={0.15} wireframe />
+                </mesh>
+              </>
+            )}
+            <pointLight color={def.color} intensity={0.8} distance={3.5} />
+          </group>
+        );
+      })}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function Explosions({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const explosions = gameRefs.current?.explosions ?? [];
+  const sphGeo = useMemo(() => new THREE.SphereGeometry(0.5, 12, 10), []);
+  useEffect(() => () => sphGeo.dispose(), [sphGeo]);
+
+  const refs = useRef<Map<number, THREE.Mesh>>(new Map());
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (const e of g.explosions) {
+      const m = refs.current.get(e.id);
+      if (m) {
+        m.position.set(e.x, e.y, e.z);
+        m.scale.setScalar(e.scale);
+        (m.material as THREE.MeshBasicMaterial).opacity = e.opacity;
+      }
+    }
+  });
+
+  return (
+    <group>
+      {explosions.map((e) => (
+        <mesh
+          key={e.id}
+          ref={(el) => {
+            if (el) refs.current.set(e.id, el);
+            else refs.current.delete(e.id);
+          }}
+          geometry={sphGeo}
+        >
+          <meshBasicMaterial color={e.color} transparent opacity={e.opacity} />
+        </mesh>
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+// Cache for canvas-rendered "+N" textures so each unique amount only creates
+// one texture even if popups spawn frequently.
+const SCORE_TEXTURE_CACHE = new Map<number, THREE.CanvasTexture>();
+function scoreTexture(amount: number): THREE.CanvasTexture {
+  const cached = SCORE_TEXTURE_CACHE.get(amount);
+  if (cached) return cached;
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 96;
+  const ctx = c.getContext("2d")!;
+  ctx.font = "bold 64px ui-sans-serif, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(0,0,0,0.85)";
+  ctx.fillStyle = "#fde047";
+  const txt = `+${amount}`;
+  ctx.strokeText(txt, c.width / 2, c.height / 2);
+  ctx.fillText(txt, c.width / 2, c.height / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  SCORE_TEXTURE_CACHE.set(amount, tex);
+  return tex;
+}
+
+function ScorePopups({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const popups = gameRefs.current?.scorePopups ?? [];
+  const refs = useRef<Map<number, THREE.Sprite>>(new Map());
+
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    const now = performance.now();
+    for (const p of g.scorePopups) {
+      const s = refs.current.get(p.id);
+      if (s) {
+        s.position.set(p.x, p.y, p.z);
+        const age = (now - p.spawnedAt) / p.ttl;
+        const mat = s.material as THREE.SpriteMaterial;
+        mat.opacity = Math.max(0, 1 - age);
+        const scale = 0.9 + age * 0.7;
+        s.scale.set(scale * 1.6, scale * 0.6, 1);
+      }
+    }
+  });
+
+  return (
+    <group>
+      {popups.map((p) => {
+        const tex = scoreTexture(p.amount);
+        return (
+          <sprite
+            key={p.id}
+            ref={(el) => {
+              if (el) refs.current.set(p.id, el);
+              else refs.current.delete(p.id);
+            }}
+            scale={[1.4, 0.55, 1]}
+          >
+            <spriteMaterial map={tex} transparent depthWrite={false} />
+          </sprite>
+        );
+      })}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function DebrisField({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+  const list = gameRefs.current?.debris ?? [];
+  const refs = useRef<Map<number, THREE.Mesh>>(new Map());
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    const now = performance.now();
+    for (const d of g.debris) {
+      const m = refs.current.get(d.id);
+      if (m) {
+        m.position.set(d.x, d.y, d.z);
+        m.rotation.set(d.rx, d.ry, d.rz);
+        const age = (now - d.spawnedAt) / d.ttl;
+        const fade = Math.max(0, 1 - Math.max(0, age - 0.6) / 0.4);
+        const mat = m.material as THREE.MeshToonMaterial;
+        mat.opacity = fade;
+        mat.transparent = true;
+      }
+    }
+  });
+  return (
+    <group>
+      {list.map((d) => (
+        <mesh
+          key={d.id}
+          ref={(el) => {
+            if (el) refs.current.set(d.id, el);
+            else refs.current.delete(d.id);
+          }}
+        >
+          <boxGeometry args={d.size} />
+          <meshToonMaterial color={d.color} emissive={d.color} emissiveIntensity={0.4} transparent />
+        </mesh>
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function SpeedLines({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs>; env: Environment; tick: number }) {
+  const lines = gameRefs.current?.speedLines ?? [];
+  const geo = useMemo(() => new THREE.CylinderGeometry(0.014, 0.014, 1, 4), []);
+  useEffect(() => () => geo.dispose(), [geo]);
+
+  const refs = useRef<(THREE.Mesh | null)[]>([]);
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    for (let i = 0; i < g.speedLines.length; i++) {
+      const m = refs.current[i];
+      const l = g.speedLines[i];
+      if (m && l) {
+        m.position.set(l.x, l.y, l.z);
+        m.scale.set(1, l.length, 1);
+        (m.material as THREE.MeshBasicMaterial).opacity = l.life * 0.7;
+      }
+    }
+  });
+
+  return (
+    <group>
+      {lines.map((_, i) => (
+        <mesh
+          key={i}
+          ref={(el) => { refs.current[i] = el; }}
+          rotation={[Math.PI / 2, 0, 0]}
+          geometry={geo}
+        >
+          <meshBasicMaterial color={env.starColor} transparent opacity={0} />
+        </mesh>
+      ))}
+      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+    </group>
+  );
+}
+
+function Starfield({ env }: { env: Environment }) {
+  const points = useMemo(() => buildStarPoints(), []);
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(points, 3));
+    return g;
+  }, [points]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <points geometry={geo}>
+      <pointsMaterial color={env.starColor} size={0.18} sizeAttenuation transparent opacity={0.85} />
+    </points>
+  );
+}
+
+function CameraRig({ gameRefs }: { gameRefs: React.RefObject<GameRefs> }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    applyCameraLerp(camera, g.cameraTargetX, g.cameraTargetY, g.cameraTargetZ, g.shipX * 0.4, g.shipY * 0.4);
+  });
+  return null;
+}
+
+// Pulls the camera back + widens FOV on portrait canvases so the playable
+// arena fills the screen and the ship feels the same size relative to
+// asteroids regardless of orientation. Eslint react-hooks/immutability flags
+// `camera.fov = ...` directly so we route it through a module-level helper.
+function configureCameraForOrientation(camera: THREE.Camera, portrait: boolean) {
+  if (!(camera instanceof THREE.PerspectiveCamera)) return;
+  camera.fov = portrait ? 75 : 60;
+  // Z position only nudged here on first setup — runtime cameraTarget still
+  // controls per-frame movement.
+  camera.position.z = portrait ? 7.5 : 5;
+  camera.updateProjectionMatrix();
+}
+
+function CameraConfigurator() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const portrait = size.height > size.width;
+    configureCameraForOrientation(camera, portrait);
+  }, [camera, size]);
+  return null;
+}
+
+function GameLoop({
+  gameRefs, onDeath, onUiSync,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  onDeath: () => void;
+  onUiSync: () => void;
+}) {
+  const { viewport } = useThree();
+  useFrame((_, dt) => {
+    const g = gameRefs.current;
+    if (!g) return;
+    runTick(g, dt, viewport, onDeath, onUiSync);
+  });
+  return null;
+}
+
+// Module-level helpers — eslint react-hooks/immutability flags direct
+// `scene.background = ...` writes inside hooks, but pushing them through a
+// plain function it can't trace satisfies the rule.
+function attachSceneBackground(scene: THREE.Scene, fallback: string) {
+  if (!(scene.background instanceof THREE.Color)) scene.background = new THREE.Color(fallback);
+  if (!scene.fog) scene.fog = new THREE.Fog(fallback, 18, 42);
+}
+function detachSceneBackground(scene: THREE.Scene) {
+  scene.background = null;
+  scene.fog = null;
+}
+
+// Imperatively syncs the scene background + fog colors to the lerped values
+// in gameRefs each frame, so biome changes look like a smooth dissolve.
+function BiomeBlender({ gameRefs }: { gameRefs: React.RefObject<GameRefs> }) {
+  const { scene } = useThree();
+  useEffect(() => {
+    attachSceneBackground(scene, "#0a0a1a");
+    return () => detachSceneBackground(scene);
+  }, [scene]);
+  useFrame(() => {
+    const g = gameRefs.current;
+    if (!g) return;
+    if (scene.background instanceof THREE.Color) scene.background.copy(g.fogColor);
+    if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(g.fogColor);
+  });
+  return null;
+}
+
+function Scene({
+  gameRefs, onDeath, onUiSync, env, tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  onDeath: () => void;
+  onUiSync: () => void;
+  env: Environment;
+  tick: number;
+}) {
+  return (
+    <>
+      <BiomeBlender gameRefs={gameRefs} />
+      <ambientLight intensity={0.5} color={env.ambient} />
+      <directionalLight position={[5, 6, 4]} intensity={0.7} />
+      <Starfield env={env} />
+      <SpeedLines gameRefs={gameRefs} env={env} tick={tick} />
+      <Ship gameRefs={gameRefs} env={env} />
+      <Obstacles gameRefs={gameRefs} env={env} tick={tick} />
+      <PowerUps gameRefs={gameRefs} tick={tick} />
+      <Bullets gameRefs={gameRefs} tick={tick} />
+      <Explosions gameRefs={gameRefs} tick={tick} />
+      <ScorePopups gameRefs={gameRefs} tick={tick} />
+      <DebrisField gameRefs={gameRefs} tick={tick} />
+      <CameraConfigurator />
+      <CameraRig gameRefs={gameRefs} />
+      <GameLoop gameRefs={gameRefs} onDeath={onDeath} onUiSync={onUiSync} />
+    </>
+  );
+}
+
+// ---------- leaderboard helpers ----------
+
+interface LeaderboardEntry {
+  name: string;
+  score: number;
+  level: number; // legacy from levelled mode — kept so old data still parses
+  seconds?: number;
+  kills?: number;
+  distance?: number;
+  region?: string;
+  createdAt: string;
+}
+
+interface SubmitParams {
+  name: string;
+  score: number;
+  seconds: number;
+  kills: number;
+  distance: number;
+  region: string;
+}
+
+interface SubmitResult {
+  ok: boolean;
+  rank?: number;
+}
+
+function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+  return fetch("/api/leaderboard", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
+    .then((data) => (Array.isArray(data?.entries) ? (data.entries as LeaderboardEntry[]) : []))
+    .catch(() => []);
+}
+
+async function submitScore(params: SubmitParams): Promise<SubmitResult> {
+  try {
+    const res = await fetch("/api/leaderboard", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: params.name,
+        score: params.score,
+        // keep legacy shape on `level` so the route validates the old field
+        level: 1,
+        seconds: params.seconds,
+        kills: params.kills,
+        distance: params.distance,
+        region: params.region,
+      }),
+    });
+    if (!res.ok) return { ok: false };
+    const data = await res.json();
+    return { ok: true, rank: typeof data?.rank === "number" ? data.rank : undefined };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// Detect the player's country/region for the leaderboard. Free, no API key
+// required. Falls back to "" silently if blocked.
+async function detectRegion(): Promise<string> {
+  try {
+    const r = await fetch("https://ipapi.co/json/", { cache: "force-cache" });
+    if (!r.ok) return "";
+    const j = await r.json();
+    if (typeof j?.country_name === "string" && j.country_name) return j.country_name;
+    if (typeof j?.country_code === "string") return j.country_code;
+  } catch {
+    // ignored
+  }
+  return "";
+}
+
+// ---------- main component ----------
+
+interface UiState {
+  status: GameStatus;
+  score: number;
+  seconds: number;
+  kills: number;
+  distance: number;
+  active: { type: PowerUpType; remainingMs: number }[];
+}
+
+type CelebrationKind = "personal" | "world" | null;
+
+// Deterministic confetti pieces — angle + distance per piece, no Math.random
+// during render (would trip react-hooks/purity).
+function buildConfetti(count: number, dist: number) {
+  const colors = ["#22c55e", "#60a5fa", "#f59e0b", "#a78bfa", "#ec4899", "#22d3ee"];
+  return Array.from({ length: count }, (_, i) => {
+    const angle = (i / count) * Math.PI * 2 + (i % 4) * 0.3;
+    const d = dist * (0.7 + (i % 5) * 0.12);
+    return {
+      id: i,
+      dx: Math.cos(angle) * d,
+      dy: Math.sin(angle) * d - 80,
+      rot: (i * 53) % 360,
+      color: colors[i % colors.length],
+    };
+  });
+}
+
+export function SpaceShooterGame() {
+  const gameRefs = useRef<GameRefs>(createRefs());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tick, setTick] = useState(0);
+  const [ui, setUi] = useState<UiState>({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, active: [] });
+  const [celebration, setCelebration] = useState<CelebrationKind>(null);
+  const [region, setRegion] = useState<string>("");
+  const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
+  const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
+  const [highScore, setHighScore] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const saved = window.localStorage.getItem(HS_KEY);
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [name, setName] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(NAME_KEY) ?? "";
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
+    // Sound is ON by default — but localStorage "0" persists explicit mute.
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem(SOUND_KEY) !== "0";
+  });
+  const [showInstructions, setShowInstructions] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen?.().catch(() => { /* user denied or unsupported */ });
+    } else {
+      document.exitFullscreen?.();
+    }
+  }, []);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+  const isTouch = useMemo<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches;
+  }, []);
+
+  // sync sound manager with React state
+  useEffect(() => {
+    sounds.setEnabled(soundEnabled);
+  }, [soundEnabled]);
+
+  const env = useMemo(() => envForTime(ui.seconds), [ui.seconds]);
+
+  const onUiSync = useCallback(() => {
+    const g = gameRefs.current;
+    const now = performance.now();
+    let seconds = 0;
+    if (g.startedAt > 0) {
+      if (g.status === "dying" || g.status === "dead") {
+        seconds = ((g.dyingAt || now) - g.startedAt) / 1000;
+      } else {
+        seconds = (now - g.startedAt) / 1000;
+      }
+    }
+    setUi({
+      status: g.status,
+      score: Math.floor(g.score),
+      seconds,
+      kills: g.kills,
+      distance: Math.floor(g.distance),
+      active: g.activePowerUps.map((p) => ({ type: p.type, remainingMs: Math.max(0, p.expiresAt - now) })),
+    });
+    setTick((t) => (t + 1) % 1_000_000);
+  }, []);
+
+  const onDeath = useCallback(() => {
+    const g = gameRefs.current;
+    // Stop any sustained sound loops that might still be playing
+    sounds.stopWarpLoop();
+    g.warpActiveLast = false;
+    // Losing jingle was played at collision; give it ~1s before crossfading
+    // into the leaderboard track so the two don't talk over each other.
+    setTimeout(() => sounds.startLeaderboardMusic(), 1100);
+    const final = Math.floor(g.score);
+    // Compare against the current state value synchronously so the celebration
+    // flag is correct in the same render cycle.
+    const isPersonalBest = final > highScore && final > 0;
+    if (isPersonalBest) {
+      window.localStorage.setItem(HS_KEY, String(final));
+      setHighScore(final);
+    }
+    setUi((u) => ({ ...u, status: "dead", score: final, kills: g.kills, distance: Math.floor(g.distance) }));
+    setSubmitted(false);
+    setCelebration(isPersonalBest ? "personal" : null);
+    fetchLeaderboard().then(setLeaderboard);
+  }, [highScore]);
+
+  // "Fly again" — reset everything to the armed state. The next mouse/touch
+  // /key press starts a fresh run.
+  const launch = useCallback(() => {
+    const g = gameRefs.current;
+    g.status = "armed";
+    g.score = 0;
+    g.kills = 0;
+    g.distance = 0;
+    g.obstacles.length = 0;
+    g.bullets.length = 0;
+    g.explosions.length = 0;
+    g.speedLines.length = 0;
+    g.powerUps.length = 0;
+    g.activePowerUps.length = 0;
+    g.debris.length = 0;
+    g.scorePopups.length = 0;
+    g.shieldActiveLast = false;
+    g.warpActiveLast = false;
+    g.currentEnv = ENVIRONMENTS[0];
+    g.nextBiomeAt = pickNextBiomeDistance(0);
+    sounds.stopWarpLoop();
+    // Stop the leaderboard track playing on the death overlay; gameplay
+    // music will start on the next first-input via startRun().
+    sounds.stopMusic(0.4);
+    g.targetX = 0;
+    g.targetY = 0;
+    g.shipX = 0;
+    g.shipY = 0;
+    g.shipZ = 2;
+    g.shipRotZ = 0;
+    g.lastBullet = 0;
+    g.lastSpawn = 0;
+    g.lastPowerUpSpawn = 0;
+    g.lastUiSync = 0;
+    g.invulnUntil = 0;
+    g.startedAt = 0;
+    g.dyingAt = 0;
+    g.shipFallSpeed = 0;
+    g.deathVelX = 0;
+    g.deathVelY = 0;
+    g.deathVelZ = 0;
+    g.deathAngVel = 0;
+    g.cameraTargetX = 0;
+    g.cameraTargetY = 0;
+    g.cameraTargetZ = 5;
+    setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, active: [] });
+    setSubmitted(false);
+    setCelebration(null);
+    setShowInstructions(true);
+  }, []);
+
+  // (Game auto-starts because createRefs() initializes startedAt = now and
+  // status = "playing"; no mount-effect needed, which keeps the
+  // react-hooks/set-state-in-effect rule happy.)
+
+  // Hide instructions after 6s
+  useEffect(() => {
+    if (!showInstructions) return;
+    const t = setTimeout(() => setShowInstructions(false), 6000);
+    return () => clearTimeout(t);
+  }, [showInstructions]);
+
+  const submit = useCallback(async () => {
+    const trimmed = name.trim().slice(0, 12) || "Pilot";
+    window.localStorage.setItem(NAME_KEY, trimmed);
+    const result = await submitScore({
+      name: trimmed,
+      score: ui.score,
+      seconds: Math.floor(ui.seconds),
+      kills: ui.kills,
+      distance: ui.distance,
+      region,
+    });
+    if (result.ok) {
+      setSubmitted(true);
+      const fresh = await fetchLeaderboard();
+      setLeaderboard(fresh);
+      // World record overrides personal best celebration
+      if (result.rank === 1 && ui.score > 0) {
+        setCelebration("world");
+      }
+    }
+  }, [name, ui.score, ui.seconds, ui.kills, ui.distance, region]);
+
+  // Initial leaderboard load + region detection
+  useEffect(() => {
+    fetchLeaderboard().then(setLeaderboard);
+    detectRegion().then(setRegion);
+  }, []);
+
+  // Sound toggle persistence
+  const toggleSound = useCallback(() => {
+    setSoundEnabledState((prev) => {
+      const next = !prev;
+      // Persist explicit choice; "1" = on, "0" = off (default-on if missing)
+      window.localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+      return next;
+    });
+  }, []);
+
+  // Pointer/touch/keyboard input
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const updateTarget = (clientX: number, clientY: number) => {
+      const g = gameRefs.current;
+      if (g.status !== "armed" && g.status !== "playing") return;
+      const rect = el.getBoundingClientRect();
+      const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = -(((clientY - rect.top) / rect.height) * 2 - 1);
+      g.targetX = nx * (ARENA_W / 2);
+      g.targetY = ny * (ARENA_H / 2);
+    };
+
+    const tryStart = () => {
+      const g = gameRefs.current;
+      if (g.status === "armed") startRun(g);
+    };
+
+    const onMove = (e: PointerEvent) => {
+      tryStart();
+      updateTarget(e.clientX, e.clientY);
+    };
+    const onTouch = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        e.preventDefault();
+        tryStart();
+        updateTarget(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("touchmove", onTouch, { passive: false });
+    el.addEventListener("touchstart", onTouch, { passive: false });
+
+    const keys = new Set<string>();
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {
+        if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) e.preventDefault();
+        tryStart();
+      }
+      keys.add(k);
+    };
+    const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+
+    let raf = 0;
+    const loop = () => {
+      const g = gameRefs.current;
+      if (g.status === "playing") {
+        const speed = 0.14;
+        let dx = 0;
+        let dy = 0;
+        if (keys.has("arrowleft") || keys.has("a")) dx -= speed;
+        if (keys.has("arrowright") || keys.has("d")) dx += speed;
+        if (keys.has("arrowup") || keys.has("w")) dy += speed;
+        if (keys.has("arrowdown") || keys.has("s")) dy -= speed;
+        g.targetX += dx;
+        g.targetY += dy;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    return () => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("touchmove", onTouch);
+      el.removeEventListener("touchstart", onTouch);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      {/* HUD */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <div className="flex items-center gap-1.5 text-(--muted)">
+          <Rocket className="h-3.5 w-3.5 text-accent-blue" />
+          <span className="font-mono font-semibold tabular-nums text-accent-blue">{ui.score}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
+          {ui.seconds.toFixed(0)}s
+        </div>
+        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
+          {ui.distance}m
+        </div>
+        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
+          {ui.kills} kills
+        </div>
+        {ui.active.map((a) => {
+          const def = POWERUP_DEFS[a.type];
+          const Icon = a.type === "shield" ? Shield : a.type === "triple" ? Crosshair : a.type === "rapid" ? Zap : a.type === "warp" ? Rocket : Target;
+          const remaining = (a.remainingMs / 1000).toFixed(1);
+          return (
+            <div key={a.type} className="flex items-center gap-1.5 font-mono" style={{ color: def.color }}>
+              <Icon className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{remaining}s</span>
+            </div>
+          );
+        })}
+        {highScore > 0 && (
+          <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
+            <Trophy className="h-3.5 w-3.5 text-accent-amber" />
+            <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
+          </div>
+        )}
+        <button
+          onClick={toggleSound}
+          aria-label={soundEnabled ? "Mute sound" : "Enable sound"}
+          className="rounded-md border border-(--border) p-1.5 text-(--muted) hover:text-(--foreground) transition-colors"
+        >
+          {soundEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          onClick={toggleFullscreen}
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          className="rounded-md border border-(--border) p-1.5 text-(--muted) hover:text-(--foreground) transition-colors"
+        >
+          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+
+      {/* 3D Canvas — responsive across mobile / 16:9 / 21:9 with a cap so
+          super-ultrawide viewports get letterboxed instead of giving the
+          player extra play area. Fullscreen mode fills the screen. */}
+      <div
+        ref={containerRef}
+        className={`relative rounded-xl border border-(--border) overflow-hidden touch-none mx-auto ${
+          isFullscreen
+            ? "fixed inset-0 z-50 w-screen h-screen rounded-none border-0"
+            // Default (mobile) is portrait 3:4 so it feels native on phones;
+            // sm:+ switches to fixed-height landscape.
+            : "w-full aspect-3/4 sm:aspect-auto sm:h-115"
+        }`}
+        style={{
+          background: env.bg,
+          cursor: ui.status === "playing" ? "none" : "default",
+          // Cap so 16:1 monitors letterbox at ~21:9, AND cap mobile portrait
+          // height so the canvas doesn't dominate the viewport on tall phones.
+          maxWidth: isFullscreen ? "100vw" : "min(100%, calc(100vh * 21 / 9))",
+          maxHeight: isFullscreen ? "100vh" : "70vh",
+        }}
+      >
+        <Canvas camera={{ position: [0, 0, 5], fov: 60 }} dpr={[1, 1.6]} performance={{ min: 0.5 }}>
+          <Scene
+            gameRefs={gameRefs}
+            onDeath={onDeath}
+            onUiSync={onUiSync}
+            env={env}
+            tick={tick}
+          />
+        </Canvas>
+
+        {/* Biome label */}
+        {ui.status === "playing" && (
+          <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-accent-blue/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-blue animate-pulse" />
+            {env.name}
+          </div>
+        )}
+
+        {/* Pulsing instruction overlay — anchored low so the ship in the
+            centre of the canvas stays visible behind it. */}
+        <AnimatePresence>
+          {ui.status === "armed" && (
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.4 }}
+              className="pointer-events-none absolute inset-x-0 bottom-6 flex flex-col items-center gap-2"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.05, 1], opacity: [0.85, 1, 0.85] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                className="relative"
+              >
+                {/* Soft pulsing glow ring behind the instruction pill */}
+                <motion.span
+                  className="absolute inset-0 rounded-full bg-accent-blue/15 blur-xl"
+                  animate={{ scale: [1, 1.4, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <div className="relative rounded-full border-2 border-accent-blue/60 bg-black/75 backdrop-blur-md px-7 py-3 text-base font-semibold text-white shadow-lg shadow-accent-blue/20">
+                  {isTouch ? "Drag your finger to start" : "Move your mouse or press WASD to start"}
+                </div>
+              </motion.div>
+              <div className="text-xs uppercase tracking-[0.25em] text-white/60">
+                Cannons fire automatically
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Death overlay with leaderboard */}
+        <AnimatePresence>
+          {ui.status === "dead" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-md p-4 overflow-y-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 240, damping: 16 }}
+                className="relative text-center"
+              >
+                {/* Confetti burst — bigger when world record */}
+                {celebration && (
+                  <>
+                    {(celebration === "world" ? WORLD_CONFETTI : PERSONAL_CONFETTI).map((c) => (
+                      <motion.div
+                        key={c.id}
+                        className="absolute top-1/2 left-1/2 h-2 w-2 rounded-sm"
+                        initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+                        animate={{ x: c.dx, y: c.dy, opacity: 0, rotate: c.rot }}
+                        transition={{ duration: celebration === "world" ? 1.8 : 1.3, ease: "easeOut", delay: c.id * 0.012 }}
+                        style={{ background: c.color }}
+                      />
+                    ))}
+                  </>
+                )}
+                <div className="text-xs uppercase tracking-[0.3em] text-red-400 font-bold">
+                  Ship destroyed
+                </div>
+                <div className="mt-1 text-5xl font-black font-display text-white tabular-nums">
+                  {ui.score}
+                </div>
+                {celebration === "world" && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.2 }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-linear-to-br from-accent-amber via-accent-pink to-accent-blue px-4 py-1.5 text-sm font-black uppercase tracking-widest text-black"
+                  >
+                    <Trophy className="h-4 w-4" />
+                    World Record
+                  </motion.div>
+                )}
+                {celebration === "personal" && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.15 }}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-amber/20 border border-accent-amber/60 px-3 py-1 text-xs font-bold uppercase tracking-widest text-accent-amber"
+                  >
+                    <Trophy className="h-3.5 w-3.5" />
+                    Personal Best
+                  </motion.div>
+                )}
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-white/75 max-w-sm mx-auto">
+                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
+                    <div className="text-white/50 uppercase tracking-wider text-[10px]">Survived</div>
+                    <div className="font-mono text-white tabular-nums">{ui.seconds.toFixed(0)}s</div>
+                  </div>
+                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
+                    <div className="text-white/50 uppercase tracking-wider text-[10px]">Distance</div>
+                    <div className="font-mono text-white tabular-nums">{ui.distance}m</div>
+                  </div>
+                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
+                    <div className="text-white/50 uppercase tracking-wider text-[10px]">Kills</div>
+                    <div className="font-mono text-white tabular-nums">{ui.kills}</div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <div className="w-full max-w-md flex items-center gap-2">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value.slice(0, 12))}
+                  placeholder="Pilot name"
+                  maxLength={12}
+                  className="flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-accent-blue focus:outline-none"
+                />
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={submit}
+                  disabled={submitted}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {submitted ? "Submitted" : "Submit"}
+                </motion.button>
+              </div>
+
+              {leaderboard.length > 0 && (
+                <div className="w-full max-w-md rounded-lg border border-white/15 bg-white/5 p-3 text-sm">
+                  <div className="text-xs uppercase tracking-widest text-white/60 mb-2 font-bold">
+                    Top pilots
+                  </div>
+                  <ol className="space-y-1">
+                    {leaderboard.slice(0, 8).map((e, i) => (
+                      <li key={`${e.name}-${e.createdAt}-${i}`} className="flex items-center gap-2 text-white/85">
+                        <span className="text-white/40 w-5 tabular-nums">{i + 1}.</span>
+                        <span className="flex-1 truncate">
+                          {e.name}
+                          {e.region && <span className="ml-1.5 text-white/40 text-xs">{e.region}</span>}
+                        </span>
+                        {typeof e.seconds === "number" && (
+                          <span className="text-white/45 text-xs tabular-nums">{e.seconds}s</span>
+                        )}
+                        <span className="font-mono tabular-nums">{e.score}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={launch}
+                className="inline-flex items-center gap-2 rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-white shadow-lg"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Fly again
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <p className="text-xs text-(--muted)">
+        Endless run. Pick up power-ups for temporary firepower or shield. Biome shifts every 35s — and the asteroids get meaner the longer you survive.
+      </p>
+    </div>
+  );
+}
