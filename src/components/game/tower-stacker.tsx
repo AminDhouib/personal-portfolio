@@ -474,6 +474,15 @@ function formatTime(ms: number): string {
 function SpeakerOn() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm12 2a4 4 0 0 0-2-3.5v7a4 4 0 0 0 2-3.5z"/></svg>; }
 function SpeakerOff() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2l2.5 2.5-1 1-2.5-2.5-2.5 2.5-1-1 2.5-2.5-2.5-2.5 1-1 2.5 2.5 2.5-2.5 1 1-2.5 2.5z"/></svg>; }
 
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-neutral-500 uppercase">{label}</div>
+      <div className="text-xl font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
 export default function TowerStacker() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -793,10 +802,32 @@ export default function TowerStacker() {
 
   function endRun() {
     const r = refs.current;
-    r.state = "game-over";
     r.runRecord.score = r.score;
     r.runRecord.durationMs = performance.now() - r.runStartMs;
-    setUiState("game-over");
+    // Cinematic pull-back: zoom out to show whole tower
+    r.cameraTargetScale = Math.min(0.3, Math.max(0.15, 800 / (r.floors.length * BASE_BLOCK_HEIGHT + 200)));
+    r.cameraTargetY = Math.max(0, viewportRef.current.h * 0.5);
+    setTimeout(() => {
+      r.state = "game-over";
+      setUiState("game-over");
+      handleRunEnd();
+    }, 3500);
+  }
+
+  function handleRunEnd() {
+    const r = refs.current;
+    try {
+      const hs = Number(localStorage.getItem(LS_PREFIX + "highscore") || "0");
+      if (r.score > hs) {
+        localStorage.setItem(LS_PREFIX + "highscore", String(r.score));
+        localStorage.setItem(LS_PREFIX + "ghost", JSON.stringify(r.runRecord));
+      }
+      const runs = Number(localStorage.getItem(LS_PREFIX + "total_runs") || "0") + 1;
+      localStorage.setItem(LS_PREFIX + "total_runs", String(runs));
+      const hf = Number(localStorage.getItem(LS_PREFIX + "highfloors") || "0");
+      const floors = r.floors.length - 1;
+      if (floors > hf) localStorage.setItem(LS_PREFIX + "highfloors", String(floors));
+    } catch {}
   }
 
   function togglePause() {
@@ -1140,6 +1171,26 @@ export default function TowerStacker() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uiState === "game-over" && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur p-6">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-neutral-900/95 p-6">
+            <h3 className="text-2xl font-bold text-red-400 mb-3">Run Complete</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-neutral-200 mb-5">
+              <Stat label="Score" value={refs.current.score.toLocaleString()} />
+              <Stat label="Floors" value={String(Math.max(0, refs.current.floors.length - 1))} />
+              <Stat label="Max Combo" value={String(refs.current.maxCombo)} />
+              <Stat label="Perfects" value={String(refs.current.perfectsCount)} />
+              <Stat label="Golden" value={String(refs.current.goldenCount)} />
+              <Stat label="Duration" value={formatTime(refs.current.runRecord.durationMs)} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => startRun()} className="flex-1 rounded-xl bg-red-600 hover:bg-red-500 text-white py-2.5 font-semibold">Play Again</button>
+              <button onClick={() => { refs.current.state = "menu"; setUiState("menu"); }} className="flex-1 rounded-xl bg-neutral-700 hover:bg-neutral-600 text-white py-2.5 font-semibold">Menu</button>
             </div>
           </div>
         </div>
