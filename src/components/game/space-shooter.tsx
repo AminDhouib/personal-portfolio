@@ -303,6 +303,51 @@ function buildBossSchedule(): { distance: number; bossId: BossId }[] {
   ];
 }
 
+const BOSS_TIERS: Record<BossId, number> = {
+  sentinel: 1, drifter: 2, "swarm-mother": 3, mirror: 4,
+  pulsar: 5, harvester: 6, warden: 7, "void-tyrant": 8,
+};
+
+const BOSS_BASE_HP: Record<BossId, number> = {
+  sentinel: 8, drifter: 12, "swarm-mother": 20, mirror: 18,
+  pulsar: 25, harvester: 30, warden: 40, "void-tyrant": 60,
+};
+
+const BOSS_DISPLAY_NAMES: Record<BossId, string> = {
+  sentinel: "SENTINEL",
+  drifter: "DRIFTER",
+  "swarm-mother": "SWARM MOTHER",
+  mirror: "MIRROR",
+  pulsar: "PULSAR",
+  harvester: "HARVESTER",
+  warden: "WARDEN",
+  "void-tyrant": "VOID TYRANT",
+};
+
+function spawnBoss(state: GameRefs, bossId: BossId, recycleCount: number): void {
+  const tier = BOSS_TIERS[bossId];
+  const difficultyMult = Math.pow(1.3, recycleCount);
+  const baseHp = BOSS_BASE_HP[bossId];
+  const now = performance.now();
+  const seed = Math.floor(now) ^ (tier * 1_000_003);
+  state.boss = {
+    id: bossId,
+    tier,
+    hp: baseHp * difficultyMult,
+    hpMax: baseHp * difficultyMult,
+    position: [0, 6, -40],
+    velocity: [0, 0, 0.6],
+    phase: "intro",
+    phaseStartAt: now,
+    encounterStartAt: now,
+    lastShotAt: now,
+    patternIndex: 0,
+    difficultyMult,
+    subEntities: [],
+    rng: mulberry32(seed),
+  };
+}
+
 interface GameRefs {
   status: GameStatus;
   score: number;
@@ -1670,13 +1715,43 @@ function runTick(
   const distMultiplier = THREE.MathUtils.lerp(1, 6, wi);
   g.distance += step * (10 + difficulty(g) * 4) * distMultiplier;
 
+  // Boss scheduling check — only if no boss active
+  if (!g.boss && g.bossScheduleIdx < g.bossSchedule.length) {
+    const next = g.bossSchedule[g.bossScheduleIdx];
+    if (g.distance >= next.distance) {
+      const recycleCount = Math.floor(g.bossScheduleIdx / 8);
+      spawnBoss(g, next.bossId, recycleCount);
+      g.bossScheduleIdx += 1;
+    }
+  }
+  // Gate normal spawning while boss is present (pushed forward each frame)
+  const bossIsActive = g.boss && g.boss.phase !== "defeated";
+  if (bossIsActive) {
+    g.normalSpawningPausedUntil = now + 100;
+  }
+  // Boss intro phase: ease from z=-40 to z=-15 over 1500ms
+  if (g.boss) {
+    const b = g.boss;
+    const phaseAge = now - b.phaseStartAt;
+    if (b.phase === "intro") {
+      const t = Math.min(1, phaseAge / 1500);
+      const eased = 1 - Math.pow(1 - t, 3);
+      b.position[2] = -40 + eased * 25;
+      b.position[1] = 6 - eased * 3;
+      if (t >= 1) {
+        b.phase = "fighting";
+        b.phaseStartAt = now;
+      }
+    }
+  }
+
   // Auto-fire
   if (now - g.lastBullet > fireIntervalMs(g)) {
     fireBullets(g, now, sounds);
   }
 
   // Spawn obstacles
-  if (now - g.lastSpawn > spawnIntervalMs(g) && g.obstacles.length < MAX_OBSTACLES) {
+  if (now > g.normalSpawningPausedUntil && now - g.lastSpawn > spawnIntervalMs(g) && g.obstacles.length < MAX_OBSTACLES) {
     g.lastSpawn = now;
     g.obstacles.push(spawnObstacle(g));
     // After ~60s, occasionally spawn clusters of 3
@@ -3075,6 +3150,21 @@ export function SpaceShooterGame() {
     const keys = new Set<string>();
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
+      // Dev hotkey: Shift+B cycles through bosses at current position
+      if (process.env.NODE_ENV !== "production" && e.shiftKey && k === "b") {
+        e.preventDefault();
+        const bossIds: BossId[] = [
+          "sentinel", "drifter", "swarm-mother", "mirror",
+          "pulsar", "harvester", "warden", "void-tyrant",
+        ];
+        const g = gameRefs.current;
+        const currentIdx = g.boss ? bossIds.indexOf(g.boss.id) : -1;
+        const nextIdx = (currentIdx + 1) % bossIds.length;
+        g.boss = null;
+        g.bossProjectiles.length = 0;
+        spawnBoss(g, bossIds[nextIdx], 0);
+        return;
+      }
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {
         if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) e.preventDefault();
         tryStart();
@@ -3337,6 +3427,16 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Boss intro banner */}
+        {gameRefs.current.boss && gameRefs.current.boss.phase === "intro" && (
+          <div className="absolute inset-x-0 top-[18%] flex flex-col items-center pointer-events-none z-30">
+            <div className="text-xs tracking-[0.4em] text-red-400 animate-pulse">INCOMING</div>
+            <div className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
+              {BOSS_DISPLAY_NAMES[gameRefs.current.boss.id]}
+            </div>
+          </div>
+        )}
 
         {/* Armed instructions: first-timer sees the pulsing pill; returning player sees Play/Shop buttons */}
         <AnimatePresence>
