@@ -158,7 +158,7 @@ If any of these move up in priority, spin a new plan off this roadmap.
 | 2 — Shop Phase 1 | COMPLETED | 2026-04-16 |
 | 3 — Shop Phase 2 | NOT STARTED | — |
 | 4 — Bosses | COMPLETED | 2026-04-16 |
-| 5 — Polish | NOT STARTED | — |
+| 5 — Polish | COMPLETED (bloom deferred; dep install blocked locally) | 2026-04-16 |
 | 6 — Tutorial + Achievements + Dash | NOT STARTED | — |
 
 Update this table after each plan ships.
