@@ -1,5 +1,5 @@
 import type { RuleDef } from "../types";
-import { pickOne } from "../prng";
+import { pickOne, rangeInt } from "../prng";
 
 const MIRROR_WORDS = ["reflect", "mirror", "reverse", "backwards", "flipped", "invert"];
 
@@ -39,4 +39,24 @@ const blurredInput: RuleDef = {
   },
 };
 
-export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput, blurredInput];
+const BAD_LETTERS = ["t", "s", "r", "n", "l", "m", "d", "p"];
+
+const noLetter: RuleDef = {
+  id: "no-letter",
+  tier: 5,
+  create(rng) {
+    const letter = BAD_LETTERS[rangeInt(rng, 0, BAD_LETTERS.length - 1)];
+    return {
+      id: "no-letter",
+      tier: 5,
+      description: `The letter "${letter}" (upper or lower) cannot appear in your password at all.`,
+      params: { letter },
+      validate(state) {
+        const lower = state.password.toLowerCase();
+        return { passed: !lower.includes(letter) };
+      },
+    };
+  },
+};
+
+export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput, blurredInput, noLetter];
