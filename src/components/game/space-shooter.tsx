@@ -59,7 +59,7 @@ const NEAR_MISS_POINTS = 15;
 // hasn't started — waiting for the player's first mouse/touch/key input.
 type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
 type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp" | "magnet";
-type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter" | "zapper";
+type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter" | "zapper" | "drone";
 type BulletStyle = "sprite" | "bolt" | "plasma";
 
 interface Environment {
@@ -1187,6 +1187,7 @@ function unlockedVariants(seconds: number): ObstacleVariant[] {
   if (seconds > 50) list.push("speeder");
   if (seconds > 90) list.push("shooter");
   if (seconds > 130) list.push("zapper");
+  if (seconds > 170) list.push("drone");
   return list;
 }
 
@@ -1256,6 +1257,10 @@ function spawnObstacle(g: GameRefs): Obstacle {
     size = 0.6 + Math.random() * 0.2;
     hp = 3;                   // tougher than shooter, incentivizes dodging
     speed = baseSpeed * 0.6;
+  } else if (variant === "drone") {
+    size = 0.5 + Math.random() * 0.15;
+    hp = 2;
+    speed = baseSpeed * 0.15; // nearly stationary — persistent threat until shot down
   }
 
   // ~25% of basic asteroids get a lateral drift so even a stationary player
@@ -2805,6 +2810,31 @@ function runTick(
       }
     }
 
+    // Drone variant: persistent shooter with fast fire rate (1.0s) — drifts
+    // slowly so players must either strafe around its shots or kill it.
+    if (o.variant === "drone" && g.status === "playing" && o.z > -28 && o.z < 2) {
+      const DRONE_INTERVAL_MS = 1000;
+      if (!o.lastShotAt || now - o.lastShotAt >= DRONE_INTERVAL_MS) {
+        o.lastShotAt = now;
+        const dx = g.shipX - o.x;
+        const dy = g.shipY - o.y;
+        const dz = g.shipZ - o.z;
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        const speed = 8;
+        g.bossProjectiles.push({
+          id: g.nextBossProjectileId++,
+          position: [o.x, o.y, o.z],
+          velocity: [(dx / len) * speed, (dy / len) * speed, (dz / len) * speed],
+          radius: 0.24,
+          color: "#ec4899",
+          spawnedAt: now,
+          ttlMs: 5000,
+          homing: false,
+          shielded: false,
+        });
+      }
+    }
+
     // Shooter variant: fire aimed projectiles every 1.6s while in visible Z band
     if (o.variant === "shooter" && g.status === "playing" && o.z > -25 && o.z < 2) {
       const SHOOT_INTERVAL_MS = 1600;
@@ -3247,6 +3277,11 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     emissive: "#0e7490",
     emissiveIntensity: 0.8,
   }), []);
+  const droneMat = useMemo(() => new THREE.MeshToonMaterial({
+    color: "#ec4899",          // hot pink — persistent hostile
+    emissive: "#831843",
+    emissiveIntensity: 0.7,
+  }), []);
   useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
   useEffect(() => () => baseMat.dispose(), [baseMat]);
   useEffect(() => () => heavyMat.dispose(), [heavyMat]);
@@ -3254,6 +3289,7 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
   useEffect(() => () => wallMat.dispose(), [wallMat]);
   useEffect(() => () => shooterMat.dispose(), [shooterMat]);
   useEffect(() => () => zapperMat.dispose(), [zapperMat]);
+  useEffect(() => () => droneMat.dispose(), [droneMat]);
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -3274,6 +3310,7 @@ function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs
     : v === "wall" ? wallMat
     : v === "shooter" ? shooterMat
     : v === "zapper" ? zapperMat
+    : v === "drone" ? droneMat
     : baseMat;
 
   return (
@@ -3720,6 +3757,69 @@ function ConsumablePreview({ icon }: { icon: ConsumableIcon }) {
         <ambientLight intensity={0.7} />
         <directionalLight position={[2, 3, 2]} intensity={0.5} />
         <SpinningConsumableMesh icon={icon} />
+      </Canvas>
+    </div>
+  );
+}
+
+type CosmeticSlotKind = "hull" | "engine" | "deathFx";
+
+function SpinningCosmeticMesh({ slot, value }: { slot: CosmeticSlotKind; value: string }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => {
+    if (ref.current) {
+      ref.current.rotation.y += dt * 1.3;
+      ref.current.rotation.x = Math.sin(performance.now() * 0.0009) * 0.2;
+    }
+  });
+  if (slot === "hull") {
+    // Mini ship tinted by the hull color
+    return (
+      <group ref={ref}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.22, 0.8, 10]} />
+          <meshStandardMaterial color={value} emissive={value} emissiveIntensity={0.45} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, -0.04, 0.08]}>
+          <boxGeometry args={[0.9, 0.08, 0.24]} />
+          <meshStandardMaterial color={value} emissive={value} emissiveIntensity={0.3} roughness={0.5} />
+        </mesh>
+      </group>
+    );
+  }
+  if (slot === "engine") {
+    // Flame cone in cosmetic color with hot white core
+    return (
+      <group ref={ref}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.22, 0.55, 16, 1, true]} />
+          <meshStandardMaterial color={value} emissive={value} emissiveIntensity={1.2} transparent opacity={0.9} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh>
+          <sphereGeometry args={[0.1, 12, 10]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1.5} />
+        </mesh>
+      </group>
+    );
+  }
+  // deathFx — abstract: torus knot representing the effect variant
+  return (
+    <group ref={ref}>
+      <mesh>
+        <torusKnotGeometry args={[0.22, 0.06, 48, 8]} />
+        <meshStandardMaterial color="#a78bfa" emissive="#6d28d9" emissiveIntensity={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+function CosmeticPreview({ slot, value }: { slot: CosmeticSlotKind; value: string }) {
+  return (
+    <div className="w-10 h-10 shrink-0 rounded-md bg-black/40 border border-white/10 overflow-hidden">
+      <Canvas camera={{ position: [0, 0, 1.4], fov: 40 }} dpr={[1, 1.5]}>
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[2, 3, 2]} intensity={0.5} />
+        <SpinningCosmeticMesh slot={slot} value={value} />
       </Canvas>
     </div>
   );
@@ -5453,11 +5553,7 @@ export function SpaceShooterGame() {
                             className={`flex flex-col items-start gap-1 rounded-lg border p-2 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"} ${locked ? "opacity-60" : ""}`}
                           >
                             <div className="flex items-center gap-2 w-full">
-                              {c.slot !== "deathFx" ? (
-                                <span className="inline-block w-4 h-4 rounded border border-white/20" style={{ background: c.value }} />
-                              ) : (
-                                <span className="inline-block w-4 h-4 rounded border border-white/20 bg-black/40 text-[10px] text-white flex items-center justify-center">FX</span>
-                              )}
+                              <CosmeticPreview slot={c.slot} value={c.value} />
                               <span className="text-xs text-white font-semibold flex-1 truncate">{c.label}</span>
                             </div>
                             <div className="text-[10px] text-slate-400">{c.slot}</div>
