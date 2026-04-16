@@ -9,10 +9,23 @@ export interface ValidationResult {
   message?: string;
 }
 
+export interface CharFormatting {
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export type FormattingMap = readonly CharFormatting[];
+
 /** Runtime state that rules can inspect or mutate (e.g. timers). */
 export interface GameState {
   /** Current password value. */
   password: string;
+  /**
+   * Parallel array of per-character formatting. Indexed by position in
+   * `password`. Same length as [...password] (code-point aware).
+   * Empty or shorter than password means "no formatting applied anywhere".
+   */
+  formatting: FormattingMap;
   /** Elapsed seconds since game start. */
   elapsedSeconds: number;
   /** Index of the currently active (unsatisfied) rule, or -1 if none. */
