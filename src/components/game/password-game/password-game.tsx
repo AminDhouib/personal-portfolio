@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RotateCcw, Key, CalendarDays } from "lucide-react";
+import { RotateCcw, Key, CalendarDays, Volume2, VolumeX } from "lucide-react";
 import { selectRulesForRun, validateRules, computeActiveRuleIndex } from "./engine";
 import { dailySeed, todayDateString } from "./daily";
+import { setSoundEnabled, isSoundEnabled, play as playSfx } from "./sound";
 import { TIER_1_RULES } from "./rules/tier1";
 import { TIER_2_RULES } from "./rules/tier2";
 import { TIER_3_RULES } from "./rules/tier3";
@@ -40,7 +41,12 @@ export function PasswordGame() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevSatisfied = useRef(0);
+  const prevActive = useRef(-1);
+  const prevChaos = useRef(0);
+  const winAnnounced = useRef(false);
 
   const rules: Rule[] = useMemo(
     () =>
@@ -120,6 +126,43 @@ export function PasswordGame() {
     }
   }, [allPassed, timerRunning]);
 
+  // Sound effects on state transitions.
+  useEffect(() => {
+    if (satisfiedCount > prevSatisfied.current) {
+      playSfx("rule-complete");
+    }
+    prevSatisfied.current = satisfiedCount;
+  }, [satisfiedCount]);
+
+  useEffect(() => {
+    if (activeIdx > prevActive.current && prevActive.current !== -1) {
+      playSfx("rule-reveal");
+    }
+    prevActive.current = activeIdx;
+  }, [activeIdx]);
+
+  useEffect(() => {
+    if (chaosLevel > prevChaos.current && chaosLevel >= 3) {
+      playSfx("chaos");
+    }
+    prevChaos.current = chaosLevel;
+  }, [chaosLevel]);
+
+  useEffect(() => {
+    if (allPassed && !winAnnounced.current) {
+      winAnnounced.current = true;
+      playSfx("win");
+    } else if (!allPassed) {
+      winAnnounced.current = false;
+    }
+  }, [allPassed]);
+
+  const toggleSound = useCallback(() => {
+    const next = !isSoundEnabled();
+    setSoundEnabled(next);
+    setSoundOn(next);
+  }, []);
+
   const foreshadowKind = useMemo(() => pickForeshadow(seed), [seed]);
   const foreshadowFired = useForeshadowTrigger(satisfiedCount, 2);
 
@@ -165,6 +208,15 @@ export function PasswordGame() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="inline-flex items-center gap-1 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
+            aria-label={soundOn ? "Disable sound" : "Enable sound"}
+          >
+            {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+            {soundOn ? "Sound" : "Muted"}
+          </button>
           <button
             type="button"
             onClick={startDaily}
