@@ -398,6 +398,149 @@ function runWardenBehavior(g: GameRefs, boss: BossState, now: number, step: numb
   }
 }
 
+function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, step: number): void {
+  for (let i = boss.subEntities.length - 1; i >= 0; i--) {
+    const d = boss.subEntities[i];
+    if (d.type !== "drone") continue;
+    const dir = normalizeVec3([
+      g.shipX - d.position[0],
+      g.shipY - d.position[1],
+      g.shipZ - d.position[2],
+    ]);
+    const lerp = 0.05;
+    d.velocity[0] = d.velocity[0] * (1 - lerp) + dir[0] * 3.5 * lerp;
+    d.velocity[1] = d.velocity[1] * (1 - lerp) + dir[1] * 3.5 * lerp;
+    d.velocity[2] = d.velocity[2] * (1 - lerp) + dir[2] * 3.5 * lerp;
+    d.position[0] += d.velocity[0] * step;
+    d.position[1] += d.velocity[1] * step;
+    d.position[2] += d.velocity[2] * step;
+    const sdx = d.position[0] - g.shipX;
+    const sdy = d.position[1] - g.shipY;
+    const sdz = d.position[2] - g.shipZ;
+    const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
+    if (now > g.invulnUntil && !shieldedShip &&
+        sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
+      g.status = "dying";
+      g.dyingAt = now;
+      g.deathVelX = -sdx / (Math.hypot(sdx, sdy) || 1) * 7;
+      g.deathVelY = -sdy / (Math.hypot(sdx, sdy) || 1) * 7 + 3.5;
+      g.deathVelZ = 2.5;
+      g.deathAngVel = (Math.random() - 0.5) * 10;
+      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#a855f7", 500, 0.45);
+      spawnShipDebris(g);
+      sounds.play("crash");
+      sounds.stopMusic(0.4);
+      sounds.playLosingJingle();
+      boss.subEntities.splice(i, 1);
+      continue;
+    }
+    if (now - d.createdAt > d.ttlMs || d.position[2] > 10) {
+      boss.subEntities.splice(i, 1);
+    }
+  }
+}
+
+function runVoidTyrantBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+  boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2.5;
+  boss.position[1] = 3 + Math.cos((now - boss.phaseStartAt) * 0.0004) * 1;
+  boss.position[2] = -16;
+  const hpPct = boss.hp / boss.hpMax;
+  const phase = hpPct > 0.66 ? 1 : hpPct > 0.33 ? 2 : 3;
+  if (phase === 1) {
+    const shotInterval = 1400 / boss.difficultyMult;
+    if (now - boss.lastShotAt >= shotInterval) {
+      for (let k = -1; k <= 1; k++) {
+        const dir = normalizeVec3([
+          g.shipX - boss.position[0] + k * 0.6,
+          g.shipY - boss.position[1],
+          g.shipZ - boss.position[2],
+        ]);
+        g.bossProjectiles.push({
+          id: g.nextBossProjectileId++,
+          position: [boss.position[0], boss.position[1], boss.position[2]],
+          velocity: [dir[0] * 7, dir[1] * 7, dir[2] * 7],
+          radius: 0.32,
+          color: "#a855f7",
+          spawnedAt: now,
+          ttlMs: 5000,
+          homing: true,
+          shielded: false,
+        });
+      }
+      boss.lastShotAt = now;
+    }
+  } else if (phase === 2) {
+    const shotInterval = 2000 / boss.difficultyMult;
+    if (now - boss.lastShotAt >= shotInterval) {
+      const count = 10;
+      for (let k = 0; k < count; k++) {
+        const angle = (k / count) * Math.PI * 2 + boss.patternIndex * 0.12;
+        g.bossProjectiles.push({
+          id: g.nextBossProjectileId++,
+          position: [boss.position[0], boss.position[1], boss.position[2]],
+          velocity: [Math.cos(angle) * 7, Math.sin(angle) * 7, 2],
+          radius: 0.3,
+          color: "#ec4899",
+          spawnedAt: now,
+          ttlMs: 4000,
+          homing: false,
+          shielded: false,
+        });
+      }
+      boss.lastShotAt = now;
+      boss.patternIndex += 1;
+    }
+  } else {
+    const shotInterval = 900 / boss.difficultyMult;
+    if (now - boss.lastShotAt >= shotInterval) {
+      const dir = normalizeVec3([
+        g.shipX - boss.position[0],
+        g.shipY - boss.position[1],
+        g.shipZ - boss.position[2],
+      ]);
+      g.bossProjectiles.push({
+        id: g.nextBossProjectileId++,
+        position: [boss.position[0], boss.position[1], boss.position[2]],
+        velocity: [dir[0] * 9, dir[1] * 9, dir[2] * 9],
+        radius: 0.35,
+        color: "#f59e0b",
+        spawnedAt: now,
+        ttlMs: 5000,
+        homing: true,
+        shielded: false,
+      });
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2 + boss.patternIndex * 0.07;
+        g.bossProjectiles.push({
+          id: g.nextBossProjectileId++,
+          position: [boss.position[0], boss.position[1], boss.position[2]],
+          velocity: [Math.cos(a) * 6, Math.sin(a) * 6, 2],
+          radius: 0.28,
+          color: "#fbbf24",
+          spawnedAt: now,
+          ttlMs: 4000,
+          homing: false,
+          shielded: false,
+        });
+      }
+      boss.lastShotAt = now;
+      boss.patternIndex += 1;
+    }
+    const droneCount = boss.subEntities.filter((s) => s.type === "drone").length;
+    if (droneCount < 2) {
+      boss.subEntities.push({
+        type: "drone",
+        position: [boss.position[0], boss.position[1], boss.position[2]],
+        velocity: [(boss.rng() - 0.5) * 3, 0, 3],
+        hp: 1,
+        createdAt: now,
+        ttlMs: 10000,
+      });
+    }
+    updateDronesGeneric(g, boss, now, step);
+  }
+}
+
 function runHarvesterBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0004) * 4;
   boss.position[1] = 5;
@@ -2061,7 +2204,7 @@ function runTick(
       else if (b.id === "pulsar") runPulsarBehavior(g, b, now);
       else if (b.id === "harvester") runHarvesterBehavior(g, b, now, step);
       else if (b.id === "warden") runWardenBehavior(g, b, now, step);
-      // other boss behaviors added in later tasks
+      else if (b.id === "void-tyrant") runVoidTyrantBehavior(g, b, now, step);
       if (now - g.lastBossPulseAt > 700) {
         sounds.bossPulse();
         g.lastBossPulseAt = now;
@@ -2956,6 +3099,24 @@ function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
       </group>
     );
   }
+  if (boss.id === "void-tyrant") {
+    const hpPct = boss.hp / boss.hpMax;
+    const color = hpPct > 0.66 ? "#581c87" : hpPct > 0.33 ? "#be185d" : "#f59e0b";
+    return (
+      <group ref={groupRef}>
+        <mesh>
+          <icosahedronGeometry args={[2.2, 1]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} wireframe />
+        </mesh>
+        <mesh scale={[0.7, 0.7, 0.7]}>
+          <icosahedronGeometry args={[2.2, 0]} />
+          <meshBasicMaterial color={color} transparent opacity={0.5} />
+        </mesh>
+        <pointLight intensity={2} distance={30} color={color} />
+        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      </group>
+    );
+  }
   // Fallback placeholder for other bosses until their meshes ship
   return (
     <group ref={groupRef}>
@@ -3379,8 +3540,9 @@ function Scene({
   tick: number;
 }) {
   const bossFighting = gameRefs.current?.boss && gameRefs.current.boss.phase !== "defeated";
-  const ambientI = bossFighting ? 0.18 : 0.5;
-  const dirI = bossFighting ? 0.35 : 0.7;
+  const voidFight = bossFighting && gameRefs.current?.boss?.id === "void-tyrant";
+  const ambientI = voidFight ? 0.05 : bossFighting ? 0.18 : 0.5;
+  const dirI = voidFight ? 0.15 : bossFighting ? 0.35 : 0.7;
   return (
     <>
       <BiomeBlender gameRefs={gameRefs} />
