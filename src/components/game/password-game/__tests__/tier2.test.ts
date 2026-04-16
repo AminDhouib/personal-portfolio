@@ -5,6 +5,7 @@ import type { GameState, Rule } from "../types";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
+import { NAMED_COLORS } from "../../../../data/password-game/colors";
 
 function makeState(password: string, rule: Rule): GameState {
   return {
@@ -186,6 +187,33 @@ describe("Tier 2 — capital city rule", () => {
   it("fails without the capital", () => {
     const rule = def.create(mulberry32(23));
     expect(rule.validate(makeState("no capital here", rule)).passed).toBe(false);
+  });
+});
+
+describe("Tier 2 — hex color rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "hex-color")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params reference a known named color", () => {
+    const rule = def.create(mulberry32(29));
+    const entry = NAMED_COLORS.find(
+      (c) => c.hex === rule.params.hex && c.name === rule.params.name
+    );
+    expect(entry).toBeDefined();
+  });
+
+  it("passes with the name in the password (case-insensitive)", () => {
+    const rule = def.create(mulberry32(29));
+    const name = rule.params.name as string;
+    expect(rule.validate(makeState(`abc${name}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails without the name", () => {
+    const rule = def.create(mulberry32(29));
+    expect(rule.validate(makeState("12345", rule)).passed).toBe(false);
   });
 });
 

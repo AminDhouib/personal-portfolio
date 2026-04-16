@@ -4,6 +4,7 @@ import { NATO_ALPHABET, NATO_LETTERS } from "../../../../data/password-game/nato
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
+import { NAMED_COLORS } from "../../../../data/password-game/colors";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -185,4 +186,23 @@ const capitalCity: RuleDef = {
   },
 };
 
-export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement, foreignWord, capitalCity];
+const hexColor: RuleDef = {
+  id: "hex-color",
+  tier: 2,
+  create(rng) {
+    const entry = pickOne(rng, NAMED_COLORS);
+    return {
+      id: "hex-color",
+      tier: 2,
+      description: `Your password must include the name of the color with hex code ${entry.hex}.`,
+      params: { name: entry.name, hex: entry.hex },
+      validate(state) {
+        return {
+          passed: state.password.toLowerCase().includes(entry.name.toLowerCase()),
+        };
+      },
+    };
+  },
+};
+
+export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement, foreignWord, capitalCity, hexColor];
