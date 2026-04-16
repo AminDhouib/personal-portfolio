@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Key } from "lucide-react";
 import { selectRulesForRun, validateRules, computeActiveRuleIndex } from "./engine";
 import { TIER_1_RULES } from "./rules/tier1";
+import { TIER_2_RULES } from "./rules/tier2";
 import { RuleCard } from "./rule-card";
 import { pickForeshadow, useForeshadowTrigger, ForeshadowOverlay } from "./foreshadowing";
 import type { GameState, Rule } from "./types";
@@ -30,8 +31,8 @@ export function PasswordGame() {
     () =>
       selectRulesForRun(
         seed,
-        { 1: Math.min(4, TIER_1_RULES.length) },
-        { 1: TIER_1_RULES }
+        { 1: Math.min(4, TIER_1_RULES.length), 2: Math.min(3, TIER_2_RULES.length) },
+        { 1: TIER_1_RULES, 2: TIER_2_RULES }
       ),
     [seed]
   );
@@ -119,7 +120,7 @@ export function PasswordGame() {
 
       {allPassed && (
         <div className="mt-5 rounded-lg border border-accent-green/40 bg-accent-green/10 px-4 py-3 text-sm text-accent-green">
-          Tier 1 cleared. (Tiers 2-5 coming soon.)
+          Tiers 1-2 cleared. (Tiers 3-5 coming soon.)
         </div>
       )}
 
