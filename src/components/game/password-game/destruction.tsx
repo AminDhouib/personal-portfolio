@@ -249,94 +249,72 @@ function FloatingDebris() {
 }
 
 /**
- * A single "broken chip" shape. Rendered as inline SVG so the polygon and
- * stroke are drawn as one unit.
+ * A realistic radial crack. Rendered as a small dark impact point with
+ * several thin white lines radiating outward and branching. No jagged
+ * polygon, no chipped chunk — this reads as glass fractured by an impact.
  *
- * Anatomy:
- *  - <polygon fill="var(--background)"> : the missing piece (dark hole).
- *  - <polyline stroke="..."> : the jagged glass-edge highlight.
- *  - <path stroke="..."> : hairline fractures extending from the chip.
+ * The SVG viewBox is 100x100 with the impact point at (50, 50). flipX/flipY
+ * mirror the geometry so the same crack asset works at any corner.
  */
 function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
-  // The chip occupies the bottom-left corner of the SVG viewBox (100x100),
-  // with jagged teeth along its exposed edge. flipX / flipY mirror it so we
-  // can reuse the same geometry for the opposite corners.
-  const transform = `${flipX ? "scale(-1 1) translate(-100 0)" : ""} ${flipY ? "scale(1 -1) translate(0 -100)" : ""}`.trim();
+  const transform = [
+    flipX ? "scale(-1 1) translate(-100 0)" : "",
+    flipY ? "scale(1 -1) translate(0 -100)" : "",
+  ].filter(Boolean).join(" ");
   return (
     <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden>
       <defs>
-        <radialGradient id="pg-chip-depth" cx="30%" cy="70%" r="75%">
-          <stop offset="0%" stopColor="#000" stopOpacity="0.55" />
-          <stop offset="70%" stopColor="var(--background, #0a0a0f)" stopOpacity="1" />
-          <stop offset="100%" stopColor="var(--background, #0a0a0f)" stopOpacity="1" />
-        </radialGradient>
+        <filter id="pg-crack-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="0.5" />
+        </filter>
       </defs>
       <g transform={transform || undefined}>
-        {/* The "hole" — filled with the page background color plus a radial
-            darkening to suggest the chip recedes inward. */}
-        <polygon
-          points="0,100 0,0 6,14 14,8 22,20 30,10 38,22 44,16 52,30 60,18 66,36 74,24 82,42 88,32 95,46 100,38 100,100"
-          fill="var(--background, #0a0a0f)"
-        />
-        <polygon
-          points="0,100 0,0 6,14 14,8 22,20 30,10 38,22 44,16 52,30 60,18 66,36 74,24 82,42 88,32 95,46 100,38 100,100"
-          fill="url(#pg-chip-depth)"
-        />
-        {/* Thin crack edge along the broken boundary. */}
-        <polyline
-          points="0,0 6,14 14,8 22,20 30,10 38,22 44,16 52,30 60,18 66,36 74,24 82,42 88,32 95,46 100,38"
-          fill="none"
-          stroke="rgba(255,255,255,0.6)"
-          strokeWidth="0.9"
-          strokeLinejoin="miter"
-          strokeLinecap="round"
-        />
-        {/* Inner highlight for depth — offset 1-2px inward. */}
-        <polyline
-          points="2,4 7,15 15,10 23,21 31,12 39,23 45,18 53,31 61,20 67,37 75,26 83,43 89,34 94,46"
-          fill="none"
-          stroke="rgba(255,255,255,0.28)"
-          strokeWidth="0.35"
-          strokeLinejoin="miter"
-        />
-        {/* Hairline fractures extending into the surviving container surface. */}
-        <g fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.28" strokeLinecap="round">
-          <path d="M 22 20 L 30 34 L 38 50" />
-          <path d="M 38 22 L 48 40 L 54 58" />
-          <path d="M 52 30 L 62 48 L 68 66" />
-          <path d="M 66 36 L 76 54 L 82 72" />
-          <path d="M 82 42 L 90 60 L 96 80" />
-          <path d="M 44 16 L 46 6" />
-          <path d="M 60 18 L 66 4" />
-          <path d="M 88 32 L 96 20" />
+        {/* Impact point — small dark crater with a halo. */}
+        <circle cx="50" cy="50" r="4" fill="rgba(0,0,0,0.75)" />
+        <circle cx="50" cy="50" r="2" fill="#000" />
+        <circle cx="50" cy="50" r="5.5" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.4" />
+
+        {/* Primary radiating fractures — 7 lines fanning from impact. Each
+            line tapers: starts thick near impact, thin at the tip. */}
+        <g stroke="#ffffff" strokeLinecap="round" fill="none">
+          {/* Upper-left long crack */}
+          <path d="M 50 50 L 42 42 L 30 28 L 18 14 L 8 6" strokeWidth="1.1" opacity="0.9" />
+          <path d="M 30 28 L 22 22" strokeWidth="0.5" opacity="0.6" />
+          <path d="M 18 14 L 10 18" strokeWidth="0.4" opacity="0.5" />
+
+          {/* Upper-right medium */}
+          <path d="M 50 50 L 56 40 L 66 28 L 78 14 L 94 4" strokeWidth="0.9" opacity="0.85" />
+          <path d="M 66 28 L 74 28" strokeWidth="0.4" opacity="0.5" />
+
+          {/* Upper short */}
+          <path d="M 50 50 L 50 36 L 46 22 L 44 8" strokeWidth="0.7" opacity="0.7" />
+
+          {/* Right horizontal */}
+          <path d="M 50 50 L 62 52 L 76 54 L 90 58" strokeWidth="0.8" opacity="0.8" />
+          <path d="M 76 54 L 82 48" strokeWidth="0.35" opacity="0.5" />
+
+          {/* Lower-right long */}
+          <path d="M 50 50 L 58 58 L 66 72 L 78 88 L 92 98" strokeWidth="1" opacity="0.9" />
+          <path d="M 66 72 L 72 70" strokeWidth="0.45" opacity="0.55" />
+          <path d="M 78 88 L 84 84" strokeWidth="0.35" opacity="0.5" />
+
+          {/* Lower short */}
+          <path d="M 50 50 L 48 60 L 46 72 L 44 88" strokeWidth="0.7" opacity="0.75" />
+
+          {/* Lower-left medium */}
+          <path d="M 50 50 L 42 56 L 30 66 L 16 78 L 6 90" strokeWidth="0.85" opacity="0.85" />
+          <path d="M 30 66 L 26 74" strokeWidth="0.4" opacity="0.55" />
+
+          {/* Left horizontal */}
+          <path d="M 50 50 L 38 50 L 22 48 L 6 44" strokeWidth="0.8" opacity="0.8" />
+          <path d="M 22 48 L 16 54" strokeWidth="0.35" opacity="0.5" />
         </g>
-        {/* Even finer micro-fractures — barely visible. */}
-        <g fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="0.18" strokeLinecap="round">
-          <path d="M 30 34 L 34 42" />
-          <path d="M 48 40 L 52 48" />
-          <path d="M 62 48 L 66 56" />
-          <path d="M 76 54 L 80 62" />
-          <path d="M 42 38 L 38 44" />
-          <path d="M 58 46 L 54 52" />
-          <path d="M 70 58 L 66 64" />
-        </g>
-        {/* Debris shards — tiny polygons scattered around the chip as if
-            material ejected from the impact. */}
-        <g fill="rgba(255,255,255,0.45)">
-          <polygon points="34,52 36,55 33,57" />
-          <polygon points="56,62 58,64 55,66" />
-          <polygon points="72,74 74,76 71,78" />
-          <polygon points="88,58 90,60 87,62" />
-          <polygon points="42,68 43,70 41,71" />
-          <polygon points="60,80 62,82 59,83" />
-        </g>
-        <g fill="rgba(255,255,255,0.25)">
-          <circle cx="46" cy="60" r="0.6" />
-          <circle cx="64" cy="72" r="0.5" />
-          <circle cx="80" cy="66" r="0.6" />
-          <circle cx="52" cy="76" r="0.4" />
-          <circle cx="78" cy="84" r="0.5" />
-          <circle cx="36" cy="78" r="0.4" />
+
+        {/* A few concentric micro-arcs near the impact for the "stressed glass" look. */}
+        <g stroke="rgba(255,255,255,0.45)" strokeWidth="0.3" fill="none">
+          <path d="M 44 48 Q 50 44 56 48" />
+          <path d="M 44 52 Q 50 56 56 52" />
+          <path d="M 43 50 Q 45 45 50 44" />
         </g>
       </g>
     </svg>

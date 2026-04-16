@@ -254,28 +254,28 @@
 
 /* Position each chip so it eats a small corner without covering rule text. */
 .pg-chip-1 {
-  /* Top-right corner — bites into the card edge near the header buttons. */
-  top: -2px;
-  right: -2px;
-  width: 58px;
-  height: 58px;
-  transform-origin: 100% 0%;
+  /* Top-right — impact point sits just inside the corner; lines radiate. */
+  top: 8px;
+  right: 12px;
+  width: 86px;
+  height: 86px;
+  transform-origin: 50% 50%;
 }
 .pg-chip-2 {
-  /* Bottom-right corner — small chip. */
-  bottom: -2px;
-  right: -2px;
-  width: 64px;
-  height: 64px;
-  transform-origin: 100% 100%;
+  /* Bottom-right — impact slightly up from the corner, lines fan up-left. */
+  bottom: 12px;
+  right: 18px;
+  width: 90px;
+  height: 90px;
+  transform-origin: 50% 50%;
 }
 .pg-chip-3 {
-  /* Left edge, slightly higher — between the input and the rule list. */
+  /* Left edge — impact near the rule list area. */
   top: 42%;
-  left: -2px;
-  width: 64px;
-  height: 64px;
-  transform-origin: 0% 50%;
+  left: 8px;
+  width: 74px;
+  height: 74px;
+  transform-origin: 50% 50%;
 }
 
 /* Reveal thresholds. Multiplied by --fx-chips so the debug panel can hide them. */
