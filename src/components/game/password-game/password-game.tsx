@@ -131,6 +131,14 @@ export function PasswordGame() {
   useEffect(() => {
     if (satisfiedCount > prevSatisfied.current) {
       playSfx("rule-complete");
+      // Big glitch burst on the container as a visual reward.
+      const container = containerRef.current?.querySelector<HTMLElement>(".pg-container");
+      if (container) {
+        container.classList.remove("pg-burst");
+        void container.offsetWidth;
+        container.classList.add("pg-burst");
+        window.setTimeout(() => container.classList.remove("pg-burst"), 320);
+      }
     }
     prevSatisfied.current = satisfiedCount;
   }, [satisfiedCount]);
@@ -257,6 +265,16 @@ export function PasswordGame() {
             setPassword(e.value);
             setFormatting(e.formatting);
             if (!timerRunning && e.value.length > 0) setTimerRunning(true);
+          }}
+          onDestructiveKey={() => {
+            const inputWrap = containerRef.current?.querySelector<HTMLElement>(".pg-chaos-root textarea")?.closest("div");
+            if (inputWrap) {
+              inputWrap.classList.remove("pg-typo-flash");
+              void inputWrap.offsetWidth;
+              inputWrap.classList.add("pg-typo-flash");
+              window.setTimeout(() => inputWrap.classList.remove("pg-typo-flash"), 300);
+            }
+            playSfx("rule-fail");
           }}
           placeholder="Enter your password..."
         />

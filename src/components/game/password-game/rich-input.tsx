@@ -14,11 +14,27 @@ interface Props {
   formatting: FormattingMap;
   onChange: (e: RichInputChangeEvent) => void;
   placeholder?: string;
+  onDestructiveKey?: () => void;
 }
 
-export function RichInput({ value, formatting, onChange, placeholder }: Props) {
+export function RichInput({ value, formatting, onChange, placeholder, onDestructiveKey }: Props) {
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Fire callback only when the key would actually remove text (there's
+      // something to delete), not on empty-input Backspace spam.
+      if (
+        (e.key === "Backspace" || e.key === "Delete") &&
+        value.length > 0 &&
+        onDestructiveKey
+      ) {
+        onDestructiveKey();
+      }
+    },
+    [value.length, onDestructiveKey]
+  );
 
   const handleSelect = useCallback(() => {
     const ta = taRef.current;
@@ -86,6 +102,7 @@ export function RichInput({ value, formatting, onChange, placeholder }: Props) {
           value={value}
           onChange={handleTextChange}
           onSelect={handleSelect}
+          onKeyDown={handleKeyDown}
           rows={3}
           placeholder={placeholder}
           spellCheck={false}
