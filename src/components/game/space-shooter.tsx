@@ -3342,6 +3342,45 @@ function DashAfterimages({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
   );
 }
 
+function SpinningPreviewMesh({ color }: { color: string }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => {
+    if (ref.current) {
+      ref.current.rotation.y += dt * 1.2;
+      ref.current.rotation.x = Math.sin(performance.now() * 0.0008) * 0.2;
+    }
+  });
+  return (
+    <group ref={ref}>
+      {/* Compact ship silhouette: fuselage cone + wide wing box + engine bulb */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.28, 1.0, 8]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, -0.05, 0.1]}>
+        <boxGeometry args={[1.1, 0.09, 0.3]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, -0.05, 0.55]}>
+        <sphereGeometry args={[0.14, 10, 10]} />
+        <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+function ShipPreview({ color }: { color: string }) {
+  return (
+    <div className="w-14 h-14 shrink-0 rounded-md bg-black/40 border border-white/10 overflow-hidden">
+      <Canvas camera={{ position: [0, 0.3, 2], fov: 40 }} dpr={[1, 1.5]}>
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[2, 3, 2]} intensity={0.6} />
+        <SpinningPreviewMesh color={color} />
+      </Canvas>
+    </div>
+  );
+}
+
 function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
   const [version, setVersion] = useState(0);
   const list = useMemo(() => activeMissions(), [version]);
@@ -4949,9 +4988,10 @@ export function SpaceShooterGame() {
                         return (
                           <div
                             key={s.id}
-                            className={`flex flex-col gap-1 rounded-lg border p-3 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
+                            className={`flex gap-3 rounded-lg border p-3 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
                           >
-                            <div className="flex items-center justify-between">
+                            <ShipPreview color={s.hullTint} />
+                            <div className="flex flex-col gap-1 flex-1 min-w-0"><div className="flex items-center justify-between">
                               <span className="font-semibold text-white text-sm">{s.label}</span>
                               <span className="inline-block w-4 h-4 rounded border border-white/20" style={{ background: s.hullTint }} />
                             </div>
@@ -4992,6 +5032,7 @@ export function SpaceShooterGame() {
                                   Unlock · {s.unlockCost}
                                 </button>
                               )}
+                            </div>
                             </div>
                           </div>
                         );
