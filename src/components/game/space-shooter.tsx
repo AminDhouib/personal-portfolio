@@ -797,6 +797,14 @@ interface GameRefs {
   powerUps: PowerUp[];
   coins: Coin[];
   coinsThisRun: number;
+  // Player preferences (mirrored from React state for per-frame access)
+  prefs: {
+    reducedMotion: boolean;
+    gyroEnabled: boolean;
+    bloomEnabled: boolean;
+    musicEnabled: boolean;
+    sfxEnabled: boolean;
+  };
   // Boss system
   boss: BossState | null;
   bossProjectiles: BossProjectile[];
@@ -887,6 +895,7 @@ function createRefs(): GameRefs {
     powerUps: [], coins: [], coinsThisRun: 0,
     coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
     comboWindowMs: 0, shieldDurationMs: 0,
+    prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
     boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
     bossScheduleIdx: 0, bossesDefeatedThisRun: 0,
     normalSpawningPausedUntil: 0, devHotkeyArmed: false,
@@ -1271,6 +1280,9 @@ function fireBullets(g: GameRefs, now: number, sounds: SoundManager) {
 }
 
 function spawnExplosion(g: GameRefs, x: number, y: number, z: number, color: string, duration = 600, scale = 0.3) {
+  // Reduced-motion: drop ~80% of small cosmetic sparks (< 400ms duration).
+  // Keep bigger, narratively important bursts (death, boss defeat) untouched.
+  if (g.prefs.reducedMotion && duration < 400 && Math.random() > 0.2) return;
   g.explosions.push({
     id: nextId(g), x, y, z,
     startedAt: performance.now(),
@@ -3740,15 +3752,25 @@ export function SpaceShooterGame() {
   useEffect(() => {
     try {
       const p = loadProfile();
+      let loaded = false;
       if (p.preferences) {
         setPrefs((prev) => ({ ...prev, ...p.preferences }));
-        return;
+        loaded = true;
+      } else {
+        const raw = localStorage.getItem("orbital-dodge-prefs");
+        if (raw) {
+          setPrefs((prev) => ({ ...prev, ...JSON.parse(raw) }));
+          loaded = true;
+        }
       }
-      const raw = localStorage.getItem("orbital-dodge-prefs");
-      if (raw) setPrefs((prev) => ({ ...prev, ...JSON.parse(raw) }));
+      // First-load OS hint: respect prefers-reduced-motion if no saved prefs yet
+      if (!loaded && typeof window !== "undefined") {
+        const osReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        if (osReduced) setPrefs((prev) => ({ ...prev, reducedMotion: true }));
+      }
     } catch { /* noop */ }
   }, []);
-  // Save on change
+  // Save on change + mirror to gameRefs for per-frame access
   useEffect(() => {
     try {
       const p = loadProfile();
@@ -3757,6 +3779,7 @@ export function SpaceShooterGame() {
     } catch {
       try { localStorage.setItem("orbital-dodge-prefs", JSON.stringify(prefs)); } catch { /* noop */ }
     }
+    gameRefs.current.prefs = { ...prefs };
   }, [prefs]);
   // Persist "first boss seen" flag when boss enters fighting phase
   useEffect(() => {
