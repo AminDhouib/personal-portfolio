@@ -179,6 +179,48 @@ export default function TowerStacker() {
   const [uiHp, setUiHp] = useState(3);
   const [uiCombo, setUiCombo] = useState(0);
 
+  function startRun() {
+    const r = refs.current;
+    const { w, h } = viewportRef.current;
+    r.state = "playing";
+    r.score = 0;
+    r.hp = r.mode === "classic" ? 3 : 1;
+    r.floors = [];
+    r.perfectCombo = 0;
+    r.maxCombo = 0;
+    r.perfectsCount = 0;
+    r.goldenCount = 0;
+    r.cameraY = 0;
+    r.cameraTargetY = 0;
+    r.cameraScale = 1;
+    r.cameraTargetScale = 1;
+    r.biomeIdx = 0;
+    r.biomeTransition = 1;
+    r.shake = 0;
+    r.slowMo = 0;
+    r.runStartMs = performance.now();
+    r.droppingLock = false;
+    r.ghostPassed = false;
+    r.achievementsUnlockedThisRun = [];
+    r.runRecord = { floors: [], score: 0, durationMs: 0 };
+    r.milestonesFired = new Set();
+    r.ambientCooldown = 0;
+    // Place base plate (future tasks will enhance with actual block spawning)
+    r.floors.push({
+      x: w / 2 - BASE_BLOCK_WIDTH_PX / 2,
+      y: h - 80,
+      width: BASE_BLOCK_WIDTH_PX,
+      height: BASE_BLOCK_HEIGHT,
+      hue: HUE_BASE,
+      isPerfect: true,
+      isGolden: false,
+    });
+    setUiState("playing");
+    setUiScore(0);
+    setUiHp(r.hp);
+    setUiCombo(0);
+  }
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -250,11 +292,19 @@ export default function TowerStacker() {
     };
   }, []);
 
-  // Suppress unused state lint warnings — wired in Task 4+
-  void setUiState;
-  void setUiScore;
-  void setUiHp;
-  void setUiCombo;
+  useEffect(() => {
+    try {
+      const m = localStorage.getItem(LS_PREFIX + "mode") as GameMode | null;
+      if (m === "classic" || m === "sudden" || m === "speedrun") refs.current.mode = m;
+      const h = localStorage.getItem(LS_PREFIX + "hints");
+      if (h !== null) refs.current.hintsOn = h === "true";
+      const t = localStorage.getItem(LS_PREFIX + "theme") as ThemeId | null;
+      if (t === "classic" || t === "neon" || t === "gold" || t === "crystal" || t === "pixel") {
+        refs.current.theme = t;
+      }
+    } catch {}
+    forceTick((n) => (n + 1) % 1_000_000);
+  }, []);
 
   return (
     <div
@@ -265,11 +315,65 @@ export default function TowerStacker() {
         ref={canvasRef}
         className="block w-full touch-none select-none"
         style={{ touchAction: "manipulation" }}
-        data-ui-state={uiState}
-        data-ui-score={uiScore}
-        data-ui-hp={uiHp}
-        data-ui-combo={uiCombo}
       />
+
+      {uiState === "menu" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-neutral-900/90 p-6 shadow-[0_0_60px_-10px_rgba(239,68,68,0.5)]">
+            <h2 className="text-3xl font-bold text-red-400 mb-1">Tower Stacker</h2>
+            <p className="text-sm text-neutral-400 mb-5">Time the drop. Keep the tower alive.</p>
+
+            <div className="space-y-3 mb-5">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-neutral-500 mb-1">Mode</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["classic", "sudden", "speedrun"] as GameMode[]).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        refs.current.mode = m;
+                        try { localStorage.setItem(LS_PREFIX + "mode", m); } catch {}
+                        forceTick((n) => (n + 1) % 1_000_000);
+                      }}
+                      className={`rounded-lg px-3 py-2 text-sm border transition ${
+                        refs.current.mode === m
+                          ? "border-red-500 bg-red-500/15 text-red-200"
+                          : "border-neutral-700 bg-neutral-800/60 text-neutral-300 hover:border-neutral-500"
+                      }`}
+                    >
+                      {m === "classic" ? "Classic" : m === "sudden" ? "Sudden" : "Speedrun"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-neutral-300">
+                <input
+                  type="checkbox"
+                  checked={refs.current.hintsOn}
+                  onChange={(e) => {
+                    refs.current.hintsOn = e.target.checked;
+                    try { localStorage.setItem(LS_PREFIX + "hints", String(e.target.checked)); } catch {}
+                    forceTick((n) => (n + 1) % 1_000_000);
+                  }}
+                />
+                Landing hints (dashed projection)
+              </label>
+            </div>
+
+            <button
+              onClick={() => startRun()}
+              className="w-full rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold py-3 text-lg shadow-lg shadow-red-900/30 transition"
+            >
+              START
+            </button>
+
+            <p className="text-xs text-neutral-500 mt-4 text-center">
+              Tap, click, or press Space / Enter to drop.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
