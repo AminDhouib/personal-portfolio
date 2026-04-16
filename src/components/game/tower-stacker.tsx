@@ -743,6 +743,112 @@ function ThemePicker({ active, onChange }: { active: ThemeId; onChange: (t: Them
   );
 }
 
+interface LbEntry { name: string; score: number; level: number; region?: string; }
+
+function LeaderboardModal({ runRefs, onClose }: { runRefs: GameRefs; onClose: () => void }) {
+  const [name, setName] = useState(() => {
+    try { return localStorage.getItem(LS_PREFIX + "player_name") || "Builder"; } catch { return "Builder"; }
+  });
+  const [entries, setEntries] = useState<LbEntry[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+  const [rank, setRank] = useState<number | null>(null);
+
+  const gameSlug = runRefs.isDailyRun
+    ? `tower-stacker-daily-${new Date().toISOString().slice(0, 10)}`
+    : runRefs.isSeededRun
+    ? "tower-stacker-seeded"
+    : "tower-stacker";
+
+  useEffect(() => {
+    fetch(`/api/leaderboard?game=${encodeURIComponent(gameSlug)}`)
+      .then((r) => r.json())
+      .then((d: { entries: LbEntry[] }) => setEntries(d.entries || []))
+      .catch(() => setEntries([]));
+  }, [gameSlug]);
+
+  async function submit() {
+    try {
+      localStorage.setItem(LS_PREFIX + "player_name", name);
+    } catch {}
+    const body = {
+      name,
+      score:
+        runRefs.mode === "speedrun" && runRefs.floors.length - 1 >= 50
+          ? Math.max(0, 1_000_000 - Math.floor(runRefs.runRecord.durationMs))
+          : runRefs.score,
+      level: Math.max(1, runRefs.floors.length - 1),
+      seconds: Math.floor(runRefs.runRecord.durationMs / 1000),
+      kills: runRefs.perfectsCount,
+      distance: runRefs.goldenCount,
+      region: runRefs.mode,
+      game: gameSlug,
+    };
+    try {
+      const res = await fetch(`/api/leaderboard`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json();
+      setRank(typeof d.rank === "number" ? d.rank : null);
+      setSubmitted(true);
+      const res2 = await fetch(`/api/leaderboard?game=${encodeURIComponent(gameSlug)}`);
+      const d2: { entries: LbEntry[] } = await res2.json();
+      setEntries(d2.entries || []);
+    } catch {
+      setSubmitted(true);
+    }
+  }
+
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-red-500/40 bg-neutral-900/95 p-5">
+        <h3 className="text-xl font-bold text-red-400 mb-3">
+          Leaderboard — {gameSlug.replace(/^tower-stacker-?/, "") || "All-Time"}
+        </h3>
+        {!submitted && (
+          <div className="flex gap-2 mb-4">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 12))}
+              maxLength={12}
+              className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white"
+            />
+            <button onClick={submit} className="rounded-lg bg-red-600 hover:bg-red-500 text-white px-4 font-semibold">
+              Submit
+            </button>
+          </div>
+        )}
+        {submitted && rank != null && (
+          <div className="mb-3 text-amber-300 font-semibold">Rank #{rank}</div>
+        )}
+        <div className="max-h-[50vh] overflow-auto divide-y divide-neutral-800">
+          {entries.map((e, i) => (
+            <div key={i} className="flex items-center justify-between py-1.5 text-sm text-neutral-200">
+              <span>
+                {i + 1}. {e.name}{" "}
+                {e.region && <span className="text-neutral-500 text-xs">{e.region}</span>}
+              </span>
+              <span>
+                {e.score.toLocaleString()} · fl {e.level}
+              </span>
+            </div>
+          ))}
+          {entries.length === 0 && (
+            <div className="py-4 text-center text-neutral-500 text-sm">No entries yet — be the first!</div>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full rounded-lg bg-neutral-700 hover:bg-neutral-600 text-white py-2"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TowerStacker({ initialSeed }: { initialSeed?: string } = {}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -798,6 +904,7 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
   const [uiHp, setUiHp] = useState(3);
   const [uiCombo, setUiCombo] = useState(0);
   const [toasts, setToasts] = useState<string[]>([]);
+  const [lbModalOpen, setLbModalOpen] = useState(false);
 
   interface AudioHandle {
     ctx: AudioContext;
@@ -1075,6 +1182,21 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
     }, 3500);
   }
 
+  async function qualifiesForLeaderboard(r: GameRefs): Promise<boolean> {
+    try {
+      const game = r.isDailyRun
+        ? `tower-stacker-daily-${new Date().toISOString().slice(0, 10)}`
+        : r.isSeededRun
+        ? "tower-stacker-seeded"
+        : "tower-stacker";
+      const res = await fetch(`/api/leaderboard?game=${encodeURIComponent(game)}`);
+      const json = await res.json() as { entries: Array<{ score: number }> };
+      if (!Array.isArray(json.entries)) return false;
+      if (json.entries.length < 25) return true;
+      return r.score > json.entries[json.entries.length - 1].score;
+    } catch { return false; }
+  }
+
   function handleRunEnd() {
     const r = refs.current;
     try {
@@ -1096,6 +1218,10 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
       setToasts(newlyUnlocked.map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.name || "Achievement"));
       setTimeout(() => setToasts([]), 3500);
     }
+    (async () => {
+      const ok = await qualifiesForLeaderboard(r);
+      if (ok) setLbModalOpen(true);
+    })();
   }
 
   function togglePause() {
@@ -1515,8 +1641,18 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
               <button onClick={() => startRun()} className="flex-1 rounded-xl bg-red-600 hover:bg-red-500 text-white py-2.5 font-semibold">Play Again</button>
               <button onClick={() => { refs.current.state = "menu"; setUiState("menu"); }} className="flex-1 rounded-xl bg-neutral-700 hover:bg-neutral-600 text-white py-2.5 font-semibold">Menu</button>
             </div>
+            <button
+              onClick={() => setLbModalOpen(true)}
+              className="w-full mt-2 rounded-xl bg-neutral-700 hover:bg-neutral-600 text-white py-2.5 font-semibold"
+            >
+              View Leaderboard
+            </button>
           </div>
         </div>
+      )}
+
+      {lbModalOpen && (
+        <LeaderboardModal runRefs={refs.current} onClose={() => setLbModalOpen(false)} />
       )}
 
       {toasts.length > 0 && (
