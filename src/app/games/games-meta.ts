@@ -6,7 +6,6 @@ export type GameSlug =
   | "space-shooter"
   | "hextris"
   | "tower-stacker"
-  | "geometric-flow"
   | "typing-speed"
   | "code-puzzle"
   | "super-voltorb-flip"
@@ -53,16 +52,6 @@ export const GAMES: GameMeta[] = [
     controls: "Click or tap anywhere to drop the block.",
     accent: "#f87171",
     accentTailwind: "accent-red",
-  },
-  {
-    slug: "geometric-flow",
-    title: "Geometric Flow",
-    tagline: "Endless wireframe dodge runner",
-    description:
-      "Navigate a green triangle through a field of wireframe shapes. Three lanes, one tap to switch. Speed ramps up forever.",
-    controls: "Click or tap anywhere to switch lanes.",
-    accent: "#f472b6",
-    accentTailwind: "accent-pink",
   },
   {
     slug: "typing-speed",

@@ -215,68 +215,6 @@ function TowerStackerBanner() {
   );
 }
 
-// ---------- Geometric Flow ----------
-
-function GeometricFlowBanner() {
-  return (
-    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-[#1f0a1f] via-[#2d0f2d] to-[#0e040e]">
-      {/* Lanes */}
-      {[25, 50, 75].map((x) => (
-        <div
-          key={x}
-          className="absolute top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-pink-400/30 to-transparent"
-          style={{ left: `${x}%` }}
-        />
-      ))}
-      {/* Wireframe obstacles flowing toward camera */}
-      {[
-        { shape: "circle", lane: 25, d: 3.5, delay: 0 },
-        { shape: "square", lane: 50, d: 3.5, delay: 1.2 },
-        { shape: "triangle", lane: 75, d: 3.5, delay: 2.4 },
-        { shape: "circle", lane: 50, d: 3.5, delay: 3.0 },
-      ].map((o, i) => (
-        <motion.svg
-          key={i}
-          viewBox="-20 -20 40 40"
-          className="absolute w-12"
-          style={{ left: `calc(${o.lane}% - 24px)` }}
-          animate={{
-            top: ["-10%", "110%"],
-            scale: [0.3, 1.4],
-            opacity: [0, 1, 1, 0],
-          }}
-          transition={{
-            duration: o.d,
-            repeat: Infinity,
-            delay: o.delay,
-            ease: "linear",
-          }}
-        >
-          {o.shape === "circle" && (
-            <circle cx="0" cy="0" r="14" fill="none" stroke="#f472b6" strokeWidth="2" />
-          )}
-          {o.shape === "square" && (
-            <rect x="-12" y="-12" width="24" height="24" fill="none" stroke="#60a5fa" strokeWidth="2" />
-          )}
-          {o.shape === "triangle" && (
-            <polygon points="0,-14 12,10 -12,10" fill="none" stroke="#fbbf24" strokeWidth="2" />
-          )}
-        </motion.svg>
-      ))}
-      {/* Player triangle */}
-      <motion.svg
-        viewBox="-20 -20 40 40"
-        className="absolute bottom-4 w-10"
-        style={{ left: "calc(50% - 20px)" }}
-        animate={{ left: ["15%", "calc(50% - 20px)", "75%", "calc(50% - 20px)", "15%"] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <polygon points="0,-14 12,10 -12,10" fill="#34d399" stroke="#a7f3d0" strokeWidth="2" />
-      </motion.svg>
-    </div>
-  );
-}
-
 // ---------- Typing Speed ----------
 
 function TypingSpeedBanner() {
@@ -475,7 +413,6 @@ const BANNERS: Record<GameSlug, () => React.ReactNode> = {
   "space-shooter": SpaceShooterBanner,
   hextris: HextrisBanner,
   "tower-stacker": TowerStackerBanner,
-  "geometric-flow": GeometricFlowBanner,
   "typing-speed": TypingSpeedBanner,
   "code-puzzle": CodePuzzleBanner,
   "super-voltorb-flip": SuperVoltorbFlipBanner,

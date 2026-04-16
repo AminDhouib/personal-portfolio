@@ -12,10 +12,6 @@ function GameSkeleton() {
   );
 }
 
-const GeometricFlowGame = dynamic(
-  () => import("./geometric-flow").then((m) => m.GeometricFlowGame),
-  { ssr: false, loading: () => <GameSkeleton /> },
-);
 const TypingSpeedGame = dynamic(
   () => import("./typing-speed").then((m) => m.TypingSpeedGame),
   { ssr: false, loading: () => <GameSkeleton /> },
@@ -46,8 +42,6 @@ export function GameLoader({ slug }: { slug: GameSlug }) {
   const towerSeed = searchParams?.get("tower-seed") ?? undefined;
 
   switch (slug) {
-    case "geometric-flow":
-      return <GeometricFlowGame />;
     case "typing-speed":
       return <TypingSpeedGame />;
     case "code-puzzle":

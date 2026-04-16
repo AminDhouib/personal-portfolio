@@ -70,7 +70,7 @@ export default async function GameDetailPage({
             <div className="w-full h-[420px] rounded-xl border border-(--border) bg-(--card)" />
           }
         >
-          <GameLoader slug={game.slug} />
+          <GameLoader key={game.slug} slug={game.slug} />
         </Suspense>
 
         <section className="mt-16">
