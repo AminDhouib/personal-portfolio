@@ -133,3 +133,21 @@
     inset 0 0 24px rgba(255, 0, 60, 0.15),
     0 0 0 1px rgba(0, 240, 255, 0.08);
 }
+
+/* Tier 5 rule-specific hazards. Applied by adding a data attribute to the input wrapper. */
+.pg-hazard-mirror textarea,
+.pg-hazard-mirror .pg-formatted-text {
+  transform: scaleX(-1);
+  direction: ltr;
+}
+
+.pg-hazard-blur textarea,
+.pg-hazard-blur .pg-formatted-text {
+  filter: blur(2px);
+  transition: filter 200ms ease-out;
+}
+
+.pg-hazard-blur:focus-within textarea,
+.pg-hazard-blur:focus-within .pg-formatted-text {
+  filter: blur(1px);
+}
