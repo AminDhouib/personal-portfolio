@@ -6,6 +6,7 @@ export type ThemeLabels = {
   headerTitle: string;               // shown before the level digit, e.g. "VOLTORB Flip Lv."
   headerSubtitle: string;            // second row of the header banner
   voltorbMessage: string;            // right-of-voltorb-icon tagline
+  legendMultipliers: string;         // right-of-1/2/3-boxes, e.g. "...x1! ...x2! ...x3!"
 };
 
 export type ThemeDef = {
@@ -38,6 +39,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       headerTitle: "VOLTORB Flip Lv.",
       headerSubtitle: "Flip the Cards and Collect Coins!",
       voltorbMessage: "Game Over! 0!",
+      legendMultipliers: "...x1! ...x2! ...x3!",
     },
   },
   meadow: {
@@ -54,6 +56,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       headerTitle: "MEADOW Flip Lv.",
       headerSubtitle: "Flip through the tall grass!",
       voltorbMessage: "Pollen burst! Run over.",
+      legendMultipliers: "leaf x1 bud x2 flower x3",
     },
   },
   twilight: {
@@ -70,6 +73,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       headerTitle: "TWILIGHT Flip Lv.",
       headerSubtitle: "Sunset gambit — play before nightfall.",
       voltorbMessage: "Dusk bomb! Round lost.",
+      legendMultipliers: "dawn x1 dusk x2 night x3",
     },
   },
 };

@@ -72,7 +72,7 @@ export function DsCanvas({
           title={labels.headerTitle}
           subtitle={labels.headerSubtitle}
         />
-        <Legend />
+        <Legend multipliers={labels.legendMultipliers} />
         <VoltorbMessage message={labels.voltorbMessage} />
         <TotalScoreboard value={state.totalCoins} label={labels.totalScoreboard} />
         <CurrentScoreboard value={state.currentCoins} label={labels.currentScoreboard} />

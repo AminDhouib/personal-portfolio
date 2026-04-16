@@ -39,4 +39,10 @@ strip("header.png", "header-frame.png",
 strip("voltorb-message.png", "voltorb-message-frame.png",
       sample_xy=(30, 2), region=(100, 2, 258, 28))
 
+# Legend: keep the three 1/2/3 tile boxes on the left side, strip the
+# "...x1! ...x2! ...x3!" text to the right. Sample green from the right-
+# most area which is always background.
+strip("legend.png", "legend-frame.png",
+      sample_xy=(255, 4), region=(96, 3, 256, 27))
+
 print("Done.")
