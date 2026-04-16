@@ -5,14 +5,26 @@ import { RowInfo, ColInfo } from "./InfoPanel";
 
 const SPRITES = "/games/super-voltorb-flip/sprites/tile";
 
-const TILE_SRC: Record<number, string> = {
-  0: `${SPRITES}/voltorb.png`,
-  1: `${SPRITES}/1.png`,
-  2: `${SPRITES}/2.png`,
-  3: `${SPRITES}/3.png`,
-};
+function tileSprite(tile: Tile): string {
+  if (!tile.flipped) return `${SPRITES}/blank.png`;
+  const f = tile.animFrame;
+  if (f === null || f >= 19) {
+    if (tile.value === 0) return `${SPRITES}/voltorb.png`;
+    return `${SPRITES}/${tile.value}.png`;
+  }
+  if (f < 6) return `${SPRITES}/blank.png`;
+  if (f < 12) return `${SPRITES}/flip_0.png`;
+  if (f < 18) return `${SPRITES}/flip_1.png`;
+  if (f === 18) {
+    return tile.value === 0
+      ? `${SPRITES}/voltorb_flip.png`
+      : `${SPRITES}/${tile.value}_flip.png`;
+  }
+  return tile.value === 0
+    ? `${SPRITES}/voltorb.png`
+    : `${SPRITES}/${tile.value}.png`;
+}
 
-const BLANK_SRC = `${SPRITES}/blank.png`;
 const MEMO_SPRITES = [
   `${SPRITES}/memo_0.png`,
   `${SPRITES}/memo_1.png`,
@@ -45,7 +57,7 @@ export function Board({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={tile.flipped ? TILE_SRC[tile.value] : BLANK_SRC}
+            src={tileSprite(tile)}
             alt=""
             className="w-full h-full select-none"
             style={{ imageRendering: "pixelated" as const }}

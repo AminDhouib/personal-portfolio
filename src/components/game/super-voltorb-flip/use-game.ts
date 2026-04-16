@@ -205,9 +205,76 @@ export function applyAction(
       return { ...s, totalCoins: newTotal, unlockedThemes: unlocked, activeTheme: a.theme };
     }
 
+    case "flip": {
+      if (s.phase !== "playing" && s.phase !== "ready") return s;
+      const tile = s.board[a.row][a.col];
+      if (tile.flipped) return s;
+
+      const board = s.board.map((row, r) =>
+        row.map((t, c) =>
+          r === a.row && c === a.col
+            ? { ...t, flipped: true, animFrame: 0 }
+            : t,
+        ),
+      );
+
+      const newSuccessful = tile.value === 0
+        ? s.successfulFlipsThisRound
+        : s.successfulFlipsThisRound + 1;
+      const nextCoins = tile.value === 0
+        ? s.currentCoins
+        : (s.currentCoins === 0 ? tile.value : s.currentCoins * tile.value);
+
+      // Win check
+      if (tile.value !== 0 && nextCoins === s.maxCoins) {
+        return {
+          ...s, board, phase: "won",
+          currentCoins: nextCoins,
+          successfulFlipsThisRound: newSuccessful,
+        };
+      }
+
+      // Voltorb hit
+      if (tile.value === 0) {
+        if (s.mode === "super" && s.shieldArmed) {
+          return {
+            ...s, board, phase: "lost",
+            shieldedLoss: true, shieldArmed: false,
+            currentCoins: nextCoins,
+            successfulFlipsThisRound: newSuccessful,
+          };
+        }
+        return {
+          ...s, board, phase: "lost",
+          currentCoins: 0,
+          successfulFlipsThisRound: newSuccessful,
+        };
+      }
+
+      return {
+        ...s, board, phase: "playing",
+        currentCoins: nextCoins,
+        successfulFlipsThisRound: newSuccessful,
+      };
+    }
+
+    case "advanceAnim": {
+      const board = s.board.map((row) =>
+        row.map((t) => {
+          if (t.animFrame === null) return t;
+          const next = t.animFrame + a.step;
+          // Voltorbs animate longer for the explosion (Task 17)
+          const limit = t.value === 0 ? 82 : 19;
+          if (next > limit) return { ...t, animFrame: null };
+          return { ...t, animFrame: next };
+        }),
+      );
+      return { ...s, board };
+    }
+
     default:
-      // flip, advanceAnim, armShield, useVoltorbReveal, cashOut, continue
-      // are added in later tasks (16, 17, 18, 20).
+      // armShield, useVoltorbReveal, cashOut, continue
+      // are added in later tasks (18, 20).
       return s;
   }
 }

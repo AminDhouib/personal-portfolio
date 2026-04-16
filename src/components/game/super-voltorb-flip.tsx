@@ -34,7 +34,7 @@ function GameScreen({
   save: ReturnType<typeof useSave>[0];
   updateSave: ReturnType<typeof useSave>[1];
 }) {
-  const { state } = useGame({
+  const { state, dispatch } = useGame({
     mode: save.mode!,
     initialTheme: save.activeTheme,
     unlockedThemes: save.unlockedThemes,
@@ -44,6 +44,28 @@ function GameScreen({
     initialStats: save.stats,
     onPersist: updateSave,
   });
+
+  useEffect(() => {
+    let raf = 0;
+    let running = true;
+
+    function tick() {
+      if (!running) return;
+      let hasAnimating = false;
+      for (const row of state.board) {
+        for (const t of row) {
+          if (t.animFrame !== null) { hasAnimating = true; break; }
+        }
+        if (hasAnimating) break;
+      }
+      if (hasAnimating) {
+        dispatch({ type: "advanceAnim", step: state.speedMode ? 3 : 1 });
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => { running = false; cancelAnimationFrame(raf); };
+  }, [state.board, state.speedMode, dispatch]);
 
   return (
     <div
@@ -59,7 +81,12 @@ function GameScreen({
       <div className="absolute inset-0 flex items-center justify-center p-6">
         <div className="flex gap-4 items-start w-full max-w-2xl">
           <div className="flex-1">
-            <Board board={state.board} rowHints={state.rowHints} colHints={state.colHints} />
+            <Board
+              board={state.board}
+              rowHints={state.rowHints}
+              colHints={state.colHints}
+              onTileClick={(r, c) => dispatch({ type: "flip", row: r, col: c })}
+            />
           </div>
           <Scoreboard
             level={state.level}
