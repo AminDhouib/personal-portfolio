@@ -74,14 +74,17 @@ function GlitchText({ text, chaos }: { text: string; chaos: number }) {
   const [display, setDisplay] = useState(text);
 
   useEffect(() => {
-    // Reset when text or chaos changes.
     setDisplay(text);
     if (chaos < 4) return;
     const tickMs = chaos >= 5 ? 1200 : 2600;
     const id = window.setInterval(() => {
       if (text.length === 0) return;
-      // Replace 1-2 random characters with glitch glyphs briefly.
-      const count = chaos >= 5 ? 2 : 1;
+      // Respect debug --fx-scramble flag. 0 = disabled.
+      const root = document.querySelector<HTMLElement>(".pg-chaos-root");
+      const fxRaw = root ? getComputedStyle(root).getPropertyValue("--fx-scramble").trim() : "1";
+      const fx = fxRaw === "" ? 1 : Number(fxRaw);
+      if (!Number.isFinite(fx) || fx <= 0) return;
+      const count = Math.max(1, Math.round((chaos >= 5 ? 2 : 1) * fx));
       const chars = [...text];
       for (let i = 0; i < count; i++) {
         const pos = Math.floor(Math.random() * chars.length);

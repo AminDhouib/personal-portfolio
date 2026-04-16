@@ -13,6 +13,7 @@ import { TIER_5_RULES } from "./rules/tier5";
 import { RuleCard } from "./rule-card";
 import { pickForeshadow, useForeshadowTrigger, ForeshadowOverlay } from "./foreshadowing";
 import { CracksOverlay } from "./destruction";
+import { ChaosDebugPanel } from "./chaos-debug-panel";
 import { ResultModal } from "./result-modal";
 import { RichInput } from "./rich-input";
 import type { GameState, Rule, FormattingMap } from "./types";
@@ -294,6 +295,7 @@ export function PasswordGame() {
         containerRef={containerRef}
       />
       </div>
+      <ChaosDebugPanel />
     </div>
   );
 }

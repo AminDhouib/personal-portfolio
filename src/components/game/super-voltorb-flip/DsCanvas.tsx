@@ -6,6 +6,7 @@ import { VoltorbMessage, VOLTORB_MESSAGE_HEIGHT } from "./chrome/VoltorbMessage"
 import { TotalScoreboard, SCOREBOARD_HEIGHT } from "./chrome/TotalScoreboard";
 import { CurrentScoreboard } from "./chrome/CurrentScoreboard";
 import { BoardSection, BOARD_SECTION_HEIGHT } from "./chrome/BoardSection";
+import { THEMES } from "./theme";
 import type { GameState, MemoMarks } from "./types";
 
 const CANVAS_W = 262;
@@ -44,6 +45,7 @@ export function DsCanvas({
   onMarkChange: (idx: 0 | 1 | 2 | 3) => void;
   onToggleCopy: () => void;
 }) {
+  const labels = THEMES[state.activeTheme].labels;
   return (
     <div
       style={{
@@ -68,8 +70,8 @@ export function DsCanvas({
         <Header level={state.level} />
         <Legend />
         <VoltorbMessage />
-        <TotalScoreboard value={state.totalCoins} />
-        <CurrentScoreboard value={state.currentCoins} />
+        <TotalScoreboard value={state.totalCoins} label={labels.totalScoreboard} />
+        <CurrentScoreboard value={state.currentCoins} label={labels.currentScoreboard} />
         <BoardSection
           state={state}
           onTileClick={onTileClick}

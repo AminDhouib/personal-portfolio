@@ -10,6 +10,19 @@
   --pg-shake-y: 0px;
   --pg-hue-shift: 0deg;
   --pg-saturate: 1;
+  /* Per-effect intensity flags. Default 1 (full strength). The debug panel
+     overrides these on the root to scale individual effects 0..2. */
+  --fx-chips: 1;
+  --fx-scanlines: 1;
+  --fx-debris: 1;
+  --fx-glitch: 1;
+  --fx-chromatic: 1;
+  --fx-scramble: 1;
+  --fx-heartbeat: 1;
+  --fx-cursortrail: 1;
+  --fx-vhs: 1;
+  --fx-noiseburst: 1;
+  --fx-ghosttext: 1;
   position: relative;
   transition: filter 600ms ease-out, background-color 600ms ease-out;
   filter: hue-rotate(var(--pg-hue-shift)) saturate(var(--pg-saturate));
@@ -42,13 +55,13 @@
   mix-blend-mode: overlay;
 }
 
-.pg-chaos-root[data-chaos="3"]::after { opacity: 0.5; }
+.pg-chaos-root[data-chaos="3"]::after { opacity: calc(0.5 * var(--fx-scanlines)); }
 .pg-chaos-root[data-chaos="4"]::after {
-  opacity: 0.75;
+  opacity: calc(0.75 * var(--fx-scanlines));
   animation: pg-scanline-drift 8s linear infinite;
 }
 .pg-chaos-root[data-chaos="5"]::after {
-  opacity: 1;
+  opacity: calc(1 * var(--fx-scanlines));
   animation: pg-scanline-drift 5s linear infinite;
 }
 
@@ -88,6 +101,11 @@
   z-index: 4;
   animation: pg-glitch-slice 7s steps(1) infinite;
   opacity: 0;
+  visibility: visible;
+}
+
+.pg-chaos-root[style*="--fx-glitch: 0"] .pg-container::before {
+  display: none;
 }
 
 .pg-chaos-root[data-chaos="5"] .pg-container::before {
@@ -148,14 +166,14 @@
 /* Chromatic aberration on text — constant at high chaos levels. */
 .pg-chaos-root[data-chaos="4"] .pg-rule-description {
   text-shadow:
-    -0.5px 0 rgba(255, 0, 60, 0.6),
-    0.5px 0 rgba(0, 220, 255, 0.6);
+    calc(-0.5px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.6 * var(--fx-chromatic))),
+    calc(0.5px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.6 * var(--fx-chromatic)));
 }
 
 .pg-chaos-root[data-chaos="5"] .pg-rule-description {
   text-shadow:
-    -1.2px 0 rgba(255, 0, 60, 0.75),
-    1.2px 0 rgba(0, 220, 255, 0.75);
+    calc(-1.2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.75 * var(--fx-chromatic))),
+    calc(1.2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.75 * var(--fx-chromatic)));
   animation: pg-glitch-pulse 3.1s steps(1) infinite;
 }
 
@@ -226,23 +244,23 @@
   transform-origin: 0% 50%;
 }
 
-/* Reveal thresholds. */
+/* Reveal thresholds. Multiplied by --fx-chips so the debug panel can hide them. */
 .pg-chaos-root[data-chaos="3"] .pg-chip-1,
 .pg-chaos-root[data-chaos="4"] .pg-chip-1,
 .pg-chaos-root[data-chaos="5"] .pg-chip-1 {
-  opacity: 1;
-  transform: scale(1);
+  opacity: calc(1 * var(--fx-chips));
+  transform: scale(var(--fx-chips));
 }
 
 .pg-chaos-root[data-chaos="4"] .pg-chip-2,
 .pg-chaos-root[data-chaos="5"] .pg-chip-2 {
-  opacity: 1;
-  transform: scale(1);
+  opacity: calc(1 * var(--fx-chips));
+  transform: scale(var(--fx-chips));
 }
 
 .pg-chaos-root[data-chaos="5"] .pg-chip-3 {
-  opacity: 1;
-  transform: scale(1);
+  opacity: calc(1 * var(--fx-chips));
+  transform: scale(var(--fx-chips));
 }
 
 /* Floating debris — tiny specks that drift. Hidden until chaos >= 3. */
@@ -256,9 +274,9 @@
   overflow: hidden;
 }
 
-.pg-chaos-root[data-chaos="3"] .pg-debris-field { opacity: 0.35; }
-.pg-chaos-root[data-chaos="4"] .pg-debris-field { opacity: 0.55; }
-.pg-chaos-root[data-chaos="5"] .pg-debris-field { opacity: 0.8; }
+.pg-chaos-root[data-chaos="3"] .pg-debris-field { opacity: calc(0.35 * var(--fx-debris)); }
+.pg-chaos-root[data-chaos="4"] .pg-debris-field { opacity: calc(0.55 * var(--fx-debris)); }
+.pg-chaos-root[data-chaos="5"] .pg-debris-field { opacity: calc(0.8 * var(--fx-debris)); }
 
 .pg-debris {
   position: absolute;
@@ -339,6 +357,11 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),
     0 0 0 1px rgba(255, 255, 255, 0.03);
   animation: pg-heartbeat 2.4s ease-in-out infinite;
+  animation-play-state: running;
+}
+
+.pg-chaos-root[style*="--fx-heartbeat: 0"] .pg-container {
+  animation-play-state: paused;
 }
 
 /* Slow heartbeat — very subtle scale pulse. Unsettling without being
@@ -364,6 +387,125 @@
     transform: scale(1);
     filter: brightness(1);
   }
+}
+
+/* Cursor trail canvas — overlays the whole root, fades based on chaos. */
+.pg-cursor-trail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 400ms ease-out;
+}
+
+.pg-chaos-root[data-chaos="3"] .pg-cursor-trail { opacity: calc(0.5 * var(--fx-cursortrail)); }
+.pg-chaos-root[data-chaos="4"] .pg-cursor-trail { opacity: calc(0.75 * var(--fx-cursortrail)); }
+.pg-chaos-root[data-chaos="5"] .pg-cursor-trail { opacity: calc(1 * var(--fx-cursortrail)); }
+
+/* VHS tracking bars — thin horizontal bands scrolling vertically. */
+.pg-vhs-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 18px;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 20%,
+    rgba(255, 0, 60, 0.12) 45%,
+    rgba(0, 220, 255, 0.1) 55%,
+    rgba(255, 255, 255, 0.06) 80%,
+    transparent 100%
+  );
+  filter: blur(0.4px);
+  opacity: 0;
+  transform: translateY(-100%);
+  mix-blend-mode: screen;
+}
+
+.pg-chaos-root[data-chaos="3"] .pg-vhs-bar-1 {
+  opacity: calc(0.6 * var(--fx-vhs));
+  animation: pg-vhs-scroll 11s linear infinite;
+}
+.pg-chaos-root[data-chaos="4"] .pg-vhs-bar-1,
+.pg-chaos-root[data-chaos="5"] .pg-vhs-bar-1 {
+  opacity: calc(0.8 * var(--fx-vhs));
+  animation: pg-vhs-scroll 7s linear infinite;
+}
+.pg-chaos-root[data-chaos="4"] .pg-vhs-bar-2,
+.pg-chaos-root[data-chaos="5"] .pg-vhs-bar-2 {
+  opacity: calc(0.6 * var(--fx-vhs));
+  animation: pg-vhs-scroll 9s linear infinite;
+  animation-delay: -3s;
+}
+
+@keyframes pg-vhs-scroll {
+  0% { transform: translateY(-20px); }
+  100% { transform: translateY(calc(100vh + 20px)); }
+}
+
+/* Pixel noise bursts — brief rectangular patches of static. */
+.pg-noise-burst {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><filter id='n'><feTurbulence baseFrequency='2.5' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 -0.3'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 80px 80px;
+  mix-blend-mode: screen;
+  opacity: 0;
+  width: 80px;
+  height: 30px;
+}
+
+.pg-noise-burst-1 { top: 18%; left: 12%; }
+.pg-noise-burst-2 { top: 52%; right: 18%; width: 100px; height: 24px; }
+.pg-noise-burst-3 { bottom: 25%; left: 40%; width: 60px; height: 40px; }
+.pg-noise-burst-4 { top: 30%; right: 8%; width: 70px; height: 20px; }
+
+.pg-chaos-root[data-chaos="3"] .pg-noise-burst-1 {
+  animation: pg-noise-flash 8s steps(1) infinite;
+  opacity: calc(1 * var(--fx-noiseburst));
+}
+.pg-chaos-root[data-chaos="4"] .pg-noise-burst-1,
+.pg-chaos-root[data-chaos="4"] .pg-noise-burst-2,
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-1,
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-2 {
+  animation: pg-noise-flash 5s steps(1) infinite;
+  opacity: calc(1 * var(--fx-noiseburst));
+}
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-3,
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-4 {
+  animation: pg-noise-flash 4s steps(1) infinite;
+  opacity: calc(1 * var(--fx-noiseburst));
+}
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-2 { animation-delay: -1.2s; }
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-3 { animation-delay: -2.4s; }
+.pg-chaos-root[data-chaos="5"] .pg-noise-burst-4 { animation-delay: -3.1s; }
+
+@keyframes pg-noise-flash {
+  0%, 96%, 100% { opacity: 0; transform: translateX(0); }
+  97% { opacity: 0.7; transform: translateX(2px); }
+  98% { opacity: 0.5; transform: translateX(-4px); }
+  99% { opacity: 0.3; transform: translateX(1px); }
+}
+
+/* Ghost text echo — all non-passed rule descriptions get a faint duplicate
+   offset slightly, as if the text is refracting through cracked glass. */
+.pg-chaos-root[data-chaos="4"] .pg-rule-description::after,
+.pg-chaos-root[data-chaos="5"] .pg-rule-description::after {
+  content: attr(data-text);
+}
+
+.pg-chaos-root[data-chaos="5"] .pg-rule-description {
+  position: relative;
+}
+
+.pg-chaos-root[data-chaos="5"] .pg-rule-description span:first-child::before {
+  content: "";
+  /* Placeholder — ghost echo would be implemented via JS duplication if needed. */
 }
 
 /* Tier 5 rule-specific hazards. Applied by adding a data attribute to the input wrapper. */

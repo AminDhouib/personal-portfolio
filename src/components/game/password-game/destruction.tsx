@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 /**
  * Destruction overlay — renders "broken chips" that appear as if pieces of
  * the container were physically knocked off. Each chip has:
@@ -24,8 +26,126 @@ export function CracksOverlay() {
         <ChipShape flipX={false} flipY={false} />
       </div>
       <FloatingDebris />
+      <CursorTrail />
+      <VhsTrackingBars />
+      <NoiseBursts />
     </>
   );
+}
+
+/**
+ * Leaves a trail of fading particles behind the cursor when hovering the
+ * container. Canvas-based so drawing is cheap even at 60fps. Intensity is
+ * multiplied by --fx-cursortrail (default 1).
+ */
+function CursorTrail() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const root = canvas.parentElement;
+    if (!root) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let particles: { x: number; y: number; life: number; vx: number; vy: number }[] = [];
+    let rafId = 0;
+
+    const resize = () => {
+      const r = root.getBoundingClientRect();
+      canvas.width = r.width * window.devicePixelRatio;
+      canvas.height = r.height * window.devicePixelRatio;
+      canvas.style.width = r.width + "px";
+      canvas.style.height = r.height + "px";
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    };
+    resize();
+    const resizeObs = new ResizeObserver(resize);
+    resizeObs.observe(root);
+
+    const onMove = (e: MouseEvent) => {
+      const intensity = getFxIntensity(root, "cursortrail");
+      const chaos = Number(root.getAttribute("data-chaos") ?? 0);
+      if (intensity <= 0 || chaos < 3) return;
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const count = Math.round(intensity * (chaos >= 5 ? 3 : 2));
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: x + (Math.random() - 0.5) * 4,
+          y: y + (Math.random() - 0.5) * 4,
+          life: 1,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+        });
+      }
+      if (particles.length > 200) particles = particles.slice(-200);
+    };
+    root.addEventListener("mousemove", onMove);
+
+    const tick = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles = particles.filter((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.025;
+        return p.life > 0;
+      });
+      for (const p of particles) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${p.life * 0.5})`;
+        ctx.fillRect(p.x, p.y, 2, 2);
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      resizeObs.disconnect();
+      root.removeEventListener("mousemove", onMove);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="pg-cursor-trail" aria-hidden />;
+}
+
+/**
+ * VHS tracking bars: a thin horizontal band that slowly scrolls vertically
+ * across the container, with a subtle displacement (shifted color channels
+ * and slight blur). Visible at chaos 3+.
+ */
+function VhsTrackingBars() {
+  return (
+    <>
+      <div className="pg-vhs-bar pg-vhs-bar-1" aria-hidden />
+      <div className="pg-vhs-bar pg-vhs-bar-2" aria-hidden />
+    </>
+  );
+}
+
+/**
+ * Pixel noise bursts: brief rectangular patches of static that appear at
+ * random positions. Each is a <div> with a repeating noise background. Four
+ * staggered elements so the timing feels unpredictable.
+ */
+function NoiseBursts() {
+  return (
+    <>
+      <div className="pg-noise-burst pg-noise-burst-1" aria-hidden />
+      <div className="pg-noise-burst pg-noise-burst-2" aria-hidden />
+      <div className="pg-noise-burst pg-noise-burst-3" aria-hidden />
+      <div className="pg-noise-burst pg-noise-burst-4" aria-hidden />
+    </>
+  );
+}
+
+function getFxIntensity(el: HTMLElement, key: string): number {
+  const raw = getComputedStyle(el).getPropertyValue(`--fx-${key}`).trim();
+  if (!raw) return 1;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 1;
 }
 
 /**
