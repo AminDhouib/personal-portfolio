@@ -157,3 +157,18 @@ describe("Tier 1 — color name rule", () => {
     expect(rule.validate(makeState("xyz", rule)).passed).toBe(false);
   });
 });
+
+describe("Tier 1 — day of week rule", () => {
+  const def = TIER_1_RULES.find((r) => r.id === "day-of-week")!;
+
+  it("passes with a day name (case-insensitive)", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("Abc123monday!", rule)).passed).toBe(true);
+    expect(rule.validate(makeState("Abc123SUNDAY!", rule)).passed).toBe(true);
+  });
+
+  it("fails without a day name", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("Abc123!", rule)).passed).toBe(false);
+  });
+});

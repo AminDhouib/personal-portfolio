@@ -126,4 +126,23 @@ const colorName: RuleDef = {
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName];
+const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+const dayOfWeek: RuleDef = {
+  id: "day-of-week",
+  tier: 1,
+  create() {
+    return {
+      id: "day-of-week",
+      tier: 1,
+      description: "Your password must include a day of the week.",
+      params: {},
+      validate(state) {
+        const lower = state.password.toLowerCase();
+        return { passed: DAYS.some((d) => lower.includes(d)) };
+      },
+    };
+  },
+};
+
+export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName, dayOfWeek];
