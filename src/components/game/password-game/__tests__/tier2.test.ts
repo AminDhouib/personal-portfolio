@@ -3,6 +3,7 @@ import { mulberry32 } from "../prng";
 import { TIER_2_RULES } from "../rules/tier2";
 import type { GameState, Rule } from "../types";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
+import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 
 function makeState(password: string, rule: Rule): GameState {
   return {
@@ -128,6 +129,34 @@ describe("Tier 2 — periodic element rule", () => {
   it("fails without any matching element symbol", () => {
     const rule = def.create(mulberry32(11));
     expect(rule.validate(makeState("zzzzzzz", rule)).passed).toBe(false);
+  });
+});
+
+describe("Tier 2 — foreign word rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "foreign-word")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params reference a real entry from the pool", () => {
+    const rule = def.create(mulberry32(17));
+    const entry = FOREIGN_WORDS.find(
+      (w) => w.translation === rule.params.translation && w.language === rule.params.language
+    );
+    expect(entry).toBeDefined();
+  });
+
+  it("passes when password contains the translation (case-insensitive)", () => {
+    const rule = def.create(mulberry32(17));
+    const tr = rule.params.translation as string;
+    expect(rule.validate(makeState(`abc${tr}xyz`, rule)).passed).toBe(true);
+    expect(rule.validate(makeState(`abc${tr.toUpperCase()}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails without the translation", () => {
+    const rule = def.create(mulberry32(17));
+    expect(rule.validate(makeState("qqqqqqq", rule)).passed).toBe(false);
   });
 });
 

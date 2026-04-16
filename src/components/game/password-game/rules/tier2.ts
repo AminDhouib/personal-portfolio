@@ -2,6 +2,7 @@ import type { RuleDef } from "../types";
 import { pickOne, rangeInt } from "../prng";
 import { NATO_ALPHABET, NATO_LETTERS } from "../../../../data/password-game/nato";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
+import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -141,4 +142,27 @@ const periodicElement: RuleDef = {
   },
 };
 
-export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement];
+const foreignWord: RuleDef = {
+  id: "foreign-word",
+  tier: 2,
+  create(rng) {
+    const entry = pickOne(rng, FOREIGN_WORDS);
+    return {
+      id: "foreign-word",
+      tier: 2,
+      description: `Your password must include the ${entry.language} word for "${entry.english}".`,
+      params: {
+        english: entry.english,
+        translation: entry.translation,
+        language: entry.language,
+      },
+      validate(state) {
+        return {
+          passed: state.password.toLowerCase().includes(entry.translation.toLowerCase()),
+        };
+      },
+    };
+  },
+};
+
+export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement, foreignWord];
