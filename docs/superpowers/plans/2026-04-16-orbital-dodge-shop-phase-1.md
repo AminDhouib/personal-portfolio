@@ -29,7 +29,7 @@
 
 **Why:** Every downstream plan reads/writes this profile. Centralizing it in one module with a version field lets us add fields additively in later plans without touching every consumer.
 
-- [ ] **Step 1: Create the file with the full schema and helpers**
+- [x] **Step 1: Create the file with the full schema and helpers**
 
 ```ts
 // src/components/game/profile.ts
@@ -165,7 +165,7 @@ export function getUpgradeLevel(upgradeId: string): number {
 }
 ```
 
-- [ ] **Step 2: Type check**
+- [x] **Step 2: Type check**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx tsc --noEmit
@@ -173,7 +173,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: no errors mentioning `profile.ts`.
 
-- [ ] **Step 3: Lint**
+- [x] **Step 3: Lint**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/profile.ts
@@ -181,7 +181,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/profile.ts
@@ -197,7 +197,7 @@ git commit -m "feat(orbital-dodge): add persistent profile module (wallet + upgr
 
 **Why:** 5 core permanent upgrades in Phase 1. Each has 5 levels with escalating cost and effect. Data-only module — no React, no imports from game — so it can be read from anywhere.
 
-- [ ] **Step 1: Create the catalog file**
+- [x] **Step 1: Create the catalog file**
 
 ```ts
 // src/components/game/shop-data.ts
@@ -291,7 +291,7 @@ export function upgradeById(id: UpgradeId): UpgradeDef | undefined {
 }
 ```
 
-- [ ] **Step 2: Type check + lint**
+- [x] **Step 2: Type check + lint**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/shop-data.ts && npx tsc --noEmit
@@ -299,7 +299,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/components/game/shop-data.ts
@@ -315,7 +315,7 @@ git commit -m "feat(orbital-dodge): add shop upgrade catalog (5 upgrades, 5 leve
 
 **Why:** Coins are the currency — they drop during play at a rate proportional to combo. Visually distinct from power-ups (smaller, yellow, no halo).
 
-- [ ] **Step 1: Add `Coin` interface**
+- [x] **Step 1: Add `Coin` interface**
 
 Near the other entity interfaces (e.g., `PowerUp`):
 
@@ -328,7 +328,7 @@ interface Coin {
 }
 ```
 
-- [ ] **Step 2: Extend `GameRefs`**
+- [x] **Step 2: Extend `GameRefs`**
 
 Inside `GameRefs`:
 
@@ -344,7 +344,7 @@ And a per-run counter for UI:
   coinsThisRun: number;
 ```
 
-- [ ] **Step 3: Initialize in `createRefs`**
+- [x] **Step 3: Initialize in `createRefs`**
 
 ```ts
     powerUps: [], coins: [], activePowerUps: [], debris: [], scorePopups: [],
@@ -352,7 +352,7 @@ And a per-run counter for UI:
     coinsThisRun: 0,
 ```
 
-- [ ] **Step 4: Reset in `launch`**
+- [x] **Step 4: Reset in `launch`**
 
 ```ts
     g.powerUps.length = 0;
@@ -360,7 +360,7 @@ And a per-run counter for UI:
     g.coinsThisRun = 0;
 ```
 
-- [ ] **Step 5: Add spawn helper**
+- [x] **Step 5: Add spawn helper**
 
 Near `spawnPowerUp`:
 
@@ -377,7 +377,7 @@ function spawnCoin(g: GameRefs, x: number, y: number, z: number, value: number) 
 }
 ```
 
-- [ ] **Step 6: Spawn coin on asteroid destroy**
+- [x] **Step 6: Spawn coin on asteroid destroy**
 
 In the asteroid-kill block inside `runTick` (the one you edited in Plan 1 Task 3), after `g.kills += 1;` add:
 
@@ -387,7 +387,7 @@ In the asteroid-kill block inside `runTick` (the one you edited in Plan 1 Task 3
           spawnCoin(g, o.x, o.y, o.z, coinValue);
 ```
 
-- [ ] **Step 7: Move and collect coins each frame**
+- [x] **Step 7: Move and collect coins each frame**
 
 In the obstacle-movement loop area of `runTick`, after the obstacles loop closes, add:
 
@@ -429,7 +429,7 @@ In the obstacle-movement loop area of `runTick`, after the obstacles loop closes
 
 Note: this references `g.coinMagnetExtra` — a field added in Task 5 (upgrade application).
 
-- [ ] **Step 8: Add `coinMagnetExtra` + `coinValueBonus` to `GameRefs`**
+- [x] **Step 8: Add `coinMagnetExtra` + `coinValueBonus` to `GameRefs`**
 
 ```ts
   // Upgrade-derived run modifiers, set at startRun.
@@ -452,7 +452,7 @@ Initialize in `createRefs`:
 
 Reset in `launch` (same values).
 
-- [ ] **Step 9: Render coin sprites in R3F**
+- [x] **Step 9: Render coin sprites in R3F**
 
 Create a new `Coins` component (follow the `PowerUps` component pattern):
 
@@ -497,7 +497,7 @@ function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: 
 }
 ```
 
-- [ ] **Step 10: Mount `<Coins />` in the `Scene` block**
+- [x] **Step 10: Mount `<Coins />` in the `Scene` block**
 
 Inside the `Scene` function return, alongside `<PowerUps ... />`:
 
@@ -505,7 +505,7 @@ Inside the `Scene` function return, alongside `<PowerUps ... />`:
       <Coins gameRefs={gameRefs} tick={tick} />
 ```
 
-- [ ] **Step 11: Lint + tsc**
+- [x] **Step 11: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
@@ -513,7 +513,7 @@ cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx
 
 Expected: clean.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -529,7 +529,7 @@ git commit -m "feat(orbital-dodge): coin entity drops from kills + magnet + coll
 
 **Why:** Coins earned in a run credit to the wallet on death. Also mark `firstRunCompleted` and bump run counters.
 
-- [ ] **Step 1: Import profile helpers**
+- [x] **Step 1: Import profile helpers**
 
 At the top of `space-shooter.tsx`, add:
 
@@ -537,7 +537,7 @@ At the top of `space-shooter.tsx`, add:
 import { addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted } from "./profile";
 ```
 
-- [ ] **Step 2: Credit coins + stats in `onDeath`**
+- [x] **Step 2: Credit coins + stats in `onDeath`**
 
 In `onDeath`, after `const final = Math.floor(g.score);` add:
 
@@ -549,13 +549,13 @@ In `onDeath`, after `const final = Math.floor(g.score);` add:
     markFirstRunCompleted();
 ```
 
-- [ ] **Step 3: Lint + tsc**
+- [x] **Step 3: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
@@ -571,7 +571,7 @@ git commit -m "feat(orbital-dodge): persist coin earnings + run stats on death"
 
 **Why:** On `startRun`, read the player's upgrade levels from the profile and populate the per-run modifier fields (`coinMagnetExtra`, `scoreMultiplier`, etc.). This keeps per-frame logic clean — no upgrade lookup inside hot loops.
 
-- [ ] **Step 1: Import upgrade catalog**
+- [x] **Step 1: Import upgrade catalog**
 
 At the top of `space-shooter.tsx`:
 
@@ -579,7 +579,7 @@ At the top of `space-shooter.tsx`:
 import { UPGRADES, upgradeById } from "./shop-data";
 ```
 
-- [ ] **Step 2: Populate modifiers in `startRun`**
+- [x] **Step 2: Populate modifiers in `startRun`**
 
 In `startRun`, after `g.nextWallAt = now + 20_000;` add:
 
@@ -594,7 +594,7 @@ In `startRun`, after `g.nextWallAt = now + 20_000;` add:
   g.shieldDurationMs = upgradeById("shield-duration")?.effectAtLevel(getLevel("shield-duration")) ?? 8000;
 ```
 
-- [ ] **Step 3: Use `comboWindowMs` for combo decay**
+- [x] **Step 3: Use `comboWindowMs` for combo decay**
 
 In `runTick`, find the combo decay from Plan 1:
 
@@ -613,7 +613,7 @@ Replace with:
   }
 ```
 
-- [ ] **Step 4: Apply `coinValueBonus` in spawn**
+- [x] **Step 4: Apply `coinValueBonus` in spawn**
 
 In the asteroid-kill block, find the coin value calc from Task 3:
 
@@ -627,7 +627,7 @@ Replace with:
           const coinValue = Math.max(1, 1 + Math.floor(g.combo / 5) + g.coinValueBonus);
 ```
 
-- [ ] **Step 5: Apply `scoreMultiplier` at death time**
+- [x] **Step 5: Apply `scoreMultiplier` at death time**
 
 In `onDeath`, replace:
 
@@ -641,7 +641,7 @@ With:
     const final = Math.floor(g.score * g.scoreMultiplier);
 ```
 
-- [ ] **Step 6: Use `shieldDurationMs` when activating shield power-up**
+- [x] **Step 6: Use `shieldDurationMs` when activating shield power-up**
 
 Find `activatePowerUp`:
 
@@ -664,13 +664,13 @@ function activatePowerUp(g: GameRefs, t: PowerUpType): void {
 }
 ```
 
-- [ ] **Step 7: Lint + tsc**
+- [x] **Step 7: Lint + tsc**
 
 ```bash
 cd "c:/Users/amind/OneDrive/Desktop/Projects/PERSONAL/personal-portfolio" && npx eslint src/components/game/space-shooter.tsx && npx tsc --noEmit
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/components/game/space-shooter.tsx
