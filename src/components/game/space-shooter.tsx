@@ -161,6 +161,7 @@ interface Obstacle {
   closestApproach: number;  // closest 3D distance the ship came to this obstacle, tracked per-frame
   brushed: boolean;         // true if the obstacle came within near-miss range but not collision
   lastShotAt?: number;      // shooter variant: timestamp of last bullet fired at the player
+  lastBeamCycle?: number;   // zapper variant: last cycle index that triggered a muzzle flash
 }
 
 interface Bullet {
@@ -2780,6 +2781,13 @@ function runTick(
       const BEAM_MS = 1100;
       const cycleAge = ((now - g.startedAt) + o.id * 317) % CYCLE_MS; // desync per-zapper
       const beamOn = cycleAge < BEAM_MS;
+      // Muzzle flash at the base the instant a new beam cycle starts
+      const cycleIdx = Math.floor(((now - g.startedAt) + o.id * 317) / CYCLE_MS);
+      if (beamOn && o.lastBeamCycle !== cycleIdx) {
+        o.lastBeamCycle = cycleIdx;
+        spawnExplosion(g, o.x, o.y - 0.5, o.z, "#06b6d4", 300, 0.4);
+        spawnExplosion(g, o.x, o.y + 2.5, o.z, "#22d3ee", 260, 0.3);
+      }
       if (beamOn) {
         const dx = g.shipX - o.x;
         const dz = g.shipZ - o.z;
@@ -2832,6 +2840,8 @@ function runTick(
           homing: false,
           shielded: false,
         });
+        // Muzzle flash at the source
+        spawnExplosion(g, o.x, o.y, o.z, "#ec4899", 220, 0.22);
       }
     }
 
@@ -2856,6 +2866,8 @@ function runTick(
           homing: false,
           shielded: false,
         });
+        // Muzzle flash
+        spawnExplosion(g, o.x, o.y, o.z, "#f59e0b", 240, 0.28);
       }
     }
 
@@ -2963,6 +2975,10 @@ function runTick(
       g.coinsThisRun += val;
       spawnScorePopup(g, c.x, c.y, c.z, val);
       sounds.play("chime");
+      // Sparkle burst — a warm amber flash + a few offset flecks for sparkle feel
+      spawnExplosion(g, c.x, c.y, c.z, "#fde047", 360, 0.22);
+      spawnExplosion(g, c.x + 0.18, c.y + 0.12, c.z, "#fbbf24", 240, 0.1);
+      spawnExplosion(g, c.x - 0.15, c.y - 0.1, c.z, "#facc15", 260, 0.1);
       g.coins.splice(i, 1);
     }
   }
@@ -3087,6 +3103,8 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
   const engineTrailRef = useRef<THREE.Mesh>(null);
   const warpAuraRef = useRef<THREE.Mesh>(null);
   const fuselageRef = useRef<THREE.Mesh>(null);
+  const magnetRingRef = useRef<THREE.Mesh>(null);
+  const magnetRingInnerRef = useRef<THREE.Mesh>(null);
   const tintColor = useMemo(() => new THREE.Color("#60a5fa"), []);
 
   useFrame(() => {
@@ -3152,6 +3170,26 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
         const aurascale = 1 + Math.sin(now * 0.03) * 0.15;
         warpAuraRef.current.scale.setScalar(aurascale);
         warpAuraRef.current.rotation.z += 0.15;
+      }
+    }
+
+    if (magnetRingRef.current) {
+      const magnetOn = isPowerUpActive(g, "magnet");
+      magnetRingRef.current.visible = magnetOn;
+      if (magnetOn) {
+        magnetRingRef.current.rotation.z += 0.035;
+        const breathe = 1 + Math.sin(now * 0.008) * 0.08;
+        magnetRingRef.current.scale.setScalar(breathe);
+        const mat = magnetRingRef.current.material as THREE.MeshBasicMaterial;
+        mat.opacity = 0.55 + Math.sin(now * 0.012) * 0.15;
+      }
+      if (magnetRingInnerRef.current) {
+        magnetRingInnerRef.current.visible = magnetOn;
+        if (magnetOn) {
+          magnetRingInnerRef.current.rotation.z -= 0.05;
+          const mat2 = magnetRingInnerRef.current.material as THREE.MeshBasicMaterial;
+          mat2.opacity = 0.3 + Math.sin(now * 0.018 + 1.2) * 0.12;
+        }
       }
     }
 
@@ -3224,6 +3262,15 @@ function Ship({ gameRefs, env }: { gameRefs: React.RefObject<GameRefs>; env: Env
       <mesh ref={shieldRef} visible={false}>
         <sphereGeometry args={[0.85, 22, 18]} />
         <meshBasicMaterial color="#60a5fa" transparent opacity={0.2} wireframe />
+      </mesh>
+      {/* Magnet power-up indicator — green ring rotating around the ship's XY plane */}
+      <mesh ref={magnetRingRef} rotation={[Math.PI / 2, 0, 0]} visible={false}>
+        <torusGeometry args={[0.95, 0.045, 10, 40]} />
+        <meshBasicMaterial color="#10b981" transparent opacity={0.6} />
+      </mesh>
+      <mesh ref={magnetRingInnerRef} rotation={[Math.PI / 2, 0, 0]} visible={false}>
+        <torusGeometry args={[0.68, 0.025, 8, 32]} />
+        <meshBasicMaterial color="#34d399" transparent opacity={0.35} />
       </mesh>
       <pointLight position={[0, 0, 0.7]} color={env.starColor} intensity={0.9} distance={3} />
     </group>
@@ -3878,25 +3925,59 @@ function MissionsPanel({ refreshProfile }: { refreshProfile: () => void }) {
 function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRefs = useRef<Map<number, THREE.Mesh>>(new Map());
+  const warnRefs = useRef<Map<number, THREE.Mesh>>(new Map());
   useFrame(() => {
     const g = gameRefs.current;
     if (!g) return;
     const now = performance.now();
     const CYCLE_MS = 2500;
     const BEAM_MS = 1100;
+    const WARN_MS = 350;    // pre-beam telegraph duration
+    const RAMP_IN = 140;    // beam fade-in ms
+    const RAMP_OUT = 220;   // beam fade-out ms
     for (const o of g.obstacles) {
       if (o.variant !== "zapper") continue;
       const mesh = meshRefs.current.get(o.id);
-      if (!mesh) continue;
+      const warn = warnRefs.current.get(o.id);
       const cycleAge = ((now - g.startedAt) + o.id * 317) % CYCLE_MS;
       const beamOn = cycleAge < BEAM_MS;
-      mesh.visible = beamOn && o.z > -25 && o.z < 2;
-      if (mesh.visible) {
-        mesh.position.set(o.x, o.y, o.z);
-        // Flicker opacity for "electric" feel
-        const mat = mesh.material as THREE.MeshBasicMaterial;
-        const flicker = 0.55 + Math.sin(now * 0.05) * 0.25 + (Math.random() - 0.5) * 0.1;
-        mat.opacity = Math.max(0.25, Math.min(1, flicker));
+      const inVisZ = o.z > -25 && o.z < 2;
+
+      // Main beam: smooth ramp-in and ramp-out with flicker on top
+      if (mesh) {
+        mesh.visible = beamOn && inVisZ;
+        if (mesh.visible) {
+          mesh.position.set(o.x, o.y, o.z);
+          const mat = mesh.material as THREE.MeshBasicMaterial;
+          const ramp = cycleAge < RAMP_IN
+            ? cycleAge / RAMP_IN
+            : cycleAge > BEAM_MS - RAMP_OUT
+              ? (BEAM_MS - cycleAge) / RAMP_OUT
+              : 1;
+          const flicker = 0.75 + Math.sin(now * 0.05) * 0.18 + (Math.random() - 0.5) * 0.08;
+          const smoothed = Math.max(0, Math.min(1, ramp)) * flicker;
+          mat.opacity = Math.max(0.05, Math.min(1, smoothed));
+          // Scale X/Z in as beam ramps so it "blooms" open
+          const widthT = Math.max(0.2, Math.min(1, ramp));
+          mesh.scale.set(widthT, 1, widthT);
+        }
+      }
+
+      // Pre-beam warning: dim cyan pulse in the last WARN_MS of the off-phase
+      if (warn) {
+        const offRemaining = CYCLE_MS - cycleAge; // ms until next beam-on
+        const warning = !beamOn && offRemaining < WARN_MS && inVisZ;
+        warn.visible = warning;
+        if (warning) {
+          warn.position.set(o.x, o.y, o.z);
+          const mat = warn.material as THREE.MeshBasicMaterial;
+          const t = 1 - offRemaining / WARN_MS; // 0→1 as beam approaches
+          // Fast pulse that accelerates to cue the strike
+          const pulse = 0.5 + 0.5 * Math.sin(now * (0.015 + t * 0.03));
+          mat.opacity = 0.08 + pulse * 0.18 * (0.4 + t * 0.6);
+          const wScale = 0.4 + t * 0.4;
+          warn.scale.set(wScale, 1, wScale);
+        }
       }
     }
   });
@@ -3904,17 +3985,29 @@ function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; 
   return (
     <group ref={groupRef}>
       {zappers.map((o) => (
-        <mesh
-          key={`zap-${o.id}`}
-          ref={(el) => {
-            if (el) meshRefs.current.set(o.id, el);
-            else meshRefs.current.delete(o.id);
-          }}
-          visible={false}
-        >
-          <boxGeometry args={[0.45, 6, 0.45]} />
-          <meshBasicMaterial color="#22d3ee" transparent opacity={0.7} />
-        </mesh>
+        <group key={`zap-${o.id}`}>
+          {/* Warning telegraph column — wider, dim, pulses before the real beam */}
+          <mesh
+            ref={(el) => {
+              if (el) warnRefs.current.set(o.id, el);
+              else warnRefs.current.delete(o.id);
+            }}
+            visible={false}
+          >
+            <boxGeometry args={[0.7, 6, 0.7]} />
+            <meshBasicMaterial color="#67e8f9" transparent opacity={0} />
+          </mesh>
+          <mesh
+            ref={(el) => {
+              if (el) meshRefs.current.set(o.id, el);
+              else meshRefs.current.delete(o.id);
+            }}
+            visible={false}
+          >
+            <boxGeometry args={[0.45, 6, 0.45]} />
+            <meshBasicMaterial color="#22d3ee" transparent opacity={0.7} />
+          </mesh>
+        </group>
       ))}
       <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
     </group>
