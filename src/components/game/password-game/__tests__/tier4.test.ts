@@ -90,3 +90,27 @@ describe("Tier 4 — forbidden vowel rule", () => {
     expect(rule.validate(makeState(`bcdf${allowedVowels[0]}gh`, rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 4 — mystery rule", () => {
+  const def = TIER_4_RULES.find((r) => r.id === "mystery")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("description contains a redacted marker", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.description).toMatch(/█|▒|\?\?\?|redacted/i);
+  });
+
+  it("passes when password contains a specific hidden number", () => {
+    const rule = def.create(mulberry32(1));
+    const answer = rule.params.answer as string;
+    expect(rule.validate(makeState(`abc${answer}xyz`, rule)).passed).toBe(true);
+  });
+
+  it("fails without the hidden answer", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("abc", rule)).passed).toBe(false);
+  });
+});
