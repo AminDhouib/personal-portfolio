@@ -28,7 +28,13 @@ type FxKey =
   | "ghosttext"
   | "flickerout"
   | "stutter"
-  | "wave";
+  | "wave"
+  | "borderwobble"
+  | "tear"
+  | "rain"
+  | "revealshake"
+  | "connlost"
+  | "desync";
 
 const ALL_FX: { key: FxKey; label: string }[] = [
   { key: "chips", label: "Broken chips" },
@@ -46,6 +52,12 @@ const ALL_FX: { key: FxKey; label: string }[] = [
   { key: "flickerout", label: "Card flicker-out" },
   { key: "stutter", label: "UI stutter" },
   { key: "wave", label: "Text wave" },
+  { key: "borderwobble", label: "Border wobble" },
+  { key: "tear", label: "Screen tear" },
+  { key: "rain", label: "Matrix rain" },
+  { key: "revealshake", label: "Reveal shake" },
+  { key: "connlost", label: "NO SIGNAL flash" },
+  { key: "desync", label: "Color desync" },
 ];
 
 function applyToRoot(fx: Record<FxKey, number>, chaosOverride: number | null) {

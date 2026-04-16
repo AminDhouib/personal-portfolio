@@ -27,6 +27,12 @@
   --fx-flickerout: 1;
   --fx-stutter: 1;
   --fx-wave: 1;
+  --fx-borderwobble: 1;
+  --fx-tear: 1;
+  --fx-rain: 1;
+  --fx-revealshake: 1;
+  --fx-connlost: 1;
+  --fx-desync: 1;
   position: relative;
   transition: filter 600ms ease-out, background-color 600ms ease-out;
   filter: hue-rotate(var(--pg-hue-shift)) saturate(var(--pg-saturate));
@@ -614,6 +620,156 @@
     0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext))),
     calc(1px * var(--fx-ghosttext)) calc(-2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.14 * var(--fx-ghosttext)));
   animation: pg-glitch-pulse 3.1s steps(1) infinite;
+}
+
+/* Border wobble — inline SVG filter creates a turbulent displacement along
+   the container edges, making the border look like it's rippling/melting. */
+.pg-chaos-root[data-chaos="5"] .pg-container {
+  /* referenced from destruction.tsx where the filter is injected */
+  filter: url(#pg-border-wobble);
+}
+
+.pg-chaos-root[style*="--fx-borderwobble: 0"] .pg-container {
+  filter: none;
+}
+
+/* Screen tear — two pseudo elements overlay the container and clip to
+   different halves, offset slightly. Briefly active during the tear animation. */
+.pg-chaos-root[data-chaos="4"] .pg-container,
+.pg-chaos-root[data-chaos="5"] .pg-container {
+  position: relative;
+}
+
+.pg-chaos-root[data-chaos="5"] .pg-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  background: inherit;
+  clip-path: inset(60% 0 0 0);
+  transform: translateX(0);
+  opacity: 0;
+  animation: pg-screen-tear calc(9s / var(--fx-tear, 1)) steps(1) infinite;
+}
+
+.pg-chaos-root[style*="--fx-tear: 0"] .pg-container::after {
+  display: none;
+}
+
+@keyframes pg-screen-tear {
+  0%, 92%, 100% { opacity: 0; transform: translateX(0); }
+  93% {
+    opacity: 0.9;
+    transform: translateX(calc(-12px * var(--fx-tear)));
+    clip-path: inset(40% 0 35% 0);
+  }
+  94% {
+    opacity: 0.8;
+    transform: translateX(calc(8px * var(--fx-tear)));
+    clip-path: inset(55% 0 20% 0);
+  }
+  95% {
+    opacity: 0.5;
+    transform: translateX(calc(-4px * var(--fx-tear)));
+    clip-path: inset(70% 0 12% 0);
+  }
+}
+
+/* Character rain — a column of Matrix-style glyphs drifting down through
+   the container. The rain element is injected by destruction.tsx. */
+.pg-matrix-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+  font-family: monospace;
+  font-size: 10px;
+  color: rgba(180, 255, 180, 0.45);
+}
+
+.pg-chaos-root[data-chaos="4"] .pg-matrix-rain { opacity: calc(0.35 * var(--fx-rain)); }
+.pg-chaos-root[data-chaos="5"] .pg-matrix-rain { opacity: calc(0.6 * var(--fx-rain)); }
+
+.pg-rain-col {
+  position: absolute;
+  top: -100%;
+  width: 1em;
+  text-align: center;
+  white-space: pre;
+  animation: pg-rain-fall linear infinite;
+  line-height: 1;
+}
+
+@keyframes pg-rain-fall {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(220%); }
+}
+
+/* Broken connection flash — periodic pulse with a subtle "no signal" band. */
+.pg-chaos-root[data-chaos="5"]::before {
+  content: "NO SIGNAL";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: #ff3355;
+  background: rgba(0, 0, 0, 0.85);
+  text-align: center;
+  pointer-events: none;
+  z-index: 7;
+  opacity: 0;
+  animation: pg-connection-lost 17s steps(1) infinite;
+}
+
+.pg-chaos-root[style*="--fx-connlost: 0"]::before { display: none; }
+
+@keyframes pg-connection-lost {
+  0%, 88%, 100% { opacity: 0; }
+  89% { opacity: calc(0.9 * var(--fx-connlost)); }
+  90% { opacity: 0; }
+  91% { opacity: calc(0.9 * var(--fx-connlost)); }
+  92% { opacity: 0; }
+}
+
+/* Text color desync — rule descriptions have an additional animated cyan
+   shadow that drifts out of sync with the chromatic aberration. */
+.pg-chaos-root[data-chaos="5"] .pg-rule-description {
+  animation:
+    pg-glitch-pulse 3.1s steps(1) infinite,
+    pg-color-desync 5s ease-in-out infinite;
+}
+
+.pg-chaos-root[style*="--fx-desync: 0"] .pg-rule-description {
+  animation: pg-glitch-pulse 3.1s steps(1) infinite !important;
+}
+
+@keyframes pg-color-desync {
+  0%, 100% { filter: hue-rotate(0); }
+  25% { filter: hue-rotate(calc(15deg * var(--fx-desync))); }
+  50% { filter: hue-rotate(0); }
+  75% { filter: hue-rotate(calc(-15deg * var(--fx-desync))); }
+}
+
+/* Reveal shake — added as a class to the container when a new rule appears. */
+.pg-reveal-shake {
+  animation: pg-reveal-shake-kf 420ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes pg-reveal-shake-kf {
+  0% { transform: translate(0, 0); }
+  15% { transform: translate(calc(-4px * var(--fx-revealshake)), calc(2px * var(--fx-revealshake))); }
+  30% { transform: translate(calc(5px * var(--fx-revealshake)), calc(-2px * var(--fx-revealshake))); }
+  50% { transform: translate(calc(-3px * var(--fx-revealshake)), calc(1px * var(--fx-revealshake))); }
+  70% { transform: translate(calc(2px * var(--fx-revealshake)), 0); }
+  100% { transform: translate(0, 0); }
 }
 
 /* Tier 5 rule-specific hazards. Applied by adding a data attribute to the input wrapper. */

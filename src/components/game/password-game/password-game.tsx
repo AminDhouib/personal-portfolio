@@ -138,6 +138,15 @@ export function PasswordGame() {
   useEffect(() => {
     if (activeIdx > prevActive.current && prevActive.current !== -1) {
       playSfx("rule-reveal");
+      // Trigger a shake on the container when a new rule is revealed.
+      const container = containerRef.current?.querySelector<HTMLElement>(".pg-container");
+      if (container) {
+        container.classList.remove("pg-reveal-shake");
+        // Force reflow so the animation restarts if it was already applied.
+        void container.offsetWidth;
+        container.classList.add("pg-reveal-shake");
+        window.setTimeout(() => container.classList.remove("pg-reveal-shake"), 500);
+      }
     }
     prevActive.current = activeIdx;
   }, [activeIdx]);

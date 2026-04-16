@@ -16,6 +16,8 @@ import { useEffect, useRef } from "react";
 export function CracksOverlay() {
   return (
     <>
+      <BorderWobbleFilter />
+      <MatrixRain />
       <div className="pg-chip pg-chip-1" data-chaos-min="3">
         <ChipShape flipX={true} flipY={true} />
       </div>
@@ -30,6 +32,67 @@ export function CracksOverlay() {
       <VhsTrackingBars />
       <NoiseBursts />
     </>
+  );
+}
+
+/**
+ * Invisible SVG that defines the feTurbulence + feDisplacementMap filter
+ * referenced by CSS (url(#pg-border-wobble)) on the container. The turbulence
+ * seed animates to create continuous displacement.
+ */
+function BorderWobbleFilter() {
+  return (
+    <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+      <defs>
+        <filter id="pg-border-wobble" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="2" seed="3">
+            <animate
+              attributeName="baseFrequency"
+              dur="8s"
+              values="0.015 0.02;0.02 0.015;0.015 0.02"
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="2.5" />
+        </filter>
+      </defs>
+    </svg>
+  );
+}
+
+/**
+ * Matrix-style falling character rain. Several columns of random glyphs drift
+ * downward at different speeds. Visible only at chaos 4+.
+ */
+function MatrixRain() {
+  // Columns are positioned at fixed percentages across the container so
+  // they stay evenly distributed regardless of width.
+  const cols = Array.from({ length: 12 }, (_, i) => {
+    const left = (i / 12) * 100 + (i * 3) % 7;
+    const speed = 2.5 + (i % 4) * 0.9; // seconds per cycle
+    const delay = (i * 0.3) % 3;
+    return { left, speed, delay, i };
+  });
+  // Characters pool — small glyphs that suggest code/noise.
+  const glyphPool = "01アイウエオカキクケコサシスセソ░▒▓<>/\\|{}+=?!@#".split("");
+  const makeStream = (len: number, seed: number) =>
+    Array.from({ length: len }, (_, i) => glyphPool[(seed * 7 + i * 13) % glyphPool.length]).join("\n");
+  return (
+    <div className="pg-matrix-rain" aria-hidden>
+      {cols.map((c) => (
+        <div
+          key={c.i}
+          className="pg-rain-col"
+          style={{
+            left: `${c.left}%`,
+            animationDuration: `${c.speed}s`,
+            animationDelay: `${c.delay}s`,
+          }}
+        >
+          {makeStream(40, c.i + 1)}
+        </div>
+      ))}
+    </div>
   );
 }
 
