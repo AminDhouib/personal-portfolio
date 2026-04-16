@@ -602,6 +602,62 @@ function formatTime(ms: number): string {
   return `${mm}:${ss}.${cs}`;
 }
 
+async function generateShareCard(r: GameRefs): Promise<Blob | null> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 630;
+  const c = canvas.getContext("2d");
+  if (!c) return null;
+
+  const b = BIOMES[r.biomeIdx];
+  const g = c.createLinearGradient(0, 0, 0, 630);
+  g.addColorStop(0, b.gradient[0]);
+  g.addColorStop(1, b.gradient[1]);
+  c.fillStyle = g;
+  c.fillRect(0, 0, 1200, 630);
+  c.fillStyle = "rgba(0,0,0,0.4)";
+  c.fillRect(0, 0, 1200, 630);
+
+  const towerW = 400;
+  const towerH = 500;
+  const towerX = 80;
+  const towerY = 80;
+  const floorsN = r.floors.length - 1;
+  const pixPerFloor = Math.max(2, Math.min(18, towerH / Math.max(1, floorsN)));
+  for (let i = 0; i < floorsN; i++) {
+    const f = r.floors[i + 1];
+    if (!f) continue;
+    const hue = (HUE_BASE + i * HUE_STEP) % 360;
+    const scale = 0.5 + (f.width / BASE_BLOCK_WIDTH_PX) * 0.5;
+    c.fillStyle = `hsl(${hue} 80% 60%)`;
+    const ww = towerW * scale;
+    c.fillRect(towerX + (towerW - ww) / 2, towerY + towerH - (i + 1) * pixPerFloor, ww, pixPerFloor * 0.9);
+  }
+
+  c.fillStyle = "#fff";
+  c.font = "bold 160px system-ui, sans-serif";
+  c.fillText(r.score.toLocaleString(), 560, 260);
+
+  c.font = "600 40px system-ui, sans-serif";
+  c.fillStyle = "#fca5a5";
+  c.fillText(`Floor ${floorsN}`, 560, 320);
+
+  c.fillStyle = "#d1d5db";
+  c.font = "500 28px system-ui, sans-serif";
+  c.fillText(`Combo ${r.maxCombo}× · ${r.perfectsCount} perfects · ${r.goldenCount} golden`, 560, 370);
+
+  c.fillStyle = "#ef4444";
+  c.font = "bold 36px system-ui, sans-serif";
+  c.fillText("TOWER STACKER", 80, 590);
+  c.fillStyle = "#d1d5db";
+  c.font = "400 24px system-ui, sans-serif";
+  c.fillText("amin.dev/games", 820, 590);
+
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((bb) => resolve(bb), "image/png");
+  });
+}
+
 function SpeakerOn() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm12 2a4 4 0 0 0-2-3.5v7a4 4 0 0 0 2-3.5z"/></svg>; }
 function SpeakerOff() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2l2.5 2.5-1 1-2.5-2.5-2.5 2.5-1-1 2.5-2.5-2.5-2.5 1-1 2.5 2.5 2.5-2.5 1 1-2.5 2.5z"/></svg>; }
 
@@ -1424,6 +1480,37 @@ export default function TowerStacker({ initialSeed }: { initialSeed?: string } =
               <Stat label="Golden" value={String(refs.current.goldenCount)} />
               <Stat label="Duration" value={formatTime(refs.current.runRecord.durationMs)} />
             </div>
+            <button
+              onClick={async () => {
+                const blob = await generateShareCard(refs.current);
+                if (!blob) return;
+                const filename = `tower-stacker-${refs.current.score}.png`;
+                const file = new File([blob], filename, { type: "image/png" });
+                try {
+                  const nav = navigator as Navigator & {
+                    canShare?: (data: ShareData) => boolean;
+                    share?: (data: ShareData) => Promise<void>;
+                  };
+                  if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+                    await nav.share({
+                      files: [file],
+                      title: "Tower Stacker",
+                      text: `I reached floor ${refs.current.floors.length - 1}!`,
+                    });
+                    return;
+                  }
+                } catch {}
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="w-full rounded-xl bg-amber-600 hover:bg-amber-500 text-white py-2.5 font-semibold mb-2"
+            >
+              Share Tower
+            </button>
             <div className="flex gap-2">
               <button onClick={() => startRun()} className="flex-1 rounded-xl bg-red-600 hover:bg-red-500 text-white py-2.5 font-semibold">Play Again</button>
               <button onClick={() => { refs.current.state = "menu"; setUiState("menu"); }} className="flex-1 rounded-xl bg-neutral-700 hover:bg-neutral-600 text-white py-2.5 font-semibold">Menu</button>
