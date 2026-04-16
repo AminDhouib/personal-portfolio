@@ -32,6 +32,22 @@ export function isSoundEnabled(): boolean {
   return enabled;
 }
 
+/**
+ * Tear down the shared AudioContext — call on component unmount so music/SFX
+ * don't bleed into other routes after leaving the password game.
+ */
+export function closeSound(): void {
+  enabled = false;
+  if (audioCtx) {
+    try {
+      audioCtx.close();
+    } catch {
+      /* ignore */
+    }
+    audioCtx = null;
+  }
+}
+
 /** Play a synthesized sound for the given kind. Silent when disabled. */
 export function play(kind: SfxKind): void {
   if (!enabled) return;

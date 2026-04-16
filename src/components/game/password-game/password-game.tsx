@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw, Key, CalendarDays, Volume2, VolumeX } from "lucide-react";
 import { selectRulesForRun, validateRules, computeActiveRuleIndex, runTicks } from "./engine";
 import { dailySeed, todayDateString } from "./daily";
-import { setSoundEnabled, isSoundEnabled, play as playSfx } from "./sound";
+import { setSoundEnabled, isSoundEnabled, play as playSfx, closeSound } from "./sound";
 import { TIER_1_RULES } from "./rules/tier1";
 import { TIER_2_RULES } from "./rules/tier2";
 import { TIER_3_RULES } from "./rules/tier3";
@@ -88,6 +88,12 @@ export function PasswordGame() {
   const prevChaos = useRef(0);
   const winAnnounced = useRef(false);
   const ruleStatesRef = useRef<Record<string, unknown>>({});
+
+  useEffect(() => {
+    return () => {
+      closeSound();
+    };
+  }, []);
 
   const rules: Rule[] = useMemo(
     () =>
