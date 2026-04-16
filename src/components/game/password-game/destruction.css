@@ -13,6 +13,7 @@
   /* Per-effect intensity flags. Default 1 (full strength). The debug panel
      overrides these on the root to scale individual effects 0..2. */
   --fx-chips: 1;
+  --fx-burn: 1;
   --fx-scanlines: 1;
   --fx-debris: 1;
   --fx-glitch: 1;
@@ -23,6 +24,7 @@
   --fx-vhs: 1;
   --fx-noiseburst: 1;
   --fx-ghosttext: 1;
+  --fx-flickerout: 1;
   position: relative;
   transition: filter 600ms ease-out, background-color 600ms ease-out;
   filter: hue-rotate(var(--pg-hue-shift)) saturate(var(--pg-saturate));
@@ -161,6 +163,31 @@
 @keyframes pg-card-jitter {
   0%, 100% { transform: translate(0, 0) rotate(0); }
   50% { transform: translate(0.5px, -0.5px) rotate(-0.15deg); }
+}
+
+/* Flicker-out — random rule cards briefly vanish (opacity 0 for ~60ms).
+   Implemented via multiple staggered animations, each on different cards.
+   Each card has a different delay + duration so the flickers feel erratic. */
+.pg-chaos-root[data-chaos="4"] .pg-rule-card,
+.pg-chaos-root[data-chaos="5"] .pg-rule-card {
+  animation:
+    pg-card-jitter 3.5s ease-in-out infinite,
+    pg-flicker-out calc(11s + var(--pg-card-idx, 0) * 1.3s) steps(1) infinite;
+  animation-delay:
+    calc(var(--pg-card-idx, 0) * -0.2s),
+    calc(var(--pg-card-idx, 0) * -2.1s);
+}
+
+.pg-chaos-root[style*="--fx-flickerout: 0"] .pg-rule-card {
+  animation: pg-card-jitter 3.5s ease-in-out infinite !important;
+  animation-delay: calc(var(--pg-card-idx, 0) * -0.2s) !important;
+}
+
+@keyframes pg-flicker-out {
+  0%, 98%, 100% { opacity: 1; }
+  98.5% { opacity: calc(0.15 * (1 - var(--fx-flickerout))); }
+  99% { opacity: 1; }
+  99.5% { opacity: calc(0.3 * (1 - var(--fx-flickerout))); }
 }
 
 /* Chromatic aberration on text — constant at high chaos levels. */
@@ -389,6 +416,38 @@
   }
 }
 
+/* Edge burn marks — dark radial smudges at specific points along the border
+   to suggest heat damage or scorching on the container material. */
+.pg-container {
+  position: relative;
+}
+
+.pg-chaos-root[data-chaos="4"] .pg-container,
+.pg-chaos-root[data-chaos="5"] .pg-container {
+  background-image:
+    radial-gradient(
+      ellipse 80px 16px at 18% 0%,
+      rgba(0, 0, 0, calc(0.35 * var(--fx-burn))) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 50px 20px at 100% 38%,
+      rgba(0, 0, 0, calc(0.25 * var(--fx-burn))) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 60px 14px at 72% 100%,
+      rgba(0, 0, 0, calc(0.3 * var(--fx-burn))) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 40px 30px at 0% 62%,
+      rgba(0, 0, 0, calc(0.22 * var(--fx-burn))) 0%,
+      transparent 100%
+    );
+  background-blend-mode: multiply;
+}
+
 /* Cursor trail canvas — overlays the whole root, fades based on chaos. */
 .pg-cursor-trail {
   position: absolute;
@@ -492,20 +551,23 @@
   99% { opacity: 0.3; transform: translateX(1px); }
 }
 
-/* Ghost text echo — all non-passed rule descriptions get a faint duplicate
-   offset slightly, as if the text is refracting through cracked glass. */
-.pg-chaos-root[data-chaos="4"] .pg-rule-description::after,
-.pg-chaos-root[data-chaos="5"] .pg-rule-description::after {
-  content: attr(data-text);
+/* Ghost text echo — adds a soft vertical offset duplicate via extra
+   text-shadow layers (layered on top of the chromatic ones). Uses the
+   chromatic layers for chaos 4, adds more blur + offset for chaos 5. */
+.pg-chaos-root[data-chaos="4"] .pg-rule-description {
+  text-shadow:
+    calc(-0.5px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.6 * var(--fx-chromatic))),
+    calc(0.5px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.6 * var(--fx-chromatic))),
+    0 calc(2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.12 * var(--fx-ghosttext)));
 }
 
 .pg-chaos-root[data-chaos="5"] .pg-rule-description {
-  position: relative;
-}
-
-.pg-chaos-root[data-chaos="5"] .pg-rule-description span:first-child::before {
-  content: "";
-  /* Placeholder — ghost echo would be implemented via JS duplication if needed. */
+  text-shadow:
+    calc(-1.2px * var(--fx-chromatic)) 0 rgba(255, 0, 60, calc(0.75 * var(--fx-chromatic))),
+    calc(1.2px * var(--fx-chromatic)) 0 rgba(0, 220, 255, calc(0.75 * var(--fx-chromatic))),
+    0 calc(3px * var(--fx-ghosttext)) calc(6px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.22 * var(--fx-ghosttext))),
+    calc(1px * var(--fx-ghosttext)) calc(-2px * var(--fx-ghosttext)) calc(4px * var(--fx-ghosttext)) rgba(255, 255, 255, calc(0.14 * var(--fx-ghosttext)));
+  animation: pg-glitch-pulse 3.1s steps(1) infinite;
 }
 
 /* Tier 5 rule-specific hazards. Applied by adding a data attribute to the input wrapper. */

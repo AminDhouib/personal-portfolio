@@ -15,6 +15,7 @@ import { Settings2, X, RefreshCcw } from "lucide-react";
 
 type FxKey =
   | "chips"
+  | "burn"
   | "scanlines"
   | "debris"
   | "glitch"
@@ -24,10 +25,12 @@ type FxKey =
   | "cursortrail"
   | "vhs"
   | "noiseburst"
-  | "ghosttext";
+  | "ghosttext"
+  | "flickerout";
 
 const ALL_FX: { key: FxKey; label: string }[] = [
   { key: "chips", label: "Broken chips" },
+  { key: "burn", label: "Edge burns" },
   { key: "scanlines", label: "Scanlines" },
   { key: "debris", label: "Floating debris" },
   { key: "glitch", label: "Glitch slice bands" },
@@ -38,6 +41,7 @@ const ALL_FX: { key: FxKey; label: string }[] = [
   { key: "vhs", label: "VHS tracking bars" },
   { key: "noiseburst", label: "Pixel noise bursts" },
   { key: "ghosttext", label: "Ghost text echo" },
+  { key: "flickerout", label: "Card flicker-out" },
 ];
 
 function applyToRoot(fx: Record<FxKey, number>, chaosOverride: number | null) {
