@@ -1,6 +1,7 @@
 import type { RuleDef } from "../types";
 import { pickOne, rangeInt } from "../prng";
 import { NATO_ALPHABET, NATO_LETTERS } from "../../../../data/password-game/nato";
+import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 
 const natoPhonetic: RuleDef = {
   id: "nato-phonetic",
@@ -111,4 +112,33 @@ const romanRange: RuleDef = {
   },
 };
 
-export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange];
+const periodicElement: RuleDef = {
+  id: "periodic-element",
+  tier: 2,
+  create(rng) {
+    const width = rangeInt(rng, 8, 15);
+    const min = rangeInt(rng, 1, 118 - width);
+    const max = min + width;
+    return {
+      id: "periodic-element",
+      tier: 2,
+      description: `Your password must include the symbol of an element whose atomic number is between ${min} and ${max}.`,
+      params: { min, max },
+      validate(state) {
+        const candidates = ELEMENTS.filter(
+          (e) => e.atomicNumber >= min && e.atomicNumber <= max
+        );
+        const pw = state.password;
+        const pwLower = pw.toLowerCase();
+        for (const el of candidates) {
+          if (pw.includes(el.symbol) || pwLower.includes(el.symbol.toLowerCase())) {
+            return { passed: true };
+          }
+        }
+        return { passed: false };
+      },
+    };
+  },
+};
+
+export const TIER_2_RULES: readonly RuleDef[] = [natoPhonetic, mathEquation, romanRange, periodicElement];

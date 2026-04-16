@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { TIER_2_RULES } from "../rules/tier2";
 import type { GameState, Rule } from "../types";
+import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 
 function makeState(password: string, rule: Rule): GameState {
   return {
@@ -97,6 +98,36 @@ describe("Tier 2 — Roman numeral range rule", () => {
   it("fails with a numeral outside the range or no numeral at all", () => {
     const rule = def.create(mulberry32(5));
     expect(rule.validate(makeState("no roman here", rule)).passed).toBe(false);
+  });
+});
+
+describe("Tier 2 — periodic element rule", () => {
+  const def = TIER_2_RULES.find((r) => r.id === "periodic-element")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("params include an atomic number range (min, max)", () => {
+    const rule = def.create(mulberry32(11));
+    const min = rule.params.min as number;
+    const max = rule.params.max as number;
+    expect(min).toBeLessThanOrEqual(max);
+    expect(min).toBeGreaterThanOrEqual(1);
+    expect(max).toBeLessThanOrEqual(118);
+  });
+
+  it("passes when password contains the symbol of an element in that range", () => {
+    const rule = def.create(mulberry32(11));
+    const min = rule.params.min as number;
+    const max = rule.params.max as number;
+    const el = ELEMENTS.find((e) => e.atomicNumber >= min && e.atomicNumber <= max)!;
+    expect(rule.validate(makeState(`000 ${el.symbol} 000`, rule)).passed).toBe(true);
+  });
+
+  it("fails without any matching element symbol", () => {
+    const rule = def.create(mulberry32(11));
+    expect(rule.validate(makeState("zzzzzzz", rule)).passed).toBe(false);
   });
 });
 
