@@ -40,8 +40,11 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full flex items-center justify-center rounded-xl overflow-hidden border border-border bg-card"
-      style={{ minHeight: 480 }}
+      className="relative w-full flex items-center justify-center rounded-xl overflow-hidden border border-accent-red/30 bg-card"
+      style={{
+        minHeight: 480,
+        boxShadow: "0 0 80px -20px rgba(239, 68, 68, 0.35), inset 0 0 0 1px rgba(239, 68, 68, 0.08)",
+      }}
     >
       <iframe
         key={`${frameSize.w}x${frameSize.h}`}
@@ -49,8 +52,9 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
         title="Tower Stacker"
         width={frameSize.w}
         height={frameSize.h}
+        scrolling="no"
         className="block border-0"
-        style={{ background: "#f95240" }}
+        style={{ background: "#0a0a0a" }}
         // Sandbox lets the game run JS + audio, but stays isolated from the host.
         sandbox="allow-scripts allow-same-origin"
         allow="autoplay"

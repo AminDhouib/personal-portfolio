@@ -16,8 +16,8 @@
 <style>
 *{margin:0;padding:0}
 img{width:100%}
-html{background:#fff;height:100%}
-body{font-family:"Helvetica Neue",Arial,Helvetica,sans-serif;margin:0 auto;text-align:center;width:100%;height:100%;background:#f95240 url(assets/main-bg.png)}
+html{background:#0a0a0a;height:100%}
+body{font-family:"Helvetica Neue",Arial,Helvetica,sans-serif;margin:0 auto;text-align:center;width:100%;height:100%;background:radial-gradient(ellipse 80% 60% at 50% 40%, #1a0b0f 0%, #0a0a0a 100%);overflow:hidden}
 @media screen and (min-height:560px){html{font-size:100px}}
 @media screen and (min-height:640px){html{font-size:112.5px}}
 @media screen and (min-height:720px){html{font-size:125px}}
@@ -32,14 +32,14 @@ a{text-decoration:none}
 li,ol,ul{list-style-type:none;padding:0;margin:0}
 .hide{display:none}
 .clear{clear:both}
-.loading{background-color:#f05a50;height:100%;width:100%}
-.loading .main{width:60%;margin:0 auto;color:#fff}
-.loading .main img{width:60%;margin:1rem auto 0}
-.loading .main .title{font-size:.3rem}
-.loading .main .text{font-size:.15rem}
-.loading .main .bar{height:.12rem;width:100%;border:3px solid #fff;border-radius:.6rem;margin:.1rem 0}
+.loading{background:radial-gradient(ellipse 70% 50% at 50% 40%, #1a0b0f 0%, #0a0a0a 100%);height:100%;width:100%;display:flex;align-items:center;justify-content:center}
+.loading .main{width:70%;margin:0 auto;color:#ededed}
+.loading .main img{width:50%;margin:0 auto 1rem;opacity:.9}
+.loading .main .title{font-size:.3rem;color:#ef4444;font-weight:700;letter-spacing:.05em}
+.loading .main .text{font-size:.15rem;color:#888;letter-spacing:.1em;text-transform:uppercase}
+.loading .main .bar{height:.12rem;width:100%;border:2px solid #1a1a1a;border-radius:.6rem;margin:.1rem 0;background:#0d0d0d;overflow:hidden}
 .loading .main .bar .sub{height:.1rem;width:98%;margin:.008rem auto 0}
-.loading .main .bar .percent{height:100%;width:0;background-color:#fff;border-radius:.6rem}
+.loading .main .bar .percent{height:100%;width:0;background:linear-gradient(90deg,#b91c1c,#ef4444);border-radius:.6rem;box-shadow:0 0 12px rgba(239,68,68,.6)}
 .loading .logo{position:absolute;bottom:.3rem;left:0;right:0}
 .loading .logo img{width:1rem}
 .content{height:100vh;margin:0 auto;position:relative}
