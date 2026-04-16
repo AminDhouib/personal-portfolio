@@ -425,6 +425,44 @@ function drawBlockWithTheme(
   }
 }
 
+function fireMilestone(r: GameRefs, floor: number) {
+  if (floor === 40) { r.bannerText = "LIGHTNING"; r.bannerTime = 0.8; r.shake = 0.5; }
+  if (floor === 60) { r.bannerText = "RADIANCE"; r.bannerTime = 0.8; }
+  if (floor === 80) { r.bannerText = "RIFT"; r.bannerTime = 0.8; r.shake = 0.8; }
+}
+
+function drawLightning(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  let x = w * 0.3, y = 0;
+  while (y < h) {
+    ctx.moveTo(x, y);
+    x += (Math.random() - 0.5) * 40;
+    y += 30 + Math.random() * 20;
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+function drawRadiance(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(0, 0, w, h);
+}
+function drawRift(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(239,68,68,0.8)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.moveTo(w / 2, h / 2);
+    ctx.lineTo(w / 2 + Math.cos(i * Math.PI / 3) * w, h / 2 + Math.sin(i * Math.PI / 3) * h);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
@@ -498,6 +536,7 @@ export default function TowerStacker() {
     const fromLeft = (floorIdx % 2) === 0;
     const y = prev ? prev.y - BASE_BLOCK_HEIGHT - 2 : h - 80 - BASE_BLOCK_HEIGHT;
     const speed = Math.min(MAX_BLOCK_SPEED, BASE_BLOCK_SPEED + r.score * SPEED_FACTOR * 0.1);
+    const isGoldenFloor = floorIdx > 0 && floorIdx % 30 === 0 && r.prng() < 0.33;
     r.activeBlock = {
       x: fromLeft ? 0 : w - prevWidth,
       y,
@@ -506,7 +545,7 @@ export default function TowerStacker() {
       hue,
       direction: fromLeft ? 1 : -1,
       speed,
-      isGolden: false,
+      isGolden: isGoldenFloor,
     };
     r.droppingLock = false;
   }
@@ -638,6 +677,8 @@ export default function TowerStacker() {
       }
     }
 
+    if ([40, 60, 80].includes(r.floors.length - 1)) fireMilestone(r, r.floors.length - 1);
+
     r.runRecord.floors.push({
       floorIndex: r.floors.length - 1, x: newX, width: newWidth,
       timeMs: performance.now() - r.runStartMs,
@@ -649,6 +690,22 @@ export default function TowerStacker() {
     r.score += pts;
     setUiScore(r.score);
     setUiCombo(r.perfectCombo);
+
+    if (a.isGolden && overlapW > 0) {
+      r.goldenCount += 1;
+      for (let i = 0; i < 25; i++) {
+        spawnParticle(r, {
+          kind: "sparkle",
+          x: newX + r.prng() * newWidth,
+          y: a.y,
+          vx: (r.prng() - 0.5) * 300,
+          vy: -r.prng() * 400 - 80,
+          life: 1.2, maxLife: 1.2,
+          size: 3 + r.prng() * 2,
+          color: "#fde047",
+        });
+      }
+    }
 
     r.activeBlock = null;
     setTimeout(() => spawnBlock(), 180);
@@ -845,6 +902,18 @@ export default function TowerStacker() {
         drawBlockWithTheme(ctx, a.x, a.y, a.width, a.height, a.hue, r.theme, a.isGolden);
       }
 
+      // extreme-combo crescendo glow
+      if (r.perfectCombo >= 10 && r.activeBlock) {
+        const a = r.activeBlock;
+        ctx.save();
+        ctx.shadowBlur = 20 + (r.perfectCombo - 10) * 2;
+        ctx.shadowColor = `hsl(${(performance.now() / 10) % 360} 100% 60%)`;
+        ctx.strokeStyle = ctx.shadowColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(a.x, a.y, a.width, a.height);
+        ctx.restore();
+      }
+
       // danger pulse when block is very narrow
       if (r.activeBlock && r.activeBlock.width < BASE_BLOCK_WIDTH_PX * 0.2 && r.state === "playing") {
         const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 100);
@@ -857,6 +926,25 @@ export default function TowerStacker() {
       }
 
       ctx.restore();
+
+      if (r.state === "playing") {
+        const fc = r.floors.length - 1;
+        if (fc >= 40 && fc < 45 && r.bannerText === "LIGHTNING") drawLightning(ctx, w, h);
+        if (fc >= 60 && fc < 65 && r.bannerText === "RADIANCE") drawRadiance(ctx, w, h);
+        if (fc >= 80 && fc < 85 && r.bannerText === "RIFT") drawRift(ctx, w, h);
+      }
+
+      if (r.perfectCombo >= 30) {
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        const grd = ctx.createLinearGradient(0, 0, w, h);
+        grd.addColorStop(0, "rgba(236,72,153,0.4)");
+        grd.addColorStop(0.5, "rgba(168,85,247,0.4)");
+        grd.addColorStop(1, "rgba(56,189,248,0.4)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+      }
 
       if (r.bannerTime > 0) {
         const alpha = Math.min(1, r.bannerTime / 0.4);
