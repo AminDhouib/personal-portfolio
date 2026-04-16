@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 /**
  * Tower Stacker — embedded port of iamkun/tower_game (MIT License).
@@ -173,18 +173,31 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full flex items-center justify-center"
+      className="relative w-full flex flex-col items-center justify-center gap-2"
       style={{ minHeight: 480 }}
     >
       <div
-        className="relative rounded-xl overflow-hidden border border-accent-red/30 bg-card"
+        className="flex w-full items-end justify-between font-mono text-[10px] uppercase tracking-[0.3em] text-foreground/40"
+        style={{ maxWidth: frameSize.w }}
+      >
+        <span>TWR-01 / REV.A</span>
+        <span className="tabular-nums">
+          {frameSize.w}×{frameSize.h}
+        </span>
+      </div>
+      <div
+        className="relative overflow-hidden bg-[#05070d]"
         style={{
           width: frameSize.w,
           height: frameSize.h,
           boxShadow:
-            "0 0 80px -20px rgba(239, 68, 68, 0.35), inset 0 0 0 1px rgba(239, 68, 68, 0.08)",
+            "0 0 60px -20px rgba(239,68,68,0.25), inset 0 0 0 1px rgba(148,163,184,0.18)",
         }}
       >
+        <CornerTick position="tl" />
+        <CornerTick position="tr" />
+        <CornerTick position="bl" />
+        <CornerTick position="br" />
         <iframe
           ref={iframeRef}
           key={`${iframeKey}-${frameSize.w}x${frameSize.h}`}
@@ -194,19 +207,22 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
           height={frameSize.h}
           scrolling="no"
           className="block border-0"
-          style={{ background: "#0a0a0a" }}
+          style={{ background: "#05070d" }}
           sandbox="allow-scripts allow-same-origin"
           allow="autoplay"
         />
 
         {showHud && (
-          <div className="pointer-events-none absolute left-0 right-0 top-4 z-20 flex flex-col items-center gap-1.5">
+          <div className="pointer-events-none absolute left-0 right-0 top-3 z-20 flex flex-col items-center gap-1">
+            <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-foreground/45">
+              Height
+            </div>
             <div
               key={scorePulseKey}
-              className="ts-score-pulse font-display text-5xl leading-none tabular-nums"
+              className="ts-score-pulse font-mono text-5xl font-bold leading-none tabular-nums text-foreground"
               style={{
                 textShadow:
-                  "0 2px 12px rgba(0,0,0,0.6), 0 0 24px rgba(239,68,68,0.25)",
+                  "0 2px 12px rgba(0,0,0,0.7), 0 0 24px rgba(239,68,68,0.2)",
               }}
             >
               {state.score}
@@ -214,10 +230,10 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
             {state.streak >= 2 && (
               <div
                 key={streakPopKey}
-                className="ts-streak-pop inline-flex items-center gap-1 rounded-full border border-accent-red/50 bg-accent-red/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accent-red backdrop-blur-sm"
+                className="ts-streak-pop inline-flex items-center gap-1.5 border border-accent-red/60 bg-accent-red/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-accent-red backdrop-blur-sm"
               >
-                <span>×{state.streak}</span>
-                <span className="text-foreground/80">Perfect</span>
+                <span className="tabular-nums">×{state.streak}</span>
+                <span className="text-foreground/70">Perfect</span>
               </div>
             )}
           </div>
@@ -231,12 +247,15 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
         )}
 
         {milestone !== null && (
-          <div className="ts-milestone-burst pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <div className="ts-milestone-burst pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1">
+            <div className="font-mono text-[11px] uppercase tracking-[0.45em] text-accent-red/80">
+              Milestone
+            </div>
             <div
-              className="font-display text-7xl text-accent-red"
+              className="font-mono text-7xl font-bold tabular-nums text-foreground"
               style={{
                 textShadow:
-                  "0 4px 24px rgba(0,0,0,0.7), 0 0 40px rgba(239,68,68,0.6)",
+                  "0 4px 24px rgba(0,0,0,0.8), 0 0 40px rgba(239,68,68,0.55)",
               }}
             >
               {milestone}
@@ -245,16 +264,20 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
         )}
 
         {state.gameOver && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
             <div
-              className="ts-gameover-in w-full max-w-sm rounded-2xl border border-accent-red/40 bg-card p-6 text-center"
+              className="ts-gameover-in relative w-full max-w-sm border border-accent-red/40 bg-[#05070d] p-6 text-center"
               style={{ boxShadow: "0 0 80px -10px rgba(239, 68, 68, 0.5)" }}
             >
-              <div className="font-display text-xs uppercase tracking-[0.2em] text-accent-red">
-                Tower Fell
+              <CornerTick position="tl" variant="card" />
+              <CornerTick position="tr" variant="card" />
+              <CornerTick position="bl" variant="card" />
+              <CornerTick position="br" variant="card" />
+              <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-accent-red">
+                Structural Failure
               </div>
               <div
-                className="font-display mt-1 mb-4 text-6xl leading-none tabular-nums text-foreground"
+                className="font-mono mt-2 mb-4 text-6xl font-bold leading-none tabular-nums text-foreground"
                 style={{ textShadow: "0 0 24px rgba(239,68,68,0.3)" }}
               >
                 {state.score}
@@ -271,28 +294,28 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
+                    placeholder="YOUR NAME"
                     maxLength={12}
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent-red/60 focus:outline-none focus:ring-2 focus:ring-accent-red/30"
+                    className="w-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs uppercase tracking-[0.15em] text-foreground placeholder:text-muted focus:border-accent-red/60 focus:outline-none focus:ring-1 focus:ring-accent-red/40"
                   />
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="mt-2 w-full rounded-lg bg-accent-red/90 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-red disabled:opacity-60"
+                    className="mt-2 w-full border border-accent-red/70 bg-accent-red/10 px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.3em] text-accent-red transition hover:bg-accent-red/20 hover:border-accent-red disabled:opacity-50"
                   >
-                    {submitting ? "Submitting…" : "Submit to leaderboard"}
+                    {submitting ? "Submitting…" : "Submit score"}
                   </button>
                 </form>
               ) : (
-                <div className="mb-3 rounded-lg border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-sm text-foreground">
+                <div className="mb-3 border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
                   {submitRank !== null ? (
                     <>
-                      Ranked <span className="font-bold text-accent-red">#{submitRank}</span> ·
-                      submitted.
+                      Ranked <span className="font-bold text-accent-red">#{submitRank}</span> —
+                      submitted
                     </>
                   ) : (
-                    <>Score submitted.</>
+                    <>Score submitted</>
                   )}
                 </div>
               )}
@@ -300,7 +323,7 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
               <button
                 type="button"
                 onClick={handlePlayAgain}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-foreground transition hover:border-accent-red/40"
+                className="w-full border border-[var(--border)] bg-transparent px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.3em] text-foreground/80 transition hover:border-accent-red/50 hover:text-foreground"
               >
                 Play again
               </button>
@@ -314,9 +337,58 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
-      <div className="font-display text-lg tabular-nums text-foreground">{value}</div>
+    <div className="border border-[var(--border)] bg-[var(--surface)] px-2 py-2">
+      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted">
+        {label}
+      </div>
+      <div className="font-mono text-lg font-bold tabular-nums text-foreground">
+        {value}
+      </div>
     </div>
   );
+}
+
+function CornerTick({
+  position,
+  variant = "frame",
+}: {
+  position: "tl" | "tr" | "bl" | "br";
+  variant?: "frame" | "card";
+}) {
+  const size = variant === "frame" ? 14 : 10;
+  const color =
+    variant === "frame" ? "rgba(239,68,68,0.75)" : "rgba(239,68,68,0.6)";
+  const offset = variant === "frame" ? 6 : 4;
+  const style: CSSProperties = {
+    position: "absolute",
+    width: size,
+    height: size,
+    borderColor: color,
+    borderStyle: "solid",
+    borderWidth: 0,
+    pointerEvents: "none",
+    zIndex: 25,
+  };
+  if (position === "tl") {
+    style.top = offset;
+    style.left = offset;
+    style.borderTopWidth = 1;
+    style.borderLeftWidth = 1;
+  } else if (position === "tr") {
+    style.top = offset;
+    style.right = offset;
+    style.borderTopWidth = 1;
+    style.borderRightWidth = 1;
+  } else if (position === "bl") {
+    style.bottom = offset;
+    style.left = offset;
+    style.borderBottomWidth = 1;
+    style.borderLeftWidth = 1;
+  } else {
+    style.bottom = offset;
+    style.right = offset;
+    style.borderBottomWidth = 1;
+    style.borderRightWidth = 1;
+  }
+  return <div style={style} />;
 }
