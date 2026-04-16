@@ -6,6 +6,7 @@ import { useSave } from "./super-voltorb-flip/use-save";
 import { useGame } from "./super-voltorb-flip/use-game";
 import { Board } from "./super-voltorb-flip/GameBoard";
 import { Scoreboard } from "./super-voltorb-flip/Scoreboard";
+import { MemoPanel } from "./super-voltorb-flip/MemoPanel";
 import type { GameMode } from "./super-voltorb-flip/types";
 
 export function SuperVoltorbFlipGame() {
@@ -85,13 +86,31 @@ function GameScreen({
               board={state.board}
               rowHints={state.rowHints}
               colHints={state.colHints}
-              onTileClick={(r, c) => dispatch({ type: "flip", row: r, col: c })}
+              onTileClick={(r, c) => {
+                if (state.phase === "memo") {
+                  dispatch({ type: "selectMemoTile", row: r, col: c });
+                } else {
+                  dispatch({ type: "flip", row: r, col: c });
+                }
+              }}
             />
           </div>
           <Scoreboard
             level={state.level}
             currentCoins={state.currentCoins}
             totalCoins={state.totalCoins}
+          />
+          <MemoPanel
+            open={state.phase === "memo"}
+            selectedMemos={
+              state.selectedMemoTile
+                ? state.board[state.selectedMemoTile.row][state.selectedMemoTile.col].memos
+                : [false, false, false, false]
+            }
+            copyMode={state.memoCopyMode}
+            onToggle={() => dispatch({ type: "toggleMemo" })}
+            onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
+            onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
           />
         </div>
       </div>
