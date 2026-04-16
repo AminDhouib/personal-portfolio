@@ -270,12 +270,12 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
         {/*
          * Impact point: a small jagged puncture near the crack's origin.
          * This is where the hit happened; primary cracks radiate from here.
+         * No stroke — the darkness of the background-colored fill alone
+         * creates the gap effect, so it reads as a hole rather than a drawn shape.
          */}
         <polygon
           points="2,0 10,4 8,10 14,8 16,16 6,14 0,18 4,8"
           fill={BG}
-          stroke="rgba(255,255,255,0.65)"
-          strokeWidth="0.7"
         />
 
         {/*
@@ -313,20 +313,16 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
           "
           fill={BG}
         />
+        {/* Very subtle lighter edge on the "sunlit" side of the crack.
+            Barely visible — just enough to suggest depth where light catches
+            the broken edge. */}
         <polyline
           points="8,8 22,14 38,8 54,22 72,18 88,34 106,30 122,50 136,48 154,68 170,66 188,88 196,100"
           fill="none"
-          stroke="rgba(255,255,255,0.7)"
-          strokeWidth="0.6"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth="0.4"
           strokeLinejoin="miter"
           strokeLinecap="round"
-        />
-        <polyline
-          points="10,12 24,20 40,14 56,28 74,26 92,40 108,36 124,56 138,54 158,74 172,72 192,102"
-          fill="none"
-          stroke="rgba(255,255,255,0.3)"
-          strokeWidth="0.35"
-          strokeLinejoin="miter"
         />
 
         {/*
@@ -366,8 +362,8 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
         <polyline
           points="10,10 28,30 22,46 38,60 30,78 48,90 40,108 58,122 48,138 60,154 56,170 68,188 74,196"
           fill="none"
-          stroke="rgba(255,255,255,0.6)"
-          strokeWidth="0.5"
+          stroke="rgba(255,255,255,0.15)"
+          strokeWidth="0.35"
           strokeLinejoin="miter"
           strokeLinecap="round"
         />
@@ -377,7 +373,7 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
          * sharp angles. These create the "web" feeling without widening the
          * visible destruction.
          */}
-        <g fill={BG} stroke="rgba(255,255,255,0.5)" strokeWidth="0.35" strokeLinejoin="miter">
+        <g fill={BG}>
           {/* Fork up from primary ~(38, 8) */}
           <polygon points="38,8 44,2 46,4 40,10" />
           {/* Fork up-right from (72, 18) */}
@@ -399,7 +395,7 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
          * where the card material is completely dislodged. Black fill so
          * they look truly missing.
          */}
-        <g fill={BG} stroke="rgba(255,255,255,0.4)" strokeWidth="0.3">
+        <g fill={BG}>
           <polygon points="54,22 60,20 58,26" />
           <polygon points="106,30 110,30 108,36" />
           <polygon points="138,48 142,46 140,52" />
@@ -411,23 +407,13 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
          * Surface hairline fractures — thin white lines NOT filled with
          * background (these are stress marks on the glass, not through-cracks).
          */}
-        <g fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="0.25" strokeLinecap="round">
+        <g fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.2" strokeLinecap="round">
           <path d="M 30 10 L 42 18 L 50 16" />
           <path d="M 100 40 L 112 44 L 118 40" />
           <path d="M 160 80 L 172 86 L 180 82" />
           <path d="M 14 38 L 26 42 L 34 40" />
           <path d="M 36 70 L 48 74 L 56 72" />
           <path d="M 54 122 L 68 118 L 76 122" />
-        </g>
-
-        {/*
-         * Micro-debris around the impact point — tiny bright specks.
-         */}
-        <g fill="rgba(255,255,255,0.55)">
-          <circle cx="20" cy="22" r="0.7" />
-          <circle cx="28" cy="14" r="0.5" />
-          <circle cx="12" cy="24" r="0.5" />
-          <circle cx="40" cy="26" r="0.4" />
         </g>
       </g>
     </svg>
