@@ -142,6 +142,13 @@ html {
   100% { transform: translateX(-50%); }
 }
 
+/* Subtle sliding rainbow gradient for the "GAMES" word in the /games navbar.
+   Paired with background-size: 200% and bg-clip-text to keep it tasteful. */
+@keyframes amin-games-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
 .animate-marquee {
   animation: marquee 40s linear infinite;
 }

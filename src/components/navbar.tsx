@@ -31,6 +31,7 @@ export function Navbar() {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const isGames = pathname === "/games" || pathname.startsWith("/games/");
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -80,12 +81,29 @@ export function Navbar() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
+          {/* Logo — "AMIN GAMES" with subtle rainbow shimmer on /games */}
           <Link
-            href="/"
+            href={isGames ? "/games" : "/"}
             className="font-display text-lg font-black tracking-tight"
           >
-            AMIN DHOUIB
+            {isGames ? (
+              <>
+                AMIN{" "}
+                <span
+                  className="bg-clip-text text-transparent"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(90deg, #ec4899, #f59e0b, #22c55e, #6366f1, #ec4899)",
+                    backgroundSize: "200% 100%",
+                    animation: "amin-games-shimmer 6s linear infinite",
+                  }}
+                >
+                  GAMES
+                </span>
+              </>
+            ) : (
+              "AMIN DHOUIB"
+            )}
           </Link>
 
           {/* Desktop nav links — only show on homepage */}
@@ -145,16 +163,27 @@ export function Navbar() {
               </button>
             )}
 
-            {/* CTA */}
-            <a
-              href={CALENDLY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-accent-green px-4 py-2 text-sm font-semibold text-black transition-all hover:brightness-110"
-            >
-              Book a Call
-              <ArrowRight className="h-3.5 w-3.5" />
-            </a>
+            {/* CTA — swaps to a portfolio link on /games so players can find
+                the author without a calendar prompt interrupting playtime */}
+            {isGames ? (
+              <Link
+                href="/"
+                className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-(--surface) border border-(--border) px-4 py-2 text-sm font-semibold text-(--foreground) transition-all hover:bg-(--surface-hover) hover:border-accent-green"
+              >
+                Who made these games?
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            ) : (
+              <a
+                href={CALENDLY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-accent-green px-4 py-2 text-sm font-semibold text-black transition-all hover:brightness-110"
+              >
+                Book a Call
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            )}
 
             {/* Mobile burger */}
             {/* Mobile burger — only on homepage */}
