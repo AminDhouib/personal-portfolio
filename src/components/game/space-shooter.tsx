@@ -147,6 +147,8 @@ interface Obstacle {
   size: number;
   hp: number;
   shape: 0 | 1 | 2;
+  closestApproach: number;  // closest 3D distance the ship came to this obstacle, tracked per-frame
+  brushed: boolean;         // true if the obstacle came within near-miss range but not collision
 }
 
 interface Bullet {
@@ -502,6 +504,8 @@ function spawnObstacle(g: GameRefs): Obstacle {
     vx, vy, vz: speed,
     size, hp,
     shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
+    closestApproach: Infinity,
+    brushed: false,
   };
 }
 
@@ -578,6 +582,8 @@ function spawnWall(g: GameRefs) {
                  // the collision), so HP is a no-op — high value avoids any
                  // edge case where despawn logic might read it
         shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
+        closestApproach: Infinity,
+        brushed: false,
       });
     }
   }
@@ -1574,7 +1580,28 @@ function runTick(
     o.ry += o.rsy * step;
     o.rz += o.rsz * step;
 
+    // Track closest approach for near-miss detection. Only relevant while
+    // the obstacle is actually within the ship's Z band.
+    if (g.status === "playing" && o.z > -4 && o.z < 4) {
+      const dx = g.shipX - o.x;
+      const dy = g.shipY - o.y;
+      const dz = g.shipZ - o.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d < o.closestApproach) o.closestApproach = d;
+    }
+
     if (o.z > DESPAWN_Z) {
+      // Near-miss: obstacle came within brush radius but never collided. Only
+      // award for non-wall variants (walls are always meant to be dodged wide).
+      if (
+        o.variant !== "wall" &&
+        o.closestApproach < o.size + SHIP_RADIUS + NEAR_MISS_RADIUS &&
+        o.closestApproach > o.size + SHIP_RADIUS &&
+        g.status === "playing"
+      ) {
+        g.score += NEAR_MISS_POINTS;
+        spawnScorePopup(g, o.x, o.y, o.z, NEAR_MISS_POINTS);
+      }
       g.obstacles.splice(i, 1);
       g.score += 4;
       continue;
