@@ -22,6 +22,41 @@ function makeSeed(): number {
   return Math.floor(Math.random() * 0xffffffff) >>> 0;
 }
 
+/**
+ * Fire one random high-tier surprise: shadow sweep, blink, or glyph flash.
+ * Each one-shot is a briefly-mounted element with a self-cleaning animation.
+ */
+function fireRandomSurprise(): void {
+  if (typeof window === "undefined") return;
+  const root = document.querySelector<HTMLElement>(".pg-chaos-root");
+  if (!root) return;
+  const kinds = ["shadow", "blink", "glyph"] as const;
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  if (kind === "blink") {
+    const container = root.querySelector<HTMLElement>(".pg-container");
+    if (!container) return;
+    container.classList.remove("pg-blink");
+    void container.offsetWidth;
+    container.classList.add("pg-blink");
+    window.setTimeout(() => container.classList.remove("pg-blink"), 220);
+    return;
+  }
+  if (kind === "shadow") {
+    const el = document.createElement("div");
+    el.className = "pg-shadow-sweep";
+    root.appendChild(el);
+    window.setTimeout(() => el.remove(), 1000);
+    return;
+  }
+  // Glyph flash — single random glitch char centered for ~320ms.
+  const glyphs = "!?#*█▓░◆⚠✦∎";
+  const el = document.createElement("div");
+  el.className = "pg-glyph-flash";
+  el.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+  root.appendChild(el);
+  window.setTimeout(() => el.remove(), 360);
+}
+
 function initialSeed(): number {
   if (typeof window === "undefined") return makeSeed();
   const params = new URLSearchParams(window.location.search);
@@ -139,21 +174,43 @@ export function PasswordGame() {
         container.classList.add("pg-burst");
         window.setTimeout(() => container.classList.remove("pg-burst"), 320);
       }
+    } else if (
+      satisfiedCount < prevSatisfied.current &&
+      prevSatisfied.current > 0 &&
+      timerRunning
+    ) {
+      // A previously-satisfied rule became unsatisfied — punish with a hard
+      // shake + error tone so the player notices what they just broke.
+      playSfx("unsatisfy");
+      const container = containerRef.current?.querySelector<HTMLElement>(".pg-container");
+      if (container) {
+        container.classList.remove("pg-unsatisfy-shake");
+        void container.offsetWidth;
+        container.classList.add("pg-unsatisfy-shake");
+        window.setTimeout(() => container.classList.remove("pg-unsatisfy-shake"), 600);
+      }
     }
     prevSatisfied.current = satisfiedCount;
-  }, [satisfiedCount]);
+  }, [satisfiedCount, timerRunning]);
 
   useEffect(() => {
     if (activeIdx > prevActive.current && prevActive.current !== -1) {
       playSfx("rule-reveal");
-      // Trigger a shake on the container when a new rule is revealed.
+      // Shake the container AND attract-animate the new rule card.
       const container = containerRef.current?.querySelector<HTMLElement>(".pg-container");
       if (container) {
         container.classList.remove("pg-reveal-shake");
-        // Force reflow so the animation restarts if it was already applied.
         void container.offsetWidth;
         container.classList.add("pg-reveal-shake");
         window.setTimeout(() => container.classList.remove("pg-reveal-shake"), 500);
+      }
+      const cards = containerRef.current?.querySelectorAll<HTMLElement>(".pg-rule-card");
+      if (cards && cards.length > 0) {
+        const newest = cards[cards.length - 1];
+        newest.classList.remove("pg-card-enter");
+        void newest.offsetWidth;
+        newest.classList.add("pg-card-enter");
+        window.setTimeout(() => newest.classList.remove("pg-card-enter"), 560);
       }
     }
     prevActive.current = activeIdx;
@@ -162,6 +219,8 @@ export function PasswordGame() {
   useEffect(() => {
     if (chaosLevel > prevChaos.current && chaosLevel >= 3) {
       playSfx("crack");
+      // Layer a low rumble underneath for weight.
+      playSfx("rumble");
     }
     prevChaos.current = chaosLevel;
   }, [chaosLevel]);
@@ -180,6 +239,21 @@ export function PasswordGame() {
     setSoundEnabled(next);
     setSoundOn(next);
   }, []);
+
+  // High-tier surprise moments — random one-shot effects at chaos 4+. Fires
+  // once per 20-40 seconds so players feel watched, not overwhelmed.
+  useEffect(() => {
+    if (chaosLevel < 4 || !timerRunning) return;
+    const schedule = () => {
+      const delay = 20000 + Math.random() * 20000;
+      return window.setTimeout(() => {
+        fireRandomSurprise();
+        id = schedule();
+      }, delay);
+    };
+    let id = schedule();
+    return () => window.clearTimeout(id);
+  }, [chaosLevel, timerRunning]);
 
   const foreshadowKind = useMemo(() => pickForeshadow(seed), [seed]);
   const foreshadowFired = useForeshadowTrigger(satisfiedCount, 2);

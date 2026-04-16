@@ -5,7 +5,7 @@
  * button in the UI; until then, nothing plays.
  */
 
-type SfxKind = "rule-complete" | "rule-fail" | "rule-reveal" | "win" | "chaos" | "crack" | "keypress";
+type SfxKind = "rule-complete" | "rule-fail" | "rule-reveal" | "win" | "chaos" | "crack" | "rumble" | "unsatisfy" | "keypress";
 
 let audioCtx: AudioContext | null = null;
 let enabled = false;
@@ -66,6 +66,19 @@ export function play(kind: SfxKind): void {
       setTimeout(() => tone(ctx, 3200 + Math.random() * 400, 0.05, "triangle", 0.06), 80);
       setTimeout(() => tone(ctx, 2600 + Math.random() * 300, 0.05, "triangle", 0.05), 140);
       setTimeout(() => tone(ctx, 3800 + Math.random() * 200, 0.04, "triangle", 0.04), 200);
+      break;
+    case "rumble":
+      // Deep low-frequency rumble — felt more than heard. Used to mark a
+      // new chaos tier unlocking, under the crack SFX.
+      tone(ctx, 55, 0.8, "sine", 0.2);
+      setTimeout(() => tone(ctx, 42, 0.9, "sine", 0.18), 100);
+      setTimeout(() => tone(ctx, 70, 0.6, "sine", 0.1), 250);
+      break;
+    case "unsatisfy":
+      // Descending two-tone "wrong" alert. Fires when a cleared rule becomes
+      // unsatisfied again (player typed over a constraint).
+      tone(ctx, 420, 0.12, "sawtooth", 0.14);
+      setTimeout(() => tone(ctx, 260, 0.2, "sawtooth", 0.12), 80);
       break;
     case "keypress":
       tone(ctx, 1400 + Math.random() * 200, 0.02, "square", 0.02);
