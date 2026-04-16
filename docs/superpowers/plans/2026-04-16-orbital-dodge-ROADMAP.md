@@ -159,6 +159,6 @@ If any of these move up in priority, spin a new plan off this roadmap.
 | 3 — Shop Phase 2 | COMPLETED (hull cosmetic render + revive + agility mul deferred) | 2026-04-16 |
 | 4 — Bosses | COMPLETED | 2026-04-16 |
 | 5 — Polish | COMPLETED (bloom deferred; dep install blocked locally) | 2026-04-16 |
-| 6 — Tutorial + Achievements + Dash | NOT STARTED | — |
+| 6 — Tutorial + Achievements + Dash | COMPLETED (tutorial input-gating + mobile swipe deferred) | 2026-04-16 |
 
 Update this table after each plan ships.
