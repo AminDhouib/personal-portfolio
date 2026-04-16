@@ -6,11 +6,13 @@ import { selectRulesForRun, validateRules, computeActiveRuleIndex } from "./engi
 import { dailySeed, todayDateString } from "./daily";
 import { TIER_1_RULES } from "./rules/tier1";
 import { TIER_2_RULES } from "./rules/tier2";
+import { TIER_3_RULES } from "./rules/tier3";
 import { RuleCard } from "./rule-card";
 import { pickForeshadow, useForeshadowTrigger, ForeshadowOverlay } from "./foreshadowing";
 import { CracksOverlay } from "./destruction";
 import { ResultModal } from "./result-modal";
-import type { GameState, Rule } from "./types";
+import { RichInput } from "./rich-input";
+import type { GameState, Rule, FormattingMap } from "./types";
 
 function makeSeed(): number {
   return Math.floor(Math.random() * 0xffffffff) >>> 0;
@@ -32,6 +34,7 @@ function initialSeed(): number {
 export function PasswordGame() {
   const [seed, setSeed] = useState<number>(() => initialSeed());
   const [password, setPassword] = useState<string>("");
+  const [formatting, setFormatting] = useState<FormattingMap>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -41,8 +44,12 @@ export function PasswordGame() {
     () =>
       selectRulesForRun(
         seed,
-        { 1: Math.min(4, TIER_1_RULES.length), 2: Math.min(3, TIER_2_RULES.length) },
-        { 1: TIER_1_RULES, 2: TIER_2_RULES }
+        {
+          1: Math.min(4, TIER_1_RULES.length),
+          2: Math.min(3, TIER_2_RULES.length),
+          3: Math.min(2, TIER_3_RULES.length),
+        },
+        { 1: TIER_1_RULES, 2: TIER_2_RULES, 3: TIER_3_RULES }
       ),
     [seed]
   );
@@ -50,13 +57,13 @@ export function PasswordGame() {
   const state: GameState = useMemo(
     () => ({
       password,
-      formatting: [],
+      formatting,
       elapsedSeconds,
       activeRuleIndex: 0,
       rules,
       seed,
     }),
-    [password, elapsedSeconds, rules, seed]
+    [password, formatting, elapsedSeconds, rules, seed]
   );
 
   const results = useMemo(() => validateRules(state), [state]);
@@ -103,6 +110,7 @@ export function PasswordGame() {
   const reset = useCallback(() => {
     setSeed(makeSeed());
     setPassword("");
+    setFormatting([]);
     setElapsedSeconds(0);
     setTimerRunning(false);
     setShowResult(false);
@@ -111,6 +119,7 @@ export function PasswordGame() {
   const startDaily = useCallback(() => {
     setSeed(dailySeed(todayDateString()));
     setPassword("");
+    setFormatting([]);
     setElapsedSeconds(0);
     setTimerRunning(false);
     setShowResult(false);
@@ -158,17 +167,15 @@ export function PasswordGame() {
       <label htmlFor="pg-input" className="block text-sm text-(--muted) mb-2">
         Please choose a password
       </label>
-      <textarea
-        id="pg-input"
+      <RichInput
         value={password}
+        formatting={formatting}
         onChange={(e) => {
-          setPassword(e.target.value);
-          if (!timerRunning && e.target.value.length > 0) setTimerRunning(true);
+          setPassword(e.value);
+          setFormatting(e.formatting);
+          if (!timerRunning && e.value.length > 0) setTimerRunning(true);
         }}
-        rows={3}
-        className="w-full rounded-lg border border-(--border) bg-(--background) px-4 py-3 font-mono text-base text-(--foreground) focus:outline-none focus:border-accent-pink/60 resize-none"
-        spellCheck={false}
-        autoComplete="off"
+        placeholder="Enter your password..."
       />
       <div className="mt-1 text-xs text-(--muted)">
         {[...password].length} characters
