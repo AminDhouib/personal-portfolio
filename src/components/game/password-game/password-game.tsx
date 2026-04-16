@@ -7,6 +7,8 @@ import { dailySeed, todayDateString } from "./daily";
 import { TIER_1_RULES } from "./rules/tier1";
 import { TIER_2_RULES } from "./rules/tier2";
 import { TIER_3_RULES } from "./rules/tier3";
+import { TIER_4_RULES } from "./rules/tier4";
+import { TIER_5_RULES } from "./rules/tier5";
 import { RuleCard } from "./rule-card";
 import { pickForeshadow, useForeshadowTrigger, ForeshadowOverlay } from "./foreshadowing";
 import { CracksOverlay } from "./destruction";
@@ -48,8 +50,16 @@ export function PasswordGame() {
           1: Math.min(4, TIER_1_RULES.length),
           2: Math.min(3, TIER_2_RULES.length),
           3: Math.min(2, TIER_3_RULES.length),
+          4: Math.min(2, TIER_4_RULES.length),
+          5: Math.min(2, TIER_5_RULES.length),
         },
-        { 1: TIER_1_RULES, 2: TIER_2_RULES, 3: TIER_3_RULES }
+        {
+          1: TIER_1_RULES,
+          2: TIER_2_RULES,
+          3: TIER_3_RULES,
+          4: TIER_4_RULES,
+          5: TIER_5_RULES,
+        }
       ),
     [seed]
   );
@@ -86,6 +96,16 @@ export function PasswordGame() {
     }
     return Math.min(5, Math.max(0, max));
   }, [rules, results]);
+
+  // Hazard classes activated by specific active rules.
+  const hazardClass = useMemo(() => {
+    if (activeIdx === -1) return "";
+    const active = rules[activeIdx];
+    if (!active) return "";
+    if (active.id === "mirror-input") return "pg-hazard-mirror";
+    if (active.id === "blurred-input") return "pg-hazard-blur";
+    return "";
+  }, [activeIdx, rules]);
 
   useEffect(() => {
     if (!timerRunning) return;
@@ -167,16 +187,18 @@ export function PasswordGame() {
       <label htmlFor="pg-input" className="block text-sm text-(--muted) mb-2">
         Please choose a password
       </label>
-      <RichInput
-        value={password}
-        formatting={formatting}
-        onChange={(e) => {
-          setPassword(e.value);
-          setFormatting(e.formatting);
-          if (!timerRunning && e.value.length > 0) setTimerRunning(true);
-        }}
-        placeholder="Enter your password..."
-      />
+      <div className={hazardClass}>
+        <RichInput
+          value={password}
+          formatting={formatting}
+          onChange={(e) => {
+            setPassword(e.value);
+            setFormatting(e.formatting);
+            if (!timerRunning && e.value.length > 0) setTimerRunning(true);
+          }}
+          placeholder="Enter your password..."
+        />
+      </div>
       <div className="mt-1 text-xs text-(--muted)">
         {[...password].length} characters
       </div>
