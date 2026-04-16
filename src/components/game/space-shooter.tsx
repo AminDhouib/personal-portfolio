@@ -10,6 +10,7 @@ import {
   Volume2, VolumeX, Crosshair, Zap, Target,
   Maximize2, Minimize2, Pause, Play,
   ShoppingCart, Magnet, Coins as CoinsIcon, Timer, X as XIcon,
+  Share2,
 } from "lucide-react";
 import {
   addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile,
@@ -1144,8 +1145,16 @@ function activatePowerUp(g: GameRefs, t: PowerUpType): void {
 // growing slowly. Drives spawn rate, asteroid speed, and unlock thresholds.
 function difficulty(g: GameRefs): number {
   const t = (performance.now() - g.startedAt) / 1000;
-  const base = Math.min(0.2 + t * 0.012, 2.5);
-  return g.isMobile ? base * 0.85 : base; // 15% softer on mobile
+  // Front-load the ramp: fast early climb (0→0.8 in 15s) then shallower ramp
+  // after so skilled players still see gradual escalation into late game.
+  //   t=0:   0.25
+  //   t=10:  0.78
+  //   t=20:  1.07
+  //   t=60:  1.78
+  //   t=180: 2.8
+  const ramp = 0.25 + Math.sqrt(t) * 0.22;
+  const base = Math.min(ramp, 3.0);
+  return g.isMobile ? base * 0.88 : base;
 }
 
 function elapsedSeconds(g: GameRefs): number {
@@ -1550,6 +1559,51 @@ class SoundManager {
       case "shieldOn": this.playShieldOn(); break;
       case "shieldOff": this.playShieldOff(); break;
       case "warp": this.playWarp(); break;
+    }
+  }
+
+  // Biome-change sting — short drum fill + whoosh so the player hears the
+  // transition. Called from runTick when the biome flips.
+  biomeTransition() {
+    if (!this.enabled || !this.musicEnabled) return;
+    this.ensure();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // Whoosh: filtered noise sweeping low→high for 0.35s
+    const dur = 0.35;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.Q.value = 3;
+    filt.frequency.setValueAtTime(200, t);
+    filt.frequency.exponentialRampToValueAtTime(4000, t + dur);
+    const gn = ctx.createGain();
+    gn.gain.setValueAtTime(0.18, t);
+    gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(filt).connect(gn).connect(ctx.destination);
+    src.start(t);
+    // Snare roll: 4 quick noise bursts accelerating into a final accent
+    for (let i = 0; i < 5; i++) {
+      const st = t + 0.05 + i * 0.06;
+      const sd = 0.06;
+      const sb = ctx.createBuffer(1, ctx.sampleRate * sd, ctx.sampleRate);
+      const sdata = sb.getChannelData(0);
+      for (let k = 0; k < sdata.length; k++) sdata[k] = (Math.random() - 0.5) * 2 * Math.exp((-k / sdata.length) * 10);
+      const ss = ctx.createBufferSource();
+      ss.buffer = sb;
+      const sf = ctx.createBiquadFilter();
+      sf.type = "highpass";
+      sf.frequency.value = 2200;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(i === 4 ? 0.35 : 0.14, st);
+      sg.gain.exponentialRampToValueAtTime(0.001, st + sd);
+      ss.connect(sf).connect(sg).connect(ctx.destination);
+      ss.start(st);
     }
   }
 
@@ -2248,6 +2302,7 @@ function runTick(
   // transitions feel organic instead of clockwork.
   if (g.distance >= g.nextBiomeAt && g.status === "playing") {
     g.currentEnv = pickRandomBiome(g.currentEnv);
+    sounds.biomeTransition();
     g.nextBiomeAt = pickNextBiomeDistance(g.distance);
   }
   // Color target: inverted (light-mode armed) or the current biome.
@@ -2288,6 +2343,8 @@ function runTick(
   // along that vector with gravity dragging it down, then explodes. Camera
   // tightens onto the wreck and speed lines redirect along the death vector.
   if (g.status === "dying") {
+    // Stop the zoom-lines — the world isn't flowing past the ship anymore
+    g.speedLines.length = 0;
     const elapsed = (now - g.dyingAt) / 1000;
     // Velocity integration + gravity on Y
     g.deathVelY -= step * 6.5;
@@ -2370,7 +2427,12 @@ function runTick(
   const warpCamZ = portraitOrMobile ? 6.0 : 3.9;
   g.cameraTargetZ = THREE.MathUtils.lerp(baseCamZ, warpCamZ, wi);
 
-  const desiredLines = wi > 0.5 ? 60 : 32;
+  // Kill speed lines once the ship is dead so the world stops streaming past
+  // the wreck. ('dying' returns earlier in the tick via a separate branch.)
+  if (g.status === "dead") {
+    g.speedLines.length = 0;
+  }
+  const desiredLines = g.status === "dead" ? 0 : (wi > 0.5 ? 60 : 32);
   while (g.speedLines.length < desiredLines) {
     g.speedLines.push({
       x: (Math.random() - 0.5) * 14,
@@ -4900,8 +4962,10 @@ export function SpaceShooterGame() {
           />
         </Canvas>
 
-        {/* ===== In-canvas HUD — lives inside the 3D viewport ===== */}
-        {(ui.status === "playing" || ui.status === "paused") && (
+        {/* ===== In-canvas HUD — lives inside the 3D viewport =====
+             Also renders on dead screen when the shop modal is open so the
+             Shop button in the death overlay can actually show the shop. */}
+        {(ui.status === "playing" || ui.status === "paused" || shopOpen) && (
           <>
             {/* Top-left: score + distance + kills — styled to match game aesthetic */}
             {/* Shop modal — only reachable for returning players */}
@@ -5684,7 +5748,7 @@ export function SpaceShooterGame() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={launch}
-                  className="inline-flex items-center gap-2 rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-6 py-2.5 text-sm font-bold uppercase tracking-wider text-white shadow-lg"
+                  className="inline-flex items-center gap-2 rounded-xl bg-accent-blue/20 border border-accent-blue/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-accent-blue"
                 >
                   <RotateCcw className="h-4 w-4" />
                   Fly again
@@ -5744,6 +5808,7 @@ export function SpaceShooterGame() {
                   }}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/20 border border-emerald-400/50 px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-emerald-300"
                 >
+                  <Share2 className="h-4 w-4" />
                   Share
                 </motion.button>
               </div>
