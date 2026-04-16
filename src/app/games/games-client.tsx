@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useState } from "react";
-import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket } from "lucide-react";
+import { Gamepad2, Keyboard, Trophy, RotateCcw, Rocket, Hexagon, Key } from "lucide-react";
 
 const GeometricFlowGame = dynamic(
   () =>
@@ -30,6 +31,12 @@ const SpaceShooterGame = dynamic(
   { ssr: false, loading: () => <GameSkeleton /> }
 );
 
+const HextrisGame = dynamic(
+  () =>
+    import("@/components/game/hextris").then((m) => m.HextrisGame),
+  { ssr: false, loading: () => <GameSkeleton /> }
+);
+
 function GameSkeleton() {
   return (
     <div className="w-full h-[420px] rounded-xl border border-(--border) bg-(--card) flex items-center justify-center">
@@ -38,7 +45,19 @@ function GameSkeleton() {
   );
 }
 
-const GAMES = [
+type GameEntry = {
+  id: string;
+  title: string;
+  description: string;
+  icon: typeof Gamepad2;
+  iconColor: string;
+  available: boolean;
+  controls?: string;
+  external?: boolean;
+  href?: string;
+};
+
+const GAMES: GameEntry[] = [
   {
     id: "geometric-flow",
     title: "Geometric Flow",
@@ -72,7 +91,69 @@ const GAMES = [
     iconColor: "text-accent-amber",
     available: true,
   },
+  {
+    id: "hextris",
+    title: "Hextris",
+    description: "Match 3 hexagon blocks to score points. Rotate and stack strategically.",
+    icon: Hexagon,
+    iconColor: "text-purple-400",
+    available: true,
+  },
+  {
+    id: "password-game",
+    title: "Password Game 2",
+    description: "Seeded chaos sequel. Every run unique. (Opens in new page)",
+    icon: Key,
+    iconColor: "text-accent-pink",
+    available: true,
+    external: true,
+    href: "/games/password-game",
+  },
 ];
+
+function ExternalOrTabButton({
+  game,
+  active,
+  onClick,
+}: {
+  game: GameEntry;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const className = `flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all shrink-0 ${
+    active
+      ? game.id === "geometric-flow"
+        ? "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
+        : game.id === "typing-speed"
+        ? "border-accent-blue/50 bg-accent-blue/10 text-accent-blue"
+        : game.id === "space-shooter"
+        ? "border-accent-green/50 bg-accent-green/10 text-accent-green"
+        : game.id === "code-puzzle"
+        ? "border-accent-amber/50 bg-accent-amber/10 text-accent-amber"
+        : game.id === "hextris"
+        ? "border-purple-400/50 bg-purple-400/10 text-purple-400"
+        : "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
+      : "border-(--border) text-(--muted) hover:border-(--muted)/40 hover:text-(--foreground)"
+  }`;
+  const content = (
+    <>
+      <game.icon className={`h-4 w-4 ${active ? game.iconColor : "opacity-60"}`} />
+      {game.title}
+    </>
+  );
+  if (game.external && game.href) {
+    return (
+      <Link href={game.href} className={className}>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <button onClick={onClick} className={className} type="button">
+      {content}
+    </button>
+  );
+}
 
 export function GamesClient() {
   const [activeGame, setActiveGame] = useState("space-shooter");
@@ -82,24 +163,12 @@ export function GamesClient() {
       {/* Game selector tabs */}
       <div className="flex items-center gap-3 overflow-x-auto pb-2">
         {GAMES.map((game) => (
-          <button
+          <ExternalOrTabButton
             key={game.id}
+            game={game}
+            active={activeGame === game.id}
             onClick={() => setActiveGame(game.id)}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all shrink-0 ${
-              activeGame === game.id
-                ? game.id === "geometric-flow"
-                  ? "border-accent-pink/50 bg-accent-pink/10 text-accent-pink"
-                  : game.id === "typing-speed"
-                  ? "border-accent-blue/50 bg-accent-blue/10 text-accent-blue"
-                  : game.id === "space-shooter"
-                  ? "border-accent-green/50 bg-accent-green/10 text-accent-green"
-                  : "border-accent-amber/50 bg-accent-amber/10 text-accent-amber"
-                : "border-(--border) text-(--muted) hover:border-(--muted)/40 hover:text-(--foreground)"
-            }`}
-          >
-            <game.icon className={`h-4 w-4 ${activeGame === game.id ? game.iconColor : "opacity-60"}`} />
-            {game.title}
-          </button>
+          />
         ))}
       </div>
 
@@ -164,6 +233,19 @@ export function GamesClient() {
             </p>
           </div>
           <CodePuzzleGame />
+        </div>
+      )}
+
+      {/* Hextris */}
+      {activeGame === "hextris" && (
+        <div>
+          <div className="mb-4">
+            <h2 className="font-display text-xl font-bold">Hextris</h2>
+            <p className="text-sm text-(--muted) mt-0.5">
+              Match 3 hexagon blocks to score points. Rotate hexagon and stack blocks strategically.
+            </p>
+          </div>
+          <HextrisGame />
         </div>
       )}
     </div>
