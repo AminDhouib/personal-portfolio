@@ -36,115 +36,190 @@ function StarField({ density = 40, color = "white" }: { density?: number; color?
 }
 
 // ---------- Orbital Dodge ----------
-// Actual game: #0a0a1a deep space bg, #a78bfa purple wireframe asteroids,
-// cyan #22d3ee ship/bullets, gold #facc15 coins, wireframe toon materials.
+// Matched from actual gameplay screenshot: dark space with warm nebula glow,
+// solid flat-shaded polyhedra asteroids (not wireframe), diagonal warp
+// streaks, cyan ship with engine trail, vignette + bloom feel.
 
 function SpaceShooterBanner() {
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0a0a1a" }}>
-      <StarField density={55} color="#cbd5e1" />
-      {/* Warp streaks */}
-      {[...Array(12)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute h-px"
-          style={{
-            top: `${8 + i * 7.5}%`,
-            width: "35%",
-            background: "linear-gradient(90deg,transparent,#a78bfa88,transparent)",
-          }}
-          animate={{ x: ["-40%", "140%"] }}
-          transition={{
-            duration: 0.8 + (i % 3) * 0.25,
-            repeat: Infinity,
-            delay: i * 0.12,
-            ease: "linear",
-          }}
-        />
-      ))}
-      {/* Ship — cone + box wing + nacelles (matches Falcon) */}
-      <motion.svg
-        viewBox="-30 -30 60 60"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%]"
-        animate={{ y: [-5, 5, -5], rotateZ: [-2, 2, -2] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <defs>
-          <linearGradient id="od-hull" x1="0" x2="0" y1="-20" y2="16">
-            <stop offset="0" stopColor="#67e8f9" />
-            <stop offset="1" stopColor="#0e7490" />
-          </linearGradient>
-        </defs>
-        {/* Engine glow */}
-        <ellipse cx="0" cy="14" rx="10" ry="6" fill="#22d3ee" opacity="0.35" />
-        {/* Fuselage cone */}
-        <polygon points="0,-20 8,12 -8,12" fill="url(#od-hull)" stroke="#a5f3fc" strokeWidth="0.6" />
-        {/* Wings */}
-        <polygon points="-8,6 -18,14 -6,12" fill="#0e7490" stroke="#67e8f9" strokeWidth="0.4" />
-        <polygon points="8,6 18,14 6,12" fill="#0e7490" stroke="#67e8f9" strokeWidth="0.4" />
-        {/* Nacelles */}
-        <rect x="-20" y="10" width="5" height="8" rx="1.5" fill="#155e75" stroke="#22d3ee" strokeWidth="0.4" />
-        <rect x="15" y="10" width="5" height="8" rx="1.5" fill="#155e75" stroke="#22d3ee" strokeWidth="0.4" />
-        {/* Cockpit */}
-        <ellipse cx="0" cy="-6" rx="2.5" ry="3.5" fill="#e0f2fe" opacity="0.85" />
-      </motion.svg>
-      {/* Engine trail */}
+      {/* Biome nebula glow — drifts slowly downward for parallax */}
       <motion.div
-        className="absolute left-1/2 top-[65%] -translate-x-1/2 w-[20%] h-5 rounded-full blur-lg"
-        style={{ background: "linear-gradient(90deg,transparent,#22d3ee,transparent)" }}
-        animate={{ opacity: [0.4, 1, 0.4], scaleX: [0.8, 1.2, 0.8] }}
-        transition={{ duration: 0.35, repeat: Infinity }}
+        className="absolute w-[70%] h-[80%] rounded-full blur-3xl"
+        style={{
+          right: "-15%",
+          background: "radial-gradient(circle, #b4540030 0%, #facc1518 40%, transparent 70%)",
+        }}
+        animate={{ top: ["-20%", "80%"] }}
+        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
       />
-      {/* Wireframe asteroids — octahedron silhouette matching game */}
+      <motion.div
+        className="absolute w-[50%] h-[60%] rounded-full blur-3xl"
+        style={{
+          left: "-10%",
+          background: "radial-gradient(circle, #a78bfa15 0%, transparent 65%)",
+        }}
+        animate={{ top: ["10%", "110%"] }}
+        transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+      />
+      {/* Starfield scrolling slowly downward — parallax layer behind everything */}
+      <motion.div
+        className="absolute left-0 w-full"
+        style={{ height: "200%", top: 0 }}
+        animate={{ top: ["0%", "50%"] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+      >
+        <StarField density={60} color="#94a3b8" />
+      </motion.div>
+      {/* Vertical warp streaks — flying forward through space */}
+      {[...Array(16)].map((_, i) => {
+        const seed = i * 7919 + 1031;
+        const x = seed % 100;
+        const len = 8 + (seed % 12);
+        return (
+          <motion.div
+            key={i}
+            className="absolute"
+            style={{
+              left: `${x}%`,
+              width: 1,
+              height: `${len}%`,
+              background: "linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent)",
+            }}
+            animate={{ top: ["-15%", "110%"] }}
+            transition={{
+              duration: 0.5 + (i % 5) * 0.12,
+              repeat: Infinity,
+              delay: i * 0.07,
+              ease: "linear",
+            }}
+          />
+        );
+      })}
+      {/* Solid flat-shaded asteroids — spawn from top, flow down, rotate */}
       {[
-        { x: "12%", y: "18%", size: 22, d: 5 },
-        { x: "85%", y: "25%", size: 16, d: 6 },
-        { x: "20%", y: "78%", size: 14, d: 7 },
-        { x: "78%", y: "72%", size: 18, d: 5.5 },
+        { x: 8, size: 44, faces: ["#4c1d95", "#5b21b6", "#7c3aed"], spd: 3.5, delay: 0 },
+        { x: 78, size: 34, faces: ["#134e4a", "#1a6b64", "#2dd4bf"], spd: 4.2, delay: 1.0 },
+        { x: 30, size: 28, faces: ["#3b0764", "#6b21a8", "#a855f7"], spd: 3.0, delay: 2.0 },
+        { x: 65, size: 38, faces: ["#1e3a5f", "#2563eb", "#60a5fa"], spd: 3.8, delay: 0.6 },
+        { x: 48, size: 22, faces: ["#4c1d95", "#6d28d9", "#8b5cf6"], spd: 2.8, delay: 1.5 },
+        { x: 90, size: 30, faces: ["#134e4a", "#0f766e", "#2dd4bf"], spd: 3.3, delay: 2.5 },
       ].map((a, i) => (
         <motion.svg
           key={i}
           className="absolute"
-          style={{ left: a.x, top: a.y, width: a.size, height: a.size }}
-          viewBox="-12 -12 24 24"
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: a.d, repeat: Infinity, ease: "linear" }}
+          style={{ left: `${a.x}%`, width: a.size, height: a.size }}
+          viewBox="-14 -14 28 28"
+          animate={{
+            top: ["-12%", "110%"],
+            rotate: [0, 360],
+            scale: [0.6, 1.2],
+          }}
+          transition={{
+            duration: a.spd,
+            repeat: Infinity,
+            delay: a.delay,
+            ease: "linear",
+          }}
         >
-          <polygon points="0,-10 10,0 0,10 -10,0" fill="none" stroke="#a78bfa" strokeWidth="1.5" />
-          <line x1="0" y1="-10" x2="0" y2="10" stroke="#a78bfa" strokeWidth="0.5" opacity="0.5" />
-          <line x1="-10" y1="0" x2="10" y2="0" stroke="#a78bfa" strokeWidth="0.5" opacity="0.5" />
+          <polygon points="0,-12 12,0 0,2" fill={a.faces[0]} />
+          <polygon points="0,-12 -12,0 0,2" fill={a.faces[1]} />
+          <polygon points="0,12 12,0 0,2" fill={a.faces[2]} />
+          <polygon points="0,12 -12,0 0,2" fill={a.faces[1]} />
+          <polygon points="0,-12 12,0 0,12 -12,0" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
         </motion.svg>
       ))}
-      {/* Bullet spheres */}
+      {/* Ship (positioned off-center like in gameplay) */}
+      <motion.svg
+        viewBox="-30 -30 60 60"
+        className="absolute w-[28%]"
+        style={{ left: "38%", top: "38%" }}
+        animate={{ y: [-4, 4, -4], rotateZ: [-1.5, 1.5, -1.5] }}
+        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <defs>
+          <linearGradient id="od-hull2" x1="0" x2="0" y1="-18" y2="14">
+            <stop offset="0" stopColor="#67e8f9" />
+            <stop offset="1" stopColor="#0e7490" />
+          </linearGradient>
+          <radialGradient id="od-eng2">
+            <stop offset="0" stopColor="#22d3ee" stopOpacity="0.7" />
+            <stop offset="1" stopColor="#22d3ee" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        {/* Engine glow */}
+        <ellipse cx="0" cy="18" rx="8" ry="12" fill="url(#od-eng2)" />
+        {/* Fuselage — solid cone */}
+        <polygon points="0,-18 7,11 -7,11" fill="url(#od-hull2)" />
+        {/* Wings — darker flat shade */}
+        <polygon points="-7,5 -16,13 -5,11" fill="#0e7490" />
+        <polygon points="7,5 16,13 5,11" fill="#0e7490" />
+        {/* Nacelles */}
+        <rect x="-18" y="9" width="4" height="7" rx="1" fill="#155e75" />
+        <rect x="14" y="9" width="4" height="7" rx="1" fill="#155e75" />
+        {/* Nacelle glow tips */}
+        <circle cx="-16" cy="16" r="2" fill="#22d3ee" opacity="0.6" />
+        <circle cx="16" cy="16" r="2" fill="#22d3ee" opacity="0.6" />
+        {/* Cockpit */}
+        <ellipse cx="0" cy="-5" rx="2" ry="3" fill="#cffafe" />
+      </motion.svg>
+      {/* Engine trail — elongated blur */}
+      <motion.div
+        className="absolute w-[15%] h-10 rounded-full blur-xl"
+        style={{
+          left: "44%",
+          top: "60%",
+          background: "linear-gradient(180deg, #22d3ee88, #22d3ee00)",
+        }}
+        animate={{ opacity: [0.5, 1, 0.5], scaleY: [0.8, 1.3, 0.8] }}
+        transition={{ duration: 0.3, repeat: Infinity }}
+      />
+      {/* Bullet tracers — bright cyan spheres shooting upward */}
       {[
-        { x: "42%", y: "32%", d: 0.6 },
-        { x: "56%", y: "28%", d: 0.9 },
-        { x: "49%", y: "20%", d: 1.2 },
+        { x: "47%", d: 0 },
+        { x: "51%", d: 0.35 },
+        { x: "49%", d: 0.7 },
       ].map((b, i) => (
         <motion.div
           key={i}
-          className="absolute w-2.5 h-2.5 rounded-full"
+          className="absolute w-2 h-2 rounded-full"
           style={{
             left: b.x,
             background: "#22d3ee",
-            boxShadow: "0 0 8px #22d3ee, 0 0 16px #22d3ee55",
+            boxShadow: "0 0 6px 2px #22d3ee, 0 0 14px #22d3ee66",
           }}
-          animate={{ top: ["50%", "-5%"], opacity: [1, 0.3] }}
-          transition={{ duration: 0.7, repeat: Infinity, delay: b.d, ease: "linear" }}
+          animate={{ top: ["42%", "0%"], opacity: [1, 0] }}
+          transition={{ duration: 0.5, repeat: Infinity, delay: b.d, ease: "linear" }}
         />
       ))}
-      {/* Gold coin */}
-      <motion.div
-        className="absolute w-4 h-4 rounded-full border-2"
+      {/* Gold coins flowing down like asteroids */}
+      {[
+        { x: "22%", spd: 3.2, delay: 0.8 },
+        { x: "72%", spd: 2.8, delay: 2.2 },
+        { x: "45%", spd: 3.6, delay: 1.6 },
+      ].map((c, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-3.5 h-3.5 rounded-full"
+          style={{
+            left: c.x,
+            background: "radial-gradient(circle at 35% 35%, #fde68a, #d97706)",
+            boxShadow: "0 0 10px #facc1566",
+          }}
+          animate={{
+            top: ["-5%", "110%"],
+            scale: [0.5, 1.1],
+            rotate: [0, 360],
+          }}
+          transition={{ duration: c.spd, repeat: Infinity, delay: c.delay, ease: "linear" }}
+        />
+      ))}
+      {/* Vignette — dark edges like the actual PostFx */}
+      <div
+        className="absolute inset-0 pointer-events-none"
         style={{
-          right: "30%",
-          top: "40%",
-          borderColor: "#facc15",
-          background: "radial-gradient(circle at 35% 35%, #fde68a, #b45309)",
-          boxShadow: "0 0 10px #facc1555",
+          background: "radial-gradient(ellipse 70% 65% at 50% 50%, transparent 40%, #0a0a1a 100%)",
         }}
-        animate={{ y: [0, -4, 0], rotate: [0, 360] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       />
     </div>
   );
