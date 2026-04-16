@@ -87,3 +87,31 @@ describe("Tier 3 — strict word count rule", () => {
     expect(rule.validate(makeState(words, rule)).passed).toBe(true);
   });
 });
+
+describe("Tier 3 — alternating case rule", () => {
+  const def = TIER_3_RULES.find((r) => r.id === "alternating-case")!;
+
+  it("exists", () => {
+    expect(def).toBeDefined();
+  });
+
+  it("passes with strict alternation (lower, upper, lower, upper...)", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("aBcDeFgH", rule)).passed).toBe(true);
+  });
+
+  it("fails with two consecutive same-case letters", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("aBCdEf", rule)).passed).toBe(false);
+  });
+
+  it("non-letters are skipped (don't reset the pattern)", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("a1B2c3D4", rule)).passed).toBe(true);
+  });
+
+  it("needs at least 4 letters", () => {
+    const rule = def.create(mulberry32(1));
+    expect(rule.validate(makeState("aB", rule)).passed).toBe(false);
+  });
+});

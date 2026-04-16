@@ -36,6 +36,32 @@ function nth(n: number): string {
   return `${n}th`;
 }
 
+const alternatingCase: RuleDef = {
+  id: "alternating-case",
+  tier: 3,
+  create() {
+    return {
+      id: "alternating-case",
+      tier: 3,
+      description: "Your password's letters must strictly alternate between lowercase and uppercase (starting with lowercase).",
+      params: {},
+      validate(state) {
+        let letters = 0;
+        for (const ch of state.password) {
+          if (!/[a-zA-Z]/.test(ch)) continue;
+          letters++;
+          const expectedLower = letters % 2 === 1;
+          const isLower = ch === ch.toLowerCase() && ch !== ch.toUpperCase();
+          const isUpper = ch === ch.toUpperCase() && ch !== ch.toLowerCase();
+          if (expectedLower && !isLower) return { passed: false };
+          if (!expectedLower && !isUpper) return { passed: false };
+        }
+        return { passed: letters >= 4 };
+      },
+    };
+  },
+};
+
 const wordCountStrict: RuleDef = {
   id: "word-count-strict",
   tier: 3,
@@ -54,4 +80,4 @@ const wordCountStrict: RuleDef = {
   },
 };
 
-export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict];
+export const TIER_3_RULES: readonly RuleDef[] = [everyNthUpper, wordCountStrict, alternatingCase];
