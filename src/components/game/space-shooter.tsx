@@ -805,6 +805,7 @@ interface GameRefs {
     musicEnabled: boolean;
     sfxEnabled: boolean;
   };
+  gyroTilt: { x: number; y: number };
   // Boss system
   boss: BossState | null;
   bossProjectiles: BossProjectile[];
@@ -896,6 +897,7 @@ function createRefs(): GameRefs {
     coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
     comboWindowMs: 0, shieldDurationMs: 0,
     prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
+    gyroTilt: { x: 0, y: 0 },
     boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
     bossScheduleIdx: 0, bossesDefeatedThisRun: 0,
     normalSpawningPausedUntil: 0, devHotkeyArmed: false,
@@ -2141,6 +2143,15 @@ function runTick(
       l.length = warpActive ? 4 + Math.random() * 4 : 1.4 + Math.random() * 2.6;
       l.life = 0;
     }
+  }
+
+  // Gyro influence: blend tilt into the target if the player enabled gyro.
+  // Gamma/beta are already normalized to -1..1 on gameRefs.gyroTilt. Apply a
+  // 60% influence so mouse/touch can still override.
+  if (g.prefs.gyroEnabled) {
+    const gyInf = 0.6;
+    g.targetX = g.targetX * (1 - gyInf) + g.gyroTilt.x * (ARENA_W / 2) * gyInf;
+    g.targetY = g.targetY * (1 - gyInf) + g.gyroTilt.y * (ARENA_H / 2) * gyInf;
   }
 
   // Arena clamp every frame (works for armed too — clamps ship preview)
@@ -3751,6 +3762,41 @@ export function SpaceShooterGame() {
     musicEnabled: true,
     sfxEnabled: true,
   });
+  const [gyroSupported, setGyroSupported] = useState(false);
+  const [gyroPermission, setGyroPermission] = useState<"unknown" | "granted" | "denied">("unknown");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasOrientation = "DeviceOrientationEvent" in window;
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    setGyroSupported(hasOrientation && isMobile);
+  }, []);
+  const requestGyroPermission = useCallback(async (): Promise<boolean> => {
+    const DOE = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission === "function") {
+      try {
+        const result = await DOE.requestPermission();
+        setGyroPermission(result === "granted" ? "granted" : "denied");
+        return result === "granted";
+      } catch {
+        setGyroPermission("denied");
+        return false;
+      }
+    }
+    setGyroPermission("granted");
+    return true;
+  }, []);
+  useEffect(() => {
+    if (!gyroSupported || !prefs.gyroEnabled || gyroPermission !== "granted") return;
+    const handler = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null || e.beta == null) return;
+      const clampedGamma = Math.max(-30, Math.min(30, e.gamma));
+      const clampedBeta = Math.max(-30, Math.min(30, e.beta - 45));
+      gameRefs.current.gyroTilt.x = clampedGamma / 30;
+      gameRefs.current.gyroTilt.y = -clampedBeta / 30;
+    };
+    window.addEventListener("deviceorientation", handler);
+    return () => window.removeEventListener("deviceorientation", handler);
+  }, [gyroSupported, prefs.gyroEnabled, gyroPermission]);
   const [firstBossSeen, setFirstBossSeen] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.localStorage.getItem("orbital-dodge-first-boss-seen") === "1";
@@ -4402,6 +4448,26 @@ export function SpaceShooterGame() {
                 <SettingsToggle label="Bloom / glow" checked={prefs.bloomEnabled} onChange={(v) => setPrefs((p) => ({ ...p, bloomEnabled: v }))} />
                 <SettingsToggle label="Music" checked={prefs.musicEnabled} onChange={(v) => setPrefs((p) => ({ ...p, musicEnabled: v }))} />
                 <SettingsToggle label="SFX" checked={prefs.sfxEnabled} onChange={(v) => setPrefs((p) => ({ ...p, sfxEnabled: v }))} />
+                {gyroSupported && (
+                  <div>
+                    <SettingsToggle
+                      label="Gyro controls"
+                      checked={prefs.gyroEnabled}
+                      onChange={async (v) => {
+                        if (v && gyroPermission !== "granted") {
+                          const ok = await requestGyroPermission();
+                          if (!ok) return;
+                        }
+                        setPrefs((p) => ({ ...p, gyroEnabled: v }));
+                      }}
+                    />
+                    {gyroPermission === "denied" && (
+                      <div className="text-[10px] text-red-400 mt-1">
+                        Permission denied. Enable motion access in iOS Settings.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
