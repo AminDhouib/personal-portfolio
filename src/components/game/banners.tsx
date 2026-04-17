@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useMotionValue, useMotionTemplate, animate } from "framer-motion";
-import { useEffect } from "react";
+import { motion, useMotionValue, animate } from "framer-motion";
+import { useEffect, useRef } from "react";
 import type { GameSlug } from "@/app/games/games-meta";
 
 // ---------- shared ----------
@@ -321,18 +321,28 @@ function HextrisBanner() {
     rotTimes.push(subStart + subLen);
   }
 
+  // Drive the SVG transform attribute directly: subscribing to a MotionValue
+  // on change and calling setAttribute("transform", `rotate(...)`) bypasses
+  // framer-motion's CSS-transform pipeline entirely, so the pivot is SVG's
+  // native (0, 0) of the parent coordinate system (= viewBox center here).
   const rotate = useMotionValue(0);
+  const gRef = useRef<SVGGElement>(null);
   useEffect(() => {
+    const unsub = rotate.on("change", (v) => {
+      gRef.current?.setAttribute("transform", `rotate(${v})`);
+    });
     const controls = animate(rotate, rotKeyframes, {
       duration: rotDuration,
       repeat: Infinity,
       times: rotTimes,
       ease: "easeOut",
     });
-    return () => controls.stop();
+    return () => {
+      controls.stop();
+      unsub();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const rotateTransform = useMotionTemplate`rotate(${rotate})`;
 
   // All animated geometry lives inside the same SVG viewBox so a block's
   // position is expressed in viewBox units — aspect-ratio-invariant. The
@@ -413,18 +423,24 @@ function HextrisBanner() {
           background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 55%, #050505 100%)",
         }}
       />
+      {/* viewBox is shifted vertically so the hex sits slightly above card
+          center — the gallery card's text overlay ("Hextris / Rotate the
+          hex…") covers the bottom of the card, so raising the hex keeps
+          it clear of the title. Raising y-min makes user-coord 0 render
+          higher in the viewport. */}
       <svg
-        viewBox="-60 -60 120 120"
+        viewBox="-60 -50 120 120"
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="xMidYMid meet"
       >
         {/* Rotating canvas — the outer hex, inner hex, blocks, fillers and
             pop texts are all children so the whole board snaps 60° between
             drop cycles (matching the real game's rotate-between-moves).
-            Uses the SVG transform attribute (not CSS transform) so the
-            rotation pivot is the element's local (0, 0) = viewBox center,
-            not the bbox center which shifts as blocks animate. */}
-        <motion.g transform={rotateTransform}>
+            Uses the SVG transform attribute (driven by a MotionValue via
+            setAttribute above) so the rotation pivot is the element's
+            local (0, 0) = viewBox center, not the bbox center which
+            shifts as blocks animate. */}
+        <g ref={gRef} transform="rotate(0)">
         {/* Outer hex boundary — flat-top orientation (flat edges at top/
             bottom, vertex points on left and right). Matches the real game
             layout so blocks sit ON faces at -90/-30/30/90/150/210. Outer
@@ -510,7 +526,7 @@ function HextrisBanner() {
             </motion.text>
           );
         })}
-        </motion.g>
+        </g>
       </svg>
     </div>
   );

@@ -29,9 +29,11 @@ export function GameCard({
           <GameBanner slug={game.slug} />
           {/* Dark overlay for legibility */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-          {/* Accent glow ring on hover */}
+          {/* Accent glow ring on hover — rounded to match the card's
+              rounded-2xl so the inset outline follows the corners instead
+              of drawing a hard rectangle that bleeds past them. */}
           <div
-            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
             style={{ boxShadow: `inset 0 0 0 2px ${game.accent}` }}
           />
           {/* Title block */}

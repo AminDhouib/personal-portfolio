@@ -4,6 +4,7 @@ import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotAction } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
+import { usePathname } from "next/navigation";
 
 const INSTRUCTIONS = `You are Amin Dhouib's personal AI assistant on his portfolio site amindhou.com.
 You are friendly, concise, and knowledgeable about Amin's work. Keep responses short — this is a chat widget.
@@ -84,7 +85,11 @@ function ChatActions() {
 }
 
 export function ChatWidget({ enabled }: { enabled?: boolean }) {
-  if (!enabled) return null;
+  const pathname = usePathname();
+  // The chat is a portfolio/sales surface — on the games area it just adds
+  // clutter, so hide it across /games and its sub-routes.
+  const onGames = pathname === "/games" || pathname.startsWith("/games/");
+  if (!enabled || onGames) return null;
   return (
     <CopilotKit runtimeUrl="/api/copilotkit">
       <ChatActions />
