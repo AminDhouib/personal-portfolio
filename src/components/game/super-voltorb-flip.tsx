@@ -241,6 +241,10 @@ function Card({
       className={`relative h-full w-full ${panelChrome} bg-transparent p-0`}
       style={{
         perspective: 1000,
+        // touchAction: manipulation disables the mobile double-tap-zoom
+        // gesture on the tile so rapid flipping on phones doesn't get
+        // interrupted by an accidental zoom.
+        touchAction: "manipulation",
         // Amber focus ring when this is the keyboard-focused tile. Uses a
         // box-shadow instead of outline so it layers cleanly on top of
         // the existing triple-outline chrome without fighting z-order.
