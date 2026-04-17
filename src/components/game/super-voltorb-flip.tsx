@@ -531,7 +531,11 @@ export function SuperVoltorbFlipGame() {
     });
   }, []);
 
-  // Auto-advance to next level on win; auto-reset on lose.
+  // Auto-advance to next level on win; auto-reset on lose. Delays sized to
+  // let the banner and — on lose — the five column-stagger voltorb reveals
+  // play in full before the board reshuffles. Cascade finishes around
+  // 1 s after flip; banner needs another beat to read. Win path is
+  // shorter since there's no cascade to wait on.
   useEffect(() => {
     if (status === "won") {
       const timeout = setTimeout(() => {
@@ -540,7 +544,7 @@ export function SuperVoltorbFlipGame() {
         setLevel((l) => l + 1);
         setBoard(generateBoard(level + 1));
         setStatus("playing");
-      }, 1400);
+      }, 2200);
       return () => clearTimeout(timeout);
     }
     if (status === "lost") {
@@ -548,7 +552,7 @@ export function SuperVoltorbFlipGame() {
         setRunning(0);
         setBoard(generateBoard(level));
         setStatus("playing");
-      }, 1800);
+      }, 2800);
       return () => clearTimeout(timeout);
     }
     return undefined;
