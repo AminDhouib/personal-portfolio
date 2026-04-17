@@ -17,7 +17,7 @@
  * isn't licensed for redistribution).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import localFont from "next/font/local";
 
@@ -198,10 +198,36 @@ function Card({
     if (next !== undefined) onToggleMemo(next);
     else visibleMemos.forEach((m) => onToggleMemo(m));
   };
+  // Long-press support for touch devices (no right-click there). If the
+  // pointer stays down for 400 ms we cycle a memo mark and flag the next
+  // click to be suppressed so the release doesn't also flip the tile.
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressNextClick = useRef(false);
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
   return (
     <button
       type="button"
+      onPointerDown={() => {
+        if (revealed) return;
+        longPressTimer.current = setTimeout(() => {
+          cycleMemo();
+          suppressNextClick.current = true;
+          longPressTimer.current = null;
+        }, 400);
+      }}
+      onPointerUp={cancelLongPress}
+      onPointerLeave={cancelLongPress}
+      onPointerCancel={cancelLongPress}
       onClick={() => {
+        if (suppressNextClick.current) {
+          suppressNextClick.current = false;
+          return;
+        }
         if (revealed) return;
         if (memoMode) cycleMemo();
         else onFlip();
