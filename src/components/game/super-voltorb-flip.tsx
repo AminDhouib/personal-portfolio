@@ -1,1093 +1,1069 @@
 "use client";
 
 /**
- * Super Voltorb Flip — web rewrite.
+ * Super Voltorb Flip — 1:1 port of https://github.com/jv-vogler/voltorb-flip
+ * Copyright (c) 2023 João Vogler. Licensed under MIT.
+ * See upstream LICENSE (https://github.com/jv-vogler/voltorb-flip/blob/main/LICENSE).
  *
- * Visual style is a port of the CSS motifs in
- * https://github.com/jv-vogler/voltorb-flip (MIT, Copyright (c) João Vogler)
- * — specifically the felt-green table palette, triple-outline DS bezel
- * ("border + outline + inner border") used on every panel, salmon card
- * faces (#bd8c84/#a55a52), and per-row/col header tints. Gameplay is the
- * Voltorb Flip minigame from Pokémon HGSS: 5x5 grid, multiply coins by
- * each non-voltorb tile value, hit a voltorb = bust.
- *
- * Fonts under public/games/voltorb-flip/fonts/ — Pokémon DS Font is CC0
- * (see LICENSE.txt alongside). The voltorb icon is a fresh inline SVG;
- * we don't ship upstream's Pokémon sprite PNGs (that's Nintendo IP that
- * isn't licensed for redistribution).
+ * Modifications by <amin dhouib@outlook.com>:
+ * - Next.js 16 / portfolio codebase integration
+ * - Inline SVG voltorb icon instead of upstream Pokémon sprite PNGs
+ *   (those are Nintendo IP not redistributed under upstream's MIT).
+ * - Fonts shipped under public/games/voltorb-flip/fonts/ with LICENSE.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, MotionConfig } from "framer-motion";
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import localFont from "next/font/local";
 
-const pokemonDs = localFont({
+// ---------------------------------------------------------------------------
+// Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
+// ---------------------------------------------------------------------------
+
+const pokemonFont = localFont({
   src: "../../../public/games/voltorb-flip/fonts/pokemon-ds-font.ttf",
   variable: "--font-voltorb-ds",
   display: "swap",
 });
-const m5x7 = localFont({
+const numberFont = localFont({
   src: "../../../public/games/voltorb-flip/fonts/m5x7.ttf",
   variable: "--font-voltorb-m5x7",
   display: "swap",
 });
-const stackedPixel = localFont({
+const scoreFont = localFont({
   src: "../../../public/games/voltorb-flip/fonts/stacked-pixel.ttf",
   variable: "--font-voltorb-stacked",
   display: "swap",
 });
 
 // ---------------------------------------------------------------------------
-// Palette — borrowed from the reference constants.ts for visual parity.
+// src/utils/constants.ts — COLORS and LEVELS table (1:1).
 // ---------------------------------------------------------------------------
 
-const FELT = "#58a66c";
-const FELT_DARK = "#448563";
-const CARD_FACE = "#bd8c84";
-const CARD_FACE_INNER = "#a55a52";
-// Ordered tints applied to the row/col clue cards 0..4.
-const HEADER_TINTS = ["#e77352", "#5eae43", "#efa539", "#3194ff", "#c872e7"];
-
-// ---------------------------------------------------------------------------
-// Board generation — classic Voltorb Flip rules.
-// Each tile is 0 (voltorb) | 1 | 2 | 3. Level determines how many 2s, 3s, and
-// voltorbs are on the board. We derive row/col totals from the finished board.
-// ---------------------------------------------------------------------------
-
-type TileValue = 0 | 1 | 2 | 3;
-
-interface BoardState {
-  tiles: TileValue[]; // row-major 25 entries
-  revealed: boolean[]; // per-tile
-  memos: Array<Set<TileValue>>; // per-tile memo marks
-}
-
-interface LevelSpec {
-  level: number;
-  twos: number;
-  threes: number;
-  voltorbs: number;
-}
-
-// Level table for levels 1..5 (a subset of the canonical HGSS table, enough
-// to demonstrate scaling difficulty).
-const LEVELS: LevelSpec[] = [
-  { level: 1, twos: 3, threes: 1, voltorbs: 6 },
-  { level: 2, twos: 0, threes: 3, voltorbs: 7 },
-  { level: 3, twos: 5, threes: 2, voltorbs: 8 },
-  { level: 4, twos: 3, threes: 4, voltorbs: 8 },
-  { level: 5, twos: 2, threes: 5, voltorbs: 10 },
+const COLORS: string[] = [
+  "#e77352",
+  "#5eae43",
+  "#efa539",
+  "#3194ff",
+  "#c872e7",
 ];
 
-function shuffle<T>(arr: T[], rand: () => number): T[] {
+type LevelData = {
+  x2: number;
+  x3: number;
+  voltorbs: number;
+  coins: number;
+};
+
+const LEVELS: LevelData[][] = [
+  // Level 1
+  [
+    { x2: 3, x3: 1, voltorbs: 6, coins: 24 },
+    { x2: 0, x3: 3, voltorbs: 6, coins: 27 },
+    { x2: 5, x3: 0, voltorbs: 6, coins: 32 },
+    { x2: 2, x3: 2, voltorbs: 6, coins: 36 },
+    { x2: 4, x3: 1, voltorbs: 6, coins: 48 },
+  ],
+  // Level 2
+  [
+    { x2: 1, x3: 3, voltorbs: 7, coins: 54 },
+    { x2: 6, x3: 0, voltorbs: 7, coins: 64 },
+    { x2: 3, x3: 2, voltorbs: 7, coins: 72 },
+    { x2: 0, x3: 4, voltorbs: 7, coins: 81 },
+    { x2: 5, x3: 1, voltorbs: 7, coins: 96 },
+  ],
+  // Level 3
+  [
+    { x2: 2, x3: 3, voltorbs: 8, coins: 108 },
+    { x2: 7, x3: 0, voltorbs: 8, coins: 128 },
+    { x2: 4, x3: 2, voltorbs: 8, coins: 144 },
+    { x2: 1, x3: 4, voltorbs: 8, coins: 162 },
+    { x2: 6, x3: 1, voltorbs: 8, coins: 192 },
+  ],
+  // Level 4
+  [
+    { x2: 3, x3: 3, voltorbs: 8, coins: 216 },
+    { x2: 0, x3: 5, voltorbs: 8, coins: 243 },
+    { x2: 8, x3: 0, voltorbs: 10, coins: 256 },
+    { x2: 5, x3: 2, voltorbs: 10, coins: 288 },
+    { x2: 2, x3: 4, voltorbs: 10, coins: 324 },
+  ],
+  // Level 5
+  [
+    { x2: 7, x3: 1, voltorbs: 10, coins: 384 },
+    { x2: 4, x3: 3, voltorbs: 10, coins: 432 },
+    { x2: 1, x3: 5, voltorbs: 10, coins: 486 },
+    { x2: 9, x3: 0, voltorbs: 10, coins: 512 },
+    { x2: 6, x3: 2, voltorbs: 10, coins: 576 },
+  ],
+  // Level 6
+  [
+    { x2: 3, x3: 4, voltorbs: 10, coins: 648 },
+    { x2: 0, x3: 6, voltorbs: 10, coins: 729 },
+    { x2: 8, x3: 1, voltorbs: 10, coins: 768 },
+    { x2: 5, x3: 3, voltorbs: 10, coins: 864 },
+    { x2: 2, x3: 5, voltorbs: 10, coins: 972 },
+  ],
+  // Level 7
+  [
+    { x2: 7, x3: 2, voltorbs: 10, coins: 1152 },
+    { x2: 4, x3: 4, voltorbs: 10, coins: 1296 },
+    { x2: 1, x3: 6, voltorbs: 13, coins: 1458 },
+    { x2: 9, x3: 1, voltorbs: 13, coins: 1536 },
+    { x2: 6, x3: 3, voltorbs: 10, coins: 1728 },
+  ],
+  // Level 8
+  [
+    { x2: 0, x3: 7, voltorbs: 10, coins: 2187 },
+    { x2: 8, x3: 2, voltorbs: 10, coins: 2304 },
+    { x2: 5, x3: 4, voltorbs: 10, coins: 2592 },
+    { x2: 2, x3: 6, voltorbs: 10, coins: 2916 },
+    { x2: 7, x3: 3, voltorbs: 10, coins: 3456 },
+  ],
+];
+
+// ---------------------------------------------------------------------------
+// src/utils/helpers.ts (1:1).
+// ---------------------------------------------------------------------------
+
+const indexToCoordinate = (index: number, gridSize = 5): [number, number] => {
+  const x = Math.floor(index / gridSize);
+  const y = index % gridSize;
+  return [x, y];
+};
+
+// ---------------------------------------------------------------------------
+// src/game/Level.ts (1:1).
+// ---------------------------------------------------------------------------
+
+class Level {
+  private _x2: number;
+  private _x3: number;
+  private _voltorbs: number;
+  private _coins: number;
+
+  constructor(level: number) {
+    const currentLevel = LEVELS[level][Math.floor(Math.random() * 5)];
+    this._x2 = currentLevel.x2;
+    this._x3 = currentLevel.x3;
+    this._voltorbs = currentLevel.voltorbs;
+    this._coins = currentLevel.coins;
+  }
+
+  get levelData() {
+    return {
+      x2: this._x2,
+      x3: this._x3,
+      voltorbs: this._voltorbs,
+      coins: this._coins,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// src/game/Board.ts (1:1 — uses a Fisher–Yates shuffle in place of lodash).
+// ---------------------------------------------------------------------------
+
+type FlagValues = { 1: boolean; 2: boolean; 3: boolean; V: boolean };
+
+type CellValue = 1 | 2 | 3 | "V";
+
+type Cell = {
+  value: CellValue;
+  flags: FlagValues;
+  isFlipped: boolean;
+  isFlagged: boolean;
+};
+
+type RowColValues = {
+  coins: number;
+  voltorbs: number;
+};
+
+function shuffle<T>(arr: T[]): T[] {
   const out = arr.slice();
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
+    const j = Math.floor(Math.random() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
 }
 
-function generateBoard(level: number): BoardState {
-  const spec = LEVELS[Math.min(level - 1, LEVELS.length - 1)];
-  const values: TileValue[] = [];
-  for (let i = 0; i < spec.voltorbs; i++) values.push(0);
-  for (let i = 0; i < spec.twos; i++) values.push(2);
-  for (let i = 0; i < spec.threes; i++) values.push(3);
-  while (values.length < 25) values.push(1);
-  const tiles = shuffle(values, Math.random) as TileValue[];
-  return {
-    tiles,
-    revealed: Array(25).fill(false),
-    memos: Array.from({ length: 25 }, () => new Set<TileValue>()),
-  };
-}
+class Board {
+  private _board: Cell[][];
+  private _flippedCells: number;
+  private _maxLevelScore: number;
+  private _rowValues: RowColValues[];
+  private _colValues: RowColValues[];
 
-// Sum and voltorb-count for one row (r=0..4) or one column (c=0..4).
-function rowStats(tiles: TileValue[], r: number) {
-  let sum = 0;
-  let volts = 0;
-  for (let c = 0; c < 5; c++) {
-    const v = tiles[r * 5 + c];
-    if (v === 0) volts++;
-    else sum += v;
+  constructor(level: Level) {
+    this._rowValues = Array(5)
+      .fill(0)
+      .map(() => ({ coins: 0, voltorbs: 0 }));
+    this._colValues = Array(5)
+      .fill(0)
+      .map(() => ({ coins: 0, voltorbs: 0 }));
+    this._board = this.createBoard(level);
+    this._flippedCells = 0;
+    this._maxLevelScore = level.levelData.coins;
   }
-  return { sum, volts };
-}
 
-function colStats(tiles: TileValue[], c: number) {
-  let sum = 0;
-  let volts = 0;
-  for (let r = 0; r < 5; r++) {
-    const v = tiles[r * 5 + c];
-    if (v === 0) volts++;
-    else sum += v;
+  public flagCell(row: number, col: number, flag: CellValue): void {
+    const cell: Cell = this._board[row][col];
+    if (cell.isFlipped) return;
+
+    cell.flags[flag] = !cell.flags[flag];
+    cell.isFlagged = Object.values(cell.flags).some((value) => value === true);
   }
-  return { sum, volts };
+
+  public flipCell(row: number, col: number): CellValue {
+    if (
+      row < 0 ||
+      row >= this._board.length ||
+      col < 0 ||
+      col >= this._board[0].length
+    ) {
+      throw new Error(`Invalid row or column: (${row}, ${col})`);
+    }
+
+    const cell: Cell = this._board[row][col];
+    if (cell.isFlipped) {
+      return 1;
+    } else {
+      if (cell.value !== "V") this._flippedCells += 1;
+      cell.isFlipped = true;
+      cell.flags = { 1: false, 2: false, 3: false, V: false };
+    }
+    return cell.value;
+  }
+
+  private createBoard(level: Level) {
+    const board: Cell[][] = [...Array(5)].map(() => Array.from({ length: 5 }));
+    const { x2, x3, voltorbs } = level.levelData;
+
+    const levelValuesArray: CellValue[] = [
+      ...Array(x2).fill(2),
+      ...Array(x3).fill(3),
+      ...Array(voltorbs).fill("V"),
+    ];
+    const remainingFillArray: 1[] = Array(25 - levelValuesArray.length).fill(1);
+    const shuffledValuesArray: CellValue[] = shuffle([
+      ...levelValuesArray,
+      ...remainingFillArray,
+    ]);
+
+    let index = 0;
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        const cell = {
+          value: shuffledValuesArray[index],
+          flags: { 1: false, 2: false, 3: false, V: false },
+          isFlagged: false,
+          isFlipped: false,
+        } as Cell;
+
+        if (cell.value === "V") {
+          this._rowValues[row].voltorbs += 1;
+          this._colValues[col].voltorbs += 1;
+        } else {
+          this._rowValues[row].coins += cell.value;
+          this._colValues[col].coins += cell.value;
+        }
+
+        board[row][col] = cell;
+        index++;
+      }
+    }
+    return board;
+  }
+
+  get cells() {
+    return this._board;
+  }
+
+  get flippedCells() {
+    return this._flippedCells;
+  }
+
+  get rowValues() {
+    return this._rowValues;
+  }
+
+  get colValues() {
+    return this._colValues;
+  }
+
+  get maxLevelScore() {
+    return this._maxLevelScore;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Voltorb SVG — hand-drawn so we don't ship third-party sprite assets.
+// src/game/VoltorbFlip.ts (1:1).
 // ---------------------------------------------------------------------------
 
-function VoltorbIcon({ size = 20 }: { size?: number }) {
+type GameStatus = "playing" | "win" | "lose" | "memo";
+
+class VoltorbFlip {
+  private _board: Board;
+  private _totalScore: number;
+  private _currentScore: number;
+  private _currentLevel: number;
+  private _level: Level;
+  private _gameStatus: GameStatus;
+
+  constructor() {
+    this._level = new Level(0);
+    this._currentLevel = 0;
+    this._currentScore = 0;
+    this._totalScore = 0;
+    this._gameStatus = "playing";
+    this._board = new Board(this._level);
+  }
+
+  public toggleMemo() {
+    this._gameStatus === "playing"
+      ? (this._gameStatus = "memo")
+      : (this._gameStatus = "playing");
+  }
+
+  public flagCell(row: number, col: number, flag: CellValue): void {
+    this._board.flagCell(row, col, flag);
+  }
+
+  public flipCell(row: number, col: number): void {
+    const cellValue = this._board.flipCell(row, col);
+
+    if (cellValue === "V") {
+      if (this._board.flippedCells < this._currentLevel) {
+        this._currentLevel = this._board.flippedCells;
+      }
+      this._gameStatus = "lose";
+      return;
+    }
+    this._currentScore === 0
+      ? (this._currentScore = cellValue)
+      : (this._currentScore *= cellValue);
+
+    if (this._currentScore === this._board.maxLevelScore) {
+      this._currentLevel = Math.min(this._currentLevel + 1, 8);
+      this._totalScore += this._currentScore;
+      this._gameStatus = "win";
+    }
+  }
+
+  public restartGame(): void {
+    this._gameStatus = "playing";
+    this._currentScore = 0;
+    this._level = new Level(this._currentLevel);
+    this._board = new Board(this._level);
+  }
+
+  get cells() {
+    return this._board.cells;
+  }
+
+  get rowValues() {
+    return this._board.rowValues;
+  }
+
+  get colValues() {
+    return this._board.colValues;
+  }
+
+  get gameStatus() {
+    return this._gameStatus;
+  }
+
+  get currentScore() {
+    return this._currentScore;
+  }
+
+  get totalScore() {
+    return this._totalScore;
+  }
+
+  get currentLevel() {
+    return this._currentLevel + 1;
+  }
+}
+
+// Structured-clone-based replacement for lodash's cloneDeep. Voltorb Flip's
+// internal state is pure data (nested arrays/objects, no functions) so the
+// class instance is reconstructed by assigning the cloned private fields.
+function cloneGame(g: VoltorbFlip): VoltorbFlip {
+  const clone = Object.create(
+    Object.getPrototypeOf(g) as object,
+  ) as VoltorbFlip;
+  const src = g as unknown as Record<string, unknown>;
+  const dst = clone as unknown as Record<string, unknown>;
+  for (const k of Object.keys(src)) {
+    const v = src[k];
+    if (v instanceof Board) {
+      const b = Object.create(Object.getPrototypeOf(v) as object) as Board;
+      const bSrc = v as unknown as Record<string, unknown>;
+      const bDst = b as unknown as Record<string, unknown>;
+      for (const bk of Object.keys(bSrc)) {
+        bDst[bk] =
+          typeof structuredClone === "function"
+            ? structuredClone(bSrc[bk])
+            : JSON.parse(JSON.stringify(bSrc[bk]));
+      }
+      dst[k] = b;
+    } else if (v instanceof Level) {
+      const l = Object.create(Object.getPrototypeOf(v) as object) as Level;
+      Object.assign(
+        l as unknown as Record<string, unknown>,
+        v as unknown as Record<string, unknown>,
+      );
+      dst[k] = l;
+    } else {
+      dst[k] =
+        typeof structuredClone === "function" && typeof v === "object"
+          ? structuredClone(v)
+          : v;
+    }
+  }
+  return clone;
+}
+
+// ---------------------------------------------------------------------------
+// src/hooks/useGame.tsx (1:1, with cloneGame replacing lodash's cloneDeep).
+// ---------------------------------------------------------------------------
+
+const useGame = () => {
+  const [game, setGame] = useState<VoltorbFlip>();
+
+  useEffect(() => {
+    setGame(new VoltorbFlip());
+  }, []);
+
+  function updateGame(callback: (game: VoltorbFlip) => void): void {
+    if (!game) return;
+    const newGame = cloneGame(game);
+    callback(newGame);
+    setGame(newGame);
+  }
+
+  return { game, updateGame };
+};
+
+// ---------------------------------------------------------------------------
+// Inline SVG voltorb — substitutes upstream's `voltorb.png` / `voltorb-flip.png`
+// (Nintendo IP we can't redistribute). Red-top, white-bottom face ball.
+// ---------------------------------------------------------------------------
+
+function VoltorbIcon({
+  size = 28,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
   return (
     <svg
       viewBox="0 0 20 20"
       width={size}
       height={size}
       aria-hidden="true"
+      className={className}
       style={{ display: "block" }}
     >
-      {/* Red top hemisphere */}
       <path d="M2 10 A8 8 0 0 1 18 10 L2 10 Z" fill="#e53935" />
-      {/* White bottom hemisphere */}
       <path d="M2 10 A8 8 0 0 0 18 10 L2 10 Z" fill="#f4f4f4" />
-      {/* Horizontal seam */}
       <rect x="2" y="9.5" width="16" height="1" fill="#1a1a1a" />
-      {/* Eyes */}
       <ellipse cx="7" cy="6.5" rx="1.2" ry="1.8" fill="#1a1a1a" />
       <ellipse cx="13" cy="6.5" rx="1.2" ry="1.8" fill="#1a1a1a" />
-      {/* Eye shine */}
       <circle cx="7.5" cy="5.8" r="0.4" fill="#fff" />
       <circle cx="13.5" cy="5.8" r="0.4" fill="#fff" />
-      {/* Outline */}
-      <circle cx="10" cy="10" r="8.2" fill="none" stroke="#1a1a1a" strokeWidth="1" />
+      <circle
+        cx="10"
+        cy="10"
+        r="8.2"
+        fill="none"
+        stroke="#1a1a1a"
+        strokeWidth="1"
+      />
     </svg>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Shared chrome styles — the reference's signature "triple outline" looks
-// crisp even without bitmap sprites. Tailwind's arbitrary-variant APIs handle
-// the perspective/transform-style stack for the flip.
+// Inlined utility styles (from upstream src/styles/globals.css and
+// tailwind.config.js). Rendered once on mount and scoped by class name so
+// we don't pollute the global stylesheet across the portfolio.
 // ---------------------------------------------------------------------------
 
-const panelChrome =
-  "border-2 border-gray-700 outline outline-4 outline-gray-200 rounded-[5px]";
+const SCOPED_STYLES = `
+.svf-root { font-family: var(--font-voltorb-ds), ui-monospace, monospace; color: #fff; background-color: #58a66c; }
+.svf-root *, .svf-root *::before, .svf-root *::after { box-sizing: border-box; text-rendering: geometricPrecision; }
+.svf-root .text-shadow-white {
+  text-shadow: 2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff, 1px 1px #fff,
+    -1px -1px #fff, 1px -1px #fff, -1px 1px #fff;
+}
+.svf-root .picture-outline {
+  -webkit-filter: drop-shadow(1px 1px white) drop-shadow(-1px -1px white)
+    drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
+  filter: drop-shadow(1px 1px white) drop-shadow(-1px -1px white)
+    drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
+}
+.svf-root .voltorb { height: 28px; width: 28px; }
+.svf-root .rounded-5 { border-radius: 5px; }
+.svf-root .drop-shadow-default {
+  filter: drop-shadow(1px 1px 0 rgba(0,0,0,1)) drop-shadow(1px 1px 0 rgba(75,85,99,1));
+}
+.svf-root .drop-shadow-soft {
+  filter: drop-shadow(1px 1px 0 rgba(75,85,99,.25)) drop-shadow(2px 2px 0 rgba(75,85,99,.25));
+}
+`;
 
 // ---------------------------------------------------------------------------
-// Card (tile)
+// src/components/Card.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-function Card({
-  value,
-  revealed,
-  memos,
-  onFlip,
-  onToggleMemo,
-  memoMode,
-  focused,
-}: {
-  value: TileValue;
-  revealed: boolean;
-  memos: Set<TileValue>;
-  onFlip: () => void;
-  onToggleMemo: (m: TileValue) => void;
-  memoMode: boolean;
-  focused: boolean;
-}) {
-  const visibleMemos: TileValue[] = [1, 2, 3, 0];
-  const cycleMemo = () => {
-    if (revealed) return;
-    // Cycle through the four possible marks (1, 2, 3, voltorb). When a mark
-    // is absent we add it; once all four are set we clear them and start
-    // over. This keeps left-click on unrevealed tiles productive in memo
-    // mode without needing a separate pick-a-mark panel.
-    const next = visibleMemos.find((m) => !memos.has(m));
-    if (next !== undefined) onToggleMemo(next);
-    else visibleMemos.forEach((m) => onToggleMemo(m));
-  };
-  // Long-press support for touch devices (no right-click there). If the
-  // pointer stays down for 400 ms we cycle a memo mark and flag the next
-  // click to be suppressed so the release doesn't also flip the tile.
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressNextClick = useRef(false);
-  const cancelLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-  return (
-    <button
-      type="button"
-      onPointerDown={() => {
-        if (revealed) return;
-        longPressTimer.current = setTimeout(() => {
-          cycleMemo();
-          suppressNextClick.current = true;
-          longPressTimer.current = null;
-        }, 400);
-      }}
-      onPointerUp={cancelLongPress}
-      onPointerLeave={cancelLongPress}
-      onPointerCancel={cancelLongPress}
-      onClick={() => {
-        if (suppressNextClick.current) {
-          suppressNextClick.current = false;
-          return;
-        }
-        if (revealed) return;
-        if (memoMode) cycleMemo();
-        else onFlip();
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        // Right-click always cycles memo marks regardless of memo mode, so
-        // power-users can mark tiles without toggling mode first.
-        cycleMemo();
-      }}
-      className={`relative h-full w-full ${panelChrome} bg-transparent p-0`}
-      style={{
-        perspective: 1000,
-        // touchAction: manipulation disables the mobile double-tap-zoom
-        // gesture on the tile so rapid flipping on phones doesn't get
-        // interrupted by an accidental zoom.
-        touchAction: "manipulation",
-        // Amber focus ring when this is the keyboard-focused tile. Uses a
-        // box-shadow instead of outline so it layers cleanly on top of
-        // the existing triple-outline chrome without fighting z-order.
-        boxShadow: focused ? "0 0 0 3px #fbbf24, 0 0 10px #fbbf24aa" : undefined,
-      }}
-      aria-label={revealed ? `Card showing ${value}` : "Hidden card"}
-    >
+type CardProps = {
+  children: React.ReactNode;
+  fake?: boolean;
+  isFlipped?: boolean;
+  flipCard?: React.MouseEventHandler<HTMLDivElement>;
+};
+
+const Card = ({ children, fake, isFlipped, flipCard }: CardProps) => {
+  return fake ? (
+    <div className="relative box-content flex h-10 w-10 select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200">
       <div
-        className="relative h-full w-full transition-transform duration-500 motion-reduce:duration-0"
-        style={{
-          transformStyle: "preserve-3d",
-          transform: revealed ? "rotateY(180deg)" : "rotateY(0)",
-        }}
+        className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center border-2 border-[#a55a52] bg-[#bd8c84] text-3xl font-bold text-black`}
       >
-        {/* Back (face-down) — striped felt carpet */}
+        {children}
+      </div>
+    </div>
+  ) : (
+    <div className="cursor-pointer [perspective:1000px]" onClick={flipCard}>
+      <div
+        className="relative box-content flex h-10 w-10 select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 transition-all duration-500 [transform-style:preserve-3d] [backface-visibility:hidden]"
+        style={{ transform: `${isFlipped ? "rotateY(180deg)" : "none"}` }}
+      >
         <div
-          className="absolute inset-0 grid grid-cols-3 grid-rows-3"
-          style={{ backfaceVisibility: "hidden" }}
+          className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-gray-800 bg-[#bd8c84] text-3xl font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
         >
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                background:
-                  (Math.floor(i / 3) + (i % 3)) % 2 === 0 ? FELT : FELT_DARK,
-              }}
-            />
-          ))}
-          {/* Memo overlay — only marks the player has toggled on are shown
-              so unset marks don't clutter the face. Each mark sits in its
-              own rounded cell with a dark tint for readability against the
-              felt-green stripes. */}
-          {!revealed && memos.size > 0 && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-1">
-              <div
-                className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5"
-                style={{ fontFamily: "var(--font-voltorb-m5x7), monospace" }}
-              >
-                {([1, 2, 3] as TileValue[]).map((m) => (
-                  <div
-                    key={m}
-                    className="flex items-center justify-center rounded-sm text-sm font-bold text-white"
-                    style={{
-                      background: memos.has(m) ? "rgba(0,0,0,0.45)" : "transparent",
-                      visibility: memos.has(m) ? "visible" : "hidden",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {m}
-                  </div>
-                ))}
-                <div
-                  className="flex items-center justify-center rounded-sm"
-                  style={{
-                    background: memos.has(0) ? "rgba(0,0,0,0.45)" : "transparent",
-                    visibility: memos.has(0) ? "visible" : "hidden",
-                  }}
-                >
-                  <VoltorbIcon size={16} />
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="flex h-full w-full items-center justify-center border-2 border-[#a55a52]">
+            {children}
+          </div>
         </div>
-        {/* Front (revealed) — scale-pulse fires when revealed flips true,
-            timed to hit once the flip rotation passes 90° (~0.22 s into
-            the 0.5 s flip) so the pop reads as the number "landing" on
-            screen instead of bouncing before it's visible. */}
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            backfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-            background: CARD_FACE,
-            border: `2px solid ${CARD_FACE_INNER}`,
-            borderRadius: 3,
-          }}
-          animate={revealed ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-          transition={{
-            duration: 0.4,
-            delay: revealed ? 0.22 : 0,
-            times: [0, 0.5, 1],
-            ease: "easeOut",
-          }}
-        >
-          {value === 0 ? (
-            <VoltorbIcon size={36} />
-          ) : (
-            <span
-              className="text-3xl font-black text-white"
-              style={{
-                fontFamily: "var(--font-voltorb-m5x7), monospace",
-                textShadow:
-                  "1px 0 0 #222,-1px 0 0 #222,0 1px 0 #222,0 -1px 0 #222",
-                lineHeight: 1,
-              }}
-            >
-              {value}
-            </span>
-          )}
-        </motion.div>
+        <div className="absolute inset-0 grid h-full w-full grid-cols-3 bg-white">
+          <div className="h-full w-full bg-[#448563]"></div>
+          <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
+          <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
+          <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
+          <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
+        </div>
       </div>
-    </button>
+    </div>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
-// RowColCard — the coin-total + voltorb-count clue cards along the right
-// and bottom edges of the board.
+// src/components/RowColCard.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-function RowColCard({
-  sum,
-  volts,
-  tint,
-}: {
-  sum: number;
-  volts: number;
-  tint: string;
-}) {
-  // Upstream's signature RowColCard shape: the coin total overflows the top
-  // edge of the card (absolute, negative offset) so it visually "stamps"
-  // above the voltorb section. The card body shows the voltorb count
-  // centered, with a hairline divider hinting at the old two-row layout.
+type RowColCardProps = {
+  coins: number;
+  voltorbs: number;
+  index: number;
+};
+
+const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
   return (
     <div
-      className={`relative h-full w-full ${panelChrome}`}
-      style={{ background: tint, overflow: "visible" }}
+      className={`${numberFont.className} box-content flex h-11 w-11 select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
     >
-      {/* Coin total — breaks the top frame */}
       <div
-        className={`absolute left-1/2 -translate-x-1/2 -top-2 px-1 py-px ${panelChrome}`}
-        style={{ background: tint }}
+        className={`relative flex h-full w-full flex-col place-content-center place-items-center text-3xl font-bold text-gray-800`}
+        style={{ backgroundColor: COLORS[index] }}
       >
-        <span
-          className="block text-xl font-black text-white"
-          style={{
-            fontFamily: "var(--font-voltorb-m5x7), monospace",
-            lineHeight: 1,
-            textShadow:
-              "1px 0 0 #222,-1px 0 0 #222,0 1px 0 #222,0 -1px 0 #222",
-          }}
-        >
-          {String(sum).padStart(2, "0")}
-        </span>
-      </div>
-      {/* Voltorb count body */}
-      <div className="flex h-full items-end justify-center gap-1 pb-1">
-        <VoltorbIcon size={14} />
-        <span
-          className="text-base font-bold text-white"
-          style={{
-            fontFamily: "var(--font-voltorb-m5x7), monospace",
-            lineHeight: 1,
-          }}
-        >
-          {volts}
-        </span>
+        <div className="absolute top-[-11px] right-[-3px] text-end tracking-widest">
+          {coins.toString().padStart(2, "0")}
+        </div>
+        <div className="absolute top-[20px] w-full outline outline-2 outline-gray-200"></div>
+        <div className="absolute bottom-[-6px] flex gap-0.5">
+          <VoltorbIcon
+            size={28}
+            className="voltorb picture-outline translate-y-1.5 object-contain"
+          />
+          <p className="translate-x-0.5">{voltorbs}</p>
+        </div>
       </div>
     </div>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
-// Scoreboard
+// src/components/Gameboard.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-function Scoreboard({ label, value }: { label: string; value: number }) {
-  // Remounting the digit span with key={value} kicks framer-motion's
-  // initial→animate transition every time the number changes, giving each
-  // multiplier reveal a brief pop instead of a silent swap.
-  // aria-live=polite so screen readers announce score changes without
-  // interrupting whatever the user was listening to.
+type GameboardProps = {
+  game: VoltorbFlip;
+  updateGame: (callback: (game: VoltorbFlip) => void) => void;
+  waitForClick: boolean;
+};
+
+const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
+  const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
+    game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
+  );
+
+  async function waitForUserInteraction() {
+    return new Promise<void>((resolve) => {
+      const handleClick = () => {
+        resolve();
+        document.removeEventListener("click", handleClick);
+      };
+      const handleKeyPress = () => {
+        resolve();
+        document.removeEventListener("keypress", handleKeyPress);
+      };
+      document.addEventListener("click", handleClick);
+      document.addEventListener("keypress", handleKeyPress);
+    });
+  }
+
+  function handleFlip(row: number, col: number) {
+    updateGame((g) => {
+      g.flipCell(row, col);
+    });
+  }
+
+  const flipCardsUp = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        setCardsFlipped((prev) => prev.map(() => ({ isFlipped: true })));
+        resolve();
+      }, 1000);
+    });
+  }, []);
+
+  const flipCardsDown = useCallback(
+    (delay = 1500) => {
+      const columns = [
+        [0, 5, 10, 15, 20],
+        [1, 6, 11, 16, 21],
+        [2, 7, 12, 17, 22],
+        [3, 8, 13, 18, 23],
+        [4, 9, 14, 19, 24],
+      ];
+
+      setTimeout(() => {
+        let stagger = 0;
+        for (let col = 0; col < 5; col++) {
+          setTimeout(() => {
+            setCardsFlipped((prev) =>
+              prev.map((card, index) =>
+                columns[col].includes(index) ? { isFlipped: false } : card,
+              ),
+            );
+          }, stagger);
+          stagger += 200;
+        }
+        setTimeout(() => {
+          updateGame((g) => g.restartGame());
+        }, stagger + 200);
+      }, delay);
+    },
+    [updateGame],
+  );
+
+  useEffect(() => {
+    setCardsFlipped(() =>
+      game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
+    );
+  }, [game.cells]);
+
+  useEffect(() => {
+    if (game.gameStatus === "lose" || game.gameStatus === "win") {
+      if (waitForClick) {
+        flipCardsUp().then(() => {
+          waitForUserInteraction().then(() => flipCardsDown(100));
+        });
+      } else {
+        flipCardsUp().then(() => flipCardsDown());
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.gameStatus]);
+
   return (
-    <div
-      className={`flex items-center justify-between gap-4 bg-white px-4 py-2 ${panelChrome}`}
-      role="group"
-      aria-label={`${label}: ${value}`}
-    >
-      <span
-        className="text-base uppercase tracking-wide text-gray-700"
-        style={{
-          fontFamily: "var(--font-voltorb-ds), monospace",
-          lineHeight: 1,
-        }}
-      >
-        {label}
-      </span>
-      <motion.span
-        key={value}
-        aria-live="polite"
-        aria-atomic="true"
-        initial={{ scale: 1.3, color: "#b45309" }}
-        animate={{ scale: 1, color: "#1f2937" }}
-        transition={{ type: "spring", stiffness: 380, damping: 18 }}
-        className="inline-block text-3xl font-black tabular-nums"
-        style={{
-          fontFamily: "var(--font-voltorb-stacked), monospace",
-          lineHeight: 1,
-          filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.15))",
-        }}
-      >
-        {String(value).padStart(5, "0")}
-      </motion.span>
-    </div>
-  );
-}
+    <div className="relative h-96 w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600">
+      {(game.gameStatus === "lose" || game.gameStatus === "win") && (
+        <div className="absolute inset-0 z-50 h-full w-full bg-blue-500 opacity-0"></div>
+      )}
+      <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-4">
+            <div className="grid grid-cols-5 gap-4">
+              {game.cells.flat().map((cell, i) => {
+                const coordinate = indexToCoordinate(i);
+                return (
+                  <Card
+                    key={i}
+                    isFlipped={cardsFlipped[i]?.isFlipped}
+                    flipCard={() => handleFlip(coordinate[0], coordinate[1])}
+                  >
+                    {cell.value === "V" ? (
+                      <VoltorbIcon
+                        size={28}
+                        className="picture-outline voltorb"
+                      />
+                    ) : (
+                      cell.value
+                    )}
+                  </Card>
+                );
+              })}
 
-// ---------------------------------------------------------------------------
-// Game header bar
-// ---------------------------------------------------------------------------
-
-function GameInfo({
-  level,
-  onHelp,
-  muted,
-  onToggleMute,
-}: {
-  level: number;
-  onHelp: () => void;
-  muted: boolean;
-  onToggleMute: () => void;
-}) {
-  return (
-    <div
-      className={`flex items-center justify-between px-4 py-2 text-white ${panelChrome}`}
-      style={{
-        background: FELT_DARK,
-        fontFamily: "var(--font-voltorb-ds), monospace",
-      }}
-    >
-      <span className="text-lg tracking-wide" style={{ lineHeight: 1 }}>
-        VOLTORB FLIP
-      </span>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onToggleMute}
-          aria-pressed={!muted}
-          aria-label={muted ? "Unmute sound" : "Mute sound"}
-          className={`flex h-6 w-6 items-center justify-center ${panelChrome}`}
-          style={{
-            background: "#fff",
-            color: "#1f2937",
-            fontFamily: "var(--font-voltorb-ds), monospace",
-            lineHeight: 1,
-          }}
-        >
-          {muted ? "\u{1F507}" : "\u{1F50A}"}
-        </button>
-        <button
-          type="button"
-          onClick={onHelp}
-          className={`flex h-6 w-6 items-center justify-center ${panelChrome}`}
-          style={{
-            background: "#fff",
-            color: "#1f2937",
-            fontFamily: "var(--font-voltorb-ds), monospace",
-            lineHeight: 1,
-          }}
-          aria-label="How to play"
-        >
-          ?
-        </button>
-        <span className="ml-1 text-lg" style={{ lineHeight: 1 }}>
-          Lv. {level}
-        </span>
+              {game.colValues.map((col, index) => (
+                <RowColCard
+                  coins={col.coins}
+                  voltorbs={col.voltorbs}
+                  key={index}
+                  index={index}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col gap-[17.5px]">
+              {game.rowValues.map((row, index) => (
+                <RowColCard
+                  coins={row.coins}
+                  voltorbs={row.voltorbs}
+                  key={index}
+                  index={index}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
-// Main component
+// src/components/Scoreboard.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-// localStorage key for the cumulative COINS total — upstream persists this
-// so a visitor coming back tomorrow still sees their score. Namespaced so
-// it can't collide with another game on the portfolio.
-const STORAGE_KEY = "svf:totalCoins:v1";
+type ScoreboardProps = {
+  totalScore: number;
+  currentScore: number;
+};
+
+const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
+  return (
+    <div className="flex w-full flex-col items-center gap-2">
+      <div className="flex w-11/12 place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
+        <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
+          Total <span className="block">Collected Coins</span>
+        </div>
+        <p
+          className={`${scoreFont.className} flex translate-y-1 text-6xl text-gray-700 drop-shadow-soft`}
+        >
+          {totalScore.toString().padStart(5, "0")}
+        </p>
+      </div>
+      <div className="flex w-11/12 place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
+        <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
+          Coins Collected in <span className="block">Current Game</span>
+        </div>
+        <p
+          className={`${scoreFont.className} flex translate-y-1 items-center text-6xl text-gray-700 drop-shadow-soft`}
+        >
+          {currentScore.toString().padStart(5, "0")}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// src/components/GameInfo.tsx (1:1 port).
+// ---------------------------------------------------------------------------
+
+type GameInfoProps = {
+  currentLevel: number;
+};
+
+const GameInfo = ({ currentLevel }: GameInfoProps) => {
+  return (
+    <>
+      <div className="border-4 border-white bg-[#448563] px-16 text-center text-3xl outline outline-2 outline-gray-600">
+        <div className="leading-7 drop-shadow-default">
+          <p>VOLTORB Flip Lv. {currentLevel}</p>
+          <p>Flip the Cards and Collect Coins!</p>
+        </div>
+      </div>
+
+      <div className="flex w-11/12 gap-3 border-b-4 border-b-gray-200 pt-3 text-3xl">
+        <div className="flex gap-4">
+          <Card fake={true}>1</Card>
+          <Card fake={true}>2</Card>
+          <Card fake={true}>3</Card>
+        </div>
+        <p className="drop-shadow-default">...x1! ...x2! ...x3!</p>
+      </div>
+
+      <div className="mr-4 flex w-8/12 gap-3 self-end border-b-4 border-b-gray-200 pt-3 text-3xl ">
+        <Card fake={true}>
+          <VoltorbIcon size={28} className="picture-outline voltorb" />
+        </Card>
+        <p className="drop-shadow-default">Game Over! 0!</p>
+      </div>
+    </>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// src/components/InstructionsModal.tsx (1:1 port).
+// ---------------------------------------------------------------------------
+
+type Language = "en" | "pt-BR";
+
+type Translations = {
+  howToPlayTitle: string;
+  instructions: string[];
+  tipsTitle: string;
+  tips: string[];
+};
+
+const translations: Record<Language, Translations> = {
+  en: {
+    howToPlayTitle: "How to play:",
+    instructions: [
+      "Click on the cards to reveal them.",
+      "The colored cards show how many Coins and Voltorbs are there per row or column.",
+      "The goal is to find all the x2 and x3 Coins on each Level while avoiding Voltorbs.",
+      "Have fun!",
+    ],
+    tipsTitle: "Tips:",
+    tips: [
+      "Avoid the rows and columns you know that can only have either a x1 Coin or a Voltorb.",
+      "Reveal the rows and columns with 0 Voltorbs first.",
+    ],
+  },
+  "pt-BR": {
+    howToPlayTitle: "Como jogar:",
+    instructions: [
+      "Clique nos cards para revelá-los.",
+      "Os cards coloridos mostram quantas Moedas e Voltorbs existem em cada linha e coluna.",
+      "O objetivo é achar todas as Moedas x2 e x3 em cada Level, evitando achar os Voltorbs.",
+      "Divirta-se!",
+    ],
+    tipsTitle: "Dicas:",
+    tips: [
+      "Evite linhas e colunas que podem ter apenas uma Moeda x1 ou um Voltorb.",
+      "Revele todas as linhas e colunas com 0 Voltorbs primeiro.",
+    ],
+  },
+};
+
+type InstructionsModalProps = {
+  language: Language;
+  setModalOpen: Dispatch<SetStateAction<boolean>>;
+};
+
+const InstructionsModal = ({
+  language,
+  setModalOpen,
+}: InstructionsModalProps) => {
+  const { howToPlayTitle, instructions, tipsTitle, tips } =
+    translations[language];
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setModalOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [setModalOpen]);
+
+  return (
+    <>
+      <div
+        className="fixed z-50 h-full w-screen -translate-y-2 bg-black opacity-50 "
+        onClick={() => setModalOpen(false)}
+      />
+      <div
+        onClick={() => setModalOpen(false)}
+        className="fixed z-50 cursor-default rounded-5 border-4 border-gray-300 bg-white outline outline-2 outline-gray-600"
+      >
+        <div className="flex flex-col gap-8 p-6 pt-3 text-gray-800 drop-shadow-soft">
+          <div>
+            <h1 className="text-4xl text-gray-700">{howToPlayTitle}</h1>
+            <ul className="flex list-disc flex-col gap-4 pl-8 pr-2 pt-2 text-2xl leading-6">
+              <li>{instructions[0]}</li>
+              <li>{instructions[1]}</li>
+              <li>{instructions[2]}</li>
+              <li>{instructions[3]}</li>
+            </ul>
+          </div>
+          <div>
+            <h1 className="text-4xl text-gray-700">{tipsTitle}</h1>
+            <ul className="flex list-disc flex-col gap-4 pl-8 pr-2 text-2xl leading-6">
+              <li>{tips[0]}</li>
+              <li>{tips[1]}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// src/components/InstructionsBtns.tsx (1:1 port).
+// ---------------------------------------------------------------------------
+
+const InstructionsBtns = () => {
+  const [language, setLanguage] = useState<Language>("en");
+  const [modalOpen, setModalOpen] = useState(false);
+
+  function handleClick(language: Language) {
+    setLanguage(language);
+    setModalOpen(true);
+  }
+
+  return (
+    <>
+      {modalOpen && (
+        <InstructionsModal language={language} setModalOpen={setModalOpen} />
+      )}
+      <div className="flex w-full justify-around gap-2">
+        <div
+          className="flex w-11/12 cursor-pointer place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600 hover:bg-zinc-200"
+          onClick={() => {
+            handleClick("pt-BR");
+          }}
+        >
+          <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
+            Como jogar
+          </div>
+        </div>
+        <div
+          className="flex w-11/12 cursor-pointer place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600 hover:bg-zinc-200"
+          onClick={() => {
+            handleClick("en");
+          }}
+        >
+          <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
+            How to play
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// src/components/Settings.tsx (1:1 port).
+// ---------------------------------------------------------------------------
+
+type SettingsProps = {
+  waitForClick: boolean;
+  setWaitForClick: Dispatch<SetStateAction<boolean>>;
+};
+
+const Settings = ({ waitForClick, setWaitForClick }: SettingsProps) => {
+  function handleClick() {
+    setWaitForClick(!waitForClick);
+  }
+
+  return (
+    <div className="flex w-11/12 items-center justify-center rounded-5 border-4 border-gray-300 bg-white px-3 py-2 text-2xl leading-7 text-gray-800 outline outline-2 outline-gray-600 drop-shadow-soft">
+      <div className="flex items-center gap-4">
+        <label className="">Wait for click/keypress to restart Level</label>
+        <input
+          type="checkbox"
+          className="h-5 w-5 rounded bg-gray-300 text-green-600 ring-offset-2 transition-colors duration-100 hover:bg-green-200 hover:text-green-500 focus:ring-green-400"
+          onClick={handleClick}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// src/components/Footer.tsx (1:1 port).
+// ---------------------------------------------------------------------------
+
+const Footer = () => {
+  return (
+    <footer className="flex w-full flex-col items-center justify-center gap-2 text-3xl drop-shadow-default">
+      <div>
+        Made by JV -{" "}
+        <a
+          className="border-b-2 border-amber-400 text-amber-400 transition-all duration-300 hover:border-amber-500 hover:text-amber-500"
+          href="https://github.com/jv-vogler/voltorb-flip"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Github
+        </a>
+      </div>
+      <div className="flex gap-1">
+        <p className="translate-y-1.5">&copy;</p>
+        {new Date().getFullYear()} All rights reserved.
+      </div>
+    </footer>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Exported root component — mirrors upstream src/pages/index.tsx layout, but
+// renders only the game panel (no full-screen background), matching the
+// portfolio's per-game-page behavior.
+// ---------------------------------------------------------------------------
 
 export function SuperVoltorbFlipGame() {
-  const [level, setLevel] = useState(1);
-  const [board, setBoard] = useState<BoardState>(() => generateBoard(1));
-  const [running, setRunning] = useState(0); // running coins this level
-  const [total, setTotal] = useState(0); // cumulative across levels
-  const [status, setStatus] = useState<"playing" | "lost" | "won">("playing");
-  const [memoMode, setMemoMode] = useState(false);
-  // Focused tile for keyboard navigation (index 0-24, row-major). Null when
-  // the player hasn't engaged the keyboard yet — we don't draw a ring in
-  // that state so the mouse-only experience stays unchanged.
-  const [focused, setFocused] = useState<number | null>(null);
-  // Floating ×2 / ×3 popup for the most-recent multiplier reveal. The id
-  // is monotonically increasing so AnimatePresence replays the animation
-  // even if the same tile index is revealed twice across reshuffles.
-  const [popup, setPopup] = useState<{
-    id: number;
-    idx: number;
-    mult: 2 | 3;
-  } | null>(null);
-  const popupIdRef = useRef(0);
-  const [helpOpen, setHelpOpen] = useState(false);
-  // Muted by default to be polite about autoplay — first tap flips the
-  // switch on in the user-gesture scope so AudioContext can resume.
-  const [muted, setMuted] = useState(true);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const ensureAudio = useCallback(() => {
-    if (audioCtxRef.current) return audioCtxRef.current;
-    if (typeof window === "undefined") return null;
-    try {
-      const Ctor =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-          .webkitAudioContext;
-      if (!Ctor) return null;
-      audioCtxRef.current = new Ctor();
-      return audioCtxRef.current;
-    } catch {
-      return null;
-    }
-  }, []);
-  const playTone = useCallback(
-    (
-      freq: number,
-      durMs: number,
-      type: OscillatorType = "square",
-      gain = 0.08,
-    ) => {
-      if (muted) return;
-      const ctx = ensureAudio();
-      if (!ctx) return;
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = type;
-      osc.frequency.value = freq;
-      env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(gain, now + 0.005);
-      env.gain.exponentialRampToValueAtTime(0.0001, now + durMs / 1000);
-      osc.connect(env).connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + durMs / 1000 + 0.02);
-    },
-    [muted, ensureAudio],
-  );
-  // Close the audio context on unmount so the game doesn't keep a live
-  // context after the user navigates away.
-  useEffect(() => {
-    return () => {
-      const ctx = audioCtxRef.current;
-      if (ctx) {
-        try {
-          ctx.close();
-        } catch {
-          /* ignore */
-        }
-        audioCtxRef.current = null;
-      }
-    };
-  }, []);
+  const { game, updateGame } = useGame();
+  const [waitForClick, setWaitForClick] = useState(false);
 
-  // Restore saved total on mount — SSR-safe guard on window.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved !== null) {
-      const parsed = Number.parseInt(saved, 10);
-      if (Number.isFinite(parsed) && parsed >= 0) setTotal(parsed);
-    }
-  }, []);
-
-  // Persist every time total changes (skips the 0 write on first mount
-  // when there's nothing saved yet; harmless to write the same value).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, String(total));
-  }, [total]);
-
-  // Row and col precomputed clues
-  const rowClues = useMemo(
-    () => Array.from({ length: 5 }, (_, r) => rowStats(board.tiles, r)),
-    [board.tiles],
-  );
-  const colClues = useMemo(
-    () => Array.from({ length: 5 }, (_, c) => colStats(board.tiles, c)),
-    [board.tiles],
-  );
-
-  // When the player hits a voltorb we replicate upstream's column-by-column
-  // reveal animation: every remaining voltorb flips face-up, staggered by
-  // column (200 ms per column) so the cascade reads left-to-right. We run
-  // this via a setTimeout chain off the initial "lost" transition.
-  const triggerLossCascade = useCallback(() => {
-    setBoard((prev) => {
-      const next = { ...prev, revealed: prev.revealed.slice() };
-      for (let c = 0; c < 5; c++) {
-        const cc = c;
-        setTimeout(() => {
-          setBoard((inner) => {
-            const revealed = inner.revealed.slice();
-            for (let r = 0; r < 5; r++) {
-              const i = r * 5 + cc;
-              if (inner.tiles[i] === 0) revealed[i] = true;
-            }
-            return { ...inner, revealed };
-          });
-        }, cc * 200);
-      }
-      return next;
-    });
-  }, []);
-
-  // Win cascade: sweep-reveal every remaining hidden tile column-by-column
-  // so the player sees the whole cleared board before auto-advance. Faster
-  // than the loss cascade (150 ms per column) since winning should feel
-  // snappy rather than ceremonial.
-  const triggerWinCascade = useCallback(() => {
-    for (let c = 0; c < 5; c++) {
-      const cc = c;
-      setTimeout(() => {
-        setBoard((inner) => {
-          const revealed = inner.revealed.slice();
-          for (let r = 0; r < 5; r++) {
-            revealed[r * 5 + cc] = true;
-          }
-          return { ...inner, revealed };
-        });
-      }, cc * 150);
-    }
-  }, []);
-
-  const flip = useCallback(
-    (idx: number) => {
-      if (status !== "playing") return;
-      setBoard((prev) => {
-        if (prev.revealed[idx]) return prev;
-        const revealed = prev.revealed.slice();
-        revealed[idx] = true;
-        return { ...prev, revealed };
-      });
-      const v = board.tiles[idx];
-      if (v === 0) {
-        setStatus("lost");
-        setRunning(0);
-        // Descending two-tone buzzer for the bust moment
-        playTone(220, 180, "sawtooth", 0.1);
-        setTimeout(() => playTone(140, 260, "sawtooth", 0.09), 90);
-        triggerLossCascade();
-        return;
-      }
-      setRunning((r) => (r === 0 ? v : r * v));
-      if (v === 2 || v === 3) {
-        setPopup({ id: ++popupIdRef.current, idx, mult: v });
-      }
-      // Reveal chirp: pitch shifts with the tile value so higher
-      // multipliers sound brighter.
-      playTone(v === 3 ? 1100 : v === 2 ? 880 : 660, 70, "square", 0.05);
-      // Win when every non-1, non-voltorb tile is revealed.
-      const nonTrivialLeft = board.tiles.some(
-        (t, i) => (t === 2 || t === 3) && !board.revealed[i] && i !== idx,
-      );
-      if (!nonTrivialLeft) {
-        setStatus("won");
-        triggerWinCascade();
-        // Ascending four-note arpeggio for the clear — each note 90 ms,
-        // 110 ms apart, 523/659/784/1047 Hz = C5/E5/G5/C6.
-        [523, 659, 784, 1047].forEach((f, i) =>
-          setTimeout(() => playTone(f, 90, "triangle", 0.08), i * 110),
-        );
-      }
-    },
-    [board, status, triggerLossCascade, triggerWinCascade, playTone],
-  );
-
-  const toggleMemo = useCallback((idx: number, mark: TileValue) => {
-    setBoard((prev) => {
-      const memos = prev.memos.slice();
-      const next = new Set(memos[idx]);
-      if (next.has(mark)) next.delete(mark);
-      else next.add(mark);
-      memos[idx] = next;
-      return { ...prev, memos };
-    });
-  }, []);
-
-  // Auto-advance to next level on win; auto-reset on lose. Delays sized to
-  // let the banner and — on lose — the five column-stagger voltorb reveals
-  // play in full before the board reshuffles. Cascade finishes around
-  // 1 s after flip; banner needs another beat to read. Win path is
-  // shorter since there's no cascade to wait on.
-  useEffect(() => {
-    if (status === "won") {
-      const timeout = setTimeout(() => {
-        setTotal((t) => t + running);
-        setRunning(0);
-        setLevel((l) => l + 1);
-        setBoard(generateBoard(level + 1));
-        setStatus("playing");
-      }, 2200);
-      return () => clearTimeout(timeout);
-    }
-    if (status === "lost") {
-      const timeout = setTimeout(() => {
-        setRunning(0);
-        setBoard(generateBoard(level));
-        setStatus("playing");
-      }, 2800);
-      return () => clearTimeout(timeout);
-    }
-    return undefined;
-  }, [status, level, running]);
-
-  // Wrap all framer-motion animations so they automatically respect the
-  // user's OS-level reduce-motion preference (spring/keyframes collapse to
-  // instant snaps). The tile CSS flip uses Tailwind's motion-reduce
-  // variant below for the same reason.
   return (
-    <MotionConfig reducedMotion="user">
     <div
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (status !== "playing") return;
-        const cur = focused ?? 12; // center tile if no prior focus
-        const r = Math.floor(cur / 5);
-        const c = cur % 5;
-        let next = cur;
-        switch (e.key) {
-          case "ArrowLeft":
-            next = r * 5 + ((c + 4) % 5);
-            break;
-          case "ArrowRight":
-            next = r * 5 + ((c + 1) % 5);
-            break;
-          case "ArrowUp":
-            next = ((r + 4) % 5) * 5 + c;
-            break;
-          case "ArrowDown":
-            next = ((r + 1) % 5) * 5 + c;
-            break;
-          case " ":
-          case "Enter":
-            if (focused !== null && !board.revealed[focused]) {
-              if (memoMode) {
-                const m = ([1, 2, 3, 0] as TileValue[]).find(
-                  (x) => !board.memos[focused].has(x),
-                );
-                if (m !== undefined) toggleMemo(focused, m);
-              } else {
-                flip(focused);
-              }
-            } else if (focused === null) {
-              setFocused(12);
-            }
-            e.preventDefault();
-            return;
-          case "m":
-          case "M":
-            setMemoMode((m) => !m);
-            e.preventDefault();
-            return;
-          default:
-            return;
-        }
-        e.preventDefault();
-        setFocused(next);
-      }}
-      className={`relative mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4 focus:outline-hidden ${pokemonDs.variable} ${m5x7.variable} ${stackedPixel.variable}`}
-      style={{
-        background: FELT,
-        borderRadius: 10,
-        fontFamily: "var(--font-voltorb-ds), ui-monospace, monospace",
-      }}
+      className={`svf-root ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center text-white`}
     >
-      <GameInfo
-        level={level}
-        onHelp={() => setHelpOpen(true)}
-        muted={muted}
-        onToggleMute={() => setMuted((m) => !m)}
-      />
-      <div className="flex flex-col gap-2">
-        <Scoreboard label="Coins" value={total} />
-        <Scoreboard label="This Game" value={running} />
-      </div>
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setRunning(0);
-            setBoard(generateBoard(level));
-            setStatus("playing");
-          }}
-          className={`px-3 py-1 text-xs uppercase text-gray-800 ${panelChrome}`}
-          style={{
-            background: "#fff",
-            fontFamily: "var(--font-voltorb-ds), monospace",
-            lineHeight: 1,
-          }}
-          aria-label="Reshuffle the current level's board"
-        >
-          New Board
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              typeof window !== "undefined" &&
-              !window.confirm("Reset your saved coin total and start a fresh level 1?")
-            ) {
-              return;
-            }
-            setTotal(0);
-            setRunning(0);
-            setLevel(1);
-            setBoard(generateBoard(1));
-            setStatus("playing");
-          }}
-          className={`px-3 py-1 text-xs uppercase text-gray-800 ${panelChrome}`}
-          style={{
-            background: "#fff",
-            fontFamily: "var(--font-voltorb-ds), monospace",
-            lineHeight: 1,
-          }}
-          aria-label="Reset all saved progress"
-        >
-          Reset
-        </button>
-      </div>
-
-      <div
-        className={`p-3 ${panelChrome}`}
-        style={{ background: FELT_DARK }}
-      >
-        {/* Explicit 6x6 grid with each child placed by gridRow/gridColumn so
-            clues land on the right column and bottom row regardless of
-            iteration order. */}
-        <div
-          className="grid gap-1.5"
-          style={{
-            gridTemplateColumns: "repeat(5, 1fr) 56px",
-            gridTemplateRows: "repeat(5, 1fr) 56px",
-            aspectRatio: "6 / 6",
-          }}
-        >
-          {Array.from({ length: 25 }).map((_, i) => {
-            const r = Math.floor(i / 5);
-            const c = i % 5;
-            return (
-              <div
-                key={`t-${i}`}
-                style={{
-                  gridColumn: c + 1,
-                  gridRow: r + 1,
-                }}
-              >
-                <Card
-                  value={board.tiles[i]}
-                  revealed={board.revealed[i]}
-                  memos={board.memos[i]}
-                  memoMode={memoMode}
-                  focused={focused === i}
-                  onFlip={() => flip(i)}
-                  onToggleMemo={(m) => toggleMemo(i, m)}
-                />
-              </div>
-            );
-          })}
-          {/* Row clues → column 6, rows 1-5 */}
-          {rowClues.map((s, r) => (
-            <div key={`rc-${r}`} style={{ gridColumn: 6, gridRow: r + 1 }}>
-              <RowColCard sum={s.sum} volts={s.volts} tint={HEADER_TINTS[r]} />
-            </div>
-          ))}
-          {/* Col clues → row 6, columns 1-5 */}
-          {colClues.map((s, c) => (
-            <div key={`cc-${c}`} style={{ gridColumn: c + 1, gridRow: 6 }}>
-              <RowColCard sum={s.sum} volts={s.volts} tint={HEADER_TINTS[c]} />
-            </div>
-          ))}
-          {/* Multiplier popup — floats up from the just-revealed tile. Lives
-              inside the grid so it inherits the 6-col/6-row placement, on
-              its own cell with position:relative so the motion.div can
-              escape the cell vertically without clipping. */}
-          <AnimatePresence>
-            {popup && (
-              <div
-                key={`popup-cell-${popup.id}`}
-                style={{
-                  gridColumn: (popup.idx % 5) + 1,
-                  gridRow: Math.floor(popup.idx / 5) + 1,
-                  position: "relative",
-                  pointerEvents: "none",
-                  zIndex: 10,
-                }}
-              >
-                <motion.div
-                  key={popup.id}
-                  initial={{ y: 0, opacity: 0, scale: 0.7 }}
-                  animate={{ y: -36, opacity: [0, 1, 1, 0], scale: 1.3 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.9, ease: "easeOut" }}
-                  onAnimationComplete={() => setPopup(null)}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#facc15",
-                    fontFamily: "var(--font-voltorb-m5x7), monospace",
-                    fontSize: 30,
-                    fontWeight: 900,
-                    lineHeight: 1,
-                    textShadow:
-                      "1px 1px 0 #1f2937, -1px -1px 0 #1f2937, 1px -1px 0 #1f2937, -1px 1px 0 #1f2937",
-                  }}
-                >
-                  ×{popup.mult}
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-          {/* Memo toggle → bottom-right corner (col 6, row 6) */}
-          <button
-            type="button"
-            onClick={() => setMemoMode((m) => !m)}
-            aria-pressed={memoMode}
-            aria-label={`Memo mode ${memoMode ? "on" : "off"}`}
-            className={`flex items-center justify-center text-sm uppercase ${panelChrome}`}
-            style={{
-              gridColumn: 6,
-              gridRow: 6,
-              background: memoMode ? "#fde68a" : "#fff",
-              fontFamily: "var(--font-voltorb-ds), monospace",
-              color: memoMode ? "#92400e" : "#1f2937",
-              lineHeight: 1,
-            }}
-          >
-            Memo
-          </button>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {helpOpen && (
-          <motion.div
-            key="help-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setHelpOpen(false)}
-            className="absolute inset-0 z-20 flex items-center justify-center p-4"
-            style={{ background: "rgba(0,0,0,0.55)", borderRadius: 10 }}
-          >
-            <motion.div
-              initial={{ scale: 0.85 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.85 }}
-              transition={{ type: "spring", stiffness: 300, damping: 24 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`w-full max-w-[340px] p-4 text-sm text-gray-800 ${panelChrome}`}
-              style={{
-                background: "#fff",
-                fontFamily: "var(--font-voltorb-ds), monospace",
-              }}
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-base font-black uppercase">How to Play</span>
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(false)}
-                  className="text-lg leading-none text-gray-500 hover:text-gray-800"
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-              <ul className="space-y-1.5 leading-snug">
-                <li>Flip a tile to collect its coin value (1, 2, or 3).</li>
-                <li>Each non-1 tile multiplies your running score.</li>
-                <li>Revealing a Voltorb busts the round — score goes to 0.</li>
-                <li>
-                  Row/column badges show total coins on top and voltorb count on the bottom. Use them to deduce safe tiles.
-                </li>
-                <li>
-                  Clear every 2 and 3 to finish the level; the running score banks into your total coins.
-                </li>
-                <li className="pt-1 text-xs text-gray-500">
-                  Right-click or long-press a tile to cycle a memo mark. M toggles memo mode; arrow keys + space navigate.
-                </li>
-              </ul>
-            </motion.div>
-          </motion.div>
+      <style>{SCOPED_STYLES}</style>
+      <div className="flex flex-col items-center gap-2 p-2">
+        <InstructionsBtns />
+        {game && (
+          <>
+            <GameInfo currentLevel={game.currentLevel} />
+            <Scoreboard
+              currentScore={game.currentScore}
+              totalScore={game.totalScore}
+            />
+            <Gameboard
+              game={game}
+              updateGame={updateGame}
+              waitForClick={waitForClick}
+            />
+            <Settings
+              waitForClick={waitForClick}
+              setWaitForClick={setWaitForClick}
+            />
+            <Footer />
+          </>
         )}
-        {status === "lost" && (
-          <motion.div
-            key="lost-banner"
-            role="status"
-            aria-live="assertive"
-            initial={{ scale: 0.7, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 320, damping: 24 }}
-            className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 px-5 py-3 ${panelChrome}`}
-            style={{
-              background: "#7a1f1f",
-              fontFamily: "var(--font-voltorb-ds), monospace",
-            }}
-          >
-            <VoltorbIcon size={28} />
-            <span className="text-lg font-black uppercase tracking-wider text-white">
-              Busted!
-            </span>
-          </motion.div>
-        )}
-        {status === "won" && (
-          <motion.div
-            key="won-banner"
-            role="status"
-            aria-live="assertive"
-            initial={{ scale: 0.7, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 320, damping: 24 }}
-            className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-6 py-3 text-center ${panelChrome}`}
-            style={{
-              background: "#eab308",
-              fontFamily: "var(--font-voltorb-ds), monospace",
-            }}
-          >
-            <div className="text-xl font-black uppercase tracking-widest text-gray-900">
-              Level Cleared!
-            </div>
-            <div
-              className="mt-1 text-sm text-gray-800"
-              style={{ fontFamily: "var(--font-voltorb-stacked), monospace" }}
-            >
-              +{running} coins
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
     </div>
-    </MotionConfig>
   );
 }
