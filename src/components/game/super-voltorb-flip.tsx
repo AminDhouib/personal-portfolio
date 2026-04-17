@@ -1,405 +1,509 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { Shield, Sparkles } from "lucide-react";
-import { useSave } from "./super-voltorb-flip/use-save";
-import { useGame } from "./super-voltorb-flip/use-game";
-import { DsCanvas } from "./super-voltorb-flip/DsCanvas";
-import { AbilityBar } from "./super-voltorb-flip/AbilityBar";
-import { SettingsMenu } from "./super-voltorb-flip/SettingsMenu";
-import { StatsPanel } from "./super-voltorb-flip/StatsPanel";
-import { ThemeSwitcher } from "./super-voltorb-flip/ThemeSwitcher";
-import { Atmosphere } from "./super-voltorb-flip/Atmosphere";
-import { THEMES } from "./super-voltorb-flip/theme";
-import { BgmPlayer, synthStinger, synthExplosion } from "./super-voltorb-flip/audio";
-import type { GameMode } from "./super-voltorb-flip/types";
+/**
+ * Super Voltorb Flip — web rewrite.
+ *
+ * Visual style is a port of the CSS motifs in
+ * https://github.com/jv-vogler/voltorb-flip (MIT, Copyright (c) João Vogler)
+ * — specifically the felt-green table palette, triple-outline DS bezel
+ * ("border + outline + inner border") used on every panel, salmon card
+ * faces (#bd8c84/#a55a52), and per-row/col header tints. Gameplay is the
+ * Voltorb Flip minigame from Pokémon HGSS: 5x5 grid, multiply coins by
+ * each non-voltorb tile value, hit a voltorb = bust. No artwork is copied
+ * from the upstream project; the voltorb icon is an inline SVG and the
+ * fonts default to the system monospace stack.
+ */
 
-export function SuperVoltorbFlipGame() {
-  const [mounted, setMounted] = useState(false);
-  const [save, updateSave] = useSave();
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+// ---------------------------------------------------------------------------
+// Palette — borrowed from the reference constants.ts for visual parity.
+// ---------------------------------------------------------------------------
 
-  if (!mounted) {
-    return <LoadingShell />;
-  }
+const FELT = "#58a66c";
+const FELT_DARK = "#448563";
+const CARD_FACE = "#bd8c84";
+const CARD_FACE_INNER = "#a55a52";
+// Ordered tints applied to the row/col clue cards 0..4.
+const HEADER_TINTS = ["#e77352", "#5eae43", "#efa539", "#3194ff", "#c872e7"];
 
-  if (save.mode === null) {
-    return <ModeSelect onPick={(mode) => updateSave({ mode })} />;
-  }
+// ---------------------------------------------------------------------------
+// Board generation — classic Voltorb Flip rules.
+// Each tile is 0 (voltorb) | 1 | 2 | 3. Level determines how many 2s, 3s, and
+// voltorbs are on the board. We derive row/col totals from the finished board.
+// ---------------------------------------------------------------------------
 
-  return <GameScreen save={save} updateSave={updateSave} />;
+type TileValue = 0 | 1 | 2 | 3;
+
+interface BoardState {
+  tiles: TileValue[]; // row-major 25 entries
+  revealed: boolean[]; // per-tile
+  memos: Array<Set<TileValue>>; // per-tile memo marks
 }
 
-function GameScreen({
-  save,
-  updateSave,
-}: {
-  save: ReturnType<typeof useSave>[0];
-  updateSave: ReturnType<typeof useSave>[1];
-}) {
-  const { state, dispatch } = useGame({
-    mode: save.mode!,
-    initialTheme: save.activeTheme,
-    unlockedThemes: save.unlockedThemes,
-    autoMemoEnabled: save.autoMemoEnabled,
-    speedMode: save.speedMode,
-    totalCoins: save.totalCoins,
-    initialStats: save.stats,
-    onPersist: updateSave,
-  });
+interface LevelSpec {
+  level: number;
+  twos: number;
+  threes: number;
+  voltorbs: number;
+}
 
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const bgmRef = useRef<BgmPlayer | null>(null);
+// Level table for levels 1..5 (a subset of the canonical HGSS table, enough
+// to demonstrate scaling difficulty).
+const LEVELS: LevelSpec[] = [
+  { level: 1, twos: 3, threes: 1, voltorbs: 6 },
+  { level: 2, twos: 0, threes: 3, voltorbs: 7 },
+  { level: 3, twos: 5, threes: 2, voltorbs: 8 },
+  { level: 4, twos: 3, threes: 4, voltorbs: 8 },
+  { level: 5, twos: 2, threes: 5, voltorbs: 10 },
+];
 
-  const lastSubmittedRef = useRef(save.stats.highestSingleRoundCoins);
-  const [pendingSubmit, setPendingSubmit] = useState<number | null>(null);
-  const [nameInput, setNameInput] = useState("");
-
-  const ensureAudio = useCallback(() => {
-    if (typeof window === "undefined") return null;
-    if (!audioCtxRef.current) {
-      const Ctor =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      if (!Ctor) return null;
-      audioCtxRef.current = new Ctor();
-      bgmRef.current = new BgmPlayer(audioCtxRef.current, save.musicVolume);
-    }
-    if (audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume();
-    }
-    return audioCtxRef.current;
-  }, [save.musicVolume]);
-
-  useEffect(() => {
-    const bgm = bgmRef.current;
-    if (!bgm) return;
-    const tier =
-      state.level <= 3 ? "rookie" : state.level <= 6 ? "veteran" : "master";
-    const isInRound =
-      state.phase === "ready" ||
-      state.phase === "playing" ||
-      state.phase === "memo";
-    const url = isInRound
-      ? `/games/super-voltorb-flip/music/${tier}.mp3`
-      : THEMES[state.activeTheme].bgmUrl;
-    bgm.crossfadeTo(url).catch(() => {});
-  }, [state.level, state.activeTheme, state.phase]);
-
-  useEffect(() => {
-    bgmRef.current?.setVolume(save.musicVolume);
-  }, [save.musicVolume]);
-
-  useEffect(() => {
-    return () => {
-      try {
-        bgmRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      bgmRef.current = null;
-      const ctx = audioCtxRef.current;
-      if (ctx) {
-        try {
-          ctx.close();
-        } catch {
-          /* ignore */
-        }
-        audioCtxRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (state.stats.highestSingleRoundCoins > lastSubmittedRef.current) {
-      setPendingSubmit(state.stats.highestSingleRoundCoins);
-    }
-    lastSubmittedRef.current = state.stats.highestSingleRoundCoins;
-  }, [state.stats.highestSingleRoundCoins]);
-
-  async function submitScore() {
-    if (pendingSubmit === null) return;
-    try {
-      await fetch("/api/leaderboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameInput.slice(0, 12) || "Anonymous",
-          score: pendingSubmit,
-          level: state.level,
-          region: state.mode,
-        }),
-      });
-    } catch {
-      // network failures shouldn't break gameplay
-    }
-    setPendingSubmit(null);
-    setNameInput("");
+function shuffle<T>(arr: T[], rand: () => number): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
+  return out;
+}
 
-  const prevPhaseRef = useRef(state.phase);
-  const prevCoinsRef = useRef(state.currentCoins);
-
-  useEffect(() => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) {
-      prevPhaseRef.current = state.phase;
-      prevCoinsRef.current = state.currentCoins;
-      return;
-    }
-    const vol = save.sfxVolume;
-    if (prevPhaseRef.current !== state.phase) {
-      if (state.phase === "won") synthStinger(ctx, "win", vol);
-      if (state.phase === "lost") {
-        if (state.shieldedLoss) synthStinger(ctx, "shieldAbsorb", vol);
-        else synthExplosion(ctx, vol);
-      }
-      if (prevPhaseRef.current === "won" && state.phase === "ready") {
-        synthStinger(ctx, "levelUp", vol);
-      }
-    }
-    if (state.currentCoins > prevCoinsRef.current) {
-      synthStinger(ctx, "coinTick", vol);
-    }
-    prevPhaseRef.current = state.phase;
-    prevCoinsRef.current = state.currentCoins;
-  }, [state.phase, state.currentCoins, state.shieldedLoss, save.sfxVolume]);
-
-  useEffect(() => {
-    let raf = 0;
-    let running = true;
-
-    function tick() {
-      if (!running) return;
-      let hasAnimating = false;
-      for (const row of state.board) {
-        for (const t of row) {
-          if (t.animFrame !== null) {
-            hasAnimating = true;
-            break;
-          }
-        }
-        if (hasAnimating) break;
-      }
-      if (hasAnimating) {
-        dispatch({ type: "advanceAnim", step: state.speedMode ? 3 : 1 });
-      }
-      raf = requestAnimationFrame(tick);
-    }
-    raf = requestAnimationFrame(tick);
-    return () => {
-      running = false;
-      cancelAnimationFrame(raf);
-    };
-  }, [state.board, state.speedMode, dispatch]);
-
-  const handleTileClick = (r: number, c: number) => {
-    ensureAudio();
-    const ctx = audioCtxRef.current;
-    if (state.phase === "memo") {
-      dispatch({ type: "selectMemoTile", row: r, col: c });
-    } else {
-      if (!state.board[r][c].flipped && ctx) {
-        synthStinger(ctx, "tileFlip", save.sfxVolume);
-      }
-      dispatch({ type: "flip", row: r, col: c });
-    }
+function generateBoard(level: number): BoardState {
+  const spec = LEVELS[Math.min(level - 1, LEVELS.length - 1)];
+  const values: TileValue[] = [];
+  for (let i = 0; i < spec.voltorbs; i++) values.push(0);
+  for (let i = 0; i < spec.twos; i++) values.push(2);
+  for (let i = 0; i < spec.threes; i++) values.push(3);
+  while (values.length < 25) values.push(1);
+  const tiles = shuffle(values, Math.random) as TileValue[];
+  return {
+    tiles,
+    revealed: Array(25).fill(false),
+    memos: Array.from({ length: 25 }, () => new Set<TileValue>()),
   };
+}
 
+// Sum and voltorb-count for one row (r=0..4) or one column (c=0..4).
+function rowStats(tiles: TileValue[], r: number) {
+  let sum = 0;
+  let volts = 0;
+  for (let c = 0; c < 5; c++) {
+    const v = tiles[r * 5 + c];
+    if (v === 0) volts++;
+    else sum += v;
+  }
+  return { sum, volts };
+}
+
+function colStats(tiles: TileValue[], c: number) {
+  let sum = 0;
+  let volts = 0;
+  for (let r = 0; r < 5; r++) {
+    const v = tiles[r * 5 + c];
+    if (v === 0) volts++;
+    else sum += v;
+  }
+  return { sum, volts };
+}
+
+// ---------------------------------------------------------------------------
+// Voltorb SVG — hand-drawn so we don't ship third-party sprite assets.
+// ---------------------------------------------------------------------------
+
+function VoltorbIcon({ size = 20 }: { size?: number }) {
   return (
-    <div className="w-full mx-auto max-w-3xl px-2 sm:px-0">
+    <svg
+      viewBox="0 0 20 20"
+      width={size}
+      height={size}
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      {/* Red top hemisphere */}
+      <path d="M2 10 A8 8 0 0 1 18 10 L2 10 Z" fill="#e53935" />
+      {/* White bottom hemisphere */}
+      <path d="M2 10 A8 8 0 0 0 18 10 L2 10 Z" fill="#f4f4f4" />
+      {/* Horizontal seam */}
+      <rect x="2" y="9.5" width="16" height="1" fill="#1a1a1a" />
+      {/* Eyes */}
+      <ellipse cx="7" cy="6.5" rx="1.2" ry="1.8" fill="#1a1a1a" />
+      <ellipse cx="13" cy="6.5" rx="1.2" ry="1.8" fill="#1a1a1a" />
+      {/* Eye shine */}
+      <circle cx="7.5" cy="5.8" r="0.4" fill="#fff" />
+      <circle cx="13.5" cy="5.8" r="0.4" fill="#fff" />
+      {/* Outline */}
+      <circle cx="10" cy="10" r="8.2" fill="none" stroke="#1a1a1a" strokeWidth="1" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared chrome styles — the reference's signature "triple outline" looks
+// crisp even without bitmap sprites. Tailwind's arbitrary-variant APIs handle
+// the perspective/transform-style stack for the flip.
+// ---------------------------------------------------------------------------
+
+const panelChrome =
+  "border-2 border-gray-700 outline outline-4 outline-gray-200 rounded-[5px]";
+
+// ---------------------------------------------------------------------------
+// Card (tile)
+// ---------------------------------------------------------------------------
+
+function Card({
+  value,
+  revealed,
+  memos,
+  onFlip,
+  onToggleMemo,
+  memoMode,
+}: {
+  value: TileValue;
+  revealed: boolean;
+  memos: Set<TileValue>;
+  onFlip: () => void;
+  onToggleMemo: (m: TileValue) => void;
+  memoMode: boolean;
+}) {
+  const visibleMemos: TileValue[] = [1, 2, 3, 0];
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (revealed) return;
+        if (memoMode) return; // memo mode uses long-press / separate UI
+        onFlip();
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (revealed) return;
+        // Right-click cycles memo for next unset mark
+        const next = visibleMemos.find((m) => !memos.has(m));
+        if (next !== undefined) onToggleMemo(next);
+      }}
+      className={`relative h-full w-full ${panelChrome} bg-transparent p-0`}
+      style={{ perspective: 1000 }}
+      aria-label={revealed ? `Card showing ${value}` : "Hidden card"}
+    >
       <div
-        className="w-full rounded-xl border border-(--border) overflow-hidden relative flex items-start justify-center py-6"
+        className="relative h-full w-full transition-transform duration-500"
         style={{
-          backgroundImage: THEMES[state.activeTheme].bgUrl,
-          backgroundSize: "cover",
+          transformStyle: "preserve-3d",
+          transform: revealed ? "rotateY(180deg)" : "rotateY(0)",
         }}
       >
-        <Atmosphere timeOfDay={state.timeOfDay} weather={state.weather} />
-
-        <div className="absolute top-3 right-3 z-20">
-          <SettingsMenu
-            mode={state.mode}
-            autoMemoEnabled={state.autoMemoEnabled}
-            speedMode={state.speedMode}
-            musicVolume={save.musicVolume}
-            sfxVolume={save.sfxVolume}
-            onToggleAutoMemo={() => dispatch({ type: "toggleAutoMemo" })}
-            onToggleSpeed={() => dispatch({ type: "toggleSpeed" })}
-            onMusicVolume={(v) => updateSave({ musicVolume: v })}
-            onSfxVolume={(v) => updateSave({ sfxVolume: v })}
-          />
-        </div>
-
-        <div className="relative z-10">
-          <DsCanvas
-            state={state}
-            scale={2}
-            onTileClick={handleTileClick}
-            onMemoToggle={() => dispatch({ type: "toggleMemo" })}
-            onMarkChange={(idx) => dispatch({ type: "toggleMemoMark", idx })}
-            onToggleCopy={() => dispatch({ type: "toggleMemoCopy" })}
-          />
-        </div>
-
-        {(state.phase === "won" || state.phase === "lost") && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-            <div className="bg-white/95 dark:bg-(--card) rounded-lg p-6 text-center max-w-sm border border-(--border)">
-              <div className="text-xl font-bold mb-2">
-                {state.phase === "won"
-                  ? `Level ${state.level} Cleared!`
-                  : state.shieldedLoss
-                  ? "Shield Absorbed! Coins Saved."
-                  : "Voltorb! Coins Lost."}
-              </div>
-              <div className="text-sm text-(--muted) mb-4">
-                {state.phase === "won"
-                  ? `+${state.currentCoins} coins`
-                  : state.shieldedLoss
-                  ? `Kept ${state.currentCoins} coins`
-                  : ""}
-              </div>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "continue" })}
-                className="px-4 py-2 bg-accent-pink text-white rounded font-medium"
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {state.mode === "super" && (
-        <AbilityBar
-          level={state.level}
-          totalCoins={state.totalCoins}
-          shieldArmed={state.shieldArmed}
-          voltorbRevealsUsed={state.voltorbRevealsUsed}
-          currentCoins={state.currentCoins}
-          onArmShield={() => {
-            ensureAudio();
-            const ctx = audioCtxRef.current;
-            if (ctx) synthStinger(ctx, "shieldAbsorb", save.sfxVolume);
-            dispatch({ type: "armShield" });
-          }}
-          onUseReveal={() => {
-            ensureAudio();
-            const ctx = audioCtxRef.current;
-            if (ctx) synthStinger(ctx, "voltorbReveal", save.sfxVolume);
-            dispatch({ type: "useVoltorbReveal" });
-          }}
-          onCashOut={() => dispatch({ type: "cashOut" })}
-        />
-      )}
-
-      <StatsPanel stats={state.stats} />
-      <ThemeSwitcher
-        unlocked={state.unlockedThemes}
-        active={state.activeTheme}
-        totalCoins={state.totalCoins}
-        onSelect={(id) => dispatch({ type: "unlockTheme", theme: id })}
-      />
-
-      {pendingSubmit !== null && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-(--card) p-6 rounded-lg max-w-sm w-full text-center border border-(--border)">
-            <h4 className="font-bold mb-2">
-              New Personal Best: {pendingSubmit} coins!
-            </h4>
-            <p className="text-(--muted) text-sm mb-4">
-              Submit your score to the leaderboard?
-            </p>
-            <input
-              type="text"
-              maxLength={12}
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Your name (optional)"
-              className="w-full px-3 py-2 rounded border border-(--border) bg-(--bg) mb-3"
+        {/* Back (face-down) — striped felt carpet */}
+        <div
+          className="absolute inset-0 grid grid-cols-3 grid-rows-3"
+          style={{ backfaceVisibility: "hidden" }}
+        >
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                background:
+                  (Math.floor(i / 3) + (i % 3)) % 2 === 0 ? FELT : FELT_DARK,
+              }}
             />
-            <div className="flex gap-2 justify-center">
-              <button
-                type="button"
-                onClick={submitScore}
-                className="px-4 py-2 rounded bg-accent-pink text-white font-medium"
-              >
-                Submit
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingSubmit(null);
-                  setNameInput("");
-                }}
-                className="px-4 py-2 rounded border border-(--border)"
-              >
-                Skip
-              </button>
+          ))}
+          {/* Memo overlay */}
+          {!revealed && memos.size > 0 && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="grid grid-cols-2 grid-rows-2 gap-0.5 text-[9px] font-bold">
+                {([1, 2, 3] as TileValue[]).map((m) => (
+                  <div
+                    key={m}
+                    className="flex h-3 w-3 items-center justify-center text-white"
+                    style={{
+                      opacity: memos.has(m) ? 1 : 0.25,
+                      textShadow: "1px 1px 0 rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    {m}
+                  </div>
+                ))}
+                <div
+                  className="flex h-3 w-3 items-center justify-center"
+                  style={{ opacity: memos.has(0) ? 1 : 0.25 }}
+                >
+                  <VoltorbIcon size={10} />
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
-    </div>
+        {/* Front (revealed) */}
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+            background: CARD_FACE,
+            border: `2px solid ${CARD_FACE_INNER}`,
+            borderRadius: 3,
+          }}
+        >
+          {value === 0 ? (
+            <VoltorbIcon size={36} />
+          ) : (
+            <span
+              className="font-mono text-2xl font-black text-white"
+              style={{
+                textShadow:
+                  "1px 0 0 #222,-1px 0 0 #222,0 1px 0 #222,0 -1px 0 #222",
+              }}
+            >
+              {value}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
   );
 }
 
-function LoadingShell() {
-  return (
-    <div className="w-full h-[420px] rounded-xl border border-(--border) bg-(--card) flex items-center justify-center">
-      <div className="text-(--muted) text-sm">Loading Super Voltorb Flip...</div>
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// RowColCard — the coin-total + voltorb-count clue cards along the right
+// and bottom edges of the board.
+// ---------------------------------------------------------------------------
 
-function ModeSelect({ onPick }: { onPick: (m: GameMode) => void }) {
+function RowColCard({
+  sum,
+  volts,
+  tint,
+}: {
+  sum: number;
+  volts: number;
+  tint: string;
+}) {
   return (
     <div
-      className="w-full rounded-xl border border-(--border) bg-(--card) p-8 flex flex-col items-center gap-6"
-      style={{ minHeight: 420 }}
+      className={`relative flex h-full w-full flex-col ${panelChrome}`}
+      style={{ background: tint }}
     >
-      <div className="text-center">
-        <h3 className="text-2xl font-bold mb-2">Choose your mode</h3>
-        <p className="text-(--muted) text-sm">
-          This choice is permanent. Both modes share stats; leaderboards are
-          separate.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
-        <button
-          type="button"
-          onClick={() => onPick("classic")}
-          className="text-left p-6 rounded-xl border border-(--border) bg-(--bg) hover:border-accent-blue transition"
+      <div className="flex h-1/2 items-center justify-center">
+        <span
+          className="font-mono text-xl font-black text-white"
+          style={{
+            textShadow:
+              "1px 0 0 #222,-1px 0 0 #222,0 1px 0 #222,0 -1px 0 #222",
+          }}
         >
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-5 h-5 text-accent-blue" />
-            <h4 className="text-lg font-semibold">Classic Mode</h4>
-          </div>
-          <p className="text-sm text-(--muted)">
-            The pure HGSS experience. No abilities, no soft drops, no power-ups.
-            Hit a Voltorb, lose your coins, risk a big level crash. For purists.
-          </p>
-        </button>
-        <button
-          type="button"
-          onClick={() => onPick("super")}
-          className="text-left p-6 rounded-xl border border-(--border) bg-(--bg) hover:border-accent-pink transition"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-5 h-5 text-accent-pink" />
-            <h4 className="text-lg font-semibold">Super Mode</h4>
-          </div>
-          <p className="text-sm text-(--muted)">
-            Spend coins on Shield, Voltorb Reveal, and Cash Out. Softer level
-            drops when you fail. Auto-memo, speed mode, and unlockable themes.
-          </p>
-        </button>
+          {String(sum).padStart(2, "0")}
+        </span>
       </div>
+      <div className="h-0.5 w-full bg-gray-700/60" />
+      <div className="flex h-1/2 items-center justify-center gap-1">
+        <VoltorbIcon size={12} />
+        <span className="font-mono text-sm font-bold text-white">{volts}</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scoreboard
+// ---------------------------------------------------------------------------
+
+function Scoreboard({ label, value }: { label: string; value: number }) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-4 bg-white px-4 py-2 ${panelChrome}`}
+    >
+      <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
+        {label}
+      </span>
+      <span className="font-mono text-2xl font-black tabular-nums text-gray-800">
+        {String(value).padStart(5, "0")}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Game header bar
+// ---------------------------------------------------------------------------
+
+function GameInfo({ level }: { level: number }) {
+  return (
+    <div
+      className={`flex items-center justify-between px-4 py-1.5 text-white ${panelChrome}`}
+      style={{ background: FELT_DARK }}
+    >
+      <span className="text-sm font-bold tracking-wide">VOLTORB FLIP</span>
+      <span className="text-sm font-mono">Lv. {level}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export function SuperVoltorbFlipGame() {
+  const [level, setLevel] = useState(1);
+  const [board, setBoard] = useState<BoardState>(() => generateBoard(1));
+  const [running, setRunning] = useState(0); // running coins this level
+  const [total, setTotal] = useState(0); // cumulative across levels
+  const [status, setStatus] = useState<"playing" | "lost" | "won">("playing");
+  const [memoMode, setMemoMode] = useState(false);
+
+  // Row and col precomputed clues
+  const rowClues = useMemo(
+    () => Array.from({ length: 5 }, (_, r) => rowStats(board.tiles, r)),
+    [board.tiles],
+  );
+  const colClues = useMemo(
+    () => Array.from({ length: 5 }, (_, c) => colStats(board.tiles, c)),
+    [board.tiles],
+  );
+
+  const flip = useCallback(
+    (idx: number) => {
+      if (status !== "playing") return;
+      setBoard((prev) => {
+        if (prev.revealed[idx]) return prev;
+        const revealed = prev.revealed.slice();
+        revealed[idx] = true;
+        return { ...prev, revealed };
+      });
+      const v = board.tiles[idx];
+      if (v === 0) {
+        setStatus("lost");
+        setRunning(0);
+        return;
+      }
+      setRunning((r) => (r === 0 ? v : r * v));
+      // Win when every non-1, non-voltorb tile is revealed.
+      const nonTrivialLeft = board.tiles.some(
+        (t, i) => (t === 2 || t === 3) && !board.revealed[i] && i !== idx,
+      );
+      if (!nonTrivialLeft) {
+        setStatus("won");
+      }
+    },
+    [board, status],
+  );
+
+  const toggleMemo = useCallback((idx: number, mark: TileValue) => {
+    setBoard((prev) => {
+      const memos = prev.memos.slice();
+      const next = new Set(memos[idx]);
+      if (next.has(mark)) next.delete(mark);
+      else next.add(mark);
+      memos[idx] = next;
+      return { ...prev, memos };
+    });
+  }, []);
+
+  // Auto-advance to next level on win; auto-reset on lose.
+  useEffect(() => {
+    if (status === "won") {
+      const timeout = setTimeout(() => {
+        setTotal((t) => t + running);
+        setRunning(0);
+        setLevel((l) => l + 1);
+        setBoard(generateBoard(level + 1));
+        setStatus("playing");
+      }, 1400);
+      return () => clearTimeout(timeout);
+    }
+    if (status === "lost") {
+      const timeout = setTimeout(() => {
+        setRunning(0);
+        setBoard(generateBoard(level));
+        setStatus("playing");
+      }, 1800);
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [status, level, running]);
+
+  return (
+    <div
+      className="mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4"
+      style={{ background: FELT, borderRadius: 10 }}
+    >
+      <GameInfo level={level} />
+      <div className="flex flex-col gap-2">
+        <Scoreboard label="Coins" value={total} />
+        <Scoreboard label="This Game" value={running} />
+      </div>
+
+      <div
+        className={`p-3 ${panelChrome}`}
+        style={{ background: FELT_DARK }}
+      >
+        {/* Explicit 6x6 grid with each child placed by gridRow/gridColumn so
+            clues land on the right column and bottom row regardless of
+            iteration order. */}
+        <div
+          className="grid gap-1.5"
+          style={{
+            gridTemplateColumns: "repeat(5, 1fr) 56px",
+            gridTemplateRows: "repeat(5, 1fr) 56px",
+            aspectRatio: "6 / 6",
+          }}
+        >
+          {Array.from({ length: 25 }).map((_, i) => {
+            const r = Math.floor(i / 5);
+            const c = i % 5;
+            return (
+              <div
+                key={`t-${i}`}
+                style={{
+                  gridColumn: c + 1,
+                  gridRow: r + 1,
+                }}
+              >
+                <Card
+                  value={board.tiles[i]}
+                  revealed={board.revealed[i]}
+                  memos={board.memos[i]}
+                  memoMode={memoMode}
+                  onFlip={() => flip(i)}
+                  onToggleMemo={(m) => toggleMemo(i, m)}
+                />
+              </div>
+            );
+          })}
+          {/* Row clues → column 6, rows 1-5 */}
+          {rowClues.map((s, r) => (
+            <div key={`rc-${r}`} style={{ gridColumn: 6, gridRow: r + 1 }}>
+              <RowColCard sum={s.sum} volts={s.volts} tint={HEADER_TINTS[r]} />
+            </div>
+          ))}
+          {/* Col clues → row 6, columns 1-5 */}
+          {colClues.map((s, c) => (
+            <div key={`cc-${c}`} style={{ gridColumn: c + 1, gridRow: 6 }}>
+              <RowColCard sum={s.sum} volts={s.volts} tint={HEADER_TINTS[c]} />
+            </div>
+          ))}
+          {/* Memo toggle → bottom-right corner (col 6, row 6) */}
+          <button
+            type="button"
+            onClick={() => setMemoMode((m) => !m)}
+            className={`flex items-center justify-center text-[10px] font-bold uppercase ${panelChrome}`}
+            style={{
+              gridColumn: 6,
+              gridRow: 6,
+              background: memoMode ? "#fde68a" : "#fff",
+            }}
+          >
+            Memo
+          </button>
+        </div>
+      </div>
+
+      {status === "lost" && (
+        <div className="text-center text-sm font-bold text-red-100">
+          Voltorb! Next round…
+        </div>
+      )}
+      {status === "won" && (
+        <div className="text-center text-sm font-bold text-yellow-100">
+          Level cleared!
+        </div>
+      )}
     </div>
   );
 }
