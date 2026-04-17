@@ -458,6 +458,11 @@ const useGame = () => {
 // (Nintendo IP we can't redistribute). Red-top, white-bottom face ball.
 // ---------------------------------------------------------------------------
 
+// 28x28 viewBox with the face ball centered — matches the visual metrics of
+// the 28-px PNG upstream used, so the positional tweaks in RowColCard
+// (translate-y-1.5, bottom:-6px) line up the same way. The ball itself is a
+// simple red-top / white-bottom sphere with two black eyes; outlined by the
+// ".picture-outline" filter callers add on top of the SVG.
 function VoltorbIcon({
   size = 28,
   className,
@@ -467,27 +472,33 @@ function VoltorbIcon({
 }) {
   return (
     <svg
-      viewBox="0 0 20 20"
+      viewBox="0 0 28 28"
       width={size}
       height={size}
       aria-hidden="true"
       className={className}
       style={{ display: "block" }}
     >
-      <path d="M2 10 A8 8 0 0 1 18 10 L2 10 Z" fill="#e53935" />
-      <path d="M2 10 A8 8 0 0 0 18 10 L2 10 Z" fill="#f4f4f4" />
-      <rect x="2" y="9.5" width="16" height="1" fill="#1a1a1a" />
-      <ellipse cx="7" cy="6.5" rx="1.2" ry="1.8" fill="#1a1a1a" />
-      <ellipse cx="13" cy="6.5" rx="1.2" ry="1.8" fill="#1a1a1a" />
-      <circle cx="7.5" cy="5.8" r="0.4" fill="#fff" />
-      <circle cx="13.5" cy="5.8" r="0.4" fill="#fff" />
+      {/* Red top hemisphere */}
+      <path d="M3 14 A11 11 0 0 1 25 14 L3 14 Z" fill="#d83a2e" />
+      {/* White bottom hemisphere */}
+      <path d="M3 14 A11 11 0 0 0 25 14 L3 14 Z" fill="#f0f0f0" />
+      {/* Seam */}
+      <rect x="3" y="13.3" width="22" height="1.4" fill="#1a1a1a" />
+      {/* Eyes */}
+      <ellipse cx="10" cy="9.5" rx="1.6" ry="2.2" fill="#1a1a1a" />
+      <ellipse cx="18" cy="9.5" rx="1.6" ry="2.2" fill="#1a1a1a" />
+      {/* Eye shine */}
+      <circle cx="10.5" cy="8.7" r="0.55" fill="#fff" />
+      <circle cx="18.5" cy="8.7" r="0.55" fill="#fff" />
+      {/* Outer border */}
       <circle
-        cx="10"
-        cy="10"
-        r="8.2"
+        cx="14"
+        cy="14"
+        r="11.2"
         fill="none"
         stroke="#1a1a1a"
-        strokeWidth="1"
+        strokeWidth="1.2"
       />
     </svg>
   );
@@ -594,10 +605,10 @@ const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
           {coins.toString().padStart(2, "0")}
         </div>
         <div className="absolute top-[20px] w-full outline outline-2 outline-gray-200"></div>
-        <div className="absolute bottom-[-6px] flex gap-0.5">
+        <div className="absolute bottom-[-6px] flex items-center gap-0.5">
           <VoltorbIcon
-            size={28}
-            className="voltorb picture-outline translate-y-1.5 object-contain"
+            size={20}
+            className="voltorb picture-outline object-contain"
           />
           <p className="translate-x-0.5">{voltorbs}</p>
         </div>
