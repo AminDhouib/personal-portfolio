@@ -185,20 +185,29 @@ function Card({
   memoMode: boolean;
 }) {
   const visibleMemos: TileValue[] = [1, 2, 3, 0];
+  const cycleMemo = () => {
+    if (revealed) return;
+    // Cycle through the four possible marks (1, 2, 3, voltorb). When a mark
+    // is absent we add it; once all four are set we clear them and start
+    // over. This keeps left-click on unrevealed tiles productive in memo
+    // mode without needing a separate pick-a-mark panel.
+    const next = visibleMemos.find((m) => !memos.has(m));
+    if (next !== undefined) onToggleMemo(next);
+    else visibleMemos.forEach((m) => onToggleMemo(m));
+  };
   return (
     <button
       type="button"
       onClick={() => {
         if (revealed) return;
-        if (memoMode) return; // memo mode uses long-press / separate UI
-        onFlip();
+        if (memoMode) cycleMemo();
+        else onFlip();
       }}
       onContextMenu={(e) => {
         e.preventDefault();
-        if (revealed) return;
-        // Right-click cycles memo for next unset mark
-        const next = visibleMemos.find((m) => !memos.has(m));
-        if (next !== undefined) onToggleMemo(next);
+        // Right-click always cycles memo marks regardless of memo mode, so
+        // power-users can mark tiles without toggling mode first.
+        cycleMemo();
       }}
       className={`relative h-full w-full ${panelChrome} bg-transparent p-0`}
       style={{ perspective: 1000 }}
@@ -393,6 +402,30 @@ export function SuperVoltorbFlipGame() {
     [board.tiles],
   );
 
+  // When the player hits a voltorb we replicate upstream's column-by-column
+  // reveal animation: every remaining voltorb flips face-up, staggered by
+  // column (200 ms per column) so the cascade reads left-to-right. We run
+  // this via a setTimeout chain off the initial "lost" transition.
+  const triggerLossCascade = useCallback(() => {
+    setBoard((prev) => {
+      const next = { ...prev, revealed: prev.revealed.slice() };
+      for (let c = 0; c < 5; c++) {
+        const cc = c;
+        setTimeout(() => {
+          setBoard((inner) => {
+            const revealed = inner.revealed.slice();
+            for (let r = 0; r < 5; r++) {
+              const i = r * 5 + cc;
+              if (inner.tiles[i] === 0) revealed[i] = true;
+            }
+            return { ...inner, revealed };
+          });
+        }, cc * 200);
+      }
+      return next;
+    });
+  }, []);
+
   const flip = useCallback(
     (idx: number) => {
       if (status !== "playing") return;
@@ -406,6 +439,7 @@ export function SuperVoltorbFlipGame() {
       if (v === 0) {
         setStatus("lost");
         setRunning(0);
+        triggerLossCascade();
         return;
       }
       setRunning((r) => (r === 0 ? v : r * v));
@@ -417,7 +451,7 @@ export function SuperVoltorbFlipGame() {
         setStatus("won");
       }
     },
-    [board, status],
+    [board, status, triggerLossCascade],
   );
 
   const toggleMemo = useCallback((idx: number, mark: TileValue) => {
