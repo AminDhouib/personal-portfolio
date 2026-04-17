@@ -512,6 +512,25 @@ export function SuperVoltorbFlipGame() {
     });
   }, []);
 
+  // Win cascade: sweep-reveal every remaining hidden tile column-by-column
+  // so the player sees the whole cleared board before auto-advance. Faster
+  // than the loss cascade (150 ms per column) since winning should feel
+  // snappy rather than ceremonial.
+  const triggerWinCascade = useCallback(() => {
+    for (let c = 0; c < 5; c++) {
+      const cc = c;
+      setTimeout(() => {
+        setBoard((inner) => {
+          const revealed = inner.revealed.slice();
+          for (let r = 0; r < 5; r++) {
+            revealed[r * 5 + cc] = true;
+          }
+          return { ...inner, revealed };
+        });
+      }, cc * 150);
+    }
+  }, []);
+
   const flip = useCallback(
     (idx: number) => {
       if (status !== "playing") return;
@@ -535,9 +554,10 @@ export function SuperVoltorbFlipGame() {
       );
       if (!nonTrivialLeft) {
         setStatus("won");
+        triggerWinCascade();
       }
     },
-    [board, status, triggerLossCascade],
+    [board, status, triggerLossCascade, triggerWinCascade],
   );
 
   const toggleMemo = useCallback((idx: number, mark: TileValue) => {
