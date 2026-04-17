@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import localFont from "next/font/local";
 
 const pokemonDs = localFont({
@@ -249,7 +249,7 @@ function Card({
       aria-label={revealed ? `Card showing ${value}` : "Hidden card"}
     >
       <div
-        className="relative h-full w-full transition-transform duration-500"
+        className="relative h-full w-full transition-transform duration-500 motion-reduce:duration-0"
         style={{
           transformStyle: "preserve-3d",
           transform: revealed ? "rotateY(180deg)" : "rotateY(0)",
@@ -665,7 +665,12 @@ export function SuperVoltorbFlipGame() {
     return undefined;
   }, [status, level, running]);
 
+  // Wrap all framer-motion animations so they automatically respect the
+  // user's OS-level reduce-motion preference (spring/keyframes collapse to
+  // instant snaps). The tile CSS flip uses Tailwind's motion-reduce
+  // variant below for the same reason.
   return (
+    <MotionConfig reducedMotion="user">
     <div
       tabIndex={0}
       onKeyDown={(e) => {
@@ -985,5 +990,6 @@ export function SuperVoltorbFlipGame() {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }
