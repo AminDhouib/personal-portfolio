@@ -269,8 +269,11 @@ function Card({
             </div>
           )}
         </div>
-        {/* Front (revealed) */}
-        <div
+        {/* Front (revealed) — scale-pulse fires when revealed flips true,
+            timed to hit once the flip rotation passes 90° (~0.22 s into
+            the 0.5 s flip) so the pop reads as the number "landing" on
+            screen instead of bouncing before it's visible. */}
+        <motion.div
           className="absolute inset-0 flex items-center justify-center"
           style={{
             backfaceVisibility: "hidden",
@@ -278,6 +281,13 @@ function Card({
             background: CARD_FACE,
             border: `2px solid ${CARD_FACE_INNER}`,
             borderRadius: 3,
+          }}
+          animate={revealed ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+          transition={{
+            duration: 0.4,
+            delay: revealed ? 0.22 : 0,
+            times: [0, 0.5, 1],
+            ease: "easeOut",
           }}
         >
           {value === 0 ? (
@@ -295,7 +305,7 @@ function Card({
               {value}
             </span>
           )}
-        </div>
+        </motion.div>
       </div>
     </button>
   );
