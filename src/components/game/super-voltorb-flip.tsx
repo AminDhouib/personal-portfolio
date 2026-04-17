@@ -243,27 +243,37 @@ function Card({
               }}
             />
           ))}
-          {/* Memo overlay */}
+          {/* Memo overlay — only marks the player has toggled on are shown
+              so unset marks don't clutter the face. Each mark sits in its
+              own rounded cell with a dark tint for readability against the
+              felt-green stripes. */}
           {!revealed && memos.size > 0 && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="grid grid-cols-2 grid-rows-2 gap-0.5 text-[9px] font-bold">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-1">
+              <div
+                className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5"
+                style={{ fontFamily: "var(--font-voltorb-m5x7), monospace" }}
+              >
                 {([1, 2, 3] as TileValue[]).map((m) => (
                   <div
                     key={m}
-                    className="flex h-3 w-3 items-center justify-center text-white"
+                    className="flex items-center justify-center rounded-sm text-sm font-bold text-white"
                     style={{
-                      opacity: memos.has(m) ? 1 : 0.25,
-                      textShadow: "1px 1px 0 rgba(0,0,0,0.6)",
+                      background: memos.has(m) ? "rgba(0,0,0,0.45)" : "transparent",
+                      visibility: memos.has(m) ? "visible" : "hidden",
+                      lineHeight: 1,
                     }}
                   >
                     {m}
                   </div>
                 ))}
                 <div
-                  className="flex h-3 w-3 items-center justify-center"
-                  style={{ opacity: memos.has(0) ? 1 : 0.25 }}
+                  className="flex items-center justify-center rounded-sm"
+                  style={{
+                    background: memos.has(0) ? "rgba(0,0,0,0.45)" : "transparent",
+                    visibility: memos.has(0) ? "visible" : "hidden",
+                  }}
                 >
-                  <VoltorbIcon size={10} />
+                  <VoltorbIcon size={16} />
                 </div>
               </div>
             </div>
