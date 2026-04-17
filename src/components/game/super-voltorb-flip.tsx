@@ -412,9 +412,13 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
   // Remounting the digit span with key={value} kicks framer-motion's
   // initial→animate transition every time the number changes, giving each
   // multiplier reveal a brief pop instead of a silent swap.
+  // aria-live=polite so screen readers announce score changes without
+  // interrupting whatever the user was listening to.
   return (
     <div
       className={`flex items-center justify-between gap-4 bg-white px-4 py-2 ${panelChrome}`}
+      role="group"
+      aria-label={`${label}: ${value}`}
     >
       <span
         className="text-base uppercase tracking-wide text-gray-700"
@@ -427,6 +431,8 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
       </span>
       <motion.span
         key={value}
+        aria-live="polite"
+        aria-atomic="true"
         initial={{ scale: 1.3, color: "#b45309" }}
         animate={{ scale: 1, color: "#1f2937" }}
         transition={{ type: "spring", stiffness: 380, damping: 18 }}
@@ -862,6 +868,8 @@ export function SuperVoltorbFlipGame() {
           <button
             type="button"
             onClick={() => setMemoMode((m) => !m)}
+            aria-pressed={memoMode}
+            aria-label={`Memo mode ${memoMode ? "on" : "off"}`}
             className={`flex items-center justify-center text-sm uppercase ${panelChrome}`}
             style={{
               gridColumn: 6,
@@ -931,6 +939,8 @@ export function SuperVoltorbFlipGame() {
         {status === "lost" && (
           <motion.div
             key="lost-banner"
+            role="status"
+            aria-live="assertive"
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -950,6 +960,8 @@ export function SuperVoltorbFlipGame() {
         {status === "won" && (
           <motion.div
             key="won-banner"
+            role="status"
+            aria-live="assertive"
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
