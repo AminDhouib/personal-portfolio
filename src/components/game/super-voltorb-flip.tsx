@@ -486,6 +486,15 @@ export function SuperVoltorbFlipGame() {
   // the player hasn't engaged the keyboard yet — we don't draw a ring in
   // that state so the mouse-only experience stays unchanged.
   const [focused, setFocused] = useState<number | null>(null);
+  // Floating ×2 / ×3 popup for the most-recent multiplier reveal. The id
+  // is monotonically increasing so AnimatePresence replays the animation
+  // even if the same tile index is revealed twice across reshuffles.
+  const [popup, setPopup] = useState<{
+    id: number;
+    idx: number;
+    mult: 2 | 3;
+  } | null>(null);
+  const popupIdRef = useRef(0);
 
   // Restore saved total on mount — SSR-safe guard on window.
   useEffect(() => {
@@ -574,6 +583,9 @@ export function SuperVoltorbFlipGame() {
         return;
       }
       setRunning((r) => (r === 0 ? v : r * v));
+      if (v === 2 || v === 3) {
+        setPopup({ id: ++popupIdRef.current, idx, mult: v });
+      }
       // Win when every non-1, non-voltorb tile is revealed.
       const nonTrivialLeft = board.tiles.some(
         (t, i) => (t === 2 || t === 3) && !board.revealed[i] && i !== idx,
@@ -780,6 +792,49 @@ export function SuperVoltorbFlipGame() {
               <RowColCard sum={s.sum} volts={s.volts} tint={HEADER_TINTS[c]} />
             </div>
           ))}
+          {/* Multiplier popup — floats up from the just-revealed tile. Lives
+              inside the grid so it inherits the 6-col/6-row placement, on
+              its own cell with position:relative so the motion.div can
+              escape the cell vertically without clipping. */}
+          <AnimatePresence>
+            {popup && (
+              <div
+                key={`popup-cell-${popup.id}`}
+                style={{
+                  gridColumn: (popup.idx % 5) + 1,
+                  gridRow: Math.floor(popup.idx / 5) + 1,
+                  position: "relative",
+                  pointerEvents: "none",
+                  zIndex: 10,
+                }}
+              >
+                <motion.div
+                  key={popup.id}
+                  initial={{ y: 0, opacity: 0, scale: 0.7 }}
+                  animate={{ y: -36, opacity: [0, 1, 1, 0], scale: 1.3 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.9, ease: "easeOut" }}
+                  onAnimationComplete={() => setPopup(null)}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#facc15",
+                    fontFamily: "var(--font-voltorb-m5x7), monospace",
+                    fontSize: 30,
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    textShadow:
+                      "1px 1px 0 #1f2937, -1px -1px 0 #1f2937, 1px -1px 0 #1f2937, -1px 1px 0 #1f2937",
+                  }}
+                >
+                  ×{popup.mult}
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
           {/* Memo toggle → bottom-right corner (col 6, row 6) */}
           <button
             type="button"
