@@ -460,9 +460,13 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
 function GameInfo({
   level,
   onHelp,
+  muted,
+  onToggleMute,
 }: {
   level: number;
   onHelp: () => void;
+  muted: boolean;
+  onToggleMute: () => void;
 }) {
   return (
     <div
@@ -475,7 +479,22 @@ function GameInfo({
       <span className="text-lg tracking-wide" style={{ lineHeight: 1 }}>
         VOLTORB FLIP
       </span>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleMute}
+          aria-pressed={!muted}
+          aria-label={muted ? "Unmute sound" : "Mute sound"}
+          className={`flex h-6 w-6 items-center justify-center ${panelChrome}`}
+          style={{
+            background: "#fff",
+            color: "#1f2937",
+            fontFamily: "var(--font-voltorb-ds), monospace",
+            lineHeight: 1,
+          }}
+        >
+          {muted ? "\u{1F507}" : "\u{1F50A}"}
+        </button>
         <button
           type="button"
           onClick={onHelp}
@@ -490,7 +509,7 @@ function GameInfo({
         >
           ?
         </button>
-        <span className="text-lg" style={{ lineHeight: 1 }}>
+        <span className="ml-1 text-lg" style={{ lineHeight: 1 }}>
           Lv. {level}
         </span>
       </div>
@@ -528,6 +547,65 @@ export function SuperVoltorbFlipGame() {
   } | null>(null);
   const popupIdRef = useRef(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Muted by default to be polite about autoplay — first tap flips the
+  // switch on in the user-gesture scope so AudioContext can resume.
+  const [muted, setMuted] = useState(true);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ensureAudio = useCallback(() => {
+    if (audioCtxRef.current) return audioCtxRef.current;
+    if (typeof window === "undefined") return null;
+    try {
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (!Ctor) return null;
+      audioCtxRef.current = new Ctor();
+      return audioCtxRef.current;
+    } catch {
+      return null;
+    }
+  }, []);
+  const playTone = useCallback(
+    (
+      freq: number,
+      durMs: number,
+      type: OscillatorType = "square",
+      gain = 0.08,
+    ) => {
+      if (muted) return;
+      const ctx = ensureAudio();
+      if (!ctx) return;
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(gain, now + 0.005);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + durMs / 1000);
+      osc.connect(env).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + durMs / 1000 + 0.02);
+    },
+    [muted, ensureAudio],
+  );
+  // Close the audio context on unmount so the game doesn't keep a live
+  // context after the user navigates away.
+  useEffect(() => {
+    return () => {
+      const ctx = audioCtxRef.current;
+      if (ctx) {
+        try {
+          ctx.close();
+        } catch {
+          /* ignore */
+        }
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   // Restore saved total on mount — SSR-safe guard on window.
   useEffect(() => {
@@ -612,6 +690,9 @@ export function SuperVoltorbFlipGame() {
       if (v === 0) {
         setStatus("lost");
         setRunning(0);
+        // Descending two-tone buzzer for the bust moment
+        playTone(220, 180, "sawtooth", 0.1);
+        setTimeout(() => playTone(140, 260, "sawtooth", 0.09), 90);
         triggerLossCascade();
         return;
       }
@@ -619,6 +700,9 @@ export function SuperVoltorbFlipGame() {
       if (v === 2 || v === 3) {
         setPopup({ id: ++popupIdRef.current, idx, mult: v });
       }
+      // Reveal chirp: pitch shifts with the tile value so higher
+      // multipliers sound brighter.
+      playTone(v === 3 ? 1100 : v === 2 ? 880 : 660, 70, "square", 0.05);
       // Win when every non-1, non-voltorb tile is revealed.
       const nonTrivialLeft = board.tiles.some(
         (t, i) => (t === 2 || t === 3) && !board.revealed[i] && i !== idx,
@@ -626,9 +710,14 @@ export function SuperVoltorbFlipGame() {
       if (!nonTrivialLeft) {
         setStatus("won");
         triggerWinCascade();
+        // Ascending four-note arpeggio for the clear — each note 90 ms,
+        // 110 ms apart, 523/659/784/1047 Hz = C5/E5/G5/C6.
+        [523, 659, 784, 1047].forEach((f, i) =>
+          setTimeout(() => playTone(f, 90, "triangle", 0.08), i * 110),
+        );
       }
     },
-    [board, status, triggerLossCascade, triggerWinCascade],
+    [board, status, triggerLossCascade, triggerWinCascade, playTone],
   );
 
   const toggleMemo = useCallback((idx: number, mark: TileValue) => {
@@ -730,7 +819,12 @@ export function SuperVoltorbFlipGame() {
         fontFamily: "var(--font-voltorb-ds), ui-monospace, monospace",
       }}
     >
-      <GameInfo level={level} onHelp={() => setHelpOpen(true)} />
+      <GameInfo
+        level={level}
+        onHelp={() => setHelpOpen(true)}
+        muted={muted}
+        onToggleMute={() => setMuted((m) => !m)}
+      />
       <div className="flex flex-col gap-2">
         <Scoreboard label="Coins" value={total} />
         <Scoreboard label="This Game" value={running} />
