@@ -355,6 +355,9 @@ function RowColCard({
 // ---------------------------------------------------------------------------
 
 function Scoreboard({ label, value }: { label: string; value: number }) {
+  // Remounting the digit span with key={value} kicks framer-motion's
+  // initial→animate transition every time the number changes, giving each
+  // multiplier reveal a brief pop instead of a silent swap.
   return (
     <div
       className={`flex items-center justify-between gap-4 bg-white px-4 py-2 ${panelChrome}`}
@@ -362,8 +365,12 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
       <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
         {label}
       </span>
-      <span
-        className="text-3xl font-black tabular-nums text-gray-800"
+      <motion.span
+        key={value}
+        initial={{ scale: 1.3, color: "#b45309" }}
+        animate={{ scale: 1, color: "#1f2937" }}
+        transition={{ type: "spring", stiffness: 380, damping: 18 }}
+        className="inline-block text-3xl font-black tabular-nums"
         style={{
           fontFamily: "var(--font-voltorb-stacked), monospace",
           lineHeight: 1,
@@ -371,7 +378,7 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
         }}
       >
         {String(value).padStart(5, "0")}
-      </span>
+      </motion.span>
     </div>
   );
 }
