@@ -9,12 +9,32 @@
  * ("border + outline + inner border") used on every panel, salmon card
  * faces (#bd8c84/#a55a52), and per-row/col header tints. Gameplay is the
  * Voltorb Flip minigame from Pokémon HGSS: 5x5 grid, multiply coins by
- * each non-voltorb tile value, hit a voltorb = bust. No artwork is copied
- * from the upstream project; the voltorb icon is an inline SVG and the
- * fonts default to the system monospace stack.
+ * each non-voltorb tile value, hit a voltorb = bust.
+ *
+ * Fonts under public/games/voltorb-flip/fonts/ — Pokémon DS Font is CC0
+ * (see LICENSE.txt alongside). The voltorb icon is a fresh inline SVG;
+ * we don't ship upstream's Pokémon sprite PNGs (that's Nintendo IP that
+ * isn't licensed for redistribution).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import localFont from "next/font/local";
+
+const pokemonDs = localFont({
+  src: "../../../public/games/voltorb-flip/fonts/pokemon-ds-font.ttf",
+  variable: "--font-voltorb-ds",
+  display: "swap",
+});
+const m5x7 = localFont({
+  src: "../../../public/games/voltorb-flip/fonts/m5x7.ttf",
+  variable: "--font-voltorb-m5x7",
+  display: "swap",
+});
+const stackedPixel = localFont({
+  src: "../../../public/games/voltorb-flip/fonts/stacked-pixel.ttf",
+  variable: "--font-voltorb-stacked",
+  display: "swap",
+});
 
 // ---------------------------------------------------------------------------
 // Palette — borrowed from the reference constants.ts for visual parity.
@@ -246,10 +266,12 @@ function Card({
             <VoltorbIcon size={36} />
           ) : (
             <span
-              className="font-mono text-2xl font-black text-white"
+              className="text-3xl font-black text-white"
               style={{
+                fontFamily: "var(--font-voltorb-m5x7), monospace",
                 textShadow:
                   "1px 0 0 #222,-1px 0 0 #222,0 1px 0 #222,0 -1px 0 #222",
+                lineHeight: 1,
               }}
             >
               {value}
@@ -282,8 +304,10 @@ function RowColCard({
     >
       <div className="flex h-1/2 items-center justify-center">
         <span
-          className="font-mono text-xl font-black text-white"
+          className="text-2xl font-black text-white"
           style={{
+            fontFamily: "var(--font-voltorb-m5x7), monospace",
+            lineHeight: 1,
             textShadow:
               "1px 0 0 #222,-1px 0 0 #222,0 1px 0 #222,0 -1px 0 #222",
           }}
@@ -294,7 +318,12 @@ function RowColCard({
       <div className="h-0.5 w-full bg-gray-700/60" />
       <div className="flex h-1/2 items-center justify-center gap-1">
         <VoltorbIcon size={12} />
-        <span className="font-mono text-sm font-bold text-white">{volts}</span>
+        <span
+          className="text-base font-bold text-white"
+          style={{ fontFamily: "var(--font-voltorb-m5x7), monospace" }}
+        >
+          {volts}
+        </span>
       </div>
     </div>
   );
@@ -312,7 +341,14 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
       <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
         {label}
       </span>
-      <span className="font-mono text-2xl font-black tabular-nums text-gray-800">
+      <span
+        className="text-3xl font-black tabular-nums text-gray-800"
+        style={{
+          fontFamily: "var(--font-voltorb-stacked), monospace",
+          lineHeight: 1,
+          filter: "drop-shadow(1px 1px 0 rgba(0,0,0,0.15))",
+        }}
+      >
         {String(value).padStart(5, "0")}
       </span>
     </div>
@@ -420,8 +456,12 @@ export function SuperVoltorbFlipGame() {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4"
-      style={{ background: FELT, borderRadius: 10 }}
+      className={`mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4 ${pokemonDs.variable} ${m5x7.variable} ${stackedPixel.variable}`}
+      style={{
+        background: FELT,
+        borderRadius: 10,
+        fontFamily: "var(--font-voltorb-ds), ui-monospace, monospace",
+      }}
     >
       <GameInfo level={level} />
       <div className="flex flex-col gap-2">
