@@ -447,7 +447,13 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
 // Game header bar
 // ---------------------------------------------------------------------------
 
-function GameInfo({ level }: { level: number }) {
+function GameInfo({
+  level,
+  onHelp,
+}: {
+  level: number;
+  onHelp: () => void;
+}) {
   return (
     <div
       className={`flex items-center justify-between px-4 py-2 text-white ${panelChrome}`}
@@ -459,9 +465,25 @@ function GameInfo({ level }: { level: number }) {
       <span className="text-lg tracking-wide" style={{ lineHeight: 1 }}>
         VOLTORB FLIP
       </span>
-      <span className="text-lg" style={{ lineHeight: 1 }}>
-        Lv. {level}
-      </span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onHelp}
+          className={`flex h-6 w-6 items-center justify-center ${panelChrome}`}
+          style={{
+            background: "#fff",
+            color: "#1f2937",
+            fontFamily: "var(--font-voltorb-ds), monospace",
+            lineHeight: 1,
+          }}
+          aria-label="How to play"
+        >
+          ?
+        </button>
+        <span className="text-lg" style={{ lineHeight: 1 }}>
+          Lv. {level}
+        </span>
+      </div>
     </div>
   );
 }
@@ -495,6 +517,7 @@ export function SuperVoltorbFlipGame() {
     mult: 2 | 3;
   } | null>(null);
   const popupIdRef = useRef(0);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Restore saved total on mount — SSR-safe guard on window.
   useEffect(() => {
@@ -692,7 +715,7 @@ export function SuperVoltorbFlipGame() {
         fontFamily: "var(--font-voltorb-ds), ui-monospace, monospace",
       }}
     >
-      <GameInfo level={level} />
+      <GameInfo level={level} onHelp={() => setHelpOpen(true)} />
       <div className="flex flex-col gap-2">
         <Scoreboard label="Coins" value={total} />
         <Scoreboard label="This Game" value={running} />
@@ -855,6 +878,56 @@ export function SuperVoltorbFlipGame() {
       </div>
 
       <AnimatePresence>
+        {helpOpen && (
+          <motion.div
+            key="help-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setHelpOpen(false)}
+            className="absolute inset-0 z-20 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.55)", borderRadius: 10 }}
+          >
+            <motion.div
+              initial={{ scale: 0.85 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 300, damping: 24 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-[340px] p-4 text-sm text-gray-800 ${panelChrome}`}
+              style={{
+                background: "#fff",
+                fontFamily: "var(--font-voltorb-ds), monospace",
+              }}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-base font-black uppercase">How to Play</span>
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(false)}
+                  className="text-lg leading-none text-gray-500 hover:text-gray-800"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <ul className="space-y-1.5 leading-snug">
+                <li>Flip a tile to collect its coin value (1, 2, or 3).</li>
+                <li>Each non-1 tile multiplies your running score.</li>
+                <li>Revealing a Voltorb busts the round — score goes to 0.</li>
+                <li>
+                  Row/column badges show total coins on top and voltorb count on the bottom. Use them to deduce safe tiles.
+                </li>
+                <li>
+                  Clear every 2 and 3 to finish the level; the running score banks into your total coins.
+                </li>
+                <li className="pt-1 text-xs text-gray-500">
+                  Right-click or long-press a tile to cycle a memo mark. M toggles memo mode; arrow keys + space navigate.
+                </li>
+              </ul>
+            </motion.div>
+          </motion.div>
+        )}
         {status === "lost" && (
           <motion.div
             key="lost-banner"
