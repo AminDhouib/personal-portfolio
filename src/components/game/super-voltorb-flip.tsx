@@ -307,14 +307,22 @@ function RowColCard({
   volts: number;
   tint: string;
 }) {
+  // Upstream's signature RowColCard shape: the coin total overflows the top
+  // edge of the card (absolute, negative offset) so it visually "stamps"
+  // above the voltorb section. The card body shows the voltorb count
+  // centered, with a hairline divider hinting at the old two-row layout.
   return (
     <div
-      className={`relative flex h-full w-full flex-col ${panelChrome}`}
-      style={{ background: tint }}
+      className={`relative h-full w-full ${panelChrome}`}
+      style={{ background: tint, overflow: "visible" }}
     >
-      <div className="flex h-1/2 items-center justify-center">
+      {/* Coin total — breaks the top frame */}
+      <div
+        className={`absolute left-1/2 -translate-x-1/2 -top-2 px-1 py-px ${panelChrome}`}
+        style={{ background: tint }}
+      >
         <span
-          className="text-2xl font-black text-white"
+          className="block text-xl font-black text-white"
           style={{
             fontFamily: "var(--font-voltorb-m5x7), monospace",
             lineHeight: 1,
@@ -325,12 +333,15 @@ function RowColCard({
           {String(sum).padStart(2, "0")}
         </span>
       </div>
-      <div className="h-0.5 w-full bg-gray-700/60" />
-      <div className="flex h-1/2 items-center justify-center gap-1">
-        <VoltorbIcon size={12} />
+      {/* Voltorb count body */}
+      <div className="flex h-full items-end justify-center gap-1 pb-1">
+        <VoltorbIcon size={14} />
         <span
           className="text-base font-bold text-white"
-          style={{ fontFamily: "var(--font-voltorb-m5x7), monospace" }}
+          style={{
+            fontFamily: "var(--font-voltorb-m5x7), monospace",
+            lineHeight: 1,
+          }}
         >
           {volts}
         </span>
