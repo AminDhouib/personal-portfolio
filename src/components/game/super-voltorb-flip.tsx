@@ -416,6 +416,11 @@ function GameInfo({ level }: { level: number }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+// localStorage key for the cumulative COINS total — upstream persists this
+// so a visitor coming back tomorrow still sees their score. Namespaced so
+// it can't collide with another game on the portfolio.
+const STORAGE_KEY = "svf:totalCoins:v1";
+
 export function SuperVoltorbFlipGame() {
   const [level, setLevel] = useState(1);
   const [board, setBoard] = useState<BoardState>(() => generateBoard(1));
@@ -423,6 +428,23 @@ export function SuperVoltorbFlipGame() {
   const [total, setTotal] = useState(0); // cumulative across levels
   const [status, setStatus] = useState<"playing" | "lost" | "won">("playing");
   const [memoMode, setMemoMode] = useState(false);
+
+  // Restore saved total on mount — SSR-safe guard on window.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved !== null) {
+      const parsed = Number.parseInt(saved, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) setTotal(parsed);
+    }
+  }, []);
+
+  // Persist every time total changes (skips the 0 write on first mount
+  // when there's nothing saved yet; harmless to write the same value).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEY, String(total));
+  }, [total]);
 
   // Row and col precomputed clues
   const rowClues = useMemo(
