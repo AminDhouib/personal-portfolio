@@ -362,7 +362,13 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
     <div
       className={`flex items-center justify-between gap-4 bg-white px-4 py-2 ${panelChrome}`}
     >
-      <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
+      <span
+        className="text-base uppercase tracking-wide text-gray-700"
+        style={{
+          fontFamily: "var(--font-voltorb-ds), monospace",
+          lineHeight: 1,
+        }}
+      >
         {label}
       </span>
       <motion.span
@@ -390,11 +396,18 @@ function Scoreboard({ label, value }: { label: string; value: number }) {
 function GameInfo({ level }: { level: number }) {
   return (
     <div
-      className={`flex items-center justify-between px-4 py-1.5 text-white ${panelChrome}`}
-      style={{ background: FELT_DARK }}
+      className={`flex items-center justify-between px-4 py-2 text-white ${panelChrome}`}
+      style={{
+        background: FELT_DARK,
+        fontFamily: "var(--font-voltorb-ds), monospace",
+      }}
     >
-      <span className="text-sm font-bold tracking-wide">VOLTORB FLIP</span>
-      <span className="text-sm font-mono">Lv. {level}</span>
+      <span className="text-lg tracking-wide" style={{ lineHeight: 1 }}>
+        VOLTORB FLIP
+      </span>
+      <span className="text-lg" style={{ lineHeight: 1 }}>
+        Lv. {level}
+      </span>
     </div>
   );
 }
@@ -575,11 +588,14 @@ export function SuperVoltorbFlipGame() {
           <button
             type="button"
             onClick={() => setMemoMode((m) => !m)}
-            className={`flex items-center justify-center text-[10px] font-bold uppercase ${panelChrome}`}
+            className={`flex items-center justify-center text-sm uppercase ${panelChrome}`}
             style={{
               gridColumn: 6,
               gridRow: 6,
               background: memoMode ? "#fde68a" : "#fff",
+              fontFamily: "var(--font-voltorb-ds), monospace",
+              color: memoMode ? "#92400e" : "#1f2937",
+              lineHeight: 1,
             }}
           >
             Memo
