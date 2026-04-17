@@ -177,6 +177,7 @@ function Card({
   onFlip,
   onToggleMemo,
   memoMode,
+  focused,
 }: {
   value: TileValue;
   revealed: boolean;
@@ -184,6 +185,7 @@ function Card({
   onFlip: () => void;
   onToggleMemo: (m: TileValue) => void;
   memoMode: boolean;
+  focused: boolean;
 }) {
   const visibleMemos: TileValue[] = [1, 2, 3, 0];
   const cycleMemo = () => {
@@ -211,7 +213,13 @@ function Card({
         cycleMemo();
       }}
       className={`relative h-full w-full ${panelChrome} bg-transparent p-0`}
-      style={{ perspective: 1000 }}
+      style={{
+        perspective: 1000,
+        // Amber focus ring when this is the keyboard-focused tile. Uses a
+        // box-shadow instead of outline so it layers cleanly on top of
+        // the existing triple-outline chrome without fighting z-order.
+        boxShadow: focused ? "0 0 0 3px #fbbf24, 0 0 10px #fbbf24aa" : undefined,
+      }}
       aria-label={revealed ? `Card showing ${value}` : "Hidden card"}
     >
       <div
@@ -428,6 +436,10 @@ export function SuperVoltorbFlipGame() {
   const [total, setTotal] = useState(0); // cumulative across levels
   const [status, setStatus] = useState<"playing" | "lost" | "won">("playing");
   const [memoMode, setMemoMode] = useState(false);
+  // Focused tile for keyboard navigation (index 0-24, row-major). Null when
+  // the player hasn't engaged the keyboard yet — we don't draw a ring in
+  // that state so the mouse-only experience stays unchanged.
+  const [focused, setFocused] = useState<number | null>(null);
 
   // Restore saved total on mount — SSR-safe guard on window.
   useEffect(() => {
@@ -544,7 +556,54 @@ export function SuperVoltorbFlipGame() {
 
   return (
     <div
-      className={`relative mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4 ${pokemonDs.variable} ${m5x7.variable} ${stackedPixel.variable}`}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (status !== "playing") return;
+        const cur = focused ?? 12; // center tile if no prior focus
+        const r = Math.floor(cur / 5);
+        const c = cur % 5;
+        let next = cur;
+        switch (e.key) {
+          case "ArrowLeft":
+            next = r * 5 + ((c + 4) % 5);
+            break;
+          case "ArrowRight":
+            next = r * 5 + ((c + 1) % 5);
+            break;
+          case "ArrowUp":
+            next = ((r + 4) % 5) * 5 + c;
+            break;
+          case "ArrowDown":
+            next = ((r + 1) % 5) * 5 + c;
+            break;
+          case " ":
+          case "Enter":
+            if (focused !== null && !board.revealed[focused]) {
+              if (memoMode) {
+                const m = ([1, 2, 3, 0] as TileValue[]).find(
+                  (x) => !board.memos[focused].has(x),
+                );
+                if (m !== undefined) toggleMemo(focused, m);
+              } else {
+                flip(focused);
+              }
+            } else if (focused === null) {
+              setFocused(12);
+            }
+            e.preventDefault();
+            return;
+          case "m":
+          case "M":
+            setMemoMode((m) => !m);
+            e.preventDefault();
+            return;
+          default:
+            return;
+        }
+        e.preventDefault();
+        setFocused(next);
+      }}
+      className={`relative mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4 focus:outline-hidden ${pokemonDs.variable} ${m5x7.variable} ${stackedPixel.variable}`}
       style={{
         background: FELT,
         borderRadius: 10,
@@ -612,6 +671,7 @@ export function SuperVoltorbFlipGame() {
                   revealed={board.revealed[i]}
                   memos={board.memos[i]}
                   memoMode={memoMode}
+                  focused={focused === i}
                   onFlip={() => flip(i)}
                   onToggleMemo={(m) => toggleMemo(i, m)}
                 />
