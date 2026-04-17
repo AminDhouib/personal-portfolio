@@ -685,30 +685,50 @@ export function SuperVoltorbFlipGame() {
         <Scoreboard label="Coins" value={total} />
         <Scoreboard label="This Game" value={running} />
       </div>
-      <button
-        type="button"
-        onClick={() => {
-          if (
-            typeof window !== "undefined" &&
-            !window.confirm("Reset your saved coin total and start a fresh level 1?")
-          ) {
-            return;
-          }
-          setTotal(0);
-          setRunning(0);
-          setLevel(1);
-          setBoard(generateBoard(1));
-          setStatus("playing");
-        }}
-        className={`self-end px-3 py-1 text-xs uppercase text-gray-800 ${panelChrome}`}
-        style={{
-          background: "#fff",
-          fontFamily: "var(--font-voltorb-ds), monospace",
-          lineHeight: 1,
-        }}
-      >
-        Reset
-      </button>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setRunning(0);
+            setBoard(generateBoard(level));
+            setStatus("playing");
+          }}
+          className={`px-3 py-1 text-xs uppercase text-gray-800 ${panelChrome}`}
+          style={{
+            background: "#fff",
+            fontFamily: "var(--font-voltorb-ds), monospace",
+            lineHeight: 1,
+          }}
+          aria-label="Reshuffle the current level's board"
+        >
+          New Board
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (
+              typeof window !== "undefined" &&
+              !window.confirm("Reset your saved coin total and start a fresh level 1?")
+            ) {
+              return;
+            }
+            setTotal(0);
+            setRunning(0);
+            setLevel(1);
+            setBoard(generateBoard(1));
+            setStatus("playing");
+          }}
+          className={`px-3 py-1 text-xs uppercase text-gray-800 ${panelChrome}`}
+          style={{
+            background: "#fff",
+            fontFamily: "var(--font-voltorb-ds), monospace",
+            lineHeight: 1,
+          }}
+          aria-label="Reset all saved progress"
+        >
+          Reset
+        </button>
+      </div>
 
       <div
         className={`p-3 ${panelChrome}`}
