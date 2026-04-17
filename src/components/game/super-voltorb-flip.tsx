@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import localFont from "next/font/local";
 
 const pokemonDs = localFont({
@@ -490,7 +491,7 @@ export function SuperVoltorbFlipGame() {
 
   return (
     <div
-      className={`mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4 ${pokemonDs.variable} ${m5x7.variable} ${stackedPixel.variable}`}
+      className={`relative mx-auto flex w-full max-w-[420px] flex-col gap-3 p-4 ${pokemonDs.variable} ${m5x7.variable} ${stackedPixel.variable}`}
       style={{
         background: FELT,
         borderRadius: 10,
@@ -568,16 +569,51 @@ export function SuperVoltorbFlipGame() {
         </div>
       </div>
 
-      {status === "lost" && (
-        <div className="text-center text-sm font-bold text-red-100">
-          Voltorb! Next round…
-        </div>
-      )}
-      {status === "won" && (
-        <div className="text-center text-sm font-bold text-yellow-100">
-          Level cleared!
-        </div>
-      )}
+      <AnimatePresence>
+        {status === "lost" && (
+          <motion.div
+            key="lost-banner"
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 24 }}
+            className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 px-5 py-3 ${panelChrome}`}
+            style={{
+              background: "#7a1f1f",
+              fontFamily: "var(--font-voltorb-ds), monospace",
+            }}
+          >
+            <VoltorbIcon size={28} />
+            <span className="text-lg font-black uppercase tracking-wider text-white">
+              Busted!
+            </span>
+          </motion.div>
+        )}
+        {status === "won" && (
+          <motion.div
+            key="won-banner"
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 24 }}
+            className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-6 py-3 text-center ${panelChrome}`}
+            style={{
+              background: "#eab308",
+              fontFamily: "var(--font-voltorb-ds), monospace",
+            }}
+          >
+            <div className="text-xl font-black uppercase tracking-widest text-gray-900">
+              Level Cleared!
+            </div>
+            <div
+              className="mt-1 text-sm text-gray-800"
+              style={{ fontFamily: "var(--font-voltorb-stacked), monospace" }}
+            >
+              +{running} coins
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
