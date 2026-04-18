@@ -393,43 +393,30 @@ class VoltorbFlip {
   }
 }
 
-// Structured-clone-based replacement for lodash's cloneDeep. Voltorb Flip's
-// internal state is pure data (nested arrays/objects, no functions) so the
-// class instance is reconstructed by assigning the cloned private fields.
+// Deep-clone the game state and reattach prototypes. structuredClone
+// strips prototypes (and instanceof checks can fail across HMR reloads
+// where the class identity changes), so we rely on well-known property
+// names instead of instanceof.
 function cloneGame(g: VoltorbFlip): VoltorbFlip {
-  const clone = Object.create(
-    Object.getPrototypeOf(g) as object,
-  ) as VoltorbFlip;
+  const deepClone: <T>(x: T) => T =
+    typeof structuredClone === "function"
+      ? structuredClone
+      : (x) => JSON.parse(JSON.stringify(x));
+
   const src = g as unknown as Record<string, unknown>;
-  const dst = clone as unknown as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
   for (const k of Object.keys(src)) {
-    const v = src[k];
-    if (v instanceof Board) {
-      const b = Object.create(Object.getPrototypeOf(v) as object) as Board;
-      const bSrc = v as unknown as Record<string, unknown>;
-      const bDst = b as unknown as Record<string, unknown>;
-      for (const bk of Object.keys(bSrc)) {
-        bDst[bk] =
-          typeof structuredClone === "function"
-            ? structuredClone(bSrc[bk])
-            : JSON.parse(JSON.stringify(bSrc[bk]));
-      }
-      dst[k] = b;
-    } else if (v instanceof Level) {
-      const l = Object.create(Object.getPrototypeOf(v) as object) as Level;
-      Object.assign(
-        l as unknown as Record<string, unknown>,
-        v as unknown as Record<string, unknown>,
-      );
-      dst[k] = l;
-    } else {
-      dst[k] =
-        typeof structuredClone === "function" && typeof v === "object"
-          ? structuredClone(v)
-          : v;
-    }
+    data[k] = deepClone(src[k]);
   }
-  return clone;
+  Object.setPrototypeOf(data, VoltorbFlip.prototype);
+
+  const boardLike = data._board as Record<string, unknown> | undefined;
+  if (boardLike) Object.setPrototypeOf(boardLike, Board.prototype);
+
+  const levelLike = data._level as Record<string, unknown> | undefined;
+  if (levelLike) Object.setPrototypeOf(levelLike, Level.prototype);
+
+  return data as unknown as VoltorbFlip;
 }
 
 // ---------------------------------------------------------------------------
@@ -593,9 +580,14 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
             {children}
           </div>
         </div>
-        <div className="absolute inset-0 grid h-full w-full grid-cols-2 bg-white">
+        <div className="absolute inset-0 grid h-full w-full grid-cols-3 bg-white">
           <div className="h-full w-full bg-[#448563]"></div>
           <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
+          <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
+          <div className="h-full w-full bg-[#58a66c]"></div>
+          <div className="h-full w-full bg-[#448563]"></div>
           <div className="h-full w-full bg-[#58a66c]"></div>
           <div className="h-full w-full bg-[#448563]"></div>
         </div>
