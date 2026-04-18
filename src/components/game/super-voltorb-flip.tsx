@@ -533,6 +533,22 @@ const SCOPED_STYLES = `
   pointer-events: none;
   box-shadow: 1px 0 0 #1a1a1a, -1px 0 0 #1a1a1a;
 }
+/* Cursor/hover selection — matches the red frame on the active tile in HG/SS. */
+.svf-root .cursor-pointer::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 4px;
+  outline: 3px solid #e63946;
+  opacity: 0;
+  transition: opacity 80ms ease-out;
+  pointer-events: none;
+  z-index: 3;
+}
+.svf-root .cursor-pointer:hover::before,
+.svf-root .cursor-pointer:focus-visible::before {
+  opacity: 1;
+}
 `;
 
 // ---------------------------------------------------------------------------
