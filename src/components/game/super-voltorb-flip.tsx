@@ -458,11 +458,7 @@ const useGame = () => {
 // (Nintendo IP we can't redistribute). Red-top, white-bottom face ball.
 // ---------------------------------------------------------------------------
 
-// 28x28 viewBox with the face ball centered — matches the visual metrics of
-// the 28-px PNG upstream used, so the positional tweaks in RowColCard
-// (translate-y-1.5, bottom:-6px) line up the same way. The ball itself is a
-// simple red-top / white-bottom sphere with two black eyes; outlined by the
-// ".picture-outline" filter callers add on top of the SVG.
+// Upstream sprite (28x28 PNG, mirrored into /public from jv-vogler/voltorb-flip).
 function VoltorbIcon({
   size = 28,
   className,
@@ -471,36 +467,16 @@ function VoltorbIcon({
   className?: string;
 }) {
   return (
-    <svg
-      viewBox="0 0 28 28"
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/games/super-voltorb-flip/sprites/upstream/voltorb.png"
       width={size}
       height={size}
+      alt=""
       aria-hidden="true"
       className={className}
-      style={{ display: "block" }}
-    >
-      {/* Red top hemisphere */}
-      <path d="M3 14 A11 11 0 0 1 25 14 L3 14 Z" fill="#d83a2e" />
-      {/* White bottom hemisphere */}
-      <path d="M3 14 A11 11 0 0 0 25 14 L3 14 Z" fill="#f0f0f0" />
-      {/* Seam */}
-      <rect x="3" y="13.3" width="22" height="1.4" fill="#1a1a1a" />
-      {/* Eyes */}
-      <ellipse cx="10" cy="9.5" rx="1.6" ry="2.2" fill="#1a1a1a" />
-      <ellipse cx="18" cy="9.5" rx="1.6" ry="2.2" fill="#1a1a1a" />
-      {/* Eye shine */}
-      <circle cx="10.5" cy="8.7" r="0.55" fill="#fff" />
-      <circle cx="18.5" cy="8.7" r="0.55" fill="#fff" />
-      {/* Outer border */}
-      <circle
-        cx="14"
-        cy="14"
-        r="11.2"
-        fill="none"
-        stroke="#1a1a1a"
-        strokeWidth="1.2"
-      />
-    </svg>
+      style={{ display: "block", imageRendering: "pixelated" }}
+    />
   );
 }
 
