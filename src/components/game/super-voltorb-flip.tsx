@@ -24,6 +24,7 @@ import localFont from "next/font/local";
 import { EffectsProvider, useEffectsTheme } from "./super-voltorb-flip/effects/context";
 import { sfx, playMusic, stopMusic, setMusicMuted } from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
+import { MemoPanel } from "./super-voltorb-flip/memo-button";
 
 // ---------------------------------------------------------------------------
 // Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
@@ -565,9 +566,10 @@ type CardProps = {
   flipCard?: React.MouseEventHandler<HTMLDivElement>;
   row?: number;
   col?: number;
+  flags?: FlagValues;
 };
 
-const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
+const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
   return fake ? (
@@ -604,6 +606,33 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
           <div className="h-full w-full bg-[#58a66c]"></div>
           <div className="h-full w-full bg-[#448563]"></div>
         </div>
+        {flags && (
+          <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2">
+            {([1, 2, 3, "V"] as const).map((f, i) =>
+              flags[f] ? (
+                <div
+                  key={f}
+                  className={[
+                    "flex",
+                    i === 0 ? "items-start justify-start" :
+                    i === 1 ? "items-start justify-end" :
+                    i === 2 ? "items-end justify-start" :
+                              "items-end justify-end",
+                  ].join(" ")}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/games/super-voltorb-flip/sprites/upstream/memo/${f === "V" ? 0 : (f as number) - 1}.png`}
+                    width={14}
+                    height={14}
+                    alt=""
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                </div>
+              ) : null,
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -654,11 +683,13 @@ type GameboardProps = {
   waitForClick: boolean;
   muted: boolean;
   onFirstInteraction: () => void;
+  memoMode: boolean;
+  memoFlag: 1 | 2 | 3 | "V";
 };
 
 type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number; onDone: () => void };
 
-const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }: GameboardProps) => {
+const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, memoMode, memoFlag }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
@@ -683,6 +714,10 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }
 
   function handleFlip(row: number, col: number) {
     if (!game) return;
+    if (memoMode) {
+      updateGame((g) => g.flagCell(row, col, memoFlag));
+      return;
+    }
     const cell = game.cells[row][col];
     if (!cell.isFlipped) {
       const kind: "bomb" | "coin" | null =
@@ -778,6 +813,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }
                     col={coordinate[1]}
                     isFlipped={cardsFlipped[i]?.isFlipped}
                     flipCard={() => handleFlip(coordinate[0], coordinate[1])}
+                    flags={cell.flags}
                   >
                     {cell.value === "V" ? (
                       <VoltorbIcon
@@ -1070,6 +1106,8 @@ const Footer = () => null;
 export function SuperVoltorbFlipGame() {
   const { game, updateGame } = useGame();
   const [muted, toggleMute] = useMute();
+  const [memoMode, setMemoMode] = useState(false);
+  const [memoFlag, setMemoFlag] = useState<1 | 2 | 3 | "V">(1);
   const musicStartedRef = useRef(false);
 
   useEffect(() => {
@@ -1082,6 +1120,19 @@ export function SuperVoltorbFlipGame() {
       musicStartedRef.current = false;
     };
   }, []);
+
+  // Reset memo mode when a new game starts (status transitions back to "playing"
+  // after win/lose — restartGame sets status to "playing").
+  const prevGameStatusRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!game) return;
+    const prev = prevGameStatusRef.current;
+    const cur = game.gameStatus;
+    if ((prev === "win" || prev === "lose") && cur === "playing") {
+      setMemoMode(false);
+    }
+    prevGameStatusRef.current = cur;
+  }, [game?.gameStatus]);
 
   function handleFirstInteraction() {
     if (!musicStartedRef.current && !muted) {
@@ -1124,6 +1175,12 @@ export function SuperVoltorbFlipGame() {
               totalScore={game.totalScore}
             />
           )}
+          <MemoPanel
+            mode={memoMode}
+            flag={memoFlag}
+            onToggleMode={() => setMemoMode((m) => !m)}
+            onFlagChange={setMemoFlag}
+          />
         </div>
 
         {/* Right column: game info, gameboard */}
@@ -1137,6 +1194,8 @@ export function SuperVoltorbFlipGame() {
                 waitForClick
                 muted={muted}
                 onFirstInteraction={handleFirstInteraction}
+                memoMode={memoMode}
+                memoFlag={memoFlag}
               />
               <Footer />
             </>
