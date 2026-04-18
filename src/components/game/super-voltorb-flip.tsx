@@ -506,7 +506,7 @@ const SCOPED_STYLES = `
   right: -17px;
   top: 50%;
   width: 18px;
-  height: 6px;
+  height: 8px;
   transform: translateY(-50%);
   z-index: 0;
   pointer-events: none;
@@ -517,7 +517,7 @@ const SCOPED_STYLES = `
   bottom: -17px;
   left: 50%;
   height: 18px;
-  width: 6px;
+  width: 8px;
   transform: translateX(-50%);
   z-index: 0;
   pointer-events: none;
