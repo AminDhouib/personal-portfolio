@@ -513,9 +513,9 @@ const SCOPED_STYLES = `
    pixels to sit flush against the tile bodies like the reference. */
 .svf-root .svf-conn-e {
   position: absolute;
-  right: -17px;
+  right: -16px;
   top: 50%;
-  width: 18px;
+  width: 16px;
   height: 6px;
   transform: translateY(-50%);
   z-index: 0;
@@ -524,9 +524,9 @@ const SCOPED_STYLES = `
 }
 .svf-root .svf-conn-s {
   position: absolute;
-  bottom: -17px;
+  bottom: -16px;
   left: 50%;
-  height: 18px;
+  height: 16px;
   width: 6px;
   transform: translateX(-50%);
   z-index: 0;
