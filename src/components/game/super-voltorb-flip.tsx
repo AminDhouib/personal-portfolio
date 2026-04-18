@@ -645,7 +645,7 @@ type GameboardProps = {
   waitForClick: boolean;
 };
 
-type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number };
+type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number; onDone: () => void };
 
 const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
@@ -671,18 +671,18 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
   }
 
   function handleFlip(row: number, col: number) {
-    updateGame((g) => {
-      const cell = g.cells[row][col];
-      if (!cell.isFlipped) {
-        const kind: "bomb" | "coin" | null =
-          cell.value === "V" ? "bomb" : (cell.value as number) > 1 ? "coin" : null;
-        if (kind) {
-          const id = nextId.current++;
-          setEffects((prev) => [...prev, { id, kind, row, col }]);
-        }
+    if (!game) return;
+    const cell = game.cells[row][col];
+    if (!cell.isFlipped) {
+      const kind: "bomb" | "coin" | null =
+        cell.value === "V" ? "bomb" : (cell.value as number) > 1 ? "coin" : null;
+      if (kind) {
+        const id = nextId.current++;
+        const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
+        setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
       }
-      g.flipCell(row, col);
-    });
+    }
+    updateGame((g) => g.flipCell(row, col));
   }
 
   const flipCardsUp = useCallback(() => {
@@ -791,7 +791,7 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
                     top:  `calc(${e.row} * (var(--svf-tile, 40px) + var(--svf-gap, 16px)))`,
                     zIndex: 20,
                   }}>
-                    <Comp row={e.row} col={e.col} onDone={() => setEffects((prev) => prev.filter((x) => x.id !== e.id))} />
+                    <Comp row={e.row} col={e.col} onDone={e.onDone} />
                   </div>
                 );
               })}
