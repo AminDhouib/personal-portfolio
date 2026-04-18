@@ -478,6 +478,13 @@ function VoltorbIcon({
 // ---------------------------------------------------------------------------
 
 const SCOPED_STYLES = `
+.svf-root {
+  --svf-tile: 40px;
+  --svf-gap: 16px;
+}
+@media (max-width: 479px) {
+  .svf-root { --svf-tile: 34px; --svf-gap: 12px; }
+}
 .svf-root { font-family: var(--font-voltorb-ds), ui-monospace, monospace; color: #fff; background-color: #58a66c; }
 .svf-root *, .svf-root *::before, .svf-root *::after { box-sizing: border-box; text-rendering: geometricPrecision; }
 .svf-root .text-shadow-white {
@@ -507,9 +514,9 @@ const SCOPED_STYLES = `
    bodies — the reference shows the bar visually ending inside the frame). */
 .svf-root .svf-conn-e {
   position: absolute;
-  right: -17px;
+  right: calc(-1 * var(--svf-gap) - 1px);
   top: 50%;
-  width: 18px;
+  width: calc(var(--svf-gap) + 2px);
   height: 8px;
   transform: translateY(-50%);
   z-index: 0;
@@ -518,9 +525,9 @@ const SCOPED_STYLES = `
 }
 .svf-root .svf-conn-s {
   position: absolute;
-  bottom: -17px;
+  bottom: calc(-1 * var(--svf-gap) - 1px);
   left: 50%;
-  height: 18px;
+  height: calc(var(--svf-gap) + 2px);
   width: 8px;
   transform: translateX(-50%);
   z-index: 0;
@@ -564,7 +571,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
   return fake ? (
-    <div className="relative box-content flex h-10 w-10 select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200">
+    <div className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200">
       <div
         className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center border-2 border-[#a55a52] bg-[#bd8c84] text-3xl font-bold text-black`}
       >
@@ -572,11 +579,11 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
       </div>
     </div>
   ) : (
-    <div className="relative h-10 w-10 cursor-pointer place-self-center [perspective:1000px]" onClick={flipCard}>
+    <div className="relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]" onClick={flipCard}>
       {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
       {colColor && <div className="svf-conn-s" style={{ backgroundColor: colColor }} />}
       <div
-        className="relative box-content flex h-10 w-10 select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 transition-all duration-500 [transform-style:preserve-3d] [backface-visibility:hidden]"
+        className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 transition-all duration-500 [transform-style:preserve-3d] [backface-visibility:hidden]"
         style={{ transform: `${isFlipped ? "rotateY(180deg)" : "none"}` }}
       >
         <div
@@ -759,9 +766,9 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }
         <div className="absolute inset-0 z-50 h-full w-full bg-blue-500 opacity-0"></div>
       )}
       <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-4">
-            <div className="relative grid grid-cols-5 gap-4">
+        <div className="flex flex-col gap-[var(--svf-gap)]">
+          <div className="flex gap-[var(--svf-gap)]">
+            <div className="relative grid grid-cols-5 gap-[var(--svf-gap)]">
               {game.cells.flat().map((cell, i) => {
                 const coordinate = indexToCoordinate(i);
                 return (
@@ -1086,10 +1093,12 @@ export function SuperVoltorbFlipGame() {
   return (
     <EffectsProvider>
       <div
-        className={`svf-root ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center text-white`}
+        className={`svf-root ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center md:grid md:grid-cols-[auto,1fr] md:items-start md:gap-4 text-white p-2`}
       >
         <style>{SCOPED_STYLES}</style>
-        <div className="flex flex-col items-center gap-2 p-2">
+
+        {/* Left column: instructions, scoreboard, mute */}
+        <div className="flex flex-col items-center gap-2 md:items-stretch">
           <div className="flex w-full items-center justify-between">
             <InstructionsBtns />
             <button
@@ -1110,12 +1119,18 @@ export function SuperVoltorbFlipGame() {
             </button>
           </div>
           {game && (
+            <Scoreboard
+              currentScore={game.currentScore}
+              totalScore={game.totalScore}
+            />
+          )}
+        </div>
+
+        {/* Right column: game info, gameboard */}
+        <div className="flex flex-col items-center gap-2">
+          {game && (
             <>
               <GameInfo currentLevel={game.currentLevel} />
-              <Scoreboard
-                currentScore={game.currentScore}
-                totalScore={game.totalScore}
-              />
               <Gameboard
                 game={game}
                 updateGame={updateGame}
