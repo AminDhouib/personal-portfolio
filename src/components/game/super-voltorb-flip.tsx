@@ -15,11 +15,13 @@
 import React, {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import localFont from "next/font/local";
+import { EffectsProvider, useEffectsTheme } from "./super-voltorb-flip/effects/context";
 
 // ---------------------------------------------------------------------------
 // Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
@@ -643,10 +645,15 @@ type GameboardProps = {
   waitForClick: boolean;
 };
 
+type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number };
+
 const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
+  const [effects, setEffects] = useState<ActiveEffect[]>([]);
+  const theme = useEffectsTheme();
+  const nextId = useRef(0);
 
   async function waitForUserInteraction() {
     return new Promise<void>((resolve) => {
@@ -665,6 +672,15 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
 
   function handleFlip(row: number, col: number) {
     updateGame((g) => {
+      const cell = g.cells[row][col];
+      if (!cell.isFlipped) {
+        const kind: "bomb" | "coin" | null =
+          cell.value === "V" ? "bomb" : (cell.value as number) > 1 ? "coin" : null;
+        if (kind) {
+          const id = nextId.current++;
+          setEffects((prev) => [...prev, { id, kind, row, col }]);
+        }
+      }
       g.flipCell(row, col);
     });
   }
@@ -735,7 +751,7 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
       <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
         <div className="flex flex-col gap-4">
           <div className="flex gap-4">
-            <div className="grid grid-cols-5 gap-4">
+            <div className="relative grid grid-cols-5 gap-4">
               {game.cells.flat().map((cell, i) => {
                 const coordinate = indexToCoordinate(i);
                 return (
@@ -766,6 +782,19 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
                   index={index}
                 />
               ))}
+
+              {theme && effects.map((e) => {
+                const Comp = e.kind === "bomb" ? theme.BombFlip : theme.CoinReveal;
+                return (
+                  <div key={e.id} className="pointer-events-none absolute" style={{
+                    left: `calc(${e.col} * (var(--svf-tile, 40px) + var(--svf-gap, 16px)))`,
+                    top:  `calc(${e.row} * (var(--svf-tile, 40px) + var(--svf-gap, 16px)))`,
+                    zIndex: 20,
+                  }}>
+                    <Comp row={e.row} col={e.col} onDone={() => setEffects((prev) => prev.filter((x) => x.id !== e.id))} />
+                  </div>
+                );
+              })}
             </div>
             <div className="flex flex-col gap-3">
               {game.rowValues.map((row, index) => (
@@ -1025,28 +1054,30 @@ export function SuperVoltorbFlipGame() {
   const { game, updateGame } = useGame();
 
   return (
-    <div
-      className={`svf-root ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center text-white`}
-    >
-      <style>{SCOPED_STYLES}</style>
-      <div className="flex flex-col items-center gap-2 p-2">
-        <InstructionsBtns />
-        {game && (
-          <>
-            <GameInfo currentLevel={game.currentLevel} />
-            <Scoreboard
-              currentScore={game.currentScore}
-              totalScore={game.totalScore}
-            />
-            <Gameboard
-              game={game}
-              updateGame={updateGame}
-              waitForClick
-            />
-            <Footer />
-          </>
-        )}
+    <EffectsProvider>
+      <div
+        className={`svf-root ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center text-white`}
+      >
+        <style>{SCOPED_STYLES}</style>
+        <div className="flex flex-col items-center gap-2 p-2">
+          <InstructionsBtns />
+          {game && (
+            <>
+              <GameInfo currentLevel={game.currentLevel} />
+              <Scoreboard
+                currentScore={game.currentScore}
+                totalScore={game.totalScore}
+              />
+              <Gameboard
+                game={game}
+                updateGame={updateGame}
+                waitForClick
+              />
+              <Footer />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </EffectsProvider>
   );
 }
