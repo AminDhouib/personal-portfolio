@@ -523,13 +523,15 @@ const SCOPED_STYLES = `
   pointer-events: none;
   box-shadow: 1px 0 0 #e5e7eb, -1px 0 0 #e5e7eb;
 }
-/* Cursor/hover selection — matches the red frame on the active tile in HG/SS. */
+/* Cursor/hover selection — matches the red frame on the active tile in HG/SS.
+   Two overlapping shadows give the pixel-art look: dark inner hairline +
+   solid red outside. */
 .svf-root .cursor-pointer::before {
   content: "";
   position: absolute;
   inset: -2px;
   border-radius: 3px;
-  outline: 3px solid #ef2020;
+  box-shadow: 0 0 0 1px #6a0a0a, 0 0 0 4px #ef2020;
   opacity: 0;
   transition: opacity 80ms ease-out;
   pointer-events: none;
