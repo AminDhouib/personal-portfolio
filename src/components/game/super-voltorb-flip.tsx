@@ -588,7 +588,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
       className="relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]"
       role="button"
       tabIndex={0}
-      aria-label={row !== undefined && col !== undefined ? `Row ${row + 1}, Col ${col + 1}, face down` : undefined}
+      aria-label={row !== undefined && col !== undefined ? `Row ${row + 1}, Col ${col + 1}, ${isFlipped ? "revealed" : "face down"}` : undefined}
       onClick={flipCard}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") flipCard?.(e as unknown as React.MouseEvent<HTMLDivElement>); }}
     >
@@ -732,7 +732,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     if (!cell.isFlipped) {
       const kind: "bomb" | "coin" | null =
         cell.value === "V" ? "bomb" : (cell.value as number) > 1 ? "coin" : null;
-      if (kind) {
+      if (kind && theme) {
         const id = nextId.current++;
         const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
         setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
@@ -1136,6 +1136,9 @@ export function SuperVoltorbFlipGame() {
     if (typeof document === "undefined") return;
     const handleVisibility = () => {
       if (document.hidden) {
+        // Fully stop music (not just pause) when tab loses focus. This prevents
+        // music from continuing to play in the background on some browsers, and
+        // ensures the next game session starts fresh without auto-resuming.
         stopMusic();
         musicStartedRef.current = false;
       }
