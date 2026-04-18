@@ -518,7 +518,7 @@ const SCOPED_STYLES = `
   width: 16px;
   height: 6px;
   transform: translateY(-50%);
-  z-index: 0;
+  z-index: 4;
   pointer-events: none;
   box-shadow: 0 1px 0 #1a1a1a, 0 -1px 0 #1a1a1a;
 }
@@ -529,10 +529,14 @@ const SCOPED_STYLES = `
   height: 16px;
   width: 6px;
   transform: translateX(-50%);
-  z-index: 0;
+  z-index: 4;
   pointer-events: none;
   box-shadow: 1px 0 0 #1a1a1a, -1px 0 0 #1a1a1a;
 }
+/* Tile wrappers that own connectors must create a stacking context so the
+   connector's z-index beats the adjacent row-/col-clue cards, which otherwise
+   render on top purely by DOM order. */
+.svf-root .cursor-pointer { z-index: 1; }
 /* Cursor/hover selection — matches the red frame on the active tile in HG/SS. */
 .svf-root .cursor-pointer::before {
   content: "";
