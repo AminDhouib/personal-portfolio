@@ -507,6 +507,31 @@ const SCOPED_STYLES = `
 .svf-root .drop-shadow-soft {
   filter: drop-shadow(1px 1px 0 rgba(75,85,99,.25)) drop-shadow(2px 2px 0 rgba(75,85,99,.25));
 }
+/* Row/col colored connector bars linking adjacent tiles (matches Pokémon HG/SS). */
+.svf-root .svf-conn-e {
+  position: absolute;
+  right: -14px;
+  top: 50%;
+  width: 16px;
+  height: 4px;
+  transform: translateY(-50%);
+  z-index: 0;
+  pointer-events: none;
+  border-top: 1px solid rgba(0,0,0,0.25);
+  border-bottom: 1px solid rgba(0,0,0,0.25);
+}
+.svf-root .svf-conn-s {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  height: 16px;
+  width: 4px;
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+  border-left: 1px solid rgba(0,0,0,0.25);
+  border-right: 1px solid rgba(0,0,0,0.25);
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -518,9 +543,13 @@ type CardProps = {
   fake?: boolean;
   isFlipped?: boolean;
   flipCard?: React.MouseEventHandler<HTMLDivElement>;
+  row?: number;
+  col?: number;
 };
 
-const Card = ({ children, fake, isFlipped, flipCard }: CardProps) => {
+const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
+  const rowColor = row !== undefined ? COLORS[row] : undefined;
+  const colColor = col !== undefined ? COLORS[col] : undefined;
   return fake ? (
     <div className="relative box-content flex h-10 w-10 select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200">
       <div
@@ -530,7 +559,9 @@ const Card = ({ children, fake, isFlipped, flipCard }: CardProps) => {
       </div>
     </div>
   ) : (
-    <div className="cursor-pointer [perspective:1000px]" onClick={flipCard}>
+    <div className="relative cursor-pointer [perspective:1000px]" onClick={flipCard}>
+      {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
+      {colColor && <div className="svf-conn-s" style={{ backgroundColor: colColor }} />}
       <div
         className="relative box-content flex h-10 w-10 select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 transition-all duration-500 [transform-style:preserve-3d] [backface-visibility:hidden]"
         style={{ transform: `${isFlipped ? "rotateY(180deg)" : "none"}` }}
@@ -701,6 +732,8 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
                 return (
                   <Card
                     key={i}
+                    row={coordinate[0]}
+                    col={coordinate[1]}
                     isFlipped={cardsFlipped[i]?.isFlipped}
                     flipCard={() => handleFlip(coordinate[0], coordinate[1])}
                   >
