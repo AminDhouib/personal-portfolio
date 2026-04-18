@@ -553,6 +553,9 @@ const SCOPED_STYLES = `
 .svf-root .cursor-pointer:focus-visible::before {
   opacity: 1;
 }
+@media (prefers-reduced-motion: reduce) {
+  .svf-root * { transition-duration: 150ms !important; animation-duration: 150ms !important; }
+}
 `;
 
 // ---------------------------------------------------------------------------
