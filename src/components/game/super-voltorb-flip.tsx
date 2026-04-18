@@ -813,7 +813,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
                     col={coordinate[1]}
                     isFlipped={cardsFlipped[i]?.isFlipped}
                     flipCard={() => handleFlip(coordinate[0], coordinate[1])}
-                    flags={cell.flags}
+                    flags={cell.isFlipped ? undefined : cell.flags}
                   >
                     {cell.value === "V" ? (
                       <VoltorbIcon
