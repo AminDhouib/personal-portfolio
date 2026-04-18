@@ -22,6 +22,8 @@ import React, {
 } from "react";
 import localFont from "next/font/local";
 import { EffectsProvider, useEffectsTheme } from "./super-voltorb-flip/effects/context";
+import { sfx, playMusic, setMusicMuted } from "./super-voltorb-flip/audio";
+import { useMute } from "./super-voltorb-flip/use-mute";
 
 // ---------------------------------------------------------------------------
 // Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
@@ -643,11 +645,13 @@ type GameboardProps = {
   game: VoltorbFlip;
   updateGame: (callback: (game: VoltorbFlip) => void) => void;
   waitForClick: boolean;
+  muted: boolean;
+  onFirstInteraction: () => void;
 };
 
 type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number; onDone: () => void };
 
-const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
+const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
@@ -681,6 +685,12 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
         const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
         setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
       }
+      if (!muted) {
+        if (kind === "bomb") sfx.lose();
+        else if (kind === "coin") sfx.coin();
+        else sfx.click();
+      }
+      onFirstInteraction();
     }
     updateGame((g) => g.flipCell(row, col));
   }
@@ -1052,6 +1062,19 @@ const Footer = () => null;
 
 export function SuperVoltorbFlipGame() {
   const { game, updateGame } = useGame();
+  const [muted, toggleMute] = useMute();
+  const musicStartedRef = useRef(false);
+
+  useEffect(() => {
+    setMusicMuted(muted);
+  }, [muted]);
+
+  function handleFirstInteraction() {
+    if (!musicStartedRef.current && !muted) {
+      musicStartedRef.current = true;
+      playMusic();
+    }
+  }
 
   return (
     <EffectsProvider>
@@ -1060,7 +1083,25 @@ export function SuperVoltorbFlipGame() {
       >
         <style>{SCOPED_STYLES}</style>
         <div className="flex flex-col items-center gap-2 p-2">
-          <InstructionsBtns />
+          <div className="flex w-full items-center justify-between">
+            <InstructionsBtns />
+            <button
+              onClick={toggleMute}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/70 hover:text-white transition-colors"
+              aria-label={muted ? "Unmute" : "Mute"}
+              title={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                </svg>
+              )}
+            </button>
+          </div>
           {game && (
             <>
               <GameInfo currentLevel={game.currentLevel} />
@@ -1072,6 +1113,8 @@ export function SuperVoltorbFlipGame() {
                 game={game}
                 updateGame={updateGame}
                 waitForClick
+                muted={muted}
+                onFirstInteraction={handleFirstInteraction}
               />
               <Footer />
             </>
