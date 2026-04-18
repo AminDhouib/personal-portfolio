@@ -725,7 +725,7 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
                 />
               ))}
             </div>
-            <div className="flex flex-col gap-[17.5px]">
+            <div className="flex flex-col gap-3">
               {game.rowValues.map((row, index) => (
                 <RowColCard
                   coins={row.coins}
@@ -971,13 +971,7 @@ const InstructionsBtns = () => {
 // src/components/Footer.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-const Footer = () => {
-  return (
-    <footer className="flex w-full flex-col items-center justify-center gap-2 text-3xl drop-shadow-default">
-      <div>Made by JV</div>
-    </footer>
-  );
-};
+const Footer = () => null;
 
 // ---------------------------------------------------------------------------
 // Exported root component — mirrors upstream src/pages/index.tsx layout, but
