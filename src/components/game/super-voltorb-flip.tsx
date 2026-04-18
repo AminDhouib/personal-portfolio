@@ -507,28 +507,31 @@ const SCOPED_STYLES = `
 .svf-root .drop-shadow-soft {
   filter: drop-shadow(1px 1px 0 rgba(75,85,99,.25)) drop-shadow(2px 2px 0 rgba(75,85,99,.25));
 }
-/* Row/col colored connector bars linking adjacent tiles (matches Pokémon HG/SS). */
+/* Row/col colored connector bars linking adjacent tiles (matches Pokémon HG/SS).
+   Gap between tile wrappers is 16px; we center the bar at +8 (the midpoint).
+   Tile outline is 4px, so bar overlaps each adjacent tile's outline by a few
+   pixels to sit flush against the tile bodies like the reference. */
 .svf-root .svf-conn-e {
   position: absolute;
-  right: -15px;
+  right: -17px;
   top: 50%;
   width: 18px;
   height: 6px;
   transform: translateY(-50%);
   z-index: 0;
   pointer-events: none;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.45), 0 -1px 0 rgba(0,0,0,0.45);
+  box-shadow: 0 1px 0 #1a1a1a, 0 -1px 0 #1a1a1a;
 }
 .svf-root .svf-conn-s {
   position: absolute;
-  bottom: -15px;
+  bottom: -17px;
   left: 50%;
   height: 18px;
   width: 6px;
   transform: translateX(-50%);
   z-index: 0;
   pointer-events: none;
-  box-shadow: 1px 0 0 rgba(0,0,0,0.45), -1px 0 0 rgba(0,0,0,0.45);
+  box-shadow: 1px 0 0 #1a1a1a, -1px 0 0 #1a1a1a;
 }
 `;
 
