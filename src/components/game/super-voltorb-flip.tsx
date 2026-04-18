@@ -527,9 +527,9 @@ const SCOPED_STYLES = `
 .svf-root .cursor-pointer::before {
   content: "";
   position: absolute;
-  inset: -5px;
-  border-radius: 4px;
-  outline: 3px solid #e63946;
+  inset: -2px;
+  border-radius: 3px;
+  outline: 3px solid #ef2020;
   opacity: 0;
   transition: opacity 80ms ease-out;
   pointer-events: none;
