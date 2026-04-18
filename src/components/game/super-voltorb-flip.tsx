@@ -578,7 +578,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
         <div
           className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-black bg-[#bd8c84] text-3xl font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
         >
-          <div className="flex h-full w-full items-center justify-center border-2 border-[#a55a52]">
+          <div className="flex h-full w-full items-center justify-center border-2 border-[#8a4236]">
             {children}
           </div>
         </div>
