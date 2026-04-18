@@ -568,7 +568,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
       </div>
     </div>
   ) : (
-    <div className="relative cursor-pointer [perspective:1000px]" onClick={flipCard}>
+    <div className="relative h-10 w-10 cursor-pointer place-self-center [perspective:1000px]" onClick={flipCard}>
       {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
       {colColor && <div className="svf-conn-s" style={{ backgroundColor: colColor }} />}
       <div
