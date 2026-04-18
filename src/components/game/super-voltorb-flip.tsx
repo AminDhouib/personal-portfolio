@@ -510,7 +510,7 @@ const SCOPED_STYLES = `
   transform: translateY(-50%);
   z-index: 0;
   pointer-events: none;
-  box-shadow: 0 1px 0 #1a1a1a, 0 -1px 0 #1a1a1a;
+  box-shadow: 0 1px 0 #e5e7eb, 0 -1px 0 #e5e7eb;
 }
 .svf-root .svf-conn-s {
   position: absolute;
@@ -521,7 +521,7 @@ const SCOPED_STYLES = `
   transform: translateX(-50%);
   z-index: 0;
   pointer-events: none;
-  box-shadow: 1px 0 0 #1a1a1a, -1px 0 0 #1a1a1a;
+  box-shadow: 1px 0 0 #e5e7eb, -1px 0 0 #e5e7eb;
 }
 /* Cursor/hover selection — matches the red frame on the active tile in HG/SS. */
 .svf-root .cursor-pointer::before {
