@@ -10,6 +10,7 @@ function ensureCtx() {
 function beep(freq: number, dur = 0.09, type: OscillatorType = "square", gain = 0.04) {
   const c = ensureCtx();
   if (!c) return;
+  c.resume();
   const osc = c.createOscillator();
   const g = c.createGain();
   osc.type = type;

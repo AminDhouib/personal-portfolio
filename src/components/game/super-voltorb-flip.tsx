@@ -22,7 +22,7 @@ import React, {
 } from "react";
 import localFont from "next/font/local";
 import { EffectsProvider, useEffectsTheme } from "./super-voltorb-flip/effects/context";
-import { sfx, playMusic, setMusicMuted } from "./super-voltorb-flip/audio";
+import { sfx, playMusic, stopMusic, setMusicMuted } from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
 
 // ---------------------------------------------------------------------------
@@ -1068,6 +1068,13 @@ export function SuperVoltorbFlipGame() {
   useEffect(() => {
     setMusicMuted(muted);
   }, [muted]);
+
+  useEffect(() => {
+    return () => {
+      stopMusic();
+      musicStartedRef.current = false;
+    };
+  }, []);
 
   function handleFirstInteraction() {
     if (!musicStartedRef.current && !muted) {
