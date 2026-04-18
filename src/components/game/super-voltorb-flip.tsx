@@ -590,14 +590,9 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
             {children}
           </div>
         </div>
-        <div className="absolute inset-0 grid h-full w-full grid-cols-3 bg-white">
+        <div className="absolute inset-0 grid h-full w-full grid-cols-2 bg-white">
           <div className="h-full w-full bg-[#448563]"></div>
           <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
-          <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
-          <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
           <div className="h-full w-full bg-[#58a66c]"></div>
           <div className="h-full w-full bg-[#448563]"></div>
         </div>
