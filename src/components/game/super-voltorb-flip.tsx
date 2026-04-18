@@ -1121,6 +1121,19 @@ export function SuperVoltorbFlipGame() {
     };
   }, []);
 
+  // Persist level + total score to localStorage on change.
+  useEffect(() => {
+    if (!game) return;
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      "svf:progress",
+      JSON.stringify({
+        currentLevel: game.currentLevel,
+        totalScore: game.totalScore,
+      }),
+    );
+  }, [game?.currentLevel, game?.totalScore]);
+
   // Reset memo mode when a new game starts (status transitions back to "playing"
   // after win/lose — restartGame sets status to "playing").
   const prevGameStatusRef = useRef<string | undefined>(undefined);
