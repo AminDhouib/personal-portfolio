@@ -574,7 +574,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
         style={{ transform: `${isFlipped ? "rotateY(180deg)" : "none"}` }}
       >
         <div
-          className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-gray-800 bg-[#bd8c84] text-3xl font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
+          className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-black bg-[#bd8c84] text-3xl font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
         >
           <div className="flex h-full w-full items-center justify-center border-2 border-[#a55a52]">
             {children}
@@ -622,7 +622,7 @@ const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
         <div className="absolute bottom-[-6px] flex items-center gap-0.5">
           <VoltorbIcon
             size={28}
-            className="voltorb picture-outline translate-y-1.5 object-contain"
+            className="voltorb translate-y-1.5 object-contain"
           />
           <p className="translate-x-0.5">{voltorbs}</p>
         </div>
