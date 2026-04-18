@@ -728,7 +728,7 @@ const Gameboard = ({ game, updateGame, waitForClick }: GameboardProps) => {
   }, [game.gameStatus]);
 
   return (
-    <div className="relative h-96 w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600">
+    <div className="relative h-96 w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]">
       {(game.gameStatus === "lose" || game.gameStatus === "win") && (
         <div className="absolute inset-0 z-50 h-full w-full bg-blue-500 opacity-0"></div>
       )}
