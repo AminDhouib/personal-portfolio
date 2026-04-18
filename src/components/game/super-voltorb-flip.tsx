@@ -622,7 +622,7 @@ type RowColCardProps = {
 const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
   return (
     <div
-      className={`${numberFont.className} relative z-[5] box-content flex h-11 w-11 select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
+      className={`${numberFont.className} relative z-[5] box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
     >
       <div
         className={`relative flex h-full w-full flex-col place-content-center place-items-center text-3xl font-bold text-gray-800`}
@@ -761,7 +761,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }
   }, [game.gameStatus]);
 
   return (
-    <div className="relative h-96 w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]">
+    <div className="relative w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]">
       {(game.gameStatus === "lose" || game.gameStatus === "win") && (
         <div className="absolute inset-0 z-50 h-full w-full bg-blue-500 opacity-0"></div>
       )}
@@ -1098,7 +1098,7 @@ export function SuperVoltorbFlipGame() {
         <style>{SCOPED_STYLES}</style>
 
         {/* Left column: instructions, scoreboard, mute */}
-        <div className="flex flex-col items-center gap-2 md:items-stretch">
+        <div className="flex flex-col items-center gap-2 md:items-stretch md:min-w-[220px]">
           <div className="flex w-full items-center justify-between">
             <InstructionsBtns />
             <button
