@@ -1131,6 +1131,19 @@ export function SuperVoltorbFlipGame() {
     };
   }, []);
 
+  // Pause music when the tab becomes hidden; don't auto-resume on return.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopMusic();
+        musicStartedRef.current = false;
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
   // Persist level + total score to localStorage on change.
   useEffect(() => {
     if (!game) return;
