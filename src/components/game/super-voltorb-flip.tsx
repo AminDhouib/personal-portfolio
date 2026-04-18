@@ -813,7 +813,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction }
                 );
               })}
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-[var(--svf-gap)]">
               {game.rowValues.map((row, index) => (
                 <RowColCard
                   coins={row.coins}
