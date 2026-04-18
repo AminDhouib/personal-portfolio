@@ -510,27 +510,42 @@ const SCOPED_STYLES = `
 /* Row/col colored connector bars linking adjacent tiles (matches Pokémon HG/SS). */
 .svf-root .svf-conn-e {
   position: absolute;
-  right: -14px;
+  right: -15px;
   top: 50%;
-  width: 16px;
-  height: 4px;
+  width: 18px;
+  height: 6px;
   transform: translateY(-50%);
   z-index: 0;
   pointer-events: none;
-  border-top: 1px solid rgba(0,0,0,0.25);
-  border-bottom: 1px solid rgba(0,0,0,0.25);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.45), 0 -1px 0 rgba(0,0,0,0.45);
 }
 .svf-root .svf-conn-s {
   position: absolute;
-  bottom: -14px;
+  bottom: -15px;
   left: 50%;
-  height: 16px;
-  width: 4px;
+  height: 18px;
+  width: 6px;
   transform: translateX(-50%);
   z-index: 0;
   pointer-events: none;
-  border-left: 1px solid rgba(0,0,0,0.25);
-  border-right: 1px solid rgba(0,0,0,0.25);
+  box-shadow: 1px 0 0 rgba(0,0,0,0.45), -1px 0 0 rgba(0,0,0,0.45);
+}
+.svf-root .svf-tile-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: #c5895e;
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.18) 100%);
+}
+.svf-root .svf-tile-back::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 1px;
+  background: #9c6035;
+  box-shadow:
+    inset 1px 1px 0 rgba(255,255,255,0.22),
+    inset -1px -1px 0 rgba(0,0,0,0.35);
 }
 `;
 
@@ -573,17 +588,8 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col }: CardProps) => {
             {children}
           </div>
         </div>
-        <div className="absolute inset-0 grid h-full w-full grid-cols-3 bg-white">
-          <div className="h-full w-full bg-[#448563]"></div>
-          <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
-          <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
-          <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
-          <div className="h-full w-full bg-[#58a66c]"></div>
-          <div className="h-full w-full bg-[#448563]"></div>
-        </div>
+        <div className="svf-tile-back" />
+
       </div>
     </div>
   );
