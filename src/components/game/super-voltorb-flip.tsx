@@ -584,7 +584,14 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
       </div>
     </div>
   ) : (
-    <div className="relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]" onClick={flipCard}>
+    <div
+      className="relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]"
+      role="button"
+      tabIndex={0}
+      aria-label={row !== undefined && col !== undefined ? `Row ${row + 1}, Col ${col + 1}, face down` : undefined}
+      onClick={flipCard}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") flipCard?.(e as unknown as React.MouseEvent<HTMLDivElement>); }}
+    >
       {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
       {colColor && <div className="svf-conn-s" style={{ backgroundColor: colColor }} />}
       <div
