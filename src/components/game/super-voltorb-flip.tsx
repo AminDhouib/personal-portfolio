@@ -511,32 +511,31 @@ const SCOPED_STYLES = `
    Gap between tile wrappers is 16px; we center the bar at +8 (the midpoint).
    Tile outline is 4px, so bar overlaps each adjacent tile's outline by a few
    pixels to sit flush against the tile bodies like the reference. */
+/* Bars span slightly past the 16px gap so their ends tuck under each
+   adjacent tile/clue-card outline (z-index 0 keeps them behind the tile
+   bodies — the reference shows the bar visually ending inside the frame). */
 .svf-root .svf-conn-e {
   position: absolute;
-  right: -16px;
+  right: -17px;
   top: 50%;
-  width: 16px;
+  width: 18px;
   height: 6px;
   transform: translateY(-50%);
-  z-index: 4;
+  z-index: 0;
   pointer-events: none;
   box-shadow: 0 1px 0 #1a1a1a, 0 -1px 0 #1a1a1a;
 }
 .svf-root .svf-conn-s {
   position: absolute;
-  bottom: -16px;
+  bottom: -17px;
   left: 50%;
-  height: 16px;
+  height: 18px;
   width: 6px;
   transform: translateX(-50%);
-  z-index: 4;
+  z-index: 0;
   pointer-events: none;
   box-shadow: 1px 0 0 #1a1a1a, -1px 0 0 #1a1a1a;
 }
-/* Tile wrappers that own connectors must create a stacking context so the
-   connector's z-index beats the adjacent row-/col-clue cards, which otherwise
-   render on top purely by DOM order. */
-.svf-root .cursor-pointer { z-index: 1; }
 /* Cursor/hover selection — matches the red frame on the active tile in HG/SS. */
 .svf-root .cursor-pointer::before {
   content: "";
@@ -618,7 +617,7 @@ type RowColCardProps = {
 const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
   return (
     <div
-      className={`${numberFont.className} box-content flex h-11 w-11 select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
+      className={`${numberFont.className} relative z-[5] box-content flex h-11 w-11 select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
     >
       <div
         className={`relative flex h-full w-full flex-col place-content-center place-items-center text-3xl font-bold text-gray-800`}
