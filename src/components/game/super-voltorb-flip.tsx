@@ -22,7 +22,15 @@ import React, {
 } from "react";
 import localFont from "next/font/local";
 import { EffectsProvider, useEffectsTheme } from "./super-voltorb-flip/effects/context";
-import { sfx, playMusic, stopMusic, setMusicMuted } from "./super-voltorb-flip/audio";
+import {
+  sfx,
+  playMusic,
+  stopMusic,
+  fadeOutMusic,
+  playGameOver,
+  stopGameOver,
+  setMusicMuted,
+} from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { MemoPanel } from "./super-voltorb-flip/memo-button";
 
@@ -553,6 +561,26 @@ const SCOPED_STYLES = `
 .svf-root .cursor-pointer:focus-visible::before {
   opacity: 1;
 }
+.svf-root .svf-gameover-overlay {
+  animation: svf-gameover-fade 260ms ease-out both;
+  background: radial-gradient(ellipse at center, rgba(120, 0, 0, 0.55) 0%, rgba(60, 0, 0, 0.75) 100%);
+}
+.svf-root .svf-gameover-banner {
+  background: linear-gradient(#c4361a 0%, #7a1a0b 100%);
+  border: 3px solid #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 0 0 2px #3a0a04 inset;
+  animation: svf-gameover-drop 420ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+@keyframes svf-gameover-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes svf-gameover-drop {
+  0%   { transform: translateY(-140%) scale(0.85); opacity: 0; }
+  60%  { transform: translateY(8%)    scale(1.02); opacity: 1; }
+  100% { transform: translateY(0)     scale(1);    opacity: 1; }
+}
 @media (prefers-reduced-motion: reduce) {
   .svf-root * { transition-duration: 150ms !important; animation-duration: 150ms !important; }
 }
@@ -739,7 +767,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
       }
       if (!muted) {
         if (kind === "bomb") sfx.lose();
-        else if (kind === "coin") sfx.coin();
+        else if (kind === "coin") sfx.coin(cell.value as number);
         else sfx.click();
       }
       onFirstInteraction();
@@ -807,8 +835,21 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
 
   return (
     <div className="relative w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]">
-      {(game.gameStatus === "lose" || game.gameStatus === "win") && (
-        <div className="absolute inset-0 z-50 h-full w-full bg-blue-500 opacity-0"></div>
+      {game.gameStatus === "lose" && (
+        <div className="svf-gameover-overlay pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
+          <div className="svf-gameover-banner flex flex-col items-center gap-1 px-6 py-4">
+            <span className="text-2xl font-black tracking-widest text-red-100 drop-shadow-[0_2px_0_rgba(0,0,0,0.8)]">
+              GAME OVER
+            </span>
+            <span className="flex items-center gap-1 text-sm font-bold text-yellow-200">
+              Lv {game.currentLevel}
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+                <path d="M2 4h8L6 10z" />
+              </svg>
+              {Math.max(1, game.currentLevel - 1)}
+            </span>
+          </div>
+        </div>
       )}
       <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
         <div className="flex flex-col gap-[var(--svf-gap)]">
@@ -1127,6 +1168,7 @@ export function SuperVoltorbFlipGame() {
   useEffect(() => {
     return () => {
       stopMusic();
+      stopGameOver();
       musicStartedRef.current = false;
     };
   }, []);
@@ -1160,18 +1202,30 @@ export function SuperVoltorbFlipGame() {
     );
   }, [game?.currentLevel, game?.totalScore]);
 
-  // Reset memo mode when a new game starts (status transitions back to "playing"
-  // after win/lose — restartGame sets status to "playing").
+  // Reset memo mode + drive music/game-over audio on status transitions.
+  // restartGame sets status back to "playing" after cards flip down.
   const prevGameStatusRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!game) return;
     const prev = prevGameStatusRef.current;
     const cur = game.gameStatus;
+    if (cur === "lose" && prev !== "lose") {
+      // Fade the loop fast, then the game_over jingle plays over the reveal.
+      fadeOutMusic(350);
+      window.setTimeout(() => {
+        if (!muted) playGameOver();
+      }, 320);
+    }
     if ((prev === "win" || prev === "lose") && cur === "playing") {
       setMemoMode(false);
+      stopGameOver();
+      if (!muted) {
+        musicStartedRef.current = true;
+        playMusic();
+      }
     }
     prevGameStatusRef.current = cur;
-  }, [game?.gameStatus]);
+  }, [game?.gameStatus, muted]);
 
   function handleFirstInteraction() {
     if (!musicStartedRef.current && !muted) {
