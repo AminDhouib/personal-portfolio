@@ -68,80 +68,6 @@ const COLORS: string[] = [
   "#c872e7",
 ];
 
-type LevelData = {
-  x2: number;
-  x3: number;
-  voltorbs: number;
-  coins: number;
-};
-
-const LEVELS: LevelData[][] = [
-  // Level 1
-  [
-    { x2: 3, x3: 1, voltorbs: 6, coins: 24 },
-    { x2: 0, x3: 3, voltorbs: 6, coins: 27 },
-    { x2: 5, x3: 0, voltorbs: 6, coins: 32 },
-    { x2: 2, x3: 2, voltorbs: 6, coins: 36 },
-    { x2: 4, x3: 1, voltorbs: 6, coins: 48 },
-  ],
-  // Level 2
-  [
-    { x2: 1, x3: 3, voltorbs: 7, coins: 54 },
-    { x2: 6, x3: 0, voltorbs: 7, coins: 64 },
-    { x2: 3, x3: 2, voltorbs: 7, coins: 72 },
-    { x2: 0, x3: 4, voltorbs: 7, coins: 81 },
-    { x2: 5, x3: 1, voltorbs: 7, coins: 96 },
-  ],
-  // Level 3
-  [
-    { x2: 2, x3: 3, voltorbs: 8, coins: 108 },
-    { x2: 7, x3: 0, voltorbs: 8, coins: 128 },
-    { x2: 4, x3: 2, voltorbs: 8, coins: 144 },
-    { x2: 1, x3: 4, voltorbs: 8, coins: 162 },
-    { x2: 6, x3: 1, voltorbs: 8, coins: 192 },
-  ],
-  // Level 4
-  [
-    { x2: 3, x3: 3, voltorbs: 8, coins: 216 },
-    { x2: 0, x3: 5, voltorbs: 8, coins: 243 },
-    { x2: 8, x3: 0, voltorbs: 10, coins: 256 },
-    { x2: 5, x3: 2, voltorbs: 10, coins: 288 },
-    { x2: 2, x3: 4, voltorbs: 10, coins: 324 },
-  ],
-  // Level 5
-  [
-    { x2: 7, x3: 1, voltorbs: 10, coins: 384 },
-    { x2: 4, x3: 3, voltorbs: 10, coins: 432 },
-    { x2: 1, x3: 5, voltorbs: 10, coins: 486 },
-    { x2: 9, x3: 0, voltorbs: 10, coins: 512 },
-    { x2: 6, x3: 2, voltorbs: 10, coins: 576 },
-  ],
-  // Level 6
-  [
-    { x2: 3, x3: 4, voltorbs: 10, coins: 648 },
-    { x2: 0, x3: 6, voltorbs: 10, coins: 729 },
-    { x2: 8, x3: 1, voltorbs: 10, coins: 768 },
-    { x2: 5, x3: 3, voltorbs: 10, coins: 864 },
-    { x2: 2, x3: 5, voltorbs: 10, coins: 972 },
-  ],
-  // Level 7
-  [
-    { x2: 7, x3: 2, voltorbs: 10, coins: 1152 },
-    { x2: 4, x3: 4, voltorbs: 10, coins: 1296 },
-    { x2: 1, x3: 6, voltorbs: 13, coins: 1458 },
-    { x2: 9, x3: 1, voltorbs: 13, coins: 1536 },
-    { x2: 6, x3: 3, voltorbs: 10, coins: 1728 },
-  ],
-  // Level 8
-  [
-    { x2: 0, x3: 7, voltorbs: 10, coins: 2187 },
-    { x2: 8, x3: 2, voltorbs: 10, coins: 2304 },
-    { x2: 5, x3: 4, voltorbs: 10, coins: 2592 },
-    { x2: 2, x3: 6, voltorbs: 10, coins: 2916 },
-    { x2: 7, x3: 3, voltorbs: 10, coins: 3456 },
-  ],
-];
-
 // ---------------------------------------------------------------------------
 // src/utils/helpers.ts (1:1).
 // ---------------------------------------------------------------------------
@@ -156,18 +82,63 @@ const indexToCoordinate = (index: number, gridSize = 5): [number, number] => {
 // src/game/Level.ts (1:1).
 // ---------------------------------------------------------------------------
 
+// Size-aware, level-aware tile distribution generator. Replaces the hand-
+// authored 5x5 LEVELS tables with a formula that's valid for N = 2..10.
+//
+// Shape of the curve (tuned to roughly match HG/SS at N=5):
+//   voltorb density:  22% -> 42%  across levels 1..8
+//   valuable density: 16% -> 38%  across levels 1..8
+//   x3 share of val:  25% -> 60%  across levels 1..8
+// Then hard caps on x2/x3 counts prevent the multiplicative max score from
+// exploding on large boards. Caps scale with level only:
+//   maxX3(L) = 1 + L                (1 .. 8)
+//   maxX2(L) = 2 + floor(L * 1.5)   (2 .. 12)
+function generateLevelComposition(level: number, boardSize: number) {
+  const L = Math.max(0, Math.min(7, level));
+  const total = boardSize * boardSize;
+  const t = L / 7;
+  const vFrac = 0.22 + t * 0.20;
+  const valFrac = 0.16 + t * 0.22;
+  const x3Share = 0.25 + t * 0.35;
+
+  let v = Math.max(1, Math.round(vFrac * total));
+  let val = Math.max(1, Math.round(valFrac * total));
+  // Keep at least one "1" tile so the player has safe information-gathering
+  // moves; otherwise every flip is score-or-bomb.
+  if (v + val >= total) val = Math.max(1, total - v - 1);
+  if (v + val >= total) v = Math.max(1, total - val - 1);
+
+  const maxX3 = Math.min(total, 1 + L);
+  const maxX2 = Math.min(total, 2 + Math.floor(L * 1.5));
+  let x3 = Math.min(maxX3, Math.round(val * x3Share));
+  let x2 = Math.max(0, Math.min(maxX2, val - x3));
+  if (x2 + x3 === 0) x3 = 1;
+
+  // Small +/-1 jitter per instance so the same (L, N) pair isn't identical
+  // every run — preserves the per-level variety that the old LEVELS variants
+  // provided.
+  const jitter = () => ((Math.random() * 3) | 0) - 1; // -1, 0, 1
+  x2 = Math.max(0, Math.min(maxX2, x2 + jitter()));
+  x3 = Math.max(0, Math.min(maxX3, x3 + jitter()));
+  v = Math.max(1, v + jitter());
+  if (x2 + x3 === 0) x3 = 1;
+  // Re-clamp after jitter in case we now overflow the board.
+  if (x2 + x3 + v >= total) v = Math.max(1, total - x2 - x3 - 1);
+  if (x2 + x3 + v >= total) val = Math.max(1, total - v - 1);
+
+  return { x2, x3, v };
+}
+
 class Level {
   private _x2: number;
   private _x3: number;
   private _voltorbs: number;
-  private _coins: number;
 
-  constructor(level: number) {
-    const currentLevel = LEVELS[level][Math.floor(Math.random() * 5)];
-    this._x2 = currentLevel.x2;
-    this._x3 = currentLevel.x3;
-    this._voltorbs = currentLevel.voltorbs;
-    this._coins = currentLevel.coins;
+  constructor(level: number, size: number = 5) {
+    const c = generateLevelComposition(level, size);
+    this._x2 = c.x2;
+    this._x3 = c.x3;
+    this._voltorbs = c.v;
   }
 
   get levelData() {
@@ -175,7 +146,9 @@ class Level {
       x2: this._x2,
       x3: this._x3,
       voltorbs: this._voltorbs,
-      coins: this._coins,
+      // coins is no longer load-bearing (Board computes maxLevelScore from
+      // the actual placed tiles) but keep the shape for backward compat.
+      coins: Math.pow(2, this._x2) * Math.pow(3, this._x3),
     };
   }
 }
@@ -265,31 +238,8 @@ class Board {
     const board: Cell[][] = [...Array(size)].map(() =>
       Array.from({ length: size }),
     );
-    const { x2, x3, voltorbs } = level.levelData;
-
-    // HG/SS level tables are tuned for 5x5. When rendering a different size we
-    // scale distributions proportionally (area ratio) and clamp to total.
-    const ratio = total / 25;
-    let scaledX2 = Math.min(total, Math.max(0, Math.round(x2 * ratio)));
-    let scaledX3 = Math.min(total - scaledX2, Math.max(0, Math.round(x3 * ratio)));
-    let scaledV = Math.min(
-      total - scaledX2 - scaledX3,
-      Math.max(0, Math.round(voltorbs * ratio)),
-    );
-    // Guarantee the board is actually winnable at any N: there must be at
-    // least one valuable tile (x2 or x3). Without this, maxLevelScore
-    // collapses to 1, which either auto-wins on first flip or never wins.
-    if (scaledX2 + scaledX3 === 0) {
-      if (total - scaledV >= 1) scaledX3 = 1;
-      else {
-        scaledV = Math.max(0, total - 1);
-        scaledX3 = 1;
-      }
-    }
-    // Also ensure at least one voltorb exists so the game has a fail state.
-    if (scaledV === 0 && total - scaledX2 - scaledX3 >= 1) {
-      scaledV = 1;
-    }
+    // Level is already size-aware — counts fit the board by construction.
+    const { x2: scaledX2, x3: scaledX3, voltorbs: scaledV } = level.levelData;
 
     const levelValuesArray: CellValue[] = [
       ...Array(scaledX2).fill(2),
@@ -371,7 +321,7 @@ class VoltorbFlip {
 
   constructor(size: number = 5) {
     this._size = size;
-    this._level = new Level(0);
+    this._level = new Level(0, this._size);
     this._currentLevel = 0;
     this._currentScore = 0;
     this._totalScore = 0;
@@ -413,7 +363,7 @@ class VoltorbFlip {
   public restartGame(): void {
     this._gameStatus = "playing";
     this._currentScore = 0;
-    this._level = new Level(this._currentLevel);
+    this._level = new Level(this._currentLevel, this._size);
     this._board = new Board(this._level, this._size);
   }
 
@@ -500,7 +450,7 @@ const useGame = () => {
     if (typeof window !== "undefined") {
       const q = new URLSearchParams(window.location.search).get("size");
       const n = q ? parseInt(q, 10) : NaN;
-      if (Number.isFinite(n) && n >= 2 && n <= 7) s = n;
+      if (Number.isFinite(n) && n >= 2 && n <= 10) s = n;
     }
     setSize(s);
     setGame(new VoltorbFlip(s));
@@ -514,7 +464,7 @@ const useGame = () => {
   }
 
   function setGameSize(n: number) {
-    const clamped = Math.max(2, Math.min(7, Math.round(n)));
+    const clamped = Math.max(2, Math.min(10, Math.round(n)));
     setSize(clamped);
     setGame(new VoltorbFlip(clamped));
   }
@@ -1699,7 +1649,7 @@ function DebugPanel({
         <div>
           <div className="mb-1 text-white/60">Grid size</div>
           <div className="flex gap-1">
-            {[2, 3, 4, 5, 6, 7].map((n) => {
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
               const active = size === n;
               return (
                 <button
@@ -1737,8 +1687,8 @@ function DebugPanel({
         </label>
 
         <p className="border-t border-white/10 pt-2 text-[10px] leading-snug text-white/40">
-          x2/x3/voltorb counts scale by area ratio at non-5 sizes; win
-          threshold is computed from the actual tiles, so every board is
+          Tile composition is generated per (size, level); x3 count is
+          capped so the max score stays playable at any N. Every board is
           winnable.
         </p>
       </div>
