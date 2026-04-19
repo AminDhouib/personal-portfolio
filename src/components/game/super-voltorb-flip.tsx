@@ -29,6 +29,8 @@ import {
   fadeOutMusic,
   playGameOver,
   stopGameOver,
+  playLevelWin,
+  stopLevelWin,
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
@@ -549,7 +551,7 @@ const SCOPED_STYLES = `
 /* Cursor/hover selection — matches the red frame on the active tile in HG/SS.
    Two overlapping shadows give the pixel-art look: dark inner hairline +
    solid red outside. */
-.svf-root .cursor-pointer::before {
+.svf-root .svf-tile-wrap::before {
   content: "";
   position: absolute;
   inset: -2px;
@@ -560,29 +562,57 @@ const SCOPED_STYLES = `
   pointer-events: none;
   z-index: 3;
 }
-.svf-root .cursor-pointer:hover::before,
-.svf-root .cursor-pointer:focus-visible::before {
+.svf-root .svf-tile-wrap:hover::before,
+.svf-root .svf-tile-wrap:focus-visible::before {
   opacity: 1;
 }
-.svf-root .svf-gameover-overlay {
-  animation: svf-gameover-fade 260ms ease-out both;
-  background: radial-gradient(ellipse at center, rgba(120, 0, 0, 0.55) 0%, rgba(60, 0, 0, 0.75) 100%);
+.svf-root .svf-coin {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+  animation: svf-coin-spin 1.3s steps(1, end) infinite;
+  transform-origin: center center;
 }
-.svf-root .svf-gameover-banner {
-  background: linear-gradient(#c4361a 0%, #7a1a0b 100%);
-  border: 3px solid #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 0 0 2px #3a0a04 inset;
-  animation: svf-gameover-drop 420ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
+.svf-root .svf-modal-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(1px);
 }
-@keyframes svf-gameover-fade {
+.svf-root .svf-modal-open {
+  animation: svf-modal-backdrop-in 220ms ease-out both;
+}
+.svf-root .svf-modal-open .svf-modal-card {
+  animation: svf-modal-card-in 320ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+.svf-root .svf-modal-closing {
+  animation: svf-modal-backdrop-out 180ms ease-in both;
+}
+.svf-root .svf-modal-closing .svf-modal-card {
+  animation: svf-modal-card-out 180ms ease-in both;
+}
+@keyframes svf-modal-backdrop-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes svf-gameover-drop {
-  0%   { transform: translateY(-140%) scale(0.85); opacity: 0; }
-  60%  { transform: translateY(8%)    scale(1.02); opacity: 1; }
+@keyframes svf-modal-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes svf-modal-card-in {
+  0%   { transform: translateY(-18px) scale(0.92); opacity: 0; }
+  60%  { transform: translateY(4px)   scale(1.02); opacity: 1; }
   100% { transform: translateY(0)     scale(1);    opacity: 1; }
+}
+@keyframes svf-modal-card-out {
+  from { transform: scale(1);    opacity: 1; }
+  to   { transform: scale(0.92); opacity: 0; }
+}
+@keyframes svf-coin-spin {
+  0%   { transform: scaleX(1);    }
+  16%  { transform: scaleX(0.7);  }
+  32%  { transform: scaleX(0.25); }
+  48%  { transform: scaleX(-0.4); }
+  64%  { transform: scaleX(-0.9); }
+  80%  { transform: scaleX(-0.4); }
+  100% { transform: scaleX(1);    }
 }
 @media (prefers-reduced-motion: reduce) {
   .svf-root * { transition-duration: 150ms !important; animation-duration: 150ms !important; }
@@ -616,7 +646,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
     </div>
   ) : (
     <div
-      className="relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]"
+      className="svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]"
       role="button"
       tabIndex={0}
       aria-label={row !== undefined && col !== undefined ? `Row ${row + 1}, Col ${col + 1}, ${isFlipped ? "revealed" : "face down"}` : undefined}
@@ -824,7 +854,21 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
   }, [game.cells]);
 
   useEffect(() => {
-    if (game.gameStatus === "lose" || game.gameStatus === "win") {
+    if (game.gameStatus === "win") {
+      // Win: reveal the board, let the victory song play, then auto-advance.
+      flipCardsUp().then(() => {
+        const fallback = window.setTimeout(() => flipCardsDown(100), 8000);
+        const advance = () => {
+          window.clearTimeout(fallback);
+          flipCardsDown(100);
+        };
+        if (muted) {
+          window.setTimeout(advance, 1500);
+        } else {
+          playLevelWin(advance);
+        }
+      });
+    } else if (game.gameStatus === "lose") {
       if (waitForClick) {
         flipCardsUp().then(() => {
           waitForUserInteraction().then(() => flipCardsDown(100));
@@ -838,22 +882,6 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
 
   return (
     <div className="relative w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]">
-      {game.gameStatus === "lose" && (
-        <div className="svf-gameover-overlay pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
-          <div className="svf-gameover-banner flex flex-col items-center gap-1 px-6 py-4">
-            <span className="text-2xl font-black tracking-widest text-red-100 drop-shadow-[0_2px_0_rgba(0,0,0,0.8)]">
-              GAME OVER
-            </span>
-            <span className="flex items-center gap-1 text-sm font-bold text-yellow-200">
-              Lv {game.currentLevel}
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-                <path d="M2 4h8L6 10z" />
-              </svg>
-              {Math.max(1, game.currentLevel - 1)}
-            </span>
-          </div>
-        </div>
-      )}
       <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
         <div className="flex flex-col gap-[var(--svf-gap)]">
           <div className="flex gap-[var(--svf-gap)]">
@@ -1008,7 +1036,7 @@ type Translations = {
 
 const translations: Record<Language, Translations> = {
   en: {
-    howToPlayTitle: "How to play:",
+    howToPlayTitle: "How to play",
     instructions: [
       "Click on the cards to reveal them.",
       "The colored cards show how many Coins and Voltorbs are there per row or column.",
@@ -1022,7 +1050,7 @@ const translations: Record<Language, Translations> = {
     ],
   },
   "pt-BR": {
-    howToPlayTitle: "Como jogar:",
+    howToPlayTitle: "Como jogar",
     instructions: [
       "Clique nos cards para revelá-los.",
       "Os cards coloridos mostram quantas Moedas e Voltorbs existem em cada linha e coluna.",
@@ -1061,101 +1089,411 @@ const InstructionsModal = ({
     };
   }, [setModalOpen]);
 
+  const [closing, setClosing] = useState(false);
+  const close = useCallback(() => {
+    setClosing(true);
+    window.setTimeout(() => setModalOpen(false), 180);
+  }, [setModalOpen]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") close();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [close]);
+
   return (
-    <>
+    <div
+      className={`svf-modal-backdrop absolute inset-0 z-[60] flex items-center justify-center overflow-y-auto p-3 ${
+        closing ? "svf-modal-closing" : "svf-modal-open"
+      }`}
+      onClick={close}
+      role="dialog"
+      aria-modal="true"
+      aria-label={howToPlayTitle}
+    >
       <div
-        className="fixed z-50 h-full w-screen -translate-y-2 bg-black opacity-50 "
-        onClick={() => setModalOpen(false)}
-      />
-      <div
-        onClick={() => setModalOpen(false)}
-        className="fixed z-50 cursor-default rounded-5 border-4 border-gray-300 bg-white outline outline-2 outline-gray-600"
+        onClick={(e) => e.stopPropagation()}
+        className="svf-modal-card my-auto w-full max-w-[460px] cursor-default rounded-5 border-4 border-gray-300 bg-white outline outline-2 outline-gray-600 text-gray-700"
       >
-        <div className="flex flex-col gap-8 p-6 pt-3 text-gray-800 drop-shadow-soft">
-          <div>
-            <h1 className="text-4xl text-gray-700">{howToPlayTitle}</h1>
-            <ul className="flex list-disc flex-col gap-4 pl-8 pr-2 pt-2 text-2xl leading-6">
+        <div className="flex items-center justify-between border-b-2 border-gray-200 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <PokeballIcon size={20} />
+            <h1 className="text-2xl leading-none drop-shadow-soft">
+              {howToPlayTitle}
+            </h1>
+          </div>
+          <button
+            onClick={close}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded border-2 border-gray-300 bg-white text-lg leading-none text-gray-600 transition-colors hover:bg-zinc-100"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
+              <rect x="1" y="2" width="2" height="2" />
+              <rect x="3" y="4" width="2" height="2" />
+              <rect x="5" y="6" width="4" height="2" />
+              <rect x="9" y="4" width="2" height="2" />
+              <rect x="11" y="2" width="2" height="2" />
+              <rect x="1" y="10" width="2" height="2" />
+              <rect x="3" y="8" width="2" height="2" />
+              <rect x="9" y="8" width="2" height="2" />
+              <rect x="11" y="10" width="2" height="2" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4 p-4 text-base leading-snug drop-shadow-soft">
+          {/* Reward legend */}
+          <section>
+            <h2 className="mb-2 text-xl text-gray-700">Tiles &amp; rewards</h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-lg">
+              <div className="flex items-center gap-2">
+                <Card fake>1</Card>
+                <Card fake>2</Card>
+                <Card fake>3</Card>
+                <span>...x1! ...x2! ...x3!</span>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-lg">
+              <div className="relative">
+                <Card fake>
+                  <VoltorbIcon size={24} className="picture-outline voltorb" />
+                </Card>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <LoopingExplosion size={36} />
+                </div>
+              </div>
+              <span>Game Over! 0!</span>
+            </div>
+          </section>
+
+          {/* Demo animations */}
+          <section>
+            <h2 className="mb-2 text-xl text-gray-700">How it plays</h2>
+            <ul className="flex list-disc flex-col gap-2 pl-6 text-base">
               <li>{instructions[0]}</li>
               <li>{instructions[1]}</li>
               <li>{instructions[2]}</li>
-              <li>{instructions[3]}</li>
             </ul>
-          </div>
-          <div>
-            <h1 className="text-4xl text-gray-700">{tipsTitle}</h1>
-            <ul className="flex list-disc flex-col gap-4 pl-8 pr-2 text-2xl leading-6">
+            <div className="mt-3 flex items-center justify-around gap-3 rounded-md bg-[#eef5ef] p-3">
+              <div className="flex flex-col items-center gap-1">
+                <div className="relative">
+                  <Card fake>3</Card>
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <LoopingSparkle size={38} />
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500">Collect coins</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="relative">
+                  <Card fake>
+                    <VoltorbIcon size={22} className="picture-outline voltorb" />
+                  </Card>
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <LoopingExplosion size={38} />
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500">Avoid Voltorbs</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Tips */}
+          <section>
+            <h2 className="mb-1 text-xl text-gray-700">{tipsTitle}</h2>
+            <ul className="flex list-disc flex-col gap-2 pl-6 text-base">
               <li>{tips[0]}</li>
               <li>{tips[1]}</li>
             </ul>
-          </div>
+          </section>
         </div>
       </div>
-    </>
+    </div>
   );
 };
+
+const EXPLODE_FRAME_URLS = Array.from(
+  { length: 9 },
+  (_, i) => `/games/super-voltorb-flip/sprites/upstream/tile/explode_${i}.png`,
+);
+const SUCCESS_FRAME_URLS = Array.from(
+  { length: 4 },
+  (_, i) => `/games/super-voltorb-flip/sprites/upstream/success_${i}.png`,
+);
+
+function LoopingFrames({
+  frames,
+  size,
+  interval = 90,
+  pauseMs = 0,
+}: {
+  frames: string[];
+  size: number;
+  interval?: number;
+  pauseMs?: number;
+}) {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number;
+    const tick = () => {
+      if (cancelled) return;
+      setFrame((f) => {
+        const next = (f + 1) % frames.length;
+        timer = window.setTimeout(tick, next === 0 && pauseMs > 0 ? pauseMs : interval);
+        return next;
+      });
+    };
+    timer = window.setTimeout(tick, interval);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [frames.length, interval, pauseMs]);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={frames[frame]}
+      width={size}
+      height={size}
+      alt=""
+      style={{ imageRendering: "pixelated", pointerEvents: "none" }}
+    />
+  );
+}
+
+const LoopingExplosion = ({ size }: { size: number }) => (
+  <LoopingFrames frames={EXPLODE_FRAME_URLS} size={size} interval={70} pauseMs={500} />
+);
+
+const LoopingSparkle = ({ size }: { size: number }) => (
+  <LoopingFrames frames={SUCCESS_FRAME_URLS} size={size} interval={110} pauseMs={700} />
+);
 
 // ---------------------------------------------------------------------------
 // src/components/InstructionsBtns.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-const MobileHelpButton = () => {
-  const [modalOpen, setModalOpen] = useState(false);
-  return (
-    <>
-      {modalOpen && (
-        <InstructionsModal language="en" setModalOpen={setModalOpen} />
+const MobileHelpButton = ({ onOpen }: { onOpen: () => void }) => (
+  <button
+    onClick={onOpen}
+    aria-label="How to play"
+    title="How to play"
+    className="flex h-10 w-10 items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white outline outline-2 outline-gray-600 transition-colors hover:bg-zinc-100"
+  >
+    <PokeballIcon size={22} />
+  </button>
+);
+
+const PixelMuteButton = ({
+  muted,
+  onToggle,
+  size = 40,
+}: {
+  muted: boolean;
+  onToggle: () => void;
+  size?: number;
+}) => (
+  <button
+    onClick={onToggle}
+    aria-label={muted ? "Unmute" : "Mute"}
+    title={muted ? "Unmute" : "Mute"}
+    className="flex items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white outline outline-2 outline-gray-600 text-gray-700 transition-colors hover:bg-zinc-100"
+    style={{ width: size, height: size }}
+  >
+    <svg
+      width={Math.round(size * 0.55)}
+      height={Math.round(size * 0.55)}
+      viewBox="0 0 16 16"
+      style={{ imageRendering: "pixelated", shapeRendering: "crispEdges" }}
+      aria-hidden
+    >
+      {/* speaker body */}
+      <rect x="2" y="6" width="2" height="4" fill="currentColor" />
+      <rect x="4" y="5" width="1" height="6" fill="currentColor" />
+      {/* cone */}
+      <rect x="5" y="4" width="1" height="8" fill="currentColor" />
+      <rect x="6" y="3" width="1" height="10" fill="currentColor" />
+      <rect x="7" y="2" width="1" height="12" fill="currentColor" />
+      {muted ? (
+        <>
+          {/* diagonal slash */}
+          <rect x="10" y="4" width="1" height="1" fill="#d62a18" />
+          <rect x="11" y="5" width="1" height="1" fill="#d62a18" />
+          <rect x="12" y="6" width="1" height="1" fill="#d62a18" />
+          <rect x="13" y="7" width="1" height="1" fill="#d62a18" />
+          <rect x="14" y="8" width="1" height="1" fill="#d62a18" />
+          <rect x="13" y="9" width="1" height="1" fill="#d62a18" />
+          <rect x="12" y="10" width="1" height="1" fill="#d62a18" />
+          <rect x="11" y="11" width="1" height="1" fill="#d62a18" />
+          <rect x="10" y="12" width="1" height="1" fill="#d62a18" />
+        </>
+      ) : (
+        <>
+          {/* sound waves */}
+          <rect x="9" y="6" width="1" height="4" fill="currentColor" />
+          <rect x="10" y="5" width="1" height="1" fill="currentColor" />
+          <rect x="10" y="10" width="1" height="1" fill="currentColor" />
+          <rect x="11" y="4" width="1" height="1" fill="currentColor" />
+          <rect x="11" y="11" width="1" height="1" fill="currentColor" />
+          <rect x="12" y="5" width="1" height="6" fill="currentColor" />
+          <rect x="13" y="6" width="1" height="4" fill="currentColor" />
+        </>
       )}
-      <button
-        onClick={() => setModalOpen(true)}
-        aria-label="How to play"
-        title="How to play"
-        className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/60 bg-white/90 text-base font-black text-[#285136] transition-colors hover:bg-white"
+    </svg>
+  </button>
+);
+
+const COIN_FRAMES = [1, 0.75, 0.35, -0.2, -0.75, -0.35, 0.35, 0.75];
+
+const CoinSpinner = ({ size = 28 }: { size?: number }) => {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setFrame((f) => (f + 1) % COIN_FRAMES.length),
+      110,
+    );
+    return () => window.clearInterval(id);
+  }, []);
+  const scaleX = COIN_FRAMES[frame];
+  const showEdge = Math.abs(scaleX) < 0.3;
+  return (
+    <div
+      className="flex items-center justify-center"
+      style={{ width: size, height: size, perspective: 200 }}
+    >
+      <div
+        style={{
+          transform: `scaleX(${scaleX})`,
+          width: size,
+          height: size,
+          imageRendering: "pixelated",
+          shapeRendering: "crispEdges",
+        }}
       >
-        ?
-      </button>
-    </>
-  );
-};
-
-const InstructionsBtns = () => {
-  const [language, setLanguage] = useState<Language>("en");
-  const [modalOpen, setModalOpen] = useState(false);
-
-  function handleClick(language: Language) {
-    setLanguage(language);
-    setModalOpen(true);
-  }
-
-  return (
-    <>
-      {modalOpen && (
-        <InstructionsModal language={language} setModalOpen={setModalOpen} />
-      )}
-      <div className="flex w-full justify-around gap-2">
-        <div
-          className="flex w-11/12 cursor-pointer place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600 hover:bg-zinc-200"
-          onClick={() => {
-            handleClick("pt-BR");
-          }}
-        >
-          <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
-            Como jogar
-          </div>
-        </div>
-        <div
-          className="flex w-11/12 cursor-pointer place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600 hover:bg-zinc-200"
-          onClick={() => {
-            handleClick("en");
-          }}
-        >
-          <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
-            How to play
-          </div>
-        </div>
+        {showEdge ? (
+          <svg width={size} height={size} viewBox="0 0 16 16">
+            <rect x="7" y="2" width="2" height="12" fill="#c69a32" />
+            <rect x="7" y="2" width="1" height="12" fill="#f4c04c" />
+          </svg>
+        ) : (
+          <svg width={size} height={size} viewBox="0 0 16 16">
+            {/* outer black edge */}
+            <rect x="5" y="1" width="6" height="1" fill="#5a4112" />
+            <rect x="3" y="2" width="2" height="1" fill="#5a4112" />
+            <rect x="11" y="2" width="2" height="1" fill="#5a4112" />
+            <rect x="2" y="3" width="1" height="1" fill="#5a4112" />
+            <rect x="13" y="3" width="1" height="1" fill="#5a4112" />
+            <rect x="1" y="4" width="1" height="8" fill="#5a4112" />
+            <rect x="14" y="4" width="1" height="8" fill="#5a4112" />
+            <rect x="2" y="12" width="1" height="1" fill="#5a4112" />
+            <rect x="13" y="12" width="1" height="1" fill="#5a4112" />
+            <rect x="3" y="13" width="2" height="1" fill="#5a4112" />
+            <rect x="11" y="13" width="2" height="1" fill="#5a4112" />
+            <rect x="5" y="14" width="6" height="1" fill="#5a4112" />
+            {/* body */}
+            <rect x="5" y="2" width="6" height="1" fill="#f4c04c" />
+            <rect x="3" y="3" width="10" height="1" fill="#f4c04c" />
+            <rect x="3" y="4" width="10" height="1" fill="#f4c04c" />
+            <rect x="2" y="5" width="12" height="7" fill="#f4c04c" />
+            <rect x="3" y="12" width="10" height="1" fill="#f4c04c" />
+            <rect x="5" y="13" width="6" height="1" fill="#f4c04c" />
+            {/* highlight */}
+            <rect x="4" y="3" width="2" height="1" fill="#fcea7d" />
+            <rect x="3" y="4" width="2" height="1" fill="#fcea7d" />
+            <rect x="2" y="5" width="1" height="3" fill="#fcea7d" />
+            {/* shadow */}
+            <rect x="11" y="11" width="2" height="1" fill="#c69a32" />
+            <rect x="13" y="8" width="1" height="4" fill="#c69a32" />
+            <rect x="12" y="12" width="1" height="1" fill="#c69a32" />
+            {/* central dollar-ish glyph */}
+            <rect x="7" y="5" width="2" height="1" fill="#8a6419" />
+            <rect x="6" y="6" width="1" height="1" fill="#8a6419" />
+            <rect x="7" y="7" width="2" height="1" fill="#8a6419" />
+            <rect x="9" y="8" width="1" height="1" fill="#8a6419" />
+            <rect x="7" y="9" width="2" height="1" fill="#8a6419" />
+            <rect x="7" y="4" width="2" height="1" fill="#8a6419" />
+            <rect x="7" y="10" width="2" height="1" fill="#8a6419" />
+          </svg>
+        )}
       </div>
-    </>
+    </div>
   );
 };
+
+const PokeballIcon = ({ size = 22 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    style={{ imageRendering: "pixelated", shapeRendering: "crispEdges" }}
+    aria-hidden
+  >
+    {/* outer black ring */}
+    <rect x="5" y="0" width="6" height="1" fill="#1a1a1a" />
+    <rect x="3" y="1" width="2" height="1" fill="#1a1a1a" />
+    <rect x="11" y="1" width="2" height="1" fill="#1a1a1a" />
+    <rect x="2" y="2" width="1" height="1" fill="#1a1a1a" />
+    <rect x="13" y="2" width="1" height="1" fill="#1a1a1a" />
+    <rect x="1" y="3" width="1" height="3" fill="#1a1a1a" />
+    <rect x="14" y="3" width="1" height="3" fill="#1a1a1a" />
+    <rect x="0" y="6" width="1" height="4" fill="#1a1a1a" />
+    <rect x="15" y="6" width="1" height="4" fill="#1a1a1a" />
+    <rect x="1" y="10" width="1" height="3" fill="#1a1a1a" />
+    <rect x="14" y="10" width="1" height="3" fill="#1a1a1a" />
+    <rect x="2" y="13" width="1" height="1" fill="#1a1a1a" />
+    <rect x="13" y="13" width="1" height="1" fill="#1a1a1a" />
+    <rect x="3" y="14" width="2" height="1" fill="#1a1a1a" />
+    <rect x="11" y="14" width="2" height="1" fill="#1a1a1a" />
+    <rect x="5" y="15" width="6" height="1" fill="#1a1a1a" />
+    {/* red top half */}
+    <rect x="5" y="1" width="6" height="1" fill="#e74c3c" />
+    <rect x="3" y="2" width="10" height="1" fill="#e74c3c" />
+    <rect x="2" y="3" width="12" height="1" fill="#e74c3c" />
+    <rect x="2" y="4" width="12" height="1" fill="#e74c3c" />
+    <rect x="1" y="5" width="14" height="1" fill="#e74c3c" />
+    <rect x="1" y="6" width="14" height="1" fill="#d62a18" />
+    {/* highlight on top-left */}
+    <rect x="4" y="2" width="2" height="1" fill="#ff8673" />
+    <rect x="3" y="3" width="2" height="1" fill="#ff8673" />
+    {/* black band */}
+    <rect x="1" y="7" width="5" height="2" fill="#1a1a1a" />
+    <rect x="10" y="7" width="5" height="2" fill="#1a1a1a" />
+    {/* center circle ring */}
+    <rect x="6" y="6" width="4" height="1" fill="#1a1a1a" />
+    <rect x="6" y="9" width="4" height="1" fill="#1a1a1a" />
+    <rect x="5" y="7" width="1" height="2" fill="#1a1a1a" />
+    <rect x="10" y="7" width="1" height="2" fill="#1a1a1a" />
+    {/* center white */}
+    <rect x="6" y="7" width="4" height="2" fill="#ffffff" />
+    {/* white bottom half */}
+    <rect x="1" y="9" width="14" height="1" fill="#f5f5f5" />
+    <rect x="1" y="10" width="14" height="1" fill="#ffffff" />
+    <rect x="2" y="11" width="12" height="1" fill="#ffffff" />
+    <rect x="2" y="12" width="12" height="1" fill="#ffffff" />
+    <rect x="3" y="13" width="10" height="1" fill="#ffffff" />
+    <rect x="5" y="14" width="6" height="1" fill="#ffffff" />
+    {/* subtle bottom shadow */}
+    <rect x="3" y="13" width="3" height="1" fill="#d0d0d0" />
+    <rect x="2" y="12" width="2" height="1" fill="#d0d0d0" />
+  </svg>
+);
+
+const InstructionsBtns = ({ onOpen }: { onOpen: () => void }) => (
+  <button
+    onClick={onOpen}
+    aria-label="How to play"
+    title="How to play"
+    className="flex items-center gap-2 rounded-5 border-4 border-gray-300 bg-white px-3 py-1 outline outline-2 outline-gray-600 hover:bg-zinc-200"
+  >
+    <PokeballIcon size={22} />
+    <span className="text-2xl leading-7 text-gray-600 drop-shadow-soft">
+      How to play
+    </span>
+  </button>
+);
 
 // ---------------------------------------------------------------------------
 // src/components/Settings.tsx (1:1 port).
@@ -1181,6 +1519,7 @@ export function SuperVoltorbFlipGame() {
   const [muted, toggleMute] = useMute();
   const [memoMode, setMemoMode] = useState(false);
   const [memoFlag, setMemoFlag] = useState<1 | 2 | 3 | "V">(1);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const musicStartedRef = useRef(false);
 
   useEffect(() => {
@@ -1191,6 +1530,7 @@ export function SuperVoltorbFlipGame() {
     return () => {
       stopMusic();
       stopGameOver();
+      stopLevelWin();
       musicStartedRef.current = false;
     };
   }, []);
@@ -1238,9 +1578,15 @@ export function SuperVoltorbFlipGame() {
         if (!muted) playGameOver();
       }, 320);
     }
+    if (cur === "win" && prev !== "win") {
+      // Fade the loop so the level-win song plays cleanly; Gameboard handles
+      // actually starting music_level_win and auto-advancing on its end event.
+      fadeOutMusic(250);
+    }
     if ((prev === "win" || prev === "lose") && cur === "playing") {
       setMemoMode(false);
       stopGameOver();
+      stopLevelWin();
       if (!muted) {
         musicStartedRef.current = true;
         playMusic();
@@ -1256,28 +1602,26 @@ export function SuperVoltorbFlipGame() {
     }
   }
 
-  const MuteIcon = muted ? (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
-    </svg>
-  ) : (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-    </svg>
-  );
-
   return (
     <EffectsProvider>
       <div
-        className={`svf-root ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center md:grid md:grid-cols-[auto_1fr] md:items-start md:gap-4 text-white p-1 sm:p-2`}
+        className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center md:grid md:grid-cols-[auto_1fr] md:items-start md:gap-4 text-white p-1 sm:p-2`}
       >
         <style>{SCOPED_STYLES}</style>
+
+        {howToPlayOpen && (
+          <InstructionsModal
+            language="en"
+            setModalOpen={setHowToPlayOpen}
+          />
+        )}
 
         {/* Compact mobile bar (hidden at sm+). Shows level, both scores,
             mute, help and memo in one tight strip so the board gets room. */}
         {game && (
           <div className="flex w-full max-w-[420px] flex-col gap-1.5 sm:hidden">
             <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-1.5 py-1 outline outline-2 outline-gray-600 text-gray-700">
+              <CoinSpinner size={28} />
               <div className="flex min-w-[44px] flex-col items-center justify-center rounded-[3px] bg-[#448563] px-1 leading-none text-white">
                 <span className="text-[9px] font-bold uppercase tracking-widest">
                   Lv
@@ -1308,15 +1652,8 @@ export function SuperVoltorbFlipGame() {
             </div>
             <div className="flex items-center justify-between gap-2 px-1">
               <div className="flex items-center gap-2">
-                <MobileHelpButton />
-                <button
-                  onClick={toggleMute}
-                  aria-label={muted ? "Unmute" : "Mute"}
-                  title={muted ? "Unmute" : "Mute"}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/60 bg-white/90 text-[#285136] transition-colors hover:bg-white"
-                >
-                  {MuteIcon}
-                </button>
+                <MobileHelpButton onOpen={() => setHowToPlayOpen(true)} />
+                <PixelMuteButton muted={muted} onToggle={toggleMute} size={40} />
               </div>
               <MemoPanel
                 compact
@@ -1331,16 +1668,16 @@ export function SuperVoltorbFlipGame() {
 
         {/* Desktop / tablet left column (sm+ only). */}
         <div className="hidden sm:flex flex-col items-center gap-2 md:items-stretch md:min-w-[220px]">
-          <div className="flex w-full items-center justify-between">
-            <InstructionsBtns />
-            <button
-              onClick={toggleMute}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/70 hover:text-white transition-colors"
-              aria-label={muted ? "Unmute" : "Mute"}
-              title={muted ? "Unmute" : "Mute"}
-            >
-              {MuteIcon}
-            </button>
+          <div className="flex w-full items-center justify-center gap-2 md:justify-start">
+            <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+            <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
+            <MemoPanel
+              compact
+              mode={memoMode}
+              flag={memoFlag}
+              onToggleMode={() => setMemoMode((m) => !m)}
+              onFlagChange={setMemoFlag}
+            />
           </div>
           {game && (
             <Scoreboard
@@ -1348,20 +1685,22 @@ export function SuperVoltorbFlipGame() {
               totalScore={game.totalScore}
             />
           )}
-          <MemoPanel
-            mode={memoMode}
-            flag={memoFlag}
-            onToggleMode={() => setMemoMode((m) => !m)}
-            onFlagChange={setMemoFlag}
-          />
         </div>
 
-        {/* Right column: game info (sm+), gameboard, footer */}
+        {/* Right column: tiny level banner (sm+), gameboard, footer */}
         <div className="flex flex-col items-center gap-2">
           {game && (
             <>
-              <div className="hidden w-full sm:flex sm:flex-col sm:items-center sm:gap-2">
-                <GameInfo currentLevel={game.currentLevel} />
+              <div className="hidden w-full sm:flex sm:items-center sm:justify-center">
+                <div className="flex items-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 py-1 outline outline-2 outline-gray-600 text-base drop-shadow-default">
+                  <span className="font-bold uppercase tracking-widest text-white/80 text-xs">
+                    Lv
+                  </span>
+                  <span className="text-lg font-black">{game.currentLevel}</span>
+                  <span className="ml-2 text-sm text-white/70">
+                    VOLTORB Flip
+                  </span>
+                </div>
               </div>
               <Gameboard
                 game={game}

@@ -1,6 +1,7 @@
 let ctx: AudioContext | null = null;
 let music: HTMLAudioElement | null = null;
 let gameOverAudio: HTMLAudioElement | null = null;
+let levelWinAudio: HTMLAudioElement | null = null;
 let globalMuted = false;
 
 function ensureCtx() {
@@ -106,8 +107,25 @@ export function stopGameOver() {
   gameOverAudio = null;
 }
 
+export function playLevelWin(onEnded?: () => void): HTMLAudioElement | null {
+  if (typeof window === "undefined") return null;
+  levelWinAudio?.pause();
+  levelWinAudio = new Audio("/games/super-voltorb-flip/audio/music_level_win.mp3");
+  levelWinAudio.volume = 0.5;
+  levelWinAudio.muted = globalMuted;
+  if (onEnded) levelWinAudio.addEventListener("ended", onEnded, { once: true });
+  levelWinAudio.play().catch(() => {});
+  return levelWinAudio;
+}
+
+export function stopLevelWin() {
+  levelWinAudio?.pause();
+  levelWinAudio = null;
+}
+
 export function setMusicMuted(muted: boolean) {
   globalMuted = muted;
   if (music) music.muted = muted;
   if (gameOverAudio) gameOverAudio.muted = muted;
+  if (levelWinAudio) levelWinAudio.muted = muted;
 }
