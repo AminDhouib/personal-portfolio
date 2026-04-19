@@ -225,9 +225,9 @@ class Board {
     this._colValues = Array(size)
       .fill(0)
       .map(() => ({ coins: 0, voltorbs: 0 }));
+    this._maxLevelScore = 0;
     this._board = this.createBoard(level);
     this._flippedCells = 0;
-    this._maxLevelScore = level.levelData.coins;
   }
 
   public flagCell(row: number, col: number, flag: CellValue): void {
@@ -276,9 +276,18 @@ class Board {
       total - scaledX2 - scaledX3,
       Math.max(0, Math.round(voltorbs * ratio)),
     );
-    // At very small boards we can round to 0 non-1 tiles; keep at least a sprinkle.
-    if (size <= 3 && scaledX2 + scaledX3 + scaledV === 0) {
-      scaledX3 = 1;
+    // Guarantee the board is actually winnable at any N: there must be at
+    // least one valuable tile (x2 or x3). Without this, maxLevelScore
+    // collapses to 1, which either auto-wins on first flip or never wins.
+    if (scaledX2 + scaledX3 === 0) {
+      if (total - scaledV >= 1) scaledX3 = 1;
+      else {
+        scaledV = Math.max(0, total - 1);
+        scaledX3 = 1;
+      }
+    }
+    // Also ensure at least one voltorb exists so the game has a fail state.
+    if (scaledV === 0 && total - scaledX2 - scaledX3 >= 1) {
       scaledV = 1;
     }
 
@@ -317,6 +326,10 @@ class Board {
         index++;
       }
     }
+    // Win threshold = product of every non-1 tile. Ignoring the authored
+    // level.coins value (which is 5x5-only) keeps every board winnable even
+    // after the area-scaling above rounds counts down.
+    this._maxLevelScore = Math.pow(2, scaledX2) * Math.pow(3, scaledX3);
     return board;
   }
 
@@ -1724,8 +1737,9 @@ function DebugPanel({
         </label>
 
         <p className="border-t border-white/10 pt-2 text-[10px] leading-snug text-white/40">
-          Board sizes other than 5x5 are visual-only; win thresholds are tuned
-          for the HG/SS 5x5 rules.
+          x2/x3/voltorb counts scale by area ratio at non-5 sizes; win
+          threshold is computed from the actual tiles, so every board is
+          winnable.
         </p>
       </div>
     </div>
