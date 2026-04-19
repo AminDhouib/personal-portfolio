@@ -34,7 +34,7 @@ import {
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
-import { MemoPanel } from "./super-voltorb-flip/memo-button";
+import { MemoBar, type MemoFlag } from "./super-voltorb-flip/memo-button";
 
 // ---------------------------------------------------------------------------
 // Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
@@ -754,13 +754,12 @@ type GameboardProps = {
   waitForClick: boolean;
   muted: boolean;
   onFirstInteraction: () => void;
-  memoMode: boolean;
-  memoFlag: 1 | 2 | 3 | "V";
+  memoFlag: MemoFlag;
 };
 
 type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number; onDone: () => void };
 
-const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, memoMode, memoFlag }: GameboardProps) => {
+const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, memoFlag }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
@@ -785,7 +784,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
 
   function handleFlip(row: number, col: number) {
     if (!game) return;
-    if (memoMode) {
+    if (memoFlag !== null) {
       updateGame((g) => g.flagCell(row, col, memoFlag));
       return;
     }
@@ -1517,8 +1516,7 @@ const Footer = () => null;
 export function SuperVoltorbFlipGame() {
   const { game, updateGame } = useGame();
   const [muted, toggleMute] = useMute();
-  const [memoMode, setMemoMode] = useState(false);
-  const [memoFlag, setMemoFlag] = useState<1 | 2 | 3 | "V">(1);
+  const [memoFlag, setMemoFlag] = useState<MemoFlag>(null);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const musicStartedRef = useRef(false);
 
@@ -1584,7 +1582,7 @@ export function SuperVoltorbFlipGame() {
       fadeOutMusic(250);
     }
     if ((prev === "win" || prev === "lose") && cur === "playing") {
-      setMemoMode(false);
+      setMemoFlag(null);
       stopGameOver();
       stopLevelWin();
       if (!muted) {
@@ -1655,30 +1653,39 @@ export function SuperVoltorbFlipGame() {
                 <MobileHelpButton onOpen={() => setHowToPlayOpen(true)} />
                 <PixelMuteButton muted={muted} onToggle={toggleMute} size={40} />
               </div>
-              <MemoPanel
-                compact
-                mode={memoMode}
-                flag={memoFlag}
-                onToggleMode={() => setMemoMode((m) => !m)}
-                onFlagChange={setMemoFlag}
+              <MemoBar
+                activeFlag={memoFlag}
+                onFlagSelect={setMemoFlag}
+                size={28}
+                showLabel={false}
               />
             </div>
           </div>
         )}
 
-        {/* Desktop / tablet left column (sm+ only). */}
-        <div className="hidden sm:flex flex-col items-center gap-2 md:items-stretch md:min-w-[220px]">
-          <div className="flex w-full items-center justify-center gap-2 md:justify-start">
+        {/* Desktop / tablet left column (sm+ only). Holds everything except
+            the board so the right column can devote full width to tiles. */}
+        <div className="hidden sm:flex flex-col items-center gap-2 md:items-stretch md:min-w-[240px]">
+          <div className="flex w-full flex-wrap items-center justify-center gap-2 md:justify-start">
             <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
             <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
-            <MemoPanel
-              compact
-              mode={memoMode}
-              flag={memoFlag}
-              onToggleMode={() => setMemoMode((m) => !m)}
-              onFlagChange={setMemoFlag}
-            />
+            {game && (
+              <div className="flex items-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 py-[6px] outline outline-2 outline-gray-600 drop-shadow-default">
+                <span className="text-xs font-bold uppercase tracking-widest text-white/80">
+                  Lv
+                </span>
+                <span className="text-lg font-black leading-none">
+                  {game.currentLevel}
+                </span>
+                <span className="text-sm text-white/70">VOLTORB Flip</span>
+              </div>
+            )}
           </div>
+          <MemoBar
+            activeFlag={memoFlag}
+            onFlagSelect={setMemoFlag}
+            size={32}
+          />
           {game && (
             <Scoreboard
               currentScore={game.currentScore}
@@ -1687,28 +1694,16 @@ export function SuperVoltorbFlipGame() {
           )}
         </div>
 
-        {/* Right column: tiny level banner (sm+), gameboard, footer */}
+        {/* Right column: just the board + footer so the tiles get full width. */}
         <div className="flex flex-col items-center gap-2">
           {game && (
             <>
-              <div className="hidden w-full sm:flex sm:items-center sm:justify-center">
-                <div className="flex items-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 py-1 outline outline-2 outline-gray-600 text-base drop-shadow-default">
-                  <span className="font-bold uppercase tracking-widest text-white/80 text-xs">
-                    Lv
-                  </span>
-                  <span className="text-lg font-black">{game.currentLevel}</span>
-                  <span className="ml-2 text-sm text-white/70">
-                    VOLTORB Flip
-                  </span>
-                </div>
-              </div>
               <Gameboard
                 game={game}
                 updateGame={updateGame}
                 waitForClick
                 muted={muted}
                 onFirstInteraction={handleFirstInteraction}
-                memoMode={memoMode}
                 memoFlag={memoFlag}
               />
               <Footer />
