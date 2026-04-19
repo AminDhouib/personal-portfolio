@@ -215,12 +215,14 @@ class Board {
   private _maxLevelScore: number;
   private _rowValues: RowColValues[];
   private _colValues: RowColValues[];
+  private _size: number;
 
-  constructor(level: Level) {
-    this._rowValues = Array(5)
+  constructor(level: Level, size: number = 5) {
+    this._size = size;
+    this._rowValues = Array(size)
       .fill(0)
       .map(() => ({ coins: 0, voltorbs: 0 }));
-    this._colValues = Array(5)
+    this._colValues = Array(size)
       .fill(0)
       .map(() => ({ coins: 0, voltorbs: 0 }));
     this._board = this.createBoard(level);
@@ -258,23 +260,44 @@ class Board {
   }
 
   private createBoard(level: Level) {
-    const board: Cell[][] = [...Array(5)].map(() => Array.from({ length: 5 }));
+    const size = this._size;
+    const total = size * size;
+    const board: Cell[][] = [...Array(size)].map(() =>
+      Array.from({ length: size }),
+    );
     const { x2, x3, voltorbs } = level.levelData;
 
+    // HG/SS level tables are tuned for 5x5. When rendering a different size we
+    // scale distributions proportionally (area ratio) and clamp to total.
+    const ratio = total / 25;
+    let scaledX2 = Math.min(total, Math.max(0, Math.round(x2 * ratio)));
+    let scaledX3 = Math.min(total - scaledX2, Math.max(0, Math.round(x3 * ratio)));
+    let scaledV = Math.min(
+      total - scaledX2 - scaledX3,
+      Math.max(0, Math.round(voltorbs * ratio)),
+    );
+    // At very small boards we can round to 0 non-1 tiles; keep at least a sprinkle.
+    if (size <= 3 && scaledX2 + scaledX3 + scaledV === 0) {
+      scaledX3 = 1;
+      scaledV = 1;
+    }
+
     const levelValuesArray: CellValue[] = [
-      ...Array(x2).fill(2),
-      ...Array(x3).fill(3),
-      ...Array(voltorbs).fill("V"),
+      ...Array(scaledX2).fill(2),
+      ...Array(scaledX3).fill(3),
+      ...Array(scaledV).fill("V"),
     ];
-    const remainingFillArray: 1[] = Array(25 - levelValuesArray.length).fill(1);
+    const remainingFillArray: 1[] = Array(
+      total - levelValuesArray.length,
+    ).fill(1);
     const shuffledValuesArray: CellValue[] = shuffle([
       ...levelValuesArray,
       ...remainingFillArray,
     ]);
 
     let index = 0;
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
         const cell = {
           value: shuffledValuesArray[index],
           flags: { 1: false, 2: false, 3: false, V: false },
@@ -331,14 +354,16 @@ class VoltorbFlip {
   private _currentLevel: number;
   private _level: Level;
   private _gameStatus: GameStatus;
+  private _size: number;
 
-  constructor() {
+  constructor(size: number = 5) {
+    this._size = size;
     this._level = new Level(0);
     this._currentLevel = 0;
     this._currentScore = 0;
     this._totalScore = 0;
     this._gameStatus = "playing";
-    this._board = new Board(this._level);
+    this._board = new Board(this._level, this._size);
   }
 
   public toggleMemo() {
@@ -376,7 +401,7 @@ class VoltorbFlip {
     this._gameStatus = "playing";
     this._currentScore = 0;
     this._level = new Level(this._currentLevel);
-    this._board = new Board(this._level);
+    this._board = new Board(this._level, this._size);
   }
 
   get cells() {
@@ -442,7 +467,16 @@ const useGame = () => {
   const [game, setGame] = useState<VoltorbFlip>();
 
   useEffect(() => {
-    setGame(new VoltorbFlip());
+    // `?size=N` (N in 2..7) creates a non-default board for layout testing.
+    // Game logic is scaled proportionally but authored for 5x5 — use at your
+    // own risk for "real" play.
+    let size = 5;
+    if (typeof window !== "undefined") {
+      const q = new URLSearchParams(window.location.search).get("size");
+      const n = q ? parseInt(q, 10) : NaN;
+      if (Number.isFinite(n) && n >= 2 && n <= 7) size = n;
+    }
+    setGame(new VoltorbFlip(size));
   }, []);
 
   function updateGame(callback: (game: VoltorbFlip) => void): void {
@@ -463,21 +497,28 @@ const useGame = () => {
 // Upstream sprite (28x28 PNG, mirrored into /public from jv-vogler/voltorb-flip).
 function VoltorbIcon({
   size = 28,
+  cssSize,
   className,
 }: {
   size?: number;
+  cssSize?: string;
   className?: string;
 }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/games/super-voltorb-flip/sprites/upstream/voltorb.png"
-      width={size}
-      height={size}
+      width={cssSize ? undefined : size}
+      height={cssSize ? undefined : size}
       alt=""
       aria-hidden="true"
       className={className}
-      style={{ display: "block", imageRendering: "pixelated" }}
+      style={{
+        display: "block",
+        imageRendering: "pixelated",
+        width: cssSize,
+        height: cssSize,
+      }}
     />
   );
 }
@@ -490,14 +531,37 @@ function VoltorbIcon({
 
 const SCOPED_STYLES = `
 .svf-root {
+  --svf-n: 5;
   --svf-tile: 40px;
   --svf-gap: 16px;
 }
-@media (max-width: 639px) {
-  .svf-root { --svf-tile: 44px; --svf-gap: 14px; }
+/* Fluid board sizing. .svf-board-frame is a container-query root so the
+   tiles/gaps can solve for any --svf-n (board size) from 2 to 7. Formula:
+     tile*(N+1) + gap*N = contentWidth, gap = 0.28*tile
+     -> tile = contentWidth / (1.28*N + 1)
+   The 12px constant accounts for outer tile outlines that sit outside each
+   grid cell (outline-4 = 4px, times ~1.5 cells on average). */
+.svf-root .svf-board-frame {
+  container-type: inline-size;
+  container-name: svf-board;
+  --svf-pad: 12px;
+  --svf-tile-cap: 72px;
+  --svf-tile-ideal: calc((100cqw - 2 * var(--svf-pad) - 16px) / (1.28 * var(--svf-n) + 1));
+  --svf-tile: min(var(--svf-tile-cap), var(--svf-tile-ideal));
+  --svf-gap: calc(var(--svf-tile) * 0.28);
+  /* Cap so a small board doesn't stretch the frame into empty green space
+     at the tile cap: cap width = tileCap * (1.28N + 1) + frame chrome. */
+  --svf-max-cap: calc(var(--svf-tile-cap) * (1.28 * var(--svf-n) + 1) + 2 * var(--svf-pad) + 16px);
+  /* Explicit width so a mobile parent (flex-col items-center) can't
+     collapse us to 0 — the container-query math needs a real inline size. */
+  width: min(92vw, 380px, var(--svf-max-cap));
+  margin-inline: auto;
 }
-@media (max-width: 359px) {
-  .svf-root { --svf-tile: 36px; --svf-gap: 12px; }
+@media (min-width: 640px) {
+  .svf-root .svf-board-frame { width: min(92vw, 460px, var(--svf-max-cap)); }
+}
+@media (min-width: 1024px) {
+  .svf-root .svf-board-frame { width: min(60vw, 560px, var(--svf-max-cap)); }
 }
 .svf-root { font-family: var(--font-voltorb-ds), ui-monospace, monospace; color: #fff; background-color: #58a66c; }
 .svf-root *, .svf-root *::before, .svf-root *::after { box-sizing: border-box; text-rendering: geometricPrecision; }
@@ -636,10 +700,13 @@ type CardProps = {
 const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
+  const faceTextStyle: React.CSSProperties = { fontSize: "calc(var(--svf-tile) * 0.6)" };
+  const flagSize = "calc(var(--svf-tile) * 0.34)";
   return fake ? (
     <div className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200">
       <div
-        className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center border-2 border-[#a55a52] bg-[#bd8c84] text-3xl font-bold text-black`}
+        className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center border-2 border-[#a55a52] bg-[#bd8c84] font-bold text-black`}
+        style={faceTextStyle}
       >
         {children}
       </div>
@@ -660,7 +727,8 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
         style={{ transform: `${isFlipped ? "rotateY(180deg)" : "none"}` }}
       >
         <div
-          className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-black bg-[#bd8c84] text-3xl font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
+          className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-black bg-[#bd8c84] font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
+          style={faceTextStyle}
         >
           <div className="flex h-full w-full items-center justify-center border-2 border-[#8a4236]">
             {children}
@@ -694,10 +762,12 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/games/super-voltorb-flip/sprites/upstream/memo/${f === "V" ? 0 : (f as number) - 1}.png`}
-                    width={14}
-                    height={14}
                     alt=""
-                    style={{ imageRendering: "pixelated" }}
+                    style={{
+                      imageRendering: "pixelated",
+                      width: flagSize,
+                      height: flagSize,
+                    }}
                   />
                 </div>
               ) : null,
@@ -725,19 +795,31 @@ const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
       className={`${numberFont.className} relative z-[5] box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
     >
       <div
-        className={`relative flex h-full w-full flex-col place-content-center place-items-center text-3xl font-bold text-gray-800`}
-        style={{ backgroundColor: COLORS[index] }}
+        className="relative flex h-full w-full flex-col place-content-center place-items-center font-bold text-gray-800"
+        style={{
+          backgroundColor: COLORS[index],
+          fontSize: "calc(var(--svf-tile) * 0.55)",
+        }}
       >
-        <div className="absolute top-[-11px] right-[-3px] text-end tracking-widest">
+        <div
+          className="absolute right-0 text-end tracking-widest"
+          style={{ top: "calc(var(--svf-tile) * -0.22)" }}
+        >
           {coins.toString().padStart(2, "0")}
         </div>
-        <div className="absolute top-[20px] w-full outline outline-2 outline-gray-200"></div>
-        <div className="absolute bottom-[-6px] flex items-center gap-0.5">
+        <div
+          className="absolute w-full outline outline-2 outline-gray-200"
+          style={{ top: "50%" }}
+        />
+        <div
+          className="absolute flex items-center gap-0.5"
+          style={{ bottom: "calc(var(--svf-tile) * -0.15)" }}
+        >
           <VoltorbIcon
-            size={28}
-            className="voltorb translate-y-1.5 object-contain"
+            cssSize="calc(var(--svf-tile) * 0.72)"
+            className="voltorb object-contain"
           />
-          <p className="translate-x-0.5">{voltorbs}</p>
+          <p style={{ transform: "translate(-1px, 2px)" }}>{voltorbs}</p>
         </div>
       </div>
     </div>
@@ -879,14 +961,24 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameStatus]);
 
+  const N = game.cells.length;
+
   return (
-    <div className="relative w-full border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]">
+    <div
+      className="svf-board-frame relative border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]"
+      style={{ "--svf-n": N } as React.CSSProperties}
+    >
       <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
         <div className="flex flex-col gap-[var(--svf-gap)]">
           <div className="flex gap-[var(--svf-gap)]">
-            <div className="relative grid grid-cols-5 gap-[var(--svf-gap)]">
+            <div
+              className="relative grid gap-[var(--svf-gap)]"
+              style={{
+                gridTemplateColumns: `repeat(${N}, var(--svf-tile))`,
+              }}
+            >
               {game.cells.flat().map((cell, i) => {
-                const coordinate = indexToCoordinate(i);
+                const coordinate = indexToCoordinate(i, N);
                 return (
                   <Card
                     key={i}
@@ -898,7 +990,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
                   >
                     {cell.value === "V" ? (
                       <VoltorbIcon
-                        size={28}
+                        cssSize="calc(var(--svf-tile) * 0.7)"
                         className="picture-outline voltorb"
                       />
                     ) : (
@@ -921,8 +1013,10 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
                 const Comp = e.kind === "bomb" ? theme.BombFlip : theme.CoinReveal;
                 return (
                   <div key={e.id} className="pointer-events-none absolute" style={{
-                    left: `calc(${e.col} * (var(--svf-tile, 40px) + var(--svf-gap, 16px)))`,
-                    top:  `calc(${e.row} * (var(--svf-tile, 40px) + var(--svf-gap, 16px)))`,
+                    left: `calc(${e.col} * (var(--svf-tile) + var(--svf-gap)))`,
+                    top:  `calc(${e.row} * (var(--svf-tile) + var(--svf-gap)))`,
+                    width: "var(--svf-tile)",
+                    height: "var(--svf-tile)",
                     zIndex: 20,
                   }}>
                     <Comp row={e.row} col={e.col} onDone={e.onDone} />
