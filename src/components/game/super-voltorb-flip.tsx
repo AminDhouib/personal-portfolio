@@ -928,23 +928,23 @@ type ScoreboardProps = {
 
 const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
   return (
-    <div className="flex w-full flex-col items-center gap-2">
-      <div className="flex w-11/12 place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
-        <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
+    <div className="flex w-full flex-col items-center gap-1 sm:gap-2">
+      <div className="flex w-11/12 place-items-center rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
+        <div className="grow text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
           Total <span className="block">Collected Coins</span>
         </div>
         <p
-          className={`${scoreFont.className} flex translate-y-1 text-6xl text-gray-700 drop-shadow-soft`}
+          className={`${scoreFont.className} flex translate-y-1 text-3xl sm:text-6xl text-gray-700 drop-shadow-soft`}
         >
           {totalScore.toString().padStart(5, "0")}
         </p>
       </div>
-      <div className="flex w-11/12 place-items-center rounded-5 border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
-        <div className="grow text-center text-3xl leading-7 text-gray-600 drop-shadow-soft">
+      <div className="flex w-11/12 place-items-center rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
+        <div className="grow text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
           Coins Collected in <span className="block">Current Game</span>
         </div>
         <p
-          className={`${scoreFont.className} flex translate-y-1 items-center text-6xl text-gray-700 drop-shadow-soft`}
+          className={`${scoreFont.className} flex translate-y-1 items-center text-3xl sm:text-6xl text-gray-700 drop-shadow-soft`}
         >
           {currentScore.toString().padStart(5, "0")}
         </p>
@@ -964,15 +964,15 @@ type GameInfoProps = {
 const GameInfo = ({ currentLevel }: GameInfoProps) => {
   return (
     <>
-      <div className="border-4 border-white bg-[#448563] px-16 text-center text-3xl outline outline-2 outline-gray-600">
-        <div className="leading-7 drop-shadow-default">
+      <div className="border-2 sm:border-4 border-white bg-[#448563] px-4 sm:px-16 text-center text-base sm:text-3xl outline outline-2 outline-gray-600">
+        <div className="leading-5 sm:leading-7 drop-shadow-default">
           <p>VOLTORB Flip Lv. {currentLevel}</p>
           <p>Flip the Cards and Collect Coins!</p>
         </div>
       </div>
 
-      <div className="flex w-11/12 gap-3 border-b-4 border-b-gray-200 pt-3 text-3xl">
-        <div className="flex gap-4">
+      <div className="flex w-11/12 items-center gap-2 sm:gap-3 border-b-2 sm:border-b-4 border-b-gray-200 pt-2 sm:pt-3 text-base sm:text-3xl">
+        <div className="flex gap-2 sm:gap-4">
           <Card fake={true}>1</Card>
           <Card fake={true}>2</Card>
           <Card fake={true}>3</Card>
@@ -980,7 +980,7 @@ const GameInfo = ({ currentLevel }: GameInfoProps) => {
         <p className="drop-shadow-default">...x1! ...x2! ...x3!</p>
       </div>
 
-      <div className="mr-4 flex w-8/12 gap-3 self-end border-b-4 border-b-gray-200 pt-3 text-3xl ">
+      <div className="mr-4 flex w-8/12 items-center gap-2 sm:gap-3 self-end border-b-2 sm:border-b-4 border-b-gray-200 pt-2 sm:pt-3 text-base sm:text-3xl">
         <Card fake={true}>
           <VoltorbIcon size={28} className="picture-outline voltorb" />
         </Card>
