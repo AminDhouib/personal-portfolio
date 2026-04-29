@@ -43,3 +43,8 @@ next-env.d.ts
 # superpowers brainstorm files
 .superpowers/
 /.data
+
+# session screenshots & QA artifacts
+.claude/*.png
+.qa-*.png
+snapshot2.txt.*.png
