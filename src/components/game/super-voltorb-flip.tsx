@@ -900,11 +900,11 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
         if (!muted) sfx.invalidTap();
         return;
       }
-      // Apply every active memo flag to the tile in one click — the user
-      // can pick "1" + "2" in the memo bar to mark a tile as "could be
-      // either of these". flagCell toggles each, so re-clicking removes
-      // the same set. HG/SS plays DP_BOX01 each time a memo flag lands
-      // on a tile.
+      // Apply the selected memo flag to the tile. memoFlags is radio
+      // (≤1 entry) — voltorb_flip.c only ever toggles one flag per tap
+      // (VoltorbFlip_TryToggleCardMemo takes a single memoId). The loop
+      // is kept since flagCell already toggles, but it runs at most
+      // once. HG/SS plays DP_BOX01 each time a memo flag lands on a tile.
       if (!muted) sfx.memoToggle();
       updateGame((g) => {
         for (const f of memoFlags) g.flagCell(row, col, f);
@@ -1729,11 +1729,12 @@ export function SuperVoltorbFlipGame() {
   const toggleMemoFlag = (f: MemoFlag) => {
     // HG/SS plays DP_SELECT whenever the memo cursor changes button.
     if (!muted) sfx.cursorMove();
+    // Radio-style — voltorb_flip.c's VoltorbFlip_TryToggleCardMemo takes
+    // exactly one memoId per tap. Picking a new button replaces the
+    // previous selection; tapping the same one twice deselects it.
     setMemoFlags((prev) => {
-      const next = new Set(prev);
-      if (next.has(f)) next.delete(f);
-      else next.add(f);
-      return next;
+      if (prev.has(f)) return new Set<MemoFlag>();
+      return new Set<MemoFlag>([f]);
     });
   };
   const clearMemoFlags = () => {
