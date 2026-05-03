@@ -974,7 +974,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
   }, [muted]);
 
   const flipCardsDown = useCallback(
-    (delay = 1500) => {
+    (delay = 1500, onStart?: () => void) => {
       const columns = [
         [0, 5, 10, 15, 20],
         [1, 6, 11, 16, 21],
@@ -984,6 +984,9 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
       ];
 
       setTimeout(() => {
+        // Fire onStart at the exact frame the first column begins flipping
+        // — keeps the level-up/down flash + SE in lockstep with the cards.
+        onStart?.();
         let stagger = 0;
         for (let col = 0; col < 5; col++) {
           setTimeout(() => {
@@ -1034,21 +1037,20 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
         if (runPostFanfare) {
           await runPostFanfare();
         }
-        // 4. Flash the Lv card with SLOT01 + green pulse just as the
-        //    cards start folding back down.
-        onFlipDownStart?.("up");
-        // 5. Cards flip down → restartGame on the tail end.
-        flipCardsDown(100);
+        // 4 + 5. Cards flip down with the SLOT01 flash fired at the
+        //         same frame as the first column — keeps SE/visual in
+        //         lockstep instead of leading by the 100ms head delay.
+        flipCardsDown(100, () => onFlipDownStart?.("up"));
       });
     } else if (game.gameStatus === "lose") {
       // Lose sequence: reveal → CARDGAME2 fanfare via playGameOver (parent)
-      // → wait for click (or instant) → level-down flash → flipCardsDown.
+      // → wait for click (or instant) → level-down flash synchronized to
+      // the first card folding back down.
       flipCardsUp().then(async () => {
         if (waitForClick) {
           await waitForUserInteraction();
         }
-        onFlipDownStart?.("down");
-        flipCardsDown(100);
+        flipCardsDown(100, () => onFlipDownStart?.("down"));
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1727,6 +1729,7 @@ export function SuperVoltorbFlipGame() {
   const prevLevelRef = useRef<number | undefined>(undefined);
   const payoutAnimRef = useRef(false);
   const tallyTimerRef = useRef<number | null>(null);
+  const tallyStepRef = useRef<number>(0);
   const prevCurrentScoreRef = useRef<number>(0);
 
   useEffect(() => {
@@ -1759,14 +1762,26 @@ export function SuperVoltorbFlipGame() {
   }, []);
 
   // Roll displayed scores toward the live game values. When currentScore
-  // climbs (player flipped a 2x/3x tile), tick up one coin at a time and
-  // play the OKOZUKAI counter SE — the same chime the original game uses
-  // during the post-round "Coins received" banner, surfaced here so each
-  // multiplier reveal feels rewarding. Drops (restart, voltorb-zero) snap.
-  // The drain phase of runPostFanfare owns both displays while it runs.
+  // climbs (player flipped a 2x/3x tile), tick up one coin per frame at
+  // ~60Hz (matches NDS frame rate; voltorb_flip.c runs the counter from
+  // its main loop) and play the OKOZUKAI counter SE every 4 frames —
+  // the cadence used by the original "Coins received" banner, surfaced
+  // here so each multiplier reveal feels rewarding. Drops (restart,
+  // voltorb-zero) snap. Once a round ends (gameStatus leaves "playing"
+  // / "memo") we stop ticking so the rollup doesn't overlap the fanfare
+  // or drain SE — runPostFanfare owns both displays from there.
   useEffect(() => {
     if (!game) return;
     if (payoutAnimRef.current) return;
+
+    const status = game.gameStatus;
+    if (status !== "playing" && status !== "memo") {
+      if (tallyTimerRef.current) {
+        window.clearTimeout(tallyTimerRef.current);
+        tallyTimerRef.current = null;
+      }
+      return;
+    }
 
     const targetCurrent = game.currentScore;
     const targetTotal = game.totalScore;
@@ -1774,6 +1789,7 @@ export function SuperVoltorbFlipGame() {
     if (displayTotal !== targetTotal) setDisplayTotal(targetTotal);
 
     if (displayCurrent >= targetCurrent) {
+      tallyStepRef.current = 0;
       if (displayCurrent !== targetCurrent) setDisplayCurrent(targetCurrent);
       return;
     }
@@ -1781,8 +1797,10 @@ export function SuperVoltorbFlipGame() {
     tallyTimerRef.current = window.setTimeout(() => {
       tallyTimerRef.current = null;
       setDisplayCurrent((prev) => Math.min(prev + 1, targetCurrent));
-      if (!muted) sfx.payoutTickEarn();
-    }, 80);
+      const step = tallyStepRef.current;
+      if (!muted && step % 4 === 0) sfx.payoutTickEarn();
+      tallyStepRef.current = step + 1;
+    }, 17);
 
     return () => {
       if (tallyTimerRef.current) {
@@ -1790,7 +1808,7 @@ export function SuperVoltorbFlipGame() {
         tallyTimerRef.current = null;
       }
     };
-  }, [game?.currentScore, game?.totalScore, displayCurrent, displayTotal, muted]);
+  }, [game?.currentScore, game?.totalScore, game?.gameStatus, displayCurrent, displayTotal, muted]);
 
   // Release the post-payout freeze when restartGame zeroes currentScore.
   // We hold payoutAnimRef.current=true through flipCardsDown / level-flash
@@ -1857,7 +1875,9 @@ export function SuperVoltorbFlipGame() {
     // Beat of pause so the player can read the earned amount before drain.
     await new Promise<void>((r) => window.setTimeout(r, 320));
 
-    const tickMs = 60;
+    // 17ms/step ≈ NDS 60Hz frame rate; SE every 4 steps matches
+    // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381.
+    const tickMs = 17;
     const tick = () => new Promise<void>((r) => window.setTimeout(r, tickMs));
 
     for (let j = 0; j < earned; j++) {
@@ -1867,6 +1887,8 @@ export function SuperVoltorbFlipGame() {
       await tick();
     }
     if (!muted) sfx.payoutFinal();
+    // Breathing room so payoutFinal doesn't bleed into the level-up SE.
+    await new Promise<void>((r) => window.setTimeout(r, 280));
 
     // Hold payoutAnimRef.current=true through onFlipDownStart / flipCardsDown.
     // The release effect above flips it back to false the instant
@@ -2030,8 +2052,20 @@ export function SuperVoltorbFlipGame() {
                         Total Coins
                       </span>
                     </div>
-                    <span className={`${scoreFont.className} text-xl tabular-nums`}>
-                      {displayTotal.toString().padStart(5, "0")}
+                    <span className={`${scoreFont.className} text-xl flex`}>
+                      {displayTotal
+                        .toString()
+                        .padStart(5, "0")
+                        .split("")
+                        .map((d, i) => (
+                          <span
+                            key={i}
+                            className="inline-block text-center"
+                            style={{ width: "0.65em" }}
+                          >
+                            {d}
+                          </span>
+                        ))}
                     </span>
                   </div>
                   <div className="h-8 w-[2px] bg-gray-200" />
@@ -2042,8 +2076,20 @@ export function SuperVoltorbFlipGame() {
                         This Game
                       </span>
                     </div>
-                    <span className={`${scoreFont.className} text-xl tabular-nums`}>
-                      {displayCurrent.toString().padStart(5, "0")}
+                    <span className={`${scoreFont.className} text-xl flex`}>
+                      {displayCurrent
+                        .toString()
+                        .padStart(5, "0")
+                        .split("")
+                        .map((d, i) => (
+                          <span
+                            key={i}
+                            className="inline-block text-center"
+                            style={{ width: "0.65em" }}
+                          >
+                            {d}
+                          </span>
+                        ))}
                     </span>
                   </div>
                 </div>
