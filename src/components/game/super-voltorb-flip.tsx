@@ -1168,7 +1168,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
       <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
         <CoinSpinner size={28} />
         <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
-          Total Coins
+          Total<br />Coins
         </div>
         <p
           className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft flex`}
@@ -1181,7 +1181,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
               <span
                 key={i}
                 className="inline-block text-center"
-                style={{ width: "0.55em" }}
+                style={{ width: "0.5em" }}
               >
                 {d}
               </span>
@@ -1191,7 +1191,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
       <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
         <CoinSpinner size={28} />
         <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
-          This Game
+          This<br />Game
         </div>
         <p
           className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft flex`}
@@ -1204,7 +1204,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
               <span
                 key={i}
                 className="inline-block text-center"
-                style={{ width: "0.55em" }}
+                style={{ width: "0.5em" }}
               >
                 {d}
               </span>
@@ -2132,7 +2132,7 @@ export function SuperVoltorbFlipGame() {
                           <span
                             key={i}
                             className="inline-block text-center"
-                            style={{ width: "0.55em" }}
+                            style={{ width: "0.5em" }}
                           >
                             {d}
                           </span>
@@ -2156,7 +2156,7 @@ export function SuperVoltorbFlipGame() {
                           <span
                             key={i}
                             className="inline-block text-center"
-                            style={{ width: "0.55em" }}
+                            style={{ width: "0.5em" }}
                           >
                             {d}
                           </span>
