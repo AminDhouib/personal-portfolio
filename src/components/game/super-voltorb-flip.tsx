@@ -1936,18 +1936,27 @@ export function SuperVoltorbFlipGame() {
     }
 
     // 17ms/step ≈ NDS 60Hz frame rate; SE every 4 steps matches
-    // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381.
+    // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381. We cap the loop
+    // at MAX_ITERATIONS so a 10k-coin haul doesn't take 170s — instead
+    // each iteration drains ceil(earned / 100) coins. That keeps total
+    // drain time bounded at ~1.7s regardless of how big "earned" is,
+    // while small earnings still tick one coin per step like HG/SS.
     const tickMs = 17;
+    const MAX_ITERATIONS = 100;
+    const coinsPerTick = Math.max(1, Math.ceil(earned / MAX_ITERATIONS));
+    const iterations = Math.ceil(earned / coinsPerTick);
     const tick = () => new Promise<void>((r) => window.setTimeout(r, tickMs));
 
     let didSkip = false;
-    for (let j = 0; j < earned; j++) {
+    let drained = 0;
+    for (let j = 0; j < iterations; j++) {
       if (skipPayoutRef.current) {
         didSkip = true;
         break;
       }
-      setDisplayCurrent(earned - (j + 1));
-      setDisplayTotal(startTotal + (j + 1));
+      drained = Math.min(earned, drained + coinsPerTick);
+      setDisplayCurrent(earned - drained);
+      setDisplayTotal(startTotal + drained);
       if (j % 4 === 0 && !muted) sfx.payoutTickBank();
       await tick();
     }
