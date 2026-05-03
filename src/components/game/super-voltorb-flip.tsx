@@ -1165,26 +1165,50 @@ type ScoreboardProps = {
 const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
   return (
     <div className="flex w-full flex-col items-center gap-1 sm:gap-2">
-      <div className="grid w-11/12 grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
+      <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
         <CoinSpinner size={28} />
         <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
           Total Coins
         </div>
         <p
-          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft tabular-nums`}
+          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft flex`}
         >
-          {totalScore.toString().padStart(5, "0")}
+          {totalScore
+            .toString()
+            .padStart(5, "0")
+            .split("")
+            .map((d, i) => (
+              <span
+                key={i}
+                className="inline-block text-center"
+                style={{ width: "0.65em" }}
+              >
+                {d}
+              </span>
+            ))}
         </p>
       </div>
-      <div className="grid w-11/12 grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
+      <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
         <CoinSpinner size={28} />
         <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
           This Game
         </div>
         <p
-          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft tabular-nums`}
+          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft flex`}
         >
-          {currentScore.toString().padStart(5, "0")}
+          {currentScore
+            .toString()
+            .padStart(5, "0")
+            .split("")
+            .map((d, i) => (
+              <span
+                key={i}
+                className="inline-block text-center"
+                style={{ width: "0.65em" }}
+              >
+                {d}
+              </span>
+            ))}
         </p>
       </div>
     </div>
@@ -2029,7 +2053,7 @@ export function SuperVoltorbFlipGame() {
         {/* Desktop / tablet left column (sm+ only). Holds everything except
             the board so the right column can devote full width to tiles. */}
         <div className="hidden lg:flex flex-col items-center gap-2">
-          <div className="flex w-11/12 items-center gap-2">
+          <div className="flex w-full items-center gap-2">
             <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
             <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
             {game && (
@@ -2052,7 +2076,7 @@ export function SuperVoltorbFlipGame() {
               </div>
             )}
           </div>
-          <div className="flex w-11/12">
+          <div className="flex w-full">
             <MemoBar
               activeFlags={memoFlags}
               onToggle={toggleMemoFlag}
