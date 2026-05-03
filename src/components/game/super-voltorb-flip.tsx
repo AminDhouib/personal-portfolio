@@ -34,7 +34,7 @@ import {
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
-import { MemoBar, type MemoFlag } from "./super-voltorb-flip/memo-button";
+import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 
 // ---------------------------------------------------------------------------
 // Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
@@ -667,6 +667,21 @@ const SCOPED_STYLES = `
   80%  { transform: scaleX(-0.4); }
   100% { transform: scaleX(1);    }
 }
+/* Level transition flashes — keyed by .svf-lv-flash-up / -down. */
+.svf-lv-flash-up   { animation: svf-lv-flash-up   1.1s ease-out 1 both; }
+.svf-lv-flash-down { animation: svf-lv-flash-down 1.1s ease-out 1 both; }
+@keyframes svf-lv-flash-up {
+  0%   { background-color: #448563; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
+  20%  { background-color: #4ade80; box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.55); transform: scale(1.18); }
+  60%  { background-color: #6ee08e; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.20); transform: scale(1.06); }
+  100% { background-color: #448563; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
+}
+@keyframes svf-lv-flash-down {
+  0%   { background-color: #448563; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
+  20%  { background-color: #b45353; box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.55); transform: scale(0.94) rotate(-1.5deg); }
+  60%  { background-color: #6e4848; box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.20); transform: scale(0.98) rotate(0.5deg); }
+  100% { background-color: #448563; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   .svf-root * { transition-duration: 150ms !important; animation-duration: 150ms !important; }
 }
@@ -750,7 +765,10 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/games/super-voltorb-flip/sprites/upstream/memo/${f === "V" ? 0 : (f as number) - 1}.png`}
+                    // Asset mapping: memo/0.png = voltorb glyph, 1.png = "1",
+                    // 2.png = "2", 3.png = "3". Was off-by-one before — flag
+                    // 1 was loading 0.png (voltorb), flag 3 was loading 2.png.
+                    src={`/games/super-voltorb-flip/sprites/upstream/memo/${f === "V" ? 0 : f}.png`}
                     alt=""
                     style={{
                       imageRendering: "pixelated",
@@ -825,13 +843,28 @@ type GameboardProps = {
   waitForClick: boolean;
   muted: boolean;
   onFirstInteraction: () => void;
-  memoFlag: MemoFlag;
+  memoFlags: MemoFlagSet;
   peek?: boolean;
+  /**
+   * Called after the level-win fanfare finishes (or after an equivalent
+   * silent delay when muted), BEFORE flipCardsDown runs. Returns a
+   * Promise that resolves once the parent's payout sequence has finished
+   * — counter scrolling + drain SE chain. Gameboard awaits the promise
+   * so the cards stay revealed while the parent animates the score
+   * cards.
+   */
+  runPostFanfare?: () => Promise<void>;
+  /**
+   * Fired right before flipCardsDown begins so the parent can flash the
+   * Lv card with the level-up / level-down SE in time with the cards
+   * folding away (rather than after the new round has already loaded).
+   */
+  onFlipDownStart?: (dir: "up" | "down") => void;
 };
 
 type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number; onDone: () => void };
 
-const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, memoFlag, peek = false }: GameboardProps) => {
+const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, memoFlags, peek = false, runPostFanfare, onFlipDownStart }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
@@ -856,37 +889,89 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
 
   function handleFlip(row: number, col: number) {
     if (!game) return;
-    if (memoFlag !== null) {
-      updateGame((g) => g.flagCell(row, col, memoFlag));
+    // Once the round is settled (voltorb hit or all valuable coins found),
+    // the board freezes until restartGame() runs from the win/lose flow.
+    if (game.gameStatus === "lose" || game.gameStatus === "win") return;
+    if (memoFlags.size > 0) {
+      const cell = game.cells[row][col];
+      // Tapping an already-revealed tile while memo is open does nothing
+      // — same DP_BOX03 thunk as the non-memo case.
+      if (cell.isFlipped) {
+        if (!muted) sfx.invalidTap();
+        return;
+      }
+      // Apply every active memo flag to the tile in one click — the user
+      // can pick "1" + "2" in the memo bar to mark a tile as "could be
+      // either of these". flagCell toggles each, so re-clicking removes
+      // the same set. HG/SS plays DP_BOX01 each time a memo flag lands
+      // on a tile.
+      if (!muted) sfx.memoToggle();
+      updateGame((g) => {
+        for (const f of memoFlags) g.flagCell(row, col, f);
+      });
       return;
     }
     const cell = game.cells[row][col];
-    if (!cell.isFlipped) {
-      const kind: "bomb" | "coin" | null =
-        cell.value === "V" ? "bomb" : (cell.value as number) > 1 ? "coin" : null;
-      if (kind && theme) {
-        const id = nextId.current++;
-        const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
-        setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
-      }
-      if (!muted) {
-        if (kind === "bomb") sfx.lose();
-        else if (kind === "coin") sfx.coin(cell.value as number);
-        else sfx.click();
-      }
-      onFirstInteraction();
+    // Already-flipped tile: HG/SS plays an "invalid action" thunk and
+    // does nothing. Mirror that here.
+    if (cell.isFlipped) {
+      if (!muted) sfx.invalidTap();
+      return;
     }
+    // Visual: voltorbs explode, every coin tile (1/2/3) sparkles.
+    // Audio: HG/SS plays PANERU_MEKURU on every flip, and overlays
+    // COIN_HAZURE (the buzzer) only when the revealed tile is a Voltorb.
+    const kind: "bomb" | "coin" =
+      cell.value === "V" ? "bomb" : "coin";
+    if (theme) {
+      const id = nextId.current++;
+      const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
+      setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
+    }
+    if (!muted) {
+      sfx.flip();
+      if (kind === "bomb") {
+        // Stagger the buzzer so the flip click is audible first — matches
+        // the in-game overlap where PANERU_MEKURU starts the animation
+        // and COIN_HAZURE kicks in once the tile lands face-up.
+        window.setTimeout(() => sfx.voltorbPop(), 140);
+      } else {
+        // "Is this what you're expecting?!" risk warning. HG/SS plays
+        // ME_CARDGAME1 if the row OR col still has ≥75% chance of being
+        // a voltorb among the unflipped tiles. See voltorb_flip.c:905.
+        const N = game.cells.length;
+        const rowCells = game.cells[row];
+        const colCells = game.cells.map((r) => r[col]);
+        const flippedInRow = rowCells.filter((c) => c.isFlipped).length;
+        const flippedInCol = colCells.filter((c) => c.isFlipped).length;
+        const voltorbsInRow = game.rowValues[row]?.voltorbs ?? 0;
+        const voltorbsInCol = game.colValues[col]?.voltorbs ?? 0;
+        const remainingRow = Math.max(1, N - flippedInRow);
+        const remainingCol = Math.max(1, N - flippedInCol);
+        const rowRisk = (voltorbsInRow * 100) / remainingRow;
+        const colRisk = (voltorbsInCol * 100) / remainingCol;
+        if (rowRisk >= 75 || colRisk >= 75) {
+          // Tiny delay so the flip click is the first thing the player
+          // hears, then the warning fanfare plays underneath.
+          window.setTimeout(() => sfx.riskWarning(), 60);
+        }
+      }
+    }
+    onFirstInteraction();
     updateGame((g) => g.flipCell(row, col));
   }
 
   const flipCardsUp = useCallback(() => {
+    // HG/SS plays the panel-flip SE once at the start of RevealBoard_Main
+    // (voltorb_flip.c:1077) — covers the win/lose whole-board reveal.
+    if (!muted) sfx.flip();
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         setCardsFlipped((prev) => prev.map(() => ({ isFlipped: true })));
         resolve();
       }, 1000);
     });
-  }, []);
+  }, [muted]);
 
   const flipCardsDown = useCallback(
     (delay = 1500) => {
@@ -926,27 +1011,45 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
 
   useEffect(() => {
     if (game.gameStatus === "win") {
-      // Win: reveal the board, let the victory song play, then auto-advance.
-      flipCardsUp().then(() => {
-        const fallback = window.setTimeout(() => flipCardsDown(100), 8000);
-        const advance = () => {
-          window.clearTimeout(fallback);
-          flipCardsDown(100);
-        };
-        if (muted) {
-          window.setTimeout(advance, 1500);
-        } else {
-          playLevelWin(advance);
+      // Win sequence (mirrors voltorb_flip.c WinRound_Main → AwardCoins_Main):
+      //   1. flipCardsUp                     — reveal the entire board
+      //   2. MUSHITORI3 fanfare (or silent)  — handled by playLevelWin
+      //   3. parent's runPostFanfare         — payout BGM + counter SE chain
+      //   4. onFlipDownStart("up")           — level-up flash + SLOT01 SE
+      //   5. flipCardsDown                   — fold cards, restartGame fires
+      flipCardsUp().then(async () => {
+        // 2. Fanfare (or silent equivalent).
+        await new Promise<void>((resolve) => {
+          if (muted) {
+            window.setTimeout(resolve, 1500);
+          } else {
+            const fallback = window.setTimeout(resolve, 4000);
+            playLevelWin(() => {
+              window.clearTimeout(fallback);
+              resolve();
+            });
+          }
+        });
+        // 3. Coin payout chain (BGM 64 + per-tick SE) lives in the parent.
+        if (runPostFanfare) {
+          await runPostFanfare();
         }
+        // 4. Flash the Lv card with SLOT01 + green pulse just as the
+        //    cards start folding back down.
+        onFlipDownStart?.("up");
+        // 5. Cards flip down → restartGame on the tail end.
+        flipCardsDown(100);
       });
     } else if (game.gameStatus === "lose") {
-      if (waitForClick) {
-        flipCardsUp().then(() => {
-          waitForUserInteraction().then(() => flipCardsDown(100));
-        });
-      } else {
-        flipCardsUp().then(() => flipCardsDown());
-      }
+      // Lose sequence: reveal → CARDGAME2 fanfare via playGameOver (parent)
+      // → wait for click (or instant) → level-down flash → flipCardsDown.
+      flipCardsUp().then(async () => {
+        if (waitForClick) {
+          await waitForUserInteraction();
+        }
+        onFlipDownStart?.("down");
+        flipCardsDown(100);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameStatus]);
@@ -979,9 +1082,26 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
                     flags={peek || cell.isFlipped ? undefined : cell.flags}
                   >
                     {cell.value === "V" ? (
-                      <VoltorbIcon
-                        cssSize="calc(var(--svf-tile) * 0.7)"
+                      // tile/voltorb.png is upstream's srcTile0 (22×22 with
+                      // salmon + voltorb body baked in, matching the
+                      // voltorb-tile region embedded in each explode_*.png
+                      // frame). Using it here makes the post-explosion
+                      // static voltorb pixel-identical in size and style
+                      // to the voltorb shown during the destruction frames,
+                      // eliminating the snap on overlay unmount.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src="/games/super-voltorb-flip/sprites/upstream/tile/voltorb.png"
+                        alt=""
                         className="picture-outline voltorb"
+                        style={{
+                          imageRendering: "pixelated",
+                          width: "calc(var(--svf-tile) * 0.95)",
+                          height: "calc(var(--svf-tile) * 0.95)",
+                          maxWidth: "none",
+                          maxHeight: "none",
+                          display: "block",
+                        }}
                       />
                     ) : (
                       cell.value
@@ -1043,22 +1163,24 @@ type ScoreboardProps = {
 const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
   return (
     <div className="flex w-full flex-col items-center gap-1 sm:gap-2">
-      <div className="flex w-11/12 place-items-center rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
-        <div className="grow text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
-          Total <span className="block">Collected Coins</span>
+      <div className="grid w-11/12 grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
+        <CoinSpinner size={28} />
+        <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
+          Total Coins
         </div>
         <p
-          className={`${scoreFont.className} flex translate-y-1 text-3xl sm:text-6xl text-gray-700 drop-shadow-soft`}
+          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft tabular-nums`}
         >
           {totalScore.toString().padStart(5, "0")}
         </p>
       </div>
-      <div className="flex w-11/12 place-items-center rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 outline outline-2 outline-gray-600">
-        <div className="grow text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
-          Coins Collected in <span className="block">Current Game</span>
+      <div className="grid w-11/12 grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
+        <CoinSpinner size={28} />
+        <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
+          This Game
         </div>
         <p
-          className={`${scoreFont.className} flex translate-y-1 items-center text-3xl sm:text-6xl text-gray-700 drop-shadow-soft`}
+          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft tabular-nums`}
         >
           {currentScore.toString().padStart(5, "0")}
         </p>
@@ -1318,23 +1440,17 @@ function LoopingFrames({
   pauseMs?: number;
 }) {
   const [frame, setFrame] = useState(0);
+  // Scheduling the next tick inside the setFrame updater fires twice in
+  // React Strict Mode (the updater runs twice for purity-checking), which
+  // doubles up the timers and makes the loop run far faster than `interval`.
+  // Keep the side effect in useEffect, keyed on `frame`.
   useEffect(() => {
-    let cancelled = false;
-    let timer: number;
-    const tick = () => {
-      if (cancelled) return;
-      setFrame((f) => {
-        const next = (f + 1) % frames.length;
-        timer = window.setTimeout(tick, next === 0 && pauseMs > 0 ? pauseMs : interval);
-        return next;
-      });
-    };
-    timer = window.setTimeout(tick, interval);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [frames.length, interval, pauseMs]);
+    const delay = frame === 0 && pauseMs > 0 ? pauseMs : interval;
+    const t = window.setTimeout(() => {
+      setFrame((f) => (f + 1) % frames.length);
+    }, delay);
+    return () => window.clearTimeout(t);
+  }, [frame, frames.length, interval, pauseMs]);
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -1359,17 +1475,6 @@ const LoopingSparkle = ({ size }: { size: number }) => (
 // src/components/InstructionsBtns.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
-const MobileHelpButton = ({ onOpen }: { onOpen: () => void }) => (
-  <button
-    onClick={onOpen}
-    aria-label="How to play"
-    title="How to play"
-    className="flex h-10 w-10 items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white outline outline-2 outline-gray-600 transition-colors hover:bg-zinc-100"
-  >
-    <PokeballIcon size={22} />
-  </button>
-);
-
 const PixelMuteButton = ({
   muted,
   onToggle,
@@ -1393,175 +1498,66 @@ const PixelMuteButton = ({
       style={{ imageRendering: "pixelated", shapeRendering: "crispEdges" }}
       aria-hidden
     >
-      {/* speaker body */}
-      <rect x="2" y="6" width="2" height="4" fill="currentColor" />
+      {/* speaker body — solid block */}
+      <rect x="1" y="6" width="3" height="4" fill="currentColor" />
+      {/* cone — triangle widening to the right */}
       <rect x="4" y="5" width="1" height="6" fill="currentColor" />
-      {/* cone */}
       <rect x="5" y="4" width="1" height="8" fill="currentColor" />
       <rect x="6" y="3" width="1" height="10" fill="currentColor" />
       <rect x="7" y="2" width="1" height="12" fill="currentColor" />
       {muted ? (
         <>
-          {/* diagonal slash */}
-          <rect x="10" y="4" width="1" height="1" fill="#d62a18" />
-          <rect x="11" y="5" width="1" height="1" fill="#d62a18" />
-          <rect x="12" y="6" width="1" height="1" fill="#d62a18" />
-          <rect x="13" y="7" width="1" height="1" fill="#d62a18" />
-          <rect x="14" y="8" width="1" height="1" fill="#d62a18" />
-          <rect x="13" y="9" width="1" height="1" fill="#d62a18" />
-          <rect x="12" y="10" width="1" height="1" fill="#d62a18" />
-          <rect x="11" y="11" width="1" height="1" fill="#d62a18" />
-          <rect x="10" y="12" width="1" height="1" fill="#d62a18" />
+          {/* bold red X (2-px strokes) on the right of the speaker */}
+          <rect x="9" y="3" width="2" height="2" fill="#d62a18" />
+          <rect x="13" y="3" width="2" height="2" fill="#d62a18" />
+          <rect x="10" y="5" width="2" height="2" fill="#d62a18" />
+          <rect x="12" y="5" width="2" height="2" fill="#d62a18" />
+          <rect x="11" y="7" width="2" height="2" fill="#d62a18" />
+          <rect x="10" y="9" width="2" height="2" fill="#d62a18" />
+          <rect x="12" y="9" width="2" height="2" fill="#d62a18" />
+          <rect x="9" y="11" width="2" height="2" fill="#d62a18" />
+          <rect x="13" y="11" width="2" height="2" fill="#d62a18" />
         </>
       ) : (
         <>
-          {/* sound waves */}
-          <rect x="9" y="6" width="1" height="4" fill="currentColor" />
-          <rect x="10" y="5" width="1" height="1" fill="currentColor" />
-          <rect x="10" y="10" width="1" height="1" fill="currentColor" />
-          <rect x="11" y="4" width="1" height="1" fill="currentColor" />
-          <rect x="11" y="11" width="1" height="1" fill="currentColor" />
-          <rect x="12" y="5" width="1" height="6" fill="currentColor" />
-          <rect x="13" y="6" width="1" height="4" fill="currentColor" />
+          {/* three concentric C-shaped sound waves */}
+          {/* close wave */}
+          <rect x="9" y="6" width="1" height="1" fill="currentColor" />
+          <rect x="10" y="7" width="1" height="2" fill="currentColor" />
+          <rect x="9" y="9" width="1" height="1" fill="currentColor" />
+          {/* middle wave */}
+          <rect x="11" y="5" width="1" height="1" fill="currentColor" />
+          <rect x="12" y="6" width="1" height="4" fill="currentColor" />
+          <rect x="11" y="10" width="1" height="1" fill="currentColor" />
+          {/* far wave */}
+          <rect x="13" y="4" width="1" height="1" fill="currentColor" />
+          <rect x="14" y="5" width="1" height="6" fill="currentColor" />
+          <rect x="13" y="11" width="1" height="1" fill="currentColor" />
         </>
       )}
     </svg>
   </button>
 );
 
-const COIN_FRAMES = [1, 0.75, 0.35, -0.2, -0.75, -0.35, 0.35, 0.75];
+const COIN_FRAME_URLS = Array.from(
+  { length: 12 },
+  (_, i) => `/games/super-voltorb-flip/sprites/upstream/coin/coin_${i}.png`,
+);
 
-const CoinSpinner = ({ size = 28 }: { size?: number }) => {
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(
-      () => setFrame((f) => (f + 1) % COIN_FRAMES.length),
-      110,
-    );
-    return () => window.clearInterval(id);
-  }, []);
-  const scaleX = COIN_FRAMES[frame];
-  const showEdge = Math.abs(scaleX) < 0.3;
-  return (
-    <div
-      className="flex items-center justify-center"
-      style={{ width: size, height: size, perspective: 200 }}
-    >
-      <div
-        style={{
-          transform: `scaleX(${scaleX})`,
-          width: size,
-          height: size,
-          imageRendering: "pixelated",
-          shapeRendering: "crispEdges",
-        }}
-      >
-        {showEdge ? (
-          <svg width={size} height={size} viewBox="0 0 16 16">
-            <rect x="7" y="2" width="2" height="12" fill="#c69a32" />
-            <rect x="7" y="2" width="1" height="12" fill="#f4c04c" />
-          </svg>
-        ) : (
-          <svg width={size} height={size} viewBox="0 0 16 16">
-            {/* outer black edge */}
-            <rect x="5" y="1" width="6" height="1" fill="#5a4112" />
-            <rect x="3" y="2" width="2" height="1" fill="#5a4112" />
-            <rect x="11" y="2" width="2" height="1" fill="#5a4112" />
-            <rect x="2" y="3" width="1" height="1" fill="#5a4112" />
-            <rect x="13" y="3" width="1" height="1" fill="#5a4112" />
-            <rect x="1" y="4" width="1" height="8" fill="#5a4112" />
-            <rect x="14" y="4" width="1" height="8" fill="#5a4112" />
-            <rect x="2" y="12" width="1" height="1" fill="#5a4112" />
-            <rect x="13" y="12" width="1" height="1" fill="#5a4112" />
-            <rect x="3" y="13" width="2" height="1" fill="#5a4112" />
-            <rect x="11" y="13" width="2" height="1" fill="#5a4112" />
-            <rect x="5" y="14" width="6" height="1" fill="#5a4112" />
-            {/* body */}
-            <rect x="5" y="2" width="6" height="1" fill="#f4c04c" />
-            <rect x="3" y="3" width="10" height="1" fill="#f4c04c" />
-            <rect x="3" y="4" width="10" height="1" fill="#f4c04c" />
-            <rect x="2" y="5" width="12" height="7" fill="#f4c04c" />
-            <rect x="3" y="12" width="10" height="1" fill="#f4c04c" />
-            <rect x="5" y="13" width="6" height="1" fill="#f4c04c" />
-            {/* highlight */}
-            <rect x="4" y="3" width="2" height="1" fill="#fcea7d" />
-            <rect x="3" y="4" width="2" height="1" fill="#fcea7d" />
-            <rect x="2" y="5" width="1" height="3" fill="#fcea7d" />
-            {/* shadow */}
-            <rect x="11" y="11" width="2" height="1" fill="#c69a32" />
-            <rect x="13" y="8" width="1" height="4" fill="#c69a32" />
-            <rect x="12" y="12" width="1" height="1" fill="#c69a32" />
-            {/* central dollar-ish glyph */}
-            <rect x="7" y="5" width="2" height="1" fill="#8a6419" />
-            <rect x="6" y="6" width="1" height="1" fill="#8a6419" />
-            <rect x="7" y="7" width="2" height="1" fill="#8a6419" />
-            <rect x="9" y="8" width="1" height="1" fill="#8a6419" />
-            <rect x="7" y="9" width="2" height="1" fill="#8a6419" />
-            <rect x="7" y="4" width="2" height="1" fill="#8a6419" />
-            <rect x="7" y="10" width="2" height="1" fill="#8a6419" />
-          </svg>
-        )}
-      </div>
-    </div>
-  );
-};
+const CoinSpinner = ({ size = 28 }: { size?: number }) => (
+  <LoopingFrames frames={COIN_FRAME_URLS} size={size} interval={90} />
+);
 
 const PokeballIcon = ({ size = 22 }: { size?: number }) => (
-  <svg
+  // eslint-disable-next-line @next/next/no-img-element
+  <img
+    src="/games/super-voltorb-flip/sprites/upstream/pokeball.png"
     width={size}
     height={size}
-    viewBox="0 0 16 16"
-    style={{ imageRendering: "pixelated", shapeRendering: "crispEdges" }}
+    alt=""
     aria-hidden
-  >
-    {/* outer black ring */}
-    <rect x="5" y="0" width="6" height="1" fill="#1a1a1a" />
-    <rect x="3" y="1" width="2" height="1" fill="#1a1a1a" />
-    <rect x="11" y="1" width="2" height="1" fill="#1a1a1a" />
-    <rect x="2" y="2" width="1" height="1" fill="#1a1a1a" />
-    <rect x="13" y="2" width="1" height="1" fill="#1a1a1a" />
-    <rect x="1" y="3" width="1" height="3" fill="#1a1a1a" />
-    <rect x="14" y="3" width="1" height="3" fill="#1a1a1a" />
-    <rect x="0" y="6" width="1" height="4" fill="#1a1a1a" />
-    <rect x="15" y="6" width="1" height="4" fill="#1a1a1a" />
-    <rect x="1" y="10" width="1" height="3" fill="#1a1a1a" />
-    <rect x="14" y="10" width="1" height="3" fill="#1a1a1a" />
-    <rect x="2" y="13" width="1" height="1" fill="#1a1a1a" />
-    <rect x="13" y="13" width="1" height="1" fill="#1a1a1a" />
-    <rect x="3" y="14" width="2" height="1" fill="#1a1a1a" />
-    <rect x="11" y="14" width="2" height="1" fill="#1a1a1a" />
-    <rect x="5" y="15" width="6" height="1" fill="#1a1a1a" />
-    {/* red top half */}
-    <rect x="5" y="1" width="6" height="1" fill="#e74c3c" />
-    <rect x="3" y="2" width="10" height="1" fill="#e74c3c" />
-    <rect x="2" y="3" width="12" height="1" fill="#e74c3c" />
-    <rect x="2" y="4" width="12" height="1" fill="#e74c3c" />
-    <rect x="1" y="5" width="14" height="1" fill="#e74c3c" />
-    <rect x="1" y="6" width="14" height="1" fill="#d62a18" />
-    {/* highlight on top-left */}
-    <rect x="4" y="2" width="2" height="1" fill="#ff8673" />
-    <rect x="3" y="3" width="2" height="1" fill="#ff8673" />
-    {/* black band */}
-    <rect x="1" y="7" width="5" height="2" fill="#1a1a1a" />
-    <rect x="10" y="7" width="5" height="2" fill="#1a1a1a" />
-    {/* center circle ring */}
-    <rect x="6" y="6" width="4" height="1" fill="#1a1a1a" />
-    <rect x="6" y="9" width="4" height="1" fill="#1a1a1a" />
-    <rect x="5" y="7" width="1" height="2" fill="#1a1a1a" />
-    <rect x="10" y="7" width="1" height="2" fill="#1a1a1a" />
-    {/* center white */}
-    <rect x="6" y="7" width="4" height="2" fill="#ffffff" />
-    {/* white bottom half */}
-    <rect x="1" y="9" width="14" height="1" fill="#f5f5f5" />
-    <rect x="1" y="10" width="14" height="1" fill="#ffffff" />
-    <rect x="2" y="11" width="12" height="1" fill="#ffffff" />
-    <rect x="2" y="12" width="12" height="1" fill="#ffffff" />
-    <rect x="3" y="13" width="10" height="1" fill="#ffffff" />
-    <rect x="5" y="14" width="6" height="1" fill="#ffffff" />
-    {/* subtle bottom shadow */}
-    <rect x="3" y="13" width="3" height="1" fill="#d0d0d0" />
-    <rect x="2" y="12" width="2" height="1" fill="#d0d0d0" />
-  </svg>
+    style={{ imageRendering: "pixelated", display: "block" }}
+  />
 );
 
 const InstructionsBtns = ({ onOpen }: { onOpen: () => void }) => (
@@ -1569,10 +1565,10 @@ const InstructionsBtns = ({ onOpen }: { onOpen: () => void }) => (
     onClick={onOpen}
     aria-label="How to play"
     title="How to play"
-    className="flex items-center gap-2 rounded-5 border-4 border-gray-300 bg-white px-3 py-1 outline outline-2 outline-gray-600 hover:bg-zinc-200"
+    className="flex h-11 items-center gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-3 outline outline-2 outline-gray-600 hover:bg-zinc-200"
   >
-    <PokeballIcon size={22} />
-    <span className="text-2xl leading-7 text-gray-600 drop-shadow-soft">
+    <PokeballIcon size={32} />
+    <span className="text-base leading-none font-bold text-gray-600 drop-shadow-soft">
       How to play
     </span>
   </button>
@@ -1700,9 +1696,38 @@ export function SuperVoltorbFlipGame() {
   const { game, updateGame, size, setGameSize } = useGame();
   const [peek, setPeek] = useState(false);
   const [muted, toggleMute] = useMute();
-  const [memoFlag, setMemoFlag] = useState<MemoFlag>(null);
+  const [memoFlags, setMemoFlags] = useState<MemoFlagSet>(() => new Set<MemoFlag>());
+  const toggleMemoFlag = (f: MemoFlag) => {
+    // HG/SS plays DP_SELECT whenever the memo cursor changes button.
+    if (!muted) sfx.cursorMove();
+    setMemoFlags((prev) => {
+      const next = new Set(prev);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
+      return next;
+    });
+  };
+  const clearMemoFlags = () => {
+    // The "Back" pad button in the memo overlay (HG/SS DP_BUTTON3).
+    if (!muted) sfx.backButton();
+    setMemoFlags(new Set<MemoFlag>());
+  };
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const musicStartedRef = useRef(false);
+
+  // Smoothly-rolled scoreboard values. Default to the live game values; the
+  // payout animation overrides them while a round wraps up. Reading game
+  // state via optional chaining since Gameboard mounts before the first
+  // restart settles.
+  const [displayTotal, setDisplayTotal] = useState(0);
+  const [displayCurrent, setDisplayCurrent] = useState(0);
+  // Level-card flash. "up" flashes green, "down" flashes red, both clear
+  // automatically once the SE finishes.
+  const [levelDir, setLevelDir] = useState<"up" | "down" | null>(null);
+  const prevLevelRef = useRef<number | undefined>(undefined);
+  const payoutAnimRef = useRef(false);
+  const tallyTimerRef = useRef<number | null>(null);
+  const prevCurrentScoreRef = useRef<number>(0);
 
   useEffect(() => {
     setMusicMuted(muted);
@@ -1732,6 +1757,122 @@ export function SuperVoltorbFlipGame() {
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, []);
+
+  // Roll displayed scores toward the live game values. When currentScore
+  // climbs (player flipped a 2x/3x tile), tick up one coin at a time and
+  // play the OKOZUKAI counter SE — the same chime the original game uses
+  // during the post-round "Coins received" banner, surfaced here so each
+  // multiplier reveal feels rewarding. Drops (restart, voltorb-zero) snap.
+  // The drain phase of runPostFanfare owns both displays while it runs.
+  useEffect(() => {
+    if (!game) return;
+    if (payoutAnimRef.current) return;
+
+    const targetCurrent = game.currentScore;
+    const targetTotal = game.totalScore;
+
+    if (displayTotal !== targetTotal) setDisplayTotal(targetTotal);
+
+    if (displayCurrent >= targetCurrent) {
+      if (displayCurrent !== targetCurrent) setDisplayCurrent(targetCurrent);
+      return;
+    }
+
+    tallyTimerRef.current = window.setTimeout(() => {
+      tallyTimerRef.current = null;
+      setDisplayCurrent((prev) => Math.min(prev + 1, targetCurrent));
+      if (!muted) sfx.payoutTickEarn();
+    }, 80);
+
+    return () => {
+      if (tallyTimerRef.current) {
+        window.clearTimeout(tallyTimerRef.current);
+        tallyTimerRef.current = null;
+      }
+    };
+  }, [game?.currentScore, game?.totalScore, displayCurrent, displayTotal, muted]);
+
+  // Release the post-payout freeze when restartGame zeroes currentScore.
+  // We hold payoutAnimRef.current=true through flipCardsDown / level-flash
+  // so the rollup effect doesn't try to re-tick from 0 → earned while the
+  // old round's currentScore is still non-zero.
+  useEffect(() => {
+    if (!game) return;
+    const prev = prevCurrentScoreRef.current;
+    if (prev > 0 && game.currentScore === 0 && payoutAnimRef.current) {
+      payoutAnimRef.current = false;
+    }
+    prevCurrentScoreRef.current = game.currentScore;
+  }, [game?.currentScore]);
+
+  // Level transitions are now fired by Gameboard at the start of
+  // flipCardsDown via the triggerLevelTransition callback below — that
+  // matches the user's request to flash the Lv card during the
+  // flip-back animation rather than after the new round has settled.
+  // We still keep prevLevelRef in sync so the predicted direction
+  // (win → up / lose → down) reflects the actual outcome.
+  useEffect(() => {
+    if (!game) return;
+    prevLevelRef.current = game.currentLevel;
+  }, [game?.currentLevel]);
+
+  const triggerLevelTransition = useCallback(
+    (dir: "up" | "down") => {
+      setLevelDir(dir);
+      if (!muted) {
+        if (dir === "up") sfx.levelUp();
+        else sfx.levelDown();
+      }
+      window.setTimeout(() => setLevelDir(null), 1200);
+    },
+    [muted],
+  );
+
+  // Promise-returning post-fanfare runner: drains the round's "This Game"
+  // pot into "Total Coins". Phase 1 (the OKOZUKAI tally-up) is now driven
+  // by the per-flip rollup effect above so the player hears each coin as
+  // they collect it; here we only run Phase 2 — COIN_PAYOUT_ONE per 4
+  // ticks, COIN_PAYOUT_LAST closes the chain. Matches voltorb_flip.c
+  // AwardCoins_Main step 2; the BGM scene swap is a JP-only Game-Corner
+  // detail and the NA build lets gameplay BGM ride through.
+  const runPostFanfare = useCallback(async () => {
+    if (!game) return;
+    const finalTotal = game.totalScore;
+    const finalCurrent = game.currentScore;
+    const startTotal = Math.max(0, finalTotal - finalCurrent);
+    const earned = finalCurrent;
+    if (earned <= 0) return;
+
+    payoutAnimRef.current = true;
+    // Cancel any in-flight per-flip tally-up — earned has already been
+    // heard during play; we own the displays from here.
+    if (tallyTimerRef.current) {
+      window.clearTimeout(tallyTimerRef.current);
+      tallyTimerRef.current = null;
+    }
+    // Snap to the round-end read in case the rollup didn't finish before
+    // the level-clear fanfare ended (covers wins on a final huge multiplier).
+    setDisplayCurrent(earned);
+    setDisplayTotal(startTotal);
+    // Beat of pause so the player can read the earned amount before drain.
+    await new Promise<void>((r) => window.setTimeout(r, 320));
+
+    const tickMs = 60;
+    const tick = () => new Promise<void>((r) => window.setTimeout(r, tickMs));
+
+    for (let j = 0; j < earned; j++) {
+      setDisplayCurrent(earned - (j + 1));
+      setDisplayTotal(startTotal + (j + 1));
+      if (j % 4 === 0 && !muted) sfx.payoutTickBank();
+      await tick();
+    }
+    if (!muted) sfx.payoutFinal();
+
+    // Hold payoutAnimRef.current=true through onFlipDownStart / flipCardsDown.
+    // The release effect above flips it back to false the instant
+    // restartGame zeroes currentScore, so the rollup effect doesn't try
+    // to re-tick 0 → earned while the round's old score lingers.
+  }, [game, muted]);
 
   // Persist level + total score to localStorage on change.
   useEffect(() => {
@@ -1766,7 +1907,7 @@ export function SuperVoltorbFlipGame() {
       fadeOutMusic(250);
     }
     if ((prev === "win" || prev === "lose") && cur === "playing") {
-      setMemoFlag(null);
+      clearMemoFlags();
       stopGameOver();
       stopLevelWin();
       if (!muted) {
@@ -1784,6 +1925,16 @@ export function SuperVoltorbFlipGame() {
     }
   }
 
+  // Try autoplay on mount. Some browsers block this until the user has
+  // interacted with the page; if so, the audio.play().catch in playMusic
+  // swallows the rejection and handleFirstInteraction starts it on the
+  // first click. We still mark musicStartedRef so we don't double-start.
+  useEffect(() => {
+    if (muted) return;
+    musicStartedRef.current = true;
+    playMusic();
+  }, [muted]);
+
   return (
     <>
       <DebugPanel
@@ -1795,7 +1946,7 @@ export function SuperVoltorbFlipGame() {
       />
     <EffectsProvider>
       <div
-        className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center md:grid md:grid-cols-[auto_1fr] md:items-start md:gap-4 text-white p-1 sm:p-2`}
+        className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center lg:grid lg:grid-cols-[auto_1fr] lg:items-start lg:gap-4 text-white p-1 sm:p-2`}
       >
         <style>{SCOPED_STYLES}</style>
 
@@ -1806,63 +1957,22 @@ export function SuperVoltorbFlipGame() {
           />
         )}
 
-        {/* Compact mobile bar (hidden at sm+). Shows level, both scores,
-            mute, help and memo in one tight strip so the board gets room. */}
-        {game && (
-          <div className="flex w-full max-w-[420px] flex-col gap-1.5 sm:hidden">
-            <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-1.5 py-1 outline outline-2 outline-gray-600 text-gray-700">
-              <CoinSpinner size={28} />
-              <div className="flex min-w-[44px] flex-col items-center justify-center rounded-[3px] bg-[#448563] px-1 leading-none text-white">
-                <span className="text-[9px] font-bold uppercase tracking-widest">
-                  Lv
-                </span>
-                <span className="text-lg font-black">
-                  {game.currentLevel}
-                </span>
-              </div>
-              <div className="flex flex-1 items-center justify-around gap-2">
-                <div className="flex flex-col items-center leading-none">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500">
-                    Total
-                  </span>
-                  <span className={`${scoreFont.className} text-xl`}>
-                    {game.totalScore.toString().padStart(5, "0")}
-                  </span>
-                </div>
-                <div className="h-8 w-[2px] bg-gray-200" />
-                <div className="flex flex-col items-center leading-none">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500">
-                    This game
-                  </span>
-                  <span className={`${scoreFont.className} text-xl`}>
-                    {game.currentScore.toString().padStart(5, "0")}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-2 px-1">
-              <div className="flex items-center gap-2">
-                <MobileHelpButton onOpen={() => setHowToPlayOpen(true)} />
-                <PixelMuteButton muted={muted} onToggle={toggleMute} size={40} />
-              </div>
-              <MemoBar
-                activeFlag={memoFlag}
-                onFlagSelect={setMemoFlag}
-                size={28}
-                showLabel={false}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Desktop / tablet left column (sm+ only). Holds everything except
             the board so the right column can devote full width to tiles. */}
-        <div className="hidden sm:flex flex-col items-center gap-2 md:items-stretch md:min-w-[240px]">
-          <div className="flex w-full flex-wrap items-center justify-center gap-2 md:justify-start">
+        <div className="hidden lg:flex flex-col items-center gap-2">
+          <div className="flex w-11/12 items-center gap-2">
             <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
             <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
             {game && (
-              <div className="flex items-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 py-[6px] outline outline-2 outline-gray-600 drop-shadow-default">
+              <div
+                className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 outline outline-2 outline-gray-600 drop-shadow-default${
+                  levelDir === "up"
+                    ? " svf-lv-flash-up"
+                    : levelDir === "down"
+                    ? " svf-lv-flash-down"
+                    : ""
+                }`}
+              >
                 <span className="text-xs font-bold uppercase tracking-widest text-white/80">
                   Lv
                 </span>
@@ -1873,21 +1983,86 @@ export function SuperVoltorbFlipGame() {
               </div>
             )}
           </div>
-          <MemoBar
-            activeFlag={memoFlag}
-            onFlagSelect={setMemoFlag}
-            size={32}
-          />
+          <div className="flex w-11/12">
+            <MemoBar
+              activeFlags={memoFlags}
+              onToggle={toggleMemoFlag}
+              onClear={clearMemoFlags}
+              size={32}
+              fullWidth
+            />
+          </div>
           {game && (
             <Scoreboard
-              currentScore={game.currentScore}
-              totalScore={game.totalScore}
+              currentScore={displayCurrent}
+              totalScore={displayTotal}
             />
           )}
         </div>
 
-        {/* Right column: just the board + footer so the tiles get full width. */}
+        {/* Right column: board + footer (and mobile bar at <lg, sized
+            to match board width). */}
         <div className="flex flex-col items-center gap-2">
+          {game && (
+            <div className="flex w-full flex-col gap-1.5 lg:hidden">
+              <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600 text-gray-700">
+                <div
+                  className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#448563] px-2 leading-none text-white${
+                    levelDir === "up"
+                      ? " svf-lv-flash-up"
+                      : levelDir === "down"
+                      ? " svf-lv-flash-down"
+                      : ""
+                  }`}
+                >
+                  <span className="text-xs font-bold uppercase tracking-widest text-white/80">
+                    Lv
+                  </span>
+                  <span className="text-xl font-black">
+                    {game.currentLevel}
+                  </span>
+                </div>
+                <div className="flex flex-1 items-center justify-around gap-2">
+                  <div className="flex flex-col items-center gap-0.5 leading-none">
+                    <div className="flex items-center gap-1">
+                      <CoinSpinner size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                        Total Coins
+                      </span>
+                    </div>
+                    <span className={`${scoreFont.className} text-xl tabular-nums`}>
+                      {displayTotal.toString().padStart(5, "0")}
+                    </span>
+                  </div>
+                  <div className="h-8 w-[2px] bg-gray-200" />
+                  <div className="flex flex-col items-center gap-0.5 leading-none">
+                    <div className="flex items-center gap-1">
+                      <CoinSpinner size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                        This Game
+                      </span>
+                    </div>
+                    <span className={`${scoreFont.className} text-xl tabular-nums`}>
+                      {displayCurrent.toString().padStart(5, "0")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+                  <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
+                </div>
+                <MemoBar
+                  activeFlags={memoFlags}
+                  onToggle={toggleMemoFlag}
+                  onClear={clearMemoFlags}
+                  size={28}
+                  showLabel={false}
+                />
+              </div>
+            </div>
+          )}
           {game && (
             <>
               <Gameboard
@@ -1896,8 +2071,10 @@ export function SuperVoltorbFlipGame() {
                 waitForClick
                 muted={muted}
                 onFirstInteraction={handleFirstInteraction}
-                memoFlag={memoFlag}
+                memoFlags={memoFlags}
                 peek={peek}
+                runPostFanfare={runPostFanfare}
+                onFlipDownStart={triggerLevelTransition}
               />
               <Footer />
             </>
