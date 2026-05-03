@@ -1967,11 +1967,13 @@ export function SuperVoltorbFlipGame() {
     // Snap to final wallet state — covers both natural completion and skip.
     setDisplayCurrent(0);
     setDisplayTotal(startTotal + earned);
-    if (!didSkip && !muted) sfx.payoutFinal();
-    // Breathing room only on natural completion so skip feels instant.
-    if (!didSkip) {
-      await new Promise<void>((r) => window.setTimeout(r, 280));
-    }
+    // COIN_PAYOUT_LAST always closes the chain, including on skip — the
+    // closing chime is the audible "money's in the bank" cue and should
+    // fire whether the player let it run or tapped through.
+    if (!muted) sfx.payoutFinal();
+    // Breathing room so payoutFinal doesn't bleed into the level-up SE.
+    // Shorter on skip so it still feels snappy.
+    await new Promise<void>((r) => window.setTimeout(r, didSkip ? 160 : 280));
     skipPayoutRef.current = false;
 
     // Hold payoutAnimRef.current=true through onFlipDownStart / flipCardsDown.
