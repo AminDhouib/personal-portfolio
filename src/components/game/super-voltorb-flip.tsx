@@ -683,9 +683,12 @@ const SCOPED_STYLES = `
   100% { background-color: #448563; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
 }
 
-/* Risk-warning tile shake — keyed by .svf-tile-anxious. Plays while
-   ME_CARDGAME1 fanfare is playing and other taps are locked out. */
-.svf-tile-anxious {
+/* Risk-warning tile shake — keyed by .svf-tile-anxious on the wrap.
+   Animation lives on the wrap's non-connector children so the row/col
+   connector lines (.svf-conn-e / .svf-conn-s) stay still while the
+   actual tile shakes. Plays while ME_CARDGAME1 fanfare is playing and
+   other taps are locked out. */
+.svf-tile-anxious > *:not(.svf-conn-e):not(.svf-conn-s) {
   animation: svf-tile-shake 0.32s linear infinite;
   filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.55));
 }
@@ -961,6 +964,10 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
       cell.value === "V" ? "bomb" : "coin";
     // Risk pre-check — voltorb_flip.c:905 plays ME_CARDGAME1 when the
     // row/col still has ≥75% voltorb density among unflipped tiles.
+    // We additionally suppress on deterministic rows/cols: a 0-voltorb
+    // direction means the tile is a guaranteed coin, and a 100%-voltorb
+    // direction means it's a guaranteed Voltorb — in either case the
+    // outcome isn't "uncertain", so the warning would just feel wrong.
     const N = game.cells.length;
     const rowCells = game.cells[row];
     const colCells = game.cells.map((r) => r[col]);
@@ -972,7 +979,10 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     const remainingCol = Math.max(1, N - flippedInCol);
     const rowRisk = (voltorbsInRow * 100) / remainingRow;
     const colRisk = (voltorbsInCol * 100) / remainingCol;
-    const highRisk = rowRisk >= 75 || colRisk >= 75;
+    const definitive =
+      rowRisk === 0 || rowRisk === 100 ||
+      colRisk === 0 || colRisk === 100;
+    const highRisk = !definitive && (rowRisk >= 75 || colRisk >= 75);
 
     onFirstInteraction();
 
@@ -993,16 +1003,27 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     };
 
     if (highRisk) {
-      // Lock the board, shake the targeted tile, fire the fanfare, then
-      // commit the flip after the warning ends. ME_CARDGAME1 is ~1.6s.
+      // Lock the board, shake the targeted tile, fire the fanfare, wait
+      // for it to finish, then pause 500ms before committing the flip.
+      // sfx.riskWarning() returns a promise that resolves on the audio
+      // element's `ended` event, so the reveal lands cleanly after the
+      // music — works for voltorb and coin tiles alike.
       warningTileRef.current = { row, col };
       setWarningTile({ row, col });
-      if (!muted) sfx.riskWarning();
-      window.setTimeout(() => {
+      const release = () => {
         warningTileRef.current = null;
         setWarningTile(null);
         commitFlip();
-      }, 1600);
+      };
+      if (!muted) {
+        sfx.riskWarning().then(() => {
+          window.setTimeout(release, 500);
+        });
+      } else {
+        // Muted — match the canonical fanfare length so timing stays
+        // consistent regardless of audio state.
+        window.setTimeout(release, 2100);
+      }
       return;
     }
 

@@ -1,66 +1,107 @@
-let ctx: AudioContext | null = null;
 let music: HTMLAudioElement | null = null;
 let gameOverAudio: HTMLAudioElement | null = null;
 let levelWinAudio: HTMLAudioElement | null = null;
 let globalMuted = false;
 
-function ensureCtx() {
-  if (!ctx && typeof window !== "undefined")
-    ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-  return ctx;
-}
+// Authentic HG/SS Voltorb-Flip sound effects, rendered directly from the
+// game's own gs_sound_data.sdat (pret/pokeheartgold). The SE constants used
+// by src/voltorb_flip/voltorb_flip.c are mapped 1:1 here:
+//   SEQ_SE_GS_PANERU_MEKURU    → tile-flip
+//   SEQ_SE_GS_COIN_PAYOUT_ONE  → coin-payout-one
+//   SEQ_SE_GS_COIN_PAYOUT_LAST → coin-payout-last
+//   SEQ_SE_GS_COIN_HAZURE      → voltorb-pop
+//   SEQ_SE_GS_OKOZUKAI         → level-clear
+//   SEQ_SE_DP_SELECT           → memo-select
+const SFX_PATH = "/games/super-voltorb-flip/sfx";
 
-function beep(freq: number, dur = 0.09, type: OscillatorType = "square", gain = 0.04) {
-  if (globalMuted) return;
-  const c = ensureCtx();
-  if (!c) return;
-  c.resume();
-  const osc = c.createOscillator();
-  const g = c.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-  g.gain.value = gain;
-  osc.connect(g).connect(c.destination);
-  osc.start();
-  osc.stop(c.currentTime + dur);
-  g.gain.setValueAtTime(gain, c.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
-}
-
-export const sfx = {
-  click: () => beep(740, 0.05, "square"),
-  // Money earned — pattern scales with the tile's coin multiplier.
-  // x2 = 2-note chime, x3 = 4-note triumphant arpeggio.
-  coin: (value: number = 2) => {
-    if (value >= 3) {
-      beep(1047, 0.06, "triangle", 0.05);
-      setTimeout(() => beep(1319, 0.06, "triangle", 0.05), 55);
-      setTimeout(() => beep(1568, 0.06, "triangle", 0.05), 110);
-      setTimeout(() => beep(2093, 0.16, "triangle", 0.055), 165);
-    } else {
-      beep(988, 0.07, "square", 0.045);
-      setTimeout(() => beep(1319, 0.1, "square", 0.045), 60);
+// Pool of preloaded Audio elements per file so rapid repeat clicks don't
+// step on each other (each call clones from the template).
+const sfxCache = new Map<string, HTMLAudioElement>();
+function playSample(file: string, volume = 0.6): Promise<void> {
+  // Resolves when the clone fires `ended` (or errors / safety-timeouts)
+  // so gameplay code can `await sfx.foo()` when timing matters. Existing
+  // fire-and-forget callers just ignore the returned promise.
+  return new Promise((resolve) => {
+    if (globalMuted || typeof window === "undefined") return resolve();
+    let template = sfxCache.get(file);
+    if (!template) {
+      template = new Audio(`${SFX_PATH}/${file}`);
+      template.preload = "auto";
+      sfxCache.set(file, template);
     }
+    // cloneNode lets the SFX overlap with itself on rapid input.
+    const node = template.cloneNode(true) as HTMLAudioElement;
+    node.volume = volume;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    node.addEventListener("ended", finish, { once: true });
+    node.addEventListener("error", finish, { once: true });
+    node.play().catch(finish);
+    // Safety net in case neither event fires.
+    window.setTimeout(finish, 8000);
+  });
+}
+
+// Sample-accurate names following the in-game C source (PlaySE call sites in
+// pret/pokeheartgold/src/voltorb_flip/voltorb_flip.c). See docs/voltorb-flip-audio-audit.md
+// for the full mapping.
+export const sfx = {
+  /** Tile flip animation start — every tile, even voltorbs. */
+  flip: () => playSample("tile-flip.mp3", 0.55),
+
+  /** Voltorb hit. In HG/SS the flip SE plays first, then this overlaps shortly after. */
+  voltorbPop: () => playSample("voltorb-pop.mp3", 0.65),
+
+  /** Played per ~4 ticks while the "you earned X coins" counter scrolls up. */
+  payoutTickEarn: () => playSample("level-clear.mp3", 0.55),
+
+  /** Played per ~4 ticks while the earned coins drain into the player's wallet. */
+  payoutTickBank: () => playSample("coin-payout-one.mp3", 0.55),
+
+  /** Final closing chime of the payout chain. */
+  payoutFinal: () => playSample("coin-payout-last.mp3", 0.6),
+
+  /** Memo open / close — same SE for both transitions in HG/SS. */
+  memoSlide: () => playSample("card-flip.mp3", 0.55),
+
+  /** Memo flag toggled on a tile (DP_BOX01). */
+  memoToggle: () => playSample("memo-toggle.mp3", 0.55),
+
+  /** Cursor moved between memo buttons or board cells (DP_SELECT). */
+  cursorMove: () => playSample("memo-select.mp3", 0.55),
+
+  /** Tap on an already-flipped tile / disallowed action (DP_BOX03). */
+  invalidTap: () => playSample("invalid-tap.mp3", 0.5),
+
+  /** Final-decision tone — quit confirmations etc. (DP_DECIDE). */
+  decide: () => playSample("decide.mp3", 0.55),
+
+  /** Memo "Back" / "Clear" button (DP_BUTTON3). */
+  backButton: () => playSample("back-button.mp3", 0.55),
+
+  /** Round-start: level went up. (GS_SLOT01) */
+  levelUp: () => playSample("level-up.mp3", 0.6),
+
+  /** Round-start: level went down. (GS_SLOT03) */
+  levelDown: () => playSample("level-down.mp3", 0.6),
+
+  /** "Is this what you're expecting?!" risk warning (ME_CARDGAME1). */
+  riskWarning: () => playSample("warning-fanfare.mp3", 0.55),
+
+  // ── Legacy/back-compat aliases (used by existing call sites until the
+  // gameplay code is migrated to the explicit names above).
+  click: () => playSample("tile-flip.mp3", 0.55),
+  coin: (_value: number = 2) => {
+    // HG/SS does NOT play a per-flip coin SE — coin chimes only fire during
+    // the post-round payout banner. Until the win flow is rewired, keep
+    // this as a no-op so x2/x3 reveals stop double-bleeping.
   },
-  win: () => {
-    [523, 659, 784, 1047].forEach((f, i) =>
-      setTimeout(() => beep(f, 0.15, "triangle"), i * 90),
-    );
-  },
-  lose: () => {
-    if (globalMuted) return;
-    const c = ensureCtx();
-    if (!c) return;
-    c.resume();
-    const buf = c.createBuffer(1, Math.floor(c.sampleRate * 0.6), c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++)
-      d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) * 0.5;
-    const src = c.createBufferSource();
-    src.buffer = buf;
-    src.connect(c.destination);
-    src.start();
-  },
+  win: () => playSample("level-clear.mp3", 0.6),
+  lose: () => playSample("voltorb-pop.mp3", 0.65),
 };
 
 export function playMusic() {
@@ -122,6 +163,10 @@ export function stopLevelWin() {
   levelWinAudio?.pause();
   levelWinAudio = null;
 }
+
+// (Note: HG/SS JP swaps to BGM scene 64 during the coin-payout chain
+// (voltorb_flip.c:1047). The NA Voltorb Flip doesn't use a separate
+// payout track — the gameplay loop continues — so we omit it here.)
 
 export function setMusicMuted(muted: boolean) {
   globalMuted = muted;
