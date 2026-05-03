@@ -682,6 +682,32 @@ const SCOPED_STYLES = `
   60%  { background-color: #6e4848; box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.20); transform: scale(0.98) rotate(0.5deg); }
   100% { background-color: #448563; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
 }
+
+/* Risk-warning tile shake — keyed by .svf-tile-anxious. Plays while
+   ME_CARDGAME1 fanfare is playing and other taps are locked out. */
+.svf-tile-anxious {
+  animation: svf-tile-shake 0.32s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.55));
+}
+@keyframes svf-tile-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20%  { transform: translate(-2px, 1px) rotate(-1.4deg); }
+  40%  { transform: translate(2px, -1px) rotate(1.4deg); }
+  60%  { transform: translate(-1px, 2px) rotate(-0.8deg); }
+  80%  { transform: translate(1px, -2px) rotate(0.8deg); }
+}
+
+/* When the game element is fullscreened, fill the viewport with the
+   board background so the surrounding chrome doesn't bleed through. */
+.svf-root:fullscreen,
+.svf-root:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  background: #2d4f3c;
+  padding: 24px;
+  overflow: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .svf-root * { transition-duration: 150ms !important; animation-duration: 150ms !important; }
 }
@@ -699,9 +725,10 @@ type CardProps = {
   row?: number;
   col?: number;
   flags?: FlagValues;
+  warning?: boolean;
 };
 
-const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProps) => {
+const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
   const faceTextStyle: React.CSSProperties = { fontSize: "calc(var(--svf-tile) * 0.6)" };
@@ -717,7 +744,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags }: CardProp
     </div>
   ) : (
     <div
-      className="svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]"
+      className={`svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]${warning ? " svf-tile-anxious" : ""}`}
       role="button"
       tabIndex={0}
       aria-label={row !== undefined && col !== undefined ? `Row ${row + 1}, Col ${col + 1}, ${isFlipped ? "revealed" : "face down"}` : undefined}
@@ -871,6 +898,10 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
   const [effects, setEffects] = useState<ActiveEffect[]>([]);
   const theme = useEffectsTheme();
   const nextId = useRef(0);
+  // Tile being announced by the risk fanfare. Renders the anxious shake
+  // and gates handleFlip so no other tap can land while it's playing.
+  const [warningTile, setWarningTile] = useState<{ row: number; col: number } | null>(null);
+  const warningTileRef = useRef<{ row: number; col: number } | null>(null);
 
   async function waitForUserInteraction() {
     return new Promise<void>((resolve) => {
@@ -892,6 +923,11 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     // Once the round is settled (voltorb hit or all valuable coins found),
     // the board freezes until restartGame() runs from the win/lose flow.
     if (game.gameStatus === "lose" || game.gameStatus === "win") return;
+    // While ME_CARDGAME1 is announcing a high-risk tile, the board is
+    // locked — only the targeted tile is "live" and it commits when the
+    // delay below resolves. Mirrors voltorb_flip.c, which freezes input
+    // for the duration of the fanfare.
+    if (warningTileRef.current) return;
     if (memoFlags.size > 0) {
       const cell = game.cells[row][col];
       // Tapping an already-revealed tile while memo is open does nothing
@@ -923,42 +959,54 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     // COIN_HAZURE (the buzzer) only when the revealed tile is a Voltorb.
     const kind: "bomb" | "coin" =
       cell.value === "V" ? "bomb" : "coin";
-    if (theme) {
-      const id = nextId.current++;
-      const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
-      setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
-    }
-    if (!muted) {
-      sfx.flip();
-      if (kind === "bomb") {
-        // Stagger the buzzer so the flip click is audible first — matches
-        // the in-game overlap where PANERU_MEKURU starts the animation
-        // and COIN_HAZURE kicks in once the tile lands face-up.
-        window.setTimeout(() => sfx.voltorbPop(), 140);
-      } else {
-        // "Is this what you're expecting?!" risk warning. HG/SS plays
-        // ME_CARDGAME1 if the row OR col still has ≥75% chance of being
-        // a voltorb among the unflipped tiles. See voltorb_flip.c:905.
-        const N = game.cells.length;
-        const rowCells = game.cells[row];
-        const colCells = game.cells.map((r) => r[col]);
-        const flippedInRow = rowCells.filter((c) => c.isFlipped).length;
-        const flippedInCol = colCells.filter((c) => c.isFlipped).length;
-        const voltorbsInRow = game.rowValues[row]?.voltorbs ?? 0;
-        const voltorbsInCol = game.colValues[col]?.voltorbs ?? 0;
-        const remainingRow = Math.max(1, N - flippedInRow);
-        const remainingCol = Math.max(1, N - flippedInCol);
-        const rowRisk = (voltorbsInRow * 100) / remainingRow;
-        const colRisk = (voltorbsInCol * 100) / remainingCol;
-        if (rowRisk >= 75 || colRisk >= 75) {
-          // Tiny delay so the flip click is the first thing the player
-          // hears, then the warning fanfare plays underneath.
-          window.setTimeout(() => sfx.riskWarning(), 60);
+    // Risk pre-check — voltorb_flip.c:905 plays ME_CARDGAME1 when the
+    // row/col still has ≥75% voltorb density among unflipped tiles.
+    const N = game.cells.length;
+    const rowCells = game.cells[row];
+    const colCells = game.cells.map((r) => r[col]);
+    const flippedInRow = rowCells.filter((c) => c.isFlipped).length;
+    const flippedInCol = colCells.filter((c) => c.isFlipped).length;
+    const voltorbsInRow = game.rowValues[row]?.voltorbs ?? 0;
+    const voltorbsInCol = game.colValues[col]?.voltorbs ?? 0;
+    const remainingRow = Math.max(1, N - flippedInRow);
+    const remainingCol = Math.max(1, N - flippedInCol);
+    const rowRisk = (voltorbsInRow * 100) / remainingRow;
+    const colRisk = (voltorbsInCol * 100) / remainingCol;
+    const highRisk = rowRisk >= 75 || colRisk >= 75;
+
+    onFirstInteraction();
+
+    const commitFlip = () => {
+      if (theme) {
+        const id = nextId.current++;
+        const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
+        setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
+      }
+      if (!muted) {
+        sfx.flip();
+        if (kind === "bomb") {
+          // Stagger the buzzer so the flip click is audible first.
+          window.setTimeout(() => sfx.voltorbPop(), 140);
         }
       }
+      updateGame((g) => g.flipCell(row, col));
+    };
+
+    if (highRisk) {
+      // Lock the board, shake the targeted tile, fire the fanfare, then
+      // commit the flip after the warning ends. ME_CARDGAME1 is ~1.6s.
+      warningTileRef.current = { row, col };
+      setWarningTile({ row, col });
+      if (!muted) sfx.riskWarning();
+      window.setTimeout(() => {
+        warningTileRef.current = null;
+        setWarningTile(null);
+        commitFlip();
+      }, 1600);
+      return;
     }
-    onFirstInteraction();
-    updateGame((g) => g.flipCell(row, col));
+
+    commitFlip();
   }
 
   const flipCardsUp = useCallback(() => {
@@ -1085,6 +1133,10 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
                     isFlipped={peek || cardsFlipped[i]?.isFlipped}
                     flipCard={() => handleFlip(coordinate[0], coordinate[1])}
                     flags={peek || cell.isFlipped ? undefined : cell.flags}
+                    warning={
+                      warningTile?.row === coordinate[0] &&
+                      warningTile?.col === coordinate[1]
+                    }
                   >
                     {cell.value === "V" ? (
                       // tile/voltorb.png is upstream's srcTile0 (22×22 with
@@ -1568,6 +1620,78 @@ const PixelMuteButton = ({
   </button>
 );
 
+const PixelFullscreenButton = ({
+  active,
+  onToggle,
+  size = 40,
+}: {
+  active: boolean;
+  onToggle: () => void;
+  size?: number;
+}) => (
+  <button
+    onClick={onToggle}
+    aria-label={active ? "Exit fullscreen" : "Enter fullscreen"}
+    title={active ? "Exit fullscreen" : "Enter fullscreen"}
+    className="flex items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white outline outline-2 outline-gray-600 text-gray-700 transition-colors hover:bg-zinc-100"
+    style={{ width: size, height: size }}
+  >
+    <svg
+      width={Math.round(size * 0.55)}
+      height={Math.round(size * 0.55)}
+      viewBox="0 0 16 16"
+      style={{ imageRendering: "pixelated", shapeRendering: "crispEdges" }}
+      aria-hidden
+    >
+      {active ? (
+        <>
+          {/* Inward-pointing corners (collapse). */}
+          <rect x="2" y="5" width="3" height="1" fill="currentColor" />
+          <rect x="4" y="3" width="1" height="3" fill="currentColor" />
+          <rect x="11" y="5" width="3" height="1" fill="currentColor" />
+          <rect x="11" y="3" width="1" height="3" fill="currentColor" />
+          <rect x="2" y="10" width="3" height="1" fill="currentColor" />
+          <rect x="4" y="10" width="1" height="3" fill="currentColor" />
+          <rect x="11" y="10" width="3" height="1" fill="currentColor" />
+          <rect x="11" y="10" width="1" height="3" fill="currentColor" />
+        </>
+      ) : (
+        <>
+          {/* Outward-pointing corners (expand). */}
+          <rect x="2" y="2" width="4" height="1" fill="currentColor" />
+          <rect x="2" y="2" width="1" height="4" fill="currentColor" />
+          <rect x="10" y="2" width="4" height="1" fill="currentColor" />
+          <rect x="13" y="2" width="1" height="4" fill="currentColor" />
+          <rect x="2" y="13" width="4" height="1" fill="currentColor" />
+          <rect x="2" y="10" width="1" height="4" fill="currentColor" />
+          <rect x="10" y="13" width="4" height="1" fill="currentColor" />
+          <rect x="13" y="10" width="1" height="4" fill="currentColor" />
+        </>
+      )}
+    </svg>
+  </button>
+);
+
+function useFullscreen(targetRef: React.RefObject<HTMLElement | null>) {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () =>
+      setActive(document.fullscreenElement === targetRef.current);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, [targetRef]);
+  const toggle = useCallback(() => {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    } else {
+      targetRef.current?.requestFullscreen?.();
+    }
+  }, [targetRef]);
+  return [active, toggle] as const;
+}
+
 const COIN_FRAME_URLS = Array.from(
   { length: 12 },
   (_, i) => `/games/super-voltorb-flip/sprites/upstream/coin/coin_${i}.png`,
@@ -1725,6 +1849,19 @@ export function SuperVoltorbFlipGame() {
   const { game, updateGame, size, setGameSize } = useGame();
   const [peek, setPeek] = useState(false);
   const [muted, toggleMute] = useMute();
+  const svfRootRef = useRef<HTMLDivElement | null>(null);
+  const [fullscreenActive, toggleFullscreen] = useFullscreen(svfRootRef);
+  // Hidden by default; revealed after 10 taps on the mute button (Konami-style
+  // unlock so debug knobs aren't visible to normal players).
+  const [debugVisible, setDebugVisible] = useState(false);
+  const muteTapCountRef = useRef(0);
+  const handleMuteToggle = () => {
+    toggleMute();
+    muteTapCountRef.current += 1;
+    if (muteTapCountRef.current >= 10 && !debugVisible) {
+      setDebugVisible(true);
+    }
+  };
   const [memoFlags, setMemoFlags] = useState<MemoFlagSet>(() => new Set<MemoFlag>());
   const toggleMemoFlag = (f: MemoFlag) => {
     // HG/SS plays DP_SELECT whenever the memo cursor changes button.
@@ -2049,15 +2186,18 @@ export function SuperVoltorbFlipGame() {
 
   return (
     <>
-      <DebugPanel
-        size={size}
-        onSizeChange={setGameSize}
-        onWinLevel={() => updateGame((g) => g.debugWinLevel())}
-        peek={peek}
-        onPeekToggle={() => setPeek((v) => !v)}
-      />
+      {debugVisible && (
+        <DebugPanel
+          size={size}
+          onSizeChange={setGameSize}
+          onWinLevel={() => updateGame((g) => g.debugWinLevel())}
+          peek={peek}
+          onPeekToggle={() => setPeek((v) => !v)}
+        />
+      )}
     <EffectsProvider>
       <div
+        ref={svfRootRef}
         className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center lg:grid lg:grid-cols-[auto_1fr] lg:items-start lg:gap-4 text-white p-1 sm:p-2`}
       >
         <style>{SCOPED_STYLES}</style>
@@ -2074,7 +2214,8 @@ export function SuperVoltorbFlipGame() {
         <div className="hidden lg:flex flex-col items-center gap-2">
           <div className="flex w-full items-center gap-2">
             <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-            <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
+            <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+            <PixelFullscreenButton active={fullscreenActive} onToggle={toggleFullscreen} size={44} />
             {game && (
               <div
                 className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 outline outline-2 outline-gray-600 drop-shadow-default${
@@ -2187,7 +2328,8 @@ export function SuperVoltorbFlipGame() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-                  <PixelMuteButton muted={muted} onToggle={toggleMute} size={44} />
+                  <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+            <PixelFullscreenButton active={fullscreenActive} onToggle={toggleFullscreen} size={44} />
                 </div>
                 <MemoBar
                   activeFlags={memoFlags}
