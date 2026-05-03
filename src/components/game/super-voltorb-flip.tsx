@@ -1181,7 +1181,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
               <span
                 key={i}
                 className="inline-block text-center"
-                style={{ width: "0.65em" }}
+                style={{ width: "0.55em" }}
               >
                 {d}
               </span>
@@ -1204,7 +1204,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
               <span
                 key={i}
                 className="inline-block text-center"
-                style={{ width: "0.65em" }}
+                style={{ width: "0.55em" }}
               >
                 {d}
               </span>
@@ -2132,7 +2132,7 @@ export function SuperVoltorbFlipGame() {
                           <span
                             key={i}
                             className="inline-block text-center"
-                            style={{ width: "0.65em" }}
+                            style={{ width: "0.55em" }}
                           >
                             {d}
                           </span>
@@ -2156,7 +2156,7 @@ export function SuperVoltorbFlipGame() {
                           <span
                             key={i}
                             className="inline-block text-center"
-                            style={{ width: "0.65em" }}
+                            style={{ width: "0.55em" }}
                           >
                             {d}
                           </span>
