@@ -34,7 +34,7 @@ export default async function GameDetailPage({
   const game = getGameMeta(slug);
   if (!game || game.external) notFound();
 
-  const others = GAMES.filter((g) => g.slug !== game.slug);
+  const others = GAMES.filter((g) => g.slug !== game.slug && !g.hidden);
 
   return (
     <div className="min-h-screen pt-24 pb-16">

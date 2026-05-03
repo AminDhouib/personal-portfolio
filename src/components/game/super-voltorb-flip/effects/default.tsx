@@ -21,10 +21,20 @@ function ExplosionSprite({ onDone }: EffectProps) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={EXPLODE_FRAMES[frame]}
-      width={40}
-      height={40}
       alt=""
-      style={{ imageRendering: "pixelated", pointerEvents: "none" }}
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        // Larger than the tile so the blast radius can extend past the cell.
+        width: "calc(var(--svf-tile) * 2.4)",
+        height: "calc(var(--svf-tile) * 2.4)",
+        maxWidth: "none",
+        maxHeight: "none",
+        imageRendering: "pixelated",
+        pointerEvents: "none",
+      }}
     />
   );
 }
@@ -48,10 +58,20 @@ function SparkleSprite({ onDone }: EffectProps) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={SUCCESS_FRAMES[frame]}
-      width={40}
-      height={40}
       alt=""
-      style={{ imageRendering: "pixelated", pointerEvents: "none" }}
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        // Slightly larger than the tile so the sparkle rays poke past edges.
+        width: "calc(var(--svf-tile) * 1.4)",
+        height: "calc(var(--svf-tile) * 1.4)",
+        maxWidth: "none",
+        maxHeight: "none",
+        imageRendering: "pixelated",
+        pointerEvents: "none",
+      }}
     />
   );
 }

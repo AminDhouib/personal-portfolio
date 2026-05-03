@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, animate } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameSlug } from "@/app/games/games-meta";
 
 // ---------- shared ----------
@@ -690,110 +690,427 @@ function TypingSpeedBanner() {
 }
 
 // ---------- Super Voltorb Flip ----------
-// Actual game: Game Boy green (#5ab859 → #3f8a3f) classic theme, gold tiles,
-// red Voltorb bombs, column/row clue indicators.
+// Pixel-accurate match: #58a66c/#448563 checkerboard tile backs, salmon
+// #bd8c84 face-up tiles, gray-200 outlines, colored clue cards from the
+// COLORS array, actual voltorb.png sprite, connector bars between tiles.
 
-function SuperVoltorbFlipBanner() {
-  const tiles = [
-    { v: 2, d: 0 },
-    { v: 1, d: 0.4 },
-    { v: "x", d: 0.8 },
-    { v: 3, d: 1.2 },
-    { v: 1, d: 1.6 },
-    { v: 2, d: 2.0 },
-    { v: "x", d: 2.4 },
-    { v: 1, d: 2.8 },
-    { v: 3, d: 3.2 },
-  ];
+// Upstream's `srcTile0` — the bomb tile face sprite (22×22, includes salmon
+// background + voltorb body + dark border). Different from the parent-level
+// voltorb.png (28×28) which is just the voltorb-body sprite for row/col
+// indicator cards. Mirrored from samualtnorman/voltorb-flip's
+// src/assets/tile/voltorb.png so its salmon (#bd8c84) matches the
+// explode_*.png frames' salmon, eliminating the color-shift on transition.
+const VOLTORB_SRC = "/games/super-voltorb-flip/sprites/upstream/tile/voltorb.png";
+const EXPLODE_FRAMES = Array.from(
+  { length: 9 },
+  (_, i) => `/games/super-voltorb-flip/sprites/upstream/tile/explode_${i}.png`,
+);
+
+// Mirrors upstream's blowup logic (samualtnorman/voltorb-flip src/index.ts):
+// 9 progressively-larger PNG frames (22×22 → 64×64 native). The artist
+// baked the growth into the assets — each frame is a larger image with
+// the voltorb portion at a consistent size and more debris around it.
+// Matches super-voltorb-flip/effects/default.tsx (60ms per frame, 80ms hold
+// after the last frame). Then a 200ms cross-fade so the explosion debris
+// dissolves smoothly into the static voltorb behind (which is pixel-
+// identical to the voltorb-tile portion baked into frame 8 — no snap).
+const FRAME_DURATION_MS = 60;
+const FRAME_HOLD_MS = 80;
+const FADE_DURATION_MS = 200;
+function ExplosionFrames({
+  onFadeStart,
+  onDone,
+}: {
+  onFadeStart: () => void;
+  onDone: () => void;
+}) {
+  const [frame, setFrame] = useState(0);
+  const [fading, setFading] = useState(false);
+  // Stash the callbacks in refs so the frame-advance effect's deps don't
+  // include them. Otherwise inline arrows from the parent would get a
+  // new identity on every parent re-render, re-running this effect and
+  // clearing the 60ms `setFrame` timer before it could fire — the frame
+  // would stay stuck at 0 forever.
+  const onFadeStartRef = useRef(onFadeStart);
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onFadeStartRef.current = onFadeStart;
+    onDoneRef.current = onDone;
+  }, [onFadeStart, onDone]);
+  useEffect(() => {
+    if (frame === EXPLODE_FRAMES.length - 1) {
+      const startFade = setTimeout(() => {
+        setFading(true);
+        onFadeStartRef.current();
+      }, FRAME_HOLD_MS);
+      const finish = setTimeout(() => onDoneRef.current(), FRAME_HOLD_MS + FADE_DURATION_MS);
+      return () => {
+        clearTimeout(startFade);
+        clearTimeout(finish);
+      };
+    }
+    const t = setTimeout(() => setFrame((f) => f + 1), FRAME_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [frame]);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={EXPLODE_FRAMES[frame]}
+      alt=""
+      style={{
+        imageRendering: "pixelated",
+        pointerEvents: "none",
+        maxWidth: "none",
+        maxHeight: "none",
+        width: "auto",
+        height: "auto",
+        display: "block",
+        opacity: fading ? 0 : 1,
+        transition: `opacity ${FADE_DURATION_MS}ms ease-out`,
+      }}
+    />
+  );
+}
+
+// Bomb tile face — just renders the voltorb sprite at native size. The
+// explosion plays in a separate overlay at the tile-outer level (see
+// BombExplosionOverlay). maxWidth/maxHeight overrides are needed because
+// Tailwind's preflight resets imgs to `max-width: 100%`, which would
+// otherwise clamp the voltorb to the parent salmon div's width.
+function BombFaceUp({ size }: { size: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={VOLTORB_SRC}
+      alt=""
+      width={size}
+      height={size}
+      style={{
+        imageRendering: "pixelated",
+        pointerEvents: "none",
+        maxWidth: "none",
+        maxHeight: "none",
+        display: "block",
+      }}
+    />
+  );
+}
+
+// Sibling-of-tile-inner overlay rendered ON TOP of the tile (z=5 vs the
+// tile-inner's z=1). Sized at the sprite's native ~40px so the voltorb
+// portion of the sprite renders at the same scale as the static voltorb
+// on a normally-sized tile, and the outer debris ring overflows past the
+// tile boundary into the gap. After onDone fires, the overlay unmounts
+// and the static voltorb in the tile-inner is visible again at full size.
+// One-shot explosion overlay. The owning cell remounts this with a fresh
+// `key` at each new cycle (or when its value flips to "bomb" again), so a
+// single-fire timer is sufficient — no internal interval.
+function BombExplosionOverlay({
+  flipDelayMs,
+  scale,
+  onExplodingChange,
+}: {
+  flipDelayMs: number;
+  scale: number;
+  onExplodingChange: (e: boolean) => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [exploding, setExploding] = useState(false);
+  const onExplodingChangeRef = useRef(onExplodingChange);
+  useEffect(() => {
+    onExplodingChangeRef.current = onExplodingChange;
+  }, [onExplodingChange]);
+  useEffect(() => {
+    onExplodingChangeRef.current(exploding);
+  }, [exploding]);
+  useEffect(() => {
+    const initial = setTimeout(() => {
+      setMounted(true);
+      setExploding(true);
+    }, flipDelayMs);
+    return () => clearTimeout(initial);
+  }, [flipDelayMs]);
+  if (!mounted) return null;
   return (
     <div
-      className="absolute inset-0 overflow-hidden flex items-center justify-center"
-      style={{ background: "linear-gradient(135deg, #3f8a3f, #5ab859, #3f8a3f)" }}
+      style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        transformOrigin: "center",
+        zIndex: 5,
+        pointerEvents: "none",
+      }}
     >
-      {/* Subtle pixel grid overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.08]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent, transparent 3px, black 3px, black 4px), repeating-linear-gradient(90deg, transparent, transparent 3px, black 3px, black 4px)",
-        }}
+      <ExplosionFrames
+        onFadeStart={() => setExploding(false)}
+        onDone={() => setMounted(false)}
       />
-      {/* Row/column clues */}
-      <div className="absolute right-[8%] top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
-        {[{ p: 6, v: 1 }, { p: 4, v: 2 }, { p: 5, v: 1 }].map((c, i) => (
-          <div key={i} className="w-8 h-6 rounded-sm bg-white/15 border border-white/20 flex items-center justify-center text-[9px] font-bold text-white/80 font-mono">
-            {c.p}/{c.v}
-          </div>
-        ))}
+    </div>
+  );
+}
+
+// 15% chance of bomb, 85% chance of number 1/2/3. With a 6×3 = 18 cell
+// board this averages ~2.7 bombs visible at any given moment. Each cell
+// rolls independently so the bomb positions wander as cycles tick.
+function pickCellValue(): number | "bomb" {
+  if (Math.random() < 0.15) return "bomb";
+  return 1 + Math.floor(Math.random() * 3);
+}
+
+// Per-cell tile component. Maintains its own value state that re-rolls at
+// each cell cycle (so bombs and numbers appear in different positions over
+// time without forcing a global board reset). The flip animation runs
+// continuously via motion.div's `repeat: Infinity` — values just swap at
+// the cycle boundaries when the cell is face-down.
+function BoardCell({
+  r,
+  c,
+  ROWS,
+  COLS,
+  FLIP_CYCLE_S,
+  TILE,
+  GAP,
+  ROW_COLORS,
+  COL_COLORS,
+  tileOuterStyle,
+  tileInnerStyle,
+}: {
+  r: number;
+  c: number;
+  ROWS: number;
+  COLS: number;
+  FLIP_CYCLE_S: number;
+  TILE: number;
+  GAP: number;
+  ROW_COLORS: string[];
+  COL_COLORS: string[];
+  tileOuterStyle: React.CSSProperties;
+  tileInnerStyle: React.CSSProperties;
+}) {
+  // Stable per-cell flip delay — set once via lazy initializer so React's
+  // purity rules don't flag Math.random in render. Survives re-renders.
+  const [flipDelay] = useState(() => Math.random() * (FLIP_CYCLE_S - 1.5));
+  // cycleTick increments at the start of each cell cycle (face-down moment
+  // between flip-down and the next flip-up). The BombExplosionOverlay's
+  // React key includes cycleTick, so it remounts cleanly each cycle when
+  // the value happens to be "bomb".
+  const [cycleTick, setCycleTick] = useState(0);
+  const [value, setValue] = useState<number | "bomb">(() => pickCellValue());
+  const [exploding, setExploding] = useState(false);
+
+  useEffect(() => {
+    const cycleMs = FLIP_CYCLE_S * 1000;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const initial = setTimeout(() => {
+      setCycleTick((n) => n + 1);
+      setValue(pickCellValue());
+      interval = setInterval(() => {
+        setCycleTick((n) => n + 1);
+        setValue(pickCellValue());
+      }, cycleMs);
+    }, (flipDelay + FLIP_CYCLE_S) * 1000);
+    return () => {
+      clearTimeout(initial);
+      if (interval) clearInterval(interval);
+    };
+  }, [flipDelay, FLIP_CYCLE_S]);
+
+  const isBomb = value === "bomb";
+  // For cycle 0 the overlay mounts at t=0, so the explosion fires at
+  // (flipDelay + 0.25*cycle) from mount. For later cycles the overlay
+  // remounts at the cycle boundary so it just needs 0.25*cycle delay.
+  const explosionDelayMs =
+    cycleTick === 0
+      ? (flipDelay + 0.25 * FLIP_CYCLE_S) * 1000
+      : 0.25 * FLIP_CYCLE_S * 1000;
+
+  const renderFaceUp = () =>
+    isBomb ? (
+      <div
+        className="flex items-center justify-center w-full h-full"
+        style={{ background: "#bd8c84", border: "2px solid #8a4236" }}
+      >
+        {!exploding && <BombFaceUp size={22} />}
       </div>
-      <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 flex gap-1.5">
-        {[{ p: 5, v: 1 }, { p: 3, v: 2 }, { p: 7, v: 0 }].map((c, i) => (
-          <div key={i} className="w-8 h-5 rounded-sm bg-white/15 border border-white/20 flex items-center justify-center text-[9px] font-bold text-white/80 font-mono">
-            {c.p}/{c.v}
-          </div>
-        ))}
+    ) : (
+      <div
+        className="flex items-center justify-center w-full h-full font-bold"
+        style={{
+          background: "#bd8c84",
+          border: "2px solid #8a4236",
+          color: "#1a1a1a",
+          fontSize: TILE * 0.55,
+          fontFamily: "ui-monospace, monospace",
+          textShadow:
+            "1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff",
+        }}
+      >
+        {value}
       </div>
-      {/* 3x3 tile grid */}
-      <div className="grid grid-cols-3 gap-1.5 w-[42%] aspect-square" style={{ perspective: 600 }}>
-        {tiles.map((t, i) => (
-          <motion.div
-            key={i}
-            className="relative rounded-md"
-            style={{ transformStyle: "preserve-3d" }}
-            animate={{ rotateY: [0, 180, 180, 360] }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              delay: t.d,
-              times: [0, 0.2, 0.8, 1],
-              ease: "easeInOut",
+    );
+
+  return (
+    <div style={{ ...tileOuterStyle, gridRow: r + 1, gridColumn: c + 1 }}>
+      {c < COLS - 1 && (
+        <div
+          style={{
+            position: "absolute",
+            right: -(GAP + 1),
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: GAP + 2,
+            height: 6,
+            backgroundColor: ROW_COLORS[r % ROW_COLORS.length],
+            zIndex: 0,
+            pointerEvents: "none",
+            boxShadow: "0 1px 0 #e5e7eb, 0 -1px 0 #e5e7eb",
+          }}
+        />
+      )}
+      {r < ROWS - 1 && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: -(GAP + 1),
+            left: "50%",
+            transform: "translateX(-50%)",
+            height: GAP + 2,
+            width: 6,
+            backgroundColor: COL_COLORS[c % COL_COLORS.length],
+            zIndex: 0,
+            pointerEvents: "none",
+            boxShadow: "1px 0 0 #e5e7eb, -1px 0 0 #e5e7eb",
+          }}
+        />
+      )}
+      {isBomb && (
+        <BombExplosionOverlay
+          key={`bomb-${cycleTick}`}
+          flipDelayMs={explosionDelayMs}
+          scale={1.0}
+          onExplodingChange={setExploding}
+        />
+      )}
+      <div style={{ ...tileInnerStyle, perspective: 600 }}>
+        <motion.div
+          style={{
+            width: "100%",
+            height: "100%",
+            transformStyle: "preserve-3d",
+            position: "relative",
+          }}
+          animate={{ rotateY: [0, 0, 180, 180, 0] }}
+          transition={{
+            duration: FLIP_CYCLE_S,
+            repeat: Infinity,
+            delay: flipDelay,
+            times: [0, 0.15, 0.25, 0.85, 0.95],
+            ease: "easeInOut",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backfaceVisibility: "hidden",
             }}
           >
-            {/* Face down — green back */}
-            <div
-              className="absolute inset-0 rounded-md flex items-center justify-center"
-              style={{
-                backfaceVisibility: "hidden",
-                background: "linear-gradient(135deg, #2d7a2d, #4a9e4a)",
-                border: "1.5px solid #6abb6a",
-              }}
-            >
-              <div className="w-3 h-3 rounded-full bg-white/15" />
-            </div>
-            {/* Face up */}
-            <div
-              className="absolute inset-0 rounded-md flex items-center justify-center font-bold text-base"
-              style={{
-                backfaceVisibility: "hidden",
-                transform: "rotateY(180deg)",
-                background: t.v === "x"
-                  ? "linear-gradient(135deg, #fee2e2, #fca5a5)"
-                  : "linear-gradient(135deg, #fef3c7, #fbbf24)",
-                border: t.v === "x" ? "1.5px solid #f87171" : "1.5px solid #d97706",
-                color: t.v === "x" ? "#dc2626" : "#78350f",
-              }}
-            >
-              {t.v === "x" ? (
-                <svg viewBox="0 0 20 20" className="w-5 h-5">
-                  <circle cx="10" cy="10" r="8" fill="#ef4444" stroke="#dc2626" strokeWidth="1" />
-                  <text x="10" y="14" textAnchor="middle" fontSize="10" fontWeight="bold" fill="white">V</text>
-                </svg>
-              ) : (
-                t.v
-              )}
-            </div>
-          </motion.div>
-        ))}
+            <VoltorbBannerTileBack />
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+            }}
+          >
+            {renderFaceUp()}
+          </div>
+        </motion.div>
       </div>
-      {/* Coin counter */}
-      <motion.div
-        className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/20 border border-white/15"
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{ duration: 2, repeat: Infinity }}
+    </div>
+  );
+}
+
+function VoltorbBannerTileBack() {
+  return (
+    <svg
+      viewBox="0 0 3 3"
+      preserveAspectRatio="none"
+      style={{ display: "block", width: "100%", height: "100%" }}
+    >
+      {[0, 1, 2].flatMap((r) =>
+        [0, 1, 2].map((c) => (
+          <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill={(r + c) % 2 === 0 ? "#448563" : "#58a66c"} />
+        )),
+      )}
+    </svg>
+  );
+}
+
+function SuperVoltorbFlipBanner() {
+  const TILE = 28;
+  const GAP = 12;
+  const OUTLINE = 3;
+  const FLIP_CYCLE_S = 6;
+  const ROWS = 3;
+  const COLS = 6;
+  const ROW_COLORS = ["#e77352", "#5eae43", "#efa539"];
+  const COL_COLORS = ["#5eae43", "#efa539", "#3194ff", "#c872e7", "#e77352", "#3194ff"];
+
+  const tileOuterStyle: React.CSSProperties = {
+    width: TILE,
+    height: TILE,
+    position: "relative",
+  };
+  const tileInnerStyle: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    borderRadius: 2,
+    border: "2px solid #374151",
+    outline: `${OUTLINE}px solid #e5e7eb`,
+    overflow: "hidden",
+    position: "relative",
+    zIndex: 1,
+  };
+
+  return (
+    <div
+      className="absolute inset-0 overflow-hidden flex items-start justify-center pt-[8%]"
+      style={{ background: "linear-gradient(160deg, #5ab859 0%, #4a9a4a 40%, #3f8a3f 100%)" }}
+    >
+      {/* Board container: 3x3 tiles + row clues right + col clues bottom */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${COLS}, ${TILE}px)`,
+          gridTemplateRows: `repeat(${ROWS}, ${TILE}px)`,
+          gap: GAP,
+          position: "relative",
+        }}
       >
-        <div className="w-3 h-3 rounded-full bg-[#fbbf24] border border-[#d97706]" />
-        <span className="text-[10px] font-bold text-white/90 font-mono">1,240</span>
-      </motion.div>
+        {Array.from({ length: ROWS }).flatMap((_, r) =>
+          Array.from({ length: COLS }).map((_, c) => (
+            <BoardCell
+              key={`${r}-${c}`}
+              r={r}
+              c={c}
+              ROWS={ROWS}
+              COLS={COLS}
+              FLIP_CYCLE_S={FLIP_CYCLE_S}
+              TILE={TILE}
+              GAP={GAP}
+              ROW_COLORS={ROW_COLORS}
+              COL_COLORS={COL_COLORS}
+              tileOuterStyle={tileOuterStyle}
+              tileInnerStyle={tileInnerStyle}
+            />
+          )),
+        )}
+      </div>
     </div>
   );
 }

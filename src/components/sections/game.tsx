@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { Gamepad2, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { GameCard } from "@/components/game/game-card";
+import { GAMES_BY_SLUG } from "@/app/games/games-meta";
 
 const SpaceShooterGame = dynamic(
   () =>
@@ -13,6 +15,8 @@ const SpaceShooterGame = dynamic(
     ),
   { ssr: false }
 );
+
+const FEATURED_BELOW_SHOOTER = ["super-voltorb-flip", "hextris"] as const;
 
 export function Game() {
   return (
@@ -48,7 +52,13 @@ export function Game() {
 
           <SpaceShooterGame />
 
-          <div className="flex items-center justify-center mt-4">
+          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {FEATURED_BELOW_SHOOTER.map((slug) => (
+              <GameCard key={slug} game={GAMES_BY_SLUG[slug]} size="lg" />
+            ))}
+          </div>
+
+          <div className="flex items-center justify-center mt-6">
             <Link
               href="/games"
               className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) hover:text-(--foreground) transition-colors"

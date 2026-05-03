@@ -913,7 +913,11 @@ export function HextrisGame() {
     const INITIAL_ROWS = 12;
     const MIN_ROWS = 4;
     const SHRINK_WARN_MS = 10000;
-    let nextShrinkMs = Date.now() + 60000;
+    // Shrink countdown is armed on the first rotation, not on game start —
+    // otherwise the boundary timer eats into the player's lead time before
+    // they've even placed a block. Infinity means "not armed yet".
+    let nextShrinkMs = Infinity;
+    let pauseStartedMs = 0;
     let lastShrinkTickSec = -1;
     let lastSyncedShrinkWarn: number | null = null;
     // Shockwaves — expanding rings emitted when bombs detonate.
@@ -1184,6 +1188,12 @@ export function HextrisGame() {
     }
 
     function hexRotate(steps: number) {
+      // Arm the shrink timer on first rotation. Players can stare at the
+      // start screen as long as they want — the 60s countdown only begins
+      // after they've engaged.
+      if (!Number.isFinite(nextShrinkMs)) {
+        nextShrinkMs = Date.now() + 60000;
+      }
       mainHex.position += steps;
       while (mainHex.position < 0) mainHex.position += mainHex.sides;
       mainHex.position = mainHex.position % mainHex.sides;
@@ -2636,7 +2646,9 @@ export function HextrisGame() {
       piecesCleared = 0;
       gameStartMs = Date.now();
       settings.rows = INITIAL_ROWS;
-      nextShrinkMs = Date.now() + 60000;
+      // Shrink timer is armed on first rotation (see hexRotate).
+      nextShrinkMs = Infinity;
+      pauseStartedMs = 0;
       lastShrinkTickSec = -1;
       lastSyncedShrinkWarn = null;
       setUiShrinkWarn(null);
@@ -2664,9 +2676,17 @@ export function HextrisGame() {
     function togglePause() {
       if (gameState === 1) {
         gameState = -1;
+        pauseStartedMs = Date.now();
         setUiState("paused");
       } else if (gameState === -1) {
         gameState = 1;
+        // Roll the shrink deadline forward by however long we were paused
+        // — wall-clock advanced but gameplay didn't, so the boundary
+        // shouldn't snap shut the moment the player resumes.
+        if (pauseStartedMs > 0 && Number.isFinite(nextShrinkMs)) {
+          nextShrinkMs += Date.now() - pauseStartedMs;
+        }
+        pauseStartedMs = 0;
         lastTime = Date.now();
         setUiState("playing");
       }
@@ -2680,8 +2700,9 @@ export function HextrisGame() {
         return;
       }
 
+      // After game-over the player must explicitly click "Play again" so
+      // they have time to read the final score. Stray keys are ignored.
       if (gameState === 2) {
-        restartGame();
         return;
       }
 
@@ -2738,8 +2759,10 @@ export function HextrisGame() {
         return;
       }
 
+      // Same rule as keyboard: don't auto-restart on a stray tap once the
+      // game is over — let the player read the score and use the "Play
+      // again" button.
       if (gameState === 2) {
-        restartGame();
         return;
       }
 
@@ -2955,63 +2978,10 @@ export function HextrisGame() {
             <Maximize2 className="h-3.5 w-3.5" />
           )}
         </button>
-        {uiState !== "menu" && (
-          <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-white/60 backdrop-blur">
-            {uiState === "playing" && (
-              <>
-                <span className="h-1.5 w-1.5 rounded-full bg-accent-green pulse-dot" />
-                <span>Live</span>
-              </>
-            )}
-            {uiState === "paused" && (
-              <span className="text-accent-amber">Paused</span>
-            )}
-            {uiState === "gameover" && (
-              <span className="text-accent-pink">Over</span>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Controls bar — bottom. Device-specific hints. */}
-      <div className="absolute bottom-0 inset-x-0 border-t border-white/10 bg-black/60 backdrop-blur px-3 py-2 flex items-center justify-center sm:justify-start gap-3 sm:gap-4 text-[11px] font-mono text-white/60 overflow-x-auto">
-        {isTouchDevice ? (
-          <>
-            <span className="flex items-center gap-1.5 whitespace-nowrap">
-              <Hand className="h-3.5 w-3.5 -scale-x-100 text-accent-pink" />
-              <span>Tap left/right</span>
-            </span>
-            <span className="opacity-30">·</span>
-            <span className="flex items-center gap-1.5 whitespace-nowrap">
-              <Hand className="h-3.5 w-3.5 text-accent-blue" />
-              <span>to rotate</span>
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="flex items-center gap-1.5 whitespace-nowrap">
-              <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white">
-                ← →
-              </kbd>
-              <span>Rotate</span>
-            </span>
-            <span className="opacity-30">·</span>
-            <span className="flex items-center gap-1.5 whitespace-nowrap">
-              <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white">
-                ↓
-              </kbd>
-              <span>Speed up</span>
-            </span>
-            <span className="opacity-30">·</span>
-            <span className="flex items-center gap-1.5 whitespace-nowrap">
-              <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white">
-                Space
-              </kbd>
-              <span>Pause</span>
-            </span>
-          </>
-        )}
-      </div>
+      {/* Bottom controls bar removed — same instructions are shown in the
+          on-canvas tutorial card and in the start menu. */}
 
       {/* Unified tutorial overlay — device-aware, icon-based. Shows DURING
           the first ~6s of gameplay (the first block is a freebie anyway). */}

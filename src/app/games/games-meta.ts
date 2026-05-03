@@ -19,6 +19,10 @@ export interface GameMeta {
   accent: string;           // hex used for banner gradient + glow
   accentTailwind: string;   // tailwind class fragment (e.g. "accent-green")
   external?: true;          // password-game has its own top-level route
+  // Hidden from the games index + home-page menu but the route still
+  // works if visited directly. Use to take a game out of rotation
+  // without deleting any code.
+  hidden?: true;
 }
 
 export const GAMES: GameMeta[] = [
@@ -51,6 +55,7 @@ export const GAMES: GameMeta[] = [
     controls: "Click or tap anywhere to drop the block.",
     accent: "#f87171",
     accentTailwind: "accent-red",
+    hidden: true,
   },
   {
     slug: "typing-speed",
@@ -61,6 +66,7 @@ export const GAMES: GameMeta[] = [
     controls: "Type the highlighted text. Don't make mistakes.",
     accent: "#60a5fa",
     accentTailwind: "accent-blue",
+    hidden: true,
   },
   {
     slug: "super-voltorb-flip",
@@ -82,6 +88,7 @@ export const GAMES: GameMeta[] = [
     accent: "#f472b6",
     accentTailwind: "accent-pink",
     external: true,
+    hidden: true,
   },
 ];
 
