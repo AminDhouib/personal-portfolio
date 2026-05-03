@@ -1823,15 +1823,13 @@ export function SuperVoltorbFlipGame() {
       return;
     }
 
+    // Stride scales with the rollup target (matches the drain formula),
+    // so a 1→500 climb takes ~100 ticks instead of dragging out the
+    // last 100 coins one at a time as a gap-based stride would.
+    const stride = Math.max(1, Math.ceil(targetCurrent / 100));
     tallyTimerRef.current = window.setTimeout(() => {
       tallyTimerRef.current = null;
-      // Stride grows with the gap so a 1→500 climb finishes in ~100 ticks
-      // instead of ~500. Small gains still advance one coin per tick.
-      setDisplayCurrent((prev) => {
-        const gap = targetCurrent - prev;
-        const stride = Math.max(1, Math.ceil(gap / 100));
-        return Math.min(prev + stride, targetCurrent);
-      });
+      setDisplayCurrent((prev) => Math.min(prev + stride, targetCurrent));
       const step = tallyStepRef.current;
       if (!muted && step % 4 === 0) sfx.payoutTickEarn();
       tallyStepRef.current = step + 1;
