@@ -1731,6 +1731,11 @@ export function SuperVoltorbFlipGame() {
   const tallyTimerRef = useRef<number | null>(null);
   const tallyStepRef = useRef<number>(0);
   const prevCurrentScoreRef = useRef<number>(0);
+  const skipPayoutRef = useRef(false);
+  // Held back from game.currentLevel during win/lose so the visible Lv
+  // value stays put while the fanfare + drain run; the new level is set
+  // here in the same beat as the flash + SE inside flipCardsDown.
+  const [displayLevel, setDisplayLevel] = useState<number>(() => 1);
 
   useEffect(() => {
     setMusicMuted(muted);
@@ -1823,19 +1828,31 @@ export function SuperVoltorbFlipGame() {
     prevCurrentScoreRef.current = game.currentScore;
   }, [game?.currentScore]);
 
-  // Level transitions are now fired by Gameboard at the start of
-  // flipCardsDown via the triggerLevelTransition callback below — that
-  // matches the user's request to flash the Lv card during the
-  // flip-back animation rather than after the new round has settled.
-  // We still keep prevLevelRef in sync so the predicted direction
-  // (win → up / lose → down) reflects the actual outcome.
+  // Hold the visible Lv value at its old number while a round is wrapping
+  // up (win/lose). The game already advances currentLevel as soon as the
+  // round ends, but the player shouldn't *see* it change until the
+  // flip-down animation runs — that's when the flash + SLOT01/03 SE fire.
+  // While playing/memo, displayLevel mirrors game.currentLevel.
   useEffect(() => {
     if (!game) return;
+    const status = game.gameStatus;
+    if (status === "playing" || status === "memo") {
+      if (displayLevel !== game.currentLevel) {
+        setDisplayLevel(game.currentLevel);
+      }
+    }
     prevLevelRef.current = game.currentLevel;
-  }, [game?.currentLevel]);
+  }, [game?.currentLevel, game?.gameStatus, displayLevel]);
 
   const triggerLevelTransition = useCallback(
     (dir: "up" | "down") => {
+      if (!game) return;
+      const newLevel = game.currentLevel;
+      const oldLevel = displayLevel;
+      // Skip when the level didn't actually move — e.g. lose at Lv 1
+      // floors at 1, win at Lv 8 caps at 8. No flash, no SE.
+      if (newLevel === oldLevel) return;
+      setDisplayLevel(newLevel);
       setLevelDir(dir);
       if (!muted) {
         if (dir === "up") sfx.levelUp();
@@ -1843,8 +1860,20 @@ export function SuperVoltorbFlipGame() {
       }
       window.setTimeout(() => setLevelDir(null), 1200);
     },
-    [muted],
+    [game, muted, displayLevel],
   );
+
+  // Click anywhere during the post-round drain to skip the counter.
+  // Pointerdown so it covers both mouse and touch. Gated on payoutAnimRef
+  // so tile clicks during normal play are unaffected.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => {
+      if (payoutAnimRef.current) skipPayoutRef.current = true;
+    };
+    window.addEventListener("pointerdown", handler);
+    return () => window.removeEventListener("pointerdown", handler);
+  }, []);
 
   // Promise-returning post-fanfare runner: drains the round's "This Game"
   // pot into "Total Coins". Phase 1 (the OKOZUKAI tally-up) is now driven
@@ -1861,6 +1890,7 @@ export function SuperVoltorbFlipGame() {
     const earned = finalCurrent;
     if (earned <= 0) return;
 
+    skipPayoutRef.current = false;
     payoutAnimRef.current = true;
     // Cancel any in-flight per-flip tally-up — earned has already been
     // heard during play; we own the displays from here.
@@ -1873,22 +1903,39 @@ export function SuperVoltorbFlipGame() {
     setDisplayCurrent(earned);
     setDisplayTotal(startTotal);
     // Beat of pause so the player can read the earned amount before drain.
-    await new Promise<void>((r) => window.setTimeout(r, 320));
+    // Pollable in 60ms slices so skipping during the pause works too.
+    {
+      const pauseEnd = Date.now() + 320;
+      while (Date.now() < pauseEnd && !skipPayoutRef.current) {
+        await new Promise<void>((r) => window.setTimeout(r, 60));
+      }
+    }
 
     // 17ms/step ≈ NDS 60Hz frame rate; SE every 4 steps matches
     // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381.
     const tickMs = 17;
     const tick = () => new Promise<void>((r) => window.setTimeout(r, tickMs));
 
+    let didSkip = false;
     for (let j = 0; j < earned; j++) {
+      if (skipPayoutRef.current) {
+        didSkip = true;
+        break;
+      }
       setDisplayCurrent(earned - (j + 1));
       setDisplayTotal(startTotal + (j + 1));
       if (j % 4 === 0 && !muted) sfx.payoutTickBank();
       await tick();
     }
-    if (!muted) sfx.payoutFinal();
-    // Breathing room so payoutFinal doesn't bleed into the level-up SE.
-    await new Promise<void>((r) => window.setTimeout(r, 280));
+    // Snap to final wallet state — covers both natural completion and skip.
+    setDisplayCurrent(0);
+    setDisplayTotal(startTotal + earned);
+    if (!didSkip && !muted) sfx.payoutFinal();
+    // Breathing room only on natural completion so skip feels instant.
+    if (!didSkip) {
+      await new Promise<void>((r) => window.setTimeout(r, 280));
+    }
+    skipPayoutRef.current = false;
 
     // Hold payoutAnimRef.current=true through onFlipDownStart / flipCardsDown.
     // The release effect above flips it back to false the instant
@@ -1999,7 +2046,7 @@ export function SuperVoltorbFlipGame() {
                   Lv
                 </span>
                 <span className="text-lg font-black leading-none">
-                  {game.currentLevel}
+                  {displayLevel}
                 </span>
                 <span className="text-sm text-white/70">VOLTORB Flip</span>
               </div>
@@ -2041,7 +2088,7 @@ export function SuperVoltorbFlipGame() {
                     Lv
                   </span>
                   <span className="text-xl font-black">
-                    {game.currentLevel}
+                    {displayLevel}
                   </span>
                 </div>
                 <div className="flex flex-1 items-center justify-around gap-2">
