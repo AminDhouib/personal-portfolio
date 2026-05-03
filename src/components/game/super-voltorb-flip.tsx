@@ -990,6 +990,9 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
         let stagger = 0;
         for (let col = 0; col < 5; col++) {
           setTimeout(() => {
+            // PANERU_MEKURU once per column (not per card) — the cards in
+            // a column flip together, so a single SE matches the visual.
+            if (!muted) sfx.flip();
             setCardsFlipped((prev) =>
               prev.map((card, index) =>
                 columns[col].includes(index) ? { isFlipped: false } : card,
@@ -1003,7 +1006,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
         }, stagger + 200);
       }, delay);
     },
-    [updateGame],
+    [updateGame, muted],
   );
 
   useEffect(() => {
