@@ -1825,7 +1825,13 @@ export function SuperVoltorbFlipGame() {
 
     tallyTimerRef.current = window.setTimeout(() => {
       tallyTimerRef.current = null;
-      setDisplayCurrent((prev) => Math.min(prev + 1, targetCurrent));
+      // Stride grows with the gap so a 1→500 climb finishes in ~100 ticks
+      // instead of ~500. Small gains still advance one coin per tick.
+      setDisplayCurrent((prev) => {
+        const gap = targetCurrent - prev;
+        const stride = Math.max(1, Math.ceil(gap / 100));
+        return Math.min(prev + stride, targetCurrent);
+      });
       const step = tallyStepRef.current;
       if (!muted && step % 4 === 0) sfx.payoutTickEarn();
       tallyStepRef.current = step + 1;
