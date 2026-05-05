@@ -25,7 +25,7 @@ export default function ReviewsPage() {
               Client Reviews
             </h1>
             <p className="text-(--muted)">
-              What clients say about working with Devino.
+              What clients say about working with Amin.
             </p>
           </div>
 
