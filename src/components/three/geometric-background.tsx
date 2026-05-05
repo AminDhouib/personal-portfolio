@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -42,7 +42,16 @@ function WireframeShape({
   );
 }
 
-function Shapes() {
+function CameraRig({ scrollY }: { scrollY: RefObject<number> }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const target = -(scrollY.current ?? 0) * 0.0015;
+    camera.position.y += (target - camera.position.y) * 0.04;
+  });
+  return null;
+}
+
+function Shapes({ scrollY }: { scrollY: RefObject<number> }) {
   const geometries = useMemo(
     () => ({
       tetra:    new THREE.TetrahedronGeometry(1.1),      // 4 faces
@@ -54,6 +63,7 @@ function Shapes() {
 
   return (
     <>
+      <CameraRig scrollY={scrollY} />
       <WireframeShape
         geometry={geometries.tetra}
         position={[3, 1, -2]}
@@ -113,6 +123,14 @@ function Shapes() {
 }
 
 export function GeometricBackground() {
+  const scrollY = useRef(0);
+
+  useEffect(() => {
+    const handler = () => { scrollY.current = window.scrollY; };
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => window.removeEventListener("scroll", handler);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-0 pointer-events-none">
       <Canvas
@@ -121,7 +139,7 @@ export function GeometricBackground() {
         gl={{ alpha: true, antialias: true }}
         style={{ background: "transparent" }}
       >
-        <Shapes />
+        <Shapes scrollY={scrollY} />
       </Canvas>
     </div>
   );

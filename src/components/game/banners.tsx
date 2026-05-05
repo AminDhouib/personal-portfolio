@@ -1079,7 +1079,7 @@ function SuperVoltorbFlipBanner() {
 
   return (
     <div
-      className="absolute inset-0 overflow-hidden flex items-start justify-center pt-[8%]"
+      className="absolute inset-0 overflow-hidden flex items-center justify-center"
       style={{ background: "linear-gradient(160deg, #5ab859 0%, #4a9a4a 40%, #3f8a3f 100%)" }}
     >
       {/* Board container: 3x3 tiles + row clues right + col clues bottom */}
