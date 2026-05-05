@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Star } from "lucide-react";
+import Link from "next/link";
+import { Star, ArrowRight } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { reviews } from "@/data/reviews";
 
@@ -79,8 +80,17 @@ export function Reviews() {
           </div>
           <span className="text-sm font-semibold">5.0 avg</span>
           <span className="text-sm text-(--muted)">
-            / 81 reviews on Contra
+            / 11 reviews
           </span>
+        </div>
+        <div className="flex items-center justify-center mt-4">
+          <Link
+            href="/reviews"
+            className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) hover:text-(--foreground) transition-colors"
+          >
+            View all reviews
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
     </section>
