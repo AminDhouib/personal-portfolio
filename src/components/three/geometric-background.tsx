@@ -45,9 +45,11 @@ function WireframeShape({
 function Shapes() {
   const geometries = useMemo(
     () => ({
-      circle: new THREE.TorusGeometry(1.2, 0.02, 16, 48),
+      tetra: new THREE.TetrahedronGeometry(1.1),
       triangle: new THREE.ConeGeometry(1, 1.5, 3),
       diamond: new THREE.OctahedronGeometry(0.9),
+      icosa: new THREE.IcosahedronGeometry(1.0),
+      dodeca: new THREE.DodecahedronGeometry(0.85),
     }),
     []
   );
@@ -55,7 +57,7 @@ function Shapes() {
   return (
     <>
       <WireframeShape
-        geometry={geometries.circle}
+        geometry={geometries.tetra}
         position={[3, 1, -2]}
         speed={0.4}
         color="#22c55e"
@@ -73,7 +75,7 @@ function Shapes() {
         color="#a78bfa"
       />
       <WireframeShape
-        geometry={geometries.circle}
+        geometry={geometries.icosa}
         position={[-2, 2.5, -4]}
         speed={0.3}
         color="#06b6d4"
@@ -91,7 +93,7 @@ function Shapes() {
         color="#f59e0b"
       />
       <WireframeShape
-        geometry={geometries.circle}
+        geometry={geometries.dodeca}
         position={[-4, -2, -3]}
         speed={0.45}
         color="#a78bfa"
