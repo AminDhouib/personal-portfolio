@@ -45,11 +45,9 @@ function WireframeShape({
 function Shapes() {
   const geometries = useMemo(
     () => ({
-      tetra: new THREE.TetrahedronGeometry(1.1),
-      triangle: new THREE.ConeGeometry(1, 1.5, 3),
-      diamond: new THREE.OctahedronGeometry(0.9),
-      icosa: new THREE.IcosahedronGeometry(1.0),
-      dodeca: new THREE.DodecahedronGeometry(0.85),
+      tetra:    new THREE.TetrahedronGeometry(1.1),      // 4 faces
+      pyramid3: new THREE.ConeGeometry(1, 1.5, 3),      // 4 faces
+      pyramid4: new THREE.ConeGeometry(1, 1.4, 4),      // 5 faces
     }),
     []
   );
@@ -63,49 +61,49 @@ function Shapes() {
         color="#22c55e"
       />
       <WireframeShape
-        geometry={geometries.triangle}
+        geometry={geometries.pyramid3}
         position={[-3, -1.5, -3]}
         speed={0.6}
         color="#6366f1"
       />
       <WireframeShape
-        geometry={geometries.diamond}
+        geometry={geometries.pyramid4}
         position={[1, -2, -1.5]}
         speed={0.5}
         color="#a78bfa"
       />
       <WireframeShape
-        geometry={geometries.icosa}
+        geometry={geometries.tetra}
         position={[-2, 2.5, -4]}
         speed={0.3}
         color="#06b6d4"
       />
       <WireframeShape
-        geometry={geometries.diamond}
+        geometry={geometries.pyramid4}
         position={[4, -3, -2.5]}
         speed={0.35}
         color="#22c55e"
       />
       <WireframeShape
-        geometry={geometries.triangle}
+        geometry={geometries.pyramid3}
         position={[3.5, 3, -5]}
         speed={0.25}
         color="#f59e0b"
       />
       <WireframeShape
-        geometry={geometries.dodeca}
+        geometry={geometries.tetra}
         position={[-4, -2, -3]}
         speed={0.45}
         color="#a78bfa"
       />
       <WireframeShape
-        geometry={geometries.diamond}
+        geometry={geometries.pyramid4}
         position={[-1.5, 3.5, -6]}
         speed={0.28}
         color="#6366f1"
       />
       <WireframeShape
-        geometry={geometries.triangle}
+        geometry={geometries.pyramid3}
         position={[2.5, -1, -4]}
         speed={0.55}
         color="#06b6d4"
