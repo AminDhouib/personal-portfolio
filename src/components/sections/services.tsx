@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { TechIcon } from "@/components/ui/tech-icon";
 import { services } from "@/data/services";
 import { CALENDLY_URL } from "@/data/nav";
 
@@ -48,9 +49,13 @@ export function Services() {
                   <p className="text-sm text-(--muted) mb-1">
                     {service.description}
                   </p>
-                  <p className="text-xs text-(--muted)/60">
-                    {service.tools}
-                  </p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {service.tools.map((tool) => (
+                      <span key={tool} className="text-xs text-(--muted)/60">
+                        <TechIcon name={tool} />
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
             );
