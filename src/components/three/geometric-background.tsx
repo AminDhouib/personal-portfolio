@@ -9,19 +9,22 @@ function WireframeShape({
   position,
   speed,
   color,
+  scrollVelocity,
 }: {
   geometry: THREE.BufferGeometry;
   position: [number, number, number];
   speed: number;
   color: string;
+  scrollVelocity: RefObject<number>;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const { pointer } = useThree();
 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
-    meshRef.current.rotation.x += delta * speed * 0.3;
-    meshRef.current.rotation.y += delta * speed * 0.2;
+    const boost = 1 + Math.min(Math.abs(scrollVelocity.current ?? 0) * 4, 10);
+    meshRef.current.rotation.x += delta * speed * 0.3 * boost;
+    meshRef.current.rotation.y += delta * speed * 0.2 * boost;
 
     // Parallax on mouse
     meshRef.current.position.x =
@@ -42,16 +45,29 @@ function WireframeShape({
   );
 }
 
-function CameraRig({ scrollY }: { scrollY: RefObject<number> }) {
+function CameraRig({
+  scrollY,
+  scrollVelocity,
+}: {
+  scrollY: RefObject<number>;
+  scrollVelocity: RefObject<number>;
+}) {
   const { camera } = useThree();
   useFrame(() => {
     const target = -(scrollY.current ?? 0) * 0.0015;
     camera.position.y += (target - camera.position.y) * 0.04;
+    scrollVelocity.current = (scrollVelocity.current ?? 0) * 0.9;
   });
   return null;
 }
 
-function Shapes({ scrollY }: { scrollY: RefObject<number> }) {
+function Shapes({
+  scrollY,
+  scrollVelocity,
+}: {
+  scrollY: RefObject<number>;
+  scrollVelocity: RefObject<number>;
+}) {
   const geometries = useMemo(
     () => ({
       tetra:    new THREE.TetrahedronGeometry(1.1),      // 4 faces
@@ -63,60 +79,69 @@ function Shapes({ scrollY }: { scrollY: RefObject<number> }) {
 
   return (
     <>
-      <CameraRig scrollY={scrollY} />
+      <CameraRig scrollY={scrollY} scrollVelocity={scrollVelocity} />
       <WireframeShape
         geometry={geometries.tetra}
         position={[3, 1, -2]}
         speed={0.4}
         color="#22c55e"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[-3, -1.5, -3]}
         speed={0.6}
         color="#6366f1"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[1, -2, -1.5]}
         speed={0.5}
         color="#a78bfa"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-2, 2.5, -4]}
         speed={0.3}
         color="#06b6d4"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[4, -3, -2.5]}
         speed={0.35}
         color="#22c55e"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[3.5, 3, -5]}
         speed={0.25}
         color="#f59e0b"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-4, -2, -3]}
         speed={0.45}
         color="#a78bfa"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[-1.5, 3.5, -6]}
         speed={0.28}
         color="#6366f1"
+        scrollVelocity={scrollVelocity}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[2.5, -1, -4]}
         speed={0.55}
         color="#06b6d4"
+        scrollVelocity={scrollVelocity}
       />
     </>
   );
@@ -124,9 +149,19 @@ function Shapes({ scrollY }: { scrollY: RefObject<number> }) {
 
 export function GeometricBackground() {
   const scrollY = useRef(0);
+  const scrollVelocity = useRef(0);
 
   useEffect(() => {
-    const handler = () => { scrollY.current = window.scrollY; };
+    let lastY = window.scrollY;
+    let lastTime = performance.now();
+    const handler = () => {
+      const now = performance.now();
+      const dt = Math.max(now - lastTime, 1);
+      scrollVelocity.current = (window.scrollY - lastY) / dt;
+      scrollY.current = window.scrollY;
+      lastY = window.scrollY;
+      lastTime = now;
+    };
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
   }, []);
@@ -139,7 +174,7 @@ export function GeometricBackground() {
         gl={{ alpha: true, antialias: true }}
         style={{ background: "transparent" }}
       >
-        <Shapes scrollY={scrollY} />
+        <Shapes scrollY={scrollY} scrollVelocity={scrollVelocity} />
       </Canvas>
     </div>
   );
