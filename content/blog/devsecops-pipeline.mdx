@@ -19,8 +19,8 @@ Pre-commit (< 2s) → Push (< 30s) → PR (< 5min) → Merge (deploy)
 
 [Husky](https://typicode.github.io/husky/) runs these on every `git commit`:
 
-```json
-// .husky/pre-commit
+```bash
+# .husky/pre-commit
 pnpm lint-staged
 ```
 
@@ -143,7 +143,7 @@ Run on staging before every release. The baseline scan takes ~3 minutes and catc
 
 For frontend projects, bundle size regressions ship silently unless you enforce a budget:
 
-```json
+```typescript
 // next.config.ts
 experimental: {
   bundlePagesRouterDependencies: true,
