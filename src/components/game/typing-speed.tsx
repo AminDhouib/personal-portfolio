@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw, Trophy, Timer, Target, Flame, Zap } from "lucide-react";
+import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 
 const SENTENCES = [
   "The quick brown fox jumps over the lazy dog near the riverbank.",
@@ -298,6 +298,7 @@ export function TypingSpeedGame() {
           </motion.span>
         </div>
         <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
+          <Percent className="h-3.5 w-3.5" />
           {accuracy}% acc
         </div>
         <AnimatePresence>
