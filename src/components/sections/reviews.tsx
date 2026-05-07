@@ -24,9 +24,11 @@ export function Reviews() {
       <div className="relative marquee-container">
         <div className="flex gap-6 animate-marquee py-2">
           {scrollReviews.map((review, i) => (
-            <div
+            <Link
               key={`${review.name}-${i}`}
-              className="shrink-0 w-[340px] rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors"
+              href="/reviews"
+              className="shrink-0 w-[340px] rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors block"
+              aria-label={`Read full review by ${review.name}`}
             >
               {/* Stars */}
               <div className="flex gap-0.5 mb-3">
@@ -62,7 +64,7 @@ export function Reviews() {
 
               {/* Bottom accent line */}
               <div className="mt-4 h-px w-full bg-accent-amber/20" />
-            </div>
+            </Link>
           ))}
         </div>
       </div>
