@@ -38,7 +38,7 @@ export default function BlogPage() {
                   {post.title}
                 </h2>
                 <p className="text-sm text-(--muted) mb-2">{post.excerpt}</p>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mb-2">
                   {post.date && (
                     <span className="text-xs text-(--muted)/60" title={formatDate(post.date)}>
                       {formatRelativeDate(post.date)}
@@ -49,6 +49,18 @@ export default function BlogPage() {
                     {post.readingTime}
                   </span>
                 </div>
+                {post.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {post.tags.slice(0, 3).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs px-2 py-0.5 rounded-full bg-(--surface) border border-(--border) text-(--muted)/70"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <ArrowRight className="h-5 w-5 shrink-0 mt-1 text-(--muted) group-hover:text-accent-blue group-hover:translate-x-1 transition-all" />
             </Link>
