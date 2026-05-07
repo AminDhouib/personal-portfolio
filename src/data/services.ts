@@ -27,7 +27,7 @@ export const services: Service[] = [
   {
     title: "DevOps & Cloud",
     description: "CI/CD, infra, deployment",
-    tools: ["Docker", "AWS", "Terraform", "Jenkins"],
+    tools: ["Docker", "Kubernetes", "Terraform", "Jenkins"],
     icon: Cloud,
     accentColor: "var(--color-accent-purple)",
   },
