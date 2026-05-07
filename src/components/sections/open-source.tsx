@@ -44,7 +44,7 @@ const ossDefaults: OSSProject[] = [
 const ciTools = [
   { name: "Prettier", icon: "prettier" },
   { name: "ESLint", icon: "eslint" },
-  { name: "knip", icon: null },
+  { name: "knip", icon: "knip" },
   { name: "ruff", icon: "astral" },
   { name: "pyright", icon: null },
   { name: "CodeRabbit", icon: "coderabbit" },
