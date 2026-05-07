@@ -21,7 +21,7 @@ export function BeyondCode() {
           color="var(--color-accent-amber)"
         />
 
-        <div className="grid grid-cols-2 gap-6 max-w-md">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {interests.map((item, i) => {
             const Icon = item.icon;
             return (
@@ -31,13 +31,15 @@ export function BeyondCode() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="flex flex-col gap-2"
+                className="flex flex-col gap-3 rounded-xl border border-(--border) bg-(--card) p-5"
               >
                 <Icon className="h-5 w-5 text-accent-amber" />
-                <p className="font-display text-sm font-bold">{item.label}</p>
-                {item.detail && (
-                  <p className="text-xs text-(--muted)">{item.detail}</p>
-                )}
+                <div>
+                  <p className="font-display text-sm font-bold">{item.label}</p>
+                  {item.detail && (
+                    <p className="text-xs text-(--muted) mt-0.5">{item.detail}</p>
+                  )}
+                </div>
               </motion.div>
             );
           })}
