@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Globe, AppWindow } from "lucide-react";
+import { SiIcon } from "@/components/ui/tech-icon";
 import { projects } from "@/data/projects";
 import { fetchMAU } from "@/lib/ga4";
 
@@ -63,15 +64,7 @@ export async function generateMetadata({
 function PlatformIcon({ icon }: { icon: string }) {
   if (icon === "globe") return <Globe className="h-4 w-4" />;
   if (icon === "microsoft") return <AppWindow className="h-4 w-4" />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://cdn.simpleicons.org/${icon.toLowerCase()}/888888`}
-      alt={icon}
-      className="h-4 w-4"
-      loading="lazy"
-    />
-  );
+  return <SiIcon slug={icon.toLowerCase()} className="h-4 w-4" />;
 }
 
 export default async function WorkDetailPage({
@@ -243,13 +236,7 @@ export default async function WorkDetailPage({
                   className="inline-flex items-center gap-1.5 rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-sm"
                 >
                   {iconSlug && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`https://cdn.simpleicons.org/${iconSlug}/888888`}
-                      alt={tech}
-                      className="h-3.5 w-3.5"
-                      loading="lazy"
-                    />
+                    <SiIcon slug={iconSlug} className="h-3.5 w-3.5" />
                   )}
                   {tech}
                 </span>

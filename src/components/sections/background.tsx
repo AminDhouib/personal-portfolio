@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { GraduationCap, Languages } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { SiIcon } from "@/components/ui/tech-icon";
 
 const techLogos = [
   "react",
@@ -92,13 +93,10 @@ export function Background() {
       <div className="overflow-hidden marquee-container">
         <div className="flex gap-12 items-center animate-marquee py-4">
           {scrollLogos.map((slug, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <SiIcon
               key={`${slug}-${i}`}
-              src={`https://cdn.simpleicons.org/${slug}/888888`}
-              alt={slug}
-              className="h-8 w-8 shrink-0 opacity-40 hover:opacity-100 transition-opacity"
-              loading="lazy"
+              slug={slug}
+              className="h-8 w-8 shrink-0 opacity-40 hover:opacity-100 transition-opacity text-(--muted)"
             />
           ))}
         </div>

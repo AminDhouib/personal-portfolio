@@ -7,6 +7,7 @@ import { Sun, Moon, Menu, X, ArrowRight, Bookmark } from "lucide-react";
 import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "framer-motion";
 import { navItems, CALENDLY_URL, socialLinks } from "@/data/nav";
+import { SiIcon } from "@/components/ui/tech-icon";
 
 function LinkedInIconNav() {
   return (
@@ -280,12 +281,7 @@ export function Navbar() {
                     ) : link.icon === "contra" ? (
                       <ContraIconNav />
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`https://cdn.simpleicons.org/${link.icon}/888888`}
-                        alt={link.name}
-                        className="h-4 w-4"
-                      />
+                      <SiIcon slug={link.icon} className="h-4 w-4" />
                     )}
                   </a>
                 ))}
