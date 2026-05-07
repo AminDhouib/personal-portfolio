@@ -75,12 +75,13 @@ export default async function BlogPostPage({
               <div className="flex items-center gap-2">
                 <Tag className="h-3.5 w-3.5" />
                 {post.tags.map((tag) => (
-                  <span
+                  <Link
                     key={tag}
-                    className="rounded-full bg-(--surface) border border-(--border) px-2.5 py-0.5 text-xs"
+                    href={`/blog?tag=${encodeURIComponent(tag)}`}
+                    className="rounded-full bg-(--surface) border border-(--border) px-2.5 py-0.5 text-xs hover:border-accent-blue/30 hover:text-(--foreground) transition-colors"
                   >
                     {tag}
-                  </span>
+                  </Link>
                 ))}
               </div>
             )}
