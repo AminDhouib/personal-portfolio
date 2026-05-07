@@ -5,21 +5,13 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Globe, AppWindow } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { SiIcon } from "@/components/ui/tech-icon";
 import { projects } from "@/data/projects";
 
 function PlatformIcon({ icon }: { icon: string }) {
   if (icon === "globe") return <Globe className="h-4 w-4" />;
   if (icon === "microsoft") return <AppWindow className="h-4 w-4" />;
-  const siSlug = icon.toLowerCase();
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://cdn.simpleicons.org/${siSlug}/888888`}
-      alt={icon}
-      className="h-4 w-4"
-      loading="lazy"
-    />
-  );
+  return <SiIcon slug={icon} className="h-4 w-4" />;
 }
 
 function formatMAU(n: number): string {
@@ -51,7 +43,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
               <Link href={`/work/${project.slug}`} className="block">
                 {/* Thumbnail */}
                 {project.heroImage ? (
-                  <div className="relative w-full h-40 overflow-hidden bg-(--surface)">
+                  <div className="relative w-full h-52 overflow-hidden bg-(--surface)">
                     <Image
                       src={project.heroImage}
                       alt={`${project.name} screenshot`}
@@ -59,10 +51,10 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                       className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
                       sizes="(max-width: 768px) 100vw, 50vw"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-(--card)" />
+                    <div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-(--card)" />
                   </div>
                 ) : (
-                  <div className="h-28 bg-gradient-to-br from-(--surface) to-(--card) flex items-center justify-center opacity-30">
+                  <div className="h-28 bg-linear-to-br from-(--surface) to-(--card) flex items-center justify-center opacity-30">
                     <span className="font-display text-3xl font-black tracking-tighter">
                       {project.name.toUpperCase()}
                     </span>

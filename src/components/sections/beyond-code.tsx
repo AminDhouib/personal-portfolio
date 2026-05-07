@@ -6,9 +6,9 @@ import { SectionHeading } from "@/components/ui/section-heading";
 
 const interests = [
   { icon: Target, label: "Team Sports", detail: "Soccer, Volleyball" },
-  { icon: Palette, label: "Design & Modeling", detail: "" },
-  { icon: Dumbbell, label: "Fitness", detail: "" },
-  { icon: Rocket, label: "Building & Shipping", detail: "" },
+  { icon: Palette, label: "Design & Modeling", detail: "Figma, Blender" },
+  { icon: Dumbbell, label: "Fitness", detail: "Gym, calisthenics" },
+  { icon: Rocket, label: "Building & Shipping", detail: "If it has a ship date, I'm in" },
 ];
 
 export function BeyondCode() {

@@ -25,6 +25,17 @@ const TOOL_TO_SLUG: Record<string, string> = {
   wireshark: "siWireshark",
 };
 
+export function SiIcon({ slug, className }: { slug: string; className?: string }) {
+  const key = `si${slug.charAt(0).toUpperCase()}${slug.slice(1)}`;
+  const icon = icons[key];
+  if (!icon) return null;
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d={icon.path} />
+    </svg>
+  );
+}
+
 export function TechIcon({ name }: { name: string }) {
   const slug = TOOL_TO_SLUG[name.toLowerCase()];
   const icon = slug ? icons[slug] : undefined;

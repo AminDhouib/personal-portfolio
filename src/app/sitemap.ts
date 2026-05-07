@@ -1,16 +1,11 @@
 import type { MetadataRoute } from "next";
 import { getAllBlogSlugs } from "@/lib/blog";
+import { projects } from "@/data/projects";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://amindhou.com";
 
-  const projectSlugs = [
-    "shorty",
-    "unotes",
-    "caramel",
-    "upup",
-    "getitdone",
-  ];
+  const projectSlugs = projects.map((p) => p.slug);
 
   const blogSlugs = getAllBlogSlugs();
 

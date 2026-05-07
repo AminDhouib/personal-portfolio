@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Heart, Mail } from "lucide-react";
 import { CALENDLY_URL, socialLinks } from "@/data/nav";
+import { SiIcon } from "@/components/ui/tech-icon";
 
 function LinkedInIcon({ className }: { className?: string }) {
   return (
@@ -24,15 +25,7 @@ function SocialIcon({ icon }: { icon: string }) {
   if (icon === "mail") return <Mail className="h-5 w-5" />;
   if (icon === "linkedin") return <LinkedInIcon className="h-5 w-5" />;
   if (icon === "contra") return <ContraIcon className="h-5 w-5" />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://cdn.simpleicons.org/${icon}/888888`}
-      alt={icon}
-      className="h-5 w-5"
-      loading="lazy"
-    />
-  );
+  return <SiIcon slug={icon} className="h-5 w-5" />;
 }
 
 export function Contact() {
