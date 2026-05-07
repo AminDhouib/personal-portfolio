@@ -47,5 +47,7 @@ next-env.d.ts
 
 # session screenshots & QA artifacts
 .claude/*.png
+.claude/*.local.*
+.claude/*.lock
 .qa-*.png
 snapshot2.txt.*.png
