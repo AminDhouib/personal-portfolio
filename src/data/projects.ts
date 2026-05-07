@@ -206,6 +206,7 @@ export const projects: Project[] = [
     tagline: "Team check-ins, tasks, time tracking",
     description:
       "One dashboard for daily check-ins, task updates, time tracking. Skip stand-ups and stop tool-hopping.",
+    heroImage: "/screenshots/getitdone.webp",
     logo: "/logos/getitdone.png",
     logoWidth: 1646,
     logoHeight: 445,
