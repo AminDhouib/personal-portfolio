@@ -859,6 +859,21 @@ function pickCellValue(): number | "bomb" {
   return 1 + Math.floor(Math.random() * 3);
 }
 
+// Deterministic per-cell seed for SSR — derives a stable pseudo-random
+// number from grid coordinates so server and client render the same
+// initial state. After mount the cell re-rolls via Math.random() in
+// useEffect, where SSR/client divergence is expected and harmless.
+function seededFromCoords(r: number, c: number): number {
+  const h = ((r * 73856093) ^ (c * 19349663)) >>> 0;
+  return (h % 1000) / 1000;
+}
+function pickCellValueSeeded(r: number, c: number): number | "bomb" {
+  const a = seededFromCoords(r, c);
+  if (a < 0.15) return "bomb";
+  const b = seededFromCoords(c, r);
+  return 1 + Math.floor(b * 3);
+}
+
 // Per-cell tile component. Maintains its own value state that re-rolls at
 // each cell cycle (so bombs and numbers appear in different positions over
 // time without forcing a global board reset). The flip animation runs
@@ -889,15 +904,24 @@ function BoardCell({
   tileOuterStyle: React.CSSProperties;
   tileInnerStyle: React.CSSProperties;
 }) {
-  // Stable per-cell flip delay — set once via lazy initializer so React's
-  // purity rules don't flag Math.random in render. Survives re-renders.
-  const [flipDelay] = useState(() => Math.random() * (FLIP_CYCLE_S - 1.5));
+  // Stable per-cell flip delay — derived deterministically from (r,c) so
+  // SSR matches client hydration. Re-roll happens in useEffect post-mount.
+  const [flipDelay, setFlipDelay] = useState(
+    () => seededFromCoords(r + 1, c + 1) * (FLIP_CYCLE_S - 1.5),
+  );
   // cycleTick increments at the start of each cell cycle (face-down moment
   // between flip-down and the next flip-up). The BombExplosionOverlay's
   // React key includes cycleTick, so it remounts cleanly each cycle when
   // the value happens to be "bomb".
   const [cycleTick, setCycleTick] = useState(0);
-  const [value, setValue] = useState<number | "bomb">(() => pickCellValue());
+  const [value, setValue] = useState<number | "bomb">(() => pickCellValueSeeded(r, c));
+  // Post-hydration: replace deterministic seeds with real randomness so the
+  // banner doesn't repeat the same starting pattern on every page load.
+  useEffect(() => {
+    setFlipDelay(Math.random() * (FLIP_CYCLE_S - 1.5));
+    setValue(pickCellValue());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [exploding, setExploding] = useState(false);
 
   useEffect(() => {
