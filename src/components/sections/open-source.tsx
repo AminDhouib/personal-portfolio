@@ -45,7 +45,7 @@ const ciTools = [
   { name: "Prettier", icon: "prettier" },
   { name: "ESLint", icon: "eslint" },
   { name: "knip", icon: "knip" },
-  { name: "ruff", icon: "astral" },
+  { name: "ruff", icon: "ruff" },
   { name: "pyright", icon: null },
   { name: "CodeRabbit", icon: "coderabbit" },
 ];

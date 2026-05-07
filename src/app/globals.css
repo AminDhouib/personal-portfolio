@@ -483,6 +483,11 @@ html {
   background-color: #111111 !important;
 }
 
+/* Hide the CopilotKit dev-console / web inspector announcement toast */
+cpk-web-inspector {
+  display: none !important;
+}
+
 /* Hide like/dislike feedback buttons (camelCase class names in CopilotKit v1) */
 .copilotKitMessageControls,
 .copilotKitMessageControls.currentMessage,

@@ -91,7 +91,7 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
   const onGames = pathname === "/games" || pathname.startsWith("/games/");
   if (!enabled || onGames) return null;
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit">
+    <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
       <ChatActions />
       <CopilotPopup
         instructions={INSTRUCTIONS}
