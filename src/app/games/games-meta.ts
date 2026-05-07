@@ -66,7 +66,6 @@ export const GAMES: GameMeta[] = [
     controls: "Type the highlighted text. Don't make mistakes.",
     accent: "#60a5fa",
     accentTailwind: "accent-blue",
-    hidden: true,
   },
   {
     slug: "super-voltorb-flip",
