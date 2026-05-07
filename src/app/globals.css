@@ -272,12 +272,27 @@ html {
 }
 
 .prose pre {
+  position: relative;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--card) !important;
   padding: 1.25rem;
+  padding-top: 2rem;
   overflow-x: auto;
   margin: 1.75rem 0;
+}
+
+.prose pre[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .prose pre code {
