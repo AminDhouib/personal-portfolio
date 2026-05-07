@@ -72,10 +72,10 @@ export default async function BlogPage({
             posts.map((post) => (
               <div
                 key={post.slug}
-                className="py-8 border-b border-(--border) hover:border-accent-blue/30 transition-colors"
+                className="group py-8 border-b border-(--border) hover:border-accent-blue/30 transition-colors"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <Link href={`/blog/${post.slug}`} className="group flex-1 pr-8">
+                  <Link href={`/blog/${post.slug}`} className="flex-1 pr-8">
                     <h2 className="font-display text-xl font-bold tracking-tight group-hover:text-accent-blue transition-colors mb-2">
                       {post.title}
                     </h2>
