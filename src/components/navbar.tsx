@@ -146,7 +146,9 @@ export function Navbar() {
               </button>
             )}
 
-            {/* Bookmark */}
+            {/* Share / bookmark — uses Web Share API when available (most modern
+                browsers including desktop Chrome/Edge/Safari), falls back to a
+                Ctrl+D hint on browsers without it (Firefox desktop). */}
             {mounted && (
               <button
                 onClick={() => {
@@ -157,8 +159,8 @@ export function Navbar() {
                   }
                 }}
                 className="rounded-lg p-2 text-(--muted) hover:text-(--foreground) hover:bg-(--surface) transition-colors"
-                aria-label="Bookmark"
-                title="Bookmark this page"
+                aria-label="Share or bookmark this page"
+                title="Share or bookmark this page"
               >
                 <Bookmark className="h-4 w-4" />
               </button>
