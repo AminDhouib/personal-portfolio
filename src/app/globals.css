@@ -247,7 +247,7 @@ html {
 }
 
 .prose a {
-  color: #6366f1;
+  color: var(--color-accent-blue);
   text-decoration: none;
   font-weight: 500;
 }
@@ -267,7 +267,7 @@ html {
   border-radius: 4px;
   padding: 0.15em 0.4em;
   font-size: 0.875em;
-  color: #22c55e;
+  color: var(--color-accent-green);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -290,7 +290,7 @@ html {
 }
 
 .prose blockquote {
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid var(--color-accent-blue);
   padding-left: 1rem;
   margin: 1.5rem 0;
   color: var(--muted);

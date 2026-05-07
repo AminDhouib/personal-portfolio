@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -64,6 +64,13 @@ export const metadata: Metadata = {
       follow: true,
     },
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#050505" },
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+  ],
 };
 
 const jsonLd = {
