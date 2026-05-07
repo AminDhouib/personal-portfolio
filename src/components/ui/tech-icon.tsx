@@ -14,7 +14,6 @@ const TOOL_TO_SLUG: Record<string, string> = {
   django: "siDjango",
   fastapi: "siFastapi",
   docker: "siDocker",
-  aws: "siAmazonwebservices",
   terraform: "siTerraform",
   jenkins: "siJenkins",
   postgresql: "siPostgresql",
