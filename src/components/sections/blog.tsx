@@ -62,6 +62,9 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
                   <h3 className="font-display text-lg font-bold tracking-tight group-hover:text-accent-blue transition-colors mb-1">
                     {post.title}
                   </h3>
+                  {post.excerpt && (
+                    <p className="text-sm text-(--muted) mb-1.5 line-clamp-1">{post.excerpt}</p>
+                  )}
                   <div className="flex items-center gap-3 text-xs text-(--muted)/60">
                     {post.date && <span>{formatRelativeDate(post.date)}</span>}
                     {post.readingTime && (
