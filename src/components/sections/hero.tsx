@@ -13,8 +13,8 @@ export function Hero() {
       id="hero"
       className="relative min-h-screen flex items-center pt-16 overflow-hidden"
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full py-10 sm:py-16 lg:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left: Text content */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -79,15 +79,15 @@ export function Hero() {
             </div>
           </motion.div>
 
-          {/* Right: Profile photo */}
+          {/* Right: Profile photo — order-first so it appears above text on mobile */}
           <motion.div
-            className="flex justify-center lg:justify-end"
+            className="flex justify-center lg:justify-end order-first lg:order-0"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
             <div className="relative">
-              <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-full overflow-hidden glow-green border-2 border-accent-green/30">
+              <div className="w-48 h-48 sm:w-64 sm:h-64 lg:w-80 lg:h-80 rounded-full overflow-hidden glow-green border-2 border-accent-green/30">
                 <Image
                   src="/profile.jpg"
                   alt="Amin Dhouib"
