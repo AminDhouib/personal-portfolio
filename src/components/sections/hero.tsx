@@ -25,11 +25,11 @@ export function Hero() {
               Portfolio / {currentYear}
             </p>
 
-            <h1 className="font-display mb-6">
-              <span className="block text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9]">
+            <h1 className="font-display mb-6" aria-label="Amin Dhouib">
+              <span aria-hidden="true" className="block text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9]">
                 AMIN
               </span>
-              <span className="hero-name-suffix block text-6xl sm:text-7xl lg:text-8xl font-extralight tracking-tighter leading-[0.9] mt-2">
+              <span aria-hidden="true" className="hero-name-suffix block text-6xl sm:text-7xl lg:text-8xl font-extralight tracking-tighter leading-[0.9] mt-2">
                 DHOUIB
               </span>
             </h1>
