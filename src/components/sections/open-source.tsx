@@ -4,6 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { GitFork, Star, ArrowRight } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { SiIcon } from "@/components/ui/tech-icon";
 import type { RepoStats, ContributionDay } from "@/lib/github";
 
 interface OSSProject {
@@ -216,13 +217,7 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
               className="inline-flex items-center gap-1.5 rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-xs text-(--muted)"
             >
               {tool.icon && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`https://cdn.simpleicons.org/${tool.icon}/888888`}
-                  alt={tool.name}
-                  className="h-3 w-3"
-                  loading="lazy"
-                />
+                <SiIcon slug={tool.icon} className="h-3 w-3" />
               )}
               {tool.name}
             </span>
