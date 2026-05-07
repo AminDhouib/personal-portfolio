@@ -107,7 +107,7 @@ export function ReviewsClient() {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="columns-3 lg:columns-2 md:columns-1 w-full"
+      className="columns-1 md:columns-2 w-full"
     >
       {sorted.map((review, i) => (
         <ReviewCard key={`${review.name}-${i}`} review={review} />
