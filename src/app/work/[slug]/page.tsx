@@ -18,7 +18,7 @@ const TECH_ICON_MAP: Record<string, string> = {
   javascript: "javascript",
   python: "python",
   docker: "docker",
-  aws: "amazonaws",
+  aws: "amazonwebservices",
   prisma: "prisma",
   django: "django",
   fastapi: "fastapi",
