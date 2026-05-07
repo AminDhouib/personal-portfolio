@@ -144,8 +144,18 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>
+          {/* Skip-to-content link — visible only on keyboard focus, lets keyboard
+              users bypass the navbar and jump straight to the page's main content. */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:rounded-lg focus:bg-accent-green focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-black"
+          >
+            Skip to main content
+          </a>
           <Navbar />
-          {children}
+          <div id="main-content" tabIndex={-1} className="contents">
+            {children}
+          </div>
           <ChatWidget enabled />
         </Providers>
       </body>
