@@ -72,7 +72,7 @@ export const GAMES: GameMeta[] = [
     title: "Super Voltorb Flip",
     tagline: "Flip tiles, deduce, don't pop the bomb",
     description:
-      "A faithful recreation of the HGSS classic with modern upgrades. Flip tiles for coins, use row/column clues to avoid Voltorbs, spend coins on shields & reveals.",
+      "A faithful recreation of the HGSS Pokémon GameCorner classic. Flip tiles to collect multipliers, use row/column clue panels to deduce where Voltorbs hide, and climb 8 difficulty levels.",
     controls: "Click tiles to flip. Toggle memo mode to mark possibilities.",
     accent: "#fbbf24",
     accentTailwind: "accent-amber",
