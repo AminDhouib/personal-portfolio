@@ -23,6 +23,7 @@ const TOOL_TO_SLUG: Record<string, string> = {
   redis: "siRedis",
   tailscale: "siTailscale",
   wireshark: "siWireshark",
+  "burp suite": "siBurpsuite",
 };
 
 export function SiIcon({ slug, className }: { slug: string; className?: string }) {
