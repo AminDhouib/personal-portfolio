@@ -50,6 +50,14 @@ body {
   font-family: var(--font-body), system-ui, sans-serif;
 }
 
+/* Accessible keyboard focus ring — replaces the default 1.2px black outline,
+   which is invisible against the dark theme. Uses accent-green so it stays
+   visible on both themes. Only applies on keyboard focus, not mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-green);
+  outline-offset: 2px;
+}
+
 /* ── Utility classes ─────────────────────────────────────── */
 .font-display {
   font-family: var(--font-display), system-ui, sans-serif;
