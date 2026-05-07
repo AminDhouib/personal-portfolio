@@ -46,7 +46,7 @@ function ReviewCard({ review }: { review: Review }) {
         <div className="min-w-0">
           {companyLogo && logoOk ? (
             companyLink ? (
-              <Link href={companyLink} target="_blank" className="inline-block mb-1">
+              <Link href={companyLink} target="_blank" rel="noopener noreferrer" className="inline-block mb-1">
                 <Image
                   src={companyLogo}
                   alt={company ?? ""}
@@ -75,7 +75,7 @@ function ReviewCard({ review }: { review: Review }) {
               {position && company && !companyLogo ? " · " : ""}
               {!companyLogo || !logoOk
                 ? companyLink
-                  ? <Link href={companyLink} target="_blank" className="font-medium hover:text-(--foreground) transition-colors">{company}</Link>
+                  ? <Link href={companyLink} target="_blank" rel="noopener noreferrer" className="font-medium hover:text-(--foreground) transition-colors">{company}</Link>
                   : company
                 : null}
             </p>
