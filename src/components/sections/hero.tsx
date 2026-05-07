@@ -29,7 +29,7 @@ export function Hero() {
               <span className="block text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9]">
                 AMIN
               </span>
-              <span className="block text-6xl sm:text-7xl lg:text-8xl font-extralight tracking-tighter leading-[0.9] mt-2">
+              <span className="hero-name-suffix block text-6xl sm:text-7xl lg:text-8xl font-extralight tracking-tighter leading-[0.9] mt-2">
                 DHOUIB
               </span>
             </h1>

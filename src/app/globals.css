@@ -38,6 +38,11 @@
   --card: #f5f5f5;
 }
 
+/* Light mode: boost hero last-name weight so extralight is legible on white */
+[data-theme="light"] .hero-name-suffix {
+  font-weight: 300;
+}
+
 /* ── Base styles ─────────────────────────────────────────── */
 body {
   background: var(--background);
