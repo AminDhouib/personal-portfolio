@@ -177,8 +177,8 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
             className="grid gap-1"
             style={{ gridTemplateColumns: "repeat(52, minmax(10px, 1fr))" }}
           >
-            {Array.from({ length: 52 }, (_, col) =>
-              Array.from({ length: 7 }, (__, row) => {
+            {Array.from({ length: 7 }, (_, row) =>
+              Array.from({ length: 52 }, (__, col) => {
                 const idx = col * 7 + row;
                 const day = graphDays[idx];
                 if (!day) return null;
