@@ -93,14 +93,15 @@ export default async function WorkDetailPage({
 
         {/* Header */}
         <div className="flex items-start gap-6 mb-8">
-          <Image
-            src={project.logo}
-            alt={`${project.name} logo`}
-            width={project.logoWidth}
-            height={project.logoHeight}
-            className="rounded-xl"
-            style={{ width: 80, height: "auto" }}
-          />
+          <div className="shrink-0 rounded-xl bg-white px-3 py-2 flex items-center justify-center" style={{ minHeight: 56 }}>
+            <Image
+              src={project.logo}
+              alt={`${project.name} logo`}
+              width={project.logoWidth}
+              height={project.logoHeight}
+              style={{ width: 96, height: "auto" }}
+            />
+          </div>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="font-display text-4xl font-black tracking-tight">

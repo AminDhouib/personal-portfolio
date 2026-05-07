@@ -64,14 +64,15 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                 <div className="p-6">
                 {/* Header: Logo + Name + OSS badge */}
                 <div className="flex items-start gap-4 mb-4">
-                  <Image
-                    src={project.logo}
-                    alt={`${project.name} logo`}
-                    width={project.logoWidth}
-                    height={project.logoHeight}
-                    className="rounded-lg"
-                    style={{ width: 48, height: "auto" }}
-                  />
+                  <div className="shrink-0 rounded-lg bg-white px-2 py-1 flex items-center justify-center" style={{ minHeight: 36 }}>
+                    <Image
+                      src={project.logo}
+                      alt={`${project.name} logo`}
+                      width={project.logoWidth}
+                      height={project.logoHeight}
+                      style={{ width: 56, height: "auto" }}
+                    />
+                  </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-display text-lg font-bold tracking-tight">
