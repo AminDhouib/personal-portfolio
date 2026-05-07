@@ -11,26 +11,26 @@ const staticPosts: BlogPostMeta[] = [
   {
     slug: "5-apps-5-lessons",
     title: "5 Apps, 5 Lessons: What I Learned Shipping Products Nobody Asked For",
-    excerpt: "I built five apps after nobody asked me to. Here's what each one taught me.",
+    excerpt: "I built Shorty, uNotes, Caramel, UpUp, and GetItDone after nobody asked me to. Here's what each one taught me — and the one mistake I made with every single one of them.",
     date: "2026-04-05",
     tags: ["products"],
-    readingTime: "8 min read",
+    readingTime: "5 min read",
   },
   {
     slug: "devsecops-pipeline",
     title: "My Full DevSecOps Pipeline: ESLint, knip, CodeRabbit, and Beyond",
-    excerpt: "Every tool in my CI/CD pipeline and why each one earns its place.",
+    excerpt: "Every tool in my CI/CD pipeline — from pre-commit hooks to AI-powered code review — and why each one earns its place.",
     date: "2026-04-01",
     tags: ["devops"],
-    readingTime: "7 min read",
+    readingTime: "4 min read",
   },
   {
     slug: "devino-solutions-lessons",
     title: "From $0 to $1M: What I Learned Building Devino Solutions",
-    excerpt: "Pricing, hiring, retention, and the moment I almost quit.",
+    excerpt: "Five years of lessons building a software studio — pricing, hiring, retention, and the moment I almost quit.",
     date: "2026-03-25",
     tags: ["business"],
-    readingTime: "9 min read",
+    readingTime: "4 min read",
   },
 ];
 
