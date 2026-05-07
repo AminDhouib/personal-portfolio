@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { GamesClient } from "./games-client";
 
 export const metadata = {
-  title: "Games — Amin Dhouib",
+  title: "Games",
   description: "Mini-games built with the geometric design language of amindhou.com.",
 };
 

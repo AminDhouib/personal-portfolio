@@ -20,7 +20,7 @@ export async function generateMetadata({
   const game = getGameMeta(slug);
   if (!game) return {};
   return {
-    title: `${game.title} — Games — Amin Dhouib`,
+    title: game.title,
     description: game.tagline,
   };
 }

@@ -4,7 +4,7 @@ import { getAllBlogPosts } from "@/lib/blog";
 import { formatRelativeDate, formatDate } from "@/lib/date-utils";
 
 export const metadata = {
-  title: "Blog — Amin Dhouib",
+  title: "Blog",
   description: "Thoughts on engineering, open source, and building products.",
 };
 

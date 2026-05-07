@@ -16,7 +16,7 @@ const PasswordGame = dynamic(
 );
 
 export const metadata = {
-  title: "Password Game 2 — Amin Dhouib",
+  title: "Password Game 2",
   description: "A spiritual successor to Neal Fun's Password Game. Seeded chaos, every run unique.",
 };
 

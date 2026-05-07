@@ -3,7 +3,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import { ReviewsClient } from "./reviews-client";
 
 export const metadata = {
-  title: "Reviews — Amin Dhouib",
+  title: "Reviews",
   description: "Client reviews and testimonials for Amin Dhouib / Devino.",
 };
 

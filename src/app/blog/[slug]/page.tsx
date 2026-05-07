@@ -23,7 +23,7 @@ export async function generateMetadata({
   const post = getBlogPost(slug);
   if (!post) return {};
   return {
-    title: `${post.title} — Amin Dhouib`,
+    title: post.title,
     description: post.excerpt,
   };
 }
