@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotAction } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
@@ -86,8 +87,19 @@ function ChatActions() {
 
 export function ChatWidget({ enabled }: { enabled?: boolean }) {
   const pathname = usePathname();
-  // The chat is a portfolio/sales surface — on the games area it just adds
-  // clutter, so hide it across /games and its sub-routes.
+
+  // The navbar "Amin AI" button dispatches this event. CopilotKit manages its
+  // own open state internally, so we click its rendered button via DOM rather
+  // than trying to drive it via props.
+  useEffect(() => {
+    const handler = () => {
+      const btn = document.querySelector<HTMLElement>(".copilotKitButton");
+      if (btn && !btn.classList.contains("open")) btn.click();
+    };
+    window.addEventListener("open-amin-ai-chat", handler);
+    return () => window.removeEventListener("open-amin-ai-chat", handler);
+  }, []);
+
   const onGames = pathname === "/games" || pathname.startsWith("/games/");
   if (!enabled || onGames) return null;
   return (
@@ -96,7 +108,7 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
       <CopilotPopup
         instructions={INSTRUCTIONS}
         labels={{
-          title: "Ask Amin's AI",
+          title: "Amin AI",
           initial: "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
           placeholder: "Ask about Amin's projects, skills...",
         }}

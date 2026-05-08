@@ -147,38 +147,45 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-7">
             {navItems.map((item) => {
               const Icon = NAV_ICONS[item.sectionId];
+              const sharedClass = `relative flex items-center gap-1.5 text-sm font-medium transition-colors duration-200`;
+              const aiContent = (
+                <span
+                  className="flex items-center gap-1.5 bg-clip-text text-transparent font-semibold"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
+                    backgroundSize: "250% 100%",
+                    animation: "amin-games-shimmer 3s linear infinite",
+                  }}
+                >
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: "#a855f7" }} />
+                  {item.label}
+                </span>
+              );
+              if (item.isAI) {
+                return (
+                  <button
+                    key={item.sectionId}
+                    onClick={() => window.dispatchEvent(new CustomEvent("open-amin-ai-chat"))}
+                    className={`${sharedClass} cursor-pointer`}
+                  >
+                    {aiContent}
+                  </button>
+                );
+              }
               return (
                 <Link
                   key={item.sectionId}
                   href={item.href}
-                  className={`relative flex items-center gap-1.5 text-sm font-medium transition-colors duration-200 ${
-                    item.isAI
-                      ? "opacity-100"
-                      : activeSection === item.sectionId
+                  className={`${sharedClass} ${
+                    activeSection === item.sectionId
                       ? "text-(--foreground)"
                       : "text-(--muted) hover:text-(--foreground)"
                   }`}
                 >
-                  {Icon && !item.isAI && (
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                  )}
-                  {item.isAI ? (
-                    <span
-                      className="flex items-center gap-1.5 bg-clip-text text-transparent font-semibold"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
-                        backgroundSize: "250% 100%",
-                        animation: "amin-games-shimmer 3s linear infinite",
-                      }}
-                    >
-                      <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: "#a855f7" }} />
-                      {item.label}
-                    </span>
-                  ) : (
-                    item.label
-                  )}
-                  {!item.isAI && activeSection === item.sectionId && (
+                  {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+                  {item.label}
+                  {activeSection === item.sectionId && (
                     <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent-green rounded-full" />
                   )}
                 </Link>
@@ -314,21 +321,14 @@ export function Navbar() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
                   >
-                    <Link
-                      href={item.href}
-                      onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
-                        item.isAI
-                          ? "hover:bg-(--surface)"
-                          : activeSection === item.sectionId
-                          ? "bg-accent-green/10 text-accent-green"
-                          : "text-(--muted) hover:text-(--foreground) hover:bg-(--surface)"
-                      }`}
-                    >
-                      {Icon && !item.isAI && (
-                        <Icon className="h-4 w-4 shrink-0" />
-                      )}
-                      {item.isAI ? (
+                    {item.isAI ? (
+                      <button
+                        onClick={() => {
+                          setMobileOpen(false);
+                          window.dispatchEvent(new CustomEvent("open-amin-ai-chat"));
+                        }}
+                        className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors hover:bg-(--surface) cursor-pointer"
+                      >
                         <span
                           className="flex items-center gap-2 bg-clip-text text-transparent font-semibold"
                           style={{
@@ -341,10 +341,21 @@ export function Navbar() {
                           <Sparkles className="h-4 w-4 shrink-0" style={{ color: "#a855f7" }} />
                           {item.label}
                         </span>
-                      ) : (
-                        item.label
-                      )}
-                    </Link>
+                      </button>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                          activeSection === item.sectionId
+                            ? "bg-accent-green/10 text-accent-green"
+                            : "text-(--muted) hover:text-(--foreground) hover:bg-(--surface)"
+                        }`}
+                      >
+                        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                        {item.label}
+                      </Link>
+                    )}
                   </motion.div>
                   );
                 })}
