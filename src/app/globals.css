@@ -710,15 +710,19 @@ button[aria-label="Copy to clipboard"] {
 .ts-perfect-flash { animation: ts-perfect-flash 650ms ease-out; }
 
 /* ── Amin AI chat highlight ──────────────────────────────────── */
-@keyframes amin-ai-border-pulse {
-  0%   { box-shadow: 0 0 0 3px #a855f7, 0 0 28px 8px #a855f760; }
-  25%  { box-shadow: 0 0 0 3px #6366f1, 0 0 28px 8px #6366f160; }
-  50%  { box-shadow: 0 0 0 3px #3b82f6, 0 0 28px 8px #3b82f660; }
-  75%  { box-shadow: 0 0 0 3px #ec4899, 0 0 28px 8px #ec489960; }
-  100% { box-shadow: 0 0 0 3px #a855f7, 0 0 28px 8px #a855f760; }
+/* CSS-transition based highlight. Box-shadow keyframes don't
+   interpolate alpha-only changes reliably in Chrome — the engine
+   normalizes transparent colors to rgba(0,0,0,0), so a fade between
+   "transparent purple" and "opaque purple" actually fades from
+   "transparent black" instead of showing the purple. A simple
+   transition between two static states avoids that entirely. */
+.copilotKitWindow {
+  transition: box-shadow 0.45s ease-out;
 }
-.amin-ai-highlight {
-  animation: amin-ai-border-pulse 1.2s ease-in-out 3 !important;
+.copilotKitWindow.amin-ai-highlight {
+  box-shadow:
+    0 0 0 3px rgb(168, 85, 247),
+    0 0 36px 10px rgba(168, 85, 247, 0.6);
 }
 
 @import "../components/game/password-game/destruction.css";

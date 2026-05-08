@@ -90,28 +90,32 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
 
   // The navbar "Amin AI" button dispatches this event. CopilotKit manages its
   // own open state internally, so we drive it via DOM.
-  // - If chat is closed: click the button to open it.
-  // - If chat is already open: pulse the window border with a rainbow glow
-  //   so the user knows they're already in the right place.
+  // - If chat is closed: click CopilotKit's button to open it.
+  // - If chat is already open: toggle a class for ~700ms; CSS transitions
+  //   handle the fade in and out smoothly.
   useEffect(() => {
+    let removeTimer: ReturnType<typeof setTimeout> | null = null;
     const handler = () => {
       const btn = document.querySelector<HTMLElement>(".copilotKitButton");
       if (!btn) return;
       if (btn.classList.contains("open")) {
         const win = document.querySelector<HTMLElement>(".copilotKitWindow");
         if (!win) return;
-        win.classList.remove("amin-ai-highlight");
-        // force reflow so re-adding the class restarts the animation
-        void win.offsetWidth;
+        if (removeTimer) clearTimeout(removeTimer);
         win.classList.add("amin-ai-highlight");
-        const cleanup = () => win.classList.remove("amin-ai-highlight");
-        win.addEventListener("animationend", cleanup, { once: true });
+        removeTimer = setTimeout(() => {
+          win.classList.remove("amin-ai-highlight");
+          removeTimer = null;
+        }, 700);
       } else {
         btn.click();
       }
     };
     window.addEventListener("open-amin-ai-chat", handler);
-    return () => window.removeEventListener("open-amin-ai-chat", handler);
+    return () => {
+      window.removeEventListener("open-amin-ai-chat", handler);
+      if (removeTimer) clearTimeout(removeTimer);
+    };
   }, []);
 
   const onGames = pathname === "/games" || pathname.startsWith("/games/");
