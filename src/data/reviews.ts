@@ -9,7 +9,7 @@ export interface Review {
   companyLink?: string;
   linkedin?: string;
   isFeatured?: boolean;
-  source: "Google" | "Upwork" | "Contra";
+  source: "Google" | "Upwork" | "Contra" | "LinkedIn";
   link?: string;
 }
 
@@ -61,7 +61,7 @@ export const reviews: Review[] = [
     comment:
       "Amin & his team are different - they're collaborative, strategic, and actually care about the long-term. If you need someone to help build AND grow, I highly recommend this team!",
     isFeatured: true,
-    source: "Google",
+    source: "Upwork",
   },
   {
     name: "Samira Ismail",
@@ -90,7 +90,7 @@ export const reviews: Review[] = [
     comment:
       "Amin was fantastic to work. He delivered professional, high-quality work with our ELK Stack. Highly recommend!",
     isFeatured: true,
-    source: "Google",
+    source: "Upwork",
   },
   {
     name: "Matt Ross",
@@ -104,7 +104,7 @@ export const reviews: Review[] = [
     comment:
       "Amin was incredible to work with. He paid particular attention to my actual business needs. Investigating the larger context as to why this was needed so that he delivered the right solution to us. Would hire again 100%!",
     isFeatured: true,
-    source: "Google",
+    source: "Upwork",
   },
   {
     name: "Ali Asif",
@@ -116,7 +116,7 @@ export const reviews: Review[] = [
     comment:
       "Amin & team are a skilled and professional group. Updates were communicated promptly and any adjustments needed to milestones were explained thoroughly. Overall, Amin was a delight to work with.",
     isFeatured: false,
-    source: "Google",
+    source: "Upwork",
   },
   {
     name: "Kaleb Dortono",
@@ -129,7 +129,7 @@ export const reviews: Review[] = [
     comment:
       "From web development, applications, automations, and dashboards - Amin has been able to help us out in so many areas, and help push our agency forward!",
     isFeatured: false,
-    source: "Google",
+    source: "Upwork",
   },
   {
     name: "Jeremy Thiesen",
@@ -142,7 +142,7 @@ export const reviews: Review[] = [
     rating: 5,
     comment:
       "The first thing you'll notice about Amin is his positive energy! He is excited and ready to jump in and get things done. He is willing to put in the time and effort to get up to speed.",
-    source: "Google",
+    source: "LinkedIn",
     link: linkedinRecommendations,
   },
   {
@@ -157,7 +157,7 @@ export const reviews: Review[] = [
     comment:
       "Great quality work, good communication, very clever SWE and is capable of handling complex tasks with minimal directive.",
     isFeatured: false,
-    source: "Google",
+    source: "Upwork",
   },
   {
     name: "Will Evers",
@@ -170,7 +170,7 @@ export const reviews: Review[] = [
     rating: 5,
     comment:
       "Amin was hired for backend projects on our AWS API Gateway/Lambda applications, however, he demonstrated that he was knowledgeable and comfortable with front end development, automated testing, & several other skill domains. A wonderful person whose positivity is remarkable.",
-    source: "Google",
+    source: "LinkedIn",
     link: linkedinRecommendations,
   },
 ];
