@@ -80,6 +80,8 @@ function Shapes({
   return (
     <>
       <CameraRig scrollY={scrollY} scrollVelocity={scrollVelocity} />
+      {/* Hero band (y ≈ -3 to +4) — left side reinforced so it matches the
+          right-side cluster behind the profile photo. */}
       <WireframeShape
         geometry={geometries.tetra}
         position={[3, 1, -2]}
@@ -141,6 +143,96 @@ function Shapes({
         position={[2.5, -1, -4]}
         speed={0.55}
         color="#06b6d4"
+        scrollVelocity={scrollVelocity}
+      />
+      {/* Extra hero left-side shapes — balances the right-side photo cluster */}
+      <WireframeShape
+        geometry={geometries.pyramid4}
+        position={[-3.5, 1.5, -2.5]}
+        speed={0.42}
+        color="#f59e0b"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.tetra}
+        position={[-4.5, 0.5, -4]}
+        speed={0.32}
+        color="#22c55e"
+        scrollVelocity={scrollVelocity}
+      />
+      {/* Mid-scroll band (y ≈ -8 to -4) — fills work/services/reviews section
+          backgrounds so they don't go visually empty as the camera glides down. */}
+      <WireframeShape
+        geometry={geometries.pyramid3}
+        position={[3.2, -5, -3]}
+        speed={0.5}
+        color="#a78bfa"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.tetra}
+        position={[-3.8, -6, -4.5]}
+        speed={0.35}
+        color="#06b6d4"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.pyramid4}
+        position={[1.5, -7.5, -2]}
+        speed={0.45}
+        color="#22c55e"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.pyramid3}
+        position={[-1.5, -8.5, -5]}
+        speed={0.28}
+        color="#6366f1"
+        scrollVelocity={scrollVelocity}
+      />
+      {/* Deep band (y ≈ -14 to -10) — covers opensource/background/game/blog
+          sections so the lower scroll positions still have ambient motion. */}
+      <WireframeShape
+        geometry={geometries.tetra}
+        position={[3.8, -10, -3.5]}
+        speed={0.4}
+        color="#f59e0b"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.pyramid4}
+        position={[-3.5, -11, -2.5]}
+        speed={0.55}
+        color="#a78bfa"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.pyramid3}
+        position={[2, -12.5, -5]}
+        speed={0.3}
+        color="#06b6d4"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.tetra}
+        position={[-2.5, -14, -3]}
+        speed={0.5}
+        color="#22c55e"
+        scrollVelocity={scrollVelocity}
+      />
+      {/* Bottom band (y ≈ -18 to -16) — keeps beyond-code + contact alive. */}
+      <WireframeShape
+        geometry={geometries.pyramid4}
+        position={[3, -16, -4]}
+        speed={0.38}
+        color="#6366f1"
+        scrollVelocity={scrollVelocity}
+      />
+      <WireframeShape
+        geometry={geometries.pyramid3}
+        position={[-3, -17.5, -3.5]}
+        speed={0.45}
+        color="#f59e0b"
         scrollVelocity={scrollVelocity}
       />
     </>

@@ -63,12 +63,34 @@ body {
   font-family: var(--font-display), system-ui, sans-serif;
 }
 
-/* Green glow ring for profile photo */
+/* Subtle green halo for profile photo — soft, slowly breathing aura
+   instead of a hard neon ring. The animation runs slow enough that it
+   reads as "alive" without becoming a distraction. */
 .glow-green {
   box-shadow:
-    0 0 20px rgba(34, 197, 94, 0.4),
-    0 0 60px rgba(34, 197, 94, 0.2),
-    0 0 100px rgba(34, 197, 94, 0.1);
+    0 0 18px rgba(34, 197, 94, 0.18),
+    0 0 60px rgba(34, 197, 94, 0.10),
+    0 0 120px rgba(34, 197, 94, 0.05);
+  animation: glow-breathe 6s ease-in-out infinite;
+}
+
+@keyframes glow-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 18px rgba(34, 197, 94, 0.18),
+      0 0 60px rgba(34, 197, 94, 0.10),
+      0 0 120px rgba(34, 197, 94, 0.05);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(34, 197, 94, 0.28),
+      0 0 80px rgba(34, 197, 94, 0.14),
+      0 0 140px rgba(34, 197, 94, 0.07);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-green { animation: none; }
 }
 
 /* Pulsing green dot for live indicators */
