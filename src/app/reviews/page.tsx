@@ -9,10 +9,9 @@ export const metadata = {
 };
 
 const trustStats = [
-  { value: "5/5", label: "On Google" },
   { value: "5/5", label: "On Contra" },
   { value: "100%", label: "Job Success On Upwork" },
-  { value: "100+", label: "Satisfied Clients" },
+  { value: "50+", label: "Satisfied Clients" },
 ];
 
 export default function ReviewsPage() {
@@ -48,23 +47,13 @@ export default function ReviewsPage() {
           </div>
         </div>
 
-        {/* Trust bar — stats + CTA */}
-        <div
-          className="relative rounded-2xl border border-accent-blue/20 px-6 py-10 sm:px-10 sm:py-12 mb-12 overflow-hidden"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(15,23,42,0.6) 60%, rgba(15,23,42,0.85) 100%)",
-          }}
-        >
-          <div
-            className="pointer-events-none absolute inset-0 opacity-30"
-            style={{
-              background:
-                "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99,102,241,0.35), transparent 70%)",
-            }}
-            aria-hidden
-          />
-          <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-y-8 gap-x-4 text-center">
+        <ReviewsClient />
+
+        {/* Trust bar — stats + CTA. Sits below the reviews so the visitor
+            ends on a strong call to action. Gradient adapts to theme. */}
+        <div className="trust-bar relative rounded-2xl border border-(--border) px-6 py-10 sm:px-10 sm:py-12 mt-12 overflow-hidden">
+          <div className="trust-bar-glow pointer-events-none absolute inset-0" aria-hidden />
+          <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-y-8 gap-x-4 text-center">
             {trustStats.map((s) => (
               <div key={s.label}>
                 <div className="font-display text-4xl sm:text-5xl font-black tracking-tight mb-2">
@@ -89,8 +78,6 @@ export default function ReviewsPage() {
             </a>
           </div>
         </div>
-
-        <ReviewsClient />
       </div>
     </div>
   );

@@ -67,7 +67,7 @@ export function ProofBar() {
       color: "var(--color-accent-green)",
     },
     {
-      target: 100,
+      target: 50,
       suffix: "+",
       label: "Clients",
       subtitle: "Successful projects shipped",

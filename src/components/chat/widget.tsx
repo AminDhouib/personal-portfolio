@@ -16,7 +16,7 @@ About Amin:
 - Languages: Fluent English & French, working Arabic
 - Favorite stack: Next.js, TypeScript, Python (Django/FastAPI), Prisma, Docker, AWS
 
-Key stats: $1M+ revenue, 100+ clients, 30K+ MAU across apps, 5.0/5.0 rating, 99.99% server uptime.
+Key stats: $1M+ revenue, 50+ clients, 30K+ MAU across apps, 5.0/5.0 rating, 99.99% server uptime.
 
 Apps:
 - Shorty (aishorty.com) — AI YouTube & Spotify summarizer. 2.1K MAU, +50% MoM.

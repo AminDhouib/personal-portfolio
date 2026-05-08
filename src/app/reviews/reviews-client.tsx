@@ -60,7 +60,7 @@ function ReviewCard({ review }: { review: Review }) {
                   alt={company ?? ""}
                   width={120}
                   height={24}
-                  className="h-5 w-auto brightness-0 dark:invert object-contain"
+                  className="h-5 w-auto logo-tinted object-contain"
                   onError={() => setLogoOk(false)}
                 />
               </Link>
@@ -70,7 +70,7 @@ function ReviewCard({ review }: { review: Review }) {
                 alt={company ?? ""}
                 width={120}
                 height={24}
-                className="h-5 w-auto brightness-0 dark:invert object-contain mb-1"
+                className="h-5 w-auto logo-tinted object-contain mb-1"
                 onError={() => setLogoOk(false)}
               />
             )

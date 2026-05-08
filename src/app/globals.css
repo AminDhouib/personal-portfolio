@@ -709,6 +709,40 @@ button[aria-label="Copy to clipboard"] {
 }
 .ts-perfect-flash { animation: ts-perfect-flash 650ms ease-out; }
 
+/* ── Reviews trust-bar (light + dark mode) ──────────────────── */
+.trust-bar {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.18) 0%,
+    rgba(15, 23, 42, 0.55) 60%,
+    rgba(15, 23, 42, 0.8) 100%
+  );
+}
+.trust-bar-glow {
+  opacity: 0.3;
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    rgba(99, 102, 241, 0.35),
+    transparent 70%
+  );
+}
+[data-theme="light"] .trust-bar {
+  background: linear-gradient(
+    135deg,
+    rgba(226, 232, 240, 0.95) 0%,
+    rgba(203, 213, 225, 0.85) 60%,
+    rgba(148, 163, 184, 0.6) 100%
+  );
+}
+[data-theme="light"] .trust-bar-glow {
+  opacity: 0.4;
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    rgba(255, 255, 255, 0.7),
+    transparent 70%
+  );
+}
+
 /* ── Amin AI chat highlight ──────────────────────────────────── */
 /* Discrete color classes with a fast transition. JS cycles through
    them (purple → indigo → blue → pink → off) so we don't rely on
