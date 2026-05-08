@@ -123,6 +123,7 @@ const jsonLd = {
 };
 
 import { Navbar } from "@/components/navbar";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { ChatWidget } from "@/components/chat/widget";
 
 export default function RootLayout({
@@ -156,6 +157,7 @@ export default function RootLayout({
           <div id="main-content" tabIndex={-1} className="contents">
             {children}
           </div>
+          <SiteFooter />
           <ChatWidget enabled />
         </Providers>
       </body>
