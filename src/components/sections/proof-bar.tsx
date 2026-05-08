@@ -10,12 +10,13 @@ interface CounterProps {
   prefix?: string;
   suffix?: string;
   label: string;
+  subtitle: string;
   color: string;
   inView: boolean;
   decimals?: number;
 }
 
-function Counter({ target, prefix = "", suffix = "", label, color, inView, decimals = 0 }: CounterProps) {
+function Counter({ target, prefix = "", suffix = "", label, subtitle, color, inView, decimals = 0 }: CounterProps) {
   const count = useMotionValue(0);
   const display = useTransform(count, (v) =>
     decimals > 0 ? v.toFixed(decimals) : Math.round(v).toString()
@@ -42,9 +43,12 @@ function Counter({ target, prefix = "", suffix = "", label, color, inView, decim
         {label}
       </div>
       <div
-        className="mx-auto h-0.5 w-10 rounded-full"
+        className="mx-auto h-0.5 w-10 rounded-full mb-2"
         style={{ backgroundColor: color }}
       />
+      <div className="text-[11px] text-(--muted)/70 leading-snug max-w-45 mx-auto">
+        {subtitle}
+      </div>
     </div>
   );
 }
@@ -59,24 +63,28 @@ export function ProofBar() {
       prefix: "$",
       suffix: "M+",
       label: "Revenue",
+      subtitle: "Generated for clients",
       color: "var(--color-accent-green)",
     },
     {
       target: 100,
       suffix: "+",
       label: "Clients",
+      subtitle: "Successful projects shipped",
       color: "var(--color-accent-blue)",
     },
     {
       target: 30,
       suffix: "K+",
       label: "Users",
+      subtitle: "Across my apps & services",
       color: "var(--color-accent-cyan)",
     },
     {
       target: 5.0,
       suffix: "",
       label: "Rating",
+      subtitle: "From every client review",
       color: "var(--color-accent-amber)",
       isStar: true,
     },
@@ -84,6 +92,7 @@ export function ProofBar() {
       target: 99.99,
       suffix: "%",
       label: "Uptime",
+      subtitle: "Across all hosted services",
       color: "var(--color-accent-green)",
       decimals: 2,
     },
@@ -110,9 +119,12 @@ export function ProofBar() {
                     {m.label}
                   </div>
                   <div
-                    className="mx-auto h-0.5 w-10 rounded-full"
+                    className="mx-auto h-0.5 w-10 rounded-full mb-2"
                     style={{ backgroundColor: m.color }}
                   />
+                  <div className="text-[11px] text-(--muted)/70 leading-snug max-w-45 mx-auto">
+                    {m.subtitle}
+                  </div>
                 </div>
               ) : (
                 <Counter
@@ -120,6 +132,7 @@ export function ProofBar() {
                   prefix={m.prefix}
                   suffix={m.suffix}
                   label={m.label}
+                  subtitle={m.subtitle}
                   color={m.color}
                   inView={inView}
                   decimals={"decimals" in m ? m.decimals : 0}
