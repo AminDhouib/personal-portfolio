@@ -7,6 +7,7 @@ export interface Review {
   rating: number;
   comment: string;
   companyLink?: string;
+  linkedin?: string;
   isFeatured?: boolean;
   source: "Google" | "Upwork" | "Contra";
   link?: string;
@@ -25,6 +26,7 @@ export const reviews: Review[] = [
     companyLink: "https://expertpartners.com",
     companyLogo: "/reviews/companies/ep.webp",
     profileImage: "/reviews/profiles/allison.png",
+    linkedin: "https://www.linkedin.com/in/theallisongaddy/",
     rating: 5,
     comment:
       "Amin was an exceptional developer who was able to complete this critical emergency project within the tight 24-hour deadline. I'm extremely impressed by his skill and professionalism.",
@@ -39,6 +41,7 @@ export const reviews: Review[] = [
     company: "Qreates",
     companyLink: "https://qreates.com",
     companyLogo: "/reviews/companies/qreates.png",
+    linkedin: "https://www.linkedin.com/in/tristan-mcintire-b33763b3/",
     rating: 5,
     comment:
       "Amin is the bomb. I originally tried hiring him for a specific task but in our intro call he quickly analyzed exactly what my needs were, suggested an alternative solution and helped guide me in a new direction. He is extremely knowledgable would definitely recommend!",
@@ -53,6 +56,7 @@ export const reviews: Review[] = [
     companyLink: "https://syncara.ca",
     profileImage: "/reviews/profiles/zarrah.png",
     companyLogo: "/reviews/companies/syncara.png",
+    linkedin: "https://www.linkedin.com/in/zarrah-uy/",
     rating: 5,
     comment:
       "Amin & his team are different - they're collaborative, strategic, and actually care about the long-term. If you need someone to help build AND grow, I highly recommend this team!",
@@ -65,6 +69,7 @@ export const reviews: Review[] = [
     profileImage: "/reviews/profiles/samira.png",
     company: "New Motion Labs",
     companyLogo: "/reviews/companies/nml.png",
+    linkedin: "https://www.linkedin.com/in/samira-ismail-26398b163/",
     rating: 5,
     comment:
       "Devino was great to work with throughout our project. They have great attention to detail when it comes to both the frontend design and UI/UX and the backend functionality. They're highly recommended for projects where time is of the essence.",
@@ -80,6 +85,7 @@ export const reviews: Review[] = [
     companyLink: "https://proxyscrape.com",
     companyLogo: "/reviews/companies/proxyscrape.png",
     profileImage: "/reviews/profiles/thibeau.png",
+    linkedin: "https://www.linkedin.com/in/thibeau-maerevoet-13b354166/",
     rating: 5,
     comment:
       "Amin was fantastic to work. He delivered professional, high-quality work with our ELK Stack. Highly recommend!",
@@ -93,6 +99,7 @@ export const reviews: Review[] = [
     companyLink: "https://www.scribd.com/",
     companyLogo: "/reviews/companies/scribd.png",
     profileImage: "/reviews/profiles/matt.png",
+    linkedin: "https://www.linkedin.com/in/matt-as-ross/",
     rating: 5,
     comment:
       "Amin was incredible to work with. He paid particular attention to my actual business needs. Investigating the larger context as to why this was needed so that he delivered the right solution to us. Would hire again 100%!",
@@ -104,6 +111,7 @@ export const reviews: Review[] = [
     position: "Product Advisor & Angel Investor",
     company: "Various Startups",
     profileImage: "/reviews/profiles/ali.png",
+    linkedin: "https://www.linkedin.com/in/aliasif7/",
     rating: 5,
     comment:
       "Amin & team are a skilled and professional group. Updates were communicated promptly and any adjustments needed to milestones were explained thoroughly. Overall, Amin was a delight to work with.",
@@ -116,6 +124,7 @@ export const reviews: Review[] = [
     company: "KickAds Marketing",
     companyLink: "https://explicitadvisory.com/",
     profileImage: "/reviews/profiles/kaleb.png",
+    linkedin: "https://www.linkedin.com/in/kalebdortono/",
     rating: 5,
     comment:
       "From web development, applications, automations, and dashboards - Amin has been able to help us out in so many areas, and help push our agency forward!",
@@ -129,6 +138,7 @@ export const reviews: Review[] = [
     companyLink: "https://mathanex.com",
     companyLogo: "/reviews/companies/mathanex.png",
     profileImage: "/reviews/profiles/jeremy.png",
+    linkedin: "https://www.linkedin.com/in/jeremy-thiesen-7566a721/",
     rating: 5,
     comment:
       "The first thing you'll notice about Amin is his positive energy! He is excited and ready to jump in and get things done. He is willing to put in the time and effort to get up to speed.",
@@ -142,6 +152,7 @@ export const reviews: Review[] = [
     company: "Plutos App",
     companyLink: "https://apps.apple.com/in/app/plutos-data",
     companyLogo: "/reviews/companies/plutos.png",
+    linkedin: "https://www.linkedin.com/in/trevor-arashiro/",
     rating: 5,
     comment:
       "Great quality work, good communication, very clever SWE and is capable of handling complex tasks with minimal directive.",
@@ -155,6 +166,7 @@ export const reviews: Review[] = [
     companyLink: "https://getrentcheck.com",
     companyLogo: "/reviews/companies/rentcheck.png",
     profileImage: "/reviews/profiles/will.png",
+    linkedin: "https://www.linkedin.com/in/will-evers-795a3632/",
     rating: 5,
     comment:
       "Amin was hired for backend projects on our AWS API Gateway/Lambda applications, however, he demonstrated that he was knowledgeable and comfortable with front end development, automated testing, & several other skill domains. A wonderful person whose positivity is remarkable.",
