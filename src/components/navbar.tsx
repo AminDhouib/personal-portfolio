@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Menu, X, ArrowRight, Bookmark } from "lucide-react";
+import {
+  Sun, Moon, Menu, X, ArrowRight, Bookmark,
+  Home, Briefcase, Layers, BookOpen, Star, Gamepad2, Sparkles,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "framer-motion";
 import { navItems, CALENDLY_URL, socialLinks } from "@/data/nav";
@@ -24,6 +28,16 @@ function ContraIconNav() {
     </svg>
   );
 }
+
+const NAV_ICONS: Record<string, LucideIcon> = {
+  hero: Home,
+  work: Briefcase,
+  services: Layers,
+  blog: BookOpen,
+  reviews: Star,
+  game: Gamepad2,
+  ai: Sparkles,
+};
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -130,23 +144,46 @@ export function Navbar() {
 
           {/* Desktop nav links — only show on homepage */}
           {isHome && (
-          <div className="hidden md:flex items-center gap-8">
-            {navItems.map((item) => (
-              <Link
-                key={item.sectionId}
-                href={item.href}
-                className={`relative text-sm font-medium transition-colors duration-200 ${
-                  activeSection === item.sectionId
-                    ? "text-(--foreground)"
-                    : "text-(--muted) hover:text-(--foreground)"
-                }`}
-              >
-                {item.label}
-                {activeSection === item.sectionId && (
-                  <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent-green rounded-full" />
-                )}
-              </Link>
-            ))}
+          <div className="hidden md:flex items-center gap-7">
+            {navItems.map((item) => {
+              const Icon = NAV_ICONS[item.sectionId];
+              return (
+                <Link
+                  key={item.sectionId}
+                  href={item.href}
+                  className={`relative flex items-center gap-1.5 text-sm font-medium transition-colors duration-200 ${
+                    item.isAI
+                      ? "opacity-100"
+                      : activeSection === item.sectionId
+                      ? "text-(--foreground)"
+                      : "text-(--muted) hover:text-(--foreground)"
+                  }`}
+                >
+                  {Icon && !item.isAI && (
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  {item.isAI ? (
+                    <span
+                      className="flex items-center gap-1.5 bg-clip-text text-transparent font-semibold"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
+                        backgroundSize: "250% 100%",
+                        animation: "amin-games-shimmer 3s linear infinite",
+                      }}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: "#a855f7" }} />
+                      {item.label}
+                    </span>
+                  ) : (
+                    item.label
+                  )}
+                  {!item.isAI && activeSection === item.sectionId && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent-green rounded-full" />
+                  )}
+                </Link>
+              );
+            })}
           </div>
           )}
 
@@ -268,7 +305,9 @@ export function Navbar() {
 
               {/* Nav links */}
               <nav className="flex-1 px-4 py-6 space-y-1">
-                {navItems.map((item, i) => (
+                {navItems.map((item, i) => {
+                  const Icon = NAV_ICONS[item.sectionId];
+                  return (
                   <motion.div
                     key={item.sectionId}
                     initial={{ opacity: 0, x: 20 }}
@@ -279,18 +318,36 @@ export function Navbar() {
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
-                        activeSection === item.sectionId
+                        item.isAI
+                          ? "hover:bg-(--surface)"
+                          : activeSection === item.sectionId
                           ? "bg-accent-green/10 text-accent-green"
                           : "text-(--muted) hover:text-(--foreground) hover:bg-(--surface)"
                       }`}
                     >
-                      {activeSection === item.sectionId && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent-green shrink-0" />
+                      {Icon && !item.isAI && (
+                        <Icon className="h-4 w-4 shrink-0" />
                       )}
-                      {item.label}
+                      {item.isAI ? (
+                        <span
+                          className="flex items-center gap-2 bg-clip-text text-transparent font-semibold"
+                          style={{
+                            backgroundImage:
+                              "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
+                            backgroundSize: "250% 100%",
+                            animation: "amin-games-shimmer 3s linear infinite",
+                          }}
+                        >
+                          <Sparkles className="h-4 w-4 shrink-0" style={{ color: "#a855f7" }} />
+                          {item.label}
+                        </span>
+                      ) : (
+                        item.label
+                      )}
                     </Link>
                   </motion.div>
-                ))}
+                  );
+                })}
               </nav>
 
               {/* Social links */}

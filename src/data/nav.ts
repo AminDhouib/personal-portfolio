@@ -2,6 +2,7 @@ export interface NavItem {
   label: string;
   href: string;
   sectionId: string;
+  isAI?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -15,6 +16,7 @@ export const navItems: NavItem[] = [
   // page. sectionId is kept so the scroll-spy still highlights the embedded
   // section while you scroll past it.
   { label: "Games", href: "/games", sectionId: "game" },
+  { label: "Amin AI", href: "/ai", sectionId: "ai", isAI: true },
 ];
 
 export const CALENDLY_URL = "https://calendly.com/amindhouib";
