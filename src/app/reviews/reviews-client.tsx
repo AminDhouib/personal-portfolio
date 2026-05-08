@@ -76,7 +76,7 @@ function ReviewCard({ review }: { review: Review }) {
             )
           ) : null}
 
-          <p className="text-sm font-semibold leading-tight inline-flex items-center gap-1.5">
+          <div className="text-sm font-semibold leading-tight flex items-center gap-1.5">
             {linkedin ? (
               <Link
                 href={linkedin}
@@ -89,9 +89,9 @@ function ReviewCard({ review }: { review: Review }) {
                 <LinkedInIcon className="h-3.5 w-3.5 text-(--muted) shrink-0" />
               </Link>
             ) : (
-              name
+              <span>{name}</span>
             )}
-          </p>
+          </div>
           {(position || company) && (
             <p className="text-xs text-(--muted) mt-0.5">
               {position}
