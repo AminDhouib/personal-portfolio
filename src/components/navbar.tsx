@@ -46,6 +46,25 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Body scroll lock while the mobile menu is open. Without this, the page
+  // scrolls behind the fixed panel/backdrop, leaving the menu visually
+  // floating over unrelated content. Restore the previous overflow on
+  // close so we don't trample any other lock the app may have set.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
+  // Close the menu automatically on route change so the panel never
+  // outlives a navigation (e.g. tapping a link, then using the back button).
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   // Scroll-spy with IntersectionObserver
   useEffect(() => {
     const sectionIds = navItems.map((i) => i.sectionId);
