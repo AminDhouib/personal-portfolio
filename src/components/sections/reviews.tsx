@@ -14,7 +14,7 @@ export function Reviews() {
     <section id="reviews" className="py-24 overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          number="05"
+          number="06"
           title="What Clients Say"
           color="var(--color-accent-amber)"
         />

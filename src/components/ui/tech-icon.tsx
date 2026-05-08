@@ -6,16 +6,23 @@ const icons = si as unknown as SIRecord;
 const TOOL_TO_SLUG: Record<string, string> = {
   python: "siPython",
   langchain: "siLangchain",
+  selenium: "siSelenium",
+  // playwright + pydoll: no simple-icons entry in v16.14 — chip renders text only.
   scrapy: "siScrapy",
   make: "siMake",
   "next.js": "siNextdotjs",
   prisma: "siPrisma",
   typescript: "siTypescript",
+  "tailwind css": "siTailwindcss",
   django: "siDjango",
   fastapi: "siFastapi",
   docker: "siDocker",
+  // Docker Swarm shares Docker's brand icon (no separate Swarm logo upstream).
+  "docker swarm": "siDocker",
   kubernetes: "siKubernetes",
   terraform: "siTerraform",
+  // AWS dropped from simple-icons (trademark policy). Chip renders text only.
+  gcp: "siGooglecloud",
   jenkins: "siJenkins",
   postgresql: "siPostgresql",
   mongodb: "siMongodb",

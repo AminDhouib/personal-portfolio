@@ -102,7 +102,7 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
     <section id="opensource" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          number="06"
+          number="04"
           title="Open Source"
           color="var(--color-accent-green)"
         />
@@ -122,12 +122,13 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
               className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-all hover:border-accent-green/30"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="shrink-0 rounded-lg bg-white px-2 py-1 flex items-center justify-center" style={{ minHeight: 36 }}>
+                <div className="shrink-0 flex items-center" style={{ minHeight: 36 }}>
                   <Image
                     src={project.logo}
                     alt={`${project.name} logo`}
                     width={project.logoWidth}
                     height={project.logoHeight}
+                    className="logo-tinted"
                     style={{ width: 56, height: "auto" }}
                   />
                 </div>

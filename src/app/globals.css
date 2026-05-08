@@ -43,6 +43,16 @@
   font-weight: 300;
 }
 
+/* Project logo recolor — flatten the colored brand mark to a clean white
+   silhouette in dark mode (no more white pill wrapper around the asset).
+   Light mode keeps the original colors so they pop against the bright bg. */
+.logo-tinted {
+  filter: brightness(0) invert(1);
+}
+[data-theme="light"] .logo-tinted {
+  filter: none;
+}
+
 /* ── Base styles ─────────────────────────────────────────── */
 body {
   background: var(--background);
@@ -65,7 +75,6 @@ body {
    except `grain` which lives above content at low opacity. */
 .bg-fx-aurora,
 .bg-fx-vignette,
-.bg-fx-glow,
 .bg-fx-grain {
   position: fixed;
   inset: 0;
@@ -99,17 +108,6 @@ body {
     transparent 40%,
     rgba(0, 0, 0, 0.55) 100%
   );
-}
-
-.bg-fx-glow {
-  --gx: 50%;
-  --gy: 40%;
-  background: radial-gradient(
-    600px circle at var(--gx) var(--gy),
-    rgba(34, 197, 94, 0.10),
-    transparent 60%
-  );
-  transition: background 80ms linear;
 }
 
 .bg-fx-grain {

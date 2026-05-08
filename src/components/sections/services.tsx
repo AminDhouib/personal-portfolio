@@ -12,7 +12,7 @@ export function Services() {
     <section id="services" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          number="04"
+          number="05"
           title="Services"
           color="var(--color-accent-purple)"
         />

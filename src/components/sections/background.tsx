@@ -5,6 +5,35 @@ import { GraduationCap, Languages } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon } from "@/components/ui/tech-icon";
 
+// uOttawa wordmark approximation. The brand identity is the lowercase "u"
+// hugged into the uppercase "O" set in garnet (#822433). We render it as a
+// circular badge so it integrates with the rest of the layout instead of
+// hanging off the text. Pure inline SVG — no asset to bundle, scales crisp.
+function UOttawaBadge() {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      className="h-12 w-12 shrink-0"
+      aria-label="University of Ottawa"
+      role="img"
+    >
+      <circle cx="32" cy="32" r="32" fill="#822433" />
+      <text
+        x="32"
+        y="42"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="28"
+        fontWeight="700"
+        fill="#ffffff"
+        letterSpacing="-1"
+      >
+        uO
+      </text>
+    </svg>
+  );
+}
+
 const techLogos = [
   "react",
   "typescript",
@@ -53,13 +82,18 @@ export function Background() {
               <GraduationCap className="h-5 w-5 text-accent-cyan" />
               <h3 className="font-display text-lg font-bold">Education</h3>
             </div>
-            <p className="text-base font-semibold">University of Ottawa</p>
-            <p className="text-sm text-(--muted)">
-              BASc Computer Software Engineering
-            </p>
-            <p className="text-sm text-accent-green font-medium mt-1">
-              Summa Cum Laude (A+)
-            </p>
+            <div className="flex items-start gap-4">
+              <UOttawaBadge />
+              <div>
+                <p className="text-base font-semibold">University of Ottawa</p>
+                <p className="text-sm text-(--muted)">
+                  BASc Computer Software Engineering
+                </p>
+                <p className="text-sm text-accent-green font-medium mt-1">
+                  Summa Cum Laude (A+)
+                </p>
+              </div>
+            </div>
           </motion.div>
 
           {/* Languages */}

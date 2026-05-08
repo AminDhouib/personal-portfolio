@@ -37,13 +37,13 @@ export default async function Home() {
         <Hero />
         <ProofBar />
         <Work mauData={mauData} />
-        <Services />
-        <Reviews />
         <OpenSource
           caramelStats={caramelStats}
           upupStats={upupStats}
           contributions={contributions}
         />
+        <Services />
+        <Reviews />
         <Background />
         <Game />
         <Blog posts={blogPosts} />
