@@ -89,12 +89,26 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
   const pathname = usePathname();
 
   // The navbar "Amin AI" button dispatches this event. CopilotKit manages its
-  // own open state internally, so we click its rendered button via DOM rather
-  // than trying to drive it via props.
+  // own open state internally, so we drive it via DOM.
+  // - If chat is closed: click the button to open it.
+  // - If chat is already open: pulse the window border with a rainbow glow
+  //   so the user knows they're already in the right place.
   useEffect(() => {
     const handler = () => {
       const btn = document.querySelector<HTMLElement>(".copilotKitButton");
-      if (btn && !btn.classList.contains("open")) btn.click();
+      if (!btn) return;
+      if (btn.classList.contains("open")) {
+        const win = document.querySelector<HTMLElement>(".copilotKitWindow");
+        if (!win) return;
+        win.classList.remove("amin-ai-highlight");
+        // force reflow so re-adding the class restarts the animation
+        void win.offsetWidth;
+        win.classList.add("amin-ai-highlight");
+        const cleanup = () => win.classList.remove("amin-ai-highlight");
+        win.addEventListener("animationend", cleanup, { once: true });
+      } else {
+        btn.click();
+      }
     };
     window.addEventListener("open-amin-ai-chat", handler);
     return () => window.removeEventListener("open-amin-ai-chat", handler);

@@ -709,4 +709,16 @@ button[aria-label="Copy to clipboard"] {
 }
 .ts-perfect-flash { animation: ts-perfect-flash 650ms ease-out; }
 
+/* ── Amin AI chat highlight ──────────────────────────────────── */
+@keyframes amin-ai-border-pulse {
+  0%   { box-shadow: 0 0 0 3px #a855f7, 0 0 28px 8px #a855f760; }
+  25%  { box-shadow: 0 0 0 3px #6366f1, 0 0 28px 8px #6366f160; }
+  50%  { box-shadow: 0 0 0 3px #3b82f6, 0 0 28px 8px #3b82f660; }
+  75%  { box-shadow: 0 0 0 3px #ec4899, 0 0 28px 8px #ec489960; }
+  100% { box-shadow: 0 0 0 3px #a855f7, 0 0 28px 8px #a855f760; }
+}
+.amin-ai-highlight {
+  animation: amin-ai-border-pulse 1.2s ease-in-out 3 !important;
+}
+
 @import "../components/game/password-game/destruction.css";
