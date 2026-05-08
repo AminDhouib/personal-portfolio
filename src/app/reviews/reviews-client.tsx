@@ -25,9 +25,9 @@ const SOURCE_ICON_SLUG: Record<Review["source"], string> = {
 
 function SourceBadge({ source, link }: { source: Review["source"]; link?: string }) {
   const inner = (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-(--muted) font-medium tracking-wide uppercase">
+    <span className="inline-flex items-center gap-1.5 text-xs text-(--muted) font-medium">
       <SiIcon slug={SOURCE_ICON_SLUG[source]} className="h-3.5 w-3.5" />
-      {source}
+      From {source}
     </span>
   );
   if (!link) return inner;
@@ -49,6 +49,14 @@ function ReviewCard({ review }: { review: Review }) {
   const [logoOk, setLogoOk] = useState(true);
 
   const { name, position, company, companyLogo, profileImage, rating, comment, companyLink, linkedin, link, source } = review;
+  // Most company logos already work with .logo-tinted (white in dark mode,
+  // original colors in light mode). Expert Partners' logo is a white-on-
+  // transparent silhouette though, so it needs the silhouette filter to
+  // remain visible on a white card in light mode.
+  const logoClass =
+    companyLogo === "/reviews/companies/ep.webp"
+      ? "logo-silhouette"
+      : "logo-tinted";
 
   return (
     <div className="break-inside-avoid relative bg-(--card) border border-(--border) rounded-[20px] mb-4 p-7">
@@ -79,7 +87,7 @@ function ReviewCard({ review }: { review: Review }) {
                   alt={company ?? ""}
                   width={120}
                   height={24}
-                  className="h-5 w-auto logo-silhouette object-contain"
+                  className={`h-5 w-auto ${logoClass} object-contain`}
                   onError={() => setLogoOk(false)}
                 />
               </Link>
@@ -89,7 +97,7 @@ function ReviewCard({ review }: { review: Review }) {
                 alt={company ?? ""}
                 width={120}
                 height={24}
-                className="h-5 w-auto logo-silhouette object-contain mb-1"
+                className={`h-5 w-auto ${logoClass} object-contain mb-1`}
                 onError={() => setLogoOk(false)}
               />
             )
