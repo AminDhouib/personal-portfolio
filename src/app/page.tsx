@@ -1,4 +1,5 @@
 import { GeometricBackgroundLoader } from "@/components/three/loader";
+import { BackgroundFX } from "@/components/three/background-fx";
 import {
   Hero,
   ProofBar,
@@ -31,6 +32,7 @@ export default async function Home() {
   return (
     <>
       <GeometricBackgroundLoader />
+      <BackgroundFX />
       <main className="relative z-10">
         <Hero />
         <ProofBar />

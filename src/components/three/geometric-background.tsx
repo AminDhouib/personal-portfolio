@@ -23,8 +23,8 @@ function WireframeShape({
   useFrame((_, delta) => {
     if (!meshRef.current) return;
     const boost = 1 + Math.min(Math.abs(scrollVelocity.current ?? 0) * 4, 10);
-    meshRef.current.rotation.x += delta * speed * 0.3 * boost;
-    meshRef.current.rotation.y += delta * speed * 0.2 * boost;
+    meshRef.current.rotation.x += delta * speed * 0.55 * boost;
+    meshRef.current.rotation.y += delta * speed * 0.4 * boost;
 
     // Parallax on mouse
     meshRef.current.position.x =
