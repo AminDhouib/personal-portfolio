@@ -52,6 +52,15 @@
 [data-theme="light"] .logo-tinted {
   filter: none;
 }
+/* Like .logo-tinted but for source images that are white-on-transparent
+   silhouettes (no usable color data). Always renders as a contrast
+   silhouette: white on dark mode, black on light mode. */
+.logo-silhouette {
+  filter: brightness(0) invert(1);
+}
+[data-theme="light"] .logo-silhouette {
+  filter: brightness(0);
+}
 
 /* ── Base styles ─────────────────────────────────────────── */
 body {
