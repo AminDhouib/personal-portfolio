@@ -39,9 +39,11 @@ export function Navbar() {
     () => false
   );
 
-  // Scroll detection for backdrop blur
+  // Scroll detection for backdrop blur. Threshold lifted from 20→64
+  // (one navbar height) so trivial scroll jitter at the very top of the
+  // page doesn't toggle the bg/border on and off.
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => setScrolled(window.scrollY > 64);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -93,9 +95,9 @@ export function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-70 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-70 transition-[background-color,backdrop-filter] duration-500 ease-out ${
         scrolled
-          ? "bg-(--background)/80 backdrop-blur-xl border-b border-(--border)"
+          ? "bg-(--background)/80 backdrop-blur-xl"
           : "bg-transparent"
       }`}
     >
