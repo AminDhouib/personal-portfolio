@@ -710,19 +710,24 @@ button[aria-label="Copy to clipboard"] {
 .ts-perfect-flash { animation: ts-perfect-flash 650ms ease-out; }
 
 /* ── Amin AI chat highlight ──────────────────────────────────── */
-/* CSS-transition based highlight. Box-shadow keyframes don't
-   interpolate alpha-only changes reliably in Chrome — the engine
-   normalizes transparent colors to rgba(0,0,0,0), so a fade between
-   "transparent purple" and "opaque purple" actually fades from
-   "transparent black" instead of showing the purple. A simple
-   transition between two static states avoids that entirely. */
+/* Discrete color classes with a fast transition. JS cycles through
+   them (purple → indigo → blue → pink → off) so we don't rely on
+   CSS animations (those get throttled when the tab is briefly
+   backgrounded, freezing the effect at 0%). */
 .copilotKitWindow {
-  transition: box-shadow 0.45s ease-out;
+  transition: box-shadow 0.18s ease-out;
 }
-.copilotKitWindow.amin-ai-highlight {
-  box-shadow:
-    0 0 0 3px rgb(168, 85, 247),
-    0 0 36px 10px rgba(168, 85, 247, 0.6);
+.copilotKitWindow.amin-ai-hl-purple {
+  box-shadow: 0 0 0 3px rgb(168, 85, 247), 0 0 40px 12px rgba(168, 85, 247, 0.6);
+}
+.copilotKitWindow.amin-ai-hl-indigo {
+  box-shadow: 0 0 0 3px rgb(99, 102, 241), 0 0 40px 12px rgba(99, 102, 241, 0.6);
+}
+.copilotKitWindow.amin-ai-hl-blue {
+  box-shadow: 0 0 0 3px rgb(59, 130, 246), 0 0 40px 12px rgba(59, 130, 246, 0.6);
+}
+.copilotKitWindow.amin-ai-hl-pink {
+  box-shadow: 0 0 0 3px rgb(236, 72, 153), 0 0 40px 12px rgba(236, 72, 153, 0.6);
 }
 
 @import "../components/game/password-game/destruction.css";

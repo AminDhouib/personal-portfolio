@@ -91,22 +91,42 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
   // The navbar "Amin AI" button dispatches this event. CopilotKit manages its
   // own open state internally, so we drive it via DOM.
   // - If chat is closed: click CopilotKit's button to open it.
-  // - If chat is already open: toggle a class for ~700ms; CSS transitions
-  //   handle the fade in and out smoothly.
+  // - If chat is already open: cycle through colored highlight classes
+  //   manually so the effect doesn't depend on CSS animations (which the
+  //   browser throttles when the tab isn't fully visible).
   useEffect(() => {
-    let removeTimer: ReturnType<typeof setTimeout> | null = null;
+    let cycleInterval: ReturnType<typeof setInterval> | null = null;
+    let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
+    const HL_CLASSES = [
+      "amin-ai-hl-purple",
+      "amin-ai-hl-indigo",
+      "amin-ai-hl-blue",
+      "amin-ai-hl-pink",
+    ];
+    const stopCycle = (win: HTMLElement) => {
+      if (cycleInterval) {
+        clearInterval(cycleInterval);
+        cycleInterval = null;
+      }
+      win.classList.remove(...HL_CLASSES);
+    };
     const handler = () => {
       const btn = document.querySelector<HTMLElement>(".copilotKitButton");
       if (!btn) return;
       if (btn.classList.contains("open")) {
         const win = document.querySelector<HTMLElement>(".copilotKitWindow");
         if (!win) return;
-        if (removeTimer) clearTimeout(removeTimer);
-        win.classList.add("amin-ai-highlight");
-        removeTimer = setTimeout(() => {
-          win.classList.remove("amin-ai-highlight");
-          removeTimer = null;
-        }, 700);
+        if (cycleInterval) clearInterval(cycleInterval);
+        if (cleanupTimer) clearTimeout(cleanupTimer);
+        let i = 0;
+        const tick = () => {
+          win.classList.remove(...HL_CLASSES);
+          win.classList.add(HL_CLASSES[i % HL_CLASSES.length]);
+          i++;
+        };
+        tick();
+        cycleInterval = setInterval(tick, 280);
+        cleanupTimer = setTimeout(() => stopCycle(win), 1400);
       } else {
         btn.click();
       }
@@ -114,7 +134,8 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
     window.addEventListener("open-amin-ai-chat", handler);
     return () => {
       window.removeEventListener("open-amin-ai-chat", handler);
-      if (removeTimer) clearTimeout(removeTimer);
+      if (cycleInterval) clearInterval(cycleInterval);
+      if (cleanupTimer) clearTimeout(cleanupTimer);
     };
   }, []);
 
