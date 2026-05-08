@@ -230,17 +230,22 @@ export function Navbar() {
       <AnimatePresence>
         {isHome && mobileOpen && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop — viewport-sized via w-screen/h-screen because the
+                navbar's `backdrop-blur` makes the nav itself a containing
+                block for fixed descendants, which would otherwise clip the
+                backdrop and panel to the navbar's 64px height. */}
             <motion.div
-              className="fixed inset-0 bg-black/60 z-60 md:hidden"
+              className="fixed top-0 left-0 w-screen h-screen bg-black/60 z-60 md:hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
             />
-            {/* Panel */}
+            {/* Panel — h-screen + inline backgroundColor for guaranteed
+                full-height solid fill regardless of containing-block quirks. */}
             <motion.div
-              className="fixed top-0 right-0 h-full w-72 bg-(--background) border-l border-(--border) z-70 md:hidden flex flex-col"
+              className="fixed top-0 right-0 h-screen w-72 border-l border-(--border) z-70 md:hidden flex flex-col"
+              style={{ backgroundColor: "var(--background)" }}
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
