@@ -142,8 +142,8 @@ export function Navbar() {
             )}
           </Link>
 
-          {/* Desktop nav links — only show on homepage */}
-          {isHome && (
+          {/* Desktop nav links — hidden only on /games routes */}
+          {!isGames && (
           <div className="hidden md:flex items-center gap-7">
             {navItems.map((item) => {
               const Icon = NAV_ICONS[item.sectionId];
@@ -185,7 +185,8 @@ export function Navbar() {
                 >
                   {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
                   {item.label}
-                  {activeSection === item.sectionId && (
+                  {((isHome && activeSection === item.sectionId) ||
+                    (!isHome && item.href === pathname)) && (
                     <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent-green rounded-full" />
                   )}
                 </Link>

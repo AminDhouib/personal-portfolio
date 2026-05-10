@@ -26,7 +26,11 @@ const SOURCE_ICON_SLUG: Record<Review["source"], string> = {
 function SourceBadge({ source, link }: { source: Review["source"]; link?: string }) {
   const inner = (
     <span className="inline-flex items-center gap-1.5 text-xs text-(--muted) font-medium">
-      <SiIcon slug={SOURCE_ICON_SLUG[source]} className="h-3.5 w-3.5" />
+      {source === "LinkedIn" ? (
+        <LinkedInIcon className="h-3.5 w-3.5" />
+      ) : (
+        <SiIcon slug={SOURCE_ICON_SLUG[source]} className="h-3.5 w-3.5" />
+      )}
       From {source}
     </span>
   );

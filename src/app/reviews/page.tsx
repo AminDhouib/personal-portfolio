@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Star } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { ReviewsClient } from "./reviews-client";
 import { CALENDLY_URL } from "@/data/nav";
 
@@ -26,25 +26,13 @@ export default function ReviewsPage() {
           Back Home
         </Link>
 
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
-          <div>
-            <h1 className="font-display text-4xl font-black tracking-tight mb-2">
-              Client Reviews
-            </h1>
-            <p className="text-(--muted)">
-              What clients say about working with Amin.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex gap-0.5">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="h-4 w-4 fill-accent-amber text-accent-amber" />
-              ))}
-            </div>
-            <span className="text-sm font-semibold">5.0</span>
-            <span className="text-sm text-(--muted)">· 11 reviews</span>
-          </div>
+        <div className="mb-10">
+          <h1 className="font-display text-4xl font-black tracking-tight mb-2">
+            Client Reviews
+          </h1>
+          <p className="text-(--muted)">
+            What clients say about working with Amin.
+          </p>
         </div>
 
         <ReviewsClient />
