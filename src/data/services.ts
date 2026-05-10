@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Bot, Code2, Cloud, Database, ShieldCheck } from "lucide-react";
+import { Bot, Code2, Cloud, Database, ShieldCheck, TrendingUp } from "lucide-react";
 
 export interface Service {
   title: string;
@@ -44,5 +44,12 @@ export const services: Service[] = [
     tools: ["Burp Suite", "Wireshark", "Tailscale"],
     icon: ShieldCheck,
     accentColor: "var(--color-accent-amber)",
+  },
+  {
+    title: "SEO & Analytics",
+    description: "Rank higher, track what matters",
+    tools: ["Google Analytics", "Google Search Console", "Google Tag Manager", "SEMrush", "Ahrefs", "Hotjar", "Lighthouse"],
+    icon: TrendingUp,
+    accentColor: "var(--color-accent-pink)",
   },
 ];
