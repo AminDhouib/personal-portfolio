@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
-import { useCopilotAction } from "@copilotkit/react-core";
+import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 import { usePathname } from "next/navigation";
@@ -37,7 +37,12 @@ to collect their name and email. Always confirm before submitting.
 
 Keep responses to 2-3 sentences max unless detail is explicitly requested.`;
 
-function ChatActions() {
+function ChatActions({ pathname }: { pathname: string }) {
+  useCopilotReadable({
+    description: "The page the visitor is currently viewing on amindhou.com",
+    value: pathname === "/" ? "homepage (portfolio overview)" : pathname,
+  });
+
   useCopilotAction({
     name: "collectLead",
     description:
@@ -140,10 +145,11 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
   }, []);
 
   const onGames = pathname === "/games" || pathname.startsWith("/games/");
-  if (!enabled || onGames) return null;
+  const onAi = pathname === "/ai" || pathname.startsWith("/ai/");
+  if (!enabled || onGames || onAi) return null;
   return (
     <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
-      <ChatActions />
+      <ChatActions pathname={pathname} />
       <CopilotPopup
         instructions={INSTRUCTIONS}
         labels={{

@@ -3,6 +3,7 @@ import {
   OpenAIAdapter,
   copilotRuntimeNextJSAppRouterEndpoint,
 } from "@copilotkit/runtime";
+import { createOpenAI } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
 
 const runtime = new CopilotRuntime();
@@ -16,19 +17,33 @@ export const POST = async (req: NextRequest) => {
     );
   }
 
+  const adapter = new OpenAIAdapter({
+    openai: {
+      apiKey: openrouterKey,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": "https://amindhou.com",
+        "X-Title": "Amin Dhouib Portfolio",
+      },
+    } as never,
+    model: "openai/gpt-4o-mini",
+  });
+
+  // @ai-sdk/openai v3 defaults to the Responses API which OpenRouter doesn't support.
+  // .chat() explicitly selects the Chat Completions endpoint instead.
+  const openrouter = createOpenAI({
+    apiKey: openrouterKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    headers: {
+      "HTTP-Referer": "https://amindhou.com",
+      "X-Title": "Amin Dhouib Portfolio",
+    },
+  });
+  adapter.getLanguageModel = () => openrouter.chat("openai/gpt-4o-mini");
+
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
     runtime,
-    serviceAdapter: new OpenAIAdapter({
-      openai: {
-        apiKey: openrouterKey,
-        baseURL: "https://openrouter.ai/api/v1",
-        defaultHeaders: {
-          "HTTP-Referer": "https://amindhou.com",
-          "X-Title": "Amin Dhouib Portfolio",
-        },
-      } as never,
-      model: "openai/gpt-4o-mini",
-    }),
+    serviceAdapter: adapter,
     endpoint: "/api/copilotkit",
   });
 
