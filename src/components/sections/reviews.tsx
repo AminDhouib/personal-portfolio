@@ -28,7 +28,6 @@ export function Reviews() {
               key={`${review.name}-${i}`}
               href="/reviews"
               className="shrink-0 w-[340px] rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors block"
-              aria-label={`Read full review by ${review.name}`}
             >
               {/* Stars */}
               <div className="flex gap-0.5 mb-3">

@@ -12,7 +12,7 @@ export function SectionHeading({
   return (
     <div className="flex items-center gap-4 mb-12">
       <span
-        className="font-display text-sm font-bold opacity-60"
+        className="font-display text-sm font-bold"
         style={{ color }}
       >
         {number}

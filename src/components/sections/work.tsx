@@ -130,7 +130,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
           })}
         </div>
 
-        <p className="text-xs text-(--muted)/60 text-center mt-8">
+        <p className="text-xs text-(--muted) text-center mt-8">
           All MAU numbers updated dynamically — last 30 days
         </p>
       </div>
