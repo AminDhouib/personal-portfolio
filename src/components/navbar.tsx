@@ -173,20 +173,23 @@ export function Navbar() {
                   </button>
                 );
               }
+              const resolvedHref = !isHome && item.href.startsWith("#") ? `/${item.href}` : item.href;
+              const isActive = isHome
+                ? activeSection === item.sectionId
+                : resolvedHref === pathname;
               return (
                 <Link
                   key={item.sectionId}
-                  href={item.href}
+                  href={resolvedHref}
                   className={`${sharedClass} ${
-                    activeSection === item.sectionId
+                    isActive
                       ? "text-(--foreground)"
                       : "text-(--muted) hover:text-(--foreground)"
                   }`}
                 >
                   {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
                   {item.label}
-                  {((isHome && activeSection === item.sectionId) ||
-                    (!isHome && item.href === pathname)) && (
+                  {isActive && (
                     <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent-green rounded-full" />
                   )}
                 </Link>
@@ -255,8 +258,8 @@ export function Navbar() {
             )}
 
             {/* Mobile burger */}
-            {/* Mobile burger — only on homepage */}
-            {isHome && (
+            {/* Mobile burger — visible on all non-games pages */}
+            {!isGames && (
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden rounded-lg p-2 text-(--muted) hover:text-(--foreground)"
@@ -275,7 +278,7 @@ export function Navbar() {
 
       {/* Mobile slide-out panel */}
       <AnimatePresence>
-        {isHome && mobileOpen && (
+        {!isGames && mobileOpen && (
           <>
             {/* Backdrop — viewport-sized via w-screen/h-screen because the
                 navbar's `backdrop-blur` makes the nav itself a containing
@@ -345,10 +348,10 @@ export function Navbar() {
                       </button>
                     ) : (
                       <Link
-                        href={item.href}
+                        href={!isHome && item.href.startsWith("#") ? `/${item.href}` : item.href}
                         onClick={() => setMobileOpen(false)}
                         className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
-                          activeSection === item.sectionId
+                          (isHome ? activeSection === item.sectionId : item.href === pathname)
                             ? "bg-accent-green/10 text-accent-green"
                             : "text-(--muted) hover:text-(--foreground) hover:bg-(--surface)"
                         }`}
