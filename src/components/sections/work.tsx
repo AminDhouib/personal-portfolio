@@ -50,6 +50,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                       fill
                       className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
                       sizes="(max-width: 768px) 100vw, 50vw"
+                      priority={i === 0}
                     />
                     <div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-(--card)" />
                   </div>
