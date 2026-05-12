@@ -144,7 +144,7 @@ export function Navbar() {
 
           {/* Desktop nav links — hidden only on /games routes */}
           {!isGames && (
-          <div className="hidden md:flex items-center gap-7">
+          <div className="hidden xl:flex items-center gap-7">
             {navItems.map((item) => {
               const Icon = NAV_ICONS[item.sectionId];
               const sharedClass = `relative flex items-center gap-1.5 text-sm font-medium transition-colors duration-200`;
@@ -262,7 +262,7 @@ export function Navbar() {
             {!isGames && (
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden rounded-lg p-2 text-(--muted) hover:text-(--foreground)"
+              className="xl:hidden rounded-lg p-2 text-(--muted) hover:text-(--foreground)"
               aria-label="Toggle menu"
             >
               {mobileOpen ? (
@@ -285,7 +285,7 @@ export function Navbar() {
                 block for fixed descendants, which would otherwise clip the
                 backdrop and panel to the navbar's 64px height. */}
             <motion.div
-              className="fixed top-0 left-0 w-screen h-screen bg-black/60 z-60 md:hidden"
+              className="fixed top-0 left-0 w-screen h-screen bg-black/60 z-60 xl:hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -294,7 +294,7 @@ export function Navbar() {
             {/* Panel — h-screen + inline backgroundColor for guaranteed
                 full-height solid fill regardless of containing-block quirks. */}
             <motion.div
-              className="fixed top-0 right-0 h-screen w-72 border-l border-(--border) z-70 md:hidden flex flex-col"
+              className="fixed top-0 right-0 h-screen w-72 border-l border-(--border) z-70 xl:hidden flex flex-col"
               style={{ backgroundColor: "var(--background)" }}
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
