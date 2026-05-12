@@ -102,7 +102,7 @@ export function ProofBar() {
     <section ref={ref} className="py-20 border-y border-(--border)">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8"
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}

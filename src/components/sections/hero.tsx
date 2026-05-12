@@ -14,7 +14,7 @@ export function Hero() {
       className="relative min-h-screen flex items-center pt-16 overflow-hidden"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full py-10 sm:py-16 lg:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 lg:gap-12 items-center">
           {/* Left: Text content */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -26,10 +26,10 @@ export function Hero() {
             </p>
 
             <h1 className="font-display mb-6" aria-label="Amin Dhouib">
-              <span aria-hidden="true" className="block text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9]">
+              <span aria-hidden="true" className="block text-6xl sm:text-7xl md:text-6xl lg:text-8xl font-black tracking-tighter leading-[0.9]">
                 AMIN
               </span>
-              <span aria-hidden="true" className="hero-name-suffix block text-6xl sm:text-7xl lg:text-8xl font-extralight tracking-tighter leading-[0.9] mt-2">
+              <span aria-hidden="true" className="hero-name-suffix block text-6xl sm:text-7xl md:text-6xl lg:text-8xl font-extralight tracking-tighter leading-[0.9] mt-2">
                 DHOUIB
               </span>
             </h1>
@@ -81,7 +81,7 @@ export function Hero() {
 
           {/* Right: Profile photo — order-first so it appears above text on mobile */}
           <motion.div
-            className="flex justify-center lg:justify-end order-first lg:order-0"
+            className="flex justify-center md:justify-end order-first md:order-last"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
