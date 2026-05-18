@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { loadProfile, saveProfile, type Profile } from "../profile";
 
 // ---------- arena constants ----------
 const ARENA_W_DESKTOP = 9;
@@ -377,4 +378,74 @@ export function nextId(g: GameRefs): number {
 export function isPowerUpActive(g: GameRefs, t: PowerUpType): boolean {
   const now = performance.now();
   return g.activePowerUps.some((p) => p.type === t && p.expiresAt > now);
+}
+
+// Cached THREE.Color targets per environment (avoids per-frame allocation)
+export const ENV_COLOR_CACHE = new WeakMap<Environment, {
+  fog: THREE.Color;
+  ambient: THREE.Color;
+  asteroidColor: THREE.Color;
+  asteroidEmissive: THREE.Color;
+  starColor: THREE.Color;
+}>();
+
+export function envColors(env: Environment) {
+  let c = ENV_COLOR_CACHE.get(env);
+  if (!c) {
+    c = {
+      fog: new THREE.Color(env.fog),
+      ambient: new THREE.Color(env.ambient),
+      asteroidColor: new THREE.Color(env.asteroidColor),
+      asteroidEmissive: new THREE.Color(env.asteroidEmissive),
+      starColor: new THREE.Color(env.starColor),
+    };
+    ENV_COLOR_CACHE.set(env, c);
+  }
+  return c;
+}
+
+export function activatePowerUp(g: GameRefs, t: PowerUpType): void {
+  const now = performance.now();
+  // Shield duration is upgradable; other power-ups use the base duration.
+  const durationMs = (t === "shield" && g.shieldDurationMs > 0)
+    ? g.shieldDurationMs
+    : POWERUP_DURATION_MS;
+  const expiresAt = now + durationMs;
+  const existing = g.activePowerUps.find((p) => p.type === t);
+  if (existing) {
+    existing.expiresAt = expiresAt;
+  } else {
+    g.activePowerUps.push({ type: t, expiresAt });
+  }
+}
+
+export function tryDash(g: GameRefs, direction: "left" | "right", now: number): boolean {
+  const DASH_WINDOW = 300;
+  const DASH_COOLDOWN = 2000;
+  const DASH_DURATION = 300;
+  const DASH_DISTANCE = 3.0;
+  if (now < g.dash.cooldownUntil) return false;
+  const lastKey: "lastLeftTapAt" | "lastRightTapAt" = direction === "left" ? "lastLeftTapAt" : "lastRightTapAt";
+  const lastTap = g.dash[lastKey];
+  if (now - lastTap <= DASH_WINDOW && lastTap > 0) {
+    g.dash.activeUntil = now + DASH_DURATION;
+    g.dash.direction = direction;
+    g.dash.startedAt = now;
+    g.dash.startX = g.shipX;
+    g.dash.targetX = g.shipX + (direction === "left" ? -DASH_DISTANCE : DASH_DISTANCE);
+    g.dash.cooldownUntil = now + DASH_COOLDOWN;
+    g.invulnUntil = Math.max(g.invulnUntil, g.dash.activeUntil);
+    g.dash.lastLeftTapAt = 0;
+    g.dash.lastRightTapAt = 0;
+    // Lifetime dash counter (additive schema -- stored under (p as any).totalDashes)
+    try {
+      const p = loadProfile();
+      const pp = p as Profile & { totalDashes?: number };
+      pp.totalDashes = (pp.totalDashes ?? 0) + 1;
+      saveProfile(p);
+    } catch { /* noop */ }
+    return true;
+  }
+  g.dash[lastKey] = now;
+  return false;
 }
