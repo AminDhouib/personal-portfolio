@@ -2,9 +2,6 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
-import { formatDate, formatRelativeDate } from "@/lib/date-utils";
-
-export { formatDate, formatRelativeDate };
 
 const BLOG_DIR = path.join(process.cwd(), "content/blog");
 
@@ -18,7 +15,7 @@ export interface BlogPost {
   content: string;
 }
 
-export interface BlogPostMeta extends Omit<BlogPost, "content"> {}
+export type BlogPostMeta = Omit<BlogPost, "content">;
 
 export function getAllBlogSlugs(): string[] {
   if (!fs.existsSync(BLOG_DIR)) return [];

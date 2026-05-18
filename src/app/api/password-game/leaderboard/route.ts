@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { createLeaderboardStore } from "@/lib/leaderboard-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,28 +7,9 @@ export const dynamic = "force-dynamic";
 interface Entry {
   name: string;
   seed: number;
-  time: number;        // seconds
-  rules: number;       // total rules cleared
+  time: number;
+  rules: number;
   createdAt: string;
-}
-
-const DATA_DIR = process.env.PG_LEADERBOARD_DIR ?? path.join(process.cwd(), ".data");
-const FILE = path.join(DATA_DIR, "password-game-leaderboard.json");
-const MAX_ENTRIES = 500;
-const RETURN_LIMIT = 50;
-const NAME_MAX = 16;
-const TIME_MAX = 24 * 3600; // 1 day in seconds — anything over is invalid
-
-async function readAll(): Promise<Entry[]> {
-  try {
-    const buf = await fs.readFile(FILE, "utf-8");
-    const parsed = JSON.parse(buf);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isEntry);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
-    return [];
-  }
 }
 
 function isEntry(x: unknown): x is Entry {
@@ -44,41 +24,30 @@ function isEntry(x: unknown): x is Entry {
   );
 }
 
-async function writeAll(entries: Entry[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const tmp = `${FILE}.tmp-${process.pid}-${nextTmp()}`;
-  await fs.writeFile(tmp, JSON.stringify(entries), "utf-8");
-  await fs.rename(tmp, FILE);
-}
+const store = createLeaderboardStore<Entry>({
+  dataDirEnv: "PG_LEADERBOARD_DIR",
+  fileName: "password-game-leaderboard.json",
+  maxEntries: 500,
+  returnLimit: 50,
+  nameMax: 16,
+  defaultName: "Anonymous",
+  isEntry,
+});
 
-let tmpCounter = 0;
-function nextTmp(): number {
-  tmpCounter = (tmpCounter + 1) % 1_000_000;
-  return tmpCounter;
-}
-
-let writeChain: Promise<unknown> = Promise.resolve();
-function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
-  const next = writeChain.then(fn, fn);
-  writeChain = next.catch(() => undefined);
-  return next;
-}
-
-function sanitizeName(raw: unknown): string {
-  if (typeof raw !== "string") return "Anonymous";
-  const cleaned = raw.replace(/[\u0000-\u001f]/g, "").trim().slice(0, NAME_MAX);
-  return cleaned.length > 0 ? cleaned : "Anonymous";
-}
+const TIME_MAX = 24 * 3600;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const seedParam = searchParams.get("seed");
-  const all = await readAll();
+  const all = await store.readAll();
   const filtered = seedParam != null
     ? all.filter((e) => e.seed === Number(seedParam))
     : all;
   filtered.sort((a, b) => a.time - b.time);
-  return NextResponse.json({ entries: filtered.slice(0, RETURN_LIMIT) });
+  return NextResponse.json(
+    { entries: filtered.slice(0, store.returnLimit) },
+    { headers: { "Cache-Control": "s-maxage=10, stale-while-revalidate=30" } },
+  );
 }
 
 export async function POST(req: Request) {
@@ -107,19 +76,19 @@ export async function POST(req: Request) {
   }
 
   const entry: Entry = {
-    name: sanitizeName(o.name),
+    name: store.sanitizeName(o.name),
     seed,
     time,
     rules,
     createdAt: new Date().toISOString(),
   };
 
-  const rank = await withWriteLock(async () => {
-    const all = await readAll();
+  const rank = await store.withWriteLock(async () => {
+    const all = await store.readAll();
     all.push(entry);
     all.sort((a, b) => a.time - b.time);
-    const trimmed = all.slice(0, MAX_ENTRIES);
-    await writeAll(trimmed);
+    const trimmed = all.slice(0, store.maxEntries);
+    await store.writeAll(trimmed);
     return trimmed.indexOf(entry) + 1;
   });
   return NextResponse.json({ ok: true, rank });

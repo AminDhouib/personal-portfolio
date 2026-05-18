@@ -10,24 +10,9 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "framer-motion";
-import { navItems, CALENDLY_URL, socialLinks } from "@/data/nav";
-import { SiIcon } from "@/components/ui/tech-icon";
+import { navItems, CALENDLY_URL } from "@/data/nav";
+import { SocialLinks } from "@/components/ui/social-links";
 
-function LinkedInIconNav() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
-    </svg>
-  );
-}
-
-function ContraIconNav() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm4.5 16.5a7.44 7.44 0 0 1-5.25 2.25A7.493 7.493 0 0 1 3.75 12a7.493 7.493 0 0 1 7.5-6.75 7.44 7.44 0 0 1 5.25 2.25l-1.5 1.5a5.24 5.24 0 0 0-3.75-1.5A5.244 5.244 0 0 0 6 12.75 5.244 5.244 0 0 0 11.25 18c1.38 0 2.63-.54 3.54-1.41L16.5 16.5z"/>
-    </svg>
-  );
-}
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   hero: Home,
@@ -78,7 +63,8 @@ export function Navbar() {
   // Close the menu automatically on route change so the panel never
   // outlives a navigation (e.g. tapping a link, then using the back button).
   useEffect(() => {
-    setMobileOpen(false);
+    const id = window.setTimeout(() => setMobileOpen(false), 0);
+    return () => window.clearTimeout(id);
   }, [pathname]);
 
   // Scroll-spy with IntersectionObserver
@@ -366,26 +352,7 @@ export function Navbar() {
               </nav>
 
               {/* Social links */}
-              <div className="px-5 pb-3 flex items-center gap-4">
-                {socialLinks.slice(0, 4).map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-(--muted) hover:text-(--foreground) transition-colors"
-                    aria-label={link.name}
-                  >
-                    {link.icon === "linkedin" ? (
-                      <LinkedInIconNav />
-                    ) : link.icon === "contra" ? (
-                      <ContraIconNav />
-                    ) : (
-                      <SiIcon slug={link.icon} className="h-4 w-4" />
-                    )}
-                  </a>
-                ))}
-              </div>
+              <SocialLinks size="h-4 w-4" limit={4} className="px-5 pb-3 flex items-center gap-4" />
 
               {/* CTA */}
               <div className="px-4 pb-8">

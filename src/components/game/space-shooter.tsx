@@ -19,317 +19,47 @@ import {
 import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
 import { PostFx } from "./post-fx";
 import { ACHIEVEMENTS, checkAchievements, grantAchievements, type Achievement } from "./achievements";
+import {
+  type GameStatus, type PowerUpType, type ObstacleVariant, type BulletStyle,
+  type Environment, type PowerUpDef, type Obstacle, type Bullet, type Coin,
+  type Explosion, type SpeedLine, type PowerUp, type ActivePowerUp, type ScorePopup,
+  type Debris, type BossId, type BossPhase, type SubEntity, type BossState,
+  type BossProjectile, type TractorBeam, type BossWallSegment, type GameRefs, type Viewport,
+  ARENA_W, ARENA_H, setArena, SPAWN_Z, DESPAWN_Z, MAX_OBSTACLES, MAX_BULLETS, MAX_POWERUPS,
+  SHIP_RADIUS, POWERUP_PICKUP_RADIUS, POWERUP_DURATION_MS, POWERUP_SPAWN_INTERVAL_MS,
+  START_INVULN_MS, COMBO_WINDOW_MS, NEAR_MISS_RADIUS, NEAR_MISS_POINTS,
+  ENVIRONMENTS, INVERTED_ARMED_ENV, envForTime,
+  POWERUP_DEFS, POWERUP_TYPES,
+  nextId, isPowerUpActive,
+} from "./space-shooter/types";
+import { difficulty, elapsedSeconds, comboMultiplier, comboColor, unlockedVariants } from "./space-shooter/difficulty";
+import { SoundManager, sounds } from "./space-shooter/sound-manager";
+import {
+  spawnIntervalMs, fireIntervalMs, bulletDamage,
+  spawnObstacle, pickWallGapX, spawnWall,
+  spawnCoin, spawnPowerUp, styleForBullet, bulletColor, fireBullets,
+  spawnExplosion, spawnScorePopup, spawnShipDebris,
+} from "./space-shooter/spawning";
+import {
+  mulberry32, buildBossSchedule, BOSS_TIERS, BOSS_BASE_HP, BOSS_DISPLAY_NAMES,
+  normalizeVec3,
+  runWardenBehavior, updateDronesGeneric, runVoidTyrantBehavior,
+  runHarvesterBehavior, runMirrorBehavior, runPulsarBehavior,
+  runSwarmMotherBehavior, runDrifterBehavior, runSentinelBehavior,
+  spawnBoss,
+} from "./space-shooter/boss-behaviors";
 
 // ---------- constants ----------
 
 const HS_KEY = "space-shooter-hs";
 const NAME_KEY = "space-shooter-name";
 const SOUND_KEY = "space-shooter-sound";
-// World-space arena bounds. The visible canvas may be wider, but the ship
-// never gets more sideways room than this — prevents cheating by stretching
-// the browser window to ultrawide.
+
+// World-space arena bounds (mobile vs desktop).
 const ARENA_W_DESKTOP = 9;
 const ARENA_H_DESKTOP = 5.4;
 const ARENA_W_MOBILE = 6.5;
 const ARENA_H_MOBILE = 6.0;
-// Default values used by spawn helpers; overridden per-frame by the runtime
-// based on viewport in runTick.
-let ARENA_W = ARENA_W_DESKTOP;
-let ARENA_H = ARENA_H_DESKTOP;
-function setArena(w: number, h: number) {
-  ARENA_W = w;
-  ARENA_H = h;
-}
-const SPAWN_Z = -42;
-const DESPAWN_Z = 6;
-const MAX_OBSTACLES = 32;
-const MAX_BULLETS = 70;
-const MAX_POWERUPS = 4;
-const SHIP_RADIUS = 0.34;
-const POWERUP_PICKUP_RADIUS = 1.15; // generous — easier to grab on the move
-const POWERUP_DURATION_MS = 8000;
-const POWERUP_SPAWN_INTERVAL_MS = 11000;
-const START_INVULN_MS = 2500;
-const COMBO_WINDOW_MS = 4000; // combo resets if no new kill within this window
-const NEAR_MISS_RADIUS = 1.2; // ship surface + this much = "brushed"
-const NEAR_MISS_POINTS = 15;
-
-// `armed` = scene is alive (ship visible, speed lines flowing) but the run
-// hasn't started — waiting for the player's first mouse/touch/key input.
-type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
-type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp" | "magnet";
-type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter" | "zapper" | "drone";
-type BulletStyle = "sprite" | "bolt" | "plasma";
-
-interface Environment {
-  name: string;
-  fog: string;
-  ambient: string;
-  asteroidColor: string;
-  asteroidEmissive: string;
-  bg: string;
-  starColor: string;
-}
-
-const ENVIRONMENTS: Environment[] = [
-  {
-    name: "Deep Space",
-    fog: "#0a0a1a",
-    ambient: "#202040",
-    asteroidColor: "#a78bfa",
-    asteroidEmissive: "#4c1d95",
-    bg: "radial-gradient(ellipse at center, #0f172a 0%, #020617 70%, #000 100%)",
-    starColor: "#cbd5e1",
-  },
-  {
-    name: "Crimson Nebula",
-    fog: "#3d1d3f",
-    ambient: "#4a1d4a",
-    asteroidColor: "#f0abfc",
-    asteroidEmissive: "#a21caf",
-    bg: "radial-gradient(ellipse at 30% 30%, #4a1d4a 0%, #1e0a2c 60%, #000 100%)",
-    starColor: "#fbcfe8",
-  },
-  {
-    name: "Glacier Belt",
-    fog: "#1a3a4a",
-    ambient: "#3a5a6a",
-    asteroidColor: "#7dd3fc",
-    asteroidEmissive: "#0369a1",
-    bg: "radial-gradient(ellipse at 70% 40%, #0c4a6e 0%, #082f49 60%, #000 100%)",
-    starColor: "#bae6fd",
-  },
-  {
-    name: "Plasma Storm",
-    fog: "#5a2410",
-    ambient: "#5a2a1a",
-    asteroidColor: "#fb923c",
-    asteroidEmissive: "#9a3412",
-    bg: "radial-gradient(ellipse at 50% 60%, #7c2d12 0%, #431407 60%, #000 100%)",
-    starColor: "#fed7aa",
-  },
-];
-
-// Light-mode "armed" palette — inverts the space so the game section doesn't
-// scream DARK MODE on an otherwise light portfolio page. Reverts to the
-// normal dark-space biome once the player starts the run.
-const INVERTED_ARMED_ENV: Environment = {
-  name: "Deep Space",
-  fog: "#e2e8f0",
-  ambient: "#94a3b8",
-  asteroidColor: "#64748b",
-  asteroidEmissive: "#334155",
-  bg: "radial-gradient(ellipse at center, #f8fafc 0%, #e2e8f0 70%, #cbd5e1 100%)",
-  starColor: "#1e293b",
-};
-
-// Switch biome every 35 seconds of play time
-function envForTime(seconds: number): Environment {
-  return ENVIRONMENTS[Math.floor(seconds / 35) % ENVIRONMENTS.length];
-}
-
-interface PowerUpDef {
-  color: string;
-  emissive: string;
-  label: string;
-}
-
-const POWERUP_DEFS: Record<PowerUpType, PowerUpDef> = {
-  shield: { color: "#60a5fa", emissive: "#1e3a8a", label: "Shield" },
-  triple: { color: "#f472b6", emissive: "#9d174d", label: "Triple Shot" },
-  rapid: { color: "#facc15", emissive: "#854d0e", label: "Rapid Fire" },
-  mega: { color: "#a78bfa", emissive: "#4c1d95", label: "Plasma" },
-  warp: { color: "#22d3ee", emissive: "#0e7490", label: "Warp Drive" },
-  magnet: { color: "#10b981", emissive: "#064e3b", label: "Magnet" },
-};
-
-const POWERUP_TYPES: PowerUpType[] = ["shield", "triple", "rapid", "mega", "warp", "magnet"];
-
-// ---------- entity types ----------
-
-interface Obstacle {
-  id: number;
-  variant: ObstacleVariant;
-  x: number; y: number; z: number;
-  rx: number; ry: number; rz: number;
-  rsx: number; rsy: number; rsz: number;
-  vx: number; vy: number; vz: number; // full 3D velocity
-  size: number;
-  hp: number;
-  shape: 0 | 1 | 2;
-  closestApproach: number;  // closest 3D distance the ship came to this obstacle, tracked per-frame
-  brushed: boolean;         // true if the obstacle came within near-miss range but not collision
-  lastShotAt?: number;      // shooter variant: timestamp of last bullet fired at the player
-  lastBeamCycle?: number;   // zapper variant: last cycle index that triggered a muzzle flash
-}
-
-interface Bullet {
-  id: number;
-  x: number; y: number; z: number;
-  vx: number; vy: number; vz: number;
-  size: number;
-  damage: number;
-  color: string;
-  hp: number;
-  style: BulletStyle;
-}
-
-interface Coin {
-  id: number;
-  x: number; y: number; z: number;
-  rx: number; ry: number; rz: number;
-  vx: number; vy: number;   // transverse velocity (magnet pull builds this up)
-  value: number;            // how many coins this token is worth (scales with combo)
-}
-
-interface Explosion {
-  id: number;
-  x: number; y: number; z: number;
-  startedAt: number;
-  color: string;
-  scale: number;
-  opacity: number;
-  duration: number;
-}
-
-interface SpeedLine {
-  x: number; y: number; z: number;
-  length: number;
-  life: number;
-}
-
-interface PowerUp {
-  id: number;
-  type: PowerUpType;
-  x: number; y: number; z: number;
-  rx: number; ry: number; rz: number;
-}
-
-interface ActivePowerUp {
-  type: PowerUpType;
-  expiresAt: number;
-}
-
-// Floating "+N" point label that drifts up from a destroyed asteroid.
-interface ScorePopup {
-  id: number;
-  x: number; y: number; z: number;
-  amount: number;
-  spawnedAt: number;
-  ttl: number;
-}
-
-// Bits of the ship that detach on collision and tumble away.
-interface Debris {
-  id: number;
-  x: number; y: number; z: number;
-  vx: number; vy: number; vz: number;
-  rx: number; ry: number; rz: number;
-  rsx: number; rsy: number; rsz: number;
-  size: [number, number, number];
-  color: string;
-  spawnedAt: number;
-  ttl: number; // ms — fades out and despawns
-}
-
-// ---------- boss system ----------
-
-type BossId =
-  | "sentinel"      // tier 1 @ 1500m
-  | "drifter"       // tier 2 @ 3000m
-  | "swarm-mother"  // tier 3 @ 4500m
-  | "mirror"        // tier 4 @ 6000m
-  | "pulsar"        // tier 5 @ 7500m
-  | "harvester"     // tier 6 @ 9000m
-  | "warden"        // tier 7 @ 11000m
-  | "void-tyrant";  // tier 8 @ 13000m
-
-type BossPhase = "intro" | "fighting" | "dying" | "defeated";
-
-interface SubEntity {
-  type: "drone" | "mine" | "beam-segment";
-  position: [number, number, number];
-  velocity: [number, number, number];
-  hp: number;
-  createdAt: number;
-  ttlMs: number;
-}
-
-interface BossState {
-  id: BossId;
-  tier: number;
-  hp: number;
-  hpMax: number;
-  position: [number, number, number];
-  velocity: [number, number, number];
-  phase: BossPhase;
-  phaseStartAt: number;
-  encounterStartAt: number;
-  lastShotAt: number;
-  patternIndex: number;
-  difficultyMult: number;
-  subEntities: SubEntity[];
-  rng: () => number;
-}
-
-interface BossProjectile {
-  id: number;
-  position: [number, number, number];
-  velocity: [number, number, number];
-  radius: number;
-  color: string;
-  spawnedAt: number;
-  ttlMs: number;
-  homing: boolean;
-  shielded: boolean;
-}
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function buildBossSchedule(): { distance: number; bossId: BossId }[] {
-  return [
-    { distance: 1500,  bossId: "sentinel" },
-    { distance: 3000,  bossId: "drifter" },
-    { distance: 4500,  bossId: "swarm-mother" },
-    { distance: 6000,  bossId: "mirror" },
-    { distance: 7500,  bossId: "pulsar" },
-    { distance: 9000,  bossId: "harvester" },
-    { distance: 11000, bossId: "warden" },
-    { distance: 13000, bossId: "void-tyrant" },
-    { distance: 16000, bossId: "sentinel" },
-    { distance: 19000, bossId: "drifter" },
-    { distance: 22000, bossId: "swarm-mother" },
-  ];
-}
-
-const BOSS_TIERS: Record<BossId, number> = {
-  sentinel: 1, drifter: 2, "swarm-mother": 3, mirror: 4,
-  pulsar: 5, harvester: 6, warden: 7, "void-tyrant": 8,
-};
-
-const BOSS_BASE_HP: Record<BossId, number> = {
-  sentinel: 8, drifter: 12, "swarm-mother": 20, mirror: 18,
-  pulsar: 25, harvester: 30, warden: 40, "void-tyrant": 60,
-};
-
-const BOSS_DISPLAY_NAMES: Record<BossId, string> = {
-  sentinel: "SENTINEL",
-  drifter: "DRIFTER",
-  "swarm-mother": "SWARM MOTHER",
-  mirror: "MIRROR",
-  pulsar: "PULSAR",
-  harvester: "HARVESTER",
-  warden: "WARDEN",
-  "void-tyrant": "VOID TYRANT",
-};
 
 function tryDash(g: GameRefs, direction: "left" | "right", now: number): boolean {
   const DASH_WINDOW = 300;
@@ -362,577 +92,6 @@ function tryDash(g: GameRefs, direction: "left" | "right", now: number): boolean
   return false;
 }
 
-function normalizeVec3(v: [number, number, number]): [number, number, number] {
-  const len = Math.hypot(v[0], v[1], v[2]) || 1;
-  return [v[0] / len, v[1] / len, v[2] / len];
-}
-
-interface TractorBeam {
-  active: boolean;
-  startAt: number;
-  durationMs: number;
-  shipOverlapAccum: number;
-}
-
-interface BossWallSegment {
-  gridIndex: number;
-  position: [number, number, number];
-  velocity: [number, number, number];
-  isGap: boolean;
-  createdAt: number;
-  wallGroupId: number;
-}
-
-function runWardenBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
-  boss.position[0] = 0;
-  boss.position[1] = 4;
-  boss.position[2] = -15;
-  const holder = boss as unknown as { wallSegments?: BossWallSegment[] };
-  if (!holder.wallSegments) holder.wallSegments = [];
-  const segs = holder.wallSegments;
-  const shotInterval = 4000 / boss.difficultyMult;
-  if (now - boss.lastShotAt >= shotInterval) {
-    const wallGroupId = Math.floor(now);
-    const gapIdx = Math.floor(boss.rng() * 5);
-    for (let k = 0; k < 5; k++) {
-      segs.push({
-        gridIndex: k,
-        position: [(k - 2) * 2, 2, -8],
-        velocity: [0, 0, 5],
-        isGap: k === gapIdx,
-        createdAt: now,
-        wallGroupId,
-      });
-    }
-    boss.lastShotAt = now;
-  }
-  for (let i = segs.length - 1; i >= 0; i--) {
-    const s = segs[i];
-    s.position[0] += s.velocity[0] * step;
-    s.position[1] += s.velocity[1] * step;
-    s.position[2] += s.velocity[2] * step;
-    if (!s.isGap) {
-      const dx = g.shipX - s.position[0];
-      const dy = g.shipY - s.position[1];
-      const dz = g.shipZ - s.position[2];
-      const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-      if (now > g.invulnUntil && !shieldedShip &&
-          Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dz) < 1) {
-        g.status = "dying";
-        g.dyingAt = now;
-        g.deathVelX = (dx / (Math.hypot(dx, dy) || 1)) * 7;
-        g.deathVelY = (dy / (Math.hypot(dx, dy) || 1)) * 7 + 3.5;
-        g.deathVelZ = 2.5;
-        g.deathAngVel = (Math.random() - 0.5) * 10;
-        spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 500, 0.45);
-        spawnShipDebris(g);
-        sounds.play("crash");
-        sounds.stopMusic(0.4);
-        sounds.playLosingJingle();
-        s.isGap = true;
-      }
-    }
-    if (s.position[2] > 10) segs.splice(i, 1);
-  }
-}
-
-function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, step: number): void {
-  for (let i = boss.subEntities.length - 1; i >= 0; i--) {
-    const d = boss.subEntities[i];
-    if (d.type !== "drone") continue;
-    const dir = normalizeVec3([
-      g.shipX - d.position[0],
-      g.shipY - d.position[1],
-      g.shipZ - d.position[2],
-    ]);
-    const lerp = 0.05;
-    d.velocity[0] = d.velocity[0] * (1 - lerp) + dir[0] * 3.5 * lerp;
-    d.velocity[1] = d.velocity[1] * (1 - lerp) + dir[1] * 3.5 * lerp;
-    d.velocity[2] = d.velocity[2] * (1 - lerp) + dir[2] * 3.5 * lerp;
-    d.position[0] += d.velocity[0] * step;
-    d.position[1] += d.velocity[1] * step;
-    d.position[2] += d.velocity[2] * step;
-    const sdx = d.position[0] - g.shipX;
-    const sdy = d.position[1] - g.shipY;
-    const sdz = d.position[2] - g.shipZ;
-    const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-    if (now > g.invulnUntil && !shieldedShip &&
-        sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
-      g.status = "dying";
-      g.dyingAt = now;
-      g.deathVelX = -sdx / (Math.hypot(sdx, sdy) || 1) * 7;
-      g.deathVelY = -sdy / (Math.hypot(sdx, sdy) || 1) * 7 + 3.5;
-      g.deathVelZ = 2.5;
-      g.deathAngVel = (Math.random() - 0.5) * 10;
-      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#a855f7", 500, 0.45);
-      spawnShipDebris(g);
-      sounds.play("crash");
-      sounds.stopMusic(0.4);
-      sounds.playLosingJingle();
-      boss.subEntities.splice(i, 1);
-      continue;
-    }
-    if (now - d.createdAt > d.ttlMs || d.position[2] > 10) {
-      boss.subEntities.splice(i, 1);
-    }
-  }
-}
-
-function runVoidTyrantBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
-  boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2.5;
-  boss.position[1] = 3 + Math.cos((now - boss.phaseStartAt) * 0.0004) * 1;
-  boss.position[2] = -16;
-  const hpPct = boss.hp / boss.hpMax;
-  const phase = hpPct > 0.66 ? 1 : hpPct > 0.33 ? 2 : 3;
-  if (phase === 1) {
-    const shotInterval = 1400 / boss.difficultyMult;
-    if (now - boss.lastShotAt >= shotInterval) {
-      for (let k = -1; k <= 1; k++) {
-        const dir = normalizeVec3([
-          g.shipX - boss.position[0] + k * 0.6,
-          g.shipY - boss.position[1],
-          g.shipZ - boss.position[2],
-        ]);
-        g.bossProjectiles.push({
-          id: g.nextBossProjectileId++,
-          position: [boss.position[0], boss.position[1], boss.position[2]],
-          velocity: [dir[0] * 7, dir[1] * 7, dir[2] * 7],
-          radius: 0.32,
-          color: "#a855f7",
-          spawnedAt: now,
-          ttlMs: 5000,
-          homing: true,
-          shielded: false,
-        });
-      }
-      boss.lastShotAt = now;
-    }
-  } else if (phase === 2) {
-    const shotInterval = 2000 / boss.difficultyMult;
-    if (now - boss.lastShotAt >= shotInterval) {
-      const count = 10;
-      for (let k = 0; k < count; k++) {
-        const angle = (k / count) * Math.PI * 2 + boss.patternIndex * 0.12;
-        g.bossProjectiles.push({
-          id: g.nextBossProjectileId++,
-          position: [boss.position[0], boss.position[1], boss.position[2]],
-          velocity: [Math.cos(angle) * 7, Math.sin(angle) * 7, 2],
-          radius: 0.3,
-          color: "#ec4899",
-          spawnedAt: now,
-          ttlMs: 4000,
-          homing: false,
-          shielded: false,
-        });
-      }
-      boss.lastShotAt = now;
-      boss.patternIndex += 1;
-    }
-  } else {
-    const shotInterval = 900 / boss.difficultyMult;
-    if (now - boss.lastShotAt >= shotInterval) {
-      const dir = normalizeVec3([
-        g.shipX - boss.position[0],
-        g.shipY - boss.position[1],
-        g.shipZ - boss.position[2],
-      ]);
-      g.bossProjectiles.push({
-        id: g.nextBossProjectileId++,
-        position: [boss.position[0], boss.position[1], boss.position[2]],
-        velocity: [dir[0] * 9, dir[1] * 9, dir[2] * 9],
-        radius: 0.35,
-        color: "#f59e0b",
-        spawnedAt: now,
-        ttlMs: 5000,
-        homing: true,
-        shielded: false,
-      });
-      for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * Math.PI * 2 + boss.patternIndex * 0.07;
-        g.bossProjectiles.push({
-          id: g.nextBossProjectileId++,
-          position: [boss.position[0], boss.position[1], boss.position[2]],
-          velocity: [Math.cos(a) * 6, Math.sin(a) * 6, 2],
-          radius: 0.28,
-          color: "#fbbf24",
-          spawnedAt: now,
-          ttlMs: 4000,
-          homing: false,
-          shielded: false,
-        });
-      }
-      boss.lastShotAt = now;
-      boss.patternIndex += 1;
-    }
-    const droneCount = boss.subEntities.filter((s) => s.type === "drone").length;
-    if (droneCount < 2) {
-      boss.subEntities.push({
-        type: "drone",
-        position: [boss.position[0], boss.position[1], boss.position[2]],
-        velocity: [(boss.rng() - 0.5) * 3, 0, 3],
-        hp: 1,
-        createdAt: now,
-        ttlMs: 10000,
-      });
-    }
-    updateDronesGeneric(g, boss, now, step);
-  }
-}
-
-function runHarvesterBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
-  boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0004) * 4;
-  boss.position[1] = 5;
-  boss.position[2] = -14;
-  const beamHolder = boss as unknown as { tractorBeam?: TractorBeam };
-  if (!beamHolder.tractorBeam) {
-    beamHolder.tractorBeam = { active: false, startAt: 0, durationMs: 2000, shipOverlapAccum: 0 };
-  }
-  const beam = beamHolder.tractorBeam;
-  const CYCLE_MS = 4000 / boss.difficultyMult;
-  const cycleAge = (now - boss.phaseStartAt) % CYCLE_MS;
-  const deltaMs = step * 1000;
-  if (cycleAge < beam.durationMs) {
-    if (!beam.active) {
-      beam.active = true;
-      beam.startAt = now;
-      beam.shipOverlapAccum = 0;
-    }
-    const dx = g.shipX - boss.position[0];
-    const dz = g.shipZ - boss.position[2];
-    if (Math.abs(dx) < 0.8 && Math.abs(dz) < 2.5) {
-      beam.shipOverlapAccum += deltaMs;
-      if (beam.shipOverlapAccum >= 500) {
-        // Drain coins if available, else score
-        const profile = loadProfile();
-        if (profile.walletCoins >= 20) {
-          spendCoins(20);
-        } else {
-          g.score = Math.max(0, g.score - 50);
-        }
-        beam.shipOverlapAccum = 0;
-      }
-    } else {
-      beam.shipOverlapAccum = Math.max(0, beam.shipOverlapAccum - deltaMs * 0.5);
-    }
-  } else {
-    beam.active = false;
-  }
-}
-
-function runMirrorBehavior(g: GameRefs, boss: BossState, now: number): void {
-  boss.position[0] = -g.shipX;
-  boss.position[1] = g.shipY + 2;
-  boss.position[2] = -16;
-  const shotInterval = 800 / boss.difficultyMult;
-  if (now - boss.lastShotAt >= shotInterval) {
-    const dir = normalizeVec3([
-      g.shipX - boss.position[0],
-      g.shipY - boss.position[1],
-      g.shipZ - boss.position[2],
-    ]);
-    g.bossProjectiles.push({
-      id: g.nextBossProjectileId++,
-      position: [boss.position[0], boss.position[1], boss.position[2]],
-      velocity: [dir[0] * 10, dir[1] * 10, dir[2] * 10],
-      radius: 0.3,
-      color: "#cbd5e1",
-      spawnedAt: now,
-      ttlMs: 3000,
-      homing: false,
-      shielded: false,
-    });
-    boss.lastShotAt = now;
-  }
-}
-
-function runPulsarBehavior(g: GameRefs, boss: BossState, now: number): void {
-  boss.position[0] = 0;
-  boss.position[1] = 3;
-  boss.position[2] = -18;
-  const shotInterval = 3000 / boss.difficultyMult;
-  if (now - boss.lastShotAt >= shotInterval) {
-    const count = 12;
-    for (let k = 0; k < count; k++) {
-      const angle = (k / count) * Math.PI * 2;
-      const offsetAngle = boss.patternIndex * 0.15;
-      const a = angle + offsetAngle;
-      g.bossProjectiles.push({
-        id: g.nextBossProjectileId++,
-        position: [boss.position[0], boss.position[1], boss.position[2]],
-        velocity: [Math.cos(a) * 8, Math.sin(a) * 8, 2],
-        radius: 0.3,
-        color: "#fef08a",
-        spawnedAt: now,
-        ttlMs: 4000,
-        homing: false,
-        shielded: false,
-      });
-    }
-    boss.lastShotAt = now;
-    boss.patternIndex += 1;
-  }
-}
-
-function runSwarmMotherBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
-  boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2;
-  boss.position[1] = 3;
-  boss.position[2] = -14;
-  const droneCount = boss.subEntities.filter((s) => s.type === "drone").length;
-  if (droneCount < 8 && now - boss.lastShotAt >= 1500 / boss.difficultyMult) {
-    for (let k = 0; k < 2; k++) {
-      const offset = (k - 0.5) * 2;
-      boss.subEntities.push({
-        type: "drone",
-        position: [boss.position[0] + offset, boss.position[1], boss.position[2]],
-        velocity: [0, 0, 3.5],
-        hp: 1,
-        createdAt: now,
-        ttlMs: 12000,
-      });
-    }
-    boss.lastShotAt = now;
-  }
-  for (let i = boss.subEntities.length - 1; i >= 0; i--) {
-    const d = boss.subEntities[i];
-    if (d.type !== "drone") continue;
-    const dir = normalizeVec3([
-      g.shipX - d.position[0],
-      g.shipY - d.position[1],
-      g.shipZ - d.position[2],
-    ]);
-    const lerp = 0.05;
-    d.velocity[0] = d.velocity[0] * (1 - lerp) + dir[0] * 3.5 * lerp;
-    d.velocity[1] = d.velocity[1] * (1 - lerp) + dir[1] * 3.5 * lerp;
-    d.velocity[2] = d.velocity[2] * (1 - lerp) + dir[2] * 3.5 * lerp;
-    d.position[0] += d.velocity[0] * step;
-    d.position[1] += d.velocity[1] * step;
-    d.position[2] += d.velocity[2] * step;
-    const sdx = d.position[0] - g.shipX;
-    const sdy = d.position[1] - g.shipY;
-    const sdz = d.position[2] - g.shipZ;
-    const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-    if (now > g.invulnUntil && !shieldedShip &&
-        sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
-      g.status = "dying";
-      g.dyingAt = now;
-      g.deathVelX = -sdx / (Math.hypot(sdx, sdy) || 1) * 7;
-      g.deathVelY = -sdy / (Math.hypot(sdx, sdy) || 1) * 7 + 3.5;
-      g.deathVelZ = 2.5;
-      g.deathAngVel = (Math.random() - 0.5) * 10;
-      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#d946ef", 500, 0.45);
-      spawnShipDebris(g);
-      sounds.play("crash");
-      sounds.stopMusic(0.4);
-      sounds.playLosingJingle();
-      boss.subEntities.splice(i, 1);
-      continue;
-    }
-    if (now - d.createdAt > d.ttlMs || d.position[2] > 10) {
-      boss.subEntities.splice(i, 1);
-    }
-  }
-}
-
-function runDrifterBehavior(g: GameRefs, boss: BossState, now: number): void {
-  const phaseAge = now - boss.phaseStartAt;
-  boss.position[0] = Math.sin(phaseAge * 0.0005) * 4;
-  boss.position[1] = 2 + Math.cos(phaseAge * 0.0008) * 1.5;
-  boss.position[2] = -12;
-  const shotInterval = 2000 / boss.difficultyMult;
-  if (now - boss.lastShotAt >= shotInterval) {
-    for (let k = 0; k < 4; k++) {
-      const angle = (k - 1.5) * 0.35;
-      const dir = normalizeVec3([Math.sin(angle), -0.2, 1]);
-      g.bossProjectiles.push({
-        id: g.nextBossProjectileId++,
-        position: [boss.position[0], boss.position[1] - 0.5, boss.position[2] + 0.5],
-        velocity: [dir[0] * 4, dir[1] * 4, dir[2] * 4],
-        radius: 0.45,
-        color: "#0ea5e9",
-        spawnedAt: now,
-        ttlMs: 5000,
-        homing: true,
-        shielded: false,
-      });
-    }
-    boss.lastShotAt = now;
-  }
-}
-
-function runSentinelBehavior(g: GameRefs, boss: BossState, now: number): void {
-  const phaseAge = now - boss.phaseStartAt;
-  boss.position[0] = Math.sin(phaseAge * 0.0008) * 3.5;
-  const shotInterval = 1200 / boss.difficultyMult;
-  if (now - boss.lastShotAt >= shotInterval) {
-    const angleRad = boss.patternIndex * (Math.PI / 4);
-    const gap = 1.4;
-    const perpX = Math.cos(angleRad);
-    const perpY = Math.sin(angleRad);
-    const dir = normalizeVec3([
-      g.shipX - boss.position[0],
-      g.shipY - boss.position[1],
-      g.shipZ - boss.position[2],
-    ]);
-    const speed = 12;
-    for (let k = -1; k <= 1; k += 2) {
-      g.bossProjectiles.push({
-        id: g.nextBossProjectileId++,
-        position: [
-          boss.position[0] + perpX * gap * k,
-          boss.position[1] + perpY * gap * k,
-          boss.position[2],
-        ],
-        velocity: [dir[0] * speed, dir[1] * speed, dir[2] * speed],
-        radius: 0.35,
-        color: "#ef4444",
-        spawnedAt: now,
-        ttlMs: 4000,
-        homing: false,
-        shielded: true,
-      });
-    }
-    boss.lastShotAt = now;
-    boss.patternIndex = (boss.patternIndex + 1) % 8;
-  }
-}
-
-function spawnBoss(state: GameRefs, bossId: BossId, recycleCount: number): void {
-  const tier = BOSS_TIERS[bossId];
-  const difficultyMult = Math.pow(1.3, recycleCount);
-  const baseHp = BOSS_BASE_HP[bossId];
-  const now = performance.now();
-  const seed = Math.floor(now) ^ (tier * 1_000_003);
-  state.boss = {
-    id: bossId,
-    tier,
-    hp: baseHp * difficultyMult,
-    hpMax: baseHp * difficultyMult,
-    position: [0, 6, -40],
-    velocity: [0, 0, 0.6],
-    phase: "intro",
-    phaseStartAt: now,
-    encounterStartAt: now,
-    lastShotAt: now,
-    patternIndex: 0,
-    difficultyMult,
-    subEntities: [],
-    rng: mulberry32(seed),
-  };
-}
-
-interface GameRefs {
-  status: GameStatus;
-  score: number;
-  kills: number;
-  distance: number;       // units travelled, ~10/sec base
-  combo: number;          // consecutive-kill multiplier (starts at 1)
-  comboLastAt: number;    // performance.now() of last combo increment
-  comboPeak: number;      // highest combo this run (for leaderboard stat)
-  obstacles: Obstacle[];
-  bullets: Bullet[];
-  explosions: Explosion[];
-  speedLines: SpeedLine[];
-  powerUps: PowerUp[];
-  coins: Coin[];
-  coinsThisRun: number;
-  // Ship-derived run modifiers (set at startRun from equipped ship)
-  shipFireRateMul: number;
-  shipDamageMul: number;
-  shipAgilityMul: number;
-  shipCoinMagnetMul: number;
-  shipHullTint: string;
-  shipEngineTint: string;
-  shipDeathFxKind: string | null;
-  shipId: string;
-  startShieldCharges: number;
-  coinBoostMul: number;
-  reviveAvailable: boolean;
-  reviveUsed: boolean;
-  // Player preferences (mirrored from React state for per-frame access)
-  prefs: {
-    reducedMotion: boolean;
-    gyroEnabled: boolean;
-    bloomEnabled: boolean;
-    musicEnabled: boolean;
-    sfxEnabled: boolean;
-  };
-  gyroTilt: { x: number; y: number };
-  // Boss system
-  boss: BossState | null;
-  bossProjectiles: BossProjectile[];
-  bossSchedule: { distance: number; bossId: BossId }[];
-  bossScheduleIdx: number;
-  bossesDefeatedThisRun: number;
-  damageTakenThisRun: number;
-  // Dash
-  dash: {
-    lastLeftTapAt: number;
-    lastRightTapAt: number;
-    activeUntil: number;
-    direction: "left" | "right" | null;
-    cooldownUntil: number;
-    startedAt: number;
-    startX: number;
-    targetX: number;
-  };
-  dashAfterimages: { pos: [number, number, number]; createdAt: number }[];
-  lastAfterimageAt: number;
-  normalSpawningPausedUntil: number;
-  devHotkeyArmed: boolean;
-  nextBossProjectileId: number;
-  lastBossPulseAt: number;
-  // Upgrade-derived run modifiers, set at startRun from profile.ownedUpgrades.
-  coinMagnetExtra: number;    // world units added to coin pickup radius
-  coinValueBonus: number;     // added to each coin's base value
-  scoreMultiplier: number;    // multiplies final score
-  comboWindowMs: number;      // overrides COMBO_WINDOW_MS when > 0
-  shieldDurationMs: number;   // overrides POWERUP_DURATION_MS for shield when > 0
-  activePowerUps: ActivePowerUp[];
-  debris: Debris[];
-  scorePopups: ScorePopup[];
-  targetX: number; targetY: number;
-  shipX: number; shipY: number; shipZ: number;
-  shipRotZ: number;
-  // Death physics
-  deathVelX: number;
-  deathVelY: number;
-  deathVelZ: number;
-  deathAngVel: number;
-  // Smooth biome lerp — current rendered colors interpolate toward env target
-  fogColor: THREE.Color;
-  ambientColor: THREE.Color;
-  asteroidColor: THREE.Color;
-  asteroidEmissive: THREE.Color;
-  starColor: THREE.Color;
-  // Track shield + warp state edges so we can play on/off SFX
-  shieldActiveLast: boolean;
-  warpActiveLast: boolean;
-  // Mobile flag — affects spawn rates / difficulty so the smaller arena
-  // remains playable.
-  isMobile: boolean;
-  // Smooth warp ramp — lerps 0→1 on activation, 1→0 on expiry (deceleration)
-  warpIntensity: number;
-  // Toggle: when true, armed-state colors lerp toward INVERTED_ARMED_ENV
-  // (used on light-themed portfolio to blend with the page).
-  invertedArmed: boolean;
-  // Distance-based biome system (replaces the fixed time-based cycle)
-  currentEnv: Environment;
-  nextBiomeAt: number; // distance in metres at which to swap biomes
-  nextWallAt: number;  // performance.now() timestamp for next wall spawn
-  lastBullet: number;
-  lastSpawn: number;
-  lastPowerUpSpawn: number;
-  lastUiSync: number;
-  nextId: number;
-  startedAt: number;
-  invulnUntil: number;
-  dyingAt: number;
-  shipFallSpeed: number;
-  cameraTargetX: number;
-  cameraTargetY: number;
-  cameraTargetZ: number;
-}
-
 // Random distance until next biome change — keeps transitions unpredictable.
 function pickNextBiomeDistance(currentDist: number): number {
   return currentDist + 700 + Math.random() * 900; // 700–1600m further
@@ -955,6 +114,7 @@ function createRefs(): GameRefs {
   const initEnv = ENVIRONMENTS[0];
   return {
     status: "armed",
+    now: 0,
     score: 0, kills: 0, distance: 0,
     combo: 1, comboLastAt: 0, comboPeak: 1,
     obstacles: [], bullets: [], explosions: [], speedLines: [],
@@ -1099,17 +259,6 @@ function startRun(g: GameRefs): boolean {
   return true;
 }
 
-function nextId(g: GameRefs): number {
-  const id = g.nextId;
-  g.nextId = id + 1;
-  return id;
-}
-
-function isPowerUpActive(g: GameRefs, t: PowerUpType): boolean {
-  const now = performance.now();
-  return g.activePowerUps.some((p) => p.type === t && p.expiresAt > now);
-}
-
 // Cached THREE.Color targets per environment (avoids per-frame allocation)
 const ENV_COLOR_CACHE = new WeakMap<Environment, {
   fog: THREE.Color;
@@ -1149,1361 +298,7 @@ function activatePowerUp(g: GameRefs, t: PowerUpType): void {
   }
 }
 
-// ---------- difficulty ----------
-
-// `difficulty` ramps from 0 to ~1.5 over the first 90 seconds, then keeps
-// growing slowly. Drives spawn rate, asteroid speed, and unlock thresholds.
-function difficulty(g: GameRefs): number {
-  const t = (performance.now() - g.startedAt) / 1000;
-  // Front-load the ramp: fast early climb (0→0.8 in 15s) then shallower ramp
-  // after so skilled players still see gradual escalation into late game.
-  //   t=0:   0.25
-  //   t=10:  0.78
-  //   t=20:  1.07
-  //   t=60:  1.78
-  //   t=180: 2.8
-  const ramp = 0.25 + Math.sqrt(t) * 0.22;
-  const base = Math.min(ramp, 3.0);
-  return g.isMobile ? base * 0.88 : base;
-}
-
-function elapsedSeconds(g: GameRefs): number {
-  return (performance.now() - g.startedAt) / 1000;
-}
-
-function comboMultiplier(combo: number): number {
-  if (combo < 3) return 1;
-  if (combo < 5) return 1.5;
-  if (combo < 10) return 2;
-  if (combo < 20) return 3;
-  if (combo < 40) return 5;
-  return 10;
-}
-
-function comboColor(combo: number): string {
-  if (combo >= 40) return "#f472b6";
-  if (combo >= 20) return "#fb923c";
-  if (combo >= 10) return "#facc15";
-  if (combo >= 5) return "#22d3ee";
-  return "#a3e635";
-}
-
-// NOTE: "wall" is intentionally excluded from this list. Wall pieces are
-// bullet-immune dodge hazards and are only created by spawnWall() as a
-// time-triggered event — never by the random spawn path.
-function unlockedVariants(seconds: number): ObstacleVariant[] {
-  const list: ObstacleVariant[] = ["basic"];
-  if (seconds > 25) list.push("heavy");
-  if (seconds > 50) list.push("speeder");
-  if (seconds > 90) list.push("shooter");
-  if (seconds > 130) list.push("zapper");
-  if (seconds > 170) list.push("drone");
-  return list;
-}
-
-function spawnIntervalMs(g: GameRefs): number {
-  const d = difficulty(g);
-  return Math.max(280, 900 - d * 280);
-}
-
-function fireIntervalMs(g: GameRefs): number {
-  const base = isPowerUpActive(g, "rapid") ? 95 : 220;
-  const d = difficulty(g);
-  return Math.max(70, base - d * 30);
-}
-
-function bulletDamage(g: GameRefs): number {
-  const base = 1 + (isPowerUpActive(g, "mega") ? 3 : 0);
-  return base * g.shipDamageMul;
-}
-
-// ---------- spawning ----------
-
-function spawnObstacle(g: GameRefs): Obstacle {
-  const seconds = elapsedSeconds(g);
-  const variants = unlockedVariants(seconds);
-  const variant = variants[Math.floor(Math.random() * variants.length)];
-
-  // Anti-camp: 35% of asteroids are loosely aimed at the player's wider
-  // neighborhood (±3 X, ±2 Y), 65% uniform across the arena. The wider band
-  // means aim-at-player no longer concentrates on the auto-fire lane so
-  // camping at any single point no longer guarantees clean kills.
-  // Spawn bounds factor in asteroid body radius + a safety margin so no part of
-  // the obstacle ever sits outside the visible arena (especially on narrow mobile
-  // viewports). Aim-at-player offsets also scale to the current arena size.
-  const maxBodyHalf = 0.8;
-  const spawnHalfW = Math.max(0.1, ARENA_W / 2 - maxBodyHalf);
-  const spawnHalfH = Math.max(0.1, ARENA_H / 2 - maxBodyHalf);
-  const aimOffsetX = Math.min(3, spawnHalfW * 1.2);
-  const aimOffsetY = Math.min(2, spawnHalfH * 1.2);
-  const aimAtPlayer = Math.random() < 0.35;
-  let x: number, y: number;
-  if (aimAtPlayer) {
-    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * aimOffsetX * 2, -spawnHalfW, spawnHalfW);
-    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * aimOffsetY * 2, -spawnHalfH, spawnHalfH);
-  } else {
-    x = (Math.random() - 0.5) * 2 * spawnHalfW;
-    y = (Math.random() - 0.5) * 2 * spawnHalfH;
-  }
-
-  const baseSpeed = 9 + difficulty(g) * 4;
-  let size = 0.55 + Math.random() * 0.45;
-  let hp = 1;
-  let speed = baseSpeed;
-
-  if (variant === "heavy") {
-    size = 0.95 + Math.random() * 0.4;
-    hp = 3;
-    speed = baseSpeed * 0.7;
-  } else if (variant === "speeder") {
-    size = 0.4 + Math.random() * 0.2;
-    hp = 1;
-    speed = baseSpeed * 1.6;
-  } else if (variant === "shooter") {
-    size = 0.7 + Math.random() * 0.2;
-    hp = 2;
-    speed = baseSpeed * 0.55; // slow — gives the player time to dodge its shots
-  } else if (variant === "zapper") {
-    size = 0.6 + Math.random() * 0.2;
-    hp = 3;                   // tougher than shooter, incentivizes dodging
-    speed = baseSpeed * 0.6;
-  } else if (variant === "drone") {
-    size = 0.5 + Math.random() * 0.15;
-    hp = 2;
-    speed = baseSpeed * 0.15; // nearly stationary — persistent threat until shot down
-  }
-
-  // ~25% of basic asteroids get a lateral drift so even a stationary player
-  // can't rely on asteroids staying out of their column. Speeders and heavies
-  // stay straight-line — they already have their own identity.
-  let vx = 0;
-  let vy = 0;
-  if (variant === "basic" && Math.random() < 0.25) {
-    // Drift toward the opposite half of the arena so an asteroid spawned on
-    // the left sweeps right and vice versa. 1-2.5 units/sec horizontal,
-    // slight vertical component for visual variety.
-    vx = -Math.sign(x || 1) * (1 + Math.random() * 1.5);
-    vy = (Math.random() - 0.5) * 1.5;
-  }
-
-  return {
-    id: nextId(g),
-    variant,
-    x, y,
-    z: SPAWN_Z - Math.random() * 8,
-    rx: Math.random() * Math.PI,
-    ry: Math.random() * Math.PI,
-    rz: Math.random() * Math.PI,
-    rsx: (Math.random() - 0.5) * 1.8,
-    rsy: (Math.random() - 0.5) * 1.8,
-    rsz: (Math.random() - 0.5) * 1.8,
-    vx, vy, vz: speed,
-    size, hp,
-    shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
-    closestApproach: Infinity,
-    brushed: false,
-  };
-}
-
-// Pick a gap X position for a wall. The gap is placed at least MIN_GAP_DIST
-// units from the player's current X so the player has to physically cross
-// the arena to reach it — breaking the edge-camping strategy.
-function pickWallGapX(playerX: number, arenaW: number): number {
-  const MIN_GAP_DIST = 3;
-  const half = arenaW / 2;
-  // Try candidates; pick the one farthest from the player, subject to the
-  // minimum-distance rule.
-  let best = -playerX; // mirror is usually far; safety fallback below handles center-spawn
-  let bestDist = Math.abs(best - playerX);
-  for (let i = 0; i < 5; i++) {
-    const candidate = (Math.random() - 0.5) * (arenaW - 2);
-    const dist = Math.abs(candidate - playerX);
-    if (dist >= MIN_GAP_DIST && dist > bestDist) {
-      best = candidate;
-      bestDist = dist;
-    }
-  }
-  // Safety: if every candidate failed, step MIN_GAP_DIST away from the player
-  // toward the nearest edge.
-  if (bestDist < MIN_GAP_DIST) {
-    best = playerX > 0 ? playerX - MIN_GAP_DIST : playerX + MIN_GAP_DIST;
-  }
-  // Clamp inside arena so the gap isn't cut off by the edge.
-  return THREE.MathUtils.clamp(best, -half + 1, half - 1);
-}
-
-// Spawn a wall: a line of asteroids across the full arena width at the same
-// Z with a single gap. Forces the player to move into the gap — breaks the
-// "camp at the edge and let auto-fire clear everything" exploit.
-function spawnWall(g: GameRefs) {
-  const WALL_COUNT = 6;           // 6 asteroid slots evenly spaced across ARENA_W
-  const ROWS = 3;                 // 3 stacked rows so the gap is a full-height Y column
-  const gapX = pickWallGapX(g.shipX, ARENA_W);
-  const slotWidth = ARENA_W / WALL_COUNT;
-  const baseSpeed = 10 + difficulty(g) * 3;
-  // Find the single slot index whose center is closest to gapX. Skipping
-  // that one slot across ALL rows means the gap is a vertical column at
-  // that X — the player must traverse to it, they can't dodge by moving
-  // to a corner of the arena.
-  let gapIndex = 0;
-  let gapBestDist = Infinity;
-  for (let i = 0; i < WALL_COUNT; i++) {
-    const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
-    const d = Math.abs(x - gapX);
-    if (d < gapBestDist) { gapBestDist = d; gapIndex = i; }
-  }
-  // Row Y positions span the full arena height: top, middle, bottom.
-  const rowYs = [-ARENA_H / 3, 0, ARENA_H / 3];
-  for (let r = 0; r < ROWS; r++) {
-    for (let i = 0; i < WALL_COUNT; i++) {
-      if (i === gapIndex) continue;
-      const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
-      g.obstacles.push({
-        id: nextId(g),
-        variant: "wall",
-        x,
-        // Small per-piece jitter so the rows don't look like a perfect grid
-        y: rowYs[r] + (Math.random() - 0.5) * 0.4,
-        z: SPAWN_Z - r * 0.3, // minor Z stagger so bullets can pick through row-by-row
-        rx: Math.random() * Math.PI,
-        ry: Math.random() * Math.PI,
-        rz: Math.random() * Math.PI,
-        rsx: (Math.random() - 0.5) * 1.8,
-        rsy: (Math.random() - 0.5) * 1.8,
-        rsz: (Math.random() - 0.5) * 1.8,
-        vx: 0, vy: 0,
-        vz: baseSpeed,
-        size: 0.8,
-        hp: 999, // wall pieces are bullet-immune (variant === "wall" skips
-                 // the collision), so HP is a no-op — high value avoids any
-                 // edge case where despawn logic might read it
-        shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
-        closestApproach: Infinity,
-        brushed: false,
-      });
-    }
-  }
-}
-
-// Coins drop from destroyed asteroids. Value scales with combo so skilled
-// play earns more currency.
-function spawnCoin(g: GameRefs, x: number, y: number, z: number, value: number) {
-  g.coins.push({
-    id: nextId(g),
-    x, y, z,
-    rx: 0, ry: 0, rz: 0,
-    vx: 0, vy: 0,
-    value,
-  });
-}
-
-function spawnPowerUp(g: GameRefs): PowerUp {
-  const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
-  return {
-    id: nextId(g),
-    type,
-    x: (Math.random() - 0.5) * (ARENA_W * 0.7),
-    y: (Math.random() - 0.5) * (ARENA_H * 0.7),
-    z: SPAWN_Z - 4,
-    rx: 0, ry: 0, rz: 0,
-  };
-}
-
-function styleForBullet(g: GameRefs): BulletStyle {
-  if (isPowerUpActive(g, "mega")) return "plasma";
-  if (isPowerUpActive(g, "triple")) return "bolt";
-  return "sprite";
-}
-
-function bulletColor(g: GameRefs): string {
-  if (isPowerUpActive(g, "mega")) return "#a78bfa";
-  if (isPowerUpActive(g, "triple")) return "#f472b6";
-  if (isPowerUpActive(g, "rapid")) return "#22d3ee";
-  return "#fde047";
-}
-
-function fireBullets(g: GameRefs, now: number, sounds: SoundManager) {
-  if (g.bullets.length >= MAX_BULLETS) return;
-  const style = styleForBullet(g);
-  const color = bulletColor(g);
-  const dmg = bulletDamage(g);
-  const baseSize = 0.07;
-  const make = (vx: number, sx: number, sizeMul = 1, hp = 1) => {
-    g.bullets.push({
-      id: nextId(g),
-      x: g.shipX + sx, y: g.shipY + 0.05, z: 1.5,
-      vx, vy: 0, vz: -55,
-      size: baseSize * sizeMul,
-      damage: dmg, color, hp, style,
-    });
-  };
-  if (isPowerUpActive(g, "mega")) {
-    make(0, 0, 2.6, 3);
-  } else if (isPowerUpActive(g, "triple")) {
-    make(0, 0);
-    make(-2.2, -0.32);
-    make(2.2, 0.32);
-  } else {
-    make(0, 0);
-  }
-  g.lastBullet = now;
-  sounds.play("laser");
-}
-
-function spawnExplosion(g: GameRefs, x: number, y: number, z: number, color: string, duration = 600, scale = 0.3) {
-  // Reduced-motion: drop ~80% of small cosmetic sparks (< 400ms duration).
-  // Keep bigger, narratively important bursts (death, boss defeat) untouched.
-  if (g.prefs.reducedMotion && duration < 400 && Math.random() > 0.2) return;
-  g.explosions.push({
-    id: nextId(g), x, y, z,
-    startedAt: performance.now(),
-    color, scale, opacity: 1, duration,
-  });
-}
-
-function spawnScorePopup(g: GameRefs, x: number, y: number, z: number, amount: number) {
-  g.scorePopups.push({
-    id: nextId(g), x, y, z, amount,
-    spawnedAt: performance.now(),
-    ttl: 1100,
-  });
-}
-
-// Spawn the chunks that fly off when the ship is destroyed: two red wing
-// tips and a cyan cockpit shard. Each gets the ship's death impulse plus a
-// random kick so they fan out instead of moving in formation.
-function spawnShipDebris(g: GameRefs) {
-  const baseVx = g.deathVelX;
-  const baseVy = g.deathVelY;
-  const baseVz = g.deathVelZ;
-  const now = performance.now();
-  const make = (
-    offsetX: number, offsetY: number, offsetZ: number,
-    color: string,
-    sx: number, sy: number, sz: number,
-    kickX: number, kickY: number,
-  ) => {
-    g.debris.push({
-      id: nextId(g),
-      x: g.shipX + offsetX,
-      y: g.shipY + offsetY,
-      z: g.shipZ + offsetZ,
-      vx: baseVx + kickX,
-      vy: baseVy + kickY,
-      vz: baseVz * 0.7 + (Math.random() - 0.5) * 2,
-      rx: 0, ry: 0, rz: 0,
-      rsx: (Math.random() - 0.5) * 8,
-      rsy: (Math.random() - 0.5) * 8,
-      rsz: (Math.random() - 0.5) * 8,
-      size: [sx, sy, sz],
-      color,
-      spawnedAt: now,
-      ttl: 1800,
-    });
-  };
-  // Right wing tip (red)
-  make(0.55, -0.03, 0.28, "#dc2626", 0.18, 0.05, 0.16, 4, 1.5);
-  // Left wing tip (red)
-  make(-0.55, -0.03, 0.28, "#dc2626", 0.18, 0.05, 0.16, -4, 1.5);
-  // Cockpit shard (cyan)
-  make(0, 0.1, -0.18, "#22d3ee", 0.16, 0.12, 0.16, (Math.random() - 0.5) * 3, 2.5);
-}
-
-// ---------- sound (Web Audio synth, no asset files) ----------
-
-type SoundType = "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff" | "warp" | "purchase";
-
-class SoundManager {
-  private ctx: AudioContext | null = null;
-  private enabled = false;
-  private sfxEnabled = true;
-  private musicEnabled = true;
-  private lastPlay: Record<SoundType, number> = {
-    laser: 0, boom: 0, chime: 0, crash: 0, shieldOn: 0, shieldOff: 0, warp: 0, purchase: 0,
-  };
-  // Sustained warp whoosh that loops while warp power-up is active
-  private warpLoop: { src: AudioBufferSourceNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode } | null = null;
-  // Music subsystem — only one track at a time, with crossfades.
-  private music: {
-    track: "gameplay" | "leaderboard";
-    masterGain: GainNode;
-    interval: ReturnType<typeof setInterval>;
-    step: number;
-  } | null = null;
-
-  setEnabled(v: boolean) {
-    this.enabled = v;
-    if (v) this.ensure();
-    else {
-      this.stopWarpLoop();
-      this.stopMusic(0);
-    }
-  }
-
-  isEnabled() {
-    return this.enabled;
-  }
-
-  ensure() {
-    if (this.ctx) {
-      if (this.ctx.state === "suspended") this.ctx.resume();
-      return;
-    }
-    try {
-      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.ctx = new Ctor();
-    } catch {
-      this.ctx = null;
-    }
-  }
-
-  setSfxEnabled(v: boolean) { this.sfxEnabled = v; }
-  setMusicEnabled(v: boolean) {
-    this.musicEnabled = v;
-    if (!v) this.stopMusic(0.2);
-  }
-
-  play(type: SoundType) {
-    if (!this.enabled || !this.sfxEnabled) return;
-    this.ensure();
-    if (!this.ctx) return;
-    // throttle laser to avoid clipping when rapid-fire
-    const now = performance.now();
-    if (type === "laser" && now - this.lastPlay.laser < 70) return;
-    this.lastPlay[type] = now;
-    switch (type) {
-      case "laser": this.playLaser(); break;
-      case "boom": this.playBoom(); break;
-      case "chime": this.playChime(); break;
-      case "crash": this.playCrash(); break;
-      case "shieldOn": this.playShieldOn(); break;
-      case "shieldOff": this.playShieldOff(); break;
-      case "warp": this.playWarp(); break;
-      case "purchase": this.playPurchase(); break;
-    }
-  }
-
-  // Cash-register / coin-drop for shop purchases. Bright triplet chime with
-  // a coin "tink" click on top — reads clearly as money-spent feedback.
-  private playPurchase() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const notes = [880, 1174.66, 1567.98]; // A5, D6, G6 — bright rising major
-    notes.forEach((f, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = f;
-      const at = t + i * 0.055;
-      gain.gain.setValueAtTime(0, at);
-      gain.gain.linearRampToValueAtTime(0.1, at + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.22);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(at);
-      osc.stop(at + 0.24);
-    });
-    // Coin "tink" click at the end — short filtered noise burst
-    const noiseDur = 0.06;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * noiseDur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 18);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filt = ctx.createBiquadFilter();
-    filt.type = "bandpass";
-    filt.frequency.value = 4800;
-    filt.Q.value = 12;
-    const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(0.12, t + 0.18);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    src.connect(filt).connect(clickGain).connect(ctx.destination);
-    src.start(t + 0.18);
-  }
-
-  // Biome-change sting — short drum fill + whoosh so the player hears the
-  // transition. Called from runTick when the biome flips.
-  biomeTransition() {
-    if (!this.enabled || !this.musicEnabled) return;
-    this.ensure();
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    // Whoosh: filtered noise sweeping low→high for 0.35s
-    const dur = 0.35;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filt = ctx.createBiquadFilter();
-    filt.type = "bandpass";
-    filt.Q.value = 3;
-    filt.frequency.setValueAtTime(200, t);
-    filt.frequency.exponentialRampToValueAtTime(4000, t + dur);
-    const gn = ctx.createGain();
-    gn.gain.setValueAtTime(0.18, t);
-    gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filt).connect(gn).connect(ctx.destination);
-    src.start(t);
-    // Snare roll: 4 quick noise bursts accelerating into a final accent
-    for (let i = 0; i < 5; i++) {
-      const st = t + 0.05 + i * 0.06;
-      const sd = 0.06;
-      const sb = ctx.createBuffer(1, ctx.sampleRate * sd, ctx.sampleRate);
-      const sdata = sb.getChannelData(0);
-      for (let k = 0; k < sdata.length; k++) sdata[k] = (Math.random() - 0.5) * 2 * Math.exp((-k / sdata.length) * 10);
-      const ss = ctx.createBufferSource();
-      ss.buffer = sb;
-      const sf = ctx.createBiquadFilter();
-      sf.type = "highpass";
-      sf.frequency.value = 2200;
-      const sg = ctx.createGain();
-      sg.gain.setValueAtTime(i === 4 ? 0.35 : 0.14, st);
-      sg.gain.exponentialRampToValueAtTime(0.001, st + sd);
-      ss.connect(sf).connect(sg).connect(ctx.destination);
-      ss.start(st);
-    }
-  }
-
-  // Boss pulse — tier-aware percussion layer stacked on top of gameplay music.
-  // Driven from runTick on a ~700ms cadence. Higher-tier bosses get richer
-  // stacks: low triangle → + tom → + saw-bass stab → + snare crack.
-  bossPulse(tier = 1) {
-    if (!this.enabled || !this.musicEnabled) return;
-    this.ensure();
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    // Layer 1 (all tiers): low triangle thump, pitch scales with tier
-    const baseFreq = 44 + tier * 2.5; // 46.5 → 64 Hz across T1-T8
-    const o1 = ctx.createOscillator();
-    const g1 = ctx.createGain();
-    o1.type = "triangle";
-    o1.frequency.setValueAtTime(baseFreq, t);
-    g1.gain.setValueAtTime(0.0, t);
-    g1.gain.linearRampToValueAtTime(0.22, t + 0.02);
-    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    o1.connect(g1).connect(ctx.destination);
-    o1.start(t);
-    o1.stop(t + 0.45);
-    // Layer 2 (tier 3+): tom hit — descending sine with short envelope
-    if (tier >= 3) {
-      const o2 = ctx.createOscillator();
-      const g2 = ctx.createGain();
-      o2.type = "sine";
-      o2.frequency.setValueAtTime(160, t);
-      o2.frequency.exponentialRampToValueAtTime(80, t + 0.15);
-      g2.gain.setValueAtTime(0.24, t);
-      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      o2.connect(g2).connect(ctx.destination);
-      o2.start(t);
-      o2.stop(t + 0.2);
-    }
-    // Layer 3 (tier 5+): sawtooth bass stab — "heavy machinery" drone
-    if (tier >= 5) {
-      const o3 = ctx.createOscillator();
-      const f3 = ctx.createBiquadFilter();
-      const g3 = ctx.createGain();
-      o3.type = "sawtooth";
-      o3.frequency.value = 55 + tier * 2;
-      f3.type = "lowpass";
-      f3.frequency.setValueAtTime(200, t);
-      f3.frequency.exponentialRampToValueAtTime(800, t + 0.08);
-      g3.gain.setValueAtTime(0.18, t);
-      g3.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-      o3.connect(f3).connect(g3).connect(ctx.destination);
-      o3.start(t);
-      o3.stop(t + 0.28);
-    }
-    // Layer 4 (tier 7+): snare crack — highpass noise burst on top
-    if (tier >= 7) {
-      const dur = 0.1;
-      const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < data.length; i++) {
-        data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 12);
-      }
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      const filt = ctx.createBiquadFilter();
-      filt.type = "highpass";
-      filt.frequency.value = 2000;
-      const gg = ctx.createGain();
-      gg.gain.setValueAtTime(0.3, t);
-      gg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
-      src.connect(filt).connect(gg).connect(ctx.destination);
-      src.start(t);
-    }
-  }
-
-  // Soft sine pulse, easy on the ears since it fires constantly.
-  private playLaser() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(720, t);
-    osc.frequency.exponentialRampToValueAtTime(420, t + 0.06);
-    gain.gain.setValueAtTime(0.025, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.08);
-  }
-
-  // Meteor explosion — three layers stacked for body + crunch + rumble:
-  //  1. Sharp filtered-noise crack (the initial hit, lasts ~0.15s)
-  //  2. Pitched-down sub-bass thump (the deep body, ~0.35s)
-  //  3. Long rumbling debris tail (low-passed noise, ~0.7s) so the explosion
-  //     decays into space rather than ending abruptly.
-  private playBoom() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-
-    // Layer 1: sharp noise crack
-    const crackDur = 0.15;
-    const crackBuf = ctx.createBuffer(1, ctx.sampleRate * crackDur, ctx.sampleRate);
-    const crackData = crackBuf.getChannelData(0);
-    for (let i = 0; i < crackData.length; i++) {
-      const env = Math.exp((-i / crackData.length) * 8);
-      crackData[i] = (Math.random() - 0.5) * 2 * env;
-    }
-    const crackSrc = ctx.createBufferSource();
-    crackSrc.buffer = crackBuf;
-    const crackFilt = ctx.createBiquadFilter();
-    crackFilt.type = "highpass";
-    crackFilt.frequency.value = 1500;
-    const crackGain = ctx.createGain();
-    crackGain.gain.setValueAtTime(0.10, t);
-    crackGain.gain.exponentialRampToValueAtTime(0.001, t + crackDur);
-    crackSrc.connect(crackFilt).connect(crackGain).connect(ctx.destination);
-    crackSrc.start(t);
-
-    // Layer 2: deep sub-bass thump (the "thoom" of the meteor)
-    const sub = ctx.createOscillator();
-    const subGain = ctx.createGain();
-    sub.type = "sine";
-    sub.frequency.setValueAtTime(110, t);
-    sub.frequency.exponentialRampToValueAtTime(28, t + 0.4);
-    subGain.gain.setValueAtTime(0.18, t);
-    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-    sub.connect(subGain).connect(ctx.destination);
-    sub.start(t);
-    sub.stop(t + 0.5);
-
-    // Layer 3: long low-passed rumble tail (debris falling apart)
-    const tailDur = 0.75;
-    const tailBuf = ctx.createBuffer(1, ctx.sampleRate * tailDur, ctx.sampleRate);
-    const tailData = tailBuf.getChannelData(0);
-    for (let i = 0; i < tailData.length; i++) {
-      const env = Math.exp((-i / tailData.length) * 3);
-      const grit = Math.sin(i * 0.012) * 0.3;
-      tailData[i] = ((Math.random() - 0.5) * 2 + grit) * env;
-    }
-    const tailSrc = ctx.createBufferSource();
-    tailSrc.buffer = tailBuf;
-    const tailFilt = ctx.createBiquadFilter();
-    tailFilt.type = "lowpass";
-    tailFilt.frequency.setValueAtTime(700, t);
-    tailFilt.frequency.exponentialRampToValueAtTime(80, t + tailDur);
-    const tailGain = ctx.createGain();
-    tailGain.gain.setValueAtTime(0.15, t + 0.05);
-    tailGain.gain.exponentialRampToValueAtTime(0.001, t + tailDur);
-    tailSrc.connect(tailFilt).connect(tailGain).connect(ctx.destination);
-    tailSrc.start(t);
-  }
-
-  private playChime() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const freqs = [659.25, 987.77]; // E5 + B5
-    for (const f of freqs) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(f, t);
-      gain.gain.setValueAtTime(0.07, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.4);
-    }
-  }
-
-  private playCrash() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * 1.0, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 4);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filt = ctx.createBiquadFilter();
-    filt.type = "lowpass";
-    filt.frequency.setValueAtTime(700, t);
-    filt.frequency.exponentialRampToValueAtTime(80, t + 0.8);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.22, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 1);
-    src.connect(filt).connect(gain).connect(ctx.destination);
-    src.start(t);
-  }
-
-  // Rising sweep — shield activating
-  private playShieldOn() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(220, t);
-    osc.frequency.exponentialRampToValueAtTime(880, t + 0.35);
-    gain.gain.setValueAtTime(0.06, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.42);
-  }
-
-  // Falling sweep — shield depleting
-  private playShieldOff() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, t);
-    osc.frequency.exponentialRampToValueAtTime(180, t + 0.35);
-    gain.gain.setValueAtTime(0.05, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.42);
-  }
-
-  // Warp jump — sharp transient swoosh on activation
-  private playWarp() {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    const dur = 0.55;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 3);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filt = ctx.createBiquadFilter();
-    filt.type = "bandpass";
-    filt.Q.setValueAtTime(8, t);
-    filt.frequency.setValueAtTime(200, t);
-    filt.frequency.exponentialRampToValueAtTime(3000, t + dur);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.16, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filt).connect(gain).connect(ctx.destination);
-    src.start(t);
-  }
-
-  // Looping wind-rushing whoosh that plays for the duration of the warp.
-  // Multi-band: a high screaming whistle layered over deep low-pass roar to
-  // really sell the speed.
-  startWarpLoop() {
-    if (!this.enabled) return;
-    this.ensure();
-    if (!this.ctx) return;
-    this.stopWarpLoop();
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const dur = 1.0;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    // High whistle band — gives the "screaming through space" character
-    const filt = ctx.createBiquadFilter();
-    filt.type = "bandpass";
-    filt.Q.setValueAtTime(4, t);
-    filt.frequency.setValueAtTime(2800, t);
-    // LFO wobbles the bandpass center to create a "rushing" tonality
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 7;
-    lfoGain.gain.value = 1100;
-    lfo.connect(lfoGain).connect(filt.frequency);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.22, t + 0.12);
-    src.connect(filt).connect(gain).connect(ctx.destination);
-    src.start(t);
-    lfo.start(t);
-    this.warpLoop = { src, gain, lfo, lfoGain };
-  }
-
-  stopWarpLoop() {
-    if (!this.warpLoop || !this.ctx) return;
-    const { src, gain, lfo } = this.warpLoop;
-    const t = this.ctx.currentTime;
-    gain.gain.cancelScheduledValues(t);
-    gain.gain.setValueAtTime(gain.gain.value, t);
-    gain.gain.linearRampToValueAtTime(0, t + 0.18);
-    setTimeout(() => {
-      try { src.stop(); } catch { /* ignore */ }
-      try { lfo?.stop(); } catch { /* ignore */ }
-    }, 220);
-    this.warpLoop = null;
-  }
-
-  // -------- Music (procedurally generated, no asset files) --------
-  // Multi-section sequencer with space-themed texture layers:
-  //  - Lead melody with detuned shimmer (chorus effect)
-  //  - Bass pulse
-  //  - Continuous low drone pad (spaceship engine room hum)
-  //  - Periodic scanner pings, radio crackle bursts, deep-space rumbles
-  // Melodies use rests (0 = silent step), wider intervals, and distinctive
-  // motifs so the soundtrack is recognizable rather than generic arpeggios.
-
-  // Synthwave progression in A minor. Each section is a chord region; the arp
-  // runs continuous 16th-notes through the chord tones (the "fast travel" pulse)
-  // while the lead plays sparse spacey melodic phrases on top. 0 = rest.
-  private static GAMEPLAY_SECTIONS: {
-    lead: number[];
-    arp: number[];
-    bass: number[];
-    leadType: OscillatorType;
-  }[] = [
-    // "Hyperdrive" — Am, establish pulse
-    {
-      lead: [440, 0, 659.25, 880, 0, 659.25, 0, 440],
-      arp:  [440, 659.25, 880, 1318.5, 880, 659.25, 523.25, 329.63],
-      bass: [55, 55, 55, 55, 55, 55, 55, 55],
-      leadType: "sawtooth",
-    },
-    // "Event Horizon" — F
-    {
-      lead: [349.23, 0, 523.25, 698.46, 0, 523.25, 0, 349.23],
-      arp:  [349.23, 523.25, 698.46, 1046.5, 698.46, 523.25, 440, 261.63],
-      bass: [43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65],
-      leadType: "sawtooth",
-    },
-    // "Wormhole" — G
-    {
-      lead: [392, 0, 587.33, 784, 0, 587.33, 0, 392],
-      arp:  [392, 587.33, 784, 1174.66, 784, 587.33, 493.88, 293.66],
-      bass: [49, 49, 49, 49, 49, 49, 49, 49],
-      leadType: "sawtooth",
-    },
-    // "Gravity Well" — Em
-    {
-      lead: [329.63, 0, 493.88, 659.25, 0, 493.88, 0, 329.63],
-      arp:  [329.63, 493.88, 659.25, 987.77, 659.25, 493.88, 392, 246.94],
-      bass: [41.2, 41.2, 41.2, 41.2, 41.2, 41.2, 41.2, 41.2],
-      leadType: "sawtooth",
-    },
-    // "Starfield Rush" — C, bright major uplift
-    {
-      lead: [523.25, 0, 784, 1046.5, 0, 784, 0, 523.25],
-      arp:  [523.25, 659.25, 784, 1046.5, 784, 659.25, 523.25, 392],
-      bass: [32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7],
-      leadType: "sawtooth",
-    },
-    // "Reentry" — Dm
-    {
-      lead: [293.66, 0, 440, 587.33, 0, 440, 0, 293.66],
-      arp:  [293.66, 440, 587.33, 880, 587.33, 440, 349.23, 220],
-      bass: [36.71, 36.71, 36.71, 36.71, 36.71, 36.71, 36.71, 36.71],
-      leadType: "sawtooth",
-    },
-    // "Pulsar" — Am climax, lead octave up
-    {
-      lead: [880, 0, 1318.5, 1760, 0, 1318.5, 0, 880],
-      arp:  [880, 1046.5, 1318.5, 1760, 1318.5, 1046.5, 880, 659.25],
-      bass: [55, 55, 65.41, 65.41, 73.42, 73.42, 82.41, 82.41],
-      leadType: "sawtooth",
-    },
-    // "Afterburner" — G → Am resolve
-    {
-      lead: [392, 440, 587.33, 659.25, 784, 880, 1318.5, 880],
-      arp:  [440, 523.25, 659.25, 880, 659.25, 523.25, 440, 329.63],
-      bass: [49, 49, 49, 49, 55, 55, 55, 55],
-      leadType: "sawtooth",
-    },
-  ];
-
-  private static LEADERBOARD_SECTIONS: {
-    lead: number[];
-    arp: number[];
-    bass: number[];
-    leadType: OscillatorType;
-  }[] = [
-    // "Aftermath" — Am, slow synth pad
-    {
-      lead: [440, 0, 0, 659.25, 0, 523.25, 0, 440],
-      arp:  [440, 659.25, 880, 659.25, 0, 523.25, 440, 329.63],
-      bass: [55, 55, 55, 55, 55, 55, 55, 55],
-      leadType: "sawtooth",
-    },
-    // "Memory" — F
-    {
-      lead: [349.23, 0, 0, 523.25, 0, 440, 0, 349.23],
-      arp:  [349.23, 523.25, 698.46, 523.25, 0, 440, 349.23, 261.63],
-      bass: [43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65],
-      leadType: "sawtooth",
-    },
-    // "Stars" — C, bright hopeful
-    {
-      lead: [523.25, 0, 0, 784, 0, 659.25, 0, 523.25],
-      arp:  [523.25, 659.25, 784, 659.25, 0, 523.25, 392, 261.63],
-      bass: [32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7],
-      leadType: "sawtooth",
-    },
-    // "Home" — G → Am resolve
-    {
-      lead: [392, 0, 440, 0, 523.25, 0, 659.25, 440],
-      arp:  [392, 493.88, 587.33, 784, 587.33, 493.88, 392, 293.66],
-      bass: [49, 49, 49, 49, 55, 55, 55, 55],
-      leadType: "sawtooth",
-    },
-  ];
-
-  // Drone pad node — a sustained low hum under the music
-  private dronePad: { osc1: OscillatorNode; osc2: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
-
-  startGameplayMusic() {
-    if (!this.musicEnabled) return;
-    this.startMusicLoop("gameplay", {
-      bpm: 128,
-      sections: SoundManager.GAMEPLAY_SECTIONS,
-      stepsPerSection: 16,
-      masterTarget: 0.085,
-      drums: true,
-      arp: true,
-    });
-  }
-
-  startLeaderboardMusic() {
-    if (!this.musicEnabled) return;
-    this.startMusicLoop("leaderboard", {
-      bpm: 92,
-      sections: SoundManager.LEADERBOARD_SECTIONS,
-      stepsPerSection: 16,
-      masterTarget: 0.09,
-      arp: true,
-    });
-  }
-
-  private startDronePad(masterGain: GainNode) {
-    this.stopDronePad();
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.14, t + 2);
-    gain.connect(masterGain);
-    // Two slightly detuned sines at ~55Hz — creates a warm "ship engine" hum
-    const osc1 = ctx.createOscillator();
-    osc1.type = "sine";
-    osc1.frequency.value = 55;
-    osc1.connect(gain);
-    osc1.start(t);
-    const osc2 = ctx.createOscillator();
-    osc2.type = "sine";
-    osc2.frequency.value = 55.8; // ~25 cents sharp → slow beating chorus
-    osc2.connect(gain);
-    osc2.start(t);
-    // Slow LFO vibrato so the drone breathes
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 0.15; // very slow
-    lfoGain.gain.value = 3;
-    lfo.connect(lfoGain).connect(osc1.frequency);
-    lfo.start(t);
-    this.dronePad = { osc1, osc2, lfo, gain };
-  }
-
-  private stopDronePad() {
-    if (!this.dronePad || !this.ctx) return;
-    const { osc1, osc2, lfo, gain } = this.dronePad;
-    const t = this.ctx.currentTime;
-    gain.gain.cancelScheduledValues(t);
-    gain.gain.setValueAtTime(gain.gain.value, t);
-    gain.gain.linearRampToValueAtTime(0, t + 0.5);
-    setTimeout(() => {
-      try { osc1.stop(); } catch { /* */ }
-      try { osc2.stop(); } catch { /* */ }
-      try { lfo.stop(); } catch { /* */ }
-    }, 600);
-    this.dronePad = null;
-  }
-
-  // Space texture one-shots triggered periodically inside the sequencer.
-  private playScannerPing(dest: AudioNode) {
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(2400, t);
-    osc.frequency.exponentialRampToValueAtTime(1800, t + 0.12);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-    osc.connect(gain).connect(dest);
-    osc.start(t);
-    osc.stop(t + 0.18);
-  }
-
-  private playRadioCrackle(dest: AudioNode) {
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const dur = 0.18;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 5);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filt = ctx.createBiquadFilter();
-    filt.type = "bandpass";
-    filt.frequency.value = 3500;
-    filt.Q.value = 6;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.06, t);
-    src.connect(filt).connect(gain).connect(dest);
-    src.start(t);
-  }
-
-  // Star whoosh — high-to-mid falling saw glide through a bandpass. The
-  // sound of a star flying past the cockpit. Used mid-section to reinforce
-  // the "fast travel" sensation without stepping on the musical groove.
-  private playStarWhoosh(dest: AudioNode) {
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const filt = ctx.createBiquadFilter();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(4200, t);
-    osc.frequency.exponentialRampToValueAtTime(600, t + 0.42);
-    filt.type = "bandpass";
-    filt.Q.value = 8;
-    filt.frequency.setValueAtTime(5000, t);
-    filt.frequency.exponentialRampToValueAtTime(800, t + 0.42);
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.06, t + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-    osc.connect(filt).connect(gain).connect(dest);
-    osc.start(t);
-    osc.stop(t + 0.48);
-  }
-
-  private playDeepRumble(dest: AudioNode) {
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(35, t);
-    osc.frequency.exponentialRampToValueAtTime(22, t + 1.2);
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.2, t + 0.3);
-    gain.gain.linearRampToValueAtTime(0, t + 1.2);
-    osc.connect(gain).connect(dest);
-    osc.start(t);
-    osc.stop(t + 1.3);
-  }
-
-  private startMusicLoop(
-    track: "gameplay" | "leaderboard",
-    cfg: {
-      bpm: number;
-      sections: { lead: number[]; arp: number[]; bass: number[]; leadType: OscillatorType }[];
-      stepsPerSection: number;
-      masterTarget: number;
-      drums?: boolean;
-      arp?: boolean;
-    },
-  ) {
-    if (!this.enabled) return;
-    this.ensure();
-    if (!this.ctx) return;
-    if (this.music?.track === track) return;
-    this.stopMusic(0.6);
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0, t);
-    masterGain.gain.linearRampToValueAtTime(cfg.masterTarget, t + 0.8);
-    masterGain.connect(ctx.destination);
-    // Drone pad underneath — a sustained low hum giving "spaceship interior"
-    this.startDronePad(masterGain);
-    const beatMs = 60000 / cfg.bpm / 2; // 8th notes
-    let step = 0;
-    let sectionIdx = 0;
-    const fire = () => {
-      if (!this.ctx || !this.music || this.music.track !== track) return;
-      const now = this.ctx.currentTime;
-      const sec = cfg.sections[sectionIdx % cfg.sections.length];
-      const sectionStep = step % cfg.stepsPerSection;
-      const leadF = sec.lead[sectionStep % sec.lead.length];
-      const bassF = sec.bass[sectionStep % sec.bass.length];
-      const dur = beatMs / 1000;
-      // Lead — supersaw (3 detuned sawtooths) through a lowpass filter sweep.
-      // Classic synthwave lead: bright attack → mellow tail, detuning gives
-      // the chorus-y "retro-future" width.
-      if (leadF > 0) {
-        const sustain = dur * 1.9;
-        const leadFilt = this.ctx.createBiquadFilter();
-        leadFilt.type = "lowpass";
-        leadFilt.Q.value = 6;
-        leadFilt.frequency.setValueAtTime(Math.min(leadF * 10, 12000), now);
-        leadFilt.frequency.exponentialRampToValueAtTime(Math.max(leadF * 2.2, 600), now + sustain * 0.6);
-        const leadGain = this.ctx.createGain();
-        leadGain.gain.setValueAtTime(0, now);
-        leadGain.gain.linearRampToValueAtTime(0.24, now + 0.01);
-        leadGain.gain.exponentialRampToValueAtTime(0.001, now + sustain * 0.95);
-        leadFilt.connect(leadGain).connect(masterGain);
-        for (const d of [0.9935, 1.0, 1.0065]) {
-          const o = this.ctx.createOscillator();
-          o.type = "sawtooth";
-          o.frequency.value = leadF * d;
-          o.connect(leadFilt);
-          o.start(now);
-          o.stop(now + sustain);
-        }
-        // Octave sparkle on top — the "high-frequency stars" layer
-        const sparkle = this.ctx.createOscillator();
-        const sparkleGain = this.ctx.createGain();
-        sparkle.type = "sine";
-        sparkle.frequency.value = leadF * 2;
-        sparkleGain.gain.setValueAtTime(0.08, now);
-        sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + sustain * 0.7);
-        sparkle.connect(sparkleGain).connect(masterGain);
-        sparkle.start(now);
-        sparkle.stop(now + sustain * 0.75);
-      }
-      // Harmony: every 4th step add a fifth above
-      if (leadF > 0 && step % 4 === 2) {
-        const harmOsc = this.ctx.createOscillator();
-        const harmGain = this.ctx.createGain();
-        harmOsc.type = "sine";
-        harmOsc.frequency.value = leadF * 1.5;
-        harmGain.gain.setValueAtTime(0.10, now);
-        harmGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.6);
-        harmOsc.connect(harmGain).connect(masterGain);
-        harmOsc.start(now);
-        harmOsc.stop(now + dur * 0.7);
-      }
-      // Arpeggio — continuous 16th-note sawtooth blips through the chord
-      // tones. This is the "fast travel through stars" engine of the track:
-      // two arp notes per 8th-step, each a short filtered saw pluck.
-      if (cfg.arp) {
-        const arpLen = sec.arp.length;
-        const playArp = (freq: number, at: number) => {
-          if (freq <= 0 || !this.ctx) return;
-          const o = this.ctx.createOscillator();
-          const g = this.ctx.createGain();
-          const f = this.ctx.createBiquadFilter();
-          o.type = "sawtooth";
-          o.frequency.value = freq;
-          f.type = "lowpass";
-          f.Q.value = 3;
-          f.frequency.setValueAtTime(freq * 6, at);
-          f.frequency.exponentialRampToValueAtTime(Math.max(freq * 2, 500), at + dur * 0.4);
-          g.gain.setValueAtTime(0.13, at);
-          g.gain.exponentialRampToValueAtTime(0.001, at + dur * 0.5);
-          o.connect(f).connect(g).connect(masterGain);
-          o.start(at);
-          o.stop(at + dur * 0.55);
-        };
-        const a1 = sec.arp[(step * 2) % arpLen];
-        const a2 = sec.arp[(step * 2 + 1) % arpLen];
-        playArp(a1, now);
-        playArp(a2, now + dur * 0.5);
-      }
-      // Drums — kick every quarter (4-on-the-floor), snare on backbeat, closed hat every 8th
-      if (cfg.drums) {
-        const isQuarter = step % 4 === 0;
-        const isBackbeat = step % 8 === 4;
-        if (isQuarter) {
-          // Kick: sine 130Hz → 40Hz sweep + short click
-          const k = this.ctx.createOscillator();
-          const kg = this.ctx.createGain();
-          k.type = "sine";
-          k.frequency.setValueAtTime(130, now);
-          k.frequency.exponentialRampToValueAtTime(40, now + 0.12);
-          kg.gain.setValueAtTime(0.55, now);
-          kg.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-          k.connect(kg).connect(masterGain);
-          k.start(now);
-          k.stop(now + 0.22);
-        }
-        if (isBackbeat) {
-          // Snare: short noise burst + highpass
-          const dur2 = 0.11;
-          const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur2, this.ctx.sampleRate);
-          const data = buf.getChannelData(0);
-          for (let i = 0; i < data.length; i++) {
-            data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 10);
-          }
-          const src = this.ctx.createBufferSource();
-          src.buffer = buf;
-          const filt = this.ctx.createBiquadFilter();
-          filt.type = "highpass";
-          filt.frequency.value = 1800;
-          const sg = this.ctx.createGain();
-          sg.gain.setValueAtTime(0.38, now);
-          sg.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-          src.connect(filt).connect(sg).connect(masterGain);
-          src.start(now);
-        }
-        // Closed hi-hat every 8th for motion
-        const hatDur = 0.04;
-        const hatBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * hatDur, this.ctx.sampleRate);
-        const hatData = hatBuf.getChannelData(0);
-        for (let i = 0; i < hatData.length; i++) {
-          hatData[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / hatData.length) * 18);
-        }
-        const hatSrc = this.ctx.createBufferSource();
-        hatSrc.buffer = hatBuf;
-        const hatFilt = this.ctx.createBiquadFilter();
-        hatFilt.type = "highpass";
-        hatFilt.frequency.value = 6500;
-        const hatGain = this.ctx.createGain();
-        // Accent off-beats (odd steps) a bit louder for groove
-        hatGain.gain.setValueAtTime(step % 2 === 1 ? 0.14 : 0.08, now);
-        hatGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-        hatSrc.connect(hatFilt).connect(hatGain).connect(masterGain);
-        hatSrc.start(now);
-      }
-      // Bass — detuned sawtooth pair through a lowpass + a sine sub an octave
-      // below. Quarter notes with a fast-up/slow-down "pumping" envelope that
-      // echoes the synthwave sidechain-duck feel.
-      if (step % 2 === 0 && bassF > 0) {
-        const bassFilt = this.ctx.createBiquadFilter();
-        bassFilt.type = "lowpass";
-        bassFilt.frequency.value = Math.min(bassF * 10, 900);
-        bassFilt.Q.value = 2;
-        const bassGain = this.ctx.createGain();
-        bassGain.gain.setValueAtTime(0.12, now);
-        bassGain.gain.linearRampToValueAtTime(0.5, now + 0.08);
-        bassGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.7);
-        bassFilt.connect(bassGain).connect(masterGain);
-        for (const d of [0.997, 1.003]) {
-          const bo = this.ctx.createOscillator();
-          bo.type = "sawtooth";
-          bo.frequency.value = bassF * d;
-          bo.connect(bassFilt);
-          bo.start(now);
-          bo.stop(now + dur * 1.8);
-        }
-        // Sub-octave sine for weight
-        const sub = this.ctx.createOscillator();
-        const subGain = this.ctx.createGain();
-        sub.type = "sine";
-        sub.frequency.value = bassF * 0.5;
-        subGain.gain.setValueAtTime(0.3, now);
-        subGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 1.6);
-        sub.connect(subGain).connect(masterGain);
-        sub.start(now);
-        sub.stop(now + dur * 1.7);
-      }
-      // ---- Space texture events (periodic) ----
-      // Scanner ping every ~4s (every section start)
-      if (step > 0 && step % cfg.stepsPerSection === 0) {
-        this.playScannerPing(masterGain);
-      }
-      // Star whoosh mid-section — "flying past stars" reinforcement
-      if (step > 0 && step % cfg.stepsPerSection === Math.floor(cfg.stepsPerSection / 2)) {
-        this.playStarWhoosh(masterGain);
-      }
-      // Radio crackle burst every ~8s
-      if (step > 0 && step % (cfg.stepsPerSection * 2) === 8) {
-        this.playRadioCrackle(masterGain);
-      }
-      // Deep-space rumble every ~16s
-      if (step > 0 && step % (cfg.stepsPerSection * 4) === 0) {
-        this.playDeepRumble(masterGain);
-      }
-      step++;
-      // Advance section every N steps so the progression evolves
-      if (step % cfg.stepsPerSection === 0) sectionIdx++;
-    };
-    const interval = setInterval(fire, beatMs);
-    this.music = { track, masterGain, interval, step: 0 };
-    fire();
-  }
-
-  // Crossfade the current music out over `fadeSec` seconds (default 0.5).
-  stopMusic(fadeSec = 0.5) {
-    this.stopDronePad();
-    if (!this.music || !this.ctx) {
-      this.music = null;
-      return;
-    }
-    const { masterGain, interval } = this.music;
-    clearInterval(interval);
-    const t = this.ctx.currentTime;
-    masterGain.gain.cancelScheduledValues(t);
-    masterGain.gain.setValueAtTime(masterGain.gain.value, t);
-    masterGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
-    const g = masterGain;
-    setTimeout(() => {
-      try { g.disconnect(); } catch { /* ignore */ }
-    }, Math.max(40, fadeSec * 1000 + 60));
-    this.music = null;
-  }
-
-  // Short descending three-note jingle on death.
-  playLosingJingle() {
-    if (!this.enabled) return;
-    this.ensure();
-    if (!this.ctx) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const notes = [493.88, 392.00, 311.13]; // B4 → G4 → D#4 (sad descent)
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = freq;
-      const start = t + i * 0.18;
-      gain.gain.setValueAtTime(0.12, start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.35);
-    });
-  }
-  destroy() {
-    this.stopWarpLoop();
-    this.stopMusic(0);
-    if (this.ctx) {
-      try { this.ctx.close(); } catch { /* ignore */ }
-      this.ctx = null;
-    }
-    this.enabled = false;
-  }
-}
-
-// Module-level singleton — survives React StrictMode double-mounts
-const sounds = new SoundManager();
-
 // ---------- game tick ----------
-
-interface Viewport { width: number; height: number }
 
 function runTick(
   g: GameRefs,
@@ -2513,6 +308,7 @@ function runTick(
   onUiSync: () => void,
 ) {
   const now = performance.now();
+  g.now = now;
   const step = Math.min(dt, 0.05);
 
   // Sync world arena dimensions to the visible viewport but cap at the
@@ -3953,10 +1749,11 @@ function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tic
 
 function DashAfterimages({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
   const list = gameRefs.current?.dashAfterimages ?? [];
+  const now = gameRefs.current?.now ?? 0;
   return (
     <group>
       {list.map((a, i) => {
-        const age = performance.now() - a.createdAt;
+        const age = now - a.createdAt;
         const fade = Math.max(0, 1 - age / 400);
         return (
           <mesh key={`ai-${i}-${a.createdAt}`} position={a.pos}>
@@ -5130,9 +2927,35 @@ interface UiState {
   comboPeak: number;
   coinsThisRun: number;
   active: { type: PowerUpType; remainingMs: number }[];
+  objectCounts: {
+    obstacles: number;
+    bossProjectiles: number;
+    explosions: number;
+  };
+  dashCooldown: {
+    pct: number;
+    onCooldown: boolean;
+  };
+  boss: {
+    id: BossId;
+    phase: BossPhase;
+    hpPct: number;
+    hasDrone: boolean;
+  } | null;
+  bossesDefeatedThisRun: number;
 }
 
 type CelebrationKind = "personal" | "world" | null;
+
+const DEFAULT_SPACE_SHOOTER_PREFS = {
+  reducedMotion: false,
+  gyroEnabled: false,
+  bloomEnabled: true,
+  musicEnabled: true,
+  sfxEnabled: true,
+};
+
+type SpaceShooterPrefs = typeof DEFAULT_SPACE_SHOOTER_PREFS;
 
 // Deterministic confetti pieces — angle + distance per piece, no Math.random
 // during render (would trip react-hooks/purity).
@@ -5151,11 +2974,103 @@ function buildConfetti(count: number, dist: number) {
   });
 }
 
+function createInitialUiState(): UiState {
+  return {
+    status: "armed",
+    score: 0,
+    seconds: 0,
+    kills: 0,
+    distance: 0,
+    combo: 1,
+    comboPeak: 1,
+    coinsThisRun: 0,
+    active: [],
+    objectCounts: { obstacles: 0, bossProjectiles: 0, explosions: 0 },
+    dashCooldown: { pct: 1, onCooldown: false },
+    boss: null,
+    bossesDefeatedThisRun: 0,
+  };
+}
+
+function createUiStateFromGame(g: GameRefs, now: number): UiState {
+  let seconds = 0;
+  if (g.startedAt > 0) {
+    if (g.status === "dying" || g.status === "dead") {
+      seconds = ((g.dyingAt || now) - g.startedAt) / 1000;
+    } else {
+      seconds = (now - g.startedAt) / 1000;
+    }
+  }
+
+  const onCooldown = now < g.dash.cooldownUntil;
+  const boss = g.boss;
+
+  return {
+    status: g.status,
+    score: Math.floor(g.score),
+    seconds,
+    kills: g.kills,
+    distance: Math.floor(g.distance),
+    combo: g.combo,
+    comboPeak: g.comboPeak,
+    coinsThisRun: g.coinsThisRun,
+    active: g.activePowerUps.map((p) => ({ type: p.type, remainingMs: Math.max(0, p.expiresAt - now) })),
+    objectCounts: {
+      obstacles: g.obstacles.length,
+      bossProjectiles: g.bossProjectiles.length,
+      explosions: g.explosions.length,
+    },
+    dashCooldown: {
+      pct: onCooldown ? Math.max(0, 1 - (g.dash.cooldownUntil - now) / 2000) : 1,
+      onCooldown,
+    },
+    boss: boss
+      ? {
+          id: boss.id,
+          phase: boss.phase,
+          hpPct: Math.max(0, (boss.hp / boss.hpMax) * 100),
+          hasDrone: boss.subEntities.some((s) => s.type === "drone"),
+        }
+      : null,
+    bossesDefeatedThisRun: g.bossesDefeatedThisRun,
+  };
+}
+
+function loadInitialPrefs(): SpaceShooterPrefs {
+  const prefs: SpaceShooterPrefs = { ...DEFAULT_SPACE_SHOOTER_PREFS };
+
+  try {
+    const profile = loadProfile();
+    if (profile.preferences) {
+      return { ...prefs, ...profile.preferences };
+    }
+
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem("orbital-dodge-prefs");
+      if (raw) return { ...prefs, ...(JSON.parse(raw) as Partial<SpaceShooterPrefs>) };
+
+      const osReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      if (osReduced) return { ...prefs, reducedMotion: true };
+    }
+  } catch {
+    // Keep defaults when profile/localStorage is unavailable.
+  }
+
+  return prefs;
+}
+
+function detectGyroSupported() {
+  if (typeof window === "undefined") return false;
+  const hasOrientation = "DeviceOrientationEvent" in window;
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  return hasOrientation && isMobile;
+}
+
 export function SpaceShooterGame() {
   const gameRefs = useRef<GameRefs>(createRefs());
   const containerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
-  const [ui, setUi] = useState<UiState>({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, coinsThisRun: 0, active: [] });
+  const [ui, setUi] = useState<UiState>(createInitialUiState);
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
   const [region, setRegion] = useState<string>("");
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
@@ -5183,13 +3098,7 @@ export function SpaceShooterGame() {
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [shopTab, setShopTab] = useState<"upgrades" | "consumables" | "ships" | "cosmetics" | "missions" | "achievements">("upgrades");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [prefs, setPrefs] = useState({
-    reducedMotion: false,
-    gyroEnabled: false,
-    bloomEnabled: true,
-    musicEnabled: true,
-    sfxEnabled: true,
-  });
+  const [prefs, setPrefs] = useState<SpaceShooterPrefs>(loadInitialPrefs);
   const [achievementToasts, setAchievementToasts] = useState<(Achievement & { firedAt: number })[]>([]);
   useEffect(() => {
     if (achievementToasts.length === 0) return;
@@ -5254,14 +3163,8 @@ export function SpaceShooterGame() {
     ctx.fillText("amindhouib.ca/games", w / 2, 580);
     return new Promise((resolve) => outCanvas.toBlob((b) => resolve(b), "image/png"));
   }, []);
-  const [gyroSupported, setGyroSupported] = useState(false);
+  const [gyroSupported] = useState(detectGyroSupported);
   const [gyroPermission, setGyroPermission] = useState<"unknown" | "granted" | "denied">("unknown");
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const hasOrientation = "DeviceOrientationEvent" in window;
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    setGyroSupported(hasOrientation && isMobile);
-  }, []);
   const requestGyroPermission = useCallback(async (): Promise<boolean> => {
     const DOE = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
     if (DOE && typeof DOE.requestPermission === "function") {
@@ -5297,28 +3200,6 @@ export function SpaceShooterGame() {
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
   const isReturningPlayer = profile.firstRunCompleted;
   // Tutorial removed — players learn the game by playing it.
-  // Load player prefs from profile (or localStorage fallback)
-  useEffect(() => {
-    try {
-      const p = loadProfile();
-      let loaded = false;
-      if (p.preferences) {
-        setPrefs((prev) => ({ ...prev, ...p.preferences }));
-        loaded = true;
-      } else {
-        const raw = localStorage.getItem("orbital-dodge-prefs");
-        if (raw) {
-          setPrefs((prev) => ({ ...prev, ...JSON.parse(raw) }));
-          loaded = true;
-        }
-      }
-      // First-load OS hint: respect prefers-reduced-motion if no saved prefs yet
-      if (!loaded && typeof window !== "undefined") {
-        const osReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-        if (osReduced) setPrefs((prev) => ({ ...prev, reducedMotion: true }));
-      }
-    } catch { /* noop */ }
-  }, []);
   // Save on change + mirror to gameRefs for per-frame access
   useEffect(() => {
     try {
@@ -5333,14 +3214,14 @@ export function SpaceShooterGame() {
   // Persist "first boss seen" flag when boss enters fighting phase
   useEffect(() => {
     if (firstBossSeen) return;
-    const b = gameRefs.current.boss;
-    if (b && b.phase === "fighting") {
+    if (ui.boss?.phase === "fighting") {
       try {
         window.localStorage.setItem("orbital-dodge-first-boss-seen", "1");
       } catch { /* noop */ }
-      setFirstBossSeen(true);
+      const id = window.setTimeout(() => setFirstBossSeen(true), 0);
+      return () => window.clearTimeout(id);
     }
-  }, [tick, firstBossSeen]);
+  }, [ui.boss?.phase, firstBossSeen]);
   const buyUpgrade = useCallback((id: string) => {
     const def = upgradeById(id as "coin-magnet" | "coin-value" | "score-multiplier" | "combo-window" | "shield-duration");
     if (!def) return;
@@ -5406,16 +3287,20 @@ export function SpaceShooterGame() {
   // Auto-stop recording when the player dies
   useEffect(() => {
     if (ui.status === "dying" && isRecording) {
-      stopRecording();
+      const id = window.setTimeout(() => stopRecording(), 0);
+      return () => window.clearTimeout(id);
     }
   }, [ui.status, isRecording, stopRecording]);
   // Shop + settings must never cover active gameplay. Close when status leaves
   // armed/dead so a menu opened on idle doesn't linger into a run.
   useEffect(() => {
     if (ui.status === "playing" || ui.status === "dying") {
-      if (shopOpen) setShopOpen(false);
-      if (settingsOpen) setSettingsOpen(false);
-      if (achievementsOpen) setAchievementsOpen(false);
+      const id = window.setTimeout(() => {
+        if (shopOpen) setShopOpen(false);
+        if (settingsOpen) setSettingsOpen(false);
+        if (achievementsOpen) setAchievementsOpen(false);
+      }, 0);
+      return () => window.clearTimeout(id);
     }
   }, [ui.status, shopOpen, settingsOpen, achievementsOpen]);
   // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
@@ -5459,25 +3344,7 @@ export function SpaceShooterGame() {
   const onUiSync = useCallback(() => {
     const g = gameRefs.current;
     const now = performance.now();
-    let seconds = 0;
-    if (g.startedAt > 0) {
-      if (g.status === "dying" || g.status === "dead") {
-        seconds = ((g.dyingAt || now) - g.startedAt) / 1000;
-      } else {
-        seconds = (now - g.startedAt) / 1000;
-      }
-    }
-    setUi({
-      status: g.status,
-      score: Math.floor(g.score),
-      seconds,
-      kills: g.kills,
-      distance: Math.floor(g.distance),
-      combo: g.combo,
-      comboPeak: g.comboPeak,
-      coinsThisRun: g.coinsThisRun,
-      active: g.activePowerUps.map((p) => ({ type: p.type, remainingMs: Math.max(0, p.expiresAt - now) })),
-    });
+    setUi(createUiStateFromGame(g, now));
     setTick((t) => (t + 1) % 1_000_000);
   }, []);
 
@@ -5611,7 +3478,7 @@ export function SpaceShooterGame() {
     g.cameraTargetX = 0;
     g.cameraTargetY = 0;
     g.cameraTargetZ = 5;
-    setUi({ status: "armed", score: 0, seconds: 0, kills: 0, distance: 0, combo: 1, comboPeak: 1, coinsThisRun: 0, active: [] });
+    setUi(createInitialUiState());
     setSubmitted(false);
     setCelebration(null);
     setShowInstructions(true);
@@ -6321,28 +4188,22 @@ export function SpaceShooterGame() {
         {/* Dev-only FPS + object counts */}
         {process.env.NODE_ENV !== "production" && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/60 text-[10px] font-mono text-white z-30 rounded">
-            {devFps} fps · obs {gameRefs.current.obstacles.length} · proj {gameRefs.current.bossProjectiles.length} · exp {gameRefs.current.explosions.length}
+            {devFps} fps · obs {ui.objectCounts.obstacles} · proj {ui.objectCounts.bossProjectiles} · exp {ui.objectCounts.explosions}
           </div>
         )}
 
         {/* Dash cooldown indicator (playing only) */}
-        {ui.status === "playing" && (() => {
-          const now = performance.now();
-          const cd = gameRefs.current.dash.cooldownUntil;
-          const onCd = now < cd;
-          const pct = onCd ? Math.max(0, 1 - (cd - now) / 2000) : 1;
-          return (
-            <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20 pointer-events-none">
-              <div className="text-[10px] tracking-[0.2em] text-slate-400">DASH</div>
-              <div className="w-16 h-1.5 bg-black/40 rounded overflow-hidden">
-                <div
-                  className={`h-full transition-[width] duration-100 ${onCd ? "bg-slate-400" : "bg-cyan-400"}`}
-                  style={{ width: `${pct * 100}%` }}
-                />
-              </div>
+        {ui.status === "playing" && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20 pointer-events-none">
+            <div className="text-[10px] tracking-[0.2em] text-slate-400">DASH</div>
+            <div className="w-16 h-1.5 bg-black/40 rounded overflow-hidden">
+              <div
+                className={`h-full transition-[width] duration-100 ${ui.dashCooldown.onCooldown ? "bg-slate-400" : "bg-cyan-400"}`}
+                style={{ width: `${ui.dashCooldown.pct * 100}%` }}
+              />
             </div>
-          );
-        })()}
+          </div>
+        )}
 
         {/* Record toggle (armed only) */}
         {ui.status === "armed" && (
@@ -6420,11 +4281,11 @@ export function SpaceShooterGame() {
         )}
 
         {/* Boss intro banner */}
-        {gameRefs.current.boss && gameRefs.current.boss.phase === "intro" && (
+        {ui.boss?.phase === "intro" && (
           <div className="absolute inset-x-0 top-[18%] flex flex-col items-center pointer-events-none z-30">
             <div className="text-xs tracking-[0.4em] text-red-400 animate-pulse">INCOMING</div>
             <div className="text-3xl sm:text-5xl font-black text-white drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">
-              {BOSS_DISPLAY_NAMES[gameRefs.current.boss.id]}
+              {BOSS_DISPLAY_NAMES[ui.boss.id]}
             </div>
             {!firstBossSeen && (
               <div className="mt-2 text-xs text-slate-300 max-w-xs text-center">
@@ -6434,19 +4295,19 @@ export function SpaceShooterGame() {
           </div>
         )}
         {/* Boss HP bar */}
-        {gameRefs.current.boss && gameRefs.current.boss.phase === "fighting" && (
+        {ui.boss?.phase === "fighting" && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none z-30">
             <div className="text-[10px] tracking-[0.3em] text-red-300">
-              {BOSS_DISPLAY_NAMES[gameRefs.current.boss.id]}
+              {BOSS_DISPLAY_NAMES[ui.boss.id]}
             </div>
             <div className="w-48 sm:w-64 h-2 bg-black/60 border border-red-500/50 overflow-hidden rounded-sm">
               <div
                 className="h-full bg-linear-to-r from-red-600 to-red-400 transition-[width] duration-100"
-                style={{ width: `${Math.max(0, (gameRefs.current.boss.hp / gameRefs.current.boss.hpMax) * 100)}%` }}
+                style={{ width: `${ui.boss.hpPct}%` }}
               />
             </div>
-            {gameRefs.current.boss.id === "swarm-mother" &&
-              gameRefs.current.boss.subEntities.some((s) => s.type === "drone") && (
+            {ui.boss.id === "swarm-mother" &&
+              ui.boss.hasDrone && (
                 <div className="text-[10px] tracking-[0.3em] text-fuchsia-300 animate-pulse">
                   CLEAR DRONES
                 </div>
@@ -6618,10 +4479,10 @@ export function SpaceShooterGame() {
                     <div className="font-mono text-white tabular-nums" style={{ color: comboColor(ui.comboPeak) }}>{"\u00d7"}{ui.comboPeak}</div>
                   </div>
                 </div>
-                {gameRefs.current.bossesDefeatedThisRun > 0 && (
+                {ui.bossesDefeatedThisRun > 0 && (
                   <div className="mt-2 flex items-center justify-center gap-1.5 text-red-300 font-mono text-sm">
                     <span>Bosses Defeated:</span>
-                    <span className="text-white font-bold">{gameRefs.current.bossesDefeatedThisRun}</span>
+                    <span className="text-white font-bold">{ui.bossesDefeatedThisRun}</span>
                   </div>
                 )}
               </motion.div>
