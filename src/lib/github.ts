@@ -1,5 +1,6 @@
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const BASE = "https://api.github.com";
+const GITHUB_REVALIDATE_SECONDS = 86400;
 
 function ghFetch(path: string) {
   return fetch(`${BASE}${path}`, {
@@ -7,7 +8,7 @@ function ghFetch(path: string) {
       Accept: "application/vnd.github+json",
       ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
     },
-    next: { revalidate: 3600 }, // Cache 1h
+    next: { revalidate: GITHUB_REVALIDATE_SECONDS },
   });
 }
 
@@ -28,7 +29,8 @@ export async function fetchRepoStats(
       forks_count: number;
     };
     return { stars: data.stargazers_count, forks: data.forks_count };
-  } catch {
+  } catch (err) {
+    console.warn(`[github] fetchRepoStats ${owner}/${repo} failed:`, err);
     return { stars: 0, forks: 0 };
   }
 }
@@ -70,7 +72,7 @@ export async function fetchContributionGraph(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query, variables: { login: username } }),
-      next: { revalidate: 3600 },
+      next: { revalidate: GITHUB_REVALIDATE_SECONDS },
     });
 
     if (!res.ok) return [];
@@ -114,7 +116,8 @@ export async function fetchContributionGraph(
       }
     }
     return days;
-  } catch {
+  } catch (err) {
+    console.warn(`[github] fetchContributionGraph failed:`, err);
     return [];
   }
 }

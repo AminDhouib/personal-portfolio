@@ -9,7 +9,7 @@ export interface Service {
   accentColor: string;
 }
 
-export const services: Service[] = [
+export const services: readonly Service[] = Object.freeze([
   {
     title: "AI Automation",
     description: "Web scraping, AI agents, orchestration",
@@ -52,4 +52,4 @@ export const services: Service[] = [
     icon: TrendingUp,
     accentColor: "var(--color-accent-pink)",
   },
-];
+]);

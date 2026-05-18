@@ -5,7 +5,7 @@ export interface NavItem {
   isAI?: boolean;
 }
 
-export const navItems: NavItem[] = [
+export const navItems: readonly NavItem[] = Object.freeze([
   { label: "Home", href: "#hero", sectionId: "hero" },
   { label: "Work", href: "#work", sectionId: "work" },
   { label: "Services", href: "#services", sectionId: "services" },
@@ -17,11 +17,11 @@ export const navItems: NavItem[] = [
   // section while you scroll past it.
   { label: "Games", href: "/games", sectionId: "game" },
   { label: "Amin AI", href: "/ai", sectionId: "ai", isAI: true },
-];
+]);
 
 export const CALENDLY_URL = "https://calendly.com/amindhouib";
 
-export const socialLinks = [
+export const socialLinks = Object.freeze([
   {
     name: "GitHub",
     icon: "github",
@@ -47,4 +47,4 @@ export const socialLinks = [
     icon: "instagram",
     url: "https://instagram.com/amin-dhou",
   },
-];
+]);

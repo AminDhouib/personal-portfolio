@@ -28,7 +28,7 @@ export interface Platform {
   url: string;
 }
 
-export const projects: Project[] = [
+export const projects: readonly Project[] = Object.freeze([
   {
     slug: "shorty",
     name: "Shorty",
@@ -224,4 +224,4 @@ export const projects: Project[] = [
       "Built on Next.js with Prisma for the data layer. Currently at 500 MAU with steady growth from B2B referrals.",
     ],
   },
-];
+]);

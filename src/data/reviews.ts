@@ -18,7 +18,7 @@ const googleReviewsLink =
 const linkedinRecommendations =
   "https://www.linkedin.com/in/amin-dhouib/details/recommendations/";
 
-export const reviews: Review[] = [
+export const reviews: readonly Review[] = Object.freeze([
   {
     name: "Allison Gaddy",
     position: "Founding Partner & CEO",
@@ -173,4 +173,4 @@ export const reviews: Review[] = [
     source: "LinkedIn",
     link: linkedinRecommendations,
   },
-];
+]);
