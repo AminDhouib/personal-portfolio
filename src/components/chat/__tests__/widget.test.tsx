@@ -1,6 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
+
+const { mockUsePathname } = vi.hoisted(() => ({
+  mockUsePathname: vi.fn(() => '/'),
+}))
+
+vi.mock('next/navigation', () => ({
+  usePathname: mockUsePathname,
+}))
+
+vi.mock('next/dynamic', () => ({
+  default: () =>
+    function DynamicChatPanel({
+      pathname,
+      initiallyOpen,
+      openSignal,
+    }: {
+      pathname: string
+      initiallyOpen?: boolean
+      openSignal?: number
+    }) {
+      return (
+        <div
+          data-testid="lazy-panel"
+          data-pathname={pathname}
+          data-initially-open={String(Boolean(initiallyOpen))}
+          data-open-signal={String(openSignal)}
+        />
+      )
+    },
+}))
 
 // Mock bare CSS import — vitest has no CSS transform
 vi.mock('@copilotkit/react-ui/styles.css', () => ({}))
@@ -17,6 +47,7 @@ vi.mock('@copilotkit/react-core', () => ({
   useCopilotAction: vi.fn((action: Record<string, unknown>) => {
     capturedAction = action
   }),
+  useCopilotReadable: vi.fn(),
 }))
 
 vi.mock('@copilotkit/react-ui', () => ({
@@ -33,16 +64,18 @@ vi.mock('@copilotkit/react-ui', () => ({
       <span data-testid="popup-placeholder">{labels.placeholder}</span>
     </div>
   ),
+  useCopilotChatSuggestions: vi.fn(),
 }))
 
 import { ChatWidget } from '../widget'
+import { ChatWidgetPanel } from '../widget-panel'
 
-describe('ChatWidget', () => {
+describe('ChatWidget shell', () => {
   beforeEach(() => {
     capturedAction = null
+    mockUsePathname.mockReturnValue('/')
+    vi.clearAllMocks()
   })
-
-  // --- Visibility ---
 
   it('renders nothing when enabled is undefined', () => {
     const { container } = render(<ChatWidget />)
@@ -54,15 +87,46 @@ describe('ChatWidget', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders CopilotKit when enabled={true}', () => {
+  it('renders a lightweight launcher instead of CopilotKit before opening', () => {
     render(<ChatWidget enabled />)
-    expect(screen.getByTestId('copilotkit')).toBeDefined()
+    expect(screen.getByRole('button', { name: /open amin ai chat/i })).toBeDefined()
+    expect(screen.queryByTestId('copilotkit')).toBeNull()
+    expect(screen.queryByTestId('lazy-panel')).toBeNull()
+  })
+
+  it('does not render on game routes', () => {
+    mockUsePathname.mockReturnValue('/games/space-shooter')
+    const { container } = render(<ChatWidget enabled />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('loads the panel when the launcher is clicked', () => {
+    render(<ChatWidget enabled />)
+    fireEvent.click(screen.getByRole('button', { name: /open amin ai chat/i }))
+    expect(screen.getByTestId('lazy-panel').getAttribute('data-pathname')).toBe('/')
+    expect(screen.getByTestId('lazy-panel').getAttribute('data-initially-open')).toBe('true')
+  })
+
+  it('loads the panel when the navbar event is dispatched', async () => {
+    render(<ChatWidget enabled />)
+    window.dispatchEvent(new CustomEvent('open-amin-ai-chat'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('lazy-panel').getAttribute('data-open-signal')).toBe('1')
+    })
+  })
+})
+
+describe('ChatWidgetPanel', () => {
+  beforeEach(() => {
+    capturedAction = null
+    vi.clearAllMocks()
   })
 
   // --- CopilotKit provider ---
 
   it('passes runtimeUrl="/api/copilotkit" to CopilotKit', () => {
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     expect(screen.getByTestId('copilotkit').getAttribute('data-runtime-url')).toBe(
       '/api/copilotkit',
     )
@@ -70,40 +134,40 @@ describe('ChatWidget', () => {
 
   // --- CopilotPopup labels ---
 
-  it('renders CopilotPopup with title "Ask Amin\'s AI"', () => {
-    render(<ChatWidget enabled />)
-    expect(screen.getByTestId('popup-title').textContent).toBe("Ask Amin's AI")
+  it('renders CopilotPopup with title "Amin AI"', () => {
+    render(<ChatWidgetPanel pathname="/" />)
+    expect(screen.getByTestId('popup-title').textContent).toBe('Amin AI')
   })
 
   it('renders CopilotPopup with correct placeholder', () => {
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     expect(screen.getByTestId('popup-placeholder').textContent).toBe(
       "Ask about Amin's projects, skills...",
     )
   })
 
   it('renders CopilotPopup with correct initial greeting', () => {
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const initial = screen.getByTestId('popup-initial').textContent ?? ''
     expect(initial).toMatch(/Hi!/)
     expect(initial).toMatch(/Ask me anything/)
   })
 
-  it('renders CopilotPopup with defaultOpen=false', () => {
-    render(<ChatWidget enabled />)
-    expect(screen.getByTestId('copilot-popup').getAttribute('data-default-open')).toBe('false')
+  it('passes initiallyOpen through to CopilotPopup defaultOpen', () => {
+    render(<ChatWidgetPanel pathname="/" initiallyOpen />)
+    expect(screen.getByTestId('copilot-popup').getAttribute('data-default-open')).toBe('true')
   })
 
   // --- collectLead action registration ---
 
   it('registers a useCopilotAction with name "collectLead"', () => {
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     expect(capturedAction).not.toBeNull()
     expect(capturedAction!.name).toBe('collectLead')
   })
 
   it('collectLead has required "name" and "email" parameters', () => {
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const params = capturedAction!.parameters as Array<{ name: string; required?: boolean }>
     const nameParam = params.find((p) => p.name === 'name')
     const emailParam = params.find((p) => p.name === 'email')
@@ -112,7 +176,7 @@ describe('ChatWidget', () => {
   })
 
   it('collectLead has optional "note" parameter', () => {
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const params = capturedAction!.parameters as Array<{ name: string; required?: boolean }>
     const noteParam = params.find((p) => p.name === 'note')
     expect(noteParam).toBeDefined()
@@ -125,7 +189,7 @@ describe('ChatWidget', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(null, { status: 200 }),
     )
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const handler = capturedAction!.handler as (args: {
       name: string
       email: string
@@ -149,7 +213,7 @@ describe('ChatWidget', () => {
 
   it('handler returns success string when response is ok', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }))
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const handler = capturedAction!.handler as (args: {
       name: string
       email: string
@@ -163,7 +227,7 @@ describe('ChatWidget', () => {
 
   it('handler returns fallback string when response is not ok', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 500 }))
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const handler = capturedAction!.handler as (args: {
       name: string
       email: string
@@ -178,7 +242,7 @@ describe('ChatWidget', () => {
 
   it('handler returns fallback string when fetch throws', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network error'))
-    render(<ChatWidget enabled />)
+    render(<ChatWidgetPanel pathname="/" />)
     const handler = capturedAction!.handler as (args: {
       name: string
       email: string
