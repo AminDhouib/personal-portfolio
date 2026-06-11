@@ -32,7 +32,7 @@ describe("selectRulesForRun", () => {
 });
 
 function state(password: string, rules: ReturnType<typeof selectRulesForRun>): GameState {
-  return { password, elapsedSeconds: 0, activeRuleIndex: 0, rules, seed: 1 };
+  return { password, formatting: [], elapsedSeconds: 0, activeRuleIndex: 0, rules, seed: 1 };
 }
 
 describe("computeActiveRuleIndex", () => {
