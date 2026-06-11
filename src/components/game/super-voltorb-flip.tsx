@@ -438,23 +438,19 @@ function cloneGame(g: VoltorbFlip): VoltorbFlip {
 // src/hooks/useGame.tsx (1:1, with cloneGame replacing lodash's cloneDeep).
 // ---------------------------------------------------------------------------
 
-const useGame = () => {
-  const [size, setSize] = useState(5);
-  const [game, setGame] = useState<VoltorbFlip>();
+function initialGameSize() {
+  // `?size=N` (N in 2..10) creates a non-default board for layout testing.
+  // Game logic is scaled proportionally but authored for 5x5 — use at your
+  // own risk for "real" play.
+  if (typeof window === "undefined") return 5;
+  const q = new URLSearchParams(window.location.search).get("size");
+  const n = q ? parseInt(q, 10) : NaN;
+  return Number.isFinite(n) && n >= 2 && n <= 10 ? n : 5;
+}
 
-  useEffect(() => {
-    // `?size=N` (N in 2..7) creates a non-default board for layout testing.
-    // Game logic is scaled proportionally but authored for 5x5 — use at your
-    // own risk for "real" play.
-    let s = 5;
-    if (typeof window !== "undefined") {
-      const q = new URLSearchParams(window.location.search).get("size");
-      const n = q ? parseInt(q, 10) : NaN;
-      if (Number.isFinite(n) && n >= 2 && n <= 10) s = n;
-    }
-    setSize(s);
-    setGame(new VoltorbFlip(s));
-  }, []);
+const useGame = () => {
+  const [size, setSize] = useState(initialGameSize);
+  const [game, setGame] = useState<VoltorbFlip>(() => new VoltorbFlip(size));
 
   function updateGame(callback: (game: VoltorbFlip) => void): void {
     if (!game) return;
@@ -1977,12 +1973,21 @@ export function SuperVoltorbFlipGame() {
     const targetCurrent = game.currentScore;
     const targetTotal = game.totalScore;
 
-    if (displayTotal !== targetTotal) setDisplayTotal(targetTotal);
+    const scheduled: number[] = [];
+    const schedule = (fn: () => void) => {
+      scheduled.push(window.setTimeout(fn, 0));
+    };
+
+    if (displayTotal !== targetTotal) {
+      schedule(() => setDisplayTotal(targetTotal));
+    }
 
     if (displayCurrent >= targetCurrent) {
       tallyStepRef.current = 0;
-      if (displayCurrent !== targetCurrent) setDisplayCurrent(targetCurrent);
-      return;
+      if (displayCurrent !== targetCurrent) {
+        schedule(() => setDisplayCurrent(targetCurrent));
+      }
+      return () => scheduled.forEach((id) => window.clearTimeout(id));
     }
 
     // Stride scales with the rollup target (matches the drain formula),
@@ -1998,6 +2003,7 @@ export function SuperVoltorbFlipGame() {
     }, 17);
 
     return () => {
+      scheduled.forEach((id) => window.clearTimeout(id));
       if (tallyTimerRef.current) {
         window.clearTimeout(tallyTimerRef.current);
         tallyTimerRef.current = null;
@@ -2026,12 +2032,18 @@ export function SuperVoltorbFlipGame() {
   useEffect(() => {
     if (!game) return;
     const status = game.gameStatus;
+    let syncLevelTimer: number | null = null;
+
     if (status === "playing" || status === "memo") {
       if (displayLevel !== game.currentLevel) {
-        setDisplayLevel(game.currentLevel);
+        syncLevelTimer = window.setTimeout(() => setDisplayLevel(game.currentLevel), 0);
       }
     }
     prevLevelRef.current = game.currentLevel;
+
+    return () => {
+      if (syncLevelTimer) window.clearTimeout(syncLevelTimer);
+    };
   }, [game?.currentLevel, game?.gameStatus, displayLevel]);
 
   const triggerLevelTransition = useCallback(
@@ -2164,6 +2176,8 @@ export function SuperVoltorbFlipGame() {
     if (!game) return;
     const prev = prevGameStatusRef.current;
     const cur = game.gameStatus;
+    let clearMemoTimer: number | null = null;
+
     if (cur === "lose" && prev !== "lose") {
       // Fade the loop fast, then the game_over jingle plays over the reveal.
       fadeOutMusic(350);
@@ -2177,7 +2191,7 @@ export function SuperVoltorbFlipGame() {
       fadeOutMusic(250);
     }
     if ((prev === "win" || prev === "lose") && cur === "playing") {
-      clearMemoFlags();
+      clearMemoTimer = window.setTimeout(() => clearMemoFlags(), 0);
       stopGameOver();
       stopLevelWin();
       if (!muted) {
@@ -2186,7 +2200,11 @@ export function SuperVoltorbFlipGame() {
       }
     }
     prevGameStatusRef.current = cur;
-  }, [game?.gameStatus, muted]);
+
+    return () => {
+      if (clearMemoTimer) window.clearTimeout(clearMemoTimer);
+    };
+  }, [game?.gameStatus, muted, clearMemoFlags]);
 
   function handleFirstInteraction() {
     if (!musicStartedRef.current && !muted) {

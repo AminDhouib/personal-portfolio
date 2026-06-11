@@ -31,6 +31,11 @@ const CANVAS_HEIGHT = 420;
 const PLAYER_X = 120;
 const HS_KEY = "geometric_flow_hs";
 
+function readHighScore() {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(HS_KEY) ?? "0");
+}
+
 function drawWireframeCircle(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -125,22 +130,21 @@ function drawPlayerTriangle(
 
 export function GeometricFlowGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [uiState, setUiState] = useState<GameState>(() => ({
+    state: "idle",
+    score: 0,
+    highScore: readHighScore(),
+  }));
   const stateRef = useRef<GameState>({
     state: "idle",
     score: 0,
-    highScore: 0,
+    highScore: uiState.highScore,
   });
   const playerRef = useRef<Player>({ lane: 1, x: PLAYER_X, y: 0, targetY: 0, pulsePhase: 0 });
   const shapesRef = useRef<Shape[]>([]);
   const frameRef = useRef<number>(0);
   const lastSpawnRef = useRef<number>(0);
   const speedMultiplierRef = useRef<number>(1);
-  const [uiState, setUiState] = useState<GameState>({
-    state: "idle",
-    score: 0,
-    highScore: 0,
-  });
-
   const getLaneY = useCallback((canvas: HTMLCanvasElement, lane: number) => {
     const padding = 80;
     const usable = canvas.height - padding * 2;
@@ -194,104 +198,6 @@ export function GeometricFlowGame() {
     p.lane = (p.lane + 1) % LANES;
     p.targetY = getLaneY(canvas, p.lane);
   }, [getLaneY, resetGame]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const hs = parseInt(localStorage.getItem(HS_KEY) ?? "0");
-    stateRef.current.highScore = hs;
-    playerRef.current.y = getLaneY(canvas, 1);
-    playerRef.current.targetY = getLaneY(canvas, 1);
-    playerRef.current.x = PLAYER_X;
-    setUiState((s) => ({ ...s, highScore: hs }));
-
-    let lastTime = 0;
-
-    function gameLoop(timestamp: number) {
-      const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
-      lastTime = timestamp;
-      const gs = stateRef.current;
-      const p = playerRef.current;
-
-      // Clear
-      ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
-
-      if (gs.state === "idle") {
-        drawIdle(ctx!, canvas!);
-      } else if (gs.state === "playing") {
-        // Score
-        gs.score += dt * 10;
-        speedMultiplierRef.current = 1 + gs.score * 0.0015;
-
-        // Spawn
-        const spawnInterval = Math.max(0.6, 1.4 - gs.score * 0.005);
-        if (timestamp - lastSpawnRef.current > spawnInterval * 1000) {
-          spawnShape(canvas!);
-          lastSpawnRef.current = timestamp;
-        }
-
-        // Move player
-        p.y += (p.targetY - p.y) * 12 * dt;
-        p.pulsePhase += dt * 3;
-
-        // Move shapes
-        for (let i = shapesRef.current.length - 1; i >= 0; i--) {
-          const s = shapesRef.current[i];
-          s.x -= s.speed * dt;
-          s.rotation += s.rotationSpeed * dt;
-          if (s.x < -100) {
-            shapesRef.current.splice(i, 1);
-          }
-        }
-
-        // Collision detection
-        const playerSize = 14;
-        for (const s of shapesRef.current) {
-          const dx = p.x - s.x;
-          const dy = p.y - s.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < playerSize + s.size * 0.65) {
-            gs.state = "dead";
-            if (gs.score > gs.highScore) {
-              gs.highScore = gs.score;
-              localStorage.setItem(HS_KEY, String(Math.floor(gs.score)));
-            }
-            setUiState({ ...gs });
-            break;
-          }
-        }
-
-        // Draw lane guides
-        drawLaneGuides(ctx!, canvas!);
-
-        // Draw shapes
-        for (const s of shapesRef.current) {
-          const shapeColor = "rgba(99,102,241,0.6)";
-          if (s.type === "circle")
-            drawWireframeCircle(ctx!, s.x, s.y, s.size, shapeColor);
-          else if (s.type === "triangle")
-            drawWireframeTriangle(ctx!, s.x, s.y, s.size, s.rotation, shapeColor);
-          else drawWireframeDiamond(ctx!, s.x, s.y, s.size, s.rotation, shapeColor);
-        }
-
-        // Draw player
-        drawPlayerTriangle(ctx!, p.x, p.y, 14, p.pulsePhase);
-
-        // Draw HUD
-        drawHUD(ctx!, canvas!, gs);
-      } else if (gs.state === "dead") {
-        drawDeadScreen(ctx!, canvas!, gs);
-      }
-
-      frameRef.current = requestAnimationFrame(gameLoop);
-    }
-
-    frameRef.current = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [getLaneY, spawnShape]);
 
   // Helpers
   function drawIdle(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
@@ -387,6 +293,101 @@ export function GeometricFlowGame() {
     ctx.fillText("TAP TO RESTART", canvas.width / 2, canvas.height / 2 + 32);
     ctx.textAlign = "left";
   }
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    playerRef.current.y = getLaneY(canvas, 1);
+    playerRef.current.targetY = getLaneY(canvas, 1);
+    playerRef.current.x = PLAYER_X;
+
+    let lastTime = 0;
+
+    function gameLoop(timestamp: number) {
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+      lastTime = timestamp;
+      const gs = stateRef.current;
+      const p = playerRef.current;
+
+      // Clear
+      ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
+
+      if (gs.state === "idle") {
+        drawIdle(ctx!, canvas!);
+      } else if (gs.state === "playing") {
+        // Score
+        gs.score += dt * 10;
+        speedMultiplierRef.current = 1 + gs.score * 0.0015;
+
+        // Spawn
+        const spawnInterval = Math.max(0.6, 1.4 - gs.score * 0.005);
+        if (timestamp - lastSpawnRef.current > spawnInterval * 1000) {
+          spawnShape(canvas!);
+          lastSpawnRef.current = timestamp;
+        }
+
+        // Move player
+        p.y += (p.targetY - p.y) * 12 * dt;
+        p.pulsePhase += dt * 3;
+
+        // Move shapes
+        for (let i = shapesRef.current.length - 1; i >= 0; i--) {
+          const s = shapesRef.current[i];
+          s.x -= s.speed * dt;
+          s.rotation += s.rotationSpeed * dt;
+          if (s.x < -100) {
+            shapesRef.current.splice(i, 1);
+          }
+        }
+
+        // Collision detection
+        const playerSize = 14;
+        for (const s of shapesRef.current) {
+          const dx = p.x - s.x;
+          const dy = p.y - s.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < playerSize + s.size * 0.65) {
+            gs.state = "dead";
+            if (gs.score > gs.highScore) {
+              gs.highScore = gs.score;
+              localStorage.setItem(HS_KEY, String(Math.floor(gs.score)));
+            }
+            setUiState({ ...gs });
+            break;
+          }
+        }
+
+        // Draw lane guides
+        drawLaneGuides(ctx!, canvas!);
+
+        // Draw shapes
+        for (const s of shapesRef.current) {
+          const shapeColor = "rgba(99,102,241,0.6)";
+          if (s.type === "circle")
+            drawWireframeCircle(ctx!, s.x, s.y, s.size, shapeColor);
+          else if (s.type === "triangle")
+            drawWireframeTriangle(ctx!, s.x, s.y, s.size, s.rotation, shapeColor);
+          else drawWireframeDiamond(ctx!, s.x, s.y, s.size, s.rotation, shapeColor);
+        }
+
+        // Draw player
+        drawPlayerTriangle(ctx!, p.x, p.y, 14, p.pulsePhase);
+
+        // Draw HUD
+        drawHUD(ctx!, canvas!, gs);
+      } else if (gs.state === "dead") {
+        drawDeadScreen(ctx!, canvas!, gs);
+      }
+
+      frameRef.current = requestAnimationFrame(gameLoop);
+    }
+
+    frameRef.current = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [getLaneY, spawnShape]);
 
   return (
     <div className="relative w-full select-none">

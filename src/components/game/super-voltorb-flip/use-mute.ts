@@ -1,14 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const KEY = "svf:muted";
 
 export function useMute() {
-  const [muted, setMuted] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setMuted(localStorage.getItem(KEY) === "1");
-  }, []);
+  const [muted, setMuted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(KEY) === "1";
+  });
   const toggle = () => {
     setMuted((prev) => {
       const next = !prev;

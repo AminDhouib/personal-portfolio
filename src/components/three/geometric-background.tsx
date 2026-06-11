@@ -9,20 +9,20 @@ function WireframeShape({
   position,
   speed,
   color,
-  scrollVelocity,
+  scrollVelocityRef,
 }: {
   geometry: THREE.BufferGeometry;
   position: [number, number, number];
   speed: number;
   color: string;
-  scrollVelocity: RefObject<number>;
+  scrollVelocityRef: RefObject<number>;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const { pointer } = useThree();
 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
-    const boost = 1 + Math.min(Math.abs(scrollVelocity.current ?? 0) * 4, 10);
+    const boost = 1 + Math.min(Math.abs(scrollVelocityRef.current ?? 0) * 4, 10);
     meshRef.current.rotation.x += delta * speed * 0.55 * boost;
     meshRef.current.rotation.y += delta * speed * 0.4 * boost;
 
@@ -47,26 +47,26 @@ function WireframeShape({
 
 function CameraRig({
   scrollY,
-  scrollVelocity,
+  scrollVelocityRef,
 }: {
   scrollY: RefObject<number>;
-  scrollVelocity: RefObject<number>;
+  scrollVelocityRef: RefObject<number>;
 }) {
   const { camera } = useThree();
   useFrame(() => {
     const target = -(scrollY.current ?? 0) * 0.0015;
-    camera.position.y += (target - camera.position.y) * 0.04;
-    scrollVelocity.current = (scrollVelocity.current ?? 0) * 0.9;
+    camera.position.setY(camera.position.y + (target - camera.position.y) * 0.04);
+    scrollVelocityRef.current = (scrollVelocityRef.current ?? 0) * 0.9;
   });
   return null;
 }
 
 function Shapes({
   scrollY,
-  scrollVelocity,
+  scrollVelocityRef,
 }: {
   scrollY: RefObject<number>;
-  scrollVelocity: RefObject<number>;
+  scrollVelocityRef: RefObject<number>;
 }) {
   const geometries = useMemo(
     () => ({
@@ -79,7 +79,7 @@ function Shapes({
 
   return (
     <>
-      <CameraRig scrollY={scrollY} scrollVelocity={scrollVelocity} />
+      <CameraRig scrollY={scrollY} scrollVelocityRef={scrollVelocityRef} />
       {/* Hero band (y ≈ -3 to +4) — left side reinforced so it matches the
           right-side cluster behind the profile photo. */}
       <WireframeShape
@@ -87,63 +87,63 @@ function Shapes({
         position={[3, 1, -2]}
         speed={0.4}
         color="#22c55e"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[-3, -1.5, -3]}
         speed={0.6}
         color="#6366f1"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[1, -2, -1.5]}
         speed={0.5}
         color="#a78bfa"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-2, 2.5, -4]}
         speed={0.3}
         color="#06b6d4"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[4, -3, -2.5]}
         speed={0.35}
         color="#22c55e"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[3.5, 3, -5]}
         speed={0.25}
         color="#f59e0b"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-4, -2, -3]}
         speed={0.45}
         color="#a78bfa"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[-1.5, 3.5, -6]}
         speed={0.28}
         color="#6366f1"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[2.5, -1, -4]}
         speed={0.55}
         color="#06b6d4"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       {/* Extra hero left-side shapes — balances the right-side photo cluster */}
       <WireframeShape
@@ -151,14 +151,14 @@ function Shapes({
         position={[-3.5, 1.5, -2.5]}
         speed={0.42}
         color="#f59e0b"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-4.5, 0.5, -4]}
         speed={0.32}
         color="#22c55e"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       {/* Mid-scroll band (y ≈ -8 to -4) — fills work/services/reviews section
           backgrounds so they don't go visually empty as the camera glides down. */}
@@ -167,28 +167,28 @@ function Shapes({
         position={[3.2, -5, -3]}
         speed={0.5}
         color="#a78bfa"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-3.8, -6, -4.5]}
         speed={0.35}
         color="#06b6d4"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[1.5, -7.5, -2]}
         speed={0.45}
         color="#22c55e"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[-1.5, -8.5, -5]}
         speed={0.28}
         color="#6366f1"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       {/* Deep band (y ≈ -14 to -10) — covers opensource/background/game/blog
           sections so the lower scroll positions still have ambient motion. */}
@@ -197,28 +197,28 @@ function Shapes({
         position={[3.8, -10, -3.5]}
         speed={0.4}
         color="#f59e0b"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid4}
         position={[-3.5, -11, -2.5]}
         speed={0.55}
         color="#a78bfa"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[2, -12.5, -5]}
         speed={0.3}
         color="#06b6d4"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.tetra}
         position={[-2.5, -14, -3]}
         speed={0.5}
         color="#22c55e"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       {/* Bottom band (y ≈ -18 to -16) — keeps beyond-code + contact alive. */}
       <WireframeShape
@@ -226,14 +226,14 @@ function Shapes({
         position={[3, -16, -4]}
         speed={0.38}
         color="#6366f1"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
       <WireframeShape
         geometry={geometries.pyramid3}
         position={[-3, -17.5, -3.5]}
         speed={0.45}
         color="#f59e0b"
-        scrollVelocity={scrollVelocity}
+        scrollVelocityRef={scrollVelocityRef}
       />
     </>
   );
@@ -241,7 +241,7 @@ function Shapes({
 
 export function GeometricBackground() {
   const scrollY = useRef(0);
-  const scrollVelocity = useRef(0);
+  const scrollVelocityRef = useRef(0);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -249,7 +249,7 @@ export function GeometricBackground() {
     const handler = () => {
       const now = performance.now();
       const dt = Math.max(now - lastTime, 1);
-      scrollVelocity.current = (window.scrollY - lastY) / dt;
+      scrollVelocityRef.current = (window.scrollY - lastY) / dt;
       scrollY.current = window.scrollY;
       lastY = window.scrollY;
       lastTime = now;
@@ -266,7 +266,7 @@ export function GeometricBackground() {
         gl={{ alpha: true, antialias: true }}
         style={{ background: "transparent" }}
       >
-        <Shapes scrollY={scrollY} scrollVelocity={scrollVelocity} />
+        <Shapes scrollY={scrollY} scrollVelocityRef={scrollVelocityRef} />
       </Canvas>
     </div>
   );
