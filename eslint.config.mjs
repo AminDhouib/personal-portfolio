@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local analysis/build artifacts:
+    "**/graphify-out/**",
+    // Archived experiments and vendored static game bundles:
+    "_to-remove-voltorb/**",
+    "public/tower_stacker/**",
   ]),
 ]);
 
