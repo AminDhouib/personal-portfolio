@@ -214,8 +214,11 @@ export function PasswordGame() {
 
   useEffect(() => {
     if (allPassed && timerRunning) {
-      setTimerRunning(false);
-      setShowResult(true);
+      const id = window.setTimeout(() => {
+        setTimerRunning(false);
+        setShowResult(true);
+      }, 0);
+      return () => window.clearTimeout(id);
     }
   }, [allPassed, timerRunning]);
 

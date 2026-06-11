@@ -74,7 +74,7 @@ export function LeaderboardClient() {
               : "border-(--border) text-(--muted) hover:text-(--foreground)"
           }`}
         >
-          Today's Daily
+          Today&apos;s Daily
         </button>
       </div>
       {tab === "all" && <div className="flex flex-col sm:flex-row gap-2 mb-4">

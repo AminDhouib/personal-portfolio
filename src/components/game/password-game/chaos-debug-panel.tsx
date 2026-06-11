@@ -81,15 +81,15 @@ const DEFAULT_FX: Record<FxKey, number> = Object.fromEntries(
 ) as Record<FxKey, number>;
 
 export function ChaosDebugPanel() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("debug") === "chaos";
+  });
   const [fx, setFx] = useState<Record<FxKey, number>>(DEFAULT_FX);
   const [chaosOverride, setChaosOverride] = useState<number | null>(null);
 
   useEffect(() => {
-    // Show if URL has ?debug=chaos
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("debug") === "chaos") setVisible(true);
     // Keyboard shortcut: Shift+D to toggle
     const onKey = (e: KeyboardEvent) => {
       if (e.shiftKey && (e.key === "D" || e.key === "d")) {

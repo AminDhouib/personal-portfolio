@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Trophy, X, Download, Send, Loader2, CheckCircle } from "lucide-react";
 import { formatTime, computeDifficultyRating, pickResultTitle } from "./result-card-util";
 
@@ -145,13 +146,13 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
             <Download className="h-4 w-4" />
             Download card
           </button>
-          <a
+          <Link
             href="/games/password-game/leaderboard"
             className="flex-1 inline-flex items-center justify-center gap-1 rounded-md border border-(--border) px-3 py-2 text-sm hover:bg-(--background)"
           >
             <Trophy className="h-4 w-4" />
             Leaderboard
-          </a>
+          </Link>
         </div>
       </div>
     </div>

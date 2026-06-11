@@ -601,7 +601,10 @@ function GlitchText({ text, chaos }: { text: string; chaos: number }) {
   const [display, setDisplay] = useState(text);
 
   useEffect(() => {
-    setDisplay(text);
+    let resetId: number | null = null;
+    if (display !== text) {
+      resetId = window.setTimeout(() => setDisplay(text), 0);
+    }
     if (chaos < 4) return;
     const tickMs = chaos >= 5 ? 1200 : 2600;
     const id = window.setInterval(() => {
@@ -622,8 +625,11 @@ function GlitchText({ text, chaos }: { text: string; chaos: number }) {
       setDisplay(chars.join(""));
       window.setTimeout(() => setDisplay(text), 90);
     }, tickMs);
-    return () => window.clearInterval(id);
-  }, [text, chaos]);
+    return () => {
+      if (resetId) window.clearTimeout(resetId);
+      window.clearInterval(id);
+    };
+  }, [text, chaos, display]);
 
   return <span>{display}</span>;
 }
