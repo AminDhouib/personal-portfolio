@@ -41,7 +41,7 @@ export function Contact() {
         <SocialLinks size="h-5 w-5" showEmail className="flex items-center justify-center gap-6 mt-12" />
 
         {/* Footer */}
-        <div className="mt-16 pt-8">
+        <footer className="mt-16 pt-8">
           <div className="section-divider mb-8" />
           <p className="text-xs text-(--muted)">
             &copy; {currentYear} Amin Dhouib / amindhou.com
@@ -49,7 +49,7 @@ export function Contact() {
           <p className="text-xs text-(--muted)/60 mt-1 flex items-center justify-center gap-1">
             Hosted on a home server with <Heart className="h-3 w-3 text-accent-green" />
           </p>
-        </div>
+        </footer>
       </div>
     </section>
   );
