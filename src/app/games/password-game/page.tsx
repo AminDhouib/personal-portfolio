@@ -1,19 +1,8 @@
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { GAMES } from "../games-meta";
 import { GameCard } from "@/components/game/game-card";
-
-const PasswordGame = dynamic(
-  () => import("@/components/game/password-game/password-game").then((m) => m.PasswordGame),
-  {
-    loading: () => (
-      <div className="w-full h-[420px] rounded-xl border border-(--border) bg-(--card) flex items-center justify-center">
-        <div className="text-(--muted) text-sm">Loading...</div>
-      </div>
-    ),
-  }
-);
+import { PasswordGameLoader } from "@/components/game/password-game/password-game-loader";
 
 export const metadata = {
   title: "Password Game 2",
@@ -41,7 +30,7 @@ export default function PasswordGamePage() {
         </p>
 
         <div className="max-w-3xl">
-          <PasswordGame />
+          <PasswordGameLoader />
         </div>
 
         <section className="mt-16">
