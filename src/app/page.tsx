@@ -21,10 +21,19 @@ import { getAllBlogPosts } from "@/lib/blog";
 export const revalidate = 86400;
 
 export default async function Home() {
-  const [mauData, caramelStats, upupStats, contributions] = await Promise.all([
+  const [
+    mauData,
+    caramelStats,
+    upupStats,
+    stealthStats,
+    notifierStats,
+    contributions,
+  ] = await Promise.all([
     fetchAllMAU(),
     fetchRepoStats("DevinoSolutions", "caramel"),
     fetchRepoStats("DevinoSolutions", "upup"),
+    fetchRepoStats("DevinoSolutions", "stealth-chrome-devtools-mcp"),
+    fetchRepoStats("DevinoSolutions", "ai-agent-notifier"),
     fetchContributionGraph("AminDhouib"),
   ]);
   const blogPosts = getAllBlogPosts();
@@ -40,6 +49,8 @@ export default async function Home() {
         <OpenSource
           caramelStats={caramelStats}
           upupStats={upupStats}
+          stealthStats={stealthStats}
+          notifierStats={notifierStats}
           contributions={contributions}
         />
         <Services />

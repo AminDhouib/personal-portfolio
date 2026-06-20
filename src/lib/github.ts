@@ -41,7 +41,17 @@ export interface ContributionDay {
   level: 0 | 1 | 2 | 3 | 4;
 }
 
-export async function fetchContributionGraph(
+const contributionLevelMap: Record<string, 0 | 1 | 2 | 3 | 4> = {
+  NONE: 0,
+  FIRST_QUARTILE: 1,
+  SECOND_QUARTILE: 2,
+  THIRD_QUARTILE: 3,
+  FOURTH_QUARTILE: 4,
+};
+
+// Official GraphQL contribution calendar. Most authoritative, but requires a
+// GITHUB_TOKEN. Returns [] when unavailable so the caller can fall back.
+async function fetchContributionsGraphql(
   username: string
 ): Promise<ContributionDay[]> {
   const query = `
@@ -61,8 +71,6 @@ export async function fetchContributionGraph(
       }
     }
   `;
-
-  if (!GITHUB_TOKEN) return [];
 
   try {
     const res = await fetch("https://api.github.com/graphql", {
@@ -94,14 +102,6 @@ export async function fetchContributionGraph(
       };
     };
 
-    const levelMap: Record<string, 0 | 1 | 2 | 3 | 4> = {
-      NONE: 0,
-      FIRST_QUARTILE: 1,
-      SECOND_QUARTILE: 2,
-      THIRD_QUARTILE: 3,
-      FOURTH_QUARTILE: 4,
-    };
-
     const weeks =
       json.data?.user?.contributionsCollection?.contributionCalendar?.weeks ??
       [];
@@ -111,13 +111,55 @@ export async function fetchContributionGraph(
         days.push({
           date: day.date,
           count: day.contributionCount,
-          level: levelMap[day.contributionLevel] ?? 0,
+          level: contributionLevelMap[day.contributionLevel] ?? 0,
         });
       }
     }
     return days;
   } catch (err) {
-    console.warn(`[github] fetchContributionGraph failed:`, err);
+    console.warn(`[github] fetchContributionsGraphql failed:`, err);
     return [];
   }
+}
+
+// Token-free fallback: a public mirror of the GitHub profile contribution
+// calendar. The ?y=last window returns the trailing ~53 weeks already aligned
+// Sunday→Saturday with the same { date, count, level } shape we render, so it
+// keeps the graph real on deployments that have no GITHUB_TOKEN configured.
+async function fetchContributionsPublic(
+  username: string
+): Promise<ContributionDay[]> {
+  try {
+    const res = await fetch(
+      `https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(
+        username
+      )}?y=last`,
+      { next: { revalidate: GITHUB_REVALIDATE_SECONDS } }
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      contributions?: Array<{ date: string; count: number; level: number }>;
+    };
+    return (json.contributions ?? []).map((d) => ({
+      date: d.date,
+      count: d.count,
+      level: Math.max(0, Math.min(4, Math.round(d.level))) as 0 | 1 | 2 | 3 | 4,
+    }));
+  } catch (err) {
+    console.warn(`[github] fetchContributionsPublic failed:`, err);
+    return [];
+  }
+}
+
+export async function fetchContributionGraph(
+  username: string
+): Promise<ContributionDay[]> {
+  // Prefer the official GraphQL calendar when a token is configured…
+  if (GITHUB_TOKEN) {
+    const viaGraphql = await fetchContributionsGraphql(username);
+    if (viaGraphql.length) return viaGraphql;
+  }
+  // …otherwise (or if GraphQL came back empty) use the token-free public mirror
+  // so the graph still reflects the real profile.
+  return fetchContributionsPublic(username);
 }

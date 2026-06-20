@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { GitFork, Star, ArrowRight } from "lucide-react";
+import { GitFork, Star, ArrowRight, EyeOff, BellRing } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon } from "@/components/ui/tech-icon";
 import type { RepoStats, ContributionDay } from "@/lib/github";
@@ -10,9 +11,13 @@ import type { RepoStats, ContributionDay } from "@/lib/github";
 interface OSSProject {
   name: string;
   description: string;
-  logo: string;
-  logoWidth: number;
-  logoHeight: number;
+  // Brand logo (Caramel, UpUp) …
+  logo?: string;
+  logoWidth?: number;
+  logoHeight?: number;
+  // … or a lucide icon for tools without a brand logo.
+  icon?: LucideIcon;
+  language?: string;
   github: string;
   forks: number;
   stars: number;
@@ -38,6 +43,26 @@ const ossDefaults: OSSProject[] = [
     github: "https://github.com/DevinoSolutions/upup",
     forks: 32,
     stars: 189,
+  },
+  {
+    name: "Stealth Chrome DevTools MCP",
+    description:
+      "Undetectable browser automation for AI agents via MCP — stealth Chrome with anti-detection profile management and full CDP access.",
+    icon: EyeOff,
+    language: "Python",
+    github: "https://github.com/DevinoSolutions/stealth-chrome-devtools-mcp",
+    forks: 0,
+    stars: 3,
+  },
+  {
+    name: "AI Agent Notifier",
+    description:
+      "Desktop & phone notifications for AI coding agents (Claude Code, Codex, Gemini CLI, Cursor). Toast + ntfy push, zero dependencies.",
+    icon: BellRing,
+    language: "JavaScript",
+    github: "https://github.com/DevinoSolutions/ai-agent-notifier",
+    forks: 0,
+    stars: 4,
   },
 ];
 
@@ -74,13 +99,28 @@ const levelColor: Record<0 | 1 | 2 | 3 | 4, string> = {
   4: "rgba(34,197,94,1.0)",
 };
 
+// GitHub's canonical language colors.
+const languageColor: Record<string, string> = {
+  Python: "#3572A5",
+  JavaScript: "#f1e05a",
+  TypeScript: "#3178c6",
+};
+
 interface Props {
   caramelStats?: RepoStats;
   upupStats?: RepoStats;
+  stealthStats?: RepoStats;
+  notifierStats?: RepoStats;
   contributions?: ContributionDay[];
 }
 
-export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
+export function OpenSource({
+  caramelStats,
+  upupStats,
+  stealthStats,
+  notifierStats,
+  contributions,
+}: Props) {
   const projects: OSSProject[] = [
     {
       ...ossDefaults[0],
@@ -91,6 +131,16 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
       ...ossDefaults[1],
       forks: upupStats?.forks ?? ossDefaults[1].forks,
       stars: upupStats?.stars ?? ossDefaults[1].stars,
+    },
+    {
+      ...ossDefaults[2],
+      forks: stealthStats?.forks ?? ossDefaults[2].forks,
+      stars: stealthStats?.stars ?? ossDefaults[2].stars,
+    },
+    {
+      ...ossDefaults[3],
+      forks: notifierStats?.forks ?? ossDefaults[3].forks,
+      stars: notifierStats?.stars ?? ossDefaults[3].stars,
     },
   ];
 
@@ -109,7 +159,9 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
 
         {/* OSS project cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          {projects.map((project, i) => (
+          {projects.map((project, i) => {
+            const Icon = project.icon;
+            return (
             <motion.a
               key={project.name}
               href={project.github}
@@ -122,15 +174,27 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
               className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-all hover:border-accent-green/30"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="shrink-0 flex items-center" style={{ minHeight: 36 }}>
-                  <Image
-                    src={project.logo}
-                    alt={`${project.name} logo`}
-                    width={project.logoWidth}
-                    height={project.logoHeight}
-                    className="logo-tinted"
-                    style={{ width: 56, height: "auto" }}
-                  />
+                <div
+                  className="shrink-0 flex items-center justify-center"
+                  style={{ minHeight: 36, width: 56 }}
+                >
+                  {project.logo ? (
+                    <Image
+                      src={project.logo}
+                      alt={`${project.name} logo`}
+                      width={project.logoWidth ?? 56}
+                      height={project.logoHeight ?? 24}
+                      className="logo-tinted"
+                      style={{ width: 56, height: "auto" }}
+                    />
+                  ) : Icon ? (
+                    <span className="flex h-10 w-14 items-center justify-center rounded-lg border border-accent-green/20 bg-accent-green/10">
+                      <Icon
+                        className="h-5 w-5 text-accent-green"
+                        strokeWidth={2}
+                      />
+                    </span>
+                  ) : null}
                 </div>
                 <div>
                   <h3 className="font-display text-lg font-bold tracking-tight">
@@ -149,6 +213,18 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
                   <Star className="h-4 w-4" />
                   <span>{project.stars.toLocaleString()}</span>
                 </div>
+                {project.language ? (
+                  <div className="flex items-center gap-1.5 text-sm text-(--muted)">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{
+                        backgroundColor:
+                          languageColor[project.language] ?? "var(--muted)",
+                      }}
+                    />
+                    <span>{project.language}</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green group-hover:gap-2 transition-all">
@@ -156,7 +232,8 @@ export function OpenSource({ caramelStats, upupStats, contributions }: Props) {
                 <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </motion.a>
-          ))}
+            );
+          })}
         </div>
 
         {/* GitHub Contribution Graph */}
