@@ -1,8 +1,12 @@
 export interface ExperienceItem {
   role: string;
   company: string;
-  /** Short monogram for the timeline node (1–3 chars). */
+  /** Short monogram for the medallion when no brand glyph exists (1–3 chars). */
   short: string;
+  /** simple-icons slug rendered in the medallion when the company has a real brand mark. */
+  brand?: string;
+  /** CSS color driving the medallion, spine, company name, and Current marker. */
+  accent: string;
   type?: string;
   period: string;
   location?: string;
@@ -17,6 +21,7 @@ export const experience: ExperienceItem[] = [
     role: "Founder & CEO",
     company: "Devino",
     short: "D",
+    accent: "var(--color-accent-blue)",
     type: "Full-time",
     period: "Jan 2023 – Present",
     location: "Ottawa, ON · Remote",
@@ -31,6 +36,8 @@ export const experience: ExperienceItem[] = [
     role: "Content Creator (Motivational Speaker)",
     company: "YouTube",
     short: "YT",
+    brand: "youtube",
+    accent: "#ff0000",
     type: "Self-employed",
     period: "Sep 2022 – Present",
     current: true,
@@ -44,6 +51,8 @@ export const experience: ExperienceItem[] = [
     role: "GIS Full Stack / Code Migration Modernization Specialist",
     company: "Fujitsu",
     short: "F",
+    brand: "fujitsu",
+    accent: "#ff0000",
     type: "Full-time",
     period: "Nov 2022 – Apr 2024",
     location: "Ottawa, ON · Remote",
@@ -58,6 +67,7 @@ export const experience: ExperienceItem[] = [
     role: "Senior Full Stack Developer (React + Django)",
     company: "Math ANEX (acquired by Amplify)",
     short: "MA",
+    accent: "var(--color-accent-purple)",
     type: "Full-time",
     period: "Mar 2023 – Jun 2023",
     location: "Remote",
@@ -71,6 +81,7 @@ export const experience: ExperienceItem[] = [
     role: "DevOps Engineer",
     company: "Levio",
     short: "L",
+    accent: "var(--color-accent-amber)",
     type: "Contract",
     period: "Mar 2023 – May 2023",
     location: "Ottawa, ON · Remote",
@@ -83,6 +94,7 @@ export const experience: ExperienceItem[] = [
     role: "Research Development Software Engineer",
     company: "Lumentum",
     short: "Lm",
+    accent: "var(--color-accent-cyan)",
     type: "Contract",
     period: "May 2021 – Sep 2021",
     location: "Ottawa, ON · Hybrid",
@@ -96,6 +108,7 @@ export const experience: ExperienceItem[] = [
     role: "CyberSecurity Software Developer",
     company: "Crypto4A Technologies",
     short: "C4",
+    accent: "var(--color-accent-green)",
     type: "Contract",
     period: "Jan 2020 – Dec 2020",
     location: "Ottawa, ON · Hybrid",
@@ -109,6 +122,7 @@ export const experience: ExperienceItem[] = [
     role: "Java Software Engineer",
     company: "Department of National Defence",
     short: "DND",
+    accent: "var(--color-accent-blue)",
     type: "Internship",
     period: "May 2019 – Sep 2019",
     location: "Ottawa, ON · On-site",
