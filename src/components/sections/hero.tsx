@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ChevronDown, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { CALENDLY_URL } from "@/data/nav";
+import { BOOKING_URL } from "@/data/nav";
 
 export function Hero() {
   const currentYear = new Date().getFullYear();
@@ -61,7 +61,7 @@ export function Hero() {
             {/* CTAs */}
             <div className="flex flex-wrap gap-4">
               <a
-                href={CALENDLY_URL}
+                href={BOOKING_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-6 py-3 text-base font-semibold text-black transition-all hover:brightness-110"

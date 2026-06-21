@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight, Heart } from "lucide-react";
-import { CALENDLY_URL } from "@/data/nav";
+import { BOOKING_URL } from "@/data/nav";
 import { SocialLinks } from "@/components/ui/social-links";
 
 export function Contact() {
@@ -18,7 +18,7 @@ export function Contact() {
           transition={{ duration: 0.6 }}
         >
           <p className="text-sm text-(--muted) mb-6 tracking-widest uppercase">
-            11 — Contact
+            12 — Contact
           </p>
           <h2 className="font-display text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
             LET&apos;S
@@ -27,7 +27,7 @@ export function Contact() {
           </h2>
 
           <a
-            href={CALENDLY_URL}
+            href={BOOKING_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-8 py-4 text-lg font-bold text-black transition-all hover:brightness-110"

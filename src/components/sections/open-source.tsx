@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { GitFork, Star, ArrowRight, EyeOff, BellRing } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { SiIcon } from "@/components/ui/tech-icon";
+import { SiIcon, TechIcon } from "@/components/ui/tech-icon";
 import type { RepoStats, ContributionDay } from "@/lib/github";
 
 interface OSSProject {
@@ -19,7 +19,8 @@ interface OSSProject {
   logoHeight?: number;
   // … or a lucide icon for tools without a brand logo.
   icon?: LucideIcon;
-  language?: string;
+  // Stack chips shown on the card (primary language first).
+  tech: string[];
   github: string;
   forks: number;
   stars: number;
@@ -32,6 +33,7 @@ const ossDefaults: OSSProject[] = [
     logo: "/logos/caramel.png",
     logoWidth: 1830,
     logoHeight: 467,
+    tech: ["TypeScript", "JavaScript", "Swift", "Browser Extension"],
     github: "https://github.com/DevinoSolutions/caramel",
     forks: 45,
     stars: 234,
@@ -42,6 +44,7 @@ const ossDefaults: OSSProject[] = [
     logo: "/logos/upup.png",
     logoWidth: 6400,
     logoHeight: 1366,
+    tech: ["React", "TypeScript", "AWS S3", "Azure"],
     github: "https://github.com/DevinoSolutions/upup",
     forks: 32,
     stars: 189,
@@ -51,7 +54,7 @@ const ossDefaults: OSSProject[] = [
     description:
       "Undetectable browser automation for AI agents via MCP — stealth Chrome with anti-detection profile management and full CDP access.",
     icon: EyeOff,
-    language: "Python",
+    tech: ["Python", "nodriver", "CDP", "MCP"],
     github: "https://github.com/DevinoSolutions/stealth-chrome-devtools-mcp",
     forks: 0,
     stars: 3,
@@ -61,7 +64,7 @@ const ossDefaults: OSSProject[] = [
     description:
       "Desktop & phone notifications for AI coding agents (Claude Code, Codex, Gemini CLI, Cursor). Toast + ntfy push, zero dependencies.",
     icon: BellRing,
-    language: "JavaScript",
+    tech: ["JavaScript", "Node.js", "ntfy"],
     github: "https://github.com/DevinoSolutions/ai-agent-notifier",
     forks: 0,
     stars: 4,
@@ -99,13 +102,6 @@ const levelColor: Record<0 | 1 | 2 | 3 | 4, string> = {
   2: "rgba(34,197,94,0.50)",
   3: "rgba(34,197,94,0.75)",
   4: "rgba(34,197,94,1.0)",
-};
-
-// GitHub's canonical language colors.
-const languageColor: Record<string, string> = {
-  Python: "#3572A5",
-  JavaScript: "#f1e05a",
-  TypeScript: "#3178c6",
 };
 
 const MONTHS = [
@@ -241,18 +237,18 @@ export function OpenSource({
                   <Star className="h-4 w-4" />
                   <span>{project.stars.toLocaleString()}</span>
                 </div>
-                {project.language ? (
-                  <div className="flex items-center gap-1.5 text-sm text-(--muted)">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{
-                        backgroundColor:
-                          languageColor[project.language] ?? "var(--muted)",
-                      }}
-                    />
-                    <span>{project.language}</span>
-                  </div>
-                ) : null}
+              </div>
+
+              {/* Tech stack */}
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {project.tech.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-md border border-(--border) bg-(--surface) px-2 py-0.5 text-[11px] text-(--muted)"
+                  >
+                    <TechIcon name={t} />
+                  </span>
+                ))}
               </div>
 
               <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green group-hover:gap-2 transition-all">

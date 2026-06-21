@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { ReviewsClient } from "./reviews-client";
-import { CALENDLY_URL } from "@/data/nav";
+import { BOOKING_URL } from "@/data/nav";
 
 export const metadata = {
   title: "Reviews",
@@ -56,7 +56,7 @@ export default function ReviewsPage() {
           </p>
           <div className="relative flex justify-center mt-6">
             <a
-              href={CALENDLY_URL}
+              href={BOOKING_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-(--foreground) text-(--background) px-7 py-3 text-sm font-semibold hover:brightness-110 transition-all"

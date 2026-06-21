@@ -5,6 +5,7 @@ export { Services } from "./services";
 export { Reviews } from "./reviews";
 export { OpenSource } from "./open-source";
 export { Background } from "./background";
+export { Experience } from "./experience";
 export { Game } from "./game";
 export { Blog } from "./blog";
 export { BeyondCode } from "./beyond-code";

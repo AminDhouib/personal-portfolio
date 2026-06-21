@@ -19,7 +19,7 @@ export const navItems: readonly NavItem[] = Object.freeze([
   { label: "Amin AI", href: "/ai", sectionId: "ai", isAI: true },
 ]);
 
-export const CALENDLY_URL = "https://calendly.com/amindhouib";
+export const BOOKING_URL = "https://app.trycaly.com/amin/15min";
 
 export const socialLinks = Object.freeze([
   {

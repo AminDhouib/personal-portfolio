@@ -23,7 +23,7 @@ export function Game() {
     <section id="game" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          number="08"
+          number="09"
           title="The Game"
           color="var(--color-accent-pink)"
         />

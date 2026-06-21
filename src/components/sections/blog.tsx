@@ -40,7 +40,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
     <section id="blog" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          number="09"
+          number="10"
           title="Blog"
           color="var(--color-accent-blue)"
         />

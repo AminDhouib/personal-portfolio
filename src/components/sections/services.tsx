@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { TechIcon } from "@/components/ui/tech-icon";
 import { services } from "@/data/services";
-import { CALENDLY_URL } from "@/data/nav";
+import { BOOKING_URL } from "@/data/nav";
 
 export function Services() {
   return (
@@ -71,7 +71,7 @@ export function Services() {
           transition={{ duration: 0.5, delay: 0.3 }}
         >
           <a
-            href={CALENDLY_URL}
+            href={BOOKING_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm font-semibold text-accent-green hover:brightness-110 transition-all"

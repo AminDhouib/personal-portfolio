@@ -8,6 +8,7 @@ import {
   Reviews,
   OpenSource,
   Background,
+  Experience,
   Game,
   Blog,
   BeyondCode,
@@ -56,6 +57,7 @@ export default async function Home() {
         <Services />
         <Reviews />
         <Background />
+        <Experience />
         <Game />
         <Blog posts={blogPosts} />
         <BeyondCode />

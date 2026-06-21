@@ -25,12 +25,12 @@ Apps:
 - GetItDone (nowgetitdone.com) — Team standups & time tracking.
 
 Services: AI Automation, Full Stack Dev, DevOps/Cloud, Database, Security/DevSecOps.
-Rate: $50-75/hr on Contra. calendly.com/amindhouib for booking.
+Rate: $50-75/hr on Contra. app.trycaly.com/amin/15min for booking.
 
 Contact: amin@devino.ca | contra.com/amin
 
 LEAD COLLECTION: When a visitor expresses interest in hiring Amin or working together,
-first encourage them to book a call at https://calendly.com/amindhouib.
+first encourage them to book a call at https://app.trycaly.com/amin/15min.
 If they'd prefer to leave their contact details instead, use the collectLead action
 to collect their name and email. Always confirm before submitting.
 
@@ -52,7 +52,7 @@ function ChatActions({ pathname }: { pathname: string }) {
   useCopilotAction({
     name: "collectLead",
     description:
-      "Collect a visitor's name and email when they express interest in hiring or working with Amin. Use this after they decline or can't use the Calendly link.",
+      "Collect a visitor's name and email when they express interest in hiring or working with Amin. Use this after they decline or can't use the booking link.",
     parameters: [
       {
         name: "name",

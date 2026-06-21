@@ -10,7 +10,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "framer-motion";
-import { navItems, CALENDLY_URL } from "@/data/nav";
+import { navItems, BOOKING_URL } from "@/data/nav";
 import { SocialLinks } from "@/components/ui/social-links";
 
 
@@ -233,7 +233,7 @@ export function Navbar() {
               </Link>
             ) : (
               <a
-                href={CALENDLY_URL}
+                href={BOOKING_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-accent-green px-4 py-2 text-sm font-semibold text-black transition-all hover:brightness-110"
@@ -357,7 +357,7 @@ export function Navbar() {
               {/* CTA */}
               <div className="px-4 pb-8">
                 <a
-                  href={CALENDLY_URL}
+                  href={BOOKING_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 rounded-lg bg-accent-green px-4 py-3 text-sm font-semibold text-black w-full"

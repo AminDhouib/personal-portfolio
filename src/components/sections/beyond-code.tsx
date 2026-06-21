@@ -16,7 +16,7 @@ export function BeyondCode() {
     <section id="beyond" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          number="10"
+          number="11"
           title="Beyond Code"
           color="var(--color-accent-amber)"
         />
