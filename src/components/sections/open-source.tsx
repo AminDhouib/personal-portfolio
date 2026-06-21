@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { GitFork, Star, ArrowRight, EyeOff, BellRing } from "lucide-react";
@@ -106,6 +108,27 @@ const languageColor: Record<string, string> = {
   TypeScript: "#3178c6",
 };
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const WEEKDAYS = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+];
+
+// GitHub-style hover label, e.g. "3 contributions on Tuesday, June 17, 2025".
+function contributionLabel(day: ContributionDay): string {
+  const phrase =
+    day.count === 0
+      ? "No contributions"
+      : `${day.count} contribution${day.count === 1 ? "" : "s"}`;
+  if (!day.date) return phrase;
+  const [y, m, d] = day.date.split("-").map(Number);
+  // Parse as UTC so the weekday/label never shifts by the viewer's timezone.
+  const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${phrase} on ${weekday}, ${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
 interface Props {
   caramelStats?: RepoStats;
   upupStats?: RepoStats;
@@ -147,6 +170,11 @@ export function OpenSource({
   const graph = contributions?.length ? contributions : fallbackContributions;
   // Take last 364 days (52 weeks × 7)
   const graphDays = graph.slice(-364);
+  const [tooltip, setTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   return (
     <section id="opensource" className="py-24">
@@ -264,9 +292,17 @@ export function OpenSource({
                 return (
                   <div
                     key={`${col}-${row}`}
-                    className="aspect-square rounded-sm min-w-[10px]"
+                    className="aspect-square rounded-sm min-w-[10px] cursor-pointer transition-shadow hover:ring-1 hover:ring-inset hover:ring-(--foreground)"
                     style={{ backgroundColor: levelColor[day.level] }}
-                    title={day.date ? `${day.date}: ${day.count} contributions` : undefined}
+                    onMouseEnter={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect();
+                      setTooltip({
+                        text: contributionLabel(day),
+                        x: r.left + r.width / 2,
+                        y: r.top,
+                      });
+                    }}
+                    onMouseLeave={() => setTooltip(null)}
                   />
                 );
               })
@@ -283,6 +319,18 @@ export function OpenSource({
             ))}
             <span className="text-xs text-(--muted)">More</span>
           </div>
+          {tooltip
+            ? createPortal(
+                <div
+                  role="tooltip"
+                  className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-full rounded-md border border-(--border) bg-(--surface) px-2.5 py-1.5 text-xs font-medium text-(--foreground) shadow-lg whitespace-nowrap"
+                  style={{ left: tooltip.x, top: tooltip.y - 8 }}
+                >
+                  {tooltip.text}
+                </div>,
+                document.body,
+              )
+            : null}
         </motion.div>
 
         {/* CI Stack */}
