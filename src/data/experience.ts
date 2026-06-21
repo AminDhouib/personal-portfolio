@@ -1,8 +1,10 @@
 export interface ExperienceItem {
   role: string;
   company: string;
-  /** Short monogram for the medallion when no brand glyph exists (1–3 chars). */
+  /** Short monogram for the medallion when no logo or brand glyph exists (1–3 chars). */
   short: string;
+  /** Real logo image in /public — takes precedence over brand/monogram. */
+  logo?: string;
   /** simple-icons slug rendered in the medallion when the company has a real brand mark. */
   brand?: string;
   /** CSS color driving the medallion, spine, company name, and Current marker. */
@@ -21,6 +23,7 @@ export const experience: ExperienceItem[] = [
     role: "Founder & CEO",
     company: "Devino",
     short: "D",
+    logo: "/logos/companies/devino.png",
     accent: "var(--color-accent-blue)",
     type: "Full-time",
     period: "Jan 2023 – Present",
@@ -67,6 +70,7 @@ export const experience: ExperienceItem[] = [
     role: "Senior Full Stack Developer (React + Django)",
     company: "Math ANEX (acquired by Amplify)",
     short: "MA",
+    logo: "/logos/companies/mathanex.png",
     accent: "var(--color-accent-purple)",
     type: "Full-time",
     period: "Mar 2023 – Jun 2023",
@@ -81,6 +85,7 @@ export const experience: ExperienceItem[] = [
     role: "DevOps Engineer",
     company: "Levio",
     short: "L",
+    logo: "/logos/companies/levio.png",
     accent: "var(--color-accent-amber)",
     type: "Contract",
     period: "Mar 2023 – May 2023",
@@ -94,6 +99,7 @@ export const experience: ExperienceItem[] = [
     role: "Research Development Software Engineer",
     company: "Lumentum",
     short: "Lm",
+    logo: "/logos/companies/lumentum.png",
     accent: "var(--color-accent-cyan)",
     type: "Contract",
     period: "May 2021 – Sep 2021",
@@ -108,6 +114,7 @@ export const experience: ExperienceItem[] = [
     role: "CyberSecurity Software Developer",
     company: "Crypto4A Technologies",
     short: "C4",
+    logo: "/logos/companies/crypto4a.png",
     accent: "var(--color-accent-green)",
     type: "Contract",
     period: "Jan 2020 – Dec 2020",
@@ -122,6 +129,7 @@ export const experience: ExperienceItem[] = [
     role: "Java Software Engineer",
     company: "Department of National Defence",
     short: "DND",
+    logo: "/logos/companies/dnd.png",
     accent: "var(--color-accent-blue)",
     type: "Internship",
     period: "May 2019 – Sep 2019",

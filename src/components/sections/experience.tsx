@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -49,17 +50,23 @@ export function Experience() {
                 {/* Logo medallion on the rail */}
                 <div className="relative z-10 shrink-0">
                   <div
-                    className="flex h-14 w-14 items-center justify-center rounded-2xl border"
+                    className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border bg-white p-2"
                     style={{
                       color: "var(--a)",
-                      borderColor: tint(38),
-                      backgroundColor: "var(--card)",
-                      backgroundImage: `linear-gradient(145deg, ${tint(18)}, ${tint(7)})`,
+                      borderColor: tint(40),
                       boxShadow: `0 0 0 4px var(--background), 0 10px 24px -14px ${tint(70)}`,
                     }}
                   >
-                    {job.brand ? (
-                      <SiIcon slug={job.brand} className="h-6 w-6" />
+                    {job.logo ? (
+                      <Image
+                        src={job.logo}
+                        alt={`${job.company} logo`}
+                        width={44}
+                        height={44}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : job.brand ? (
+                      <SiIcon slug={job.brand} className="h-7 w-7" />
                     ) : (
                       <span className="font-display text-sm font-bold tracking-tight">
                         {job.short}
