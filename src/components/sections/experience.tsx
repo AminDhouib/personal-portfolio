@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
@@ -10,6 +10,20 @@ import { experience } from "@/data/experience";
 
 // Translucent tint of the active role's accent (exposed as --a on each row).
 const tint = (pct: number) => `color-mix(in srgb, var(--a) ${pct}%, transparent)`;
+
+// A single accomplishment line with the rotated-diamond marker.
+function Bullet({ children }: { children: ReactNode }) {
+  return (
+    <li className="flex gap-2.5 text-sm leading-relaxed text-(--muted)">
+      <span
+        className="mt-[7px] h-1.5 w-1.5 shrink-0 rotate-45 rounded-[1px]"
+        style={{ backgroundColor: tint(75) }}
+        aria-hidden="true"
+      />
+      <span>{children}</span>
+    </li>
+  );
+}
 
 export function Experience() {
   return (
@@ -155,21 +169,36 @@ export function Experience() {
                     </p>
                   ) : null}
 
-                  <ul className="mt-3.5 space-y-2">
-                    {job.highlights.map((h) => (
-                      <li
-                        key={h}
-                        className="flex gap-2.5 text-sm leading-relaxed text-(--muted)"
-                      >
-                        <span
-                          className="mt-[7px] h-1.5 w-1.5 shrink-0 rotate-45 rounded-[1px]"
-                          style={{ backgroundColor: tint(75) }}
-                          aria-hidden="true"
-                        />
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {job.highlightGroups ? (
+                    <div className="mt-3.5 space-y-3.5">
+                      {job.highlightGroups.map((group) => (
+                        <div key={group.label}>
+                          <p
+                            className="mb-1.5 flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider"
+                            style={{ color: tint(90) }}
+                          >
+                            <span
+                              className="h-px w-4 shrink-0"
+                              style={{ backgroundColor: tint(50) }}
+                              aria-hidden="true"
+                            />
+                            {group.label}
+                          </p>
+                          <ul className="space-y-2">
+                            {group.items.map((h) => (
+                              <Bullet key={h}>{h}</Bullet>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <ul className="mt-3.5 space-y-2">
+                      {job.highlights.map((h) => (
+                        <Bullet key={h}>{h}</Bullet>
+                      ))}
+                    </ul>
+                  )}
 
                   <div className="mt-4 flex flex-wrap gap-1.5">
                     {job.skills.map((s) => (

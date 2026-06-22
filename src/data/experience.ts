@@ -1,3 +1,9 @@
+/** A labeled cluster of bullets — used when one role spans distinct tracks. */
+export interface HighlightGroup {
+  label: string;
+  items: string[];
+}
+
 export interface ExperienceItem {
   role: string;
   company: string;
@@ -13,7 +19,10 @@ export interface ExperienceItem {
   period: string;
   location?: string;
   current?: boolean;
+  /** Flat list of accomplishments. Empty when the role uses grouped tracks instead. */
   highlights: string[];
+  /** Optional labeled sub-tracks (rendered in place of `highlights` when present). */
+  highlightGroups?: HighlightGroup[];
   skills: string[];
 }
 
@@ -30,8 +39,9 @@ export const experience: ExperienceItem[] = [
     location: "Ottawa, ON · Remote",
     current: true,
     highlights: [
-      "Generated over $1M in project revenue across 100+ clients with a 5-star average rating.",
-      "Published apps including uNotes and Shorty, reaching ~20K cumulative monthly active users.",
+      "Successfully generated over $1M in project revenue, working with 100+ satisfied clients and earning an average 5-star rating.",
+      "Developed many great B2B relationships and long-term client partnerships.",
+      "Published several apps, including uNotes and Shorty, reaching a cumulative 20K monthly active users.",
     ],
     skills: ["Leadership", "Full-Stack", "Product", "B2B Sales"],
   },
@@ -45,13 +55,13 @@ export const experience: ExperienceItem[] = [
     period: "Sep 2022 – Present",
     current: true,
     highlights: [
-      "Produce videos and thumbnails with Adobe Photoshop and Premiere Pro.",
-      "Created inspirational content that has positively impacted 100+ people's mental health.",
+      "Created videos and thumbnails using Adobe Photoshop and Premiere Pro.",
+      "Formed inspirational content that has positively impacted over 100 people's mental and physical health.",
     ],
     skills: ["Video Editing", "Photoshop", "Premiere Pro", "Public Speaking"],
   },
   {
-    role: "GIS Full Stack / Code Migration Modernization Specialist",
+    role: "GIS Full Stack / Code Migration Modernization Porting Specialist",
     company: "Fujitsu",
     short: "F",
     brand: "fujitsu",
@@ -59,10 +69,26 @@ export const experience: ExperienceItem[] = [
     type: "Full-time",
     period: "Nov 2022 – Apr 2024",
     location: "Ottawa, ON · Remote",
-    highlights: [
-      "Optimized spatial data storage and queries with PostGIS and built interactive front-ends in jQuery.",
-      "Ported legacy JS/jQuery to Vue.js single-page apps and automated CI/CD with Jenkins and Azure.",
-      "Modernized legacy COBOL into C# and Java, recreating terminals in React.",
+    highlights: [],
+    highlightGroups: [
+      {
+        label: "GIS Full Stack Developer",
+        items: [
+          "Optimized spatial data storage and query management using PostGIS.",
+          "Developed dynamic and interactive front-end features with jQuery and CSS.",
+          "Ported old JS/jQuery code to Vue.js, building user interfaces and single-page applications (SPAs).",
+          "Managed backend systems and data handling with SQLAlchemy.",
+          "Automated development workflows and improved CI/CD processes with Jenkins and Azure.",
+        ],
+      },
+      {
+        label: "Code Migration Modernization Specialist",
+        items: [
+          "Migrated legacy COBOL code to C#.",
+          "Converted COBOL code to Java for system modernization.",
+          "Recreated frontend terminals using React.js.",
+        ],
+      },
     ],
     skills: ["Vue.js", "C#", "PostGIS", "SQLAlchemy", "Jenkins", "Azure"],
   },
@@ -76,8 +102,12 @@ export const experience: ExperienceItem[] = [
     period: "Mar 2023 – Jun 2023",
     location: "Remote",
     highlights: [
-      "Built and maintained Django REST APIs and responsive React user interfaces.",
-      "Managed AWS hosting (EC2, S3, RDS) behind NGINX with PostgreSQL migrations via Django ORM.",
+      "Collaborated with the team to analyze requirements and design user stories and next steps toward our goals.",
+      "Managed webapp hosting using AWS services (EC2, S3, RDS) and NGINX.",
+      "Created and maintained Django REST APIs for data communication between frontend and backend.",
+      "Managed PostgreSQL database migrations using Django's ORM.",
+      "Implemented responsive and user-friendly UI components using React.js.",
+      "Developed scripts to perform cronjobs and automate sending emails using the SendGrid API.",
     ],
     skills: ["React", "Django", "AWS", "PostgreSQL", "NGINX"],
   },
@@ -105,8 +135,9 @@ export const experience: ExperienceItem[] = [
     period: "May 2021 – Sep 2021",
     location: "Ottawa, ON · Hybrid",
     highlights: [
-      "Built a C# CLI to share and manage files in the cloud.",
-      "Designed embedded Visual Basic features for high-performance optical modules and ran in-lab optical wave tests.",
+      "Created a C# CLI program that programmatically allows users to share and manage files in the cloud.",
+      "Designed key features in Visual Basic on embedded platforms for high-performance optical modules.",
+      "Performed in-lab optical wave test experiments with various high-tech equipment.",
     ],
     skills: ["C#", "Visual Basic", "Fiber Optics", "Embedded"],
   },
@@ -120,8 +151,12 @@ export const experience: ExperienceItem[] = [
     period: "Jan 2020 – Dec 2020",
     location: "Ottawa, ON · Hybrid",
     highlights: [
-      "Managed cryptographic keys (RSA, ECC, AES, McEliece, HSS) from an HSM and Yubico YubiKeys via Java, Python and Bash.",
-      "Wrote test cases for low-level C/C++ HSM logic to 80%+ coverage and migrated the Java/Maven project from JDK8 to JDK11.",
+      "Created services using Java, Python, and Bash to manage the data of different cryptographic keys (McEliece, RSA, ECC, AES, and HSS) from Crypto4A's HSM (Hardware Security Module) and Yubico's YubiKey.",
+      "Created test cases for Crypto4A's low-level C/C++ program that handles the HSM's hardware logic, achieving 80%+ code coverage.",
+      "Developed JavaScript web apps that interfaced with Crypto4A's Java services using a REST API.",
+      "Migrated Crypto4A's entire Java/Maven project from JDK 8 to JDK 11.",
+      "Created custom terminal Linux commands that interfaced with the Java services.",
+      "Supervised newly recruited students by performing professional code reviews and scheduling weekly meetings to assist them in their tasks.",
     ],
     skills: ["Java", "Python", "C/C++", "Cryptography", "HSM"],
   },
@@ -135,8 +170,8 @@ export const experience: ExperienceItem[] = [
     period: "May 2019 – Sep 2019",
     location: "Ottawa, ON · On-site",
     highlights: [
-      "Laid the foundations for a Java application to build and run automated SOAP-service tests.",
-      "Wrote JUnit test cases against an Oracle/MySQL database with Hibernate.",
+      "Laid the foundations for a Java application allowing DND to create, build, and run automated tests for their SOAP services.",
+      "Worked with JUnit to create test cases, an Oracle MySQL database for managing DB data, and Hibernate to interface with the DB.",
     ],
     skills: ["Java", "JUnit", "Hibernate", "SQL"],
   },
