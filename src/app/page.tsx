@@ -28,6 +28,8 @@ export default async function Home() {
     upupStats,
     stealthStats,
     notifierStats,
+    dokployStats,
+    multideckStats,
     contributions,
   ] = await Promise.all([
     fetchAllMAU(),
@@ -35,6 +37,8 @@ export default async function Home() {
     fetchRepoStats("DevinoSolutions", "upup"),
     fetchRepoStats("DevinoSolutions", "stealth-chrome-devtools-mcp"),
     fetchRepoStats("DevinoSolutions", "ai-agent-notifier"),
+    fetchRepoStats("DevinoSolutions", "dokploy-community"),
+    fetchRepoStats("DevinoSolutions", "multideck-ai-agents-manager"),
     fetchContributionGraph("AminDhouib"),
   ]);
   const blogPosts = getAllBlogPosts();
@@ -52,6 +56,8 @@ export default async function Home() {
           upupStats={upupStats}
           stealthStats={stealthStats}
           notifierStats={notifierStats}
+          dokployStats={dokployStats}
+          multideckStats={multideckStats}
           contributions={contributions}
         />
         <Services />

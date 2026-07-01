@@ -902,7 +902,7 @@ export function SpaceShooterGame() {
       <div
         ref={containerRef}
         className={`relative rounded-xl border border-(--border) overflow-hidden mx-auto ${
-          (ui.status === "playing" || ui.status === "armed" || ui.status === "paused") ? "touch-none" : "touch-auto"
+          (ui.status === "playing" || ui.status === "paused") ? "touch-none" : "touch-auto"
         } ${
           isFullscreen
             ? "fixed inset-0 z-50 w-screen h-screen rounded-none border-0"

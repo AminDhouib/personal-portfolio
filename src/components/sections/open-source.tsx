@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { GitFork, Star, ArrowRight, EyeOff, BellRing } from "lucide-react";
+import { GitFork, Star, ArrowRight, EyeOff, BellRing, Cloud, LayoutGrid } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon, TechIcon } from "@/components/ui/tech-icon";
@@ -69,6 +69,26 @@ const ossDefaults: OSSProject[] = [
     forks: 0,
     stars: 4,
   },
+  {
+    name: "Dokploy Community",
+    description:
+      "Open Source Alternative to Vercel, Netlify and Heroku.",
+    icon: Cloud,
+    tech: ["TypeScript", "Docker", "Traefik"],
+    github: "https://github.com/DevinoSolutions/dokploy-community",
+    forks: 0,
+    stars: 7,
+  },
+  {
+    name: "MultiDeck",
+    description:
+      "Open every project in its own terminal and auto-tile them into a grid across all your monitors — DPI-correct on mixed-scale setups.",
+    icon: LayoutGrid,
+    tech: ["PowerShell", "Claude Code", "Codex"],
+    github: "https://github.com/DevinoSolutions/multideck-ai-agents-manager",
+    forks: 0,
+    stars: 2,
+  },
 ];
 
 const ciTools = [
@@ -130,6 +150,8 @@ interface Props {
   upupStats?: RepoStats;
   stealthStats?: RepoStats;
   notifierStats?: RepoStats;
+  dokployStats?: RepoStats;
+  multideckStats?: RepoStats;
   contributions?: ContributionDay[];
 }
 
@@ -138,6 +160,8 @@ export function OpenSource({
   upupStats,
   stealthStats,
   notifierStats,
+  dokployStats,
+  multideckStats,
   contributions,
 }: Props) {
   const projects: OSSProject[] = [
@@ -160,6 +184,16 @@ export function OpenSource({
       ...ossDefaults[3],
       forks: notifierStats?.forks ?? ossDefaults[3].forks,
       stars: notifierStats?.stars ?? ossDefaults[3].stars,
+    },
+    {
+      ...ossDefaults[4],
+      forks: dokployStats?.forks ?? ossDefaults[4].forks,
+      stars: dokployStats?.stars ?? ossDefaults[4].stars,
+    },
+    {
+      ...ossDefaults[5],
+      forks: multideckStats?.forks ?? ossDefaults[5].forks,
+      stars: multideckStats?.stars ?? ossDefaults[5].stars,
     },
   ];
 

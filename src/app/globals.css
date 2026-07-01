@@ -476,58 +476,33 @@ html {
   z-index: 9999 !important;
 }
 
-/* Multi-color AI gradient button with animated scrolling gradient */
+/* Match CopilotKit's FAB to the pre-load pill ("Amin AI" + sparkles) */
 .copilotKitButton {
-  width: 4rem !important;
-  height: 4rem !important;
-  border-radius: 50% !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 9999px !important;
   overflow: hidden !important;
-  background-color: transparent !important;
-  background-image: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 25%, #06b6d4 50%, #ec4899 75%, #8b5cf6 100%) !important;
-  background-size: 300% 300% !important;
-  border: none !important;
-  box-shadow:
-    0 0 20px rgba(139, 92, 246, 0.4),
-    0 0 60px rgba(59, 130, 246, 0.15) !important;
-  animation: chatbot-pulse 3s ease-in-out infinite, gradient-shift 6s ease infinite !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  background-image: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(12px) !important;
   position: relative !important;
-}
-
-/* Pulsing ring effect */
-.copilotKitButton::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid rgba(139, 92, 246, 0.5);
-  animation: pulse-ring 2s ease-out infinite;
-  pointer-events: none;
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.8;
-  }
-  70% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1.35);
-    opacity: 0;
-  }
+  animation: none !important;
+  transition: border-color 0.2s, background-color 0.2s !important;
 }
 
 .copilotKitButton:hover {
-  box-shadow:
-    0 0 25px rgba(139, 92, 246, 0.6),
-    0 0 80px rgba(59, 130, 246, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  background-color: rgba(0, 0, 0, 1) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3) !important;
 }
 
 .copilotKitButton .copilotKitButtonIcon svg {
-  width: 1.75rem !important;
-  height: 1.75rem !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  color: var(--color-accent-blue) !important;
 }
 
 @keyframes chatbot-pulse {
