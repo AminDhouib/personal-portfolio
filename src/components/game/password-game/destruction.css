@@ -553,7 +553,7 @@
   position: absolute;
   pointer-events: none;
   z-index: 4;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><filter id='n'><feTurbulence baseFrequency='2.5' numOctaves='1' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 -0.3'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-image: url("/textures/noise-burst.svg");
   background-size: 80px 80px;
   mix-blend-mode: screen;
   opacity: 0;

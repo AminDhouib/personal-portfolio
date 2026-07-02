@@ -58,3 +58,8 @@ snapshot2.txt.*.png
 
 # stray monitor output (unrelated to this project)
 aishorty-monitor.*
+
+# stray junk files
+nul
+.devserver.log
+element_clones/
