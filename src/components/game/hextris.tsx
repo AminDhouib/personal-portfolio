@@ -2817,15 +2817,17 @@ export function HextrisGame() {
     resizeObserver.observe(container);
 
     // Rescale on fullscreen transitions so the canvas fills the new viewport.
+    let fsChangeRaf: number | null = null;
     const onFsChange = () => {
       // Delay by one frame so the browser has laid out the new rect.
-      requestAnimationFrame(() => scaleCanvas());
+      fsChangeRaf = requestAnimationFrame(() => scaleCanvas());
     };
     document.addEventListener("fullscreenchange", onFsChange);
     // Also listen to window resize as a safety net for orientation changes
     // and pseudo-fullscreen toggles (keyboard opening, rotation, etc.).
+    let resizeRaf: number | null = null;
     const onWindowResize = () => {
-      requestAnimationFrame(() => scaleCanvas());
+      resizeRaf = requestAnimationFrame(() => scaleCanvas());
     };
     window.addEventListener("resize", onWindowResize);
     window.addEventListener("orientationchange", onWindowResize);
@@ -2850,6 +2852,8 @@ export function HextrisGame() {
       window.removeEventListener("resize", onWindowResize);
       window.removeEventListener("orientationchange", onWindowResize);
       window.removeEventListener("blur", handleBlur);
+      if (fsChangeRaf !== null) cancelAnimationFrame(fsChangeRaf);
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
       if (soundsRef.current) soundsRef.current.destroy();
     };
   }, []);

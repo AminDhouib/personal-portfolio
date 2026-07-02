@@ -95,7 +95,7 @@ export const sfx = {
   // ── Legacy/back-compat aliases (used by existing call sites until the
   // gameplay code is migrated to the explicit names above).
   click: () => playSample("tile-flip.mp3", 0.55),
-  coin: (_value: number = 2) => {
+  coin: () => {
     // HG/SS does NOT play a per-flip coin SE — coin chimes only fire during
     // the post-round payout banner. Until the win flow is rewired, keep
     // this as a no-op so x2/x3 reveals stop double-bleeping.

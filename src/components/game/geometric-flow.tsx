@@ -235,22 +235,22 @@ export function GeometricFlowGame() {
     );
   }
 
-  function drawLaneGuides(
-    ctx: CanvasRenderingContext2D,
-    canvas: HTMLCanvasElement
-  ) {
-    for (let lane = 0; lane < LANES; lane++) {
-      const y = getLaneY(canvas, lane);
-      ctx.strokeStyle = "rgba(255,255,255,0.04)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 8]);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
+  const drawLaneGuides = useCallback(
+    (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+      for (let lane = 0; lane < LANES; lane++) {
+        const y = getLaneY(canvas, lane);
+        ctx.strokeStyle = "rgba(255,255,255,0.04)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 8]);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    },
+    [getLaneY]
+  );
 
   function drawHUD(
     ctx: CanvasRenderingContext2D,
@@ -387,7 +387,7 @@ export function GeometricFlowGame() {
 
     frameRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(frameRef.current);
-  }, [getLaneY, spawnShape]);
+  }, [getLaneY, spawnShape, drawLaneGuides]);
 
   return (
     <div className="relative w-full select-none">

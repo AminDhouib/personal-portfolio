@@ -8,15 +8,15 @@ import {
   Rocket, Trophy, Shield, RotateCcw, Send,
   Volume2, VolumeX, Crosshair, Zap, Target,
   Maximize2, Minimize2, Pause, Play,
-  ShoppingCart, Magnet, Coins as CoinsIcon, Timer, X as XIcon,
+  ShoppingCart, Magnet, Coins as CoinsIcon, X as XIcon,
   Share2,
 } from "lucide-react";
 import {
   addCoins, addRunStats, incrementRunsPlayed, loadProfile, markFirstRunCompleted, saveProfile,
   setUpgradeLevel, spendCoins,
 } from "./profile";
-import { UPGRADES, upgradeById, SHIPS, shipById, CONSUMABLES, consumableById, COSMETICS, cosmeticById } from "./shop-data";
-import { ShipPreview, UpgradePreview, ConsumablePreview, CosmeticPreview, type UpgradeIcon, type ConsumableIcon, type CosmeticSlotKind } from "./space-shooter/shop-previews";
+import { UPGRADES, upgradeById, SHIPS, CONSUMABLES, COSMETICS } from "./shop-data";
+import { ShipPreview, UpgradePreview, ConsumablePreview, CosmeticPreview } from "./space-shooter/shop-previews";
 import { PostFx } from "./post-fx";
 import { ACHIEVEMENTS, checkAchievements, grantAchievements, type Achievement } from "./achievements";
 import {
@@ -24,7 +24,7 @@ import {
   type BossId, type BossPhase, type GameRefs,
   ARENA_W, ARENA_H, POWERUP_DURATION_MS,
   ENVIRONMENTS, INVERTED_ARMED_ENV, envForTime,
-  POWERUP_DEFS, isPowerUpActive, tryDash,
+  POWERUP_DEFS, tryDash,
 } from "./space-shooter/types";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";

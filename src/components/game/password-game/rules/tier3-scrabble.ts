@@ -16,14 +16,6 @@ const SCORES: Record<string, number> = {
   q: 10, z: 10,
 };
 
-function scoreOf(word: string): number {
-  let total = 0;
-  for (const ch of word.toLowerCase()) {
-    total += SCORES[ch] ?? 0;
-  }
-  return total;
-}
-
 function hasWordWithScore(password: string, target: number): boolean {
   // Find all maximal alphabetic runs, then check every substring ≥ 3 letters.
   const runs = password.match(/[a-zA-Z]+/g) ?? [];

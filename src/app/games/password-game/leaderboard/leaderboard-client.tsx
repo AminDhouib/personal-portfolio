@@ -48,7 +48,6 @@ export function LeaderboardClient() {
     } else {
       fetchEntries("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   return (

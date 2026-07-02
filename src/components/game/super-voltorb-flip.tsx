@@ -330,9 +330,7 @@ class VoltorbFlip {
   }
 
   public toggleMemo() {
-    this._gameStatus === "playing"
-      ? (this._gameStatus = "memo")
-      : (this._gameStatus = "playing");
+    this._gameStatus = this._gameStatus === "playing" ? "memo" : "playing";
   }
 
   public flagCell(row: number, col: number, flag: CellValue): void {
@@ -349,9 +347,8 @@ class VoltorbFlip {
       this._gameStatus = "lose";
       return;
     }
-    this._currentScore === 0
-      ? (this._currentScore = cellValue)
-      : (this._currentScore *= cellValue);
+    this._currentScore =
+      this._currentScore === 0 ? cellValue : this._currentScore * cellValue;
 
     if (this._currentScore === this._board.maxLevelScore) {
       this._currentLevel = Math.min(this._currentLevel + 1, 8);
@@ -1288,43 +1285,6 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
 };
 
 // ---------------------------------------------------------------------------
-// src/components/GameInfo.tsx (1:1 port).
-// ---------------------------------------------------------------------------
-
-type GameInfoProps = {
-  currentLevel: number;
-};
-
-const GameInfo = ({ currentLevel }: GameInfoProps) => {
-  return (
-    <>
-      <div className="border-2 sm:border-4 border-white bg-[#448563] px-4 sm:px-16 text-center text-base sm:text-3xl outline outline-2 outline-gray-600">
-        <div className="leading-5 sm:leading-7 drop-shadow-default">
-          <p>VOLTORB Flip Lv. {currentLevel}</p>
-          <p>Flip the Cards and Collect Coins!</p>
-        </div>
-      </div>
-
-      <div className="flex w-11/12 items-center gap-2 sm:gap-3 border-b-2 sm:border-b-4 border-b-gray-200 pt-2 sm:pt-3 text-base sm:text-3xl">
-        <div className="flex gap-2 sm:gap-4">
-          <Card fake={true}>1</Card>
-          <Card fake={true}>2</Card>
-          <Card fake={true}>3</Card>
-        </div>
-        <p className="drop-shadow-default">...x1! ...x2! ...x3!</p>
-      </div>
-
-      <div className="mr-4 flex w-8/12 items-center gap-2 sm:gap-3 self-end border-b-2 sm:border-b-4 border-b-gray-200 pt-2 sm:pt-3 text-base sm:text-3xl">
-        <Card fake={true}>
-          <VoltorbIcon size={28} className="picture-outline voltorb" />
-        </Card>
-        <p className="drop-shadow-default">Game Over! 0!</p>
-      </div>
-    </>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // src/components/InstructionsModal.tsx (1:1 port).
 // ---------------------------------------------------------------------------
 
@@ -1891,11 +1851,11 @@ export function SuperVoltorbFlipGame() {
       return new Set<MemoFlag>([f]);
     });
   };
-  const clearMemoFlags = () => {
+  const clearMemoFlags = useCallback(() => {
     // The "Back" pad button in the memo overlay (HG/SS DP_BUTTON3).
     if (!muted) sfx.backButton();
     setMemoFlags(new Set<MemoFlag>());
-  };
+  }, [muted]);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const musicStartedRef = useRef(false);
 
@@ -2009,7 +1969,7 @@ export function SuperVoltorbFlipGame() {
         tallyTimerRef.current = null;
       }
     };
-  }, [game?.currentScore, game?.totalScore, game?.gameStatus, displayCurrent, displayTotal, muted]);
+  }, [game, game?.currentScore, game?.totalScore, game?.gameStatus, displayCurrent, displayTotal, muted]);
 
   // Release the post-payout freeze when restartGame zeroes currentScore.
   // We hold payoutAnimRef.current=true through flipCardsDown / level-flash
@@ -2022,7 +1982,7 @@ export function SuperVoltorbFlipGame() {
       payoutAnimRef.current = false;
     }
     prevCurrentScoreRef.current = game.currentScore;
-  }, [game?.currentScore]);
+  }, [game, game?.currentScore]);
 
   // Hold the visible Lv value at its old number while a round is wrapping
   // up (win/lose). The game already advances currentLevel as soon as the
@@ -2044,7 +2004,7 @@ export function SuperVoltorbFlipGame() {
     return () => {
       if (syncLevelTimer) window.clearTimeout(syncLevelTimer);
     };
-  }, [game?.currentLevel, game?.gameStatus, displayLevel]);
+  }, [game, game?.currentLevel, game?.gameStatus, displayLevel]);
 
   const triggerLevelTransition = useCallback(
     (dir: "up" | "down") => {
@@ -2167,7 +2127,7 @@ export function SuperVoltorbFlipGame() {
         totalScore: game.totalScore,
       }),
     );
-  }, [game?.currentLevel, game?.totalScore]);
+  }, [game, game?.currentLevel, game?.totalScore]);
 
   // Reset memo mode + drive music/game-over audio on status transitions.
   // restartGame sets status back to "playing" after cards flip down.
@@ -2204,7 +2164,7 @@ export function SuperVoltorbFlipGame() {
     return () => {
       if (clearMemoTimer) window.clearTimeout(clearMemoTimer);
     };
-  }, [game?.gameStatus, muted, clearMemoFlags]);
+  }, [game, game?.gameStatus, muted, clearMemoFlags]);
 
   function handleFirstInteraction() {
     if (!musicStartedRef.current && !muted) {

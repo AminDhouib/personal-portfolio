@@ -4,8 +4,8 @@ import {
   ARENA_W, ARENA_H, setArena, SPAWN_Z, DESPAWN_Z, MAX_OBSTACLES, MAX_POWERUPS,
   SHIP_RADIUS, POWERUP_PICKUP_RADIUS, POWERUP_SPAWN_INTERVAL_MS,
   COMBO_WINDOW_MS, NEAR_MISS_RADIUS, NEAR_MISS_POINTS,
-  POWERUP_TYPES, POWERUP_DEFS, ENVIRONMENTS, INVERTED_ARMED_ENV,
-  nextId, isPowerUpActive, envColors, activatePowerUp,
+  POWERUP_DEFS, ENVIRONMENTS, INVERTED_ARMED_ENV,
+  isPowerUpActive, envColors, activatePowerUp,
 } from "./types";
 import { difficulty, elapsedSeconds, comboMultiplier } from "./difficulty";
 import { sounds } from "./sound-manager";

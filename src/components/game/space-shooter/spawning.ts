@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import type { GameRefs, Obstacle, Bullet, BulletStyle, PowerUp, PowerUpType } from "./types";
-import { ARENA_W, ARENA_H, SPAWN_Z, MAX_BULLETS, POWERUP_TYPES, nextId, isPowerUpActive, POWERUP_DURATION_MS } from "./types";
+import type { GameRefs, Obstacle, BulletStyle, PowerUp } from "./types";
+import { ARENA_W, ARENA_H, SPAWN_Z, MAX_BULLETS, POWERUP_TYPES, nextId, isPowerUpActive } from "./types";
 import { difficulty, elapsedSeconds, unlockedVariants } from "./difficulty";
 import type { SoundManager } from "./sound-manager";
 

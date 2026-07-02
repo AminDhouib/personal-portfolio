@@ -4,8 +4,6 @@ import { loadProfile, saveProfile, type Profile } from "../profile";
 // ---------- arena constants ----------
 const ARENA_W_DESKTOP = 9;
 const ARENA_H_DESKTOP = 5.4;
-const ARENA_W_MOBILE = 6.5;
-const ARENA_H_MOBILE = 6.0;
 export let ARENA_W = ARENA_W_DESKTOP;
 export let ARENA_H = ARENA_H_DESKTOP;
 export function setArena(w: number, h: number) {

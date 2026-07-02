@@ -116,6 +116,7 @@ export function PasswordGame() {
       ),
     // wordleVersion bumps when the real NYT word resolves — re-memo so the
     // Wordle rule picks up the authoritative answer instead of the fallback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [seed, wordleVersion]
   );
 

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { GameRefs, Environment, PowerUpType } from "./types";
-import { ENVIRONMENTS, POWERUP_DURATION_MS, START_INVULN_MS, POWERUP_TYPES, activatePowerUp } from "./types";
+import { ENVIRONMENTS, POWERUP_DURATION_MS, START_INVULN_MS } from "./types";
 import { buildBossSchedule } from "./boss-behaviors";
 import { sounds } from "./sound-manager";
 import { loadProfile, saveProfile } from "../profile";

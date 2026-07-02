@@ -1,6 +1,11 @@
+import { logWarn } from "@/lib/log";
+
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const BASE = "https://api.github.com";
 const GITHUB_REVALIDATE_SECONDS = 86400;
+// Every upstream call gets this timeout so a hung GitHub (or mirror) request
+// can't stall ISR regeneration.
+const GITHUB_FETCH_TIMEOUT_MS = 8000;
 
 function ghFetch(path: string) {
   return fetch(`${BASE}${path}`, {
@@ -9,6 +14,7 @@ function ghFetch(path: string) {
       ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
     },
     next: { revalidate: GITHUB_REVALIDATE_SECONDS },
+    signal: AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS),
   });
 }
 
@@ -30,7 +36,7 @@ export async function fetchRepoStats(
     };
     return { stars: data.stargazers_count, forks: data.forks_count };
   } catch (err) {
-    console.warn(`[github] fetchRepoStats ${owner}/${repo} failed:`, err);
+    logWarn("github", `fetchRepoStats ${owner}/${repo} failed`, err);
     return { stars: 0, forks: 0 };
   }
 }
@@ -81,6 +87,7 @@ async function fetchContributionsGraphql(
       },
       body: JSON.stringify({ query, variables: { login: username } }),
       next: { revalidate: GITHUB_REVALIDATE_SECONDS },
+      signal: AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return [];
@@ -117,7 +124,7 @@ async function fetchContributionsGraphql(
     }
     return days;
   } catch (err) {
-    console.warn(`[github] fetchContributionsGraphql failed:`, err);
+    logWarn("github", "fetchContributionsGraphql failed", err);
     return [];
   }
 }
@@ -134,7 +141,10 @@ async function fetchContributionsPublic(
       `https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(
         username
       )}?y=last`,
-      { next: { revalidate: GITHUB_REVALIDATE_SECONDS } }
+      {
+        next: { revalidate: GITHUB_REVALIDATE_SECONDS },
+        signal: AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS),
+      }
     );
     if (!res.ok) return [];
     const json = (await res.json()) as {
@@ -146,7 +156,7 @@ async function fetchContributionsPublic(
       level: Math.max(0, Math.min(4, Math.round(d.level))) as 0 | 1 | 2 | 3 | 4,
     }));
   } catch (err) {
-    console.warn(`[github] fetchContributionsPublic failed:`, err);
+    logWarn("github", "fetchContributionsPublic failed", err);
     return [];
   }
 }

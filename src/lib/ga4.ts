@@ -1,4 +1,5 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { logWarn } from "@/lib/log";
 
 // Property IDs for each app (set in .env.local)
 const propertyIds: Record<string, string | undefined> = {
@@ -8,6 +9,10 @@ const propertyIds: Record<string, string | undefined> = {
   upup: process.env.GA4_PROPERTY_UPUP,
   getitdone: process.env.GA4_PROPERTY_GETITDONE,
 };
+
+// Client-side timeout for GA4 Data API calls so a slow/hung upstream request
+// can't stall ISR regeneration.
+const GA4_TIMEOUT_MS = 8000;
 
 let _client: BetaAnalyticsDataClient | null = null;
 
@@ -22,7 +27,8 @@ function getClient(): BetaAnalyticsDataClient | null {
     };
     _client = new BetaAnalyticsDataClient({ credentials });
     return _client;
-  } catch {
+  } catch (err) {
+    logWarn("ga4", "failed to parse GA4_SERVICE_ACCOUNT_KEY / init client", err);
     return null;
   }
 }
@@ -34,14 +40,18 @@ export async function fetchMAU(slug: string): Promise<number | null> {
   if (!client) return null;
 
   try {
-    const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
-      dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-      metrics: [{ name: "activeUsers" }],
-    });
+    const [response] = await client.runReport(
+      {
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+        metrics: [{ name: "activeUsers" }],
+      },
+      { timeout: GA4_TIMEOUT_MS }
+    );
     const value = response.rows?.[0]?.metricValues?.[0]?.value;
     return value ? parseInt(value, 10) : null;
-  } catch {
+  } catch (err) {
+    logWarn("ga4", `runReport activeUsers failed for slug "${slug}" (property ${propertyId})`, err);
     return null;
   }
 }

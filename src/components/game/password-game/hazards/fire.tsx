@@ -12,7 +12,7 @@ const FIRE = "🔥";
 export const fireRule: RuleDef = {
   id: "fire",
   tier: 4,
-  create(_rng) {
+  create() {
     const spreadInterval = 3000 + Math.floor(Math.random() * 2000);
     const maxFires = 3;
     return {

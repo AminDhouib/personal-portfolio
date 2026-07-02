@@ -1,4 +1,4 @@
-import type { GameRefs, BossState, BossId, BossWallSegment, TractorBeam, PowerUpType } from "./types";
+import type { GameRefs, BossState, BossId, BossWallSegment, TractorBeam } from "./types";
 import { isPowerUpActive } from "./types";
 import { spawnExplosion, spawnShipDebris } from "./spawning";
 import { sounds } from "./sound-manager";
