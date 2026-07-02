@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createLeaderboardStore } from "@/lib/leaderboard-store";
+import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,16 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  const rate = checkRateLimit(`pg-leaderboard:${getClientIp(req)}`, { limit: 10, windowMs: 60_000 });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "too many requests" },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
+  }
   let body: unknown;
   try {
     body = await req.json();

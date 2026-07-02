@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Amin Dhouib — Personal Portfolio
 
-## Getting Started
+Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog, five browser games with persistent leaderboards, an AI chat assistant, and live GitHub/GA4 stats.
 
-First, run the development server:
+## Stack
+
+- [Next.js 16](https://nextjs.org) App Router with Turbopack, [React 19](https://react.dev), TypeScript (strict mode)
+- Tailwind CSS v4
+- [CopilotKit](https://www.copilotkit.ai/) + [OpenRouter](https://openrouter.ai/) for the AI chat assistant
+- three.js / React Three Fiber for the browser games
+- MDX (`next-mdx-remote`) for the blog
+- Vitest + Testing Library for tests
+- pnpm, managed via Corepack
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+corepack enable
+pnpm install
+cp .env.example .env.local   # optional — see below
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Everything in `.env.example` is optional for local dev: each integration (AI chat, GitHub stats, GA4, lead emails) degrades gracefully — falling back to public/unauthenticated data or simply going quiet — when its variable is unset. See the comments in `.env.example` for the exact fallback behavior of each one.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script | Description |
+| --- | --- |
+| `pnpm dev` | Start the dev server (Turbopack) |
+| `pnpm build` | Production build |
+| `pnpm start` | Serve the production build |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | Type-check with `tsc --noEmit` |
+| `pnpm test` | Run the test suite once |
+| `pnpm test:watch` | Run tests in watch mode |
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/          Next.js App Router routes: pages + API routes (chat, leaderboards, leads)
+  components/   React components (blog, chat, games, layout, sections, three, ui)
+  data/         Static app data (e.g. password-game content)
+  lib/          Server-side utilities: GitHub stats, GA4, blog loader, leaderboard store
+  test/         Vitest setup
+content/
+  blog/         MDX blog posts
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm test        # vitest run, single pass
+pnpm test:watch  # vitest, watch mode
+```
 
-## Deploy on Vercel
+Tests use Vitest with `@testing-library/react` and jsdom.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The site is self-hosted via [Dokploy](https://dokploy.com/) (Docker) on a home server, built from the repo's `Dockerfile` — a multi-stage build (`deps` → `builder` → `runner`) producing a Next.js `standalone` output that runs as a non-root user.
+
+**Persistent data.** Game leaderboards and contact-form leads are written as plain JSON/JSONL files under `/app/.data` inside the container. In production this path is a named Docker volume, `portfolio-data`, mounted onto the Dokploy application — without it, that data is wiped on every redeploy since the container filesystem is otherwise ephemeral.
+
+**CI/CD.** `.github/workflows/ci.yml` runs on every push and pull request:
+
+1. `quality` job — install, typecheck, lint, test, build.
+2. `deploy` job — runs only on push to `main`, and only after `quality` passes. It checks for four repository secrets (`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DOKPLOY_URL`, `DOKPLOY_TOKEN`); if any are missing it prints `deploy skipped: secrets not configured` and exits cleanly. Otherwise it joins the tailnet via `tailscale/github-action` (OAuth client tagged `tag:ci`) and calls the Dokploy API to trigger a deploy.
+
+This exists because Dokploy's built-in GitHub `autoDeploy` webhook **cannot** work here: the Dokploy panel is reachable only over Tailscale, and GitHub's servers can't reach into the tailnet to deliver a webhook. Instead, the GitHub Actions runner joins the tailnet itself and pushes the deploy trigger from inside it.
+
+**Manual deploy fallback**, from a machine on the tailnet:
+
+```bash
+curl -sf -X POST "$DOKPLOY_URL/api/application.deploy" \
+  -H "x-api-key: $DOKPLOY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"applicationId":"9ZeLiZVLfBtm0OwzIWBxI"}'
+```
+
+or use the "Deploy" button in the Dokploy panel directly.
+
+**Verifying a deploy.** Check the deployment list in Dokploy for the new commit hash with status `done` (build takes roughly 45s), then spot-check [amindhou.com](https://amindhou.com).
+
+## Windows dev note
+
+Turbopack previously panicked on an inline SVG data-URI in `globals.css`; the fix was externalizing the image to `public/textures/noise.svg` and referencing it by URL instead. If a dev route ever starts 500ing and a stray `nul` file appears at the repo root, suspect a reintroduced CSS data-URI as the cause.

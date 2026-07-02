@@ -5,10 +5,34 @@ import {
 } from "@copilotkit/runtime";
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
+import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 
 const runtime = new CopilotRuntime();
 
 export const POST = async (req: NextRequest) => {
+  // Guard the open LLM proxy before any work: reject cross-origin callers and
+  // throttle per client IP so the OpenRouter key can't be drained by abuse.
+  if (!isSameOrigin(req)) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden" }),
+      { status: 403, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const rate = checkRateLimit(`copilotkit:${getClientIp(req)}`, { limit: 20, windowMs: 60_000 });
+  if (!rate.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests" }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(rate.retryAfterSeconds),
+        },
+      }
+    );
+  }
+
   const openrouterKey = process.env.OPENROUTER_KEY;
   if (!openrouterKey) {
     return new Response(

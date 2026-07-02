@@ -9,87 +9,14 @@ import type { LucideIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon, TechIcon } from "@/components/ui/tech-icon";
 import type { RepoStats, ContributionDay } from "@/lib/github";
+import { ossProjects, type OssIcon } from "@/data/oss-projects";
 
-interface OSSProject {
-  name: string;
-  description: string;
-  // Brand logo (Caramel, UpUp) …
-  logo?: string;
-  logoWidth?: number;
-  logoHeight?: number;
-  // … or a lucide icon for tools without a brand logo.
-  icon?: LucideIcon;
-  // Stack chips shown on the card (primary language first).
-  tech: string[];
-  github: string;
-  forks: number;
-  stars: number;
-}
-
-const ossDefaults: OSSProject[] = [
-  {
-    name: "Caramel",
-    description: "Open-source Honey alternative",
-    logo: "/logos/caramel.png",
-    logoWidth: 1830,
-    logoHeight: 467,
-    tech: ["TypeScript", "JavaScript", "Swift", "Browser Extension"],
-    github: "https://github.com/DevinoSolutions/caramel",
-    forks: 45,
-    stars: 234,
-  },
-  {
-    name: "UpUp",
-    description: "React file upload component",
-    logo: "/logos/upup.png",
-    logoWidth: 6400,
-    logoHeight: 1366,
-    tech: ["React", "TypeScript", "AWS S3", "Azure"],
-    github: "https://github.com/DevinoSolutions/upup",
-    forks: 32,
-    stars: 189,
-  },
-  {
-    name: "Stealth Chrome DevTools MCP",
-    description:
-      "Undetectable browser automation for AI agents via MCP — stealth Chrome with anti-detection profile management and full CDP access.",
-    icon: EyeOff,
-    tech: ["Python", "nodriver", "CDP", "MCP"],
-    github: "https://github.com/DevinoSolutions/stealth-chrome-devtools-mcp",
-    forks: 0,
-    stars: 3,
-  },
-  {
-    name: "AI Agent Notifier",
-    description:
-      "Desktop & phone notifications for AI coding agents (Claude Code, Codex, Gemini CLI, Cursor). Toast + ntfy push, zero dependencies.",
-    icon: BellRing,
-    tech: ["JavaScript", "Node.js", "ntfy"],
-    github: "https://github.com/DevinoSolutions/ai-agent-notifier",
-    forks: 0,
-    stars: 4,
-  },
-  {
-    name: "Dokploy Community",
-    description:
-      "Open Source Alternative to Vercel, Netlify and Heroku.",
-    icon: Cloud,
-    tech: ["TypeScript", "Docker", "Traefik"],
-    github: "https://github.com/DevinoSolutions/dokploy-community",
-    forks: 0,
-    stars: 7,
-  },
-  {
-    name: "MultiDeck",
-    description:
-      "Open every project in its own terminal and auto-tile them into a grid across all your monitors — DPI-correct on mixed-scale setups.",
-    icon: LayoutGrid,
-    tech: ["PowerShell", "Claude Code", "Codex"],
-    github: "https://github.com/DevinoSolutions/multideck-ai-agents-manager",
-    forks: 0,
-    stars: 2,
-  },
-];
+const iconMap: Record<OssIcon, LucideIcon> = {
+  EyeOff,
+  BellRing,
+  Cloud,
+  LayoutGrid,
+};
 
 const ciTools = [
   { name: "Prettier", icon: "prettier" },
@@ -146,56 +73,16 @@ function contributionLabel(day: ContributionDay): string {
 }
 
 interface Props {
-  caramelStats?: RepoStats;
-  upupStats?: RepoStats;
-  stealthStats?: RepoStats;
-  notifierStats?: RepoStats;
-  dokployStats?: RepoStats;
-  multideckStats?: RepoStats;
+  stats?: Record<string, RepoStats | null>;
   contributions?: ContributionDay[];
 }
 
-export function OpenSource({
-  caramelStats,
-  upupStats,
-  stealthStats,
-  notifierStats,
-  dokployStats,
-  multideckStats,
-  contributions,
-}: Props) {
-  const projects: OSSProject[] = [
-    {
-      ...ossDefaults[0],
-      forks: caramelStats?.forks ?? ossDefaults[0].forks,
-      stars: caramelStats?.stars ?? ossDefaults[0].stars,
-    },
-    {
-      ...ossDefaults[1],
-      forks: upupStats?.forks ?? ossDefaults[1].forks,
-      stars: upupStats?.stars ?? ossDefaults[1].stars,
-    },
-    {
-      ...ossDefaults[2],
-      forks: stealthStats?.forks ?? ossDefaults[2].forks,
-      stars: stealthStats?.stars ?? ossDefaults[2].stars,
-    },
-    {
-      ...ossDefaults[3],
-      forks: notifierStats?.forks ?? ossDefaults[3].forks,
-      stars: notifierStats?.stars ?? ossDefaults[3].stars,
-    },
-    {
-      ...ossDefaults[4],
-      forks: dokployStats?.forks ?? ossDefaults[4].forks,
-      stars: dokployStats?.stars ?? ossDefaults[4].stars,
-    },
-    {
-      ...ossDefaults[5],
-      forks: multideckStats?.forks ?? ossDefaults[5].forks,
-      stars: multideckStats?.stars ?? ossDefaults[5].stars,
-    },
-  ];
+export function OpenSource({ stats, contributions }: Props) {
+  const projects = ossProjects.map((project) => ({
+    ...project,
+    forks: stats?.[project.key]?.forks ?? project.forks,
+    stars: stats?.[project.key]?.stars ?? project.stars,
+  }));
 
   const graph = contributions?.length ? contributions : fallbackContributions;
   // Take last 364 days (52 weeks × 7)
@@ -218,11 +105,11 @@ export function OpenSource({
         {/* OSS project cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           {projects.map((project, i) => {
-            const Icon = project.icon;
+            const Icon = project.icon ? iconMap[project.icon] : undefined;
             return (
             <motion.a
               key={project.name}
-              href={project.github}
+              href={`https://github.com/${project.owner}/${project.repo}`}
               target="_blank"
               rel="noopener noreferrer"
               initial={{ opacity: 0, y: 20 }}

@@ -15,32 +15,22 @@ import {
   Contact,
 } from "@/components/sections";
 import { fetchAllMAU } from "@/lib/ga4";
-import { fetchRepoStats, fetchContributionGraph } from "@/lib/github";
+import { fetchRepoStats, fetchContributionGraph, type RepoStats } from "@/lib/github";
 import { getAllBlogPosts } from "@/lib/blog";
+import { ossProjects } from "@/data/oss-projects";
 
 // ISR: revalidate every 24h for live MAU + GitHub data
 export const revalidate = 86400;
 
 export default async function Home() {
-  const [
-    mauData,
-    caramelStats,
-    upupStats,
-    stealthStats,
-    notifierStats,
-    dokployStats,
-    multideckStats,
-    contributions,
-  ] = await Promise.all([
+  const [mauData, ossRepoStats, contributions] = await Promise.all([
     fetchAllMAU(),
-    fetchRepoStats("DevinoSolutions", "caramel"),
-    fetchRepoStats("DevinoSolutions", "upup"),
-    fetchRepoStats("DevinoSolutions", "stealth-chrome-devtools-mcp"),
-    fetchRepoStats("DevinoSolutions", "ai-agent-notifier"),
-    fetchRepoStats("DevinoSolutions", "dokploy-community"),
-    fetchRepoStats("DevinoSolutions", "multideck-ai-agents-manager"),
+    Promise.all(ossProjects.map((p) => fetchRepoStats(p.owner, p.repo))),
     fetchContributionGraph("AminDhouib"),
   ]);
+  const ossStats: Record<string, RepoStats | null> = Object.fromEntries(
+    ossProjects.map((p, i) => [p.key, ossRepoStats[i]]),
+  );
   const blogPosts = getAllBlogPosts();
 
   return (
@@ -51,15 +41,7 @@ export default async function Home() {
         <Hero />
         <ProofBar />
         <Work mauData={mauData} />
-        <OpenSource
-          caramelStats={caramelStats}
-          upupStats={upupStats}
-          stealthStats={stealthStats}
-          notifierStats={notifierStats}
-          dokployStats={dokployStats}
-          multideckStats={multideckStats}
-          contributions={contributions}
-        />
+        <OpenSource stats={ossStats} contributions={contributions} />
         <Services />
         <Reviews />
         <Background />

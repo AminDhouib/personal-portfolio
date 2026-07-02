@@ -5,6 +5,14 @@ import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
+import { ossProjects, type OssProject } from "@/data/oss-projects";
+
+// Open-source project facts (Caramel, UpUp below) are sourced from the single
+// source of truth in src/data/oss-projects.ts so they can't drift out of sync
+// with the site's Open Source section.
+const ossByKey: Record<string, OssProject> = Object.fromEntries(
+  ossProjects.map((p) => [p.key, p] as const),
+);
 
 const INSTRUCTIONS = `You are Amin Dhouib's personal AI assistant on his portfolio site amindhou.com.
 You are friendly, concise, and knowledgeable about Amin's work. Keep responses short — this is a chat widget.
@@ -20,8 +28,8 @@ Key stats: $1M+ revenue, 50+ clients, 30K+ MAU across apps, 5.0/5.0 rating, 99.9
 Apps:
 - Shorty (aishorty.com) — AI YouTube & Spotify summarizer. 2.1K MAU, +50% MoM.
 - uNotes (unotes.net) — Community university notes platform. 5K MAU.
-- Caramel (grabcaramel.com) — Open-source Honey alternative browser ext.
-- UpUp (useupup.com) — React file upload NPM component.
+- Caramel (grabcaramel.com) — ${ossByKey.caramel.description} browser ext.
+- UpUp (useupup.com) — ${ossByKey.upup.description}.
 - GetItDone (nowgetitdone.com) — Team standups & time tracking.
 
 Services: AI Automation, Full Stack Dev, DevOps/Cloud, Database, Security/DevSecOps.
