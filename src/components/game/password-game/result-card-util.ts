@@ -26,8 +26,16 @@ interface TitleInput {
   tiers: number[];
 }
 
-const FAST_TITLES: readonly [string, ...string[]] = ["The Unbreakable", "Speed Demon", "Machine-Fast"];
-const AVERAGE_TITLES: readonly [string, ...string[]] = ["Survivor", "Password Adept", "Chaos Tamer"];
+const FAST_TITLES: readonly [string, ...string[]] = [
+  "The Unbreakable",
+  "Speed Demon",
+  "Machine-Fast",
+];
+const AVERAGE_TITLES: readonly [string, ...string[]] = [
+  "Survivor",
+  "Password Adept",
+  "Chaos Tamer",
+];
 const SLOW_TITLES: readonly [string, ...string[]] = ["Persistent", "Barely Survived", "Methodical"];
 
 export function pickResultTitle(input: TitleInput): string {

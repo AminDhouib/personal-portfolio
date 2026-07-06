@@ -10,12 +10,7 @@
     "eslint-rules/index.mjs"
   ],
   "project": ["src/**/*.{ts,tsx}"],
-  "ignore": [
-    "scripts/**",
-    "public/**",
-    "audit/**",
-    "_to-remove-voltorb/**"
-  ],
+  "ignore": ["scripts/**", "public/**", "audit/**", "_to-remove-voltorb/**"],
   "ignoreDependencies": [
     "eslint-config-next",
     "eslint-plugin-oxlint",

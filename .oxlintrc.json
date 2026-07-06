@@ -24,6 +24,7 @@
         "*.config.ts",
         "*.config.mjs",
         "src/lib/log.ts",
+        "src/lib/safe-json.ts",
         "src/app/api/leads/route.ts"
       ],
       "rules": {

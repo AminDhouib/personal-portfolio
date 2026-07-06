@@ -38,12 +38,7 @@ const FS_ALLOWLIST = [
   "src/app/api/leads/route.ts",
 ];
 
-const TEST_AND_SCRIPT_GLOBS = [
-  "**/*.test.ts",
-  "**/*.test.tsx",
-  "**/__tests__/**",
-  "scripts/**",
-];
+const TEST_AND_SCRIPT_GLOBS = ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", "scripts/**"];
 
 export default defineConfig([
   ...nextVitals,
@@ -87,7 +82,10 @@ export default defineConfig([
         {
           paths: [
             { name: "fs", message: "Use a store module; fs is the persistence boundary (RC-2)." },
-            { name: "node:fs", message: "Use a store module; fs is the persistence boundary (RC-2)." },
+            {
+              name: "node:fs",
+              message: "Use a store module; fs is the persistence boundary (RC-2).",
+            },
             {
               name: "fs/promises",
               message: "Use a store module; fs is the persistence boundary (RC-2).",

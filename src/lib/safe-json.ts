@@ -3,20 +3,13 @@
  *
  * `no-restricted-syntax` bans `JSON.parse` everywhere else so that malformed
  * input can never crash a request or be swallowed silently. Failures are
- * routed to the exception tracker (via {@link captureException}) and the caller
- * gets an explicit `null`/fallback instead of a throw. This is the
- * "report, don't silently corrupt" boundary for JSONL reads (RC-2 adjacent).
- */
-import { captureException } from "./log";
-
-/**
- * Parse `text` as JSON, never throwing. On failure the error is reported under
- * `scope` and `fallback` (default `null`) is returned, so corrupt data is
- * visible in the tracker instead of silently skipped.
+ * reported via console.error (universal, works in both server and client
+ * bundles) and the caller gets an explicit `null`/fallback instead of a throw.
  *
- * The generic `T` names the expected shape at the call site; it is an assertion,
- * not a validation. For untrusted input, parse the result with a zod schema.
+ * This module must stay free of server-only imports (posthog-node, node:fs)
+ * because it is used in client components (profile.ts, game engines).
  */
+
 export function safeJsonParse<T = unknown>(
   text: string,
   scope: string,
@@ -26,7 +19,8 @@ export function safeJsonParse<T = unknown>(
     // eslint-disable-next-line no-restricted-syntax -- this wrapper is the one allowed JSON.parse site
     return JSON.parse(text) as T;
   } catch (err) {
-    captureException(scope, err);
+    console.error(`[${scope}] safeJsonParse failed:`, err);
+    if (typeof reportError === "function") reportError(err);
     return fallback;
   }
 }
