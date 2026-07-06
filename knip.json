@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,loading,error,global-error,not-found,template,default}.tsx",
+    "src/app/**/route.ts",
+    "src/instrumentation.ts",
+    "src/instrumentation-client.ts",
+    "next.config.ts",
+    "eslint.config.mjs",
+    "eslint-rules/index.mjs"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": [
+    "scripts/**",
+    "public/**",
+    "audit/**",
+    "_to-remove-voltorb/**"
+  ],
+  "ignoreDependencies": [
+    "eslint-config-next",
+    "eslint-plugin-oxlint",
+    "tailwindcss",
+    "@tailwindcss/typography"
+  ],
+  "ignoreExportsUsedInFile": true
+}
