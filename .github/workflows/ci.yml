@@ -30,11 +30,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Oxlint
+        run: pnpm exec oxlint -c .oxlintrc.json .
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
+
+      - name: Env drift check
+        run: node scripts/check-env-drift.mjs
 
       - name: Test
         run: pnpm test
