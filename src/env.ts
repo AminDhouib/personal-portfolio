@@ -15,6 +15,7 @@ const schema = z.object({
   LEADS_DATA_DIR: z.string().optional(),
   LEADERBOARD_DATA_DIR: z.string().optional(),
   PG_LEADERBOARD_DIR: z.string().optional(),
+  SENTRY_DSN: z.string().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().optional(),
 });
 

@@ -6,6 +6,7 @@
  */
 
 import { PostHog } from "posthog-node";
+import * as Sentry from "@sentry/nextjs";
 import { env } from "@/env";
 
 // Stable identity for server-originated events; there's no per-visitor
@@ -71,10 +72,16 @@ function getPostHogClient(): PostHog | null {
 export function captureException(scope: string, error: unknown): void {
   logError(scope, "captured exception", error);
 
+  const normalized = error instanceof Error ? error : new Error(renderDetail(error));
+
+  Sentry.withScope((sentryScope) => {
+    sentryScope.setTag("scope", scope);
+    Sentry.captureException(normalized);
+  });
+
   try {
     const client = getPostHogClient();
     if (!client) return;
-    const normalized = error instanceof Error ? error : new Error(renderDetail(error));
     client.captureException(normalized, SERVER_DISTINCT_ID, { scope });
   } catch (captureErr) {
     logError("posthog", "captureException failed", captureErr);

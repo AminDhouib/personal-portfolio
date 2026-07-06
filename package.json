@@ -26,6 +26,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
+    "@sentry/nextjs": "^10.63.0",
     "ai": "^6.0.146",
     "chess.js": "^1.4.0",
     "framer-motion": "^12.38.0",

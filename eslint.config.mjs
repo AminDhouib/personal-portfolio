@@ -120,7 +120,8 @@ export default defineConfig([
     files: [
       "src/env.ts",
       "next.config.ts",
-      "instrumentation.ts",
+      "src/instrumentation.ts",
+      "src/instrumentation-client.ts",
       "src/components/game/space-shooter.tsx",
     ],
     rules: { "no-restricted-properties": "off" },
