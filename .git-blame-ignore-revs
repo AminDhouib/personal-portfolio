@@ -1,0 +1,7 @@
+# Revisions listed here are skipped by `git blame` (GitHub honors this file
+# natively). Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# Only add commits that are pure, mechanical, no-logic reformatting.
+
+# style: prettier reformat, no logic changes (interlude step 2)
+3a9e0d2049114c7ac147037462f610cacee78b6a
