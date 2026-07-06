@@ -23,10 +23,7 @@ export interface RepoStats {
   forks: number;
 }
 
-export async function fetchRepoStats(
-  owner: string,
-  repo: string
-): Promise<RepoStats> {
+export async function fetchRepoStats(owner: string, repo: string): Promise<RepoStats> {
   try {
     const res = await ghFetch(`/repos/${owner}/${repo}`);
     if (!res.ok) throw new Error(`GitHub API ${res.status}`);
@@ -57,9 +54,7 @@ const contributionLevelMap: Record<string, 0 | 1 | 2 | 3 | 4> = {
 
 // Official GraphQL contribution calendar. Most authoritative, but requires a
 // GITHUB_TOKEN. Returns [] when unavailable so the caller can fall back.
-async function fetchContributionsGraphql(
-  username: string
-): Promise<ContributionDay[]> {
+async function fetchContributionsGraphql(username: string): Promise<ContributionDay[]> {
   const query = `
     query($login: String!) {
       user(login: $login) {
@@ -109,9 +104,7 @@ async function fetchContributionsGraphql(
       };
     };
 
-    const weeks =
-      json.data?.user?.contributionsCollection?.contributionCalendar?.weeks ??
-      [];
+    const weeks = json.data?.user?.contributionsCollection?.contributionCalendar?.weeks ?? [];
     const days: ContributionDay[] = [];
     for (const week of weeks) {
       for (const day of week.contributionDays ?? []) {
@@ -133,18 +126,14 @@ async function fetchContributionsGraphql(
 // calendar. The ?y=last window returns the trailing ~53 weeks already aligned
 // Sunday→Saturday with the same { date, count, level } shape we render, so it
 // keeps the graph real on deployments that have no GITHUB_TOKEN configured.
-async function fetchContributionsPublic(
-  username: string
-): Promise<ContributionDay[]> {
+async function fetchContributionsPublic(username: string): Promise<ContributionDay[]> {
   try {
     const res = await fetch(
-      `https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(
-        username
-      )}?y=last`,
+      `https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(username)}?y=last`,
       {
         next: { revalidate: GITHUB_REVALIDATE_SECONDS },
         signal: AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS),
-      }
+      },
     );
     if (!res.ok) return [];
     const json = (await res.json()) as {
@@ -161,9 +150,7 @@ async function fetchContributionsPublic(
   }
 }
 
-export async function fetchContributionGraph(
-  username: string
-): Promise<ContributionDay[]> {
+export async function fetchContributionGraph(username: string): Promise<ContributionDay[]> {
   // Prefer the official GraphQL calendar when a token is configured…
   if (GITHUB_TOKEN) {
     const viaGraphql = await fetchContributionsGraphql(username);

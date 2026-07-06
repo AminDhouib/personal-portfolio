@@ -51,9 +51,7 @@ export function getAllBlogPosts(): BlogPostMeta[] {
     .map((slug) => getBlogPost(slug))
     .filter((p): p is BlogPost => p !== null)
     .map(({ content: _, ...meta }) => meta)
-    .sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export interface TocEntry {

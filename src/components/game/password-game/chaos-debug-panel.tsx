@@ -77,7 +77,7 @@ function applyToRoot(fx: Record<FxKey, number>, chaosOverride: number | null) {
 }
 
 const DEFAULT_FX: Record<FxKey, number> = Object.fromEntries(
-  ALL_FX.map((f) => [f.key, 1])
+  ALL_FX.map((f) => [f.key, 1]),
 ) as Record<FxKey, number>;
 
 export function ChaosDebugPanel() {
@@ -134,13 +134,16 @@ export function ChaosDebugPanel() {
   };
   const solo = (key: FxKey) => {
     setFx(
-      Object.fromEntries(ALL_FX.map((f) => [f.key, f.key === key ? 1 : 0])) as Record<FxKey, number>
+      Object.fromEntries(ALL_FX.map((f) => [f.key, f.key === key ? 1 : 0])) as Record<
+        FxKey,
+        number
+      >,
     );
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] w-72 rounded-lg border border-(--border) bg-(--card) shadow-2xl font-mono text-xs">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-(--border)">
+    <div className="fixed right-4 bottom-4 z-[100] w-72 rounded-lg border border-(--border) bg-(--card) font-mono text-xs shadow-2xl">
+      <div className="flex items-center justify-between border-b border-(--border) px-3 py-2">
         <div className="flex items-center gap-2">
           <Settings2 className="h-3.5 w-3.5 text-accent-pink" />
           <span className="font-semibold">Chaos FX</span>
@@ -165,9 +168,9 @@ export function ChaosDebugPanel() {
         </div>
       </div>
 
-      <div className="p-3 space-y-2">
+      <div className="space-y-2 p-3">
         <div>
-          <div className="flex items-center justify-between mb-1">
+          <div className="mb-1 flex items-center justify-between">
             <label>Chaos override</label>
             <span className="font-mono text-accent-pink">
               {chaosOverride === null ? "auto" : chaosOverride}
@@ -178,7 +181,7 @@ export function ChaosDebugPanel() {
               <button
                 key={v === null ? "auto" : v}
                 onClick={() => setChaosOverride(v)}
-                className={`flex-1 rounded px-1 py-0.5 text-xs border ${
+                className={`flex-1 rounded border px-1 py-0.5 text-xs ${
                   chaosOverride === v
                     ? "border-accent-pink/60 bg-accent-pink/10 text-accent-pink"
                     : "border-(--border) text-(--muted) hover:text-(--foreground)"
@@ -191,42 +194,44 @@ export function ChaosDebugPanel() {
           </div>
         </div>
 
-        <div className="border-t border-(--border) pt-2 flex gap-1">
+        <div className="flex gap-1 border-t border-(--border) pt-2">
           <button
             onClick={allOff}
-            className="flex-1 rounded px-2 py-1 text-[10px] border border-(--border) text-(--muted) hover:text-(--foreground)"
+            className="flex-1 rounded border border-(--border) px-2 py-1 text-[10px] text-(--muted) hover:text-(--foreground)"
             type="button"
           >
             All off
           </button>
           <button
             onClick={allOn}
-            className="flex-1 rounded px-2 py-1 text-[10px] border border-(--border) text-(--muted) hover:text-(--foreground)"
+            className="flex-1 rounded border border-(--border) px-2 py-1 text-[10px] text-(--muted) hover:text-(--foreground)"
             type="button"
           >
             All on
           </button>
           <button
             onClick={resetAll}
-            className="flex-1 rounded px-2 py-1 text-[10px] border border-(--border) text-(--muted) hover:text-(--foreground)"
+            className="flex-1 rounded border border-(--border) px-2 py-1 text-[10px] text-(--muted) hover:text-(--foreground)"
             type="button"
           >
             Defaults
           </button>
         </div>
 
-        <div className="border-t border-(--border) pt-2 space-y-1.5">
+        <div className="space-y-1.5 border-t border-(--border) pt-2">
           {ALL_FX.map(({ key, label }) => (
             <div key={key} className="flex items-center gap-2">
               <button
                 onClick={() => solo(key)}
-                className="text-[10px] rounded px-1 py-0.5 border border-(--border) text-(--muted) hover:text-accent-pink hover:border-accent-pink/60 shrink-0"
+                className="shrink-0 rounded border border-(--border) px-1 py-0.5 text-[10px] text-(--muted) hover:border-accent-pink/60 hover:text-accent-pink"
                 title={`Solo ${label}`}
                 type="button"
               >
                 S
               </button>
-              <label className="flex-1 truncate" title={label}>{label}</label>
+              <label className="flex-1 truncate" title={label}>
+                {label}
+              </label>
               <input
                 type="range"
                 min={0}

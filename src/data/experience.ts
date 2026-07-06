@@ -120,9 +120,7 @@ export const experience: ExperienceItem[] = [
     type: "Contract",
     period: "Mar 2023 – May 2023",
     location: "Ottawa, ON · Remote",
-    highlights: [
-      "Owned DevOps workflows and CI/CD pipelines on a Bitbucket-based stack.",
-    ],
+    highlights: ["Owned DevOps workflows and CI/CD pipelines on a Bitbucket-based stack."],
     skills: ["DevOps", "Bitbucket", "CI/CD"],
   },
   {

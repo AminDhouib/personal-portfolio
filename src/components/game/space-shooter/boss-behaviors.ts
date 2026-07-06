@@ -7,7 +7,8 @@ import { loadProfile, spendCoins } from "../profile";
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -16,12 +17,12 @@ export function mulberry32(seed: number): () => number {
 
 export function buildBossSchedule(): { distance: number; bossId: BossId }[] {
   return [
-    { distance: 1500,  bossId: "sentinel" },
-    { distance: 3000,  bossId: "drifter" },
-    { distance: 4500,  bossId: "swarm-mother" },
-    { distance: 6000,  bossId: "mirror" },
-    { distance: 7500,  bossId: "pulsar" },
-    { distance: 9000,  bossId: "harvester" },
+    { distance: 1500, bossId: "sentinel" },
+    { distance: 3000, bossId: "drifter" },
+    { distance: 4500, bossId: "swarm-mother" },
+    { distance: 6000, bossId: "mirror" },
+    { distance: 7500, bossId: "pulsar" },
+    { distance: 9000, bossId: "harvester" },
     { distance: 11000, bossId: "warden" },
     { distance: 13000, bossId: "void-tyrant" },
     { distance: 16000, bossId: "sentinel" },
@@ -31,13 +32,25 @@ export function buildBossSchedule(): { distance: number; bossId: BossId }[] {
 }
 
 export const BOSS_TIERS: Record<BossId, number> = {
-  sentinel: 1, drifter: 2, "swarm-mother": 3, mirror: 4,
-  pulsar: 5, harvester: 6, warden: 7, "void-tyrant": 8,
+  sentinel: 1,
+  drifter: 2,
+  "swarm-mother": 3,
+  mirror: 4,
+  pulsar: 5,
+  harvester: 6,
+  warden: 7,
+  "void-tyrant": 8,
 };
 
 export const BOSS_BASE_HP: Record<BossId, number> = {
-  sentinel: 8, drifter: 12, "swarm-mother": 20, mirror: 18,
-  pulsar: 25, harvester: 30, warden: 40, "void-tyrant": 60,
+  sentinel: 8,
+  drifter: 12,
+  "swarm-mother": 20,
+  mirror: 18,
+  pulsar: 25,
+  harvester: 30,
+  warden: 40,
+  "void-tyrant": 60,
 };
 
 export const BOSS_DISPLAY_NAMES: Record<BossId, string> = {
@@ -89,8 +102,13 @@ export function runWardenBehavior(g: GameRefs, boss: BossState, now: number, ste
       const dy = g.shipY - s.position[1];
       const dz = g.shipZ - s.position[2];
       const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-      if (now > g.invulnUntil && !shieldedShip &&
-          Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dz) < 1) {
+      if (
+        now > g.invulnUntil &&
+        !shieldedShip &&
+        Math.abs(dx) < 1 &&
+        Math.abs(dy) < 1 &&
+        Math.abs(dz) < 1
+      ) {
         g.status = "dying";
         g.dyingAt = now;
         g.deathVelX = (dx / (Math.hypot(dx, dy) || 1)) * 7;
@@ -129,12 +147,11 @@ export function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, s
     const sdy = d.position[1] - g.shipY;
     const sdz = d.position[2] - g.shipZ;
     const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-    if (now > g.invulnUntil && !shieldedShip &&
-        sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
+    if (now > g.invulnUntil && !shieldedShip && sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
       g.status = "dying";
       g.dyingAt = now;
-      g.deathVelX = -sdx / (Math.hypot(sdx, sdy) || 1) * 7;
-      g.deathVelY = -sdy / (Math.hypot(sdx, sdy) || 1) * 7 + 3.5;
+      g.deathVelX = (-sdx / (Math.hypot(sdx, sdy) || 1)) * 7;
+      g.deathVelY = (-sdy / (Math.hypot(sdx, sdy) || 1)) * 7 + 3.5;
       g.deathVelZ = 2.5;
       g.deathAngVel = (Math.random() - 0.5) * 10;
       spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#a855f7", 500, 0.45);
@@ -151,7 +168,12 @@ export function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, s
   }
 }
 
-export function runVoidTyrantBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+export function runVoidTyrantBehavior(
+  g: GameRefs,
+  boss: BossState,
+  now: number,
+  step: number,
+): void {
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2.5;
   boss.position[1] = 3 + Math.cos((now - boss.phaseStartAt) * 0.0004) * 1;
   boss.position[2] = -16;
@@ -252,7 +274,12 @@ export function runVoidTyrantBehavior(g: GameRefs, boss: BossState, now: number,
   }
 }
 
-export function runHarvesterBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+export function runHarvesterBehavior(
+  g: GameRefs,
+  boss: BossState,
+  now: number,
+  step: number,
+): void {
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0004) * 4;
   boss.position[1] = 5;
   boss.position[2] = -14;
@@ -346,7 +373,12 @@ export function runPulsarBehavior(g: GameRefs, boss: BossState, now: number): vo
   }
 }
 
-export function runSwarmMotherBehavior(g: GameRefs, boss: BossState, now: number, step: number): void {
+export function runSwarmMotherBehavior(
+  g: GameRefs,
+  boss: BossState,
+  now: number,
+  step: number,
+): void {
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0003) * 2;
   boss.position[1] = 3;
   boss.position[2] = -14;
@@ -384,12 +416,11 @@ export function runSwarmMotherBehavior(g: GameRefs, boss: BossState, now: number
     const sdy = d.position[1] - g.shipY;
     const sdz = d.position[2] - g.shipZ;
     const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-    if (now > g.invulnUntil && !shieldedShip &&
-        sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
+    if (now > g.invulnUntil && !shieldedShip && sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
       g.status = "dying";
       g.dyingAt = now;
-      g.deathVelX = -sdx / (Math.hypot(sdx, sdy) || 1) * 7;
-      g.deathVelY = -sdy / (Math.hypot(sdx, sdy) || 1) * 7 + 3.5;
+      g.deathVelX = (-sdx / (Math.hypot(sdx, sdy) || 1)) * 7;
+      g.deathVelY = (-sdy / (Math.hypot(sdx, sdy) || 1)) * 7 + 3.5;
       g.deathVelZ = 2.5;
       g.deathAngVel = (Math.random() - 0.5) * 10;
       spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#d946ef", 500, 0.45);

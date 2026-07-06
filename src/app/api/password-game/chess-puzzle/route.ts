@@ -35,8 +35,18 @@ interface ChessPuzzleDto {
 }
 
 const UNICODE: Record<string, string> = {
-  K: "\u2654", Q: "\u2655", R: "\u2656", B: "\u2657", N: "\u2658", P: "\u2659",
-  k: "\u265A", q: "\u265B", r: "\u265C", b: "\u265D", n: "\u265E", p: "\u265F",
+  K: "\u2654",
+  Q: "\u2655",
+  R: "\u2656",
+  B: "\u2657",
+  N: "\u2658",
+  P: "\u2659",
+  k: "\u265A",
+  q: "\u265B",
+  r: "\u265C",
+  b: "\u265D",
+  n: "\u265E",
+  p: "\u265F",
 };
 
 function fenToBoard(fen: string): string[] {
@@ -105,9 +115,7 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
 
     const san = applied.san;
     const sanBare = san.replace(/[+#]/g, "");
-    const accept = Array.from(
-      new Set([san, sanBare, `${sanBare}+`, `${sanBare}#`])
-    );
+    const accept = Array.from(new Set([san, sanBare, `${sanBare}+`, `${sanBare}#`]));
 
     return {
       id: `lichess-${puzzle.id ?? "daily"}`,
@@ -129,11 +137,11 @@ export async function GET() {
   if (!puzzle) {
     return NextResponse.json(
       { puzzle: null, source: "unavailable" },
-      { headers: { "cache-control": "public, s-maxage=300" } }
+      { headers: { "cache-control": "public, s-maxage=300" } },
     );
   }
   return NextResponse.json(
     { puzzle, source: "lichess" },
-    { headers: { "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400" } }
+    { headers: { "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400" } },
   );
 }

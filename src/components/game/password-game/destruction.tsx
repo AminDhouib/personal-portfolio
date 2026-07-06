@@ -18,8 +18,8 @@ export function CracksOverlay({ seed = 0 }: { seed?: number }) {
   const variant = (n: number) => {
     // Bit-mixing so the 3 variants differ even for small seeds.
     const h = ((seed ^ (n * 0x9e3779b1)) * 0x85ebca6b) >>> 0;
-    const rotDeg = ((h % 1000) / 1000) * 30 - 15;        // -15° … +15°
-    const scaleJitter = 0.9 + ((h >> 10) % 1000) / 1000 * 0.25; // 0.9 … 1.15
+    const rotDeg = ((h % 1000) / 1000) * 30 - 15; // -15° … +15°
+    const scaleJitter = 0.9 + (((h >> 10) % 1000) / 1000) * 0.25; // 0.9 … 1.15
     return { rotate: `${rotDeg.toFixed(1)}deg`, scale: scaleJitter.toFixed(2) };
   };
   const v1 = variant(1);
@@ -100,7 +100,7 @@ function MatrixRain() {
   // Columns are positioned at fixed percentages across the container so
   // they stay evenly distributed regardless of width.
   const cols = Array.from({ length: 12 }, (_, i) => {
-    const left = (i / 12) * 100 + (i * 3) % 7;
+    const left = (i / 12) * 100 + ((i * 3) % 7);
     const speed = 2.5 + (i % 4) * 0.9; // seconds per cycle
     const delay = (i * 0.3) % 3;
     return { left, speed, delay, i };
@@ -108,7 +108,9 @@ function MatrixRain() {
   // Characters pool — small glyphs that suggest code/noise.
   const glyphPool = "01アイウエオカキクケコサシスセソ░▒▓<>/\\|{}+=?!@#".split("");
   const makeStream = (len: number, seed: number) =>
-    Array.from({ length: len }, (_, i) => glyphPool[(seed * 7 + i * 13) % glyphPool.length]).join("\n");
+    Array.from({ length: len }, (_, i) => glyphPool[(seed * 7 + i * 13) % glyphPool.length]).join(
+      "\n",
+    );
   return (
     <div className="pg-matrix-rain" aria-hidden>
       {cols.map((c) => (
@@ -254,7 +256,7 @@ function FloatingDebris() {
   const particles = Array.from({ length: 14 }, (_, i) => {
     const seed = i * 0.618;
     const left = (seed * 100) % 100;
-    const top = ((seed * 73) % 100);
+    const top = (seed * 73) % 100;
     const delay = (i * 0.7) % 6;
     const duration = 6 + ((i * 1.3) % 5);
     const size = 1.5 + ((i * 0.4) % 2);
@@ -305,12 +307,7 @@ function FractureWeb({ seed }: { seed: number }) {
   const j = [jitter(1), jitter(2), jitter(3), jitter(4), jitter(5), jitter(6)];
   const BG = "var(--background, #0a0a0f)";
   return (
-    <svg
-      className="pg-fracture-web"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
+    <svg className="pg-fracture-web" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
       {/* Top-right chip → midway diagonal toward center-left */}
       <polyline
         points={`96,4 ${72 + j[0]},${22 + j[1]} ${55 + j[2]},${38 + j[3]} ${38 + j[4]},${50 + j[5]}`}
@@ -343,7 +340,9 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
   const transform = [
     flipX ? "scale(-1 1) translate(-200 0)" : "",
     flipY ? "scale(1 -1) translate(0 -200)" : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
   const BG = "var(--background, #0a0a0f)";
   return (
     <svg viewBox="0 0 200 200" width="100%" height="100%" aria-hidden preserveAspectRatio="none">
@@ -354,10 +353,7 @@ function ChipShape({ flipX, flipY }: { flipX: boolean; flipY: boolean }) {
          * No stroke — the darkness of the background-colored fill alone
          * creates the gap effect, so it reads as a hole rather than a drawn shape.
          */}
-        <polygon
-          points="2,0 10,4 8,10 14,8 16,16 6,14 0,18 4,8"
-          fill={BG}
-        />
+        <polygon points="2,0 10,4 8,10 14,8 16,16 6,14 0,18 4,8" fill={BG} />
 
         {/*
          * Primary crack — thin slit running from impact to ~(190, 100).

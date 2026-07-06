@@ -41,9 +41,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const seedParam = searchParams.get("seed");
   const all = await store.readAll();
-  const filtered = seedParam != null
-    ? all.filter((e) => e.seed === Number(seedParam))
-    : all;
+  const filtered = seedParam != null ? all.filter((e) => e.seed === Number(seedParam)) : all;
   filtered.sort((a, b) => a.time - b.time);
   return NextResponse.json(
     { entries: filtered.slice(0, store.returnLimit) },
@@ -55,7 +53,10 @@ export async function POST(req: Request) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
-  const rate = checkRateLimit(`pg-leaderboard:${getClientIp(req)}`, { limit: 10, windowMs: 60_000 });
+  const rate = checkRateLimit(`pg-leaderboard:${getClientIp(req)}`, {
+    limit: 10,
+    windowMs: 60_000,
+  });
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "too many requests" },

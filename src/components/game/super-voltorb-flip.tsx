@@ -334,9 +334,9 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }:
   const faceTextStyle: React.CSSProperties = { fontSize: "calc(var(--svf-tile) * 0.6)" };
   const flagSize = "calc(var(--svf-tile) * 0.34)";
   return fake ? (
-    <div className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200">
+    <div className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 select-none">
       <div
-        className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center border-2 border-[#a55a52] bg-[#bd8c84] font-bold text-black`}
+        className={`${numberFont.className} flex h-full w-full place-content-center place-items-center border-2 border-[#a55a52] bg-[#bd8c84] font-bold text-black text-shadow-white`}
         style={faceTextStyle}
       >
         {children}
@@ -344,21 +344,28 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }:
     </div>
   ) : (
     <div
-      className={`svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]${warning ? " svf-tile-anxious" : ""}`}
+      className={`svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]${warning ? "svf-tile-anxious" : ""}`}
       role="button"
       tabIndex={0}
-      aria-label={row !== undefined && col !== undefined ? `Row ${row + 1}, Col ${col + 1}, ${isFlipped ? "revealed" : "face down"}` : undefined}
+      aria-label={
+        row !== undefined && col !== undefined
+          ? `Row ${row + 1}, Col ${col + 1}, ${isFlipped ? "revealed" : "face down"}`
+          : undefined
+      }
       onClick={flipCard}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") flipCard?.(e as unknown as React.MouseEvent<HTMLDivElement>); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ")
+          flipCard?.(e as unknown as React.MouseEvent<HTMLDivElement>);
+      }}
     >
       {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
       {colColor && <div className="svf-conn-s" style={{ backgroundColor: colColor }} />}
       <div
-        className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 transition-all duration-500 [transform-style:preserve-3d] [backface-visibility:hidden]"
+        className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 transition-all duration-500 select-none [backface-visibility:hidden] [transform-style:preserve-3d]"
         style={{ transform: `${isFlipped ? "rotateY(180deg)" : "none"}` }}
       >
         <div
-          className={`${numberFont.className} text-shadow-white flex h-full w-full place-content-center place-items-center rounded-sm border-2 border-black bg-[#bd8c84] font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] [transform:rotateY(180deg)]`}
+          className={`${numberFont.className} flex h-full w-full [transform:rotateY(180deg)] place-content-center place-items-center rounded-sm border-2 border-black bg-[#bd8c84] font-bold text-black outline outline-4 outline-gray-200 [backface-visibility:hidden] text-shadow-white`}
           style={faceTextStyle}
         >
           <div className="flex h-full w-full items-center justify-center border-2 border-[#8a4236]">
@@ -384,10 +391,13 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }:
                   key={f}
                   className={[
                     "flex",
-                    i === 0 ? "items-start justify-start" :
-                    i === 1 ? "items-start justify-end" :
-                    i === 2 ? "items-end justify-start" :
-                              "items-end justify-end",
+                    i === 0
+                      ? "items-start justify-start"
+                      : i === 1
+                        ? "items-start justify-end"
+                        : i === 2
+                          ? "items-end justify-start"
+                          : "items-end justify-end",
                   ].join(" ")}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -426,7 +436,7 @@ type RowColCardProps = {
 const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
   return (
     <div
-      className={`${numberFont.className} relative z-[5] box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] select-none flex-col rounded-sm outline outline-4 outline-gray-200`}
+      className={`${numberFont.className} relative z-[5] box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] flex-col rounded-sm outline outline-4 outline-gray-200 select-none`}
     >
       <div
         className="relative flex h-full w-full flex-col place-content-center place-items-center font-bold text-gray-800"
@@ -449,10 +459,7 @@ const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
           className="absolute flex items-center gap-0.5"
           style={{ bottom: "calc(var(--svf-tile) * -0.15)" }}
         >
-          <VoltorbIcon
-            cssSize="calc(var(--svf-tile) * 0.72)"
-            className="voltorb object-contain"
-          />
+          <VoltorbIcon cssSize="calc(var(--svf-tile) * 0.72)" className="voltorb object-contain" />
           <p style={{ transform: "translate(-1px, 2px)" }}>{voltorbs}</p>
         </div>
       </div>
@@ -489,9 +496,25 @@ type GameboardProps = {
   onFlipDownStart?: (dir: "up" | "down") => void;
 };
 
-type ActiveEffect = { id: number; kind: "bomb" | "coin"; row: number; col: number; onDone: () => void };
+type ActiveEffect = {
+  id: number;
+  kind: "bomb" | "coin";
+  row: number;
+  col: number;
+  onDone: () => void;
+};
 
-const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, memoFlags, peek = false, runPostFanfare, onFlipDownStart }: GameboardProps) => {
+const Gameboard = ({
+  game,
+  updateGame,
+  waitForClick,
+  muted,
+  onFirstInteraction,
+  memoFlags,
+  peek = false,
+  runPostFanfare,
+  onFlipDownStart,
+}: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
@@ -557,8 +580,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     // Visual: voltorbs explode, every coin tile (1/2/3) sparkles.
     // Audio: HG/SS plays PANERU_MEKURU on every flip, and overlays
     // COIN_HAZURE (the buzzer) only when the revealed tile is a Voltorb.
-    const kind: "bomb" | "coin" =
-      cell.value === "V" ? "bomb" : "coin";
+    const kind: "bomb" | "coin" = cell.value === "V" ? "bomb" : "coin";
     // Risk pre-check — voltorb_flip.c:905 plays ME_CARDGAME1 when the
     // row/col still has ≥75% voltorb density among unflipped tiles.
     // We additionally suppress on deterministic rows/cols: a 0-voltorb
@@ -576,9 +598,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
     const remainingCol = Math.max(1, N - flippedInCol);
     const rowRisk = (voltorbsInRow * 100) / remainingRow;
     const colRisk = (voltorbsInCol * 100) / remainingCol;
-    const definitive =
-      rowRisk === 0 || rowRisk === 100 ||
-      colRisk === 0 || colRisk === 100;
+    const definitive = rowRisk === 0 || rowRisk === 100 || colRisk === 0 || colRisk === 100;
     const highRisk = !definitive && (rowRisk >= 75 || colRisk >= 75);
 
     onFirstInteraction();
@@ -676,9 +696,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
   );
 
   useEffect(() => {
-    setCardsFlipped(() =>
-      game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
-    );
+    setCardsFlipped(() => game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })));
   }, [game.cells]);
 
   useEffect(() => {
@@ -729,7 +747,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
 
   return (
     <div
-      className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 outline outline-2 outline-gray-600 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)]`}
+      className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)] outline outline-2 outline-gray-600`}
       style={{ "--svf-n": N } as React.CSSProperties}
     >
       <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
@@ -752,8 +770,7 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
                     flipCard={() => handleFlip(coordinate[0], coordinate[1])}
                     flags={peek || cell.isFlipped ? undefined : cell.flags}
                     warning={
-                      warningTile?.row === coordinate[0] &&
-                      warningTile?.col === coordinate[1]
+                      warningTile?.row === coordinate[0] && warningTile?.col === coordinate[1]
                     }
                   >
                     {cell.value === "V" ? (
@@ -786,37 +803,32 @@ const Gameboard = ({ game, updateGame, waitForClick, muted, onFirstInteraction, 
               })}
 
               {game.colValues.map((col, index) => (
-                <RowColCard
-                  coins={col.coins}
-                  voltorbs={col.voltorbs}
-                  key={index}
-                  index={index}
-                />
+                <RowColCard coins={col.coins} voltorbs={col.voltorbs} key={index} index={index} />
               ))}
 
-              {theme && effects.map((e) => {
-                const Comp = e.kind === "bomb" ? theme.BombFlip : theme.CoinReveal;
-                return (
-                  <div key={e.id} className="pointer-events-none absolute" style={{
-                    left: `calc(${e.col} * (var(--svf-tile) + var(--svf-gap)))`,
-                    top:  `calc(${e.row} * (var(--svf-tile) + var(--svf-gap)))`,
-                    width: "var(--svf-tile)",
-                    height: "var(--svf-tile)",
-                    zIndex: 20,
-                  }}>
-                    <Comp row={e.row} col={e.col} onDone={e.onDone} />
-                  </div>
-                );
-              })}
+              {theme &&
+                effects.map((e) => {
+                  const Comp = e.kind === "bomb" ? theme.BombFlip : theme.CoinReveal;
+                  return (
+                    <div
+                      key={e.id}
+                      className="pointer-events-none absolute"
+                      style={{
+                        left: `calc(${e.col} * (var(--svf-tile) + var(--svf-gap)))`,
+                        top: `calc(${e.row} * (var(--svf-tile) + var(--svf-gap)))`,
+                        width: "var(--svf-tile)",
+                        height: "var(--svf-tile)",
+                        zIndex: 20,
+                      }}
+                    >
+                      <Comp row={e.row} col={e.col} onDone={e.onDone} />
+                    </div>
+                  );
+                })}
             </div>
             <div className="flex flex-col gap-[var(--svf-gap)]">
               {game.rowValues.map((row, index) => (
-                <RowColCard
-                  coins={row.coins}
-                  voltorbs={row.voltorbs}
-                  key={index}
-                  index={index}
-                />
+                <RowColCard coins={row.coins} voltorbs={row.voltorbs} key={index} index={index} />
               ))}
             </div>
           </div>
@@ -838,47 +850,43 @@ type ScoreboardProps = {
 const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
   return (
     <div className="flex w-full flex-col items-center gap-1 sm:gap-2">
-      <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
+      <div className="rounded-5 grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600 sm:border-4">
         <CoinSpinner size={28} />
-        <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
-          Total<br />Coins
+        <div className="drop-shadow-soft text-center text-sm leading-4 text-gray-600 sm:text-3xl sm:leading-7">
+          Total
+          <br />
+          Coins
         </div>
         <p
-          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft flex`}
+          className={`${scoreFont.className} drop-shadow-soft flex text-3xl text-gray-700 sm:text-6xl`}
         >
           {totalScore
             .toString()
             .padStart(5, "0")
             .split("")
             .map((d, i) => (
-              <span
-                key={i}
-                className="inline-block text-center"
-                style={{ width: "0.5em" }}
-              >
+              <span key={i} className="inline-block text-center" style={{ width: "0.5em" }}>
                 {d}
               </span>
             ))}
         </p>
       </div>
-      <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-5 border-2 sm:border-4 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600">
+      <div className="rounded-5 grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600 sm:border-4">
         <CoinSpinner size={28} />
-        <div className="text-center text-sm leading-4 sm:text-3xl sm:leading-7 text-gray-600 drop-shadow-soft">
-          This<br />Game
+        <div className="drop-shadow-soft text-center text-sm leading-4 text-gray-600 sm:text-3xl sm:leading-7">
+          This
+          <br />
+          Game
         </div>
         <p
-          className={`${scoreFont.className} text-3xl sm:text-6xl text-gray-700 drop-shadow-soft flex`}
+          className={`${scoreFont.className} drop-shadow-soft flex text-3xl text-gray-700 sm:text-6xl`}
         >
           {currentScore
             .toString()
             .padStart(5, "0")
             .split("")
             .map((d, i) => (
-              <span
-                key={i}
-                className="inline-block text-center"
-                style={{ width: "0.5em" }}
-              >
+              <span key={i} className="inline-block text-center" style={{ width: "0.5em" }}>
                 {d}
               </span>
             ))}
@@ -937,12 +945,8 @@ type InstructionsModalProps = {
   setModalOpen: Dispatch<SetStateAction<boolean>>;
 };
 
-const InstructionsModal = ({
-  language,
-  setModalOpen,
-}: InstructionsModalProps) => {
-  const { howToPlayTitle, instructions, tipsTitle, tips } =
-    translations[language];
+const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) => {
+  const { howToPlayTitle, instructions, tipsTitle, tips } = translations[language];
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -982,14 +986,12 @@ const InstructionsModal = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="svf-modal-card my-auto w-full max-w-[460px] cursor-default rounded-5 border-4 border-gray-300 bg-white outline outline-2 outline-gray-600 text-gray-700"
+        className="svf-modal-card rounded-5 my-auto w-full max-w-[460px] cursor-default border-4 border-gray-300 bg-white text-gray-700 outline outline-2 outline-gray-600"
       >
         <div className="flex items-center justify-between border-b-2 border-gray-200 px-4 py-2">
           <div className="flex items-center gap-2">
             <PokeballIcon size={20} />
-            <h1 className="text-2xl leading-none drop-shadow-soft">
-              {howToPlayTitle}
-            </h1>
+            <h1 className="drop-shadow-soft text-2xl leading-none">{howToPlayTitle}</h1>
           </div>
           <button
             onClick={close}
@@ -1010,7 +1012,7 @@ const InstructionsModal = ({
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 p-4 text-base leading-snug drop-shadow-soft">
+        <div className="drop-shadow-soft flex flex-col gap-4 p-4 text-base leading-snug">
           {/* Reward legend */}
           <section>
             <h2 className="mb-2 text-xl text-gray-700">Tiles &amp; rewards</h2>
@@ -1121,7 +1123,7 @@ function DebugPanel({
         onClick={() => setOpen(true)}
         aria-label="Open debug panel"
         title="Debug panel"
-        className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-3 py-1.5 font-mono text-xs text-white/80 shadow-lg backdrop-blur hover:bg-black/85"
+        className="fixed right-3 bottom-3 z-50 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-3 py-1.5 font-mono text-xs text-white/80 shadow-lg backdrop-blur hover:bg-black/85"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <path d="M19.14 12.94a7.49 7.49 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.24-1.13.55-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.67 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.05.31-.08.62-.08.94s.03.63.08.94L2.79 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.42.33.68.22l2.39-.96c.49.39 1.04.7 1.62.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.24 1.13-.55 1.62-.94l2.39.96c.26.11.54.02.68-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.19-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" />
@@ -1133,12 +1135,12 @@ function DebugPanel({
 
   return (
     <div
-      className="fixed bottom-3 right-3 z-50 w-64 rounded-lg border border-white/20 bg-black/85 p-3 font-mono text-xs text-white shadow-xl backdrop-blur"
+      className="fixed right-3 bottom-3 z-50 w-64 rounded-lg border border-white/20 bg-black/85 p-3 font-mono text-xs text-white shadow-xl backdrop-blur"
       role="dialog"
       aria-label="Debug panel"
     >
       <div className="flex items-center justify-between border-b border-white/10 pb-2">
-        <span className="font-bold uppercase tracking-widest">Debug</span>
+        <span className="font-bold tracking-widest uppercase">Debug</span>
         <button
           onClick={() => setOpen(false)}
           aria-label="Close debug panel"
@@ -1190,9 +1192,8 @@ function DebugPanel({
         </label>
 
         <p className="border-t border-white/10 pt-2 text-[10px] leading-snug text-white/40">
-          Tile composition is generated per (size, level); x3 count is
-          capped so the max score stays playable at any N. Every board is
-          winnable.
+          Tile composition is generated per (size, level); x3 count is capped so the max score stays
+          playable at any N. Every board is winnable.
         </p>
       </div>
     </div>
@@ -1346,7 +1347,15 @@ export function SuperVoltorbFlipGame() {
         tallyTimerRef.current = null;
       }
     };
-  }, [game, game?.currentScore, game?.totalScore, game?.gameStatus, displayCurrent, displayTotal, muted]);
+  }, [
+    game,
+    game?.currentScore,
+    game?.totalScore,
+    game?.gameStatus,
+    displayCurrent,
+    displayTotal,
+    muted,
+  ]);
 
   // Release the post-payout freeze when restartGame zeroes currentScore.
   // We hold payoutAnimRef.current=true through flipCardsDown / level-flash
@@ -1571,171 +1580,165 @@ export function SuperVoltorbFlipGame() {
           onPeekToggle={() => setPeek((v) => !v)}
         />
       )}
-    <EffectsProvider>
-      <div
-        ref={svfRootRef}
-        className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center lg:grid lg:grid-cols-[auto_1fr] lg:items-start lg:gap-4 text-white p-1 sm:p-2`}
-      >
-        <style>{SCOPED_STYLES}</style>
+      <EffectsProvider>
+        <div
+          ref={svfRootRef}
+          className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center p-1 text-white sm:p-2 lg:grid lg:grid-cols-[auto_1fr] lg:items-start lg:gap-4`}
+        >
+          <style>{SCOPED_STYLES}</style>
 
-        {howToPlayOpen && (
-          <InstructionsModal
-            language="en"
-            setModalOpen={setHowToPlayOpen}
-          />
-        )}
+          {howToPlayOpen && <InstructionsModal language="en" setModalOpen={setHowToPlayOpen} />}
 
-        {/* Desktop / tablet left column (sm+ only). Holds everything except
+          {/* Desktop / tablet left column (sm+ only). Holds everything except
             the board so the right column can devote full width to tiles. */}
-        <div className="hidden lg:flex flex-col items-center gap-2">
-          <div className="flex w-full items-center gap-2">
-            <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-            <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
-            <PixelFullscreenButton active={fullscreenActive} onToggle={toggleFullscreen} size={44} />
-            {game && (
-              <div
-                className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 outline outline-2 outline-gray-600 drop-shadow-default${
-                  levelDir === "up"
-                    ? " svf-lv-flash-up"
-                    : levelDir === "down"
-                    ? " svf-lv-flash-down"
-                    : ""
-                }`}
-              >
-                <span className="text-xs font-bold uppercase tracking-widest text-white/80">
-                  Lv
-                </span>
-                <span className="text-lg font-black leading-none">
-                  {displayLevel}
-                </span>
-                <span className="text-sm text-white/70">VOLTORB Flip</span>
-              </div>
-            )}
-          </div>
-          <div className="flex w-full">
-            <MemoBar
-              activeFlags={memoFlags}
-              onToggle={toggleMemoFlag}
-              onClear={clearMemoFlags}
-              size={32}
-              fullWidth
-            />
-          </div>
-          {game && (
-            <Scoreboard
-              currentScore={displayCurrent}
-              totalScore={displayTotal}
-            />
-          )}
-        </div>
-
-        {/* Right column: board + footer (and mobile bar at <lg, sized
-            to match board width). */}
-        <div className="flex flex-col items-center gap-2">
-          {game && (
-            <div className="flex w-full flex-col gap-1.5 lg:hidden">
-              <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 outline outline-2 outline-gray-600 text-gray-700">
+          <div className="hidden flex-col items-center gap-2 lg:flex">
+            <div className="flex w-full items-center gap-2">
+              <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+              <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+              <PixelFullscreenButton
+                active={fullscreenActive}
+                onToggle={toggleFullscreen}
+                size={44}
+              />
+              {game && (
                 <div
-                  className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#448563] px-2 leading-none text-white${
+                  className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 outline outline-2 outline-gray-600 drop-shadow-default${
                     levelDir === "up"
-                      ? " svf-lv-flash-up"
+                      ? "svf-lv-flash-up"
                       : levelDir === "down"
-                      ? " svf-lv-flash-down"
-                      : ""
+                        ? "svf-lv-flash-down"
+                        : ""
                   }`}
                 >
-                  <span className="text-xs font-bold uppercase tracking-widest text-white/80">
+                  <span className="text-xs font-bold tracking-widest text-white/80 uppercase">
                     Lv
                   </span>
-                  <span className="text-xl font-black">
-                    {displayLevel}
-                  </span>
+                  <span className="text-lg leading-none font-black">{displayLevel}</span>
+                  <span className="text-sm text-white/70">VOLTORB Flip</span>
                 </div>
-                <div className="flex flex-1 items-center justify-around gap-2">
-                  <div className="flex flex-col items-center gap-0.5 leading-none">
-                    <div className="flex items-center gap-1">
-                      <CoinSpinner size={14} />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                        Total Coins
-                      </span>
-                    </div>
-                    <span className={`${scoreFont.className} text-xl flex`}>
-                      {displayTotal
-                        .toString()
-                        .padStart(5, "0")
-                        .split("")
-                        .map((d, i) => (
-                          <span
-                            key={i}
-                            className="inline-block text-center"
-                            style={{ width: "0.5em" }}
-                          >
-                            {d}
-                          </span>
-                        ))}
-                    </span>
-                  </div>
-                  <div className="h-8 w-[2px] bg-gray-200" />
-                  <div className="flex flex-col items-center gap-0.5 leading-none">
-                    <div className="flex items-center gap-1">
-                      <CoinSpinner size={14} />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                        This Game
-                      </span>
-                    </div>
-                    <span className={`${scoreFont.className} text-xl flex`}>
-                      {displayCurrent
-                        .toString()
-                        .padStart(5, "0")
-                        .split("")
-                        .map((d, i) => (
-                          <span
-                            key={i}
-                            className="inline-block text-center"
-                            style={{ width: "0.5em" }}
-                          >
-                            {d}
-                          </span>
-                        ))}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-                  <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
-            <PixelFullscreenButton active={fullscreenActive} onToggle={toggleFullscreen} size={44} />
-                </div>
-                <MemoBar
-                  activeFlags={memoFlags}
-                  onToggle={toggleMemoFlag}
-                  onClear={clearMemoFlags}
-                  size={28}
-                  showLabel={false}
-                />
-              </div>
+              )}
             </div>
-          )}
-          {game && (
-            <>
-              <Gameboard
-                game={game}
-                updateGame={updateGame}
-                waitForClick
-                muted={muted}
-                onFirstInteraction={handleFirstInteraction}
-                memoFlags={memoFlags}
-                peek={peek}
-                runPostFanfare={runPostFanfare}
-                onFlipDownStart={triggerLevelTransition}
+            <div className="flex w-full">
+              <MemoBar
+                activeFlags={memoFlags}
+                onToggle={toggleMemoFlag}
+                onClear={clearMemoFlags}
+                size={32}
+                fullWidth
               />
-              <Footer />
-            </>
-          )}
+            </div>
+            {game && <Scoreboard currentScore={displayCurrent} totalScore={displayTotal} />}
+          </div>
+
+          {/* Right column: board + footer (and mobile bar at <lg, sized
+            to match board width). */}
+          <div className="flex flex-col items-center gap-2">
+            {game && (
+              <div className="flex w-full flex-col gap-1.5 lg:hidden">
+                <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 text-gray-700 outline outline-2 outline-gray-600">
+                  <div
+                    className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#448563] px-2 leading-none text-white${
+                      levelDir === "up"
+                        ? "svf-lv-flash-up"
+                        : levelDir === "down"
+                          ? "svf-lv-flash-down"
+                          : ""
+                    }`}
+                  >
+                    <span className="text-xs font-bold tracking-widest text-white/80 uppercase">
+                      Lv
+                    </span>
+                    <span className="text-xl font-black">{displayLevel}</span>
+                  </div>
+                  <div className="flex flex-1 items-center justify-around gap-2">
+                    <div className="flex flex-col items-center gap-0.5 leading-none">
+                      <div className="flex items-center gap-1">
+                        <CoinSpinner size={14} />
+                        <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+                          Total Coins
+                        </span>
+                      </div>
+                      <span className={`${scoreFont.className} flex text-xl`}>
+                        {displayTotal
+                          .toString()
+                          .padStart(5, "0")
+                          .split("")
+                          .map((d, i) => (
+                            <span
+                              key={i}
+                              className="inline-block text-center"
+                              style={{ width: "0.5em" }}
+                            >
+                              {d}
+                            </span>
+                          ))}
+                      </span>
+                    </div>
+                    <div className="h-8 w-[2px] bg-gray-200" />
+                    <div className="flex flex-col items-center gap-0.5 leading-none">
+                      <div className="flex items-center gap-1">
+                        <CoinSpinner size={14} />
+                        <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+                          This Game
+                        </span>
+                      </div>
+                      <span className={`${scoreFont.className} flex text-xl`}>
+                        {displayCurrent
+                          .toString()
+                          .padStart(5, "0")
+                          .split("")
+                          .map((d, i) => (
+                            <span
+                              key={i}
+                              className="inline-block text-center"
+                              style={{ width: "0.5em" }}
+                            >
+                              {d}
+                            </span>
+                          ))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+                    <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+                    <PixelFullscreenButton
+                      active={fullscreenActive}
+                      onToggle={toggleFullscreen}
+                      size={44}
+                    />
+                  </div>
+                  <MemoBar
+                    activeFlags={memoFlags}
+                    onToggle={toggleMemoFlag}
+                    onClear={clearMemoFlags}
+                    size={28}
+                    showLabel={false}
+                  />
+                </div>
+              </div>
+            )}
+            {game && (
+              <>
+                <Gameboard
+                  game={game}
+                  updateGame={updateGame}
+                  waitForClick
+                  muted={muted}
+                  onFirstInteraction={handleFirstInteraction}
+                  memoFlags={memoFlags}
+                  peek={peek}
+                  runPostFanfare={runPostFanfare}
+                  onFlipDownStart={triggerLevelTransition}
+                />
+                <Footer />
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </EffectsProvider>
+      </EffectsProvider>
     </>
   );
 }

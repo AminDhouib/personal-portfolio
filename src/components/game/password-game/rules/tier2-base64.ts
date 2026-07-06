@@ -7,8 +7,22 @@ import { pickOne } from "../prng";
  * player doesn't need a base64 tool — just pattern-matching help.
  */
 const BASE64_WORDS: readonly string[] = [
-  "cat", "dog", "sun", "moon", "star", "fish", "zero", "hero",
-  "code", "blue", "red", "gold", "frog", "wolf", "lava", "rain",
+  "cat",
+  "dog",
+  "sun",
+  "moon",
+  "star",
+  "fish",
+  "zero",
+  "hero",
+  "code",
+  "blue",
+  "red",
+  "gold",
+  "frog",
+  "wolf",
+  "lava",
+  "rain",
 ];
 
 function b64(s: string): string {

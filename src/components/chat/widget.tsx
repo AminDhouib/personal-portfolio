@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 
-const ChatWidgetPanel = dynamic(
-  () => import("./widget-panel").then((mod) => mod.ChatWidgetPanel),
-  { ssr: false, loading: () => null },
-);
+const ChatWidgetPanel = dynamic(() => import("./widget-panel").then((mod) => mod.ChatWidgetPanel), {
+  ssr: false,
+  loading: () => null,
+});
 
 export function ChatWidget({ enabled }: { enabled?: boolean }) {
   const pathname = usePathname();
@@ -36,11 +36,7 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
 
   if (panelLoaded) {
     return (
-      <ChatWidgetPanel
-        pathname={pathname}
-        initiallyOpen={openSignal > 0}
-        openSignal={openSignal}
-      />
+      <ChatWidgetPanel pathname={pathname} initiallyOpen={openSignal > 0} openSignal={openSignal} />
     );
   }
 
@@ -48,7 +44,7 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
     <button
       type="button"
       onClick={openChat}
-      className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/80 px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-black/30 backdrop-blur transition hover:border-white/30 hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue"
+      className="fixed right-5 bottom-5 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/80 px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-black/30 backdrop-blur transition hover:border-white/30 hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue"
       aria-label="Open Amin AI chat"
     >
       <Sparkles className="h-4 w-4 text-accent-blue" aria-hidden />

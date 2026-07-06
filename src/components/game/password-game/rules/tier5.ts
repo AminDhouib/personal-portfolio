@@ -70,7 +70,10 @@ const lastWordLength: RuleDef = {
       description: `The final word of your password must be exactly ${length} characters long.`,
       params: { length },
       validate(state) {
-        const words = state.password.trim().split(/\s+/).filter((w) => w.length > 0);
+        const words = state.password
+          .trim()
+          .split(/\s+/)
+          .filter((w) => w.length > 0);
         const last = words[words.length - 1];
         if (!last) return { passed: false };
         return {
@@ -82,4 +85,9 @@ const lastWordLength: RuleDef = {
   },
 };
 
-export const TIER_5_RULES: readonly RuleDef[] = [mirrorInput, blurredInput, noLetter, lastWordLength];
+export const TIER_5_RULES: readonly RuleDef[] = [
+  mirrorInput,
+  blurredInput,
+  noLetter,
+  lastWordLength,
+];

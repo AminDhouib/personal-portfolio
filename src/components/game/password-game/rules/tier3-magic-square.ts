@@ -25,9 +25,7 @@ export const magicSquareRule: RuleDef = {
     const square = pickOne(rng, MAGIC_SQUARES);
     const blank = Math.floor(rng() * 9);
     const answer = square[blank];
-    const valuesStr = square
-      .map((v, i) => (i === blank ? "?" : String(v)))
-      .join(",");
+    const valuesStr = square.map((v, i) => (i === blank ? "?" : String(v))).join(",");
     return {
       id: "magic-square",
       tier: 3,

@@ -112,12 +112,12 @@ export function PasswordGame() {
           3: TIER_3_RULES,
           4: TIER_4_RULES,
           5: TIER_5_RULES,
-        }
+        },
       ),
     // wordleVersion bumps when the real NYT word resolves — re-memo so the
     // Wordle rule picks up the authoritative answer instead of the fallback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [seed, wordleVersion]
+    [seed, wordleVersion],
   );
 
   const state: GameState = useMemo(
@@ -129,7 +129,7 @@ export function PasswordGame() {
       rules,
       seed,
     }),
-    [password, formatting, elapsedSeconds, rules, seed]
+    [password, formatting, elapsedSeconds, rules, seed],
   );
 
   const results = useMemo(() => validateRules(state), [state]);
@@ -363,120 +363,118 @@ export function PasswordGame() {
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="pg-chaos-root w-full relative"
-      data-chaos={chaosLevel}
-    >
+    <div ref={containerRef} className="pg-chaos-root relative w-full" data-chaos={chaosLevel}>
       <CracksOverlay seed={seed} />
       <div className="pg-container relative rounded-xl border border-(--border) bg-(--card) p-5 sm:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Key className="h-4 w-4 text-accent-pink" />
-          <span className="text-xs font-medium text-(--muted)">
-            Seed: <span className="font-mono text-(--foreground)">{seed}</span>
-            {" • "}
-            <span className="font-mono text-(--foreground)">
-              {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Key className="h-4 w-4 text-accent-pink" />
+            <span className="text-xs font-medium text-(--muted)">
+              Seed: <span className="font-mono text-(--foreground)">{seed}</span>
+              {" • "}
+              <span className="font-mono text-(--foreground)">
+                {Math.floor(elapsedSeconds / 60)}:
+                {(elapsedSeconds % 60).toString().padStart(2, "0")}
+              </span>
             </span>
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={toggleSound}
-            className="inline-flex items-center gap-1 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
-            aria-label={soundOn ? "Disable sound" : "Enable sound"}
-          >
-            {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-            {soundOn ? "Sound" : "Muted"}
-          </button>
-          <button
-            type="button"
-            onClick={startDaily}
-            className="inline-flex items-center gap-1 text-xs text-accent-amber hover:text-accent-amber/80 transition-colors"
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            Daily
-          </button>
-          <button
-            type="button"
-            onClick={reset}
-            className="inline-flex items-center gap-1 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            New seed
-          </button>
-        </div>
-      </div>
-
-      <label htmlFor="pg-input" className="block text-sm text-(--muted) mb-2">
-        Please choose a password
-      </label>
-      <div className={hazardClass}>
-        <RichInput
-          value={password}
-          formatting={formatting}
-          onChange={(e) => {
-            setPassword(e.value);
-            setFormatting(e.formatting);
-            if (!timerRunning && e.value.length > 0) setTimerRunning(true);
-          }}
-          onDestructiveKey={() => {
-            const inputWrap = containerRef.current?.querySelector<HTMLElement>(".pg-chaos-root textarea")?.closest("div");
-            if (inputWrap) {
-              inputWrap.classList.remove("pg-typo-flash");
-              void inputWrap.offsetWidth;
-              inputWrap.classList.add("pg-typo-flash");
-              window.setTimeout(() => inputWrap.classList.remove("pg-typo-flash"), 300);
-            }
-            playSfx("rule-fail");
-          }}
-          placeholder="Enter your password..."
-        />
-      </div>
-      <div className="mt-1 text-xs text-(--muted)">
-        {[...password].length} characters
-      </div>
-
-      <div className="mt-5 space-y-2">
-        {visibleRules.map((rule, i) => (
-          <div
-            key={`${rule.id}-${i}`}
-            className="pg-rule-card"
-            style={{ ["--pg-card-idx" as string]: i }}
-          >
-            <RuleCard
-              rule={rule}
-              result={visibleResults[i]}
-              index={i}
-              isActive={i === activeIdx}
-              chaos={chaosLevel}
-            />
           </div>
-        ))}
-      </div>
-
-      {allPassed && (
-        <div className="mt-5 rounded-lg border border-accent-green/40 bg-accent-green/10 px-4 py-3 text-sm text-accent-green">
-          All rules cleared in {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}!
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSound}
+              className="inline-flex items-center gap-1 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+              aria-label={soundOn ? "Disable sound" : "Enable sound"}
+            >
+              {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+              {soundOn ? "Sound" : "Muted"}
+            </button>
+            <button
+              type="button"
+              onClick={startDaily}
+              className="inline-flex items-center gap-1 text-xs text-accent-amber transition-colors hover:text-accent-amber/80"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Daily
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="inline-flex items-center gap-1 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              New seed
+            </button>
+          </div>
         </div>
-      )}
 
-      <ResultModal
-        open={showResult}
-        seed={seed}
-        timeSeconds={elapsedSeconds}
-        rulesCleared={rules.length}
-        tiers={rules.map((r) => r.tier)}
-        onClose={() => setShowResult(false)}
-      />
+        <label htmlFor="pg-input" className="mb-2 block text-sm text-(--muted)">
+          Please choose a password
+        </label>
+        <div className={hazardClass}>
+          <RichInput
+            value={password}
+            formatting={formatting}
+            onChange={(e) => {
+              setPassword(e.value);
+              setFormatting(e.formatting);
+              if (!timerRunning && e.value.length > 0) setTimerRunning(true);
+            }}
+            onDestructiveKey={() => {
+              const inputWrap = containerRef.current
+                ?.querySelector<HTMLElement>(".pg-chaos-root textarea")
+                ?.closest("div");
+              if (inputWrap) {
+                inputWrap.classList.remove("pg-typo-flash");
+                void inputWrap.offsetWidth;
+                inputWrap.classList.add("pg-typo-flash");
+                window.setTimeout(() => inputWrap.classList.remove("pg-typo-flash"), 300);
+              }
+              playSfx("rule-fail");
+            }}
+            placeholder="Enter your password..."
+          />
+        </div>
+        <div className="mt-1 text-xs text-(--muted)">{[...password].length} characters</div>
 
-      <ForeshadowOverlay
-        kind={foreshadowKind}
-        active={foreshadowFired}
-        containerRef={containerRef}
-      />
+        <div className="mt-5 space-y-2">
+          {visibleRules.map((rule, i) => (
+            <div
+              key={`${rule.id}-${i}`}
+              className="pg-rule-card"
+              style={{ ["--pg-card-idx" as string]: i }}
+            >
+              <RuleCard
+                rule={rule}
+                result={visibleResults[i]}
+                index={i}
+                isActive={i === activeIdx}
+                chaos={chaosLevel}
+              />
+            </div>
+          ))}
+        </div>
+
+        {allPassed && (
+          <div className="mt-5 rounded-lg border border-accent-green/40 bg-accent-green/10 px-4 py-3 text-sm text-accent-green">
+            All rules cleared in {Math.floor(elapsedSeconds / 60)}:
+            {(elapsedSeconds % 60).toString().padStart(2, "0")}!
+          </div>
+        )}
+
+        <ResultModal
+          open={showResult}
+          seed={seed}
+          timeSeconds={elapsedSeconds}
+          rulesCleared={rules.length}
+          tiers={rules.map((r) => r.tier)}
+          onClose={() => setShowResult(false)}
+        />
+
+        <ForeshadowOverlay
+          kind={foreshadowKind}
+          active={foreshadowFired}
+          containerRef={containerRef}
+        />
       </div>
       <ChaosDebugPanel />
     </div>

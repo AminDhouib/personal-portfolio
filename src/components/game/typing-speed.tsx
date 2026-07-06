@@ -192,20 +192,20 @@ export function TypingSpeedGame() {
         }
       }
     },
-    [state, target, typed.length, highScore, spawnBurst]
+    [state, target, typed.length, highScore, spawnBurst],
   );
 
   const correctChars = useMemo(
     () => typed.split("").filter((c, i) => c === target[i]).length,
-    [typed, target]
+    [typed, target],
   );
   const totalTyped = typed.length;
   const currentWPM =
     state === "playing"
       ? calcWPM(totalTyped, elapsed)
       : state === "done"
-      ? calcWPM(target.length, elapsed)
-      : 0;
+        ? calcWPM(target.length, elapsed)
+        : 0;
   const accuracy = calcAccuracy(correctChars, totalTyped);
   const progress = (totalTyped / target.length) * 100;
 
@@ -219,7 +219,8 @@ export function TypingSpeedGame() {
     if (isCorrect) cls += " text-accent-green";
     else if (isWrong) cls += " text-red-400 bg-red-500/15 rounded";
     else cls += " text-(--muted)/50";
-    if (isCursor) cls += " border-b-2 border-accent-blue animate-pulse shadow-[0_2px_8px_rgba(96,165,250,0.6)]";
+    if (isCursor)
+      cls += " border-b-2 border-accent-blue animate-pulse shadow-[0_2px_8px_rgba(96,165,250,0.6)]";
 
     return (
       <span
@@ -256,7 +257,7 @@ export function TypingSpeedGame() {
       nodes.push(
         <span key={`w${wordKey++}`} className="inline-block">
           {chars}
-        </span>
+        </span>,
       );
     }
     return nodes;
@@ -275,7 +276,7 @@ export function TypingSpeedGame() {
           <span
             className={
               state === "playing"
-                ? "text-accent-blue font-mono font-semibold tabular-nums"
+                ? "font-mono font-semibold text-accent-blue tabular-nums"
                 : "font-mono tabular-nums"
             }
           >
@@ -290,14 +291,14 @@ export function TypingSpeedGame() {
             animate={{ scale: 1 }}
             className={
               state === "playing" || state === "done"
-                ? "text-accent-green font-mono font-semibold tabular-nums"
+                ? "font-mono font-semibold text-accent-green tabular-nums"
                 : "font-mono tabular-nums"
             }
           >
             {currentWPM} WPM
           </motion.span>
         </div>
-        <div className="flex items-center gap-1.5 text-(--muted) font-mono tabular-nums">
+        <div className="flex items-center gap-1.5 font-mono text-(--muted) tabular-nums">
           <Percent className="h-3.5 w-3.5" />
           {accuracy}% acc
         </div>
@@ -307,7 +308,7 @@ export function TypingSpeedGame() {
               initial={{ opacity: 0, scale: 0.7, y: -6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.7 }}
-              className="flex items-center gap-1.5 text-accent-amber font-mono font-semibold"
+              className="flex items-center gap-1.5 font-mono font-semibold text-accent-amber"
             >
               <motion.span
                 animate={{ rotate: [0, -12, 12, 0] }}
@@ -320,17 +321,15 @@ export function TypingSpeedGame() {
           )}
         </AnimatePresence>
         {highScore > 0 && (
-          <div className="flex items-center gap-1.5 text-(--muted) ml-auto">
+          <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
             <Trophy className="h-3.5 w-3.5 text-accent-amber" />
-            <span className="font-mono text-accent-amber tabular-nums">
-              {highScore} best
-            </span>
+            <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
           </div>
         )}
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 w-full rounded-full bg-(--border)/40 overflow-hidden">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-(--border)/40">
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-green to-accent-amber"
           animate={{ width: `${progress}%` }}
@@ -344,11 +343,10 @@ export function TypingSpeedGame() {
         key={shake}
         animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
         transition={{ duration: 0.3 }}
-        className="relative rounded-2xl border border-(--border) bg-(--card) p-6 sm:p-8 text-lg sm:text-2xl leading-relaxed font-serif cursor-text overflow-hidden"
+        className="relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
         onClick={() => state === "playing" && inputRef.current?.focus()}
         style={{
-          background:
-            "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
+          background: "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
         }}
       >
         <AnimatePresence mode="wait">
@@ -395,7 +393,7 @@ export function TypingSpeedGame() {
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={startGame}
-                className="rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-accent-blue/20"
+                className="rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
               >
                 Start typing
               </motion.button>
@@ -448,19 +446,20 @@ export function TypingSpeedGame() {
               initial={{ scale: 0.5 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 260, damping: 14, delay: 0.1 }}
-              className="relative text-5xl font-black font-display text-accent-green"
+              className="relative font-display text-5xl font-black text-accent-green"
             >
               {currentWPM}
-              <span className="ml-1 text-xl text-(--muted) font-semibold">WPM</span>
+              <span className="ml-1 text-xl font-semibold text-(--muted)">WPM</span>
             </motion.div>
             <div className="relative mt-2 text-sm text-(--muted)">
-              {accuracy}% accuracy · {(elapsed / 1000).toFixed(1)}s · best streak {maxStreak} · {errors} error{errors === 1 ? "" : "s"}
+              {accuracy}% accuracy · {(elapsed / 1000).toFixed(1)}s · best streak {maxStreak} ·{" "}
+              {errors} error{errors === 1 ? "" : "s"}
               {currentWPM >= highScore && currentWPM > 0 && (
                 <motion.span
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  className="ml-2 inline-flex items-center gap-1 text-accent-amber font-semibold"
+                  className="ml-2 inline-flex items-center gap-1 font-semibold text-accent-amber"
                 >
                   <Trophy className="h-3.5 w-3.5" />
                   New best!
@@ -471,7 +470,7 @@ export function TypingSpeedGame() {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.95 }}
               onClick={resetGame}
-              className="relative mt-4 inline-flex items-center gap-2 rounded-lg bg-accent-green/15 border border-accent-green/40 px-5 py-2 text-sm font-semibold text-accent-green hover:bg-accent-green/25 transition-colors"
+              className="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/15 px-5 py-2 text-sm font-semibold text-accent-green transition-colors hover:bg-accent-green/25"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Next sentence
@@ -484,7 +483,7 @@ export function TypingSpeedGame() {
       {state === "playing" && (
         <button
           onClick={resetGame}
-          className="inline-flex items-center gap-1.5 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <RotateCcw className="h-3 w-3" />
           Skip

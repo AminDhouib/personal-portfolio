@@ -123,10 +123,7 @@ export function incrementRunsPlayed(): Profile {
   return p;
 }
 
-export function addRunStats(stats: {
-  asteroidsDestroyed: number;
-  distance: number;
-}): Profile {
+export function addRunStats(stats: { asteroidsDestroyed: number; distance: number }): Profile {
   const p = loadProfile();
   p.totalAsteroidsDestroyed += stats.asteroidsDestroyed;
   p.totalDistance += stats.distance;
@@ -178,7 +175,10 @@ export function unlockCosmetic(id: string): Profile {
   return p;
 }
 
-export function equipCosmetic(slot: "hull" | "engine" | "deathFx" | "ship", id: string | null): Profile {
+export function equipCosmetic(
+  slot: "hull" | "engine" | "deathFx" | "ship",
+  id: string | null,
+): Profile {
   const p = loadProfile();
   if (slot === "hull") p.equippedHull = id;
   else if (slot === "engine") p.equippedEngine = id;

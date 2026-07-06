@@ -41,9 +41,12 @@ type MathOp = "+" | "-" | "*";
 
 function evalMath(a: number, op: MathOp, b: number): number {
   switch (op) {
-    case "+": return a + b;
-    case "-": return a - b;
-    case "*": return a * b;
+    case "+":
+      return a + b;
+    case "-":
+      return a - b;
+    case "*":
+      return a * b;
   }
 }
 
@@ -75,15 +78,25 @@ const mathEquation: RuleDef = {
 };
 
 const ROMAN_TABLE: readonly [number, string][] = [
-  [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-  [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  [100, "C"],
+  [90, "XC"],
+  [50, "L"],
+  [40, "XL"],
+  [10, "X"],
+  [9, "IX"],
+  [5, "V"],
+  [4, "IV"],
+  [1, "I"],
 ];
 
 function toRoman(n: number): string {
   let out = "";
   let rem = n;
   for (const [v, s] of ROMAN_TABLE) {
-    while (rem >= v) { out += s; rem -= v; }
+    while (rem >= v) {
+      out += s;
+      rem -= v;
+    }
   }
   return out;
 }
@@ -95,7 +108,8 @@ function fromRoman(s: string): number {
   for (let i = s.length - 1; i >= 0; i--) {
     const v = map[s[i]] ?? 0;
     if (v === 0) return NaN;
-    if (v < prev) total -= v; else total += v;
+    if (v < prev) total -= v;
+    else total += v;
     prev = v;
   }
   return total;
@@ -141,9 +155,7 @@ const periodicElement: RuleDef = {
       description: `Your password must include the symbol of an element whose atomic number is between ${min} and ${max}.`,
       params: { min, max },
       validate(state) {
-        const candidates = ELEMENTS.filter(
-          (e) => e.atomicNumber >= min && e.atomicNumber <= max
-        );
+        const candidates = ELEMENTS.filter((e) => e.atomicNumber >= min && e.atomicNumber <= max);
         const pw = state.password;
         const pwLower = pw.toLowerCase();
         for (const el of candidates) {

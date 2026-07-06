@@ -6,7 +6,7 @@ import { RotateCcw, Trophy, CheckCircle, XCircle, ArrowRight } from "lucide-reac
 interface Puzzle {
   label: string;
   description: string;
-  broken: string;  // code with a bug highlighted via [BUG]marker[/BUG]
+  broken: string; // code with a bug highlighted via [BUG]marker[/BUG]
   options: string[];
   correct: number; // index into options
   explanation: string;
@@ -27,7 +27,8 @@ const PUZZLES: Puzzle[] = [
       "arr.slice(0, n)",
     ],
     correct: 1,
-    explanation: "`arr.length - n` gives the correct start index. Adding `+ 1` skips the first of the last N elements.",
+    explanation:
+      "`arr.length - n` gives the correct start index. Adding `+ 1` skips the first of the last N elements.",
   },
   {
     label: "Missing await",
@@ -43,11 +44,13 @@ const PUZZLES: Puzzle[] = [
       "user.name needs optional chaining",
     ],
     correct: 0,
-    explanation: "`fetchUser(id)` returns a Promise, not the resolved value. Without `await`, `user` is a pending Promise object, so `user.name` is always `undefined`.",
+    explanation:
+      "`fetchUser(id)` returns a Promise, not the resolved value. Without `await`, `user` is a pending Promise object, so `user.name` is always `undefined`.",
   },
   {
     label: "React stale closure",
-    description: "The count never increments correctly — clicking multiple times fast stays at 1. Why?",
+    description:
+      "The count never increments correctly — clicking multiple times fast stays at 1. Why?",
     broken: `const [count, setCount] = useState(0);
 
 function increment() {
@@ -60,7 +63,8 @@ function increment() {
       "count should be a ref, not state",
     ],
     correct: 1,
-    explanation: "`count` is captured in the closure at render time. Multiple rapid calls all see `count = 0`. The updater form `setCount(c => c + 1)` always uses the latest queued value.",
+    explanation:
+      "`count` is captured in the closure at render time. Multiple rapid calls all see `count = 0`. The updater form `setCount(c => c + 1)` always uses the latest queued value.",
   },
   {
     label: "SQL injection risk",
@@ -75,7 +79,8 @@ function increment() {
       "Should use double quotes around the column name",
     ],
     correct: 1,
-    explanation: "Injecting raw user input into SQL strings allows attackers to terminate the query and run arbitrary SQL. Use parameterized queries: `db.query('SELECT * FROM users WHERE email = $1', [email])`.",
+    explanation:
+      "Injecting raw user input into SQL strings allows attackers to terminate the query and run arbitrary SQL. Use parameterized queries: `db.query('SELECT * FROM users WHERE email = $1', [email])`.",
   },
   {
     label: "useEffect infinite loop",
@@ -90,7 +95,8 @@ function increment() {
       "useEffect can't call state setters",
     ],
     correct: 2,
-    explanation: "Without a dependency array, `useEffect` runs after every render. `setData` triggers a re-render, which triggers the effect again — infinite loop. Adding `[]` (once) or `[data]` (on data change) fixes it.",
+    explanation:
+      "Without a dependency array, `useEffect` runs after every render. `setData` triggers a re-render, which triggers the effect again — infinite loop. Adding `[]` (once) or `[data]` (on data change) fixes it.",
   },
   {
     label: "Docker CMD vs ENTRYPOINT",
@@ -106,7 +112,8 @@ CMD ["node", "server.js"]`,
       "Missing EXPOSE instruction",
     ],
     correct: 1,
-    explanation: "`CMD` sets default arguments that are replaced entirely when you pass args to `docker run`. `ENTRYPOINT` sets the executable that always runs, and `CMD` then provides default args that can be appended or overridden.",
+    explanation:
+      "`CMD` sets default arguments that are replaced entirely when you pass args to `docker run`. `ENTRYPOINT` sets the executable that always runs, and `CMD` then provides default args that can be appended or overridden.",
   },
 ];
 
@@ -129,7 +136,7 @@ export function CodePuzzleGame() {
       setTotal((t) => t + 1);
       if (correct) setScore((s) => s + 1);
     },
-    [answer, puzzle.correct]
+    [answer, puzzle.correct],
   );
 
   const next = useCallback(() => {
@@ -152,8 +159,8 @@ export function CodePuzzleGame() {
   if (finished) {
     const pct = Math.round((score / total) * 100);
     return (
-      <div className="rounded-xl border border-(--border) bg-(--card) p-8 text-center space-y-3">
-        <div className="text-5xl font-black font-display text-accent-amber">
+      <div className="space-y-3 rounded-xl border border-(--border) bg-(--card) p-8 text-center">
+        <div className="font-display text-5xl font-black text-accent-amber">
           {score}/{total}
         </div>
         <div className="text-base text-(--muted)">{pct}% correct</div>
@@ -161,12 +168,12 @@ export function CodePuzzleGame() {
           {pct === 100
             ? "Perfect score! You're the 10x."
             : pct >= 70
-            ? "Solid. A few bugs snuck through."
-            : "Bugs happen. That's why we have code review."}
+              ? "Solid. A few bugs snuck through."
+              : "Bugs happen. That's why we have code review."}
         </div>
         <button
           onClick={reset}
-          className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-4 py-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors mt-2"
+          className="mt-2 inline-flex items-center gap-2 rounded-lg border border-(--border) px-4 py-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Play again
@@ -191,20 +198,20 @@ export function CodePuzzleGame() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 rounded-full bg-(--surface) overflow-hidden">
+      <div className="h-1 overflow-hidden rounded-full bg-(--surface)">
         <div
-          className="h-full bg-accent-amber rounded-full transition-all"
-          style={{ width: `${((idx) / PUZZLES.length) * 100}%` }}
+          className="h-full rounded-full bg-accent-amber transition-all"
+          style={{ width: `${(idx / PUZZLES.length) * 100}%` }}
         />
       </div>
 
       {/* Puzzle */}
-      <div className="rounded-xl border border-(--border) bg-(--card) p-5 space-y-3">
-        <div className="text-xs text-(--muted) uppercase tracking-wider font-medium">
+      <div className="space-y-3 rounded-xl border border-(--border) bg-(--card) p-5">
+        <div className="text-xs font-medium tracking-wider text-(--muted) uppercase">
           {puzzle.label}
         </div>
         <p className="text-sm text-(--foreground)">{puzzle.description}</p>
-        <pre className="font-mono text-xs leading-relaxed bg-(--surface) rounded-lg p-4 overflow-x-auto text-(--foreground)/80 whitespace-pre">
+        <pre className="overflow-x-auto rounded-lg bg-(--surface) p-4 font-mono text-xs leading-relaxed whitespace-pre text-(--foreground)/80">
           {puzzle.broken}
         </pre>
       </div>
@@ -234,10 +241,10 @@ export function CodePuzzleGame() {
             >
               <div className="flex items-start gap-2">
                 {answer !== null && i === puzzle.correct && (
-                  <CheckCircle className="h-4 w-4 mt-0.5 shrink-0 text-accent-green" />
+                  <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent-green" />
                 )}
                 {answer !== null && i === answer.selected && !answer.correct && (
-                  <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
                 )}
                 <span>{option}</span>
               </div>
@@ -248,7 +255,7 @@ export function CodePuzzleGame() {
 
       {/* Explanation */}
       {answer !== null && (
-        <div className="rounded-lg border border-(--border) bg-(--surface) p-4 text-sm text-(--muted) leading-relaxed">
+        <div className="rounded-lg border border-(--border) bg-(--surface) p-4 text-sm leading-relaxed text-(--muted)">
           <span className="font-semibold text-(--foreground)">Why: </span>
           {puzzle.explanation}
         </div>
@@ -258,10 +265,14 @@ export function CodePuzzleGame() {
       {answer !== null && (
         <button
           onClick={next}
-          className="rounded-lg bg-accent-blue px-5 py-2 text-sm font-semibold text-white hover:brightness-110 transition-all"
+          className="rounded-lg bg-accent-blue px-5 py-2 text-sm font-semibold text-white transition-all hover:brightness-110"
         >
-          {idx + 1 >= PUZZLES.length ? "See results" : (
-            <span className="inline-flex items-center gap-1.5">Next puzzle <ArrowRight className="h-3.5 w-3.5" /></span>
+          {idx + 1 >= PUZZLES.length ? (
+            "See results"
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              Next puzzle <ArrowRight className="h-3.5 w-3.5" />
+            </span>
           )}
         </button>
       )}

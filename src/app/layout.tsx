@@ -41,19 +41,19 @@ export const metadata: Metadata = {
   creator: "Amin Dhouib",
   openGraph: {
     title: "Amin Dhouib — Engineer, Founder, Builder",
-    description:
-      "I build apps people actually use, then self-host them on my home server.",
+    description: "I build apps people actually use, then self-host them on my home server.",
     url: "https://amindhou.com",
     siteName: "Amin Dhouib",
     locale: "en_US",
     type: "website",
-    images: [{ url: ogImage, width: 1200, height: 630, alt: "Amin Dhouib — Engineer, Founder, Builder" }],
+    images: [
+      { url: ogImage, width: 1200, height: 630, alt: "Amin Dhouib — Engineer, Founder, Builder" },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Amin Dhouib — Engineer, Founder, Builder",
-    description:
-      "I build apps people actually use, then self-host them on my home server.",
+    description: "I build apps people actually use, then self-host them on my home server.",
     images: [ogImage],
   },
   robots: {
@@ -145,7 +145,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col">
         <Providers>
           {/* Skip-to-content link — visible only on keyboard focus, lets keyboard
               users bypass the navbar and jump straight to the page's main content. */}

@@ -5,7 +5,13 @@ import { themes } from ".";
 
 const EffectsCtx = createContext<EffectTheme | null>(null);
 
-export function EffectsProvider({ themeName = "default", children }: { themeName?: string; children: ReactNode }) {
+export function EffectsProvider({
+  themeName = "default",
+  children,
+}: {
+  themeName?: string;
+  children: ReactNode;
+}) {
   const [theme, setTheme] = useState<EffectTheme | null>(null);
   useEffect(() => {
     themes[themeName]?.().then(setTheme);

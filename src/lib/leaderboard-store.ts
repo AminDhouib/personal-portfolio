@@ -13,8 +13,8 @@ export interface LeaderboardConfig<T> {
 }
 
 export function createLeaderboardStore<T>(config: LeaderboardConfig<T>) {
-  const dataDir = (config.dataDirEnv && process.env[config.dataDirEnv])
-    ?? path.join(process.cwd(), ".data");
+  const dataDir =
+    (config.dataDirEnv && process.env[config.dataDirEnv]) ?? path.join(process.cwd(), ".data");
   const filePath = path.join(dataDir, config.fileName);
 
   let tmpCounter = 0;
@@ -53,9 +53,19 @@ export function createLeaderboardStore<T>(config: LeaderboardConfig<T>) {
 
   function sanitizeName(raw: unknown): string {
     if (typeof raw !== "string") return config.defaultName;
-    const cleaned = raw.replace(/[\u0000-\u001f]/g, "").trim().slice(0, config.nameMax);
+    const cleaned = raw
+      .replace(/[\u0000-\u001f]/g, "")
+      .trim()
+      .slice(0, config.nameMax);
     return cleaned.length > 0 ? cleaned : config.defaultName;
   }
 
-  return { readAll, writeAll, withWriteLock, sanitizeName, returnLimit: config.returnLimit, maxEntries: config.maxEntries };
+  return {
+    readAll,
+    writeAll,
+    withWriteLock,
+    sanitizeName,
+    returnLimit: config.returnLimit,
+    maxEntries: config.maxEntries,
+  };
 }

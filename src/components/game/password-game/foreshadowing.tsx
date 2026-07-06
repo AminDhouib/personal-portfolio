@@ -61,9 +61,7 @@ function NudgeEffect({ containerRef }: { containerRef: React.RefObject<HTMLEleme
 }
 
 function GaslighterEffect() {
-  return (
-    <div aria-hidden className="pg-foreshadow-gaslight" />
-  );
+  return <div aria-hidden className="pg-foreshadow-gaslight" />;
 }
 
 function PeekEffect() {
@@ -88,7 +86,7 @@ function RumbleEffect() {
         { transform: "translate(-1px, 2px)" },
         { transform: "translate(0, 0)" },
       ],
-      { duration: 350, iterations: 1 }
+      { duration: 350, iterations: 1 },
     );
   }, []);
   return null;

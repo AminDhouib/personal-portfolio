@@ -29,20 +29,16 @@ export function Experience() {
   return (
     <section id="experience" className="py-24">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          number="08"
-          title="Experience"
-          color="var(--color-accent-blue)"
-        />
+        <SectionHeading number="08" title="Experience" color="var(--color-accent-blue)" />
         <p className="-mt-8 mb-12 max-w-2xl text-sm leading-relaxed text-(--muted)">
-          Eight roles across cryptography, optical systems, GIS, and full-stack
-          product — from a defence internship to founding Devino.
+          Eight roles across cryptography, optical systems, GIS, and full-stack product — from a
+          defence internship to founding Devino.
         </p>
 
         <div className="relative">
           {/* Timeline rail threaded through the medallions, fading at both ends. */}
           <div
-            className="absolute left-7 top-3 bottom-3 z-0 w-px"
+            className="absolute top-3 bottom-3 left-7 z-0 w-px"
             style={{
               background:
                 "linear-gradient(to bottom, transparent, var(--border) 6%, var(--border) 94%, transparent)",
@@ -89,10 +85,7 @@ export function Experience() {
                   </div>
 
                   {job.current ? (
-                    <span
-                      className="absolute -right-1 -top-1 flex h-3.5 w-3.5"
-                      aria-hidden="true"
-                    >
+                    <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5" aria-hidden="true">
                       <span
                         className="absolute inline-flex h-full w-full animate-ping rounded-full"
                         style={{ backgroundColor: "var(--a)", opacity: 0.7 }}
@@ -119,19 +112,14 @@ export function Experience() {
 
                   <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                     <div className="min-w-0">
-                      <h3 className="font-display text-base font-bold leading-snug tracking-tight">
+                      <h3 className="font-display text-base leading-snug font-bold tracking-tight">
                         {job.role}
                       </h3>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                        <span
-                          className="font-semibold"
-                          style={{ color: "var(--a)" }}
-                        >
+                        <span className="font-semibold" style={{ color: "var(--a)" }}>
                           {job.company}
                         </span>
-                        {job.type ? (
-                          <span className="text-(--muted)">· {job.type}</span>
-                        ) : null}
+                        {job.type ? <span className="text-(--muted)">· {job.type}</span> : null}
                         {job.current ? (
                           <span
                             className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
@@ -157,7 +145,7 @@ export function Experience() {
                       </div>
                     </div>
 
-                    <span className="shrink-0 whitespace-nowrap rounded-full border border-(--border) bg-(--surface) px-2.5 py-1 font-mono text-[11px] text-(--muted)">
+                    <span className="shrink-0 rounded-full border border-(--border) bg-(--surface) px-2.5 py-1 font-mono text-[11px] whitespace-nowrap text-(--muted)">
                       {job.period}
                     </span>
                   </div>
@@ -174,7 +162,7 @@ export function Experience() {
                       {job.highlightGroups.map((group) => (
                         <div key={group.label}>
                           <p
-                            className="mb-1.5 flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider"
+                            className="mb-1.5 flex items-center gap-2 font-mono text-[11px] font-semibold tracking-wider uppercase"
                             style={{ color: tint(90) }}
                           >
                             <span

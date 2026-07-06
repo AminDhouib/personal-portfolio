@@ -41,11 +41,40 @@ export const binaryRule: RuleDef = {
 };
 
 const NUM_WORDS = [
-  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
-  "seventeen", "eighteen", "nineteen", "twenty",
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+  "twenty",
 ];
-const TENS_WORDS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const TENS_WORDS = [
+  "",
+  "",
+  "twenty",
+  "thirty",
+  "forty",
+  "fifty",
+  "sixty",
+  "seventy",
+  "eighty",
+  "ninety",
+];
 
 function numberToWords(n: number): string {
   if (n < 0) return "minus" + numberToWords(-n);
@@ -88,13 +117,12 @@ export const captchaRule: RuleDef = {
   tier: 2,
   create(rng) {
     const len = 4;
-    const chars = Array.from({ length: len }, () =>
-      CAPTCHA_ALPHABET[Math.floor(rng() * CAPTCHA_ALPHABET.length)]
+    const chars = Array.from(
+      { length: len },
+      () => CAPTCHA_ALPHABET[Math.floor(rng() * CAPTCHA_ALPHABET.length)],
     );
     // Randomly upper/lowercase each character.
-    const code = chars
-      .map((c) => (Math.floor(rng() * 2) === 0 ? c : c.toLowerCase()))
-      .join("");
+    const code = chars.map((c) => (Math.floor(rng() * 2) === 0 ? c : c.toLowerCase())).join("");
     const display = `▓${code.split("").join("░")}▓`;
     return {
       id: "captcha",

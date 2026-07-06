@@ -68,8 +68,7 @@ export default function GlobalError({
               margin: "0 0 2rem",
             }}
           >
-            A critical error interrupted the page. Try again, or head back to the
-            homepage.
+            A critical error interrupted the page. Try again, or head back to the homepage.
           </p>
           {error.digest ? (
             <p

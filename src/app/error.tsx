@@ -24,19 +24,14 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center px-4">
       {/* Decorative wireframe shapes */}
       <svg
         className="pointer-events-none fixed inset-0 h-full w-full opacity-[0.04]"
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
       >
-        <polygon
-          points="200,80 320,240 80,240"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1"
-        />
+        <polygon points="200,80 320,240 80,240" fill="none" stroke="currentColor" strokeWidth="1" />
         <polygon
           points="1100,120 1280,320 920,320"
           fill="none"
@@ -51,19 +46,19 @@ export default function Error({
         />
       </svg>
 
-      <div className="text-center relative z-10 max-w-md">
-        <p className="text-sm text-(--muted) tracking-widest uppercase mb-4">
+      <div className="relative z-10 max-w-md text-center">
+        <p className="mb-4 text-sm tracking-widest text-(--muted) uppercase">
           Error — Something went wrong
         </p>
-        <h1 className="font-display text-7xl font-black tracking-tighter leading-none text-(--foreground) mb-4">
+        <h1 className="mb-4 font-display text-7xl leading-none font-black tracking-tighter text-(--foreground)">
           Well, that broke.
         </h1>
-        <p className="text-lg text-(--muted) mb-8">
-          An unexpected error interrupted this page. You can try again, or head
-          back to the homepage.
+        <p className="mb-8 text-lg text-(--muted)">
+          An unexpected error interrupted this page. You can try again, or head back to the
+          homepage.
         </p>
         {error.digest ? (
-          <p className="text-xs font-mono text-(--muted) opacity-70 mb-8">
+          <p className="mb-8 font-mono text-xs text-(--muted) opacity-70">
             Reference: {error.digest}
           </p>
         ) : null}

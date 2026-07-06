@@ -68,12 +68,12 @@ const lengthBomb: RuleDef = {
 };
 
 const MYSTERY_ANSWERS = [
-  "42",       // famous
-  "3.14",     // pi
-  "1337",     // leet
-  "404",      // not found
-  "8675309",  // song
-  "2024",     // year
+  "42", // famous
+  "3.14", // pi
+  "1337", // leet
+  "404", // not found
+  "8675309", // song
+  "2024", // year
 ];
 
 const mysteryRule: RuleDef = {
@@ -94,4 +94,14 @@ const mysteryRule: RuleDef = {
   },
 };
 
-export const TIER_4_RULES: readonly RuleDef[] = [lengthBomb, clockRule, forbiddenVowel, mysteryRule, paulRule, fireRule, hourglassRule, sacrificeRule, palindromeRule];
+export const TIER_4_RULES: readonly RuleDef[] = [
+  lengthBomb,
+  clockRule,
+  forbiddenVowel,
+  mysteryRule,
+  paulRule,
+  fireRule,
+  hourglassRule,
+  sacrificeRule,
+  palindromeRule,
+];

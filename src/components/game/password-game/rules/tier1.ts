@@ -101,9 +101,26 @@ const digitSum: RuleDef = {
 };
 
 const COLOR_NAMES = [
-  "red", "blue", "green", "yellow", "purple", "orange", "pink",
-  "violet", "indigo", "coral", "teal", "cyan", "magenta", "lime",
-  "gold", "silver", "black", "white", "brown", "gray",
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "orange",
+  "pink",
+  "violet",
+  "indigo",
+  "coral",
+  "teal",
+  "cyan",
+  "magenta",
+  "lime",
+  "gold",
+  "silver",
+  "black",
+  "white",
+  "brown",
+  "gray",
 ];
 
 const colorName: RuleDef = {
@@ -210,11 +227,25 @@ const wordCount: RuleDef = {
       description: `Your password must contain exactly ${n} words (space-separated).`,
       params: { n },
       validate(state) {
-        const words = state.password.trim().split(/\s+/).filter((w) => w.length > 0);
+        const words = state.password
+          .trim()
+          .split(/\s+/)
+          .filter((w) => w.length > 0);
         return { passed: words.length === n, message: `${words.length} / ${n}` };
       },
     };
   },
 };
 
-export const TIER_1_RULES: readonly RuleDef[] = [minLength, digitCount, uppercase, specialChar, digitSum, colorName, dayOfWeek, planet, palindrome, wordCount];
+export const TIER_1_RULES: readonly RuleDef[] = [
+  minLength,
+  digitCount,
+  uppercase,
+  specialChar,
+  digitSum,
+  colorName,
+  dayOfWeek,
+  planet,
+  palindrome,
+  wordCount,
+];

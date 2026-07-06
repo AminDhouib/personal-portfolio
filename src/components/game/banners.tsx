@@ -46,7 +46,7 @@ function SpaceShooterBanner() {
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0a0a1a" }}>
       {/* Biome nebula glow — drifts slowly downward for parallax */}
       <motion.div
-        className="absolute w-[70%] h-[80%] rounded-full blur-3xl"
+        className="absolute h-[80%] w-[70%] rounded-full blur-3xl"
         style={{
           right: "-15%",
           background: "radial-gradient(circle, #b4540030 0%, #facc1518 40%, transparent 70%)",
@@ -55,7 +55,7 @@ function SpaceShooterBanner() {
         transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
       />
       <motion.div
-        className="absolute w-[50%] h-[60%] rounded-full blur-3xl"
+        className="absolute h-[60%] w-[50%] rounded-full blur-3xl"
         style={{
           left: "-10%",
           background: "radial-gradient(circle, #a78bfa15 0%, transparent 65%)",
@@ -85,7 +85,8 @@ function SpaceShooterBanner() {
               left: `${x}%`,
               width: 1,
               height: `${len}%`,
-              background: "linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent)",
+              background:
+                "linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent)",
             }}
             animate={{ top: ["-15%", "110%"] }}
             transition={{
@@ -127,7 +128,12 @@ function SpaceShooterBanner() {
           <polygon points="0,-12 -12,0 0,2" fill={a.faces[1]} />
           <polygon points="0,12 12,0 0,2" fill={a.faces[2]} />
           <polygon points="0,12 -12,0 0,2" fill={a.faces[1]} />
-          <polygon points="0,-12 12,0 0,12 -12,0" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+          <polygon
+            points="0,-12 12,0 0,12 -12,0"
+            fill="none"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth="0.5"
+          />
         </motion.svg>
       ))}
       {/* Ship (positioned off-center like in gameplay) */}
@@ -166,7 +172,7 @@ function SpaceShooterBanner() {
       </motion.svg>
       {/* Engine trail — elongated blur */}
       <motion.div
-        className="absolute w-[15%] h-10 rounded-full blur-xl"
+        className="absolute h-10 w-[15%] rounded-full blur-xl"
         style={{
           left: "44%",
           top: "60%",
@@ -183,7 +189,7 @@ function SpaceShooterBanner() {
       ].map((b, i) => (
         <motion.div
           key={i}
-          className="absolute w-2 h-2 rounded-full"
+          className="absolute h-2 w-2 rounded-full"
           style={{
             left: b.x,
             background: "#22d3ee",
@@ -201,7 +207,7 @@ function SpaceShooterBanner() {
       ].map((c, i) => (
         <motion.div
           key={i}
-          className="absolute w-3.5 h-3.5 rounded-full"
+          className="absolute h-3.5 w-3.5 rounded-full"
           style={{
             left: c.x,
             background: "radial-gradient(circle at 35% 35%, #fde68a, #d97706)",
@@ -217,7 +223,7 @@ function SpaceShooterBanner() {
       ))}
       {/* Vignette — dark edges like the actual PostFx */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="pointer-events-none absolute inset-0"
         style={{
           background: "radial-gradient(ellipse 70% 65% at 50% 50%, transparent 40%, #0a0a1a 100%)",
         }}
@@ -284,7 +290,7 @@ function HextrisBanner() {
   const t_landed = [0.18, 0.36, 0.54];
   const t_rest_end = 0.58;
   const t_pop = 0.62;
-  const t_clear = 0.70;
+  const t_clear = 0.7;
 
   // Rotation: once per CYCLE the whole canvas snaps 60° (6 steps = one full
   // revolution, so the outer animation cycle = 6·CYCLE seconds and loops
@@ -378,15 +384,7 @@ function HextrisBanner() {
           repeat: Infinity,
           delay,
           ease: "linear",
-          times: [
-            0,
-            t_release[slot],
-            t_landed[slot],
-            t_rest_end,
-            t_pop,
-            t_clear,
-            1,
-          ],
+          times: [0, t_release[slot], t_landed[slot], t_rest_end, t_pop, t_clear, 1],
         }}
       >
         <rect
@@ -418,7 +416,7 @@ function HextrisBanner() {
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0d0d0d" }}>
       {/* Outer-hex vignette — matches the boundary fade in the real canvas */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="pointer-events-none absolute inset-0"
         style={{
           background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 55%, #050505 100%)",
         }}
@@ -430,7 +428,7 @@ function HextrisBanner() {
           higher in the viewport. */}
       <svg
         viewBox="-60 -50 120 120"
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 h-full w-full"
         preserveAspectRatio="xMidYMid meet"
       >
         {/* Rotating canvas — the outer hex, inner hex, blocks, fillers and
@@ -441,91 +439,91 @@ function HextrisBanner() {
             local (0, 0) = viewBox center, not the bbox center which
             shifts as blocks animate. */}
         <g ref={gRef} transform="rotate(0)">
-        {/* Outer hex boundary — flat-top orientation (flat edges at top/
+          {/* Outer hex boundary — flat-top orientation (flat edges at top/
             bottom, vertex points on left and right). Matches the real game
             layout so blocks sit ON faces at -90/-30/30/90/150/210. Outer
             vertex-radius 46, apothem 40. */}
-        <polygon
-          points="46,0 23,-40 -23,-40 -46,0 -23,40 23,40"
-          fill="rgba(255,255,255,0.02)"
-          stroke="rgba(255,255,255,0.14)"
-          strokeWidth={1}
-        />
-        {/* Inner score hex — flat-top, vertex-radius 14, apothem ~12.12 */}
-        <polygon
-          points="14,0 7,-12 -7,-12 -14,0 -7,12 7,12"
-          fill="#111114"
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth={0.5}
-        />
-        {/* Three faces running the full match-and-clear cycle */}
-        {faces.flatMap((f) =>
-          [0, 1, 2].map((slot) =>
-            renderBlock(f.angleDeg, slot, f.color, f.delay, `${f.angleDeg}-${slot}`),
-          ),
-        )}
-        {/* Non-matching filler blocks on other faces (slot 0, static) so
+          <polygon
+            points="46,0 23,-40 -23,-40 -46,0 -23,40 23,40"
+            fill="rgba(255,255,255,0.02)"
+            stroke="rgba(255,255,255,0.14)"
+            strokeWidth={1}
+          />
+          {/* Inner score hex — flat-top, vertex-radius 14, apothem ~12.12 */}
+          <polygon
+            points="14,0 7,-12 -7,-12 -14,0 -7,12 7,12"
+            fill="#111114"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth={0.5}
+          />
+          {/* Three faces running the full match-and-clear cycle */}
+          {faces.flatMap((f) =>
+            [0, 1, 2].map((slot) =>
+              renderBlock(f.angleDeg, slot, f.color, f.delay, `${f.angleDeg}-${slot}`),
+            ),
+          )}
+          {/* Non-matching filler blocks on other faces (slot 0, static) so
             the hex never looks half-empty between clears. */}
-        {fillers.map((f) => {
-          const rad = (f.angleDeg * Math.PI) / 180;
-          const cx = Math.cos(rad) * SLOT_R[0];
-          const cy = Math.sin(rad) * SLOT_R[0];
-          return (
-            <g key={`filler-${f.angleDeg}`} transform={`translate(${cx} ${cy})`} opacity={0.85}>
-              <rect
-                x={-BLOCK_W / 2}
-                y={-BLOCK_H / 2}
-                width={BLOCK_W}
-                height={BLOCK_H}
-                rx={0.8}
-                fill={f.color}
-                transform={`rotate(${f.angleDeg + 90})`}
-                style={{ filter: `drop-shadow(0 0 2.5px ${f.color})` }}
-              />
-              <rect
-                x={-BLOCK_W / 2}
-                y={-BLOCK_H / 2}
-                width={BLOCK_W}
-                height={BLOCK_H}
-                rx={0.8}
-                fill="none"
-                stroke="rgba(255,255,255,0.2)"
-                strokeWidth={0.4}
-                transform={`rotate(${f.angleDeg + 90})`}
-              />
-            </g>
-          );
-        })}
-        {/* Score pop — "+9" that appears centered on the cleared face, rises
+          {fillers.map((f) => {
+            const rad = (f.angleDeg * Math.PI) / 180;
+            const cx = Math.cos(rad) * SLOT_R[0];
+            const cy = Math.sin(rad) * SLOT_R[0];
+            return (
+              <g key={`filler-${f.angleDeg}`} transform={`translate(${cx} ${cy})`} opacity={0.85}>
+                <rect
+                  x={-BLOCK_W / 2}
+                  y={-BLOCK_H / 2}
+                  width={BLOCK_W}
+                  height={BLOCK_H}
+                  rx={0.8}
+                  fill={f.color}
+                  transform={`rotate(${f.angleDeg + 90})`}
+                  style={{ filter: `drop-shadow(0 0 2.5px ${f.color})` }}
+                />
+                <rect
+                  x={-BLOCK_W / 2}
+                  y={-BLOCK_H / 2}
+                  width={BLOCK_W}
+                  height={BLOCK_H}
+                  rx={0.8}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.2)"
+                  strokeWidth={0.4}
+                  transform={`rotate(${f.angleDeg + 90})`}
+                />
+              </g>
+            );
+          })}
+          {/* Score pop — "+9" that appears centered on the cleared face, rises
             toward center. Positioned in viewBox units so it stays aligned. */}
-        {faces.map((f) => {
-          const rad = (f.angleDeg * Math.PI) / 180;
-          const popX = Math.cos(rad) * 8;
-          const popY = Math.sin(rad) * 8;
-          return (
-            <motion.text
-              key={`pop-${f.angleDeg}`}
-              x={popX}
-              y={popY}
-              textAnchor="middle"
-              fontFamily="ui-monospace, monospace"
-              fontSize={7}
-              fontWeight={700}
-              fill={f.color}
-              style={{ filter: `drop-shadow(0 0 3px ${f.color})` }}
-              animate={{ opacity: [0, 0, 1, 0], scale: [0.6, 0.6, 1.2, 1] }}
-              transition={{
-                duration: CYCLE,
-                repeat: Infinity,
-                delay: f.delay,
-                ease: "easeOut",
-                times: [0, t_pop - 0.01, t_pop + 0.02, t_clear + 0.05],
-              }}
-            >
-              +9
-            </motion.text>
-          );
-        })}
+          {faces.map((f) => {
+            const rad = (f.angleDeg * Math.PI) / 180;
+            const popX = Math.cos(rad) * 8;
+            const popY = Math.sin(rad) * 8;
+            return (
+              <motion.text
+                key={`pop-${f.angleDeg}`}
+                x={popX}
+                y={popY}
+                textAnchor="middle"
+                fontFamily="ui-monospace, monospace"
+                fontSize={7}
+                fontWeight={700}
+                fill={f.color}
+                style={{ filter: `drop-shadow(0 0 3px ${f.color})` }}
+                animate={{ opacity: [0, 0, 1, 0], scale: [0.6, 0.6, 1.2, 1] }}
+                transition={{
+                  duration: CYCLE,
+                  repeat: Infinity,
+                  delay: f.delay,
+                  ease: "easeOut",
+                  times: [0, t_pop - 0.01, t_pop + 0.02, t_clear + 0.05],
+                }}
+              >
+                +9
+              </motion.text>
+            );
+          })}
         </g>
       </svg>
     </div>
@@ -554,14 +552,14 @@ function TowerStackerBanner() {
         "bottom-2 left-2 border-b border-l",
         "bottom-2 right-2 border-b border-r",
       ].map((pos, i) => (
-        <div key={i} className={`absolute w-4 h-4 ${pos}`} style={{ borderColor: "#ef444488" }} />
+        <div key={i} className={`absolute h-4 w-4 ${pos}`} style={{ borderColor: "#ef444488" }} />
       ))}
       {/* Score HUD */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 font-mono text-xs tracking-widest text-white/60 uppercase">
         FLOOR 12
       </div>
       {/* Stacked blocks — red tones, progressively trimmed */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col-reverse items-center pb-3 gap-px">
+      <div className="absolute inset-x-0 bottom-0 flex flex-col-reverse items-center gap-px pb-3">
         {blocks.map((b, i) => (
           <motion.div
             key={i}
@@ -592,9 +590,10 @@ function TowerStackerBanner() {
       />
       {/* Scanline overlay */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, white 2px, white 3px)",
+          backgroundImage:
+            "repeating-linear-gradient(0deg, transparent, transparent 2px, white 2px, white 3px)",
         }}
       />
     </div>
@@ -609,10 +608,10 @@ function TypingSpeedBanner() {
   const text = "THE QUICK FOX";
   const correctColors = ["#22c55e", "#60a5fa", "#f59e0b", "#a78bfa", "#ec4899"];
   return (
-    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-[#0a0f1a] via-[#111827] to-[#0a0f1a] flex items-center justify-center">
+    <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#0a0f1a] via-[#111827] to-[#0a0f1a]">
       {/* WPM display in corner */}
       <div className="absolute top-3 left-4 font-mono">
-        <div className="text-[10px] text-white/40 uppercase tracking-widest">WPM</div>
+        <div className="text-[10px] tracking-widest text-white/40 uppercase">WPM</div>
         <motion.div
           className="text-2xl font-black text-white/90"
           animate={{ opacity: [0.7, 1, 0.7] }}
@@ -622,12 +621,12 @@ function TypingSpeedBanner() {
         </motion.div>
       </div>
       {/* Accuracy in corner */}
-      <div className="absolute top-3 right-4 font-mono text-right">
-        <div className="text-[10px] text-white/40 uppercase tracking-widest">ACC</div>
+      <div className="absolute top-3 right-4 text-right font-mono">
+        <div className="text-[10px] tracking-widest text-white/40 uppercase">ACC</div>
         <div className="text-lg font-bold text-[#22c55e]">98%</div>
       </div>
       {/* Animated typed text */}
-      <div className="relative font-mono text-xl sm:text-2xl md:text-3xl font-bold tracking-wide">
+      <div className="relative font-mono text-xl font-bold tracking-wide sm:text-2xl md:text-3xl">
         {text.split("").map((ch, i) => (
           <motion.span
             key={i}
@@ -655,19 +654,19 @@ function TypingSpeedBanner() {
       </div>
       {/* Streak counter */}
       <motion.div
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full border bg-black/40"
+        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border bg-black/40 px-3 py-1"
         style={{ borderColor: "#f59e0b55" }}
         animate={{ scale: [1, 1.08, 1] }}
         transition={{ duration: 0.8, repeat: Infinity }}
       >
-        <div className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+        <div className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]" />
         <span className="text-xs font-bold text-[#f59e0b]">STREAK x12</span>
       </motion.div>
       {/* Confetti bursts */}
       {correctColors.map((c, i) => (
         <motion.div
           key={i}
-          className="absolute w-1.5 h-1.5 rounded-full"
+          className="absolute h-1.5 w-1.5 rounded-full"
           style={{
             left: `${20 + i * 15}%`,
             background: c,
@@ -717,13 +716,7 @@ const EXPLODE_FRAMES = Array.from(
 const FRAME_DURATION_MS = 60;
 const FRAME_HOLD_MS = 80;
 const FADE_DURATION_MS = 200;
-function ExplosionFrames({
-  onFadeStart,
-  onDone,
-}: {
-  onFadeStart: () => void;
-  onDone: () => void;
-}) {
+function ExplosionFrames({ onFadeStart, onDone }: { onFadeStart: () => void; onDone: () => void }) {
   const [frame, setFrame] = useState(0);
   const [fading, setFading] = useState(false);
   // Stash the callbacks in refs so the frame-advance effect's deps don't
@@ -843,10 +836,7 @@ function BombExplosionOverlay({
         pointerEvents: "none",
       }}
     >
-      <ExplosionFrames
-        onFadeStart={() => setExploding(false)}
-        onDone={() => setMounted(false)}
-      />
+      <ExplosionFrames onFadeStart={() => setExploding(false)} onDone={() => setMounted(false)} />
     </div>
   );
 }
@@ -927,14 +917,17 @@ function BoardCell({
   useEffect(() => {
     const cycleMs = FLIP_CYCLE_S * 1000;
     let interval: ReturnType<typeof setInterval> | null = null;
-    const initial = setTimeout(() => {
-      setCycleTick((n) => n + 1);
-      setValue(pickCellValue());
-      interval = setInterval(() => {
+    const initial = setTimeout(
+      () => {
         setCycleTick((n) => n + 1);
         setValue(pickCellValue());
-      }, cycleMs);
-    }, (flipDelay + FLIP_CYCLE_S) * 1000);
+        interval = setInterval(() => {
+          setCycleTick((n) => n + 1);
+          setValue(pickCellValue());
+        }, cycleMs);
+      },
+      (flipDelay + FLIP_CYCLE_S) * 1000,
+    );
     return () => {
       clearTimeout(initial);
       if (interval) clearInterval(interval);
@@ -946,29 +939,26 @@ function BoardCell({
   // (flipDelay + 0.25*cycle) from mount. For later cycles the overlay
   // remounts at the cycle boundary so it just needs 0.25*cycle delay.
   const explosionDelayMs =
-    cycleTick === 0
-      ? (flipDelay + 0.25 * FLIP_CYCLE_S) * 1000
-      : 0.25 * FLIP_CYCLE_S * 1000;
+    cycleTick === 0 ? (flipDelay + 0.25 * FLIP_CYCLE_S) * 1000 : 0.25 * FLIP_CYCLE_S * 1000;
 
   const renderFaceUp = () =>
     isBomb ? (
       <div
-        className="flex items-center justify-center w-full h-full"
+        className="flex h-full w-full items-center justify-center"
         style={{ background: "#bd8c84", border: "2px solid #8a4236" }}
       >
         {!exploding && <BombFaceUp size={22} />}
       </div>
     ) : (
       <div
-        className="flex items-center justify-center w-full h-full font-bold"
+        className="flex h-full w-full items-center justify-center font-bold"
         style={{
           background: "#bd8c84",
           border: "2px solid #8a4236",
           color: "#1a1a1a",
           fontSize: TILE * 0.55,
           fontFamily: "ui-monospace, monospace",
-          textShadow:
-            "1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff",
+          textShadow: "1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff",
         }}
       >
         {value}
@@ -1068,7 +1058,14 @@ function VoltorbBannerTileBack() {
     >
       {[0, 1, 2].flatMap((r) =>
         [0, 1, 2].map((c) => (
-          <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill={(r + c) % 2 === 0 ? "#448563" : "#58a66c"} />
+          <rect
+            key={`${r}-${c}`}
+            x={c}
+            y={r}
+            width={1}
+            height={1}
+            fill={(r + c) % 2 === 0 ? "#448563" : "#58a66c"}
+          />
         )),
       )}
     </svg>
@@ -1103,7 +1100,7 @@ function SuperVoltorbFlipBanner() {
 
   return (
     <div
-      className="absolute inset-0 overflow-hidden flex items-center justify-center"
+      className="absolute inset-0 flex items-center justify-center overflow-hidden"
       style={{ background: "linear-gradient(160deg, #5ab859 0%, #4a9a4a 40%, #3f8a3f 100%)" }}
     >
       {/* Board container: 3x3 tiles + row clues right + col clues bottom */}
@@ -1145,16 +1142,20 @@ function SuperVoltorbFlipBanner() {
 
 function PasswordGameBanner() {
   return (
-    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-[#0a0a0f] via-[#1a0e1e] to-[#0a0a0f] p-4 sm:p-5 flex flex-col justify-center">
+    <div className="absolute inset-0 flex flex-col justify-center overflow-hidden bg-gradient-to-br from-[#0a0a0f] via-[#1a0e1e] to-[#0a0a0f] p-4 sm:p-5">
       {/* Fracture cracks (SVG lines like the actual game's FractureWeb) */}
-      <svg className="absolute inset-0 w-full h-full opacity-20" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg
+        className="absolute inset-0 h-full w-full opacity-20"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
         <polyline points="95,5 72,21 56,37 37,50" fill="none" stroke="#f472b6" strokeWidth="0.4" />
         <polyline points="5,45 23,51 39,60 56,67" fill="none" stroke="#f472b6" strokeWidth="0.3" />
         <polyline points="95,95 77,83 64,71 50,59" fill="none" stroke="#a78bfa" strokeWidth="0.3" />
       </svg>
       {/* Chaos indicator */}
       <motion.div
-        className="absolute top-3 right-3 px-2 py-0.5 rounded text-[9px] font-bold font-mono tracking-wider"
+        className="absolute top-3 right-3 rounded px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider"
         style={{
           background: "linear-gradient(90deg, #f472b6, #a78bfa)",
           color: "white",
@@ -1166,14 +1167,20 @@ function PasswordGameBanner() {
       </motion.div>
       {/* Seed display */}
       <div className="absolute top-3 left-3 flex items-center gap-1.5">
-        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <svg
+          viewBox="0 0 20 20"
+          className="h-3.5 w-3.5 text-white/40"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
           <rect x="4" y="8" width="12" height="9" rx="1" />
           <path d="M7 8V5a3 3 0 016 0v3" />
         </svg>
-        <span className="text-[10px] font-mono text-white/40">3697376024</span>
+        <span className="font-mono text-[10px] text-white/40">3697376024</span>
       </div>
       {/* Password input field */}
-      <div className="rounded-lg border border-pink-400/30 bg-black/50 px-3 py-2 font-mono text-sm text-pink-100 mb-3 flex items-center gap-0.5 backdrop-blur-sm">
+      <div className="mb-3 flex items-center gap-0.5 rounded-lg border border-pink-400/30 bg-black/50 px-3 py-2 font-mono text-sm text-pink-100 backdrop-blur-sm">
         <span className="text-white/90">p@ssW0rd</span>
         <motion.span
           className="text-pink-300"
@@ -1183,7 +1190,7 @@ function PasswordGameBanner() {
           Kg4
         </motion.span>
         <motion.span
-          className="inline-block w-0.5 h-4 bg-pink-300 ml-0.5"
+          className="ml-0.5 inline-block h-4 w-0.5 bg-pink-300"
           animate={{ opacity: [1, 0, 1] }}
           transition={{ duration: 0.6, repeat: Infinity }}
         />
@@ -1212,7 +1219,9 @@ function PasswordGameBanner() {
               times: [0, 0.15, 0.85, 1],
             }}
           >
-            <span className="font-bold mr-1">{r.ok ? "\u2713" : "\u2717"} {r.rule}:</span>
+            <span className="mr-1 font-bold">
+              {r.ok ? "\u2713" : "\u2717"} {r.rule}:
+            </span>
             {r.text}
           </motion.div>
         ))}
@@ -1224,7 +1233,7 @@ function PasswordGameBanner() {
       ].map((chip, i) => (
         <motion.div
           key={i}
-          className={`absolute w-8 h-8 border border-pink-400/20 rounded-sm ${chip.pos}`}
+          className={`absolute h-8 w-8 rounded-sm border border-pink-400/20 ${chip.pos}`}
           style={{ rotate: chip.rot, scale: chip.scale }}
           animate={{ opacity: [0, 0.3, 0], rotate: [chip.rot, `${parseFloat(chip.rot) + 2}deg`] }}
           transition={{ duration: 3, repeat: Infinity, delay: i * 1.5 }}

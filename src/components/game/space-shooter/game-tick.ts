@@ -1,24 +1,49 @@
 import * as THREE from "three";
 import type { GameRefs, Viewport, Environment } from "./types";
 import {
-  ARENA_W, ARENA_H, setArena, SPAWN_Z, DESPAWN_Z, MAX_OBSTACLES, MAX_POWERUPS,
-  SHIP_RADIUS, POWERUP_PICKUP_RADIUS, POWERUP_SPAWN_INTERVAL_MS,
-  COMBO_WINDOW_MS, NEAR_MISS_RADIUS, NEAR_MISS_POINTS,
-  POWERUP_DEFS, ENVIRONMENTS, INVERTED_ARMED_ENV,
-  isPowerUpActive, envColors, activatePowerUp,
+  ARENA_W,
+  ARENA_H,
+  setArena,
+  SPAWN_Z,
+  DESPAWN_Z,
+  MAX_OBSTACLES,
+  MAX_POWERUPS,
+  SHIP_RADIUS,
+  POWERUP_PICKUP_RADIUS,
+  POWERUP_SPAWN_INTERVAL_MS,
+  COMBO_WINDOW_MS,
+  NEAR_MISS_RADIUS,
+  NEAR_MISS_POINTS,
+  POWERUP_DEFS,
+  ENVIRONMENTS,
+  INVERTED_ARMED_ENV,
+  isPowerUpActive,
+  envColors,
+  activatePowerUp,
 } from "./types";
 import { difficulty, elapsedSeconds, comboMultiplier } from "./difficulty";
 import { sounds } from "./sound-manager";
 import {
-  spawnIntervalMs, fireIntervalMs,
-  spawnObstacle, spawnWall,
-  spawnCoin, fireBullets,
-  spawnExplosion, spawnScorePopup, spawnShipDebris, spawnPowerUp,
+  spawnIntervalMs,
+  fireIntervalMs,
+  spawnObstacle,
+  spawnWall,
+  spawnCoin,
+  fireBullets,
+  spawnExplosion,
+  spawnScorePopup,
+  spawnShipDebris,
+  spawnPowerUp,
 } from "./spawning";
 import {
-  runWardenBehavior, runVoidTyrantBehavior,
-  runHarvesterBehavior, runMirrorBehavior, runPulsarBehavior,
-  runSwarmMotherBehavior, runDrifterBehavior, runSentinelBehavior,
+  runWardenBehavior,
+  runVoidTyrantBehavior,
+  runHarvesterBehavior,
+  runMirrorBehavior,
+  runPulsarBehavior,
+  runSwarmMotherBehavior,
+  runDrifterBehavior,
+  runSentinelBehavior,
   spawnBoss,
 } from "./boss-behaviors";
 
@@ -63,10 +88,7 @@ export function runTick(
   const portraitOrMobile = g.isMobile || aspect < 1.05;
   const maxW = portraitOrMobile ? ARENA_W_MOBILE : ARENA_W_DESKTOP;
   const maxH = portraitOrMobile ? ARENA_H_MOBILE : ARENA_H_DESKTOP;
-  setArena(
-    Math.min(maxW, viewport.width - 1),
-    Math.min(maxH, viewport.height - 1),
-  );
+  setArena(Math.min(maxW, viewport.width - 1), Math.min(maxH, viewport.height - 1));
 
   // Distance-based biome roll — random next env every 700–1600m so the
   // transitions feel organic instead of clockwork.
@@ -177,7 +199,7 @@ export function runTick(
 
   // Warp intensity ramps up on activation and ramps DOWN on expiry so the
   // transition out of warp is a smooth deceleration, not a hard cut.
-  const warpTarget = (g.status === "playing" && isPowerUpActive(g, "warp")) ? 1 : 0;
+  const warpTarget = g.status === "playing" && isPowerUpActive(g, "warp") ? 1 : 0;
   const warpRampSpeed = warpTarget > 0 ? dt * 4 : dt * 1.8; // fast in, slower out
   g.warpIntensity = THREE.MathUtils.lerp(g.warpIntensity, warpTarget, Math.min(1, warpRampSpeed));
   if (g.warpIntensity < 0.01) g.warpIntensity = 0;
@@ -202,7 +224,7 @@ export function runTick(
   if (g.status === "dead") {
     g.speedLines.length = 0;
   }
-  const desiredLines = g.status === "dead" ? 0 : (wi > 0.5 ? 60 : 32);
+  const desiredLines = g.status === "dead" ? 0 : wi > 0.5 ? 60 : 32;
   while (g.speedLines.length < desiredLines) {
     g.speedLines.push({
       x: (Math.random() - 0.5) * 14,
@@ -381,8 +403,7 @@ export function runTick(
     const dz = p.position[2] - g.shipZ;
     const hitDist = p.radius + SHIP_RADIUS + 0.1;
     const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-    if (now > g.invulnUntil && !shieldedShip &&
-        dx * dx + dy * dy + dz * dz < hitDist * hitDist) {
+    if (now > g.invulnUntil && !shieldedShip && dx * dx + dy * dy + dz * dz < hitDist * hitDist) {
       g.status = "dying";
       g.dyingAt = now;
       g.deathVelX = (dx / (Math.hypot(dx, dy) || 1)) * 7;
@@ -408,7 +429,11 @@ export function runTick(
   }
 
   // Spawn obstacles
-  if (now > g.normalSpawningPausedUntil && now - g.lastSpawn > spawnIntervalMs(g) && g.obstacles.length < MAX_OBSTACLES) {
+  if (
+    now > g.normalSpawningPausedUntil &&
+    now - g.lastSpawn > spawnIntervalMs(g) &&
+    g.obstacles.length < MAX_OBSTACLES
+  ) {
     g.lastSpawn = now;
     g.obstacles.push(spawnObstacle(g));
     // After ~60s, occasionally spawn clusters of 3
@@ -421,12 +446,7 @@ export function runTick(
   // Wall spawn — every 25-40s, a line of asteroids forces the player to move
   // to a specific gap position. Only while playing (not during warp) so the
   // wall has time to arrive under normal physics before warp trivializes it.
-  if (
-    g.status === "playing" &&
-    wi < 0.1 &&
-    g.nextWallAt > 0 &&
-    now >= g.nextWallAt
-  ) {
+  if (g.status === "playing" && wi < 0.1 && g.nextWallAt > 0 && now >= g.nextWallAt) {
     spawnWall(g);
     g.nextWallAt = nextWallTimeMs(now);
   }
@@ -467,8 +487,7 @@ export function runTick(
     // Bullet-vs-boss: fighting phase only; Swarm Mother requires drones cleared
     if (g.boss && g.boss.phase === "fighting") {
       const bo = g.boss;
-      const droneAlive = bo.id === "swarm-mother"
-        && bo.subEntities.some((s) => s.type === "drone");
+      const droneAlive = bo.id === "swarm-mother" && bo.subEntities.some((s) => s.type === "drone");
       const dx = b.x - bo.position[0];
       const dy = b.y - bo.position[1];
       const dz = b.z - bo.position[2];
@@ -538,10 +557,10 @@ export function runTick(
     if (o.variant === "zapper" && g.status === "playing" && o.z > -25 && o.z < 2) {
       const CYCLE_MS = 2500;
       const BEAM_MS = 1100;
-      const cycleAge = ((now - g.startedAt) + o.id * 317) % CYCLE_MS; // desync per-zapper
+      const cycleAge = (now - g.startedAt + o.id * 317) % CYCLE_MS; // desync per-zapper
       const beamOn = cycleAge < BEAM_MS;
       // Muzzle flash at the base the instant a new beam cycle starts
-      const cycleIdx = Math.floor(((now - g.startedAt) + o.id * 317) / CYCLE_MS);
+      const cycleIdx = Math.floor((now - g.startedAt + o.id * 317) / CYCLE_MS);
       if (beamOn && o.lastBeamCycle !== cycleIdx) {
         o.lastBeamCycle = cycleIdx;
         spawnExplosion(g, o.x, o.y - 0.5, o.z, "#06b6d4", 300, 0.4);
@@ -551,8 +570,7 @@ export function runTick(
         const dx = g.shipX - o.x;
         const dz = g.shipZ - o.z;
         const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-        if (Math.abs(dx) < 0.6 && Math.abs(dz) < 2.5 &&
-            now > g.invulnUntil && !shieldedShip) {
+        if (Math.abs(dx) < 0.6 && Math.abs(dz) < 2.5 && now > g.invulnUntil && !shieldedShip) {
           if (g.reviveAvailable && !g.reviveUsed) {
             g.reviveAvailable = false;
             g.reviveUsed = true;
@@ -690,9 +708,9 @@ export function runTick(
   // the coin-magnet upgrade (g.coinMagnetExtra > 0).
   const magnetActive = isPowerUpActive(g, "magnet") || g.coinMagnetExtra > 0;
   const magnetStrength = isPowerUpActive(g, "magnet")
-    ? 1.8                                            // strong while power-up active
-    : 0.6 + g.coinMagnetExtra * 0.15;                // gentler from upgrade alone
-  const magnetRange = isPowerUpActive(g, "magnet") ? 6 : (2 + g.coinMagnetExtra);
+    ? 1.8 // strong while power-up active
+    : 0.6 + g.coinMagnetExtra * 0.15; // gentler from upgrade alone
+  const magnetRange = isPowerUpActive(g, "magnet") ? 6 : 2 + g.coinMagnetExtra;
   for (let i = g.coins.length - 1; i >= 0; i--) {
     const c = g.coins[i];
     c.z += 8 * step * obstacleSpeedMul;
@@ -788,7 +806,8 @@ export function runTick(
             sounds.play("shieldOn");
             for (let k = g.obstacles.length - 1; k >= 0; k--) {
               const other = g.obstacles[k];
-              const d2 = (other.x - g.shipX) ** 2 + (other.y - g.shipY) ** 2 + (other.z - g.shipZ) ** 2;
+              const d2 =
+                (other.x - g.shipX) ** 2 + (other.y - g.shipY) ** 2 + (other.z - g.shipZ) ** 2;
               if (d2 < 9 && other.variant !== "wall") g.obstacles.splice(k, 1);
             }
             break;

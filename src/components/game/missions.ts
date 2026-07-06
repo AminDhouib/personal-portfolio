@@ -3,7 +3,13 @@
 // Daily mission rotation. Missions reset on local calendar day change.
 // All clients on the same calendar day see the same 3 missions (seeded PRNG).
 
-import { claimMission, loadProfile, saveProfile, setMissions, type MissionProgress } from "./profile";
+import {
+  claimMission,
+  loadProfile,
+  saveProfile,
+  setMissions,
+  type MissionProgress,
+} from "./profile";
 
 export interface MissionDef {
   id: string;
@@ -15,14 +21,70 @@ export interface MissionDef {
 }
 
 const MISSION_POOL: MissionDef[] = [
-  { id: "kill-20-heavies",   label: "Kill 20 heavies",         description: "Destroy 20 heavy asteroids in a single run.", target: 20, reward: 500, tracker: "kills" },
-  { id: "reach-2km",         label: "Reach 2000m",             description: "Travel 2000m in a single run.",              target: 2000, reward: 1000, tracker: "distance" },
-  { id: "warp-3-grabs",      label: "Grab 3 warp power-ups",   description: "Pick up 3 warp power-ups in a single run.",  target: 3, reward: 800, tracker: "warpPickups" },
-  { id: "survive-180-clean", label: "3min flawless",           description: "Survive 3 minutes without taking damage.",   target: 180, reward: 1500, tracker: "surviveDamageFreeSeconds" },
-  { id: "score-5k",          label: "Score 5000",              description: "Reach a score of 5000 in a single run.",    target: 5000, reward: 600, tracker: "score" },
-  { id: "reach-5km",         label: "Reach 5000m",             description: "Travel 5000m in a single run.",              target: 5000, reward: 2000, tracker: "distance" },
-  { id: "kill-50",           label: "Kill 50 asteroids",       description: "Destroy 50 asteroids in a single run.",      target: 50, reward: 400, tracker: "kills" },
-  { id: "score-10k",         label: "Score 10000",             description: "Reach a score of 10000 in a single run.",   target: 10000, reward: 1200, tracker: "score" },
+  {
+    id: "kill-20-heavies",
+    label: "Kill 20 heavies",
+    description: "Destroy 20 heavy asteroids in a single run.",
+    target: 20,
+    reward: 500,
+    tracker: "kills",
+  },
+  {
+    id: "reach-2km",
+    label: "Reach 2000m",
+    description: "Travel 2000m in a single run.",
+    target: 2000,
+    reward: 1000,
+    tracker: "distance",
+  },
+  {
+    id: "warp-3-grabs",
+    label: "Grab 3 warp power-ups",
+    description: "Pick up 3 warp power-ups in a single run.",
+    target: 3,
+    reward: 800,
+    tracker: "warpPickups",
+  },
+  {
+    id: "survive-180-clean",
+    label: "3min flawless",
+    description: "Survive 3 minutes without taking damage.",
+    target: 180,
+    reward: 1500,
+    tracker: "surviveDamageFreeSeconds",
+  },
+  {
+    id: "score-5k",
+    label: "Score 5000",
+    description: "Reach a score of 5000 in a single run.",
+    target: 5000,
+    reward: 600,
+    tracker: "score",
+  },
+  {
+    id: "reach-5km",
+    label: "Reach 5000m",
+    description: "Travel 5000m in a single run.",
+    target: 5000,
+    reward: 2000,
+    tracker: "distance",
+  },
+  {
+    id: "kill-50",
+    label: "Kill 50 asteroids",
+    description: "Destroy 50 asteroids in a single run.",
+    target: 50,
+    reward: 400,
+    tracker: "kills",
+  },
+  {
+    id: "score-10k",
+    label: "Score 10000",
+    description: "Reach a score of 10000 in a single run.",
+    target: 10000,
+    reward: 1200,
+    tracker: "score",
+  },
 ];
 
 function seededRng(seed: string): () => number {
@@ -30,7 +92,7 @@ function seededRng(seed: string): () => number {
   for (let i = 0; i < seed.length; i++) h = ((h * 33) ^ seed.charCodeAt(i)) >>> 0;
   let s = h;
   return function rand() {
-    s = (s + 0x6D2B79F5) >>> 0;
+    s = (s + 0x6d2b79f5) >>> 0;
     let t = s;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);

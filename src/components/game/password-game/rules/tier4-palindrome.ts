@@ -21,12 +21,20 @@ function hasPalindromeOfLength(text: string, minLen: number): boolean {
   // Expand-around-center for every possible center.
   for (let center = 0; center < n; center++) {
     // Odd-length palindromes centered on `center`.
-    let l = center, r = center;
-    while (l >= 0 && r < n && clean[l] === clean[r]) { l--; r++; }
+    let l = center,
+      r = center;
+    while (l >= 0 && r < n && clean[l] === clean[r]) {
+      l--;
+      r++;
+    }
     if (r - l - 1 >= minLen) return true;
     // Even-length palindromes between center and center+1.
-    l = center; r = center + 1;
-    while (l >= 0 && r < n && clean[l] === clean[r]) { l--; r++; }
+    l = center;
+    r = center + 1;
+    while (l >= 0 && r < n && clean[l] === clean[r]) {
+      l--;
+      r++;
+    }
     if (r - l - 1 >= minLen) return true;
   }
   return false;

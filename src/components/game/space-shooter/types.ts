@@ -27,7 +27,8 @@ export const NEAR_MISS_POINTS = 15;
 // ---------- type aliases ----------
 export type GameStatus = "armed" | "playing" | "paused" | "dying" | "dead";
 export type PowerUpType = "shield" | "triple" | "rapid" | "mega" | "warp" | "magnet";
-export type ObstacleVariant = "basic" | "heavy" | "speeder" | "wall" | "shooter" | "zapper" | "drone";
+export type ObstacleVariant =
+  "basic" | "heavy" | "speeder" | "wall" | "shooter" | "zapper" | "drone";
 export type BulletStyle = "sprite" | "bolt" | "plasma";
 
 // ---------- environment ----------
@@ -116,10 +117,18 @@ export const POWERUP_TYPES: PowerUpType[] = ["shield", "triple", "rapid", "mega"
 export interface Obstacle {
   id: number;
   variant: ObstacleVariant;
-  x: number; y: number; z: number;
-  rx: number; ry: number; rz: number;
-  rsx: number; rsy: number; rsz: number;
-  vx: number; vy: number; vz: number;
+  x: number;
+  y: number;
+  z: number;
+  rx: number;
+  ry: number;
+  rz: number;
+  rsx: number;
+  rsy: number;
+  rsz: number;
+  vx: number;
+  vy: number;
+  vz: number;
   size: number;
   hp: number;
   shape: 0 | 1 | 2;
@@ -131,8 +140,12 @@ export interface Obstacle {
 
 export interface Bullet {
   id: number;
-  x: number; y: number; z: number;
-  vx: number; vy: number; vz: number;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
   size: number;
   damage: number;
   color: string;
@@ -142,15 +155,22 @@ export interface Bullet {
 
 export interface Coin {
   id: number;
-  x: number; y: number; z: number;
-  rx: number; ry: number; rz: number;
-  vx: number; vy: number;
+  x: number;
+  y: number;
+  z: number;
+  rx: number;
+  ry: number;
+  rz: number;
+  vx: number;
+  vy: number;
   value: number;
 }
 
 export interface Explosion {
   id: number;
-  x: number; y: number; z: number;
+  x: number;
+  y: number;
+  z: number;
   startedAt: number;
   color: string;
   scale: number;
@@ -159,7 +179,9 @@ export interface Explosion {
 }
 
 export interface SpeedLine {
-  x: number; y: number; z: number;
+  x: number;
+  y: number;
+  z: number;
   length: number;
   life: number;
 }
@@ -167,8 +189,12 @@ export interface SpeedLine {
 export interface PowerUp {
   id: number;
   type: PowerUpType;
-  x: number; y: number; z: number;
-  rx: number; ry: number; rz: number;
+  x: number;
+  y: number;
+  z: number;
+  rx: number;
+  ry: number;
+  rz: number;
 }
 
 export interface ActivePowerUp {
@@ -178,7 +204,9 @@ export interface ActivePowerUp {
 
 export interface ScorePopup {
   id: number;
-  x: number; y: number; z: number;
+  x: number;
+  y: number;
+  z: number;
   amount: number;
   spawnedAt: number;
   ttl: number;
@@ -186,10 +214,18 @@ export interface ScorePopup {
 
 export interface Debris {
   id: number;
-  x: number; y: number; z: number;
-  vx: number; vy: number; vz: number;
-  rx: number; ry: number; rz: number;
-  rsx: number; rsy: number; rsz: number;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rx: number;
+  ry: number;
+  rz: number;
+  rsx: number;
+  rsy: number;
+  rsz: number;
   size: [number, number, number];
   color: string;
   spawnedAt: number;
@@ -330,8 +366,11 @@ export interface GameRefs {
   activePowerUps: ActivePowerUp[];
   debris: Debris[];
   scorePopups: ScorePopup[];
-  targetX: number; targetY: number;
-  shipX: number; shipY: number; shipZ: number;
+  targetX: number;
+  targetY: number;
+  shipX: number;
+  shipY: number;
+  shipZ: number;
   shipRotZ: number;
   deathVelX: number;
   deathVelY: number;
@@ -364,7 +403,10 @@ export interface GameRefs {
   cameraTargetZ: number;
 }
 
-export interface Viewport { width: number; height: number }
+export interface Viewport {
+  width: number;
+  height: number;
+}
 
 // ---------- shared helpers ----------
 export function nextId(g: GameRefs): number {
@@ -379,13 +421,16 @@ export function isPowerUpActive(g: GameRefs, t: PowerUpType): boolean {
 }
 
 // Cached THREE.Color targets per environment (avoids per-frame allocation)
-export const ENV_COLOR_CACHE = new WeakMap<Environment, {
-  fog: THREE.Color;
-  ambient: THREE.Color;
-  asteroidColor: THREE.Color;
-  asteroidEmissive: THREE.Color;
-  starColor: THREE.Color;
-}>();
+export const ENV_COLOR_CACHE = new WeakMap<
+  Environment,
+  {
+    fog: THREE.Color;
+    ambient: THREE.Color;
+    asteroidColor: THREE.Color;
+    asteroidEmissive: THREE.Color;
+    starColor: THREE.Color;
+  }
+>();
 
 export function envColors(env: Environment) {
   let c = ENV_COLOR_CACHE.get(env);
@@ -405,9 +450,8 @@ export function envColors(env: Environment) {
 export function activatePowerUp(g: GameRefs, t: PowerUpType): void {
   const now = performance.now();
   // Shield duration is upgradable; other power-ups use the base duration.
-  const durationMs = (t === "shield" && g.shieldDurationMs > 0)
-    ? g.shieldDurationMs
-    : POWERUP_DURATION_MS;
+  const durationMs =
+    t === "shield" && g.shieldDurationMs > 0 ? g.shieldDurationMs : POWERUP_DURATION_MS;
   const expiresAt = now + durationMs;
   const existing = g.activePowerUps.find((p) => p.type === t);
   if (existing) {
@@ -423,7 +467,8 @@ export function tryDash(g: GameRefs, direction: "left" | "right", now: number): 
   const DASH_DURATION = 300;
   const DASH_DISTANCE = 3.0;
   if (now < g.dash.cooldownUntil) return false;
-  const lastKey: "lastLeftTapAt" | "lastRightTapAt" = direction === "left" ? "lastLeftTapAt" : "lastRightTapAt";
+  const lastKey: "lastLeftTapAt" | "lastRightTapAt" =
+    direction === "left" ? "lastLeftTapAt" : "lastRightTapAt";
   const lastTap = g.dash[lastKey];
   if (now - lastTap <= DASH_WINDOW && lastTap > 0) {
     g.dash.activeUntil = now + DASH_DURATION;
@@ -441,7 +486,9 @@ export function tryDash(g: GameRefs, direction: "left" | "right", now: number): 
       const pp = p as Profile & { totalDashes?: number };
       pp.totalDashes = (pp.totalDashes ?? 0) + 1;
       saveProfile(p);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     return true;
   }
   g.dash[lastKey] = now;

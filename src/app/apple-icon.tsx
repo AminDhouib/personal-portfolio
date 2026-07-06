@@ -13,32 +13,30 @@ export default async function AppleIcon() {
   const photoSrc = `data:image/jpeg;base64,${photo.toString("base64")}`;
 
   return new ImageResponse(
-    (
-      <div
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "transparent",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={photoSrc}
+        alt=""
+        width={180}
+        height={180}
         style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "transparent",
+          width: "180px",
+          height: "180px",
+          borderRadius: "9999px",
+          objectFit: "cover",
         }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photoSrc}
-          alt=""
-          width={180}
-          height={180}
-          style={{
-            width: "180px",
-            height: "180px",
-            borderRadius: "9999px",
-            objectFit: "cover",
-          }}
-        />
-      </div>
-    ),
+      />
+    </div>,
     { ...size },
   );
 }

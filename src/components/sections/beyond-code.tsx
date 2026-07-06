@@ -15,13 +15,9 @@ export function BeyondCode() {
   return (
     <section id="beyond" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          number="11"
-          title="Beyond Code"
-          color="var(--color-accent-amber)"
-        />
+        <SectionHeading number="11" title="Beyond Code" color="var(--color-accent-amber)" />
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {interests.map((item, i) => {
             const Icon = item.icon;
             return (
@@ -36,9 +32,7 @@ export function BeyondCode() {
                 <Icon className="h-5 w-5 text-accent-amber" />
                 <div>
                   <p className="font-display text-sm font-bold">{item.label}</p>
-                  {item.detail && (
-                    <p className="text-xs text-(--muted) mt-0.5">{item.detail}</p>
-                  )}
+                  {item.detail && <p className="mt-0.5 text-xs text-(--muted)">{item.detail}</p>}
                 </div>
               </motion.div>
             );

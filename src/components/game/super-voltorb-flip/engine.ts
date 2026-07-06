@@ -29,7 +29,7 @@ export function generateLevelComposition(level: number, boardSize: number) {
   const L = Math.max(0, Math.min(7, level));
   const total = boardSize * boardSize;
   const t = L / 7;
-  const vFrac = 0.22 + t * 0.20;
+  const vFrac = 0.22 + t * 0.2;
   const valFrac = 0.16 + t * 0.22;
   const x3Share = 0.25 + t * 0.35;
 
@@ -128,12 +128,7 @@ export class Board {
   }
 
   public flipCell(row: number, col: number): CellValue {
-    if (
-      row < 0 ||
-      row >= this._board.length ||
-      col < 0 ||
-      col >= this._board[0].length
-    ) {
+    if (row < 0 || row >= this._board.length || col < 0 || col >= this._board[0].length) {
       throw new Error(`Invalid row or column: (${row}, ${col})`);
     }
 
@@ -151,9 +146,7 @@ export class Board {
   private createBoard(level: Level) {
     const size = this._size;
     const total = size * size;
-    const board: Cell[][] = [...Array(size)].map(() =>
-      Array.from({ length: size }),
-    );
+    const board: Cell[][] = [...Array(size)].map(() => Array.from({ length: size }));
     // Level is already size-aware — counts fit the board by construction.
     const { x2: scaledX2, x3: scaledX3, voltorbs: scaledV } = level.levelData;
 
@@ -162,13 +155,8 @@ export class Board {
       ...Array(scaledX3).fill(3),
       ...Array(scaledV).fill("V"),
     ];
-    const remainingFillArray: 1[] = Array(
-      total - levelValuesArray.length,
-    ).fill(1);
-    const shuffledValuesArray: CellValue[] = shuffle([
-      ...levelValuesArray,
-      ...remainingFillArray,
-    ]);
+    const remainingFillArray: 1[] = Array(total - levelValuesArray.length).fill(1);
+    const shuffledValuesArray: CellValue[] = shuffle([...levelValuesArray, ...remainingFillArray]);
 
     let index = 0;
     for (let row = 0; row < size; row++) {
@@ -261,8 +249,7 @@ export class VoltorbFlip {
       this._gameStatus = "lose";
       return;
     }
-    this._currentScore =
-      this._currentScore === 0 ? cellValue : this._currentScore * cellValue;
+    this._currentScore = this._currentScore === 0 ? cellValue : this._currentScore * cellValue;
 
     if (this._currentScore === this._board.maxLevelScore) {
       this._currentLevel = Math.min(this._currentLevel + 1, 8);
@@ -325,9 +312,7 @@ export class VoltorbFlip {
 // names instead of instanceof.
 export function cloneGame(g: VoltorbFlip): VoltorbFlip {
   const deepClone: <T>(x: T) => T =
-    typeof structuredClone === "function"
-      ? structuredClone
-      : (x) => JSON.parse(JSON.stringify(x));
+    typeof structuredClone === "function" ? structuredClone : (x) => JSON.parse(JSON.stringify(x));
 
   const src = g as unknown as Record<string, unknown>;
   const data: Record<string, unknown> = {};

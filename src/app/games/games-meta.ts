@@ -13,12 +13,12 @@ export type GameSlug =
 export interface GameMeta {
   slug: GameSlug;
   title: string;
-  tagline: string;          // short neal.fun-style hook for the banner
-  description: string;      // long copy on the game page
+  tagline: string; // short neal.fun-style hook for the banner
+  description: string; // long copy on the game page
   controls?: string;
-  accent: string;           // hex used for banner gradient + glow
-  accentTailwind: string;   // tailwind class fragment (e.g. "accent-green")
-  external?: true;          // password-game has its own top-level route
+  accent: string; // hex used for banner gradient + glow
+  accentTailwind: string; // tailwind class fragment (e.g. "accent-green")
+  external?: true; // password-game has its own top-level route
   // Hidden from the games index + home-page menu but the route still
   // works if visited directly. Use to take a game out of rotation
   // without deleting any code.

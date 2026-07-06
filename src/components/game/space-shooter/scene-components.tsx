@@ -2,9 +2,13 @@ import { useRef, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import {
-  type Environment, type ObstacleVariant, type BossWallSegment, type GameRefs,
+  type Environment,
+  type ObstacleVariant,
+  type BossWallSegment,
+  type GameRefs,
   POWERUP_DURATION_MS,
-  POWERUP_DEFS, isPowerUpActive,
+  POWERUP_DEFS,
+  isPowerUpActive,
 } from "./types";
 import { runTick } from "./game-tick";
 
@@ -12,7 +16,14 @@ import { runTick } from "./game-tick";
 
 // Module-level mutation helper — keeps eslint react-hooks/immutability happy
 // when applying camera lerp inside useFrame
-function applyCameraLerp(camera: THREE.Camera, tx: number, ty: number, tz: number, lookX: number, lookY: number) {
+function applyCameraLerp(
+  camera: THREE.Camera,
+  tx: number,
+  ty: number,
+  tz: number,
+  lookX: number,
+  lookY: number,
+) {
   camera.position.x = THREE.MathUtils.lerp(camera.position.x, tx, 0.06);
   camera.position.y = THREE.MathUtils.lerp(camera.position.y, ty, 0.06);
   camera.position.z = THREE.MathUtils.lerp(camera.position.z, tz, 0.06);
@@ -38,7 +49,15 @@ function buildStarPoints(): Float32Array {
 
 // ---------- 3D components ----------
 
-export function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<GameRefs>; env: Environment; shipId: string }) {
+export function Ship({
+  gameRefs,
+  env,
+  shipId,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  env: Environment;
+  shipId: string;
+}) {
   const grpRef = useRef<THREE.Group>(null);
   const shieldRef = useRef<THREE.Mesh>(null);
   const engineRef = useRef<THREE.Mesh>(null);
@@ -92,7 +111,7 @@ export function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<Game
     if (g.status === "dying") {
       grpRef.current.rotation.x += 0.05;
       grpRef.current.rotation.y += 0.07;
-      grpRef.current.visible = (now - g.dyingAt) < 1500;
+      grpRef.current.visible = now - g.dyingAt < 1500;
     } else {
       // Per-ship movement feel:
       //   juggernaut: heavy, slow-to-bank (0.11) with a low-freq bob
@@ -102,11 +121,13 @@ export function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<Game
       //   falcon:     baseline
       const sid = g.shipId;
       const pitchLerp =
-        sid === "juggernaut" ? 0.11 :
-        sid === "phantom"    ? 0.28 :
-        sid === "void"       ? 0.22 : 0.18;
+        sid === "juggernaut" ? 0.11 : sid === "phantom" ? 0.28 : sid === "void" ? 0.22 : 0.18;
       const targetPitch = THREE.MathUtils.clamp((g.targetY - g.shipY) * 0.18, -0.25, 0.25);
-      grpRef.current.rotation.x = THREE.MathUtils.lerp(grpRef.current.rotation.x, targetPitch, pitchLerp);
+      grpRef.current.rotation.x = THREE.MathUtils.lerp(
+        grpRef.current.rotation.x,
+        targetPitch,
+        pitchLerp,
+      );
       if (sid === "void") {
         grpRef.current.rotation.y = Math.sin(now * 0.0012) * 0.08;
       } else if (sid === "scavenger") {
@@ -128,7 +149,8 @@ export function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<Game
       const mat = (child as THREE.Mesh).material as THREE.Material | undefined;
       if (mat && "opacity" in mat) {
         (mat as THREE.MeshBasicMaterial).opacity = isWarping ? 0.45 : 1;
-        (mat as THREE.MeshBasicMaterial).transparent = isWarping || (mat as THREE.MeshBasicMaterial).transparent;
+        (mat as THREE.MeshBasicMaterial).transparent =
+          isWarping || (mat as THREE.MeshBasicMaterial).transparent;
       }
     });
 
@@ -149,13 +171,17 @@ export function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<Game
       //   scavenger:  short, wide (cargo-thruster puffs)
       //   void:       jittery length with crackle
       const sid = g.shipId;
-      const baseStretch = sid === "phantom" ? 2.2 : sid === "juggernaut" ? 1.2 : sid === "scavenger" ? 1.15 : 1.6;
-      const baseWiden = sid === "juggernaut" ? 1.3 : sid === "scavenger" ? 1.2 : sid === "phantom" ? 0.55 : 0.9;
+      const baseStretch =
+        sid === "phantom" ? 2.2 : sid === "juggernaut" ? 1.2 : sid === "scavenger" ? 1.15 : 1.6;
+      const baseWiden =
+        sid === "juggernaut" ? 1.3 : sid === "scavenger" ? 1.2 : sid === "phantom" ? 0.55 : 0.9;
       const jitter = sid === "void" ? (Math.random() - 0.5) * 0.25 : 0;
-      const stretch = isWarping ? 3.4 + Math.sin(now * 0.05) * 0.4 : baseStretch + Math.sin(now * 0.025) * 0.4 + jitter;
+      const stretch = isWarping
+        ? 3.4 + Math.sin(now * 0.05) * 0.4
+        : baseStretch + Math.sin(now * 0.025) * 0.4 + jitter;
       const widen = isWarping ? 2.0 : baseWiden;
       engineTrailRef.current.scale.set(widen, widen, stretch);
-      engineTrailRef.current.position.z = 0.55 + (0.7 * stretch * 0.5);
+      engineTrailRef.current.position.z = 0.55 + 0.7 * stretch * 0.5;
       const mat = engineTrailRef.current.material as THREE.MeshBasicMaterial;
       mat.opacity = isWarping ? 0.95 : 0.5;
     }
@@ -383,24 +409,43 @@ export function Ship({ gameRefs, env, shipId }: { gameRefs: React.RefObject<Game
   );
 }
 
-export function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs>; env: Environment; tick: number }) {
+export function Obstacles({
+  gameRefs,
+  env,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  env: Environment;
+  tick: number;
+}) {
   const obstacles = gameRefs.current?.obstacles ?? [];
   const meshRefs = useRef<Map<number, THREE.Mesh>>(new Map());
-  const geos = useMemo(() => [
-    new THREE.IcosahedronGeometry(1, 0),
-    new THREE.DodecahedronGeometry(1, 0),
-    new THREE.OctahedronGeometry(1, 0),
-  ], []);
-  const baseMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: env.asteroidColor,
-    emissive: env.asteroidEmissive,
-    emissiveIntensity: 0.45,
-  }), [env]);
-  const heavyMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: "#475569",
-    emissive: env.asteroidEmissive,
-    emissiveIntensity: 0.3,
-  }), [env]);
+  const geos = useMemo(
+    () => [
+      new THREE.IcosahedronGeometry(1, 0),
+      new THREE.DodecahedronGeometry(1, 0),
+      new THREE.OctahedronGeometry(1, 0),
+    ],
+    [],
+  );
+  const baseMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: env.asteroidColor,
+        emissive: env.asteroidEmissive,
+        emissiveIntensity: 0.45,
+      }),
+    [env],
+  );
+  const heavyMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: "#475569",
+        emissive: env.asteroidEmissive,
+        emissiveIntensity: 0.3,
+      }),
+    [env],
+  );
 
   // Smooth biome lerp — base + heavy materials inherit env target each frame.
   useFrame(() => {
@@ -410,31 +455,51 @@ export function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<G
     baseMat.emissive.copy(g.asteroidEmissive);
     heavyMat.emissive.copy(g.asteroidEmissive);
   });
-  const speederMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: "#fbbf24",
-    emissive: "#92400e",
-    emissiveIntensity: 0.55,
-  }), []);
-  const wallMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: "#991b1b",          // deep crimson — reads as "hazard / do not shoot"
-    emissive: "#dc2626",
-    emissiveIntensity: 0.6,
-  }), []);
-  const shooterMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: "#f59e0b",          // amber — "this one shoots back"
-    emissive: "#b45309",
-    emissiveIntensity: 0.7,
-  }), []);
-  const zapperMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: "#06b6d4",          // cyan — "electric"
-    emissive: "#0e7490",
-    emissiveIntensity: 0.8,
-  }), []);
-  const droneMat = useMemo(() => new THREE.MeshToonMaterial({
-    color: "#ec4899",          // hot pink — persistent hostile
-    emissive: "#831843",
-    emissiveIntensity: 0.7,
-  }), []);
+  const speederMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: "#fbbf24",
+        emissive: "#92400e",
+        emissiveIntensity: 0.55,
+      }),
+    [],
+  );
+  const wallMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: "#991b1b", // deep crimson — reads as "hazard / do not shoot"
+        emissive: "#dc2626",
+        emissiveIntensity: 0.6,
+      }),
+    [],
+  );
+  const shooterMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: "#f59e0b", // amber — "this one shoots back"
+        emissive: "#b45309",
+        emissiveIntensity: 0.7,
+      }),
+    [],
+  );
+  const zapperMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: "#06b6d4", // cyan — "electric"
+        emissive: "#0e7490",
+        emissiveIntensity: 0.8,
+      }),
+    [],
+  );
+  const droneMat = useMemo(
+    () =>
+      new THREE.MeshToonMaterial({
+        color: "#ec4899", // hot pink — persistent hostile
+        emissive: "#831843",
+        emissiveIntensity: 0.7,
+      }),
+    [],
+  );
   useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
   useEffect(() => () => baseMat.dispose(), [baseMat]);
   useEffect(() => () => heavyMat.dispose(), [heavyMat]);
@@ -458,13 +523,19 @@ export function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<G
   });
 
   const matFor = (v: ObstacleVariant) =>
-    v === "heavy" ? heavyMat
-    : v === "speeder" ? speederMat
-    : v === "wall" ? wallMat
-    : v === "shooter" ? shooterMat
-    : v === "zapper" ? zapperMat
-    : v === "drone" ? droneMat
-    : baseMat;
+    v === "heavy"
+      ? heavyMat
+      : v === "speeder"
+        ? speederMat
+        : v === "wall"
+          ? wallMat
+          : v === "shooter"
+            ? shooterMat
+            : v === "zapper"
+              ? zapperMat
+              : v === "drone"
+                ? droneMat
+                : baseMat;
 
   return (
     <group>
@@ -479,7 +550,12 @@ export function Obstacles({ gameRefs, env, tick }: { gameRefs: React.RefObject<G
           material={matFor(o.variant)}
         />
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -489,7 +565,14 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
   const cylGeo = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 8), []);
   const sphGeo = useMemo(() => new THREE.SphereGeometry(1, 12, 10), []);
   const ringGeo = useMemo(() => new THREE.RingGeometry(0.6, 1, 16), []);
-  useEffect(() => () => { cylGeo.dispose(); sphGeo.dispose(); ringGeo.dispose(); }, [cylGeo, sphGeo, ringGeo]);
+  useEffect(
+    () => () => {
+      cylGeo.dispose();
+      sphGeo.dispose();
+      ringGeo.dispose();
+    },
+    [cylGeo, sphGeo, ringGeo],
+  );
 
   const refs = useRef<Map<number, THREE.Object3D>>(new Map());
   useFrame(() => {
@@ -527,7 +610,12 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
                 <meshBasicMaterial color={b.color} transparent opacity={0.35} />
               </mesh>
               <mesh geometry={ringGeo} scale={b.size * 4} rotation={[Math.PI / 2, 0, 0]}>
-                <meshBasicMaterial color={b.color} transparent opacity={0.5} side={THREE.DoubleSide} />
+                <meshBasicMaterial
+                  color={b.color}
+                  transparent
+                  opacity={0.5}
+                  side={THREE.DoubleSide}
+                />
               </mesh>
             </group>
           );
@@ -543,24 +631,38 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
           </group>
         );
       })}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function PowerUps({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const list = gameRefs.current?.powerUps ?? [];
   const sphereGeo = useMemo(() => new THREE.SphereGeometry(1, 16, 12), []);
   const octaGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), []);
   const torusKnotGeo = useMemo(() => new THREE.TorusKnotGeometry(0.6, 0.18, 32, 6), []);
   const coneGeo = useMemo(() => new THREE.ConeGeometry(0.5, 1, 6), []);
   const refs = useRef<Map<number, THREE.Group>>(new Map());
-  useEffect(() => () => {
-    sphereGeo.dispose();
-    octaGeo.dispose();
-    torusKnotGeo.dispose();
-    coneGeo.dispose();
-  }, [sphereGeo, octaGeo, torusKnotGeo, coneGeo]);
+  useEffect(
+    () => () => {
+      sphereGeo.dispose();
+      octaGeo.dispose();
+      torusKnotGeo.dispose();
+      coneGeo.dispose();
+    },
+    [sphereGeo, octaGeo, torusKnotGeo, coneGeo],
+  );
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -594,7 +696,11 @@ export function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
                   <meshBasicMaterial color={def.color} transparent opacity={0.45} wireframe />
                 </mesh>
                 <mesh geometry={sphereGeo} scale={0.28}>
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.8} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.8}
+                  />
                 </mesh>
               </>
             )}
@@ -602,26 +708,46 @@ export function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
               <>
                 {/* Three small orbs in a triangle */}
                 <mesh geometry={sphereGeo} scale={0.13} position={[0, 0.22, 0]}>
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.7} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.7}
+                  />
                 </mesh>
                 <mesh geometry={sphereGeo} scale={0.13} position={[-0.22, -0.13, 0]}>
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.7} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.7}
+                  />
                 </mesh>
                 <mesh geometry={sphereGeo} scale={0.13} position={[0.22, -0.13, 0]}>
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.7} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.7}
+                  />
                 </mesh>
               </>
             )}
             {p.type === "rapid" && (
               <mesh geometry={torusKnotGeo} scale={0.45}>
-                <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.8} />
+                <meshToonMaterial
+                  color={def.color}
+                  emissive={def.emissive}
+                  emissiveIntensity={0.8}
+                />
               </mesh>
             )}
             {p.type === "mega" && (
               <>
                 {/* Big crystal core + halo */}
                 <mesh geometry={octaGeo} scale={0.42}>
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.85} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.85}
+                  />
                 </mesh>
                 <mesh geometry={sphereGeo} scale={0.65}>
                   <meshBasicMaterial color={def.color} transparent opacity={0.15} />
@@ -632,7 +758,11 @@ export function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
               <>
                 {/* Forward-pointing chevron + halo ring suggesting speed */}
                 <mesh geometry={coneGeo} scale={[0.35, 0.55, 0.35]} rotation={[Math.PI / 2, 0, 0]}>
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.85} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.85}
+                  />
                 </mesh>
                 <mesh geometry={sphereGeo} scale={0.5}>
                   <meshBasicMaterial color={def.color} transparent opacity={0.15} wireframe />
@@ -644,7 +774,11 @@ export function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
                 {/* Horseshoe magnet: half-torus body + two red pole caps + two white pole tips */}
                 <mesh rotation={[0, 0, Math.PI]}>
                   <torusGeometry args={[0.28, 0.08, 10, 20, Math.PI]} />
-                  <meshToonMaterial color={def.color} emissive={def.emissive} emissiveIntensity={0.8} />
+                  <meshToonMaterial
+                    color={def.color}
+                    emissive={def.emissive}
+                    emissiveIntensity={0.8}
+                  />
                 </mesh>
                 {/* Left pole — red */}
                 <mesh position={[-0.28, -0.06, 0]}>
@@ -671,12 +805,23 @@ export function PowerUps({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           </group>
         );
       })}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function DashAfterimages({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function DashAfterimages({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const list = gameRefs.current?.dashAfterimages ?? [];
   const now = gameRefs.current?.now ?? 0;
   return (
@@ -691,12 +836,23 @@ export function DashAfterimages({ gameRefs, tick }: { gameRefs: React.RefObject<
           </mesh>
         );
       })}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function ZapperBeams({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRefs = useRef<Map<number, THREE.Mesh>>(new Map());
   const warnRefs = useRef<Map<number, THREE.Mesh>>(new Map());
@@ -706,14 +862,14 @@ export function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<Game
     const now = performance.now();
     const CYCLE_MS = 2500;
     const BEAM_MS = 1100;
-    const WARN_MS = 350;    // pre-beam telegraph duration
-    const RAMP_IN = 140;    // beam fade-in ms
-    const RAMP_OUT = 220;   // beam fade-out ms
+    const WARN_MS = 350; // pre-beam telegraph duration
+    const RAMP_IN = 140; // beam fade-in ms
+    const RAMP_OUT = 220; // beam fade-out ms
     for (const o of g.obstacles) {
       if (o.variant !== "zapper") continue;
       const mesh = meshRefs.current.get(o.id);
       const warn = warnRefs.current.get(o.id);
-      const cycleAge = ((now - g.startedAt) + o.id * 317) % CYCLE_MS;
+      const cycleAge = (now - g.startedAt + o.id * 317) % CYCLE_MS;
       const beamOn = cycleAge < BEAM_MS;
       const inVisZ = o.z > -25 && o.z < 2;
 
@@ -723,11 +879,12 @@ export function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<Game
         if (mesh.visible) {
           mesh.position.set(o.x, o.y, o.z);
           const mat = mesh.material as THREE.MeshBasicMaterial;
-          const ramp = cycleAge < RAMP_IN
-            ? cycleAge / RAMP_IN
-            : cycleAge > BEAM_MS - RAMP_OUT
-              ? (BEAM_MS - cycleAge) / RAMP_OUT
-              : 1;
+          const ramp =
+            cycleAge < RAMP_IN
+              ? cycleAge / RAMP_IN
+              : cycleAge > BEAM_MS - RAMP_OUT
+                ? (BEAM_MS - cycleAge) / RAMP_OUT
+                : 1;
           const flicker = 0.75 + Math.sin(now * 0.05) * 0.18 + (Math.random() - 0.5) * 0.08;
           const smoothed = Math.max(0, Math.min(1, ramp)) * flicker;
           mat.opacity = Math.max(0.05, Math.min(1, smoothed));
@@ -783,12 +940,23 @@ export function ZapperBeams({ gameRefs, tick }: { gameRefs: React.RefObject<Game
           </mesh>
         </group>
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function BossMesh({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const groupRef = useRef<THREE.Group>(null);
   useFrame(() => {
     const b = gameRefs.current?.boss;
@@ -815,7 +983,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           <torusGeometry args={[0.8, 0.15, 8, 16]} />
           <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.6} />
         </mesh>
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -824,13 +997,23 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
       <group ref={groupRef}>
         <mesh>
           <octahedronGeometry args={[1.4, 0]} />
-          <meshStandardMaterial color="#0ea5e9" emissive="#0284c7" emissiveIntensity={0.5} flatShading />
+          <meshStandardMaterial
+            color="#0ea5e9"
+            emissive="#0284c7"
+            emissiveIntensity={0.5}
+            flatShading
+          />
         </mesh>
         <mesh scale={[0.6, 0.6, 0.6]}>
           <octahedronGeometry args={[1.4, 0]} />
           <meshBasicMaterial color="#7dd3fc" transparent opacity={0.4} />
         </mesh>
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -845,7 +1028,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           <torusKnotGeometry args={[0.9, 0.2, 32, 8]} />
           <meshStandardMaterial color="#d946ef" emissive="#d946ef" emissiveIntensity={0.6} />
         </mesh>
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -860,7 +1048,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           <ringGeometry args={[1.0, 1.3, 32]} />
           <meshBasicMaterial color="#e2e8f0" transparent opacity={0.6} side={THREE.DoubleSide} />
         </mesh>
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -872,7 +1065,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           <meshStandardMaterial color="#ffffff" emissive="#fef08a" emissiveIntensity={1.5} />
         </mesh>
         <pointLight intensity={3} distance={20} color="#fef08a" />
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -894,7 +1092,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
             <meshBasicMaterial color="#f59e0b" transparent opacity={0.3} />
           </mesh>
         )}
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -909,7 +1112,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           <ringGeometry args={[0.6, 0.9, 4]} />
           <meshBasicMaterial color="#fca5a5" side={THREE.DoubleSide} />
         </mesh>
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -927,7 +1135,12 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
           <meshBasicMaterial color={color} transparent opacity={0.5} />
         </mesh>
         <pointLight intensity={2} distance={30} color={color} />
-        <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+        <group visible={false}>
+          <mesh>
+            <boxGeometry args={[0, 0, tick * 0]} />
+            <meshBasicMaterial />
+          </mesh>
+        </group>
       </group>
     );
   }
@@ -936,14 +1149,30 @@ export function BossMesh({ gameRefs, tick }: { gameRefs: React.RefObject<GameRef
     <group ref={groupRef}>
       <mesh>
         <icosahedronGeometry args={[1.3, 0]} />
-        <meshStandardMaterial color="#475569" emissive="#ef4444" emissiveIntensity={0.35} wireframe />
+        <meshStandardMaterial
+          color="#475569"
+          emissive="#ef4444"
+          emissiveIntensity={0.35}
+          wireframe
+        />
       </mesh>
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function BossWalls({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function BossWalls({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const boss = gameRefs.current?.boss;
   if (!boss || boss.id !== "warden") return null;
   const segs = (boss as unknown as { wallSegments?: BossWallSegment[] }).wallSegments ?? [];
@@ -951,21 +1180,29 @@ export function BossWalls({ gameRefs, tick }: { gameRefs: React.RefObject<GameRe
     <group>
       {segs.map((s) =>
         s.isGap ? null : (
-          <mesh
-            key={`wall-${s.wallGroupId}-${s.gridIndex}`}
-            position={s.position}
-          >
+          <mesh key={`wall-${s.wallGroupId}-${s.gridIndex}`} position={s.position}>
             <boxGeometry args={[1.8, 1.8, 0.3]} />
             <meshStandardMaterial color="#991b1b" emissive="#ef4444" emissiveIntensity={0.3} />
           </mesh>
-        )
+        ),
       )}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function BossSubEntities({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function BossSubEntities({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const boss = gameRefs.current?.boss;
   const list = boss?.subEntities ?? [];
   useFrame(() => {
@@ -980,14 +1217,25 @@ export function BossSubEntities({ gameRefs, tick }: { gameRefs: React.RefObject<
             <tetrahedronGeometry args={[0.35]} />
             <meshStandardMaterial color="#d946ef" emissive="#d946ef" emissiveIntensity={0.6} />
           </mesh>
-        ) : null
+        ) : null,
       )}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function BossProjectiles({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function BossProjectiles({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const list = gameRefs.current?.bossProjectiles ?? [];
   const geo = useMemo(() => new THREE.SphereGeometry(1, 10, 8), []);
   useEffect(() => () => geo.dispose(), [geo]);
@@ -1017,7 +1265,12 @@ export function BossProjectiles({ gameRefs, tick }: { gameRefs: React.RefObject<
           <meshBasicMaterial color={p.color} toneMapped={false} />
         </mesh>
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -1056,12 +1309,23 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
           <pointLight color="#fde047" intensity={0.4} distance={1.5} />
         </group>
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function Explosions({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function Explosions({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const explosions = gameRefs.current?.explosions ?? [];
   const sphGeo = useMemo(() => new THREE.SphereGeometry(0.5, 12, 10), []);
   useEffect(() => () => sphGeo.dispose(), [sphGeo]);
@@ -1094,7 +1358,12 @@ export function Explosions({ gameRefs, tick }: { gameRefs: React.RefObject<GameR
           <meshBasicMaterial color={e.color} transparent opacity={e.opacity} toneMapped={false} />
         </mesh>
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -1125,7 +1394,13 @@ function scoreTexture(amount: number): THREE.CanvasTexture {
   return tex;
 }
 
-export function ScorePopups({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function ScorePopups({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const popups = gameRefs.current?.scorePopups ?? [];
   const refs = useRef<Map<number, THREE.Sprite>>(new Map());
 
@@ -1163,12 +1438,23 @@ export function ScorePopups({ gameRefs, tick }: { gameRefs: React.RefObject<Game
           </sprite>
         );
       })}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function DebrisField({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
+export function DebrisField({
+  gameRefs,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  tick: number;
+}) {
   const list = gameRefs.current?.debris ?? [];
   const refs = useRef<Map<number, THREE.Mesh>>(new Map());
   useFrame(() => {
@@ -1199,15 +1485,33 @@ export function DebrisField({ gameRefs, tick }: { gameRefs: React.RefObject<Game
           }}
         >
           <boxGeometry args={d.size} />
-          <meshToonMaterial color={d.color} emissive={d.color} emissiveIntensity={0.4} transparent />
+          <meshToonMaterial
+            color={d.color}
+            emissive={d.color}
+            emissiveIntensity={0.4}
+            transparent
+          />
         </mesh>
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
 
-export function SpeedLines({ gameRefs, env, tick }: { gameRefs: React.RefObject<GameRefs>; env: Environment; tick: number }) {
+export function SpeedLines({
+  gameRefs,
+  env,
+  tick,
+}: {
+  gameRefs: React.RefObject<GameRefs>;
+  env: Environment;
+  tick: number;
+}) {
   const lines = gameRefs.current?.speedLines ?? [];
   const geo = useMemo(() => new THREE.CylinderGeometry(0.014, 0.014, 1, 4), []);
   useEffect(() => () => geo.dispose(), [geo]);
@@ -1240,14 +1544,21 @@ export function SpeedLines({ gameRefs, env, tick }: { gameRefs: React.RefObject<
       {lines.map((_, i) => (
         <mesh
           key={i}
-          ref={(el) => { refs.current[i] = el; }}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
           rotation={[Math.PI / 2, 0, 0]}
           geometry={geo}
         >
           <meshBasicMaterial color={env.starColor} transparent opacity={0} />
         </mesh>
       ))}
-      <group visible={false}><mesh><boxGeometry args={[0, 0, tick * 0]} /><meshBasicMaterial /></mesh></group>
+      <group visible={false}>
+        <mesh>
+          <boxGeometry args={[0, 0, tick * 0]} />
+          <meshBasicMaterial />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -1262,7 +1573,13 @@ function Starfield({ env }: { env: Environment }) {
   useEffect(() => () => geo.dispose(), [geo]);
   return (
     <points geometry={geo}>
-      <pointsMaterial color={env.starColor} size={0.18} sizeAttenuation transparent opacity={0.85} />
+      <pointsMaterial
+        color={env.starColor}
+        size={0.18}
+        sizeAttenuation
+        transparent
+        opacity={0.85}
+      />
     </points>
   );
 }
@@ -1272,7 +1589,14 @@ function CameraRig({ gameRefs }: { gameRefs: React.RefObject<GameRefs> }) {
   useFrame(() => {
     const g = gameRefs.current;
     if (!g) return;
-    applyCameraLerp(camera, g.cameraTargetX, g.cameraTargetY, g.cameraTargetZ, g.shipX * 0.4, g.shipY * 0.4);
+    applyCameraLerp(
+      camera,
+      g.cameraTargetX,
+      g.cameraTargetY,
+      g.cameraTargetZ,
+      g.shipX * 0.4,
+      g.shipY * 0.4,
+    );
   });
   return null;
 }
@@ -1300,7 +1624,9 @@ function CameraConfigurator() {
 }
 
 function GameLoop({
-  gameRefs, onDeath, onUiSync,
+  gameRefs,
+  onDeath,
+  onUiSync,
 }: {
   gameRefs: React.RefObject<GameRefs>;
   onDeath: () => void;
@@ -1345,7 +1671,12 @@ function BiomeBlender({ gameRefs }: { gameRefs: React.RefObject<GameRefs> }) {
 }
 
 export function Scene({
-  gameRefs, onDeath, onUiSync, env, tick, shipId,
+  gameRefs,
+  onDeath,
+  onUiSync,
+  env,
+  tick,
+  shipId,
 }: {
   gameRefs: React.RefObject<GameRefs>;
   onDeath: () => void;

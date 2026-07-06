@@ -29,25 +29,75 @@ export function createRefs(): GameRefs {
   return {
     status: "armed",
     now: 0,
-    score: 0, kills: 0, distance: 0,
-    combo: 1, comboLastAt: 0, comboPeak: 1,
-    obstacles: [], bullets: [], explosions: [], speedLines: [],
-    powerUps: [], coins: [], coinsThisRun: 0,
-    coinMagnetExtra: 0, coinValueBonus: 0, scoreMultiplier: 1,
-    comboWindowMs: 0, shieldDurationMs: 0,
-    shipFireRateMul: 1, shipDamageMul: 1, shipAgilityMul: 1, shipCoinMagnetMul: 1,
-    shipHullTint: "#60a5fa", shipEngineTint: "#22d3ee", shipDeathFxKind: null, shipId: "falcon", startShieldCharges: 0, coinBoostMul: 1,
-    reviveAvailable: false, reviveUsed: false,
-    prefs: { reducedMotion: false, gyroEnabled: false, bloomEnabled: true, musicEnabled: true, sfxEnabled: true },
+    score: 0,
+    kills: 0,
+    distance: 0,
+    combo: 1,
+    comboLastAt: 0,
+    comboPeak: 1,
+    obstacles: [],
+    bullets: [],
+    explosions: [],
+    speedLines: [],
+    powerUps: [],
+    coins: [],
+    coinsThisRun: 0,
+    coinMagnetExtra: 0,
+    coinValueBonus: 0,
+    scoreMultiplier: 1,
+    comboWindowMs: 0,
+    shieldDurationMs: 0,
+    shipFireRateMul: 1,
+    shipDamageMul: 1,
+    shipAgilityMul: 1,
+    shipCoinMagnetMul: 1,
+    shipHullTint: "#60a5fa",
+    shipEngineTint: "#22d3ee",
+    shipDeathFxKind: null,
+    shipId: "falcon",
+    startShieldCharges: 0,
+    coinBoostMul: 1,
+    reviveAvailable: false,
+    reviveUsed: false,
+    prefs: {
+      reducedMotion: false,
+      gyroEnabled: false,
+      bloomEnabled: true,
+      musicEnabled: true,
+      sfxEnabled: true,
+    },
     gyroTilt: { x: 0, y: 0 },
-    boss: null, bossProjectiles: [], bossSchedule: buildBossSchedule(),
-    bossScheduleIdx: 0, bossesDefeatedThisRun: 0, damageTakenThisRun: 0,
-    dash: { lastLeftTapAt: 0, lastRightTapAt: 0, activeUntil: 0, direction: null, cooldownUntil: 0, startedAt: 0, startX: 0, targetX: 0 },
-    dashAfterimages: [], lastAfterimageAt: 0,
-    normalSpawningPausedUntil: 0, devHotkeyArmed: false,
-    nextBossProjectileId: 0, lastBossPulseAt: 0,
-    activePowerUps: [], debris: [], scorePopups: [],
-    targetX: 0, targetY: 0, shipX: 0, shipY: 0, shipZ: 2, shipRotZ: 0,
+    boss: null,
+    bossProjectiles: [],
+    bossSchedule: buildBossSchedule(),
+    bossScheduleIdx: 0,
+    bossesDefeatedThisRun: 0,
+    damageTakenThisRun: 0,
+    dash: {
+      lastLeftTapAt: 0,
+      lastRightTapAt: 0,
+      activeUntil: 0,
+      direction: null,
+      cooldownUntil: 0,
+      startedAt: 0,
+      startX: 0,
+      targetX: 0,
+    },
+    dashAfterimages: [],
+    lastAfterimageAt: 0,
+    normalSpawningPausedUntil: 0,
+    devHotkeyArmed: false,
+    nextBossProjectileId: 0,
+    lastBossPulseAt: 0,
+    activePowerUps: [],
+    debris: [],
+    scorePopups: [],
+    targetX: 0,
+    targetY: 0,
+    shipX: 0,
+    shipY: 0,
+    shipZ: 2,
+    shipRotZ: 0,
     fogColor: new THREE.Color(initEnv.fog),
     ambientColor: new THREE.Color(initEnv.ambient),
     asteroidColor: new THREE.Color(initEnv.asteroidColor),
@@ -55,19 +105,30 @@ export function createRefs(): GameRefs {
     starColor: new THREE.Color(initEnv.starColor),
     shieldActiveLast: false,
     warpActiveLast: false,
-    isMobile: typeof window !== "undefined" &&
+    isMobile:
+      typeof window !== "undefined" &&
       (matchMedia("(pointer: coarse)").matches || window.innerWidth < 640),
     warpIntensity: 0,
     invertedArmed: false,
     currentEnv: initEnv,
     nextBiomeAt: pickNextBiomeDistance(0),
     nextWallAt: 0, // set by startRun
-    lastBullet: 0, lastSpawn: 0, lastPowerUpSpawn: 0, lastUiSync: 0,
-    nextId: 1, startedAt: 0,
+    lastBullet: 0,
+    lastSpawn: 0,
+    lastPowerUpSpawn: 0,
+    lastUiSync: 0,
+    nextId: 1,
+    startedAt: 0,
     invulnUntil: 0,
-    dyingAt: 0, shipFallSpeed: 0,
-    deathVelX: 0, deathVelY: 0, deathVelZ: 0, deathAngVel: 0,
-    cameraTargetX: 0, cameraTargetY: 0, cameraTargetZ: 5,
+    dyingAt: 0,
+    shipFallSpeed: 0,
+    deathVelX: 0,
+    deathVelY: 0,
+    deathVelZ: 0,
+    deathAngVel: 0,
+    cameraTargetX: 0,
+    cameraTargetY: 0,
+    cameraTargetZ: 5,
   };
 }
 
@@ -112,13 +173,16 @@ export function startRun(g: GameRefs): boolean {
   g.shipCoinMagnetMul = ship.coinMagnetMul;
   // Cosmetic hull (if equipped) overrides the ship's built-in tint
   const hullCosmetic = profile.equippedHull ? cosmeticById(profile.equippedHull) : undefined;
-  g.shipHullTint = hullCosmetic && hullCosmetic.slot === "hull" ? hullCosmetic.value : ship.hullTint;
+  g.shipHullTint =
+    hullCosmetic && hullCosmetic.slot === "hull" ? hullCosmetic.value : ship.hullTint;
   // Engine trail / thruster tint -- cosmetic override falls back to cyan default
   const engineCosmetic = profile.equippedEngine ? cosmeticById(profile.equippedEngine) : undefined;
-  g.shipEngineTint = engineCosmetic && engineCosmetic.slot === "engine" ? engineCosmetic.value : "#22d3ee";
+  g.shipEngineTint =
+    engineCosmetic && engineCosmetic.slot === "engine" ? engineCosmetic.value : "#22d3ee";
   // Death FX variant (spiral / shatter / disintegrate) -- consumed in onDeath
   const deathCosmetic = profile.equippedDeathFx ? cosmeticById(profile.equippedDeathFx) : undefined;
-  g.shipDeathFxKind = deathCosmetic && deathCosmetic.slot === "deathFx" ? deathCosmetic.value : null;
+  g.shipDeathFxKind =
+    deathCosmetic && deathCosmetic.slot === "deathFx" ? deathCosmetic.value : null;
   g.startShieldCharges = ship.startShieldCharges;
   if (g.startShieldCharges > 0) {
     const effShieldMs = g.shieldDurationMs > 0 ? g.shieldDurationMs : POWERUP_DURATION_MS;
@@ -146,17 +210,20 @@ export function startRun(g: GameRefs): boolean {
     if ((inv["head-start-2000"] ?? 0) > 0) {
       g.distance = 2000;
       const p2 = loadProfile();
-      p2.consumableInventory["head-start-2000"] = (p2.consumableInventory["head-start-2000"] ?? 0) - 1;
+      p2.consumableInventory["head-start-2000"] =
+        (p2.consumableInventory["head-start-2000"] ?? 0) - 1;
       saveProfile(p2);
     } else if ((inv["head-start-1000"] ?? 0) > 0) {
       g.distance = 1000;
       const p2 = loadProfile();
-      p2.consumableInventory["head-start-1000"] = (p2.consumableInventory["head-start-1000"] ?? 0) - 1;
+      p2.consumableInventory["head-start-1000"] =
+        (p2.consumableInventory["head-start-1000"] ?? 0) - 1;
       saveProfile(p2);
     } else if ((inv["head-start-500"] ?? 0) > 0) {
       g.distance = 500;
       const p2 = loadProfile();
-      p2.consumableInventory["head-start-500"] = (p2.consumableInventory["head-start-500"] ?? 0) - 1;
+      p2.consumableInventory["head-start-500"] =
+        (p2.consumableInventory["head-start-500"] ?? 0) - 1;
       saveProfile(p2);
     }
     if ((inv["lucky-start"] ?? 0) > 0) {
@@ -167,7 +234,9 @@ export function startRun(g: GameRefs): boolean {
       const pick = luckyTypes[Math.floor(Math.random() * luckyTypes.length)];
       g.activePowerUps.push({ type: pick, expiresAt: now + POWERUP_DURATION_MS });
     }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 
   sounds.startGameplayMusic();
   return true;

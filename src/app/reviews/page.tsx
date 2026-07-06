@@ -20,46 +20,42 @@ export default function ReviewsPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors mb-8"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <ArrowLeft className="h-4 w-4" />
           Back Home
         </Link>
 
         <div className="mb-10">
-          <h1 className="font-display text-4xl font-black tracking-tight mb-2">
-            Client Reviews
-          </h1>
-          <p className="text-(--muted)">
-            What clients say about working with Amin.
-          </p>
+          <h1 className="mb-2 font-display text-4xl font-black tracking-tight">Client Reviews</h1>
+          <p className="text-(--muted)">What clients say about working with Amin.</p>
         </div>
 
         <ReviewsClient />
 
         {/* Trust bar — stats + CTA. Sits below the reviews so the visitor
             ends on a strong call to action. Gradient adapts to theme. */}
-        <div className="trust-bar relative rounded-2xl border border-(--border) px-6 py-10 sm:px-10 sm:py-12 mt-12 overflow-hidden">
+        <div className="trust-bar relative mt-12 overflow-hidden rounded-2xl border border-(--border) px-6 py-10 sm:px-10 sm:py-12">
           <div className="trust-bar-glow pointer-events-none absolute inset-0" aria-hidden />
-          <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-y-8 gap-x-4 text-center">
+          <div className="relative grid grid-cols-1 gap-x-4 gap-y-8 text-center sm:grid-cols-3">
             {trustStats.map((s) => (
               <div key={s.label}>
-                <div className="font-display text-4xl sm:text-5xl font-black tracking-tight mb-2">
+                <div className="mb-2 font-display text-4xl font-black tracking-tight sm:text-5xl">
                   {s.value}
                 </div>
                 <div className="text-sm text-(--muted)">{s.label}</div>
               </div>
             ))}
           </div>
-          <p className="relative text-center text-base text-(--foreground)/90 mt-10 max-w-2xl mx-auto">
+          <p className="relative mx-auto mt-10 max-w-2xl text-center text-base text-(--foreground)/90">
             Let me exceed your expectations and make you my next happy client.
           </p>
-          <div className="relative flex justify-center mt-6">
+          <div className="relative mt-6 flex justify-center">
             <a
               href={BOOKING_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-(--foreground) text-(--background) px-7 py-3 text-sm font-semibold hover:brightness-110 transition-all"
+              className="inline-flex items-center gap-2 rounded-full bg-(--foreground) px-7 py-3 text-sm font-semibold text-(--background) transition-all hover:brightness-110"
             >
               Let&apos;s Talk
               <ArrowRight className="h-3.5 w-3.5" />

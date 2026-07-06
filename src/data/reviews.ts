@@ -15,8 +15,7 @@ export interface Review {
 
 const googleReviewsLink =
   "https://www.google.com/search?q=devino+solutions#lrd=0x61d982d544ce5eb3:0xa7a66037b29c5f50,1,,,,";
-const linkedinRecommendations =
-  "https://www.linkedin.com/in/amin-dhouib/details/recommendations/";
+const linkedinRecommendations = "https://www.linkedin.com/in/amin-dhouib/details/recommendations/";
 
 export const reviews: readonly Review[] = Object.freeze([
   {

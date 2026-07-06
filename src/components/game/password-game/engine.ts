@@ -13,7 +13,7 @@ export type RulePoolsPerTier = Partial<Record<Tier, readonly RuleDef[]>>;
 export function selectRulesForRun(
   seed: number,
   counts: RuleCountsPerTier,
-  pools: RulePoolsPerTier
+  pools: RulePoolsPerTier,
 ): Rule[] {
   const out: Rule[] = [];
   const pickedIds = new Set<string>();
@@ -71,7 +71,7 @@ export interface TickedState {
 export function runTicks(
   state: GameState,
   deltaMs: number,
-  ruleStates: Record<string, unknown>
+  ruleStates: Record<string, unknown>,
 ): TickedState {
   let password = state.password;
   let formatting = state.formatting;

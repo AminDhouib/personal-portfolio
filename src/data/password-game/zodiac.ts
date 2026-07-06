@@ -15,17 +15,17 @@ export interface ZodiacSign {
 const TEXT_VS = "\uFE0E";
 
 export const ZODIAC_SIGNS: readonly ZodiacSign[] = Object.freeze([
-  { name: "Capricorn",   glyph: `\u2651${TEXT_VS}`, startMonth: 12, startDay: 22 },
-  { name: "Aquarius",    glyph: `\u2652${TEXT_VS}`, startMonth: 1,  startDay: 20 },
-  { name: "Pisces",      glyph: `\u2653${TEXT_VS}`, startMonth: 2,  startDay: 19 },
-  { name: "Aries",       glyph: `\u2648${TEXT_VS}`, startMonth: 3,  startDay: 21 },
-  { name: "Taurus",      glyph: `\u2649${TEXT_VS}`, startMonth: 4,  startDay: 20 },
-  { name: "Gemini",      glyph: `\u264A${TEXT_VS}`, startMonth: 5,  startDay: 21 },
-  { name: "Cancer",      glyph: `\u264B${TEXT_VS}`, startMonth: 6,  startDay: 21 },
-  { name: "Leo",         glyph: `\u264C${TEXT_VS}`, startMonth: 7,  startDay: 23 },
-  { name: "Virgo",       glyph: `\u264D${TEXT_VS}`, startMonth: 8,  startDay: 23 },
-  { name: "Libra",       glyph: `\u264E${TEXT_VS}`, startMonth: 9,  startDay: 23 },
-  { name: "Scorpio",     glyph: `\u264F${TEXT_VS}`, startMonth: 10, startDay: 23 },
+  { name: "Capricorn", glyph: `\u2651${TEXT_VS}`, startMonth: 12, startDay: 22 },
+  { name: "Aquarius", glyph: `\u2652${TEXT_VS}`, startMonth: 1, startDay: 20 },
+  { name: "Pisces", glyph: `\u2653${TEXT_VS}`, startMonth: 2, startDay: 19 },
+  { name: "Aries", glyph: `\u2648${TEXT_VS}`, startMonth: 3, startDay: 21 },
+  { name: "Taurus", glyph: `\u2649${TEXT_VS}`, startMonth: 4, startDay: 20 },
+  { name: "Gemini", glyph: `\u264A${TEXT_VS}`, startMonth: 5, startDay: 21 },
+  { name: "Cancer", glyph: `\u264B${TEXT_VS}`, startMonth: 6, startDay: 21 },
+  { name: "Leo", glyph: `\u264C${TEXT_VS}`, startMonth: 7, startDay: 23 },
+  { name: "Virgo", glyph: `\u264D${TEXT_VS}`, startMonth: 8, startDay: 23 },
+  { name: "Libra", glyph: `\u264E${TEXT_VS}`, startMonth: 9, startDay: 23 },
+  { name: "Scorpio", glyph: `\u264F${TEXT_VS}`, startMonth: 10, startDay: 23 },
   { name: "Sagittarius", glyph: `\u2650${TEXT_VS}`, startMonth: 11, startDay: 22 },
 ]);
 

@@ -185,9 +185,7 @@ describe("Tier 3 — bold/italic parity rule", () => {
     const rule = def.create(mulberry32(1));
     const state: GameState = {
       password: "xxxxxx",
-      formatting: [
-        { bold: true }, { bold: true }, { italic: true }, { italic: true }, {}, {},
-      ],
+      formatting: [{ bold: true }, { bold: true }, { italic: true }, { italic: true }, {}, {}],
       elapsedSeconds: 0,
       activeRuleIndex: 0,
       rules: [rule],

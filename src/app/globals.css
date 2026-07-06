@@ -92,23 +92,31 @@ body {
 }
 
 .bg-fx-aurora {
-  background:
-    linear-gradient(
-      120deg,
-      rgba(99, 102, 241, 0.08) 0%,
-      rgba(34, 197, 94, 0.06) 33%,
-      rgba(168, 85, 247, 0.07) 66%,
-      rgba(6, 182, 212, 0.06) 100%
-    );
+  background: linear-gradient(
+    120deg,
+    rgba(99, 102, 241, 0.08) 0%,
+    rgba(34, 197, 94, 0.06) 33%,
+    rgba(168, 85, 247, 0.07) 66%,
+    rgba(6, 182, 212, 0.06) 100%
+  );
   background-size: 300% 300%;
   animation: bg-fx-aurora-drift 32s ease-in-out infinite;
   mix-blend-mode: screen;
 }
 @keyframes bg-fx-aurora-drift {
-  0%, 100% { background-position:   0%   0%; }
-  25%      { background-position: 100%  50%; }
-  50%      { background-position: 100% 100%; }
-  75%      { background-position:   0% 100%; }
+  0%,
+  100% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
 }
 
 .bg-fx-vignette {
@@ -132,7 +140,9 @@ body {
 
 /* Reduced motion: stop the aurora drift so the page is calmer. */
 @media (prefers-reduced-motion: reduce) {
-  .bg-fx-aurora { animation: none; }
+  .bg-fx-aurora {
+    animation: none;
+  }
 }
 
 /* Light theme: dial down the vignette + grain so the page doesn't muddy.
@@ -144,7 +154,10 @@ body {
     rgba(0, 0, 0, 0.12) 100%
   );
 }
-[data-theme="light"] .bg-fx-grain { opacity: 0.03; mix-blend-mode: multiply; }
+[data-theme="light"] .bg-fx-grain {
+  opacity: 0.03;
+  mix-blend-mode: multiply;
+}
 
 /* ── Utility classes ─────────────────────────────────────── */
 .font-display {
@@ -157,16 +170,17 @@ body {
 .glow-green {
   box-shadow:
     0 0 18px rgba(34, 197, 94, 0.18),
-    0 0 60px rgba(34, 197, 94, 0.10),
+    0 0 60px rgba(34, 197, 94, 0.1),
     0 0 120px rgba(34, 197, 94, 0.05);
   animation: glow-breathe 6s ease-in-out infinite;
 }
 
 @keyframes glow-breathe {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow:
       0 0 18px rgba(34, 197, 94, 0.18),
-      0 0 60px rgba(34, 197, 94, 0.10),
+      0 0 60px rgba(34, 197, 94, 0.1),
       0 0 120px rgba(34, 197, 94, 0.05);
   }
   50% {
@@ -178,13 +192,20 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glow-green { animation: none; }
+  .glow-green {
+    animation: none;
+  }
 }
 
 /* Pulsing green dot for live indicators */
 @keyframes pulse-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .pulse-dot {
@@ -193,9 +214,18 @@ body {
 
 /* Hextris: score chip pulse on match */
 @keyframes hextris-pulse {
-  0% { transform: scale(1); color: var(--color-accent-pink); }
-  40% { transform: scale(1.25); color: var(--color-accent-pink); }
-  100% { transform: scale(1); color: var(--foreground); }
+  0% {
+    transform: scale(1);
+    color: var(--color-accent-pink);
+  }
+  40% {
+    transform: scale(1.25);
+    color: var(--color-accent-pink);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--foreground);
+  }
 }
 
 .hextris-score-pulse {
@@ -204,8 +234,14 @@ body {
 
 /* Hextris: game-over card entrance */
 @keyframes hextris-gameover-in {
-  0% { transform: scale(0.85) translateY(10px); opacity: 0; }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+  0% {
+    transform: scale(0.85) translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 .hextris-gameover-in {
@@ -214,9 +250,17 @@ body {
 
 /* Hextris: combo chip pop */
 @keyframes hextris-combo-pop {
-  0% { transform: scale(0.7); opacity: 0; }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .hextris-combo-pop {
@@ -225,13 +269,24 @@ body {
 
 /* Hextris: tutorial overlay gentle fade-in + idle drift */
 @keyframes hextris-tutorial-fade {
-  0% { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes hextris-tutorial-breathe {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 .hextris-tutorial-fade > div {
@@ -244,10 +299,22 @@ body {
 
 /* Hextris: combo milestone burst — big centered text scales in then fades up */
 @keyframes hextris-milestone-burst {
-  0% { transform: scale(0.4); opacity: 0; }
-  20% { transform: scale(1.15); opacity: 1; }
-  50% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.1) translateY(-20px); opacity: 0; }
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.1) translateY(-20px);
+    opacity: 0;
+  }
 }
 
 .hextris-milestone-burst > div {
@@ -261,15 +328,23 @@ html {
 
 /* Auto-scrolling marquee */
 @keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 /* Subtle sliding rainbow gradient for the "GAMES" word in the /games navbar.
    Paired with background-size: 200% and bg-clip-text to keep it tasteful. */
 @keyframes amin-games-shimmer {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 .animate-marquee {
@@ -289,13 +364,7 @@ html {
     black 90%,
     transparent 100%
   );
-  mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    black 10%,
-    black 90%,
-    transparent 100%
-  );
+  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
 /* Section divider accent line */
@@ -491,7 +560,9 @@ html {
   backdrop-filter: blur(12px) !important;
   position: relative !important;
   animation: none !important;
-  transition: border-color 0.2s, background-color 0.2s !important;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s !important;
 }
 
 .copilotKitButton:hover {
@@ -540,7 +611,9 @@ html {
   color: #fafafa !important;
   border: 1px solid rgba(139, 92, 246, 0.3) !important;
   border-radius: 0.5rem !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease !important;
 }
 
 .copilotKitInput:focus-within {
@@ -621,7 +694,9 @@ button[aria-label="Copy to clipboard"] {
   border-radius: 0.75rem !important;
   padding: 0.5rem 1rem !important;
   font-size: 0.85rem !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease !important;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease !important;
   cursor: pointer !important;
 }
 
@@ -640,39 +715,91 @@ button[aria-label="Copy to clipboard"] {
 
 /* ── Tower Stacker overlays ─────────────────────────────── */
 @keyframes ts-score-pulse {
-  0% { transform: scale(1); color: var(--color-accent-red); }
-  40% { transform: scale(1.22); color: var(--color-accent-red); }
-  100% { transform: scale(1); color: var(--foreground); }
+  0% {
+    transform: scale(1);
+    color: var(--color-accent-red);
+  }
+  40% {
+    transform: scale(1.22);
+    color: var(--color-accent-red);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--foreground);
+  }
 }
-.ts-score-pulse { animation: ts-score-pulse 380ms ease-out; display: inline-block; }
+.ts-score-pulse {
+  animation: ts-score-pulse 380ms ease-out;
+  display: inline-block;
+}
 
 @keyframes ts-streak-pop {
-  0% { transform: scale(0.7); opacity: 0; }
-  50% { transform: scale(1.15); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
-.ts-streak-pop { animation: ts-streak-pop 300ms cubic-bezier(0.2, 0.9, 0.35, 1.1); }
+.ts-streak-pop {
+  animation: ts-streak-pop 300ms cubic-bezier(0.2, 0.9, 0.35, 1.1);
+}
 
 @keyframes ts-milestone-burst {
-  0% { transform: scale(0.4); opacity: 0; }
-  18% { transform: scale(1.2); opacity: 1; }
-  55% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.1) translateY(-30px); opacity: 0; }
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  18% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.1) translateY(-30px);
+    opacity: 0;
+  }
 }
-.ts-milestone-burst > div { animation: ts-milestone-burst 1400ms cubic-bezier(0.2, 0.9, 0.35, 1.1) forwards; }
+.ts-milestone-burst > div {
+  animation: ts-milestone-burst 1400ms cubic-bezier(0.2, 0.9, 0.35, 1.1) forwards;
+}
 
 @keyframes ts-gameover-in {
-  0% { transform: scale(0.85) translateY(12px); opacity: 0; }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+  0% {
+    transform: scale(0.85) translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
-.ts-gameover-in { animation: ts-gameover-in 320ms cubic-bezier(0.2, 0.9, 0.35, 1.1); }
+.ts-gameover-in {
+  animation: ts-gameover-in 320ms cubic-bezier(0.2, 0.9, 0.35, 1.1);
+}
 
 @keyframes ts-perfect-flash {
-  0% { box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0); }
-  30% { box-shadow: inset 0 0 40px 8px rgba(239, 68, 68, 0.45); }
-  100% { box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0); }
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  30% {
+    box-shadow: inset 0 0 40px 8px rgba(239, 68, 68, 0.45);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0);
+  }
 }
-.ts-perfect-flash { animation: ts-perfect-flash 650ms ease-out; }
+.ts-perfect-flash {
+  animation: ts-perfect-flash 650ms ease-out;
+}
 
 /* ── Reviews trust-bar (light + dark mode) ──────────────────── */
 .trust-bar {
@@ -685,11 +812,7 @@ button[aria-label="Copy to clipboard"] {
 }
 .trust-bar-glow {
   opacity: 0.3;
-  background: radial-gradient(
-    ellipse 60% 50% at 50% 0%,
-    rgba(99, 102, 241, 0.35),
-    transparent 70%
-  );
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99, 102, 241, 0.35), transparent 70%);
 }
 [data-theme="light"] .trust-bar {
   background: linear-gradient(
@@ -701,11 +824,7 @@ button[aria-label="Copy to clipboard"] {
 }
 [data-theme="light"] .trust-bar-glow {
   opacity: 0.4;
-  background: radial-gradient(
-    ellipse 60% 50% at 50% 0%,
-    rgba(255, 255, 255, 0.7),
-    transparent 70%
-  );
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 255, 255, 0.7), transparent 70%);
 }
 
 /* ── Amin AI chat highlight ──────────────────────────────────── */
@@ -717,16 +836,24 @@ button[aria-label="Copy to clipboard"] {
   transition: box-shadow 0.18s ease-out;
 }
 .copilotKitWindow.amin-ai-hl-purple {
-  box-shadow: 0 0 0 3px rgb(168, 85, 247), 0 0 40px 12px rgba(168, 85, 247, 0.6);
+  box-shadow:
+    0 0 0 3px rgb(168, 85, 247),
+    0 0 40px 12px rgba(168, 85, 247, 0.6);
 }
 .copilotKitWindow.amin-ai-hl-indigo {
-  box-shadow: 0 0 0 3px rgb(99, 102, 241), 0 0 40px 12px rgba(99, 102, 241, 0.6);
+  box-shadow:
+    0 0 0 3px rgb(99, 102, 241),
+    0 0 40px 12px rgba(99, 102, 241, 0.6);
 }
 .copilotKitWindow.amin-ai-hl-blue {
-  box-shadow: 0 0 0 3px rgb(59, 130, 246), 0 0 40px 12px rgba(59, 130, 246, 0.6);
+  box-shadow:
+    0 0 0 3px rgb(59, 130, 246),
+    0 0 40px 12px rgba(59, 130, 246, 0.6);
 }
 .copilotKitWindow.amin-ai-hl-pink {
-  box-shadow: 0 0 0 3px rgb(236, 72, 153), 0 0 40px 12px rgba(236, 72, 153, 0.6);
+  box-shadow:
+    0 0 0 3px rgb(236, 72, 153),
+    0 0 40px 12px rgba(236, 72, 153, 0.6);
 }
 
 @import "../components/game/password-game/destruction.css";

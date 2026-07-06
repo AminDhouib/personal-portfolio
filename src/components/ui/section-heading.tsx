@@ -10,11 +10,8 @@ export function SectionHeading({
   color = "var(--color-accent-green)",
 }: SectionHeadingProps) {
   return (
-    <div className="flex items-center gap-4 mb-12">
-      <span
-        className="font-display text-sm font-bold"
-        style={{ color }}
-      >
+    <div className="mb-12 flex items-center gap-4">
+      <span className="font-display text-sm font-bold" style={{ color }}>
         {number}
       </span>
       <div className="h-px w-8" style={{ backgroundColor: color, opacity: 0.4 }} />

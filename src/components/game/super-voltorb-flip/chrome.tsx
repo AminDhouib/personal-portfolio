@@ -105,7 +105,7 @@ export const PixelMuteButton = ({
     onClick={onToggle}
     aria-label={muted ? "Unmute" : "Mute"}
     title={muted ? "Unmute" : "Mute"}
-    className="flex items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white outline outline-2 outline-gray-600 text-gray-700 transition-colors hover:bg-zinc-100"
+    className="flex items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white text-gray-700 outline outline-2 outline-gray-600 transition-colors hover:bg-zinc-100"
     style={{ width: size, height: size }}
   >
     <svg
@@ -169,7 +169,7 @@ export const PixelFullscreenButton = ({
     onClick={onToggle}
     aria-label={active ? "Exit fullscreen" : "Enter fullscreen"}
     title={active ? "Exit fullscreen" : "Enter fullscreen"}
-    className="flex items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white outline outline-2 outline-gray-600 text-gray-700 transition-colors hover:bg-zinc-100"
+    className="flex items-center justify-center rounded-[6px] border-2 border-gray-300 bg-white text-gray-700 outline outline-2 outline-gray-600 transition-colors hover:bg-zinc-100"
     style={{ width: size, height: size }}
   >
     <svg
@@ -212,8 +212,7 @@ export function useFullscreen(targetRef: React.RefObject<HTMLElement | null>) {
   const [active, setActive] = useState(false);
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const handler = () =>
-      setActive(document.fullscreenElement === targetRef.current);
+    const handler = () => setActive(document.fullscreenElement === targetRef.current);
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, [targetRef]);
@@ -257,7 +256,7 @@ export const InstructionsBtns = ({ onOpen }: { onOpen: () => void }) => (
     className="flex h-11 items-center gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-3 outline outline-2 outline-gray-600 hover:bg-zinc-200"
   >
     <PokeballIcon size={32} />
-    <span className="text-base leading-none font-bold text-gray-600 drop-shadow-soft">
+    <span className="drop-shadow-soft text-base leading-none font-bold text-gray-600">
       How to play
     </span>
   </button>

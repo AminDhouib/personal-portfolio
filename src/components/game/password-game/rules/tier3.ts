@@ -66,7 +66,8 @@ const alternatingCase: RuleDef = {
     return {
       id: "alternating-case",
       tier: 3,
-      description: "Your password's letters must strictly alternate between lowercase and uppercase (starting with lowercase).",
+      description:
+        "Your password's letters must strictly alternate between lowercase and uppercase (starting with lowercase).",
       params: {},
       validate(state) {
         let letters = 0;
@@ -97,7 +98,10 @@ const wordCountStrict: RuleDef = {
       description: `Your password must contain exactly ${n} space-separated words.`,
       params: { n },
       validate(state) {
-        const words = state.password.trim().split(/\s+/).filter((w) => w.length > 0);
+        const words = state.password
+          .trim()
+          .split(/\s+/)
+          .filter((w) => w.length > 0);
         return { passed: words.length === n, message: `${words.length} / ${n}` };
       },
     };
@@ -147,7 +151,8 @@ const boldItalicParity: RuleDef = {
     return {
       id: "bold-italic-parity",
       tier: 3,
-      description: "Your password must have the same number of bold and italic characters (at least 1 of each).",
+      description:
+        "Your password must have the same number of bold and italic characters (at least 1 of each).",
       params: {},
       validate(state) {
         const b = countFmt(state.formatting, "bold");

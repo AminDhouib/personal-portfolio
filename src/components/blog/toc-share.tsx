@@ -24,7 +24,7 @@ export function ShareButton({ title }: { title: string }) {
   return (
     <button
       onClick={handleShare}
-      className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) hover:text-(--foreground) hover:border-(--muted)/40 transition-all"
+      className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) transition-all hover:border-(--muted)/40 hover:text-(--foreground)"
       title="Share this post"
     >
       {copied ? (
@@ -61,7 +61,7 @@ export function TableOfContents({
         ([entry]) => {
           if (entry.isIntersecting) setActiveId(id);
         },
-        { rootMargin: "-20% 0px -70% 0px" }
+        { rootMargin: "-20% 0px -70% 0px" },
       );
       observer.observe(el);
       observers.push(observer);
@@ -75,7 +75,7 @@ export function TableOfContents({
   return (
     <nav className="hidden lg:block" aria-label="Table of contents">
       <div className="sticky top-28">
-        <p className="text-xs font-bold uppercase tracking-wider text-(--muted) mb-3">
+        <p className="mb-3 text-xs font-bold tracking-wider text-(--muted) uppercase">
           On this page
         </p>
         <ul className="space-y-1.5">
@@ -87,22 +87,22 @@ export function TableOfContents({
                   entry.level === 3 ? "pl-3" : ""
                 } ${
                   activeId === entry.id
-                    ? "text-accent-blue font-medium"
+                    ? "font-medium text-accent-blue"
                     : "text-(--muted) hover:text-(--foreground)"
                 }`}
               >
                 {activeId === entry.id && (
-                  <span className="inline-block w-1 h-1 rounded-full bg-accent-blue mr-1.5 align-middle" />
+                  <span className="mr-1.5 inline-block h-1 w-1 rounded-full bg-accent-blue align-middle" />
                 )}
                 {entry.text}
               </a>
             </li>
           ))}
         </ul>
-        <div className="mt-6 pt-4 border-t border-(--border)">
+        <div className="mt-6 border-t border-(--border) pt-4">
           <a
             href="#"
-            className="inline-flex items-center gap-1.5 text-xs text-(--muted) hover:text-(--foreground) transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
           >
             <Link className="h-3 w-3" />
             Back to top

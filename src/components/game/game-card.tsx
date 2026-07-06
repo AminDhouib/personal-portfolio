@@ -5,13 +5,7 @@ import { motion } from "framer-motion";
 import { GameBanner } from "./banners";
 import type { GameMeta } from "@/app/games/games-meta";
 
-export function GameCard({
-  game,
-  size = "lg",
-}: {
-  game: GameMeta;
-  size?: "lg" | "sm";
-}) {
+export function GameCard({ game, size = "lg" }: { game: GameMeta; size?: "lg" | "sm" }) {
   const href = game.external ? `/games/${game.slug}` : `/games/${game.slug}`;
   const aspect = size === "lg" ? "aspect-[5/3]" : "aspect-[4/3]";
   const titleSize = size === "lg" ? "text-xl sm:text-2xl" : "text-base sm:text-lg";
@@ -23,7 +17,7 @@ export function GameCard({
     >
       <Link
         href={href}
-        className="group relative block overflow-hidden rounded-2xl border border-(--border) hover:border-white/20 transition-colors shadow-lg shadow-black/30"
+        className="group relative block overflow-hidden rounded-2xl border border-(--border) shadow-lg shadow-black/30 transition-colors hover:border-white/20"
       >
         <div className={`relative ${aspect} w-full`}>
           <GameBanner slug={game.slug} />
@@ -33,7 +27,7 @@ export function GameCard({
               rounded-2xl so the inset outline follows the corners instead
               of drawing a hard rectangle that bleeds past them. */}
           <div
-            className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity group-hover:opacity-100"
             style={{ boxShadow: `inset 0 0 0 2px ${game.accent}` }}
           />
           {/* Title block */}
@@ -44,9 +38,7 @@ export function GameCard({
             >
               {game.title}
             </h3>
-            <p className={`mt-1 ${taglineSize} text-white/80 line-clamp-2`}>
-              {game.tagline}
-            </p>
+            <p className={`mt-1 ${taglineSize} line-clamp-2 text-white/80`}>{game.tagline}</p>
           </div>
         </div>
       </Link>

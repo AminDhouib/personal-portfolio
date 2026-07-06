@@ -146,7 +146,7 @@ describe("Tier 2 — foreign word rule", () => {
   it("params reference a real entry from the pool", () => {
     const rule = def.create(mulberry32(17));
     const entry = FOREIGN_WORDS.find(
-      (w) => w.translation === rule.params.translation && w.language === rule.params.language
+      (w) => w.translation === rule.params.translation && w.language === rule.params.language,
     );
     expect(entry).toBeDefined();
   });
@@ -174,7 +174,7 @@ describe("Tier 2 — capital city rule", () => {
   it("params reference a known country and capital", () => {
     const rule = def.create(mulberry32(23));
     const entry = COUNTRY_CAPITALS.find(
-      (c) => c.country === rule.params.country && c.capital === rule.params.capital
+      (c) => c.country === rule.params.country && c.capital === rule.params.capital,
     );
     expect(entry).toBeDefined();
   });
@@ -202,7 +202,7 @@ describe("Tier 2 — hex color rule", () => {
   it("params reference a known named color", () => {
     const rule = def.create(mulberry32(29));
     const entry = NAMED_COLORS.find(
-      (c) => c.hex === rule.params.hex && c.name === rule.params.name
+      (c) => c.hex === rule.params.hex && c.name === rule.params.name,
     );
     expect(entry).toBeDefined();
   });
@@ -229,7 +229,7 @@ describe("Tier 2 — code snippet rule", () => {
   it("params reference a real snippet and language from the pool", () => {
     const rule = def.create(mulberry32(31));
     const entry = CODE_SNIPPETS.find(
-      (s) => s.language === rule.params.language && s.snippet === rule.params.snippet
+      (s) => s.language === rule.params.language && s.snippet === rule.params.snippet,
     );
     expect(entry).toBeDefined();
   });
@@ -256,13 +256,23 @@ describe("Tier 2 — code snippet rule", () => {
 
 function toRomanForTest(n: number): string {
   const table: [number, string][] = [
-    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
   ];
   let out = "";
   let rem = n;
   for (const [v, s] of table) {
-    while (rem >= v) { out += s; rem -= v; }
+    while (rem >= v) {
+      out += s;
+      rem -= v;
+    }
   }
   return out;
 }

@@ -180,11 +180,11 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full flex flex-col items-center justify-center gap-2"
+      className="relative flex w-full flex-col items-center justify-center gap-2"
       style={{ minHeight: 480 }}
     >
       <div
-        className="flex w-full items-end justify-between font-mono text-[10px] uppercase tracking-[0.3em] text-foreground/40"
+        className="text-foreground/40 flex w-full items-end justify-between font-mono text-[10px] tracking-[0.3em] uppercase"
         style={{ maxWidth: frameSize.w }}
       >
         <span>TWR-01 / REV.A</span>
@@ -197,8 +197,7 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
         style={{
           width: frameSize.w,
           height: frameSize.h,
-          boxShadow:
-            "0 0 60px -20px rgba(239,68,68,0.25), inset 0 0 0 1px rgba(148,163,184,0.18)",
+          boxShadow: "0 0 60px -20px rgba(239,68,68,0.25), inset 0 0 0 1px rgba(148,163,184,0.18)",
         }}
       >
         <CornerTick position="tl" />
@@ -237,15 +236,14 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
             />
             <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[96px] items-center justify-between px-4">
               <div className="flex flex-col items-start leading-none">
-                <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-foreground/70">
+                <div className="text-foreground/70 font-mono text-[9px] font-bold tracking-[0.3em] uppercase">
                   Height
                 </div>
                 <div
                   key={scorePulseKey}
-                  className="ts-score-pulse mt-1 font-mono text-[34px] font-bold leading-none tabular-nums text-foreground"
+                  className="ts-score-pulse text-foreground mt-1 font-mono text-[34px] leading-none font-bold tabular-nums"
                   style={{
-                    textShadow:
-                      "0 2px 10px rgba(0,0,0,0.9), 0 0 16px rgba(239,68,68,0.35)",
+                    textShadow: "0 2px 10px rgba(0,0,0,0.9), 0 0 16px rgba(239,68,68,0.35)",
                   }}
                 >
                   {state.score}
@@ -254,18 +252,18 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
               {state.streak >= 2 ? (
                 <div
                   key={streakPopKey}
-                  className="ts-streak-pop inline-flex items-center gap-1.5 border border-accent-red/70 bg-accent-red/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-accent-red"
+                  className="ts-streak-pop inline-flex items-center gap-1.5 border border-accent-red/70 bg-accent-red/15 px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.3em] text-accent-red uppercase"
                 >
                   <span className="tabular-nums">×{state.streak}</span>
                   <span className="text-foreground/80">Perfect</span>
                 </div>
               ) : (
-                <div className="font-mono text-[9px] font-bold uppercase tracking-[0.4em] text-foreground/35">
+                <div className="text-foreground/35 font-mono text-[9px] font-bold tracking-[0.4em] uppercase">
                   Stack
                 </div>
               )}
               <div className="flex flex-col items-end leading-none">
-                <div className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-foreground/70">
+                <div className="text-foreground/70 font-mono text-[9px] font-bold tracking-[0.3em] uppercase">
                   Lives
                 </div>
                 <div className="mt-2 flex items-center gap-1.5">
@@ -280,9 +278,7 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
                           border: alive
                             ? "1px solid rgb(239,68,68)"
                             : "1px solid rgba(239,68,68,0.35)",
-                          boxShadow: alive
-                            ? "0 0 10px rgba(239,68,68,0.55)"
-                            : "none",
+                          boxShadow: alive ? "0 0 10px rgba(239,68,68,0.55)" : "none",
                         }}
                       />
                     );
@@ -302,14 +298,13 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
 
         {milestone !== null && (
           <div className="ts-milestone-burst pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-1">
-            <div className="font-mono text-[11px] uppercase tracking-[0.45em] text-accent-red/80">
+            <div className="font-mono text-[11px] tracking-[0.45em] text-accent-red/80 uppercase">
               Milestone
             </div>
             <div
-              className="font-mono text-7xl font-bold tabular-nums text-foreground"
+              className="text-foreground font-mono text-7xl font-bold tabular-nums"
               style={{
-                textShadow:
-                  "0 4px 24px rgba(0,0,0,0.8), 0 0 40px rgba(239,68,68,0.55)",
+                textShadow: "0 4px 24px rgba(0,0,0,0.8), 0 0 40px rgba(239,68,68,0.55)",
               }}
             >
               {milestone}
@@ -327,11 +322,11 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
               <CornerTick position="tr" variant="card" />
               <CornerTick position="bl" variant="card" />
               <CornerTick position="br" variant="card" />
-              <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-accent-red">
+              <div className="font-mono text-[10px] tracking-[0.35em] text-accent-red uppercase">
                 Structural Failure
               </div>
               <div
-                className="font-mono mt-2 mb-4 text-6xl font-bold leading-none tabular-nums text-foreground"
+                className="text-foreground mt-2 mb-4 font-mono text-6xl leading-none font-bold tabular-nums"
                 style={{ textShadow: "0 0 24px rgba(239,68,68,0.3)" }}
               >
                 {state.score}
@@ -351,18 +346,18 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
                     placeholder="YOUR NAME"
                     maxLength={12}
                     disabled={submitting}
-                    className="w-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs uppercase tracking-[0.15em] text-foreground placeholder:text-muted focus:border-accent-red/60 focus:outline-none focus:ring-1 focus:ring-accent-red/40"
+                    className="text-foreground placeholder:text-muted w-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs tracking-[0.15em] uppercase focus:border-accent-red/60 focus:ring-1 focus:ring-accent-red/40 focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="mt-2 w-full border border-accent-red/70 bg-accent-red/10 px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.3em] text-accent-red transition hover:bg-accent-red/20 hover:border-accent-red disabled:opacity-50"
+                    className="mt-2 w-full border border-accent-red/70 bg-accent-red/10 px-4 py-2 font-mono text-xs font-bold tracking-[0.3em] text-accent-red uppercase transition hover:border-accent-red hover:bg-accent-red/20 disabled:opacity-50"
                   >
                     {submitting ? "Submitting…" : "Submit score"}
                   </button>
                 </form>
               ) : (
-                <div className="mb-3 border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
+                <div className="text-foreground mb-3 border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-[11px] tracking-[0.2em] uppercase">
                   {submitRank !== null ? (
                     <>
                       Ranked <span className="font-bold text-accent-red">#{submitRank}</span> —
@@ -377,7 +372,7 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
               <button
                 type="button"
                 onClick={handlePlayAgain}
-                className="w-full border border-[var(--border)] bg-transparent px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.3em] text-foreground/80 transition hover:border-accent-red/50 hover:text-foreground"
+                className="text-foreground/80 hover:text-foreground w-full border border-[var(--border)] bg-transparent px-4 py-2 font-mono text-xs font-bold tracking-[0.3em] uppercase transition hover:border-accent-red/50"
               >
                 Play again
               </button>
@@ -392,12 +387,8 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="border border-[var(--border)] bg-[var(--surface)] px-2 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted">
-        {label}
-      </div>
-      <div className="font-mono text-lg font-bold tabular-nums text-foreground">
-        {value}
-      </div>
+      <div className="text-muted font-mono text-[9px] tracking-[0.25em] uppercase">{label}</div>
+      <div className="text-foreground font-mono text-lg font-bold tabular-nums">{value}</div>
     </div>
   );
 }
@@ -410,8 +401,7 @@ function CornerTick({
   variant?: "frame" | "card";
 }) {
   const size = variant === "frame" ? 14 : 10;
-  const color =
-    variant === "frame" ? "rgba(239,68,68,0.75)" : "rgba(239,68,68,0.6)";
+  const color = variant === "frame" ? "rgba(239,68,68,0.75)" : "rgba(239,68,68,0.6)";
   const offset = variant === "frame" ? 6 : 4;
   const style: CSSProperties = {
     position: "absolute",

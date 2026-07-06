@@ -25,15 +25,11 @@ export function RichInput({ value, formatting, onChange, placeholder, onDestruct
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       // Fire callback only when the key would actually remove text (there's
       // something to delete), not on empty-input Backspace spam.
-      if (
-        (e.key === "Backspace" || e.key === "Delete") &&
-        value.length > 0 &&
-        onDestructiveKey
-      ) {
+      if ((e.key === "Backspace" || e.key === "Delete") && value.length > 0 && onDestructiveKey) {
         onDestructiveKey();
       }
     },
-    [value.length, onDestructiveKey]
+    [value.length, onDestructiveKey],
   );
 
   const handleSelect = useCallback(() => {
@@ -52,7 +48,7 @@ export function RichInput({ value, formatting, onChange, placeholder, onDestruct
       while (nextFmt.length < nextLen) nextFmt.push({});
       onChange({ value: next, formatting: nextFmt });
     },
-    [formatting, onChange]
+    [formatting, onChange],
   );
 
   const applyAttr = useCallback(
@@ -63,20 +59,18 @@ export function RichInput({ value, formatting, onChange, placeholder, onDestruct
       if (start === end) return;
 
       // Determine toggle: if every char in range already has the attribute, clear it.
-      const allHave = [...Array(end - start)].every(
-        (_, i) => formatting[start + i]?.[attr]
-      );
+      const allHave = [...Array(end - start)].every((_, i) => formatting[start + i]?.[attr]);
       const next = applyFormatRange(formatting, start, end, {
         [attr]: allHave ? false : true,
       });
       onChange({ value, formatting: next });
     },
-    [selection, value, formatting, onChange]
+    [selection, value, formatting, onChange],
   );
 
   return (
     <div>
-      <div className="flex gap-2 mb-2">
+      <div className="mb-2 flex gap-2">
         <button
           type="button"
           onClick={() => applyAttr("bold")}
@@ -107,12 +101,12 @@ export function RichInput({ value, formatting, onChange, placeholder, onDestruct
           placeholder={placeholder}
           spellCheck={false}
           autoComplete="off"
-          className="w-full rounded-lg border border-(--border) bg-(--background) px-4 py-3 font-mono text-base text-transparent caret-(--foreground) focus:outline-none focus:border-accent-pink/60 resize-none"
+          className="w-full resize-none rounded-lg border border-(--border) bg-(--background) px-4 py-3 font-mono text-base text-transparent caret-(--foreground) focus:border-accent-pink/60 focus:outline-none"
           style={{ color: "transparent", caretColor: "var(--foreground)" }}
         />
         <div
           aria-hidden
-          className="pg-formatted-text pointer-events-none absolute inset-0 px-4 py-3 font-mono text-base whitespace-pre-wrap break-words"
+          className="pg-formatted-text pointer-events-none absolute inset-0 px-4 py-3 font-mono text-base break-words whitespace-pre-wrap"
         >
           <FormattedText value={value} formatting={formatting} />
         </div>
@@ -146,7 +140,7 @@ export function applyFormatRange(
   fmt: FormattingMap,
   start: number,
   end: number,
-  attrs: Partial<CharFormatting>
+  attrs: Partial<CharFormatting>,
 ): CharFormatting[] {
   const out: CharFormatting[] = [];
   const neededLen = Math.max(fmt.length, end);

@@ -39,7 +39,7 @@ export function MemoBar({
       className={`flex h-11 ${fullWidth ? "w-full" : ""} items-center gap-1 rounded-[6px] border-2 border-gray-300 bg-white/95 px-1.5 outline outline-2 outline-gray-600`}
     >
       {showLabel && (
-        <span className="pr-1 text-[10px] font-bold uppercase tracking-widest text-gray-500 leading-none">
+        <span className="pr-1 text-[10px] leading-none font-bold tracking-widest text-gray-500 uppercase">
           Memo
         </span>
       )}

@@ -28,13 +28,10 @@ function todayUtcIso(): string {
 
 async function fetchNyt(dateIso: string): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://www.nytimes.com/svc/wordle/v2/${dateIso}.json`,
-      {
-        headers: { "User-Agent": "password-game-portfolio/1.0" },
-        next: { revalidate: 60 * 60 * 12 },
-      }
-    );
+    const res = await fetch(`https://www.nytimes.com/svc/wordle/v2/${dateIso}.json`, {
+      headers: { "User-Agent": "password-game-portfolio/1.0" },
+      next: { revalidate: 60 * 60 * 12 },
+    });
     if (!res.ok) return null;
     const data: NytWordle = await res.json();
     const raw = data.solution;
@@ -53,13 +50,13 @@ export async function GET() {
   if (remote) {
     return NextResponse.json(
       { word: remote, source: "nyt", date: dateIso },
-      { headers: { "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400" } }
+      { headers: { "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400" } },
     );
   }
   // Fallback: deterministic pick from our static pool so the game keeps working.
   const fallback = wordleOfTheDay();
   return NextResponse.json(
     { word: fallback, source: "fallback", date: dateIso, poolSize: WORDLE_WORDS.length },
-    { headers: { "cache-control": "public, s-maxage=3600" } }
+    { headers: { "cache-control": "public, s-maxage=3600" } },
   );
 }

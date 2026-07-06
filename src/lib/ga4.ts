@@ -46,7 +46,7 @@ export async function fetchMAU(slug: string): Promise<number | null> {
         dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
         metrics: [{ name: "activeUsers" }],
       },
-      { timeout: GA4_TIMEOUT_MS }
+      { timeout: GA4_TIMEOUT_MS },
     );
     const value = response.rows?.[0]?.metricValues?.[0]?.value;
     return value ? parseInt(value, 10) : null;
@@ -63,6 +63,6 @@ export async function fetchAllMAU(): Promise<Record<string, number | null>> {
     slugs.map((slug, i) => {
       const r = results[i];
       return [slug, r.status === "fulfilled" ? r.value : null];
-    })
+    }),
   );
 }

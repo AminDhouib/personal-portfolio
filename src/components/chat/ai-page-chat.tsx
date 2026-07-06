@@ -45,7 +45,12 @@ function AiPageActions() {
     parameters: [
       { name: "name", type: "string", description: "The visitor's full name", required: true },
       { name: "email", type: "string", description: "The visitor's email address", required: true },
-      { name: "note", type: "string", description: "Brief note about what they're looking for", required: false },
+      {
+        name: "note",
+        type: "string",
+        description: "Brief note about what they're looking for",
+        required: false,
+      },
     ],
     handler: async ({ name, email, note }: { name: string; email: string; note?: string }) => {
       try {
@@ -63,7 +68,8 @@ function AiPageActions() {
   });
 
   useCopilotChatSuggestions({
-    instructions: "ALWAYS suggest EXACTLY these 3 options: 1. 'What services does Amin offer?' 2. 'Tell me about Amin\\'s projects' 3. 'How do I hire Amin?'",
+    instructions:
+      "ALWAYS suggest EXACTLY these 3 options: 1. 'What services does Amin offer?' 2. 'Tell me about Amin\\'s projects' 3. 'How do I hire Amin?'",
     maxSuggestions: 3,
   });
 
@@ -78,7 +84,8 @@ export function AiPageChat() {
         instructions={INSTRUCTIONS}
         labels={{
           title: "Amin AI",
-          initial: "Hi! I'm Amin's AI assistant. Ask me anything about his work, skills, or how you can work together.",
+          initial:
+            "Hi! I'm Amin's AI assistant. Ask me anything about his work, skills, or how you can work together.",
           placeholder: "Ask about projects, services, availability...",
         }}
         className="h-full"

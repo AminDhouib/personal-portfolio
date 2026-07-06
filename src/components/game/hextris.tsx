@@ -65,7 +65,9 @@ export function HextrisGame() {
   const [mobileImmersive, setMobileImmersive] = useState(false);
   const [showTutorial, setShowTutorial] = useState(true);
   // Combo milestone text (e.g., "×5 COMBO!") displayed briefly on crossing thresholds
-  const [milestone, setMilestone] = useState<{ id: number; text: string; color: string } | null>(null);
+  const [milestone, setMilestone] = useState<{ id: number; text: string; color: string } | null>(
+    null,
+  );
 
   // Leaderboard state
   const [playerName, setPlayerName] = useState<string>(() => {
@@ -78,8 +80,9 @@ export function HextrisGame() {
   });
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [rank, setRank] = useState<number | null>(null);
-  const [submitState, setSubmitState] =
-    useState<"idle" | "submitting" | "submitted" | "failed">("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "submitted" | "failed">(
+    "idle",
+  );
   const submittedOnceRef = useRef(false);
 
   // Sound manager — created once per component lifetime
@@ -121,8 +124,7 @@ export function HextrisGame() {
   // fall back to CSS "fixed inset-0" so the game still fills the viewport.
   const enterImmersive = async () => {
     if (typeof document === "undefined") return;
-    const canNative =
-      !!document.fullscreenEnabled && !!containerRef.current?.requestFullscreen;
+    const canNative = !!document.fullscreenEnabled && !!containerRef.current?.requestFullscreen;
     if (canNative) {
       try {
         await containerRef.current!.requestFullscreen();
@@ -566,28 +568,21 @@ export function HextrisGame() {
       });
       lane += mainHex.position;
       lane = ((lane % mainHex.sides) + mainHex.sides) % mainHex.sides;
-      block.distFromHex =
-        hexSurfaceDist() + block.height * mainHex.blocks[lane].length;
+      block.distFromHex = hexSurfaceDist() + block.height * mainHex.blocks[lane].length;
       mainHex.blocks[lane].push(block);
       block.attachedLane = lane;
       block.checked = 1;
       if (gameState === 1) sounds.settle();
     }
 
-    function hexDoesBlockCollide(
-      block: Block,
-      position?: number,
-      tArr?: Block[],
-    ) {
+    function hexDoesBlockCollide(block: Block, position?: number, tArr?: Block[]) {
       if (block.settled) return;
 
       if (position !== undefined && tArr) {
         // Re-settling blocks after deletion
         if (position <= 0) {
           if (
-            block.distFromHex -
-              block.iter * mainHex.dt * settings.scale -
-              hexSurfaceDist() <=
+            block.distFromHex - block.iter * mainHex.dt * settings.scale - hexSurfaceDist() <=
             0
           ) {
             block.distFromHex = hexSurfaceDist();
@@ -607,8 +602,7 @@ export function HextrisGame() {
               tArr[position - 1].height <=
               0
           ) {
-            block.distFromHex =
-              tArr[position - 1].distFromHex + tArr[position - 1].height;
+            block.distFromHex = tArr[position - 1].distFromHex + tArr[position - 1].height;
             block.settled = 1;
             block.checked = 1;
           } else {
@@ -636,9 +630,7 @@ export function HextrisGame() {
           }
         } else {
           if (
-            block.distFromHex -
-              block.iter * mainHex.dt * settings.scale -
-              hexSurfaceDist() <=
+            block.distFromHex - block.iter * mainHex.dt * settings.scale - hexSurfaceDist() <=
             0
           ) {
             hexAddBlock(block);
@@ -698,9 +690,8 @@ export function HextrisGame() {
         mainHex.angularVelocity += AV_CONST * mainHex.dt;
       }
       if (
-        Math.abs(
-          mainHex.angle - mainHex.targetAngle + mainHex.angularVelocity,
-        ) <= Math.abs(mainHex.angularVelocity)
+        Math.abs(mainHex.angle - mainHex.targetAngle + mainHex.angularVelocity) <=
+        Math.abs(mainHex.angularVelocity)
       ) {
         mainHex.angle = mainHex.targetAngle;
         mainHex.angularVelocity = 0;
@@ -736,13 +727,9 @@ export function HextrisGame() {
       if (waveGen.currentFunction) waveGen.currentFunction();
       waveGen.dt = 16.6667 * mainHex.ct;
       wgComputeDifficulty();
-      if (
-        (waveGen.dt - waveGen.lastGen) * settings.creationSpeedModifier >
-        waveGen.nextGen
-      ) {
+      if ((waveGen.dt - waveGen.lastGen) * settings.creationSpeedModifier > waveGen.nextGen) {
         if (waveGen.nextGen > 600) {
-          waveGen.nextGen -=
-            11 * (waveGen.nextGen / 1300) * settings.creationSpeedModifier;
+          waveGen.nextGen -= 11 * (waveGen.nextGen / 1300) * settings.creationSpeedModifier;
         }
       }
     }
@@ -751,25 +738,17 @@ export function HextrisGame() {
       if (waveGen.difficulty < 35) {
         let increment: number;
         if (waveGen.difficulty < 8) {
-          increment =
-            ((waveGen.dt - waveGen.last) / 5166667) * settings.speedModifier;
+          increment = ((waveGen.dt - waveGen.last) / 5166667) * settings.speedModifier;
         } else if (waveGen.difficulty < 15) {
-          increment =
-            ((waveGen.dt - waveGen.last) / 72333333) * settings.speedModifier;
+          increment = ((waveGen.dt - waveGen.last) / 72333333) * settings.speedModifier;
         } else {
-          increment =
-            ((waveGen.dt - waveGen.last) / 90000000) * settings.speedModifier;
+          increment = ((waveGen.dt - waveGen.last) / 90000000) * settings.speedModifier;
         }
         waveGen.difficulty += increment * 0.5;
       }
     }
 
-    function addNewBlock(
-      blocklane: number,
-      color: string,
-      iter: number,
-      distFromHex?: number,
-    ) {
+    function addNewBlock(blocklane: number, color: string, iter: number, distFromHex?: number) {
       iter *= settings.speedModifier;
       // Specials unlock by skill: bombs at combo ≥3, rainbows at combo ≥5.
       // Also gated behind a short warmup so the very-early game stays clean.
@@ -787,11 +766,7 @@ export function HextrisGame() {
         waveGen.ct++;
         waveGen.lastGen = waveGen.dt;
         const fv = randInt(0, mainHex.sides);
-        addNewBlock(
-          fv,
-          colors[randInt(0, colors.length)],
-          1.6 + (waveGen.difficulty / 15) * 3,
-        );
+        addNewBlock(fv, colors[randInt(0, colors.length)], 1.6 + (waveGen.difficulty / 15) * 3);
         if (waveGen.ct > 5) {
           const next = randInt(0, 24);
           if (next > 15) {
@@ -817,11 +792,7 @@ export function HextrisGame() {
     function wgDoubleGeneration() {
       if (waveGen.dt - waveGen.lastGen > waveGen.nextGen) {
         const i = randInt(0, mainHex.sides);
-        addNewBlock(
-          i,
-          colors[randInt(0, colors.length)],
-          1.5 + (waveGen.difficulty / 15) * 3,
-        );
+        addNewBlock(i, colors[randInt(0, colors.length)], 1.5 + (waveGen.difficulty / 15) * 3);
         addNewBlock(
           (i + 1) % mainHex.sides,
           colors[randInt(0, colors.length)],
@@ -872,11 +843,7 @@ export function HextrisGame() {
         }
 
         for (let i = 0; i < mainHex.sides; i++) {
-          addNewBlock(
-            i,
-            colorList[i % numColors],
-            1.5 + (waveGen.difficulty / 15) * 3,
-          );
+          addNewBlock(i, colorList[i % numColors], 1.5 + (waveGen.difficulty / 15) * 3);
         }
         waveGen.ct += 15;
         waveGen.lastGen = waveGen.dt;
@@ -894,11 +861,7 @@ export function HextrisGame() {
         }
         const d = randInt(0, 6);
         for (let i = 0; i < 3; i++) {
-          addNewBlock(
-            (d + i) % 6,
-            colorList[i],
-            1.5 + (waveGen.difficulty / 15) * 3,
-          );
+          addNewBlock((d + i) % 6, colorList[i], 1.5 + (waveGen.difficulty / 15) * 3);
         }
         waveGen.ct += 8;
         waveGen.lastGen = waveGen.dt;
@@ -911,11 +874,7 @@ export function HextrisGame() {
         const ri = randInt(0, colors.length);
         const i = randInt(0, mainHex.sides);
         addNewBlock(i, colors[ri], 0.6 + (waveGen.difficulty / 15) * 3);
-        addNewBlock(
-          (i + 3) % mainHex.sides,
-          colors[ri],
-          0.6 + (waveGen.difficulty / 15) * 3,
-        );
+        addNewBlock((i + 3) % mainHex.sides, colors[ri], 0.6 + (waveGen.difficulty / 15) * 3);
         waveGen.ct += 1.5;
         waveGen.lastGen = waveGen.dt;
         wgShouldChangePattern(false);
@@ -971,19 +930,13 @@ export function HextrisGame() {
       return false;
     }
 
-    function floodFill(
-      side: number,
-      index: number,
-      deleting: number[][],
-      targetColor: string,
-    ) {
+    function floodFill(side: number, index: number, deleting: number[][], targetColor: string) {
       if (!mainHex.blocks[side] || !mainHex.blocks[side][index]) return;
 
       for (let x = -1; x < 2; x++) {
         for (let y = -1; y < 2; y++) {
           if (Math.abs(x) === Math.abs(y)) continue;
-          const curSide =
-            ((side + x) % mainHex.sides + mainHex.sides) % mainHex.sides;
+          const curSide = (((side + x) % mainHex.sides) + mainHex.sides) % mainHex.sides;
           const curIndex = index + y;
           if (!mainHex.blocks[curSide]) continue;
           const neighbor = mainHex.blocks[curSide][curIndex];
@@ -991,8 +944,7 @@ export function HextrisGame() {
           if (neighbor.deleted !== 0) continue;
           if (floodSearch(deleting, [curSide, curIndex])) continue;
           // Rainbow is a wildcard — it matches any chain color.
-          const colorMatch =
-            neighbor.color === targetColor || neighbor.special === "rainbow";
+          const colorMatch = neighbor.color === targetColor || neighbor.special === "rainbow";
           if (colorMatch) {
             deleting.push([curSide, curIndex]);
             floodFill(curSide, curIndex, deleting, targetColor);
@@ -1013,12 +965,8 @@ export function HextrisGame() {
       avgDFH /= arr.length;
       avgAngle /= arr.length;
       return {
-        x:
-          trueCanvas.width / 2 +
-          Math.cos((avgAngle * Math.PI) / 180) * avgDFH,
-        y:
-          trueCanvas.height / 2 +
-          Math.sin((avgAngle * Math.PI) / 180) * avgDFH,
+        x: trueCanvas.width / 2 + Math.cos((avgAngle * Math.PI) / 180) * avgDFH,
+        y: trueCanvas.height / 2 + Math.sin((avgAngle * Math.PI) / 180) * avgDFH,
       };
     }
 
@@ -1061,8 +1009,7 @@ export function HextrisGame() {
         if (bombAnchor) {
           const ang = (bombAnchor.angle * Math.PI) / 180;
           const ax =
-            trueCanvas.width / 2 +
-            Math.sin(ang) * (bombAnchor.distFromHex + bombAnchor.height / 2);
+            trueCanvas.width / 2 + Math.sin(ang) * (bombAnchor.distFromHex + bombAnchor.height / 2);
           const ay =
             trueCanvas.height / 2 -
             Math.cos(ang) * (bombAnchor.distFromHex + bombAnchor.height / 2);
@@ -1072,10 +1019,7 @@ export function HextrisGame() {
           emitParticles(ax, ay, "#ef4444", 18);
         }
         for (let i = 0; i < laneBlocks.length; i++) {
-          if (
-            laneBlocks[i].deleted === 0 &&
-            !floodSearch(deleting, [s, i])
-          ) {
+          if (laneBlocks[i].deleted === 0 && !floodSearch(deleting, [s, i])) {
             deleting.push([s, i]);
           }
         }
@@ -1094,13 +1038,10 @@ export function HextrisGame() {
       // extra +1 on the combo so cascades escalate the multiplier faster.
       const now = mainHex.ct;
       const deltaTicks = now - mainHex.lastCombo;
-      const isChain =
-        deltaTicks > 0 && deltaTicks < 30 && mainHex.comboMultiplier >= 1;
+      const isChain = deltaTicks > 0 && deltaTicks < 30 && mainHex.comboMultiplier >= 1;
       if (deltaTicks < settings.comboTime) {
         settings.comboTime =
-          (1 / settings.creationSpeedModifier) *
-          (waveGen.nextGen / 16.666667) *
-          3;
+          (1 / settings.creationSpeedModifier) * (waveGen.nextGen / 16.666667) * 3;
         mainHex.comboMultiplier += isChain ? 2 : 1;
         mainHex.lastCombo = now;
         const coords = findCenterOfBlocks(deletedBlocks);
@@ -1130,8 +1071,7 @@ export function HextrisGame() {
       }
       sounds.match(mainHex.comboMultiplier);
 
-      const adder =
-        deleting.length * deleting.length * mainHex.comboMultiplier;
+      const adder = deleting.length * deleting.length * mainHex.comboMultiplier;
       mainHex.texts.push({
         x: mainHex.x,
         y: mainHex.y,
@@ -1143,15 +1083,11 @@ export function HextrisGame() {
       // Prefer a non-special block's color for the combo timer. If the only
       // blocks in the group were special (rainbow/bomb), fall back to their
       // backing color.
-      const chainColorBlock =
-        deletedBlocks.find((b) => !b.special) ?? deletedBlocks[0];
+      const chainColorBlock = deletedBlocks.find((b) => !b.special) ?? deletedBlocks[0];
       mainHex.lastColorScored = chainColorBlock.color;
       score += adder;
       // Momentum: earn ~1.5 per block cleared, plus combo bonus. Caps at 100.
-      momentum = Math.min(
-        100,
-        momentum + deleting.length * 1.5 + mainHex.comboMultiplier,
-      );
+      momentum = Math.min(100, momentum + deleting.length * 1.5 + mainHex.comboMultiplier);
       // Match haptic — stronger for bigger combos, extra punch for bombs.
       const bombExploded = deletedBlocks.some((b) => b.special === "bomb");
       if (bombExploded) haptic([50, 30, 80]);
@@ -1233,8 +1169,7 @@ export function HextrisGame() {
     // ─── FLOATING TEXT ───────────────────────────────────────
 
     function fadeUpAndOut(t: TextObj) {
-      t.opacity -=
-        (mainHex.dt * Math.pow(Math.pow(1 - t.opacity, 1 / 3) + 1, 3)) / 100;
+      t.opacity -= (mainHex.dt * Math.pow(Math.pow(1 - t.opacity, 1 / 3) + 1, 3)) / 100;
       t.alive = t.opacity;
       t.y -= 3 * mainHex.dt;
     }
@@ -1297,8 +1232,7 @@ export function HextrisGame() {
           tLane %= mainHex.sides;
           mainHex.shakes.push({
             lane: tLane,
-            magnitude:
-              3 * (window.devicePixelRatio || 1) * settings.scale,
+            magnitude: 3 * (window.devicePixelRatio || 1) * settings.scale,
           });
         }
         block.opacity -= 0.075 * mainHex.dt;
@@ -1362,16 +1296,8 @@ export function HextrisGame() {
         if (rat > 1) rat = 1;
         p1 = rotatePoint((-block.width / 2) * rat, block.height / 2, block.angle);
         p2 = rotatePoint((block.width / 2) * rat, block.height / 2, block.angle);
-        p3 = rotatePoint(
-          (block.widthWide / 2) * rat,
-          -block.height / 2,
-          block.angle,
-        );
-        p4 = rotatePoint(
-          (-block.widthWide / 2) * rat,
-          -block.height / 2,
-          block.angle,
-        );
+        p3 = rotatePoint((block.widthWide / 2) * rat, -block.height / 2, block.angle);
+        p4 = rotatePoint((-block.widthWide / 2) * rat, -block.height / 2, block.angle);
         if (mainHex.ct - block.ict >= block.initLen) {
           block.initializing = 0;
         }
@@ -1385,13 +1311,9 @@ export function HextrisGame() {
       ctx.globalAlpha = block.opacity;
       const angleRad = (block.angle * Math.PI) / 180;
       const baseX =
-        trueCanvas.width / 2 +
-        Math.sin(angleRad) * (block.distFromHex + block.height / 2) +
-        gdx;
+        trueCanvas.width / 2 + Math.sin(angleRad) * (block.distFromHex + block.height / 2) + gdx;
       const baseY =
-        trueCanvas.height / 2 -
-        Math.cos(angleRad) * (block.distFromHex + block.height / 2) +
-        gdy;
+        trueCanvas.height / 2 - Math.cos(angleRad) * (block.distFromHex + block.height / 2) + gdy;
 
       // Build the trapezoid path once — we reuse it for fill + any overlay.
       const drawTrapezoid = () => {
@@ -1413,11 +1335,11 @@ export function HextrisGame() {
           baseX + block.widthWide / 2,
           baseY,
         );
-        grad.addColorStop(((0 + shift) % 1), "#ec4899");
-        grad.addColorStop(((0.25 + shift) % 1), "#f59e0b");
-        grad.addColorStop(((0.5 + shift) % 1), "#22c55e");
-        grad.addColorStop(((0.75 + shift) % 1), "#6366f1");
-        grad.addColorStop(((1 + shift) % 1 || 1), "#ec4899");
+        grad.addColorStop((0 + shift) % 1, "#ec4899");
+        grad.addColorStop((0.25 + shift) % 1, "#f59e0b");
+        grad.addColorStop((0.5 + shift) % 1, "#22c55e");
+        grad.addColorStop((0.75 + shift) % 1, "#6366f1");
+        grad.addColorStop((1 + shift) % 1 || 1, "#ec4899");
         ctx.fillStyle = grad;
         ctx.shadowColor = "rgba(255,255,255,0.7)";
         ctx.shadowBlur = 16 * settings.scale;
@@ -1490,9 +1412,7 @@ export function HextrisGame() {
       startVertex = (startVertex + offset) % 12;
       endVertex = (endVertex + offset) % 12;
 
-      const radius =
-        settings.rows * settings.blockHeight * (2 / Math.sqrt(3)) +
-        settings.hexWidth;
+      const radius = settings.rows * settings.blockHeight * (2 / Math.sqrt(3)) + settings.hexWidth;
       const halfRadius = radius / 2;
       const triHeight = radius * (Math.sqrt(3) / 2);
 
@@ -1524,8 +1444,7 @@ export function HextrisGame() {
 
     function drawTimerSide(vertexes: number[][][]) {
       if (gameState === 0) {
-        ctx.strokeStyle =
-          TINTED[mainHex.lastColorScored] || mainHex.lastColorScored;
+        ctx.strokeStyle = TINTED[mainHex.lastColorScored] || mainHex.lastColorScored;
       } else {
         ctx.strokeStyle = mainHex.lastColorScored;
       }
@@ -1551,22 +1470,8 @@ export function HextrisGame() {
             leftV.push(calcSide(i, i + 1, 1, 1));
             rightV.push(calcSide(12 - i, 11 - i, 1, 1));
           } else {
-            leftV.push(
-              calcSide(
-                i,
-                i + 1,
-                1 - (((done * 6) / settings.comboTime) % 1),
-                1,
-              ),
-            );
-            rightV.push(
-              calcSide(
-                12 - i,
-                11 - i,
-                1 - (((done * 6) / settings.comboTime) % 1),
-                1,
-              ),
-            );
+            leftV.push(calcSide(i, i + 1, 1 - (((done * 6) / settings.comboTime) % 1), 1));
+            rightV.push(calcSide(12 - i, 11 - i, 1 - (((done * 6) / settings.comboTime) % 1), 1));
             break;
           }
         }
@@ -1597,10 +1502,7 @@ export function HextrisGame() {
         highscores.sort((a, b) => b - a);
         highscores = highscores.slice(0, 3);
         try {
-          localStorage.setItem(
-            "hextris_highscores",
-            JSON.stringify(highscores),
-          );
+          localStorage.setItem("hextris_highscores", JSON.stringify(highscores));
         } catch {
           /* empty */
         }
@@ -1623,8 +1525,7 @@ export function HextrisGame() {
         hexDoesBlockCollide(blocks[i]);
         if (!blocks[i].settled) {
           if (!blocks[i].initializing) {
-            blocks[i].distFromHex -=
-              blocks[i].iter * dt * settings.scale;
+            blocks[i].distFromHex -= blocks[i].iter * dt * settings.scale;
           }
         } else if (!blocks[i].removed) {
           blocks[i].removed = 1;
@@ -1650,11 +1551,9 @@ export function HextrisGame() {
             // Spawn a burst of particles at the block's screen position
             const ang = (block.angle * Math.PI) / 180;
             const px =
-              trueCanvas.width / 2 +
-              Math.sin(ang) * (block.distFromHex + block.height / 2);
+              trueCanvas.width / 2 + Math.sin(ang) * (block.distFromHex + block.height / 2);
             const py =
-              trueCanvas.height / 2 -
-              Math.cos(ang) * (block.distFromHex + block.height / 2);
+              trueCanvas.height / 2 - Math.cos(ang) * (block.distFromHex + block.height / 2);
             emitParticles(px, py, block.color, 10);
             mainHex.blocks[i].splice(j, 1);
             blockDestroyed();
@@ -1680,8 +1579,7 @@ export function HextrisGame() {
           const block = mainHex.blocks[i][j];
           hexDoesBlockCollide(block, j, mainHex.blocks[i]);
           if (!mainHex.blocks[i][j].settled) {
-            mainHex.blocks[i][j].distFromHex -=
-              block.iter * dt * settings.scale;
+            mainHex.blocks[i][j].distFromHex -= block.iter * dt * settings.scale;
           }
         }
       }
@@ -1733,20 +1631,14 @@ export function HextrisGame() {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, trueCanvas.width, trueCanvas.height);
 
-      if (
-        gameState === 1 ||
-        gameState === 2 ||
-        gameState === -1 ||
-        gameState === 0
-      ) {
+      if (gameState === 1 || gameState === 2 || gameState === -1 || gameState === 0) {
         if (op < 1) op += 0.01;
         ctx.globalAlpha = op;
 
         // Outer boundary hexagon. During the shrink countdown, stroke pulses
         // red and thicker so the player sees the ring that's about to vanish.
         const outerRadius =
-          settings.rows * settings.blockHeight * (2 / Math.sqrt(3)) +
-          settings.hexWidth;
+          settings.rows * settings.blockHeight * (2 / Math.sqrt(3)) + settings.hexWidth;
         const warnActive = lastSyncedShrinkWarn !== null;
         const pulse = warnActive ? 0.5 + 0.5 * Math.sin(Date.now() / 120) : 0;
         drawPolygon(
@@ -1757,9 +1649,7 @@ export function HextrisGame() {
           30,
           boundaryColor,
           warnActive ? 2 + 2 * pulse : 1,
-          warnActive
-            ? `rgba(239,68,68,${0.5 + 0.5 * pulse})`
-            : "rgba(255,255,255,0.1)",
+          warnActive ? `rgba(239,68,68,${0.5 + 0.5 * pulse})` : "rgba(255,255,255,0.1)",
         );
 
         // Combo timer
@@ -1933,11 +1823,7 @@ export function HextrisGame() {
         // Color steps through 6 accents so every new combo feels distinct.
         // Skip if a CLEAN SWEEP just fired this frame — it should dominate.
         const sweepRecent = performance.now() - lastCleanSweepMs < 200;
-        if (
-          currentCombo > lastSyncedCombo &&
-          currentCombo >= 2 &&
-          !sweepRecent
-        ) {
+        if (currentCombo > lastSyncedCombo && currentCombo >= 2 && !sweepRecent) {
           const palette = [
             "#6366f1", // blue
             "#22c55e", // green
@@ -2325,29 +2211,25 @@ export function HextrisGame() {
         isFullscreen
           ? "h-screen w-screen rounded-none"
           : mobileImmersive
-          ? "hextris-immersive fixed inset-0 z-50 w-screen h-[100dvh] rounded-none"
-          : "w-full rounded-xl"
+            ? "hextris-immersive fixed inset-0 z-50 h-[100dvh] w-screen rounded-none"
+            : "w-full rounded-xl"
       }`}
     >
-      <canvas
-        ref={canvasRef}
-        className="block w-full"
-        style={{ touchAction: "none" }}
-      />
+      <canvas ref={canvasRef} className="block w-full" style={{ touchAction: "none" }} />
 
       {/* HUD — top-left chip. `key` pulse forces a brief scale animation on score change. */}
-      <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap max-w-[calc(100%-140px)]">
-        <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs font-mono text-white/60 backdrop-blur">
+      <div className="absolute top-3 left-3 flex max-w-[calc(100%-140px)] flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-xs text-white/60 backdrop-blur">
           <span className="text-accent-pink/90">SCORE</span>
           <span
             key={scorePulse}
-            className="text-white tabular-nums inline-block hextris-score-pulse"
+            className="hextris-score-pulse inline-block text-white tabular-nums"
           >
             {uiScore}
           </span>
         </div>
         {uiHigh > 0 && (
-          <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs font-mono text-white/60 backdrop-blur">
+          <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-xs text-white/60 backdrop-blur">
             <span className="text-accent-green/90">BEST</span>
             <span className="text-white tabular-nums">{uiHigh}</span>
           </div>
@@ -2355,10 +2237,10 @@ export function HextrisGame() {
         {uiCombo > 1 && uiState === "playing" && (
           <div
             key={`combo-${uiCombo}`}
-            className="flex items-center gap-1.5 rounded-md border border-accent-amber/40 bg-accent-amber/10 px-2.5 py-1.5 text-xs font-mono text-accent-amber backdrop-blur hextris-combo-pop"
+            className="hextris-combo-pop flex items-center gap-1.5 rounded-md border border-accent-amber/40 bg-accent-amber/10 px-2.5 py-1.5 font-mono text-xs text-accent-amber backdrop-blur"
           >
             <span className="opacity-80">COMBO</span>
-            <span className="tabular-nums font-bold">×{uiCombo}</span>
+            <span className="font-bold tabular-nums">×{uiCombo}</span>
           </div>
         )}
       </div>
@@ -2366,23 +2248,23 @@ export function HextrisGame() {
       {/* Momentum meter — bottom-center. At 100% the entire bar becomes a large
           tappable button (thumb-friendly on mobile). */}
       {uiState === "playing" && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-none w-[min(80%,320px)]">
+        <div className="pointer-events-none absolute bottom-6 left-1/2 flex w-[min(80%,320px)] -translate-x-1/2 flex-col items-center gap-1.5">
           {uiMomentum >= 100 ? (
             <button
               type="button"
               onClick={() => panicRef.current()}
-              className="pointer-events-auto flex w-full items-center justify-center gap-2 rounded-lg border-2 border-accent-purple bg-gradient-to-r from-accent-purple/40 via-accent-pink/40 to-accent-purple/40 px-4 py-3 text-sm font-mono text-white hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-accent-purple/50 hextris-score-pulse"
+              className="hextris-score-pulse pointer-events-auto flex w-full items-center justify-center gap-2 rounded-lg border-2 border-accent-purple bg-gradient-to-r from-accent-purple/40 via-accent-pink/40 to-accent-purple/40 px-4 py-3 font-mono text-sm text-white shadow-lg shadow-accent-purple/50 transition-all hover:brightness-110 active:scale-95"
               title="Purge the board (F)"
               aria-label="Panic Clear"
             >
               <span className="font-bold tracking-wider">PANIC CLEAR</span>
-              <kbd className="hidden sm:inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded border border-white/40 bg-white/10 px-1 text-[10px]">
+              <kbd className="hidden h-5 min-w-[1.25rem] items-center justify-center rounded border border-white/40 bg-white/10 px-1 text-[10px] sm:inline-flex">
                 F
               </kbd>
             </button>
           ) : (
             <>
-              <div className="relative h-3 w-48 rounded-full overflow-hidden border border-white/15 bg-black/50 backdrop-blur">
+              <div className="relative h-3 w-48 overflow-hidden rounded-full border border-white/15 bg-black/50 backdrop-blur">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-150"
                   style={{
@@ -2391,7 +2273,7 @@ export function HextrisGame() {
                   }}
                 />
               </div>
-              <span className="text-[10px] font-mono uppercase text-white/50 tracking-wider">
+              <span className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
                 Momentum {uiMomentum}%
               </span>
             </>
@@ -2405,7 +2287,7 @@ export function HextrisGame() {
           <button
             type="button"
             onClick={() => pauseRef.current()}
-            className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 hover:bg-black/60 px-2 py-1.5 text-white/60 hover:text-white backdrop-blur transition-colors"
+            className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
             aria-label={uiState === "paused" ? "Resume" : "Pause"}
             title={uiState === "paused" ? "Resume" : "Pause"}
           >
@@ -2419,20 +2301,16 @@ export function HextrisGame() {
         <button
           type="button"
           onClick={() => setSoundEnabled((v) => !v)}
-          className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 hover:bg-black/60 px-2 py-1.5 text-white/60 hover:text-white backdrop-blur transition-colors"
+          className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
           aria-label={soundEnabled ? "Mute" : "Unmute"}
           title={soundEnabled ? "Mute" : "Unmute"}
         >
-          {soundEnabled ? (
-            <Volume2 className="h-3.5 w-3.5" />
-          ) : (
-            <VolumeX className="h-3.5 w-3.5" />
-          )}
+          {soundEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
         </button>
         <button
           type="button"
           onClick={toggleFullscreen}
-          className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 hover:bg-black/60 px-2 py-1.5 text-white/60 hover:text-white backdrop-blur transition-colors"
+          className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
           aria-label={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
           title={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
         >
@@ -2453,52 +2331,44 @@ export function HextrisGame() {
         <button
           type="button"
           onClick={dismissTutorial}
-          className="absolute inset-0 z-10 flex items-end justify-center pb-20 sm:pb-24 px-4 hextris-tutorial-fade"
+          className="hextris-tutorial-fade absolute inset-0 z-10 flex items-end justify-center px-4 pb-20 sm:pb-24"
           aria-label="Dismiss tutorial"
         >
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-black/75 backdrop-blur-md px-5 py-4 shadow-2xl pointer-events-none">
+          <div className="pointer-events-none flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-black/75 px-5 py-4 shadow-2xl backdrop-blur-md">
             {isTouchDevice ? (
               <div className="flex items-center gap-4 text-white">
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className="h-11 w-11 rounded-lg border border-accent-pink/50 bg-accent-pink/10 flex items-center justify-center text-accent-pink">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-accent-pink/50 bg-accent-pink/10 text-accent-pink">
                     <Hand className="h-5 w-5 -scale-x-100" />
                   </div>
-                  <span className="text-[9px] uppercase font-mono text-white/50">
-                    Left half
-                  </span>
+                  <span className="font-mono text-[9px] text-white/50 uppercase">Left half</span>
                 </div>
                 <ArrowLeftRight className="h-4 w-4 text-white/40" />
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className="h-11 w-11 rounded-lg border border-accent-blue/50 bg-accent-blue/10 flex items-center justify-center text-accent-blue">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-accent-blue/50 bg-accent-blue/10 text-accent-blue">
                     <Hand className="h-5 w-5" />
                   </div>
-                  <span className="text-[9px] uppercase font-mono text-white/50">
-                    Right half
-                  </span>
+                  <span className="font-mono text-[9px] text-white/50 uppercase">Right half</span>
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-4 text-white">
                 <div className="flex flex-col items-center gap-1.5">
-                  <kbd className="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded border border-accent-pink/50 bg-accent-pink/10 px-2 text-accent-pink text-sm font-mono">
+                  <kbd className="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded border border-accent-pink/50 bg-accent-pink/10 px-2 font-mono text-sm text-accent-pink">
                     ←
                   </kbd>
-                  <span className="text-[9px] uppercase font-mono text-white/50">
-                    Rotate left
-                  </span>
+                  <span className="font-mono text-[9px] text-white/50 uppercase">Rotate left</span>
                 </div>
                 <ArrowLeftRight className="h-4 w-4 text-white/40" />
                 <div className="flex flex-col items-center gap-1.5">
-                  <kbd className="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded border border-accent-blue/50 bg-accent-blue/10 px-2 text-accent-blue text-sm font-mono">
+                  <kbd className="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded border border-accent-blue/50 bg-accent-blue/10 px-2 font-mono text-sm text-accent-blue">
                     →
                   </kbd>
-                  <span className="text-[9px] uppercase font-mono text-white/50">
-                    Rotate right
-                  </span>
+                  <span className="font-mono text-[9px] text-white/50 uppercase">Rotate right</span>
                 </div>
               </div>
             )}
-            <span className="text-[11px] text-white/50 font-mono mt-1">
+            <span className="mt-1 font-mono text-[11px] text-white/50">
               Match 3+ blocks to score
             </span>
           </div>
@@ -2507,26 +2377,22 @@ export function HextrisGame() {
 
       {/* Pause overlay — React card with clickable Resume (mobile-friendly) */}
       {uiState === "paused" && (
-        <div className="absolute inset-0 flex items-center justify-center px-4 pointer-events-none z-25">
-          <div className="pointer-events-auto rounded-2xl border border-white/10 bg-black/85 backdrop-blur-md px-8 py-6 shadow-2xl hextris-gameover-in text-center">
-            <div className="text-[11px] uppercase tracking-widest text-accent-amber mb-2 font-mono">
+        <div className="pointer-events-none absolute inset-0 z-25 flex items-center justify-center px-4">
+          <div className="hextris-gameover-in pointer-events-auto rounded-2xl border border-white/10 bg-black/85 px-8 py-6 text-center shadow-2xl backdrop-blur-md">
+            <div className="mb-2 font-mono text-[11px] tracking-widest text-accent-amber uppercase">
               Paused
             </div>
-            <div className="font-display text-3xl font-black text-white mb-4">
-              Take a breath
-            </div>
+            <div className="mb-4 font-display text-3xl font-black text-white">Take a breath</div>
             <button
               type="button"
               onClick={() => pauseRef.current()}
-              className="inline-flex items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/10 hover:bg-accent-green/20 px-4 py-2 text-sm font-medium text-accent-green transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/10 px-4 py-2 text-sm font-medium text-accent-green transition-colors hover:bg-accent-green/20"
             >
               <Play className="h-4 w-4" />
               Resume
             </button>
             {!isTouchDevice && (
-              <div className="text-[10px] text-white/40 font-mono mt-3">
-                or press Space
-              </div>
+              <div className="mt-3 font-mono text-[10px] text-white/40">or press Space</div>
             )}
           </div>
         </div>
@@ -2536,10 +2402,10 @@ export function HextrisGame() {
       {uiShrinkWarn !== null && uiState === "playing" && (
         <div
           key={`shrink-${uiShrinkWarn}`}
-          className="absolute top-14 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-md border border-accent-red/60 bg-accent-red/15 px-3 py-1.5 text-xs font-mono text-accent-red backdrop-blur hextris-combo-pop z-20"
+          className="hextris-combo-pop absolute top-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-md border border-accent-red/60 bg-accent-red/15 px-3 py-1.5 font-mono text-xs text-accent-red backdrop-blur"
         >
-          <span className="uppercase tracking-wider font-bold">Boundary shrinks</span>
-          <span className="text-white tabular-nums text-sm font-bold">{uiShrinkWarn}s</span>
+          <span className="font-bold tracking-wider uppercase">Boundary shrinks</span>
+          <span className="text-sm font-bold text-white tabular-nums">{uiShrinkWarn}s</span>
         </div>
       )}
 
@@ -2547,10 +2413,10 @@ export function HextrisGame() {
       {milestone && (
         <div
           key={milestone.id}
-          className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 hextris-milestone-burst"
+          className="hextris-milestone-burst pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
         >
           <div
-            className="font-display font-black tracking-tight text-center"
+            className="text-center font-display font-black tracking-tight"
             style={{
               color: milestone.color,
               // Combo bursts ("×N COMBO!") scale with N. Special events (CLEAN
@@ -2584,17 +2450,17 @@ export function HextrisGame() {
       {/* Game-over card — React-rendered for interactivity. Dark palette is
           hard-coded so the card renders consistently even in light mode. */}
       {uiState === "gameover" && (
-        <div className="absolute inset-0 flex items-center justify-center px-3 sm:px-4 pointer-events-none overflow-auto py-4 z-30">
-          <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-white/10 bg-black/90 backdrop-blur-md p-4 sm:p-6 shadow-2xl hextris-gameover-in text-white">
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center overflow-auto px-3 py-4 sm:px-4">
+          <div className="hextris-gameover-in pointer-events-auto w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-4 text-white shadow-2xl backdrop-blur-md sm:p-6">
             <div className="text-center">
-              <div className="text-[11px] uppercase tracking-widest text-accent-pink mb-2 font-mono">
+              <div className="mb-2 font-mono text-[11px] tracking-widest text-accent-pink uppercase">
                 Game Over
               </div>
-              <div className="font-display text-4xl sm:text-5xl font-black tabular-nums text-white">
+              <div className="font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
                 {uiScore}
               </div>
               {uiHigh > 0 && (
-                <div className="text-xs text-white/50 mt-1 font-mono">
+                <div className="mt-1 font-mono text-xs text-white/50">
                   Best <span className="text-accent-green">{uiHigh}</span>
                   {rank !== null && (
                     <>
@@ -2608,30 +2474,29 @@ export function HextrisGame() {
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                <div className="text-[10px] text-white/50 font-mono uppercase tracking-wider">
+                <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
                   Max Combo
                 </div>
-                <div className="text-base font-mono tabular-nums text-accent-amber mt-0.5">
+                <div className="mt-0.5 font-mono text-base text-accent-amber tabular-nums">
                   ×{uiStats.maxCombo || 1}
                 </div>
               </div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                <div className="text-[10px] text-white/50 font-mono uppercase tracking-wider">
+                <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
                   Cleared
                 </div>
-                <div className="text-base font-mono tabular-nums text-accent-blue mt-0.5">
+                <div className="mt-0.5 font-mono text-base text-accent-blue tabular-nums">
                   {uiStats.pieces}
                 </div>
               </div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                <div className="text-[10px] text-white/50 font-mono uppercase tracking-wider">
+                <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
                   Time
                 </div>
-                <div className="text-base font-mono tabular-nums text-accent-pink mt-0.5">
-                  {Math.floor(uiStats.seconds / 60)}:
-                  {String(uiStats.seconds % 60).padStart(2, "0")}
+                <div className="mt-0.5 font-mono text-base text-accent-pink tabular-nums">
+                  {Math.floor(uiStats.seconds / 60)}:{String(uiStats.seconds % 60).padStart(2, "0")}
                 </div>
               </div>
             </div>
@@ -2644,62 +2509,63 @@ export function HextrisGame() {
                 onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
                 placeholder="Your name"
                 maxLength={12}
-                className="flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-accent-pink/60 font-mono"
+                className="flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-sm text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => submitScore(playerName)}
                 disabled={
-                  submitState === "submitting" ||
-                  submitState === "submitted" ||
-                  !playerName.trim()
+                  submitState === "submitting" || submitState === "submitted" || !playerName.trim()
                 }
-                className="rounded-md border border-accent-green/40 bg-accent-green/10 hover:bg-accent-green/20 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 text-xs font-mono text-accent-green transition-colors"
+                className="rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {submitState === "submitting"
                   ? "..."
                   : submitState === "submitted"
-                  ? "Saved"
-                  : submitState === "failed"
-                  ? "Retry"
-                  : "Submit"}
+                    ? "Saved"
+                    : submitState === "failed"
+                      ? "Retry"
+                      : "Submit"}
               </button>
             </div>
 
             {/* Top 8 leaderboard */}
             {leaderboard.length > 0 && (
               <div className="mt-4">
-                <div className="text-[10px] uppercase tracking-widest text-white/50 font-mono mb-2 px-1">
+                <div className="mb-2 px-1 font-mono text-[10px] tracking-widest text-white/50 uppercase">
                   Top Runs
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] divide-y divide-white/5 overflow-hidden">
+                <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
                   {leaderboard.slice(0, 8).map((e, i) => {
                     const isYou =
                       rank !== null &&
                       i + 1 === rank &&
                       e.score === uiScore &&
-                      e.name.toLowerCase() ===
-                        (playerName.trim() || "Player").toLowerCase();
+                      e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase();
                     return (
                       <div
                         key={`${e.createdAt}-${i}`}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono ${
-                          isYou
-                            ? "bg-accent-pink/10"
-                            : ""
+                        className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
+                          isYou ? "bg-accent-pink/10" : ""
                         }`}
                       >
-                        <span className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}>
+                        <span
+                          className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
+                        >
                           {i + 1}
                         </span>
                         <span
                           className={`flex-1 truncate ${
-                            isYou ? "text-accent-pink font-bold" : "text-white/90"
+                            isYou ? "font-bold text-accent-pink" : "text-white/90"
                           }`}
                         >
                           {e.name}
                         </span>
-                        <span className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}>{e.score}</span>
+                        <span
+                          className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
+                        >
+                          {e.score}
+                        </span>
                       </div>
                     );
                   })}
@@ -2710,7 +2576,7 @@ export function HextrisGame() {
             <button
               type="button"
               onClick={() => restartRef.current()}
-              className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 hover:bg-accent-pink/20 py-2.5 text-sm font-medium text-accent-pink transition-colors"
+              className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
             >
               Play again
             </button>

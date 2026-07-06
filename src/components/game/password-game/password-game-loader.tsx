@@ -13,17 +13,14 @@ import dynamic from "next/dynamic";
 // `ssr: false` is only allowed inside a Client Component, so this thin wrapper
 // exists to host it — the game page itself is a Server Component (it exports
 // `metadata`).
-const PasswordGame = dynamic(
-  () => import("./password-game").then((m) => m.PasswordGame),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-[420px] rounded-xl border border-(--border) bg-(--card) flex items-center justify-center">
-        <div className="text-(--muted) text-sm">Loading...</div>
-      </div>
-    ),
-  }
-);
+const PasswordGame = dynamic(() => import("./password-game").then((m) => m.PasswordGame), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[420px] w-full items-center justify-center rounded-xl border border-(--border) bg-(--card)">
+      <div className="text-sm text-(--muted)">Loading...</div>
+    </div>
+  ),
+});
 
 export function PasswordGameLoader() {
   return <PasswordGame />;

@@ -25,8 +25,8 @@ export function RuleCard({ rule, result, index, isActive, chaos = 0 }: Props) {
         passed
           ? "border-accent-green/30 bg-accent-green/5"
           : isActive
-          ? "border-accent-amber/60 bg-accent-amber/10 shadow-[0_0_0_1px_var(--accent-amber)]"
-          : "border-(--border) bg-(--card)"
+            ? "border-accent-amber/60 bg-accent-amber/10 shadow-[0_0_0_1px_var(--accent-amber)]"
+            : "border-(--border) bg-(--card)"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -38,8 +38,10 @@ export function RuleCard({ rule, result, index, isActive, chaos = 0 }: Props) {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-(--muted) mb-1">Rule {index + 1}</div>
-          <div className={`pg-rule-description text-sm ${passed ? "text-(--muted) line-through" : "text-(--foreground)"}`}>
+          <div className="mb-1 text-xs text-(--muted)">Rule {index + 1}</div>
+          <div
+            className={`pg-rule-description text-sm ${passed ? "text-(--muted) line-through" : "text-(--foreground)"}`}
+          >
             <RuleDescription text={rule.description} chaos={chaos} />
           </div>
           {result.message && !passed && (
@@ -58,7 +60,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     const flag = FLAGS.find((f) => f.country === flagMatch[1].trim());
     const before = text.slice(0, flagMatch.index);
     return (
-      <span className="inline-flex items-center gap-2 flex-wrap">
+      <span className="inline-flex flex-wrap items-center gap-2">
         <GlitchText text={before} chaos={chaos} />
         {flag && <FlagBadge flag={flag} />}
       </span>
@@ -70,7 +72,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     const sign = ZODIAC_SIGNS.find((s) => s.name === zodiacMatch[1]);
     const before = text.slice(0, zodiacMatch.index);
     return (
-      <span className="inline-flex items-center gap-2 flex-wrap">
+      <span className="inline-flex flex-wrap items-center gap-2">
         <GlitchText text={before} chaos={chaos} />
         {sign && (
           <span
@@ -101,7 +103,10 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const diceMatch = text.match(/\[\[DICE:(\d+(?:,\d+)*)\]\]/);
   if (diceMatch) {
     const before = text.slice(0, diceMatch.index);
-    const faces = diceMatch[1].split(",").map(Number).filter((n) => n >= 1 && n <= 6);
+    const faces = diceMatch[1]
+      .split(",")
+      .map(Number)
+      .filter((n) => n >= 1 && n <= 6);
     return (
       <>
         <GlitchText text={before} chaos={chaos} />
@@ -121,7 +126,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     return (
       <>
         <GlitchText text={before} chaos={chaos} />
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-(--background) border border-(--border) px-3 py-2 font-mono">
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-(--border) bg-(--background) px-3 py-2 font-mono">
           {[...bits].map((b, i) => (
             <span
               key={i}
@@ -156,7 +161,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   if (mixMatch) {
     const before = text.slice(0, mixMatch.index);
     return (
-      <span className="inline-flex items-center gap-2 flex-wrap">
+      <span className="inline-flex flex-wrap items-center gap-2">
         <GlitchText text={before} chaos={chaos} />
         <ColorMixBadge a={mixMatch[1]} b={mixMatch[2]} />
       </span>
@@ -168,7 +173,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
     const fraction = Number(moonMatch[1]);
     const before = text.slice(0, moonMatch.index);
     return (
-      <span className="inline-flex items-center gap-2 flex-wrap">
+      <span className="inline-flex flex-wrap items-center gap-2">
         <GlitchText text={before} chaos={chaos} />
         <MoonBadge fraction={fraction} />
       </span>
@@ -183,7 +188,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
       <>
         <GlitchText text={before} chaos={chaos} />
         {entry && (
-          <pre className="mt-2 inline-block rounded-md bg-(--background) border border-(--border) p-3 text-xs font-mono leading-tight whitespace-pre text-(--foreground)">
+          <pre className="mt-2 inline-block rounded-md border border-(--border) bg-(--background) p-3 font-mono text-xs leading-tight whitespace-pre text-(--foreground)">
             {entry.art.join("\n")}
           </pre>
         )}
@@ -256,7 +261,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   return (
     <>
       <GlitchText text={prose} chaos={chaos} />
-      <pre className="mt-2 rounded-md bg-(--background) border border-(--border) p-3 text-xs font-mono overflow-x-auto whitespace-pre text-(--foreground)">
+      <pre className="mt-2 overflow-x-auto rounded-md border border-(--border) bg-(--background) p-3 font-mono text-xs whitespace-pre text-(--foreground)">
         {code}
       </pre>
     </>
@@ -271,7 +276,7 @@ function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
     <span
       role="img"
       aria-label={`flag of ${flag.country}`}
-      className="inline-block align-middle rounded-sm border border-black/20"
+      className="inline-block rounded-sm border border-black/20 align-middle"
       style={{
         width: 40,
         height: 28,
@@ -284,14 +289,14 @@ function FlagBadge({ flag }: { flag: (typeof FLAGS)[number] }) {
 /** 3×3 magic square grid where one cell is shown as "?". */
 function MagicSquare({ cells }: { cells: readonly string[] }) {
   return (
-    <div className="mt-2 inline-grid grid-cols-3 gap-0.5 rounded-md bg-(--background) border border-(--border) p-2">
+    <div className="mt-2 inline-grid grid-cols-3 gap-0.5 rounded-md border border-(--border) bg-(--background) p-2">
       {cells.map((cell, i) => {
         const isBlank = cell === "?";
         return (
           <div
             key={i}
-            className={`flex items-center justify-center w-8 h-8 font-mono text-lg border border-(--border) ${
-              isBlank ? "bg-accent-amber/20 text-accent-amber font-bold" : "text-(--foreground)"
+            className={`flex h-8 w-8 items-center justify-center border border-(--border) font-mono text-lg ${
+              isBlank ? "bg-accent-amber/20 font-bold text-accent-amber" : "text-(--foreground)"
             }`}
           >
             {cell}
@@ -310,18 +315,12 @@ function ShapeGrid({ cells }: { cells: ReadonlyArray<"T" | "C" | "S"> }) {
     S: "#a78bfa",
   };
   return (
-    <div className="mt-2 inline-grid grid-cols-4 gap-1 rounded-md bg-(--background) border border-(--border) p-2">
+    <div className="mt-2 inline-grid grid-cols-4 gap-1 rounded-md border border-(--border) bg-(--background) p-2">
       {cells.map((shape, i) => (
         <svg key={i} width={24} height={24} viewBox="0 0 24 24" aria-hidden>
-          {shape === "T" && (
-            <polygon points="12,4 22,20 2,20" fill={COLORS.T} />
-          )}
-          {shape === "C" && (
-            <circle cx={12} cy={12} r={9} fill={COLORS.C} />
-          )}
-          {shape === "S" && (
-            <rect x={4} y={4} width={16} height={16} fill={COLORS.S} />
-          )}
+          {shape === "T" && <polygon points="12,4 22,20 2,20" fill={COLORS.T} />}
+          {shape === "C" && <circle cx={12} cy={12} r={9} fill={COLORS.C} />}
+          {shape === "S" && <rect x={4} y={4} width={16} height={16} fill={COLORS.S} />}
         </svg>
       ))}
     </div>
@@ -333,19 +332,59 @@ function DieFace({ value }: { value: number }) {
   // Pip grid: 3×3 cells. For each value, which cells are lit.
   const PIPS: Record<number, readonly [number, number][]> = {
     1: [[1, 1]],
-    2: [[0, 0], [2, 2]],
-    3: [[0, 0], [1, 1], [2, 2]],
-    4: [[0, 0], [0, 2], [2, 0], [2, 2]],
-    5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
-    6: [[0, 0], [1, 0], [2, 0], [0, 2], [1, 2], [2, 2]],
+    2: [
+      [0, 0],
+      [2, 2],
+    ],
+    3: [
+      [0, 0],
+      [1, 1],
+      [2, 2],
+    ],
+    4: [
+      [0, 0],
+      [0, 2],
+      [2, 0],
+      [2, 2],
+    ],
+    5: [
+      [0, 0],
+      [0, 2],
+      [1, 1],
+      [2, 0],
+      [2, 2],
+    ],
+    6: [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [0, 2],
+      [1, 2],
+      [2, 2],
+    ],
   };
   const size = 36;
   const padding = 5;
   const cell = (size - padding * 2) / 3;
   const lit = PIPS[value] ?? [];
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`die showing ${value}`} role="img">
-      <rect x={1} y={1} width={size - 2} height={size - 2} rx={5} fill="#f8fafc" stroke="#0f172a" strokeWidth={1.5} />
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      aria-label={`die showing ${value}`}
+      role="img"
+    >
+      <rect
+        x={1}
+        y={1}
+        width={size - 2}
+        height={size - 2}
+        rx={5}
+        fill="#f8fafc"
+        stroke="#0f172a"
+        strokeWidth={1.5}
+      />
       {lit.map(([r, c], i) => (
         <circle
           key={i}
@@ -362,10 +401,12 @@ function DieFace({ value }: { value: number }) {
 /** LED-style 7-segment HH:MM clock display. */
 function SevenSegClock({ hh, mm }: { hh: string; mm: string }) {
   return (
-    <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-[#0a0a0a] border border-(--border) px-3 py-2">
+    <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-(--border) bg-[#0a0a0a] px-3 py-2">
       <SevenSegDigit value={Number(hh[0])} />
       <SevenSegDigit value={Number(hh[1])} />
-      <span className="text-red-500 text-2xl font-bold leading-none" style={{ letterSpacing: 2 }}>:</span>
+      <span className="text-2xl leading-none font-bold text-red-500" style={{ letterSpacing: 2 }}>
+        :
+      </span>
       <SevenSegDigit value={Number(mm[0])} />
       <SevenSegDigit value={Number(mm[1])} />
     </div>
@@ -393,19 +434,19 @@ function SevenSegDigit({ value }: { value: number }) {
   return (
     <svg width={30} height={50} viewBox="0 0 30 50" aria-label={`digit ${value}`} role="img">
       {/* a: top */}
-      <rect x={6} y={2}  width={18} height={4} rx={1.5} fill={on("a")} />
+      <rect x={6} y={2} width={18} height={4} rx={1.5} fill={on("a")} />
       {/* f: top-left */}
-      <rect x={2} y={6}  width={4}  height={16} rx={1.5} fill={on("f")} />
+      <rect x={2} y={6} width={4} height={16} rx={1.5} fill={on("f")} />
       {/* b: top-right */}
-      <rect x={24} y={6} width={4}  height={16} rx={1.5} fill={on("b")} />
+      <rect x={24} y={6} width={4} height={16} rx={1.5} fill={on("b")} />
       {/* g: middle */}
-      <rect x={6} y={22} width={18} height={4}  rx={1.5} fill={on("g")} />
+      <rect x={6} y={22} width={18} height={4} rx={1.5} fill={on("g")} />
       {/* e: bottom-left */}
-      <rect x={2} y={28} width={4}  height={16} rx={1.5} fill={on("e")} />
+      <rect x={2} y={28} width={4} height={16} rx={1.5} fill={on("e")} />
       {/* c: bottom-right */}
       <rect x={24} y={28} width={4} height={16} rx={1.5} fill={on("c")} />
       {/* d: bottom */}
-      <rect x={6} y={44} width={18} height={4}  rx={1.5} fill={on("d")} />
+      <rect x={6} y={44} width={18} height={4} rx={1.5} fill={on("d")} />
     </svg>
   );
 }
@@ -469,7 +510,13 @@ function MoonBadge({ fraction }: { fraction: number }) {
   const overlayX = waxing ? cx - rx / 2 : cx + rx / 2;
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label="moon phase" role="img">
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      aria-label="moon phase"
+      role="img"
+    >
       {/* Dark disc — sky + shadow side */}
       <circle cx={cx} cy={cy} r={r} fill={SHADOW} />
       {/* Full moon special case */}
@@ -514,7 +561,13 @@ function PianoKeyboard({ highlight }: { highlight: number }) {
   whiteKeys.forEach((k, i) => (whiteIndexByOrder[k.order] = i));
   return (
     <div className="mt-2">
-      <svg width={svgW} height={whiteH} viewBox={`0 0 ${svgW} ${whiteH}`} aria-label="piano keyboard" role="img">
+      <svg
+        width={svgW}
+        height={whiteH}
+        viewBox={`0 0 ${svgW} ${whiteH}`}
+        aria-label="piano keyboard"
+        role="img"
+      >
         {whiteKeys.map((k, i) => {
           const isHi = k.order === highlight;
           return (
@@ -566,14 +619,14 @@ function ChessBoard({
 }) {
   return (
     <div className="mt-2">
-      <div className="inline-grid grid-cols-8 rounded-md border border-(--border) overflow-hidden bg-(--background) text-2xl leading-none font-mono">
+      <div className="inline-grid grid-cols-8 overflow-hidden rounded-md border border-(--border) bg-(--background) font-mono text-2xl leading-none">
         {board.flatMap((row, r) =>
           [...row].map((cell, c) => {
             const light = (r + c) % 2 === 0;
             return (
               <span
                 key={`${r}-${c}`}
-                className="flex items-center justify-center w-6 h-6"
+                className="flex h-6 w-6 items-center justify-center"
                 style={{
                   background: light ? "#e0e0c8" : "#7a8b50",
                   color: "#1a1a1a",
@@ -582,10 +635,12 @@ function ChessBoard({
                 {cell === "." ? "" : cell}
               </span>
             );
-          })
+          }),
         )}
       </div>
-      <div className="mt-1 text-xs text-(--muted)">{toMove} to move · {hint}</div>
+      <div className="mt-1 text-xs text-(--muted)">
+        {toMove} to move · {hint}
+      </div>
     </div>
   );
 }

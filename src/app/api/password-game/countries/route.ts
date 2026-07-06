@@ -24,13 +24,10 @@ interface CountryCapital {
 
 async function fetchAll(): Promise<CountryCapital[]> {
   try {
-    const res = await fetch(
-      "https://restcountries.com/v3.1/all?fields=name,capital",
-      {
-        headers: { "User-Agent": "password-game-portfolio/1.0" },
-        next: { revalidate: 60 * 60 * 24 * 7 },
-      }
-    );
+    const res = await fetch("https://restcountries.com/v3.1/all?fields=name,capital", {
+      headers: { "User-Agent": "password-game-portfolio/1.0" },
+      next: { revalidate: 60 * 60 * 24 * 7 },
+    });
     if (!res.ok) return [];
     const data: RestCountry[] = await res.json();
     if (!Array.isArray(data)) return [];
@@ -39,8 +36,10 @@ async function fetchAll(): Promise<CountryCapital[]> {
       const country = c.name?.common;
       const capital = c.capital?.[0];
       if (
-        typeof country === "string" && country.length > 0 &&
-        typeof capital === "string" && capital.length > 0
+        typeof country === "string" &&
+        country.length > 0 &&
+        typeof capital === "string" &&
+        capital.length > 0
       ) {
         out.push({ country, capital });
       }
@@ -64,6 +63,6 @@ export async function GET() {
       headers: {
         "cache-control": "public, s-maxage=604800, stale-while-revalidate=86400",
       },
-    }
+    },
   );
 }

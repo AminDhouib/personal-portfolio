@@ -11,7 +11,8 @@ const staticPosts: BlogPostMeta[] = [
   {
     slug: "5-apps-5-lessons",
     title: "5 Apps, 5 Lessons: What I Learned Shipping Products Nobody Asked For",
-    excerpt: "I built Shorty, uNotes, Caramel, UpUp, and GetItDone after nobody asked me to. Here's what each one taught me — and the one mistake I made with every single one of them.",
+    excerpt:
+      "I built Shorty, uNotes, Caramel, UpUp, and GetItDone after nobody asked me to. Here's what each one taught me — and the one mistake I made with every single one of them.",
     date: "2026-04-05",
     tags: ["products"],
     readingTime: "5 min read",
@@ -19,7 +20,8 @@ const staticPosts: BlogPostMeta[] = [
   {
     slug: "devsecops-pipeline",
     title: "My Full DevSecOps Pipeline: ESLint, knip, CodeRabbit, and Beyond",
-    excerpt: "Every tool in my CI/CD pipeline — from pre-commit hooks to AI-powered code review — and why each one earns its place.",
+    excerpt:
+      "Every tool in my CI/CD pipeline — from pre-commit hooks to AI-powered code review — and why each one earns its place.",
     date: "2026-04-01",
     tags: ["devops"],
     readingTime: "4 min read",
@@ -27,7 +29,8 @@ const staticPosts: BlogPostMeta[] = [
   {
     slug: "devino-solutions-lessons",
     title: "From $0 to $1M: What I Learned Building Devino Solutions",
-    excerpt: "Five years of lessons building a software studio — pricing, hiring, retention, and the moment I almost quit.",
+    excerpt:
+      "Five years of lessons building a software studio — pricing, hiring, retention, and the moment I almost quit.",
     date: "2026-03-25",
     tags: ["business"],
     readingTime: "4 min read",
@@ -39,11 +42,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
   return (
     <section id="blog" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          number="10"
-          title="Blog"
-          color="var(--color-accent-blue)"
-        />
+        <SectionHeading number="10" title="Blog" color="var(--color-accent-blue)" />
 
         <div className="space-y-0">
           {displayPosts.map((post, i) => (
@@ -56,14 +55,14 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
             >
               <Link
                 href={`/blog/${post.slug}`}
-                className="group flex items-start justify-between py-6 border-b border-(--border) transition-colors hover:border-accent-blue/30"
+                className="group flex items-start justify-between border-b border-(--border) py-6 transition-colors hover:border-accent-blue/30"
               >
                 <div>
-                  <h3 className="font-display text-lg font-bold tracking-tight group-hover:text-accent-blue transition-colors mb-1">
+                  <h3 className="mb-1 font-display text-lg font-bold tracking-tight transition-colors group-hover:text-accent-blue">
                     {post.title}
                   </h3>
                   {post.excerpt && (
-                    <p className="text-sm text-(--muted) mb-1.5 line-clamp-1">{post.excerpt}</p>
+                    <p className="mb-1.5 line-clamp-1 text-sm text-(--muted)">{post.excerpt}</p>
                   )}
                   <div className="flex items-center gap-3 text-xs text-(--muted)/60">
                     {post.date && <span>{formatRelativeDate(post.date)}</span>}
@@ -75,7 +74,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
                     )}
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-(--muted) group-hover:text-accent-blue group-hover:translate-x-1 transition-all mt-1" />
+                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-(--muted) transition-all group-hover:translate-x-1 group-hover:text-accent-blue" />
               </Link>
             </motion.div>
           ))}
@@ -90,7 +89,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
         >
           <Link
             href="/blog"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-blue hover:brightness-110 transition-all"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-blue transition-all hover:brightness-110"
           >
             View all posts
             <ArrowRight className="h-4 w-4" />

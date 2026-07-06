@@ -27,20 +27,13 @@ function WireframeShape({
     meshRef.current.rotation.y += delta * speed * 0.4 * boost;
 
     // Parallax on mouse
-    meshRef.current.position.x =
-      position[0] + pointer.x * 0.3;
-    meshRef.current.position.y =
-      position[1] + pointer.y * 0.2;
+    meshRef.current.position.x = position[0] + pointer.x * 0.3;
+    meshRef.current.position.y = position[1] + pointer.y * 0.2;
   });
 
   return (
     <mesh ref={meshRef} position={position} geometry={geometry}>
-      <meshBasicMaterial
-        color={color}
-        wireframe
-        transparent
-        opacity={0.15}
-      />
+      <meshBasicMaterial color={color} wireframe transparent opacity={0.15} />
     </mesh>
   );
 }
@@ -70,11 +63,11 @@ function Shapes({
 }) {
   const geometries = useMemo(
     () => ({
-      tetra:    new THREE.TetrahedronGeometry(1.1),      // 4 faces
-      pyramid3: new THREE.ConeGeometry(1, 1.5, 3),      // 4 faces
-      pyramid4: new THREE.ConeGeometry(1, 1.4, 4),      // 5 faces
+      tetra: new THREE.TetrahedronGeometry(1.1), // 4 faces
+      pyramid3: new THREE.ConeGeometry(1, 1.5, 3), // 4 faces
+      pyramid4: new THREE.ConeGeometry(1, 1.4, 4), // 5 faces
     }),
-    []
+    [],
   );
 
   return (
@@ -259,7 +252,7 @@ export function GeometricBackground() {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none">
+    <div className="pointer-events-none fixed inset-0 z-0">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 60 }}
         dpr={[1, 1.5]}

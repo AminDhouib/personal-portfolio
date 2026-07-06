@@ -6,24 +6,24 @@ import type { GameSlug } from "@/app/games/games-meta";
 
 function GameSkeleton() {
   return (
-    <div className="w-full h-[420px] rounded-xl border border-(--border) bg-(--card) flex items-center justify-center">
-      <div className="text-(--muted) text-sm">Loading game...</div>
+    <div className="flex h-[420px] w-full items-center justify-center rounded-xl border border-(--border) bg-(--card)">
+      <div className="text-sm text-(--muted)">Loading game...</div>
     </div>
   );
 }
 
-const TypingSpeedGame = dynamic(
-  () => import("./typing-speed").then((m) => m.TypingSpeedGame),
-  { ssr: false, loading: () => <GameSkeleton /> },
-);
-const SpaceShooterGame = dynamic(
-  () => import("./space-shooter").then((m) => m.SpaceShooterGame),
-  { ssr: false, loading: () => <GameSkeleton /> },
-);
-const HextrisGame = dynamic(
-  () => import("./hextris").then((m) => m.HextrisGame),
-  { ssr: false, loading: () => <GameSkeleton /> },
-);
+const TypingSpeedGame = dynamic(() => import("./typing-speed").then((m) => m.TypingSpeedGame), {
+  ssr: false,
+  loading: () => <GameSkeleton />,
+});
+const SpaceShooterGame = dynamic(() => import("./space-shooter").then((m) => m.SpaceShooterGame), {
+  ssr: false,
+  loading: () => <GameSkeleton />,
+});
+const HextrisGame = dynamic(() => import("./hextris").then((m) => m.HextrisGame), {
+  ssr: false,
+  loading: () => <GameSkeleton />,
+});
 const SuperVoltorbFlipGame = dynamic(
   () => import("./super-voltorb-flip").then((m) => m.SuperVoltorbFlipGame),
   { ssr: false, loading: () => <GameSkeleton /> },

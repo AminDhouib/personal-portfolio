@@ -34,9 +34,7 @@ export function pickResultTitle(input: TitleInput): string {
   const avgPerRule = input.timeSeconds / Math.max(1, input.rulesCleared);
   // Simple deterministic pick based on the input so the same run always
   // gets the same title (not true randomness here; avoids PRNG dependency).
-  const bucket = avgPerRule < 6 ? FAST_TITLES
-    : avgPerRule < 30 ? AVERAGE_TITLES
-    : SLOW_TITLES;
+  const bucket = avgPerRule < 6 ? FAST_TITLES : avgPerRule < 30 ? AVERAGE_TITLES : SLOW_TITLES;
   const idx = (input.tiers.reduce((a, b) => a + b, 0) + input.rulesCleared) % bucket.length;
   return bucket[idx];
 }

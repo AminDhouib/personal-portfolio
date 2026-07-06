@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
     );
   }
 

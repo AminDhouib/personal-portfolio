@@ -2,8 +2,8 @@ import type { RuleDef, TickResult } from "../types";
 
 interface PaulState {
   hatched: boolean;
-  hunger: number;        // 0-100
-  hatchAt: number;       // ms timestamp when hatching happens
+  hunger: number; // 0-100
+  hatchAt: number; // ms timestamp when hatching happens
   dead: boolean;
   firstSeen: number | null;
 }
@@ -27,7 +27,10 @@ export const paulRule: RuleDef = {
         const hasChicken = state.password.includes(CHICKEN);
         const isDead = state.password.includes(DEAD);
         if (isDead) return { passed: false, message: "Paul has starved." };
-        return { passed: hasEgg || hasChicken, message: hasEgg || hasChicken ? "Paul is safe" : "Paul is missing." };
+        return {
+          passed: hasEgg || hasChicken,
+          message: hasEgg || hasChicken ? "Paul is safe" : "Paul is missing.",
+        };
       },
       onTick(state, deltaMs, ruleStateRaw): TickResult | null {
         const ruleState = (ruleStateRaw ?? {
@@ -48,7 +51,12 @@ export const paulRule: RuleDef = {
         }
 
         // Hatch: replace egg with chicken.
-        if (!ruleState.hatched && ruleState.hatchAt > 0 && now >= ruleState.hatchAt && state.password.includes(EGG)) {
+        if (
+          !ruleState.hatched &&
+          ruleState.hatchAt > 0 &&
+          now >= ruleState.hatchAt &&
+          state.password.includes(EGG)
+        ) {
           const nextPassword = state.password.replace(EGG, CHICKEN);
           return {
             password: nextPassword,

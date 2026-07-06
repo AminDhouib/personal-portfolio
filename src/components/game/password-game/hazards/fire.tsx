@@ -24,7 +24,10 @@ export const fireRule: RuleDef = {
         const fireCount = [...state.password].filter((c) => c === FIRE).length;
         if (fireCount > maxFires) return { passed: false, message: "Your password burned up." };
         // Pass only when no fire remains AND the rule has ignited at least once.
-        return { passed: fireCount === 0, message: fireCount > 0 ? `${fireCount} ${FIRE} active` : "Fire out" };
+        return {
+          passed: fireCount === 0,
+          message: fireCount > 0 ? `${fireCount} ${FIRE} active` : "Fire out",
+        };
       },
       onTick(state, _deltaMs, ruleStateRaw): TickResult | null {
         const ruleState = (ruleStateRaw ?? {
@@ -52,7 +55,10 @@ export const fireRule: RuleDef = {
         }
 
         // Spread: on interval, pick a char adjacent to an existing fire.
-        if (ruleState.ignitedAt !== null && now - ruleState.lastSpreadAt >= ruleState.spreadInterval) {
+        if (
+          ruleState.ignitedAt !== null &&
+          now - ruleState.lastSpreadAt >= ruleState.spreadInterval
+        ) {
           const chars = [...state.password];
           const currentFires = chars.reduce((n, c) => n + (c === FIRE ? 1 : 0), 0);
           if (currentFires > 0 && currentFires <= ruleState.maxFires) {
@@ -60,7 +66,7 @@ export const fireRule: RuleDef = {
             const anchor = fireIndexes[Math.floor(Math.random() * fireIndexes.length)];
             // Try spreading left or right to a letter.
             const candidates = [anchor - 1, anchor + 1].filter(
-              (i) => i >= 0 && i < chars.length && /[a-zA-Z]/.test(chars[i])
+              (i) => i >= 0 && i < chars.length && /[a-zA-Z]/.test(chars[i]),
             );
             if (candidates.length > 0) {
               const target = candidates[Math.floor(Math.random() * candidates.length)];

@@ -11,33 +11,29 @@ export function Reviews() {
   const scrollReviews = [...reviews, ...reviews];
 
   return (
-    <section id="reviews" className="py-24 overflow-hidden">
+    <section id="reviews" className="overflow-hidden py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          number="06"
-          title="What Clients Say"
-          color="var(--color-accent-amber)"
-        />
+        <SectionHeading number="06" title="What Clients Say" color="var(--color-accent-amber)" />
       </div>
 
       {/* Auto-scrolling marquee */}
-      <div className="relative marquee-container">
-        <div className="flex gap-6 animate-marquee py-2">
+      <div className="marquee-container relative">
+        <div className="animate-marquee flex gap-6 py-2">
           {scrollReviews.map((review, i) => (
             <Link
               key={`${review.name}-${i}`}
               href="/reviews"
-              className="shrink-0 w-[340px] rounded-xl border border-(--border) bg-(--card) p-6 hover:border-(--muted)/30 transition-colors block"
+              className="block w-[340px] shrink-0 rounded-xl border border-(--border) bg-(--card) p-6 transition-colors hover:border-(--muted)/30"
             >
               {/* Stars */}
-              <div className="flex gap-0.5 mb-3">
+              <div className="mb-3 flex gap-0.5">
                 {Array.from({ length: review.rating }).map((_, s) => (
                   <Star key={s} className="h-3.5 w-3.5 fill-accent-amber text-accent-amber" />
                 ))}
               </div>
 
               {/* Quote */}
-              <p className="text-sm text-(--foreground) leading-relaxed mb-4 line-clamp-4">
+              <p className="mb-4 line-clamp-4 text-sm leading-relaxed text-(--foreground)">
                 &ldquo;{review.comment}&rdquo;
               </p>
 
@@ -69,25 +65,20 @@ export function Reviews() {
       </div>
 
       {/* Rating summary */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-10">
+      <div className="mx-auto mt-10 max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center gap-2">
           <div className="flex gap-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Star
-                key={i}
-                className="h-4 w-4 fill-accent-amber text-accent-amber"
-              />
+              <Star key={i} className="h-4 w-4 fill-accent-amber text-accent-amber" />
             ))}
           </div>
           <span className="text-sm font-semibold">5.0 avg</span>
-          <span className="text-sm text-(--muted)">
-            / 11 reviews
-          </span>
+          <span className="text-sm text-(--muted)">/ 11 reviews</span>
         </div>
-        <div className="flex items-center justify-center mt-4">
+        <div className="mt-4 flex items-center justify-center">
           <Link
             href="/reviews"
-            className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) hover:text-(--foreground) transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-medium text-(--muted) transition-colors hover:text-(--foreground)"
           >
             View all reviews
             <ArrowRight className="h-3.5 w-3.5" />

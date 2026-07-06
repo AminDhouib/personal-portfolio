@@ -5,7 +5,16 @@
  * button in the UI; until then, nothing plays.
  */
 
-type SfxKind = "rule-complete" | "rule-fail" | "rule-reveal" | "win" | "chaos" | "crack" | "rumble" | "unsatisfy" | "keypress";
+type SfxKind =
+  | "rule-complete"
+  | "rule-fail"
+  | "rule-reveal"
+  | "win"
+  | "chaos"
+  | "crack"
+  | "rumble"
+  | "unsatisfy"
+  | "keypress";
 
 let audioCtx: AudioContext | null = null;
 let enabled = false;
@@ -14,7 +23,9 @@ function ensureCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (audioCtx) return audioCtx;
   try {
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     audioCtx = new Ctor();
     return audioCtx;
@@ -107,7 +118,7 @@ function tone(
   freq: number,
   duration: number,
   type: OscillatorType,
-  volume: number
+  volume: number,
 ): void {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -144,7 +155,7 @@ function filteredNoise(
   ctx: AudioContext,
   duration: number,
   volume: number,
-  cutoffHz: number
+  cutoffHz: number,
 ): void {
   const bufferSize = Math.floor(ctx.sampleRate * duration);
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);

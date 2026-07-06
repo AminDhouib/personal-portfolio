@@ -28,20 +28,12 @@ const ciTools = [
 ];
 
 // Generate deterministic fallback contribution data
-const fallbackContributions: ContributionDay[] = Array.from(
-  { length: 364 },
-  (_, i) => {
-    const hash = ((i * 2654435761) >>> 0) / 4294967296;
-    const count = hash > 0.8 ? 8 : hash > 0.5 ? 4 : hash > 0.2 ? 1 : 0;
-    const level = (hash > 0.8 ? 4 : hash > 0.5 ? 2 : hash > 0.2 ? 1 : 0) as
-      | 0
-      | 1
-      | 2
-      | 3
-      | 4;
-    return { date: "", count, level };
-  }
-);
+const fallbackContributions: ContributionDay[] = Array.from({ length: 364 }, (_, i) => {
+  const hash = ((i * 2654435761) >>> 0) / 4294967296;
+  const count = hash > 0.8 ? 8 : hash > 0.5 ? 4 : hash > 0.2 ? 1 : 0;
+  const level = (hash > 0.8 ? 4 : hash > 0.5 ? 2 : hash > 0.2 ? 1 : 0) as 0 | 1 | 2 | 3 | 4;
+  return { date: "", count, level };
+});
 
 const levelColor: Record<0 | 1 | 2 | 3 | 4, string> = {
   0: "rgba(34,197,94,0.06)",
@@ -52,19 +44,25 @@ const levelColor: Record<0 | 1 | 2 | 3 | 4, string> = {
 };
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
-const WEEKDAYS = [
-  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
-];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // GitHub-style hover label, e.g. "3 contributions on Tuesday, June 17, 2025".
 function contributionLabel(day: ContributionDay): string {
   const phrase =
-    day.count === 0
-      ? "No contributions"
-      : `${day.count} contribution${day.count === 1 ? "" : "s"}`;
+    day.count === 0 ? "No contributions" : `${day.count} contribution${day.count === 1 ? "" : "s"}`;
   if (!day.date) return phrase;
   const [y, m, d] = day.date.split("-").map(Number);
   // Parse as UTC so the weekday/label never shifts by the viewer's timezone.
@@ -96,103 +94,96 @@ export function OpenSource({ stats, contributions }: Props) {
   return (
     <section id="opensource" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          number="04"
-          title="Open Source"
-          color="var(--color-accent-green)"
-        />
+        <SectionHeading number="04" title="Open Source" color="var(--color-accent-green)" />
 
         {/* OSS project cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-2">
           {projects.map((project, i) => {
             const Icon = project.icon ? iconMap[project.icon] : undefined;
             return (
-            <motion.a
-              key={project.name}
-              href={`https://github.com/${project.owner}/${project.repo}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-all hover:border-accent-green/30"
-            >
-              <div className="flex items-start gap-4 mb-4">
-                <div
-                  className="shrink-0 flex items-center justify-center"
-                  style={{ minHeight: 36, width: 56 }}
-                >
-                  {project.logo ? (
-                    <Image
-                      src={project.logo}
-                      alt={`${project.name} logo`}
-                      width={project.logoWidth ?? 56}
-                      height={project.logoHeight ?? 24}
-                      className="logo-tinted"
-                      style={{ width: 56, height: "auto" }}
-                    />
-                  ) : Icon ? (
-                    <span className="flex h-10 w-14 items-center justify-center rounded-lg border border-accent-green/20 bg-accent-green/10">
-                      <Icon
-                        className="h-5 w-5 text-accent-green"
-                        strokeWidth={2}
-                      />
-                    </span>
-                  ) : null}
-                </div>
-                <div>
-                  <h3 className="font-display text-lg font-bold tracking-tight">
-                    {project.name.toUpperCase()}
-                  </h3>
-                  <p className="text-sm text-(--muted)">{project.description}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6 mb-4">
-                <div className="flex items-center gap-1.5 text-sm text-(--muted)">
-                  <GitFork className="h-4 w-4" />
-                  <span>{project.forks.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-sm text-(--muted)">
-                  <Star className="h-4 w-4" />
-                  <span>{project.stars.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Tech stack */}
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                {project.tech.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 rounded-md border border-(--border) bg-(--surface) px-2 py-0.5 text-[11px] text-(--muted)"
+              <motion.a
+                key={project.name}
+                href={`https://github.com/${project.owner}/${project.repo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-all hover:border-accent-green/30"
+              >
+                <div className="mb-4 flex items-start gap-4">
+                  <div
+                    className="flex shrink-0 items-center justify-center"
+                    style={{ minHeight: 36, width: 56 }}
                   >
-                    <TechIcon name={t} />
-                  </span>
-                ))}
-              </div>
+                    {project.logo ? (
+                      <Image
+                        src={project.logo}
+                        alt={`${project.name} logo`}
+                        width={project.logoWidth ?? 56}
+                        height={project.logoHeight ?? 24}
+                        className="logo-tinted"
+                        style={{ width: 56, height: "auto" }}
+                      />
+                    ) : Icon ? (
+                      <span className="flex h-10 w-14 items-center justify-center rounded-lg border border-accent-green/20 bg-accent-green/10">
+                        <Icon className="h-5 w-5 text-accent-green" strokeWidth={2} />
+                      </span>
+                    ) : null}
+                  </div>
+                  <div>
+                    <h3 className="font-display text-lg font-bold tracking-tight">
+                      {project.name.toUpperCase()}
+                    </h3>
+                    <p className="text-sm text-(--muted)">{project.description}</p>
+                  </div>
+                </div>
 
-              <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green group-hover:gap-2 transition-all">
-                View on GitHub
-                <ArrowRight className="h-3.5 w-3.5" />
-              </div>
-            </motion.a>
+                <div className="mb-4 flex items-center gap-6">
+                  <div className="flex items-center gap-1.5 text-sm text-(--muted)">
+                    <GitFork className="h-4 w-4" />
+                    <span>{project.forks.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm text-(--muted)">
+                    <Star className="h-4 w-4" />
+                    <span>{project.stars.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Tech stack */}
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                  {project.tech.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 rounded-md border border-(--border) bg-(--surface) px-2 py-0.5 text-[11px] text-(--muted)"
+                    >
+                      <TechIcon name={t} />
+                    </span>
+                  ))}
+                </div>
+
+                <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green transition-all group-hover:gap-2">
+                  View on GitHub
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </div>
+              </motion.a>
             );
           })}
         </div>
 
         {/* GitHub Contribution Graph */}
         <motion.div
-          className="rounded-xl border border-(--border) bg-(--card) p-6 mb-8 overflow-x-auto"
+          className="mb-8 overflow-x-auto rounded-xl border border-(--border) bg-(--card) p-6"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <h3 className="text-sm font-semibold text-(--muted) mb-4 uppercase tracking-wider">
+          <h3 className="mb-4 text-sm font-semibold tracking-wider text-(--muted) uppercase">
             Contribution Graph
             {contributions?.length ? (
-              <span className="ml-2 text-accent-green/60 normal-case font-normal">
+              <span className="ml-2 font-normal text-accent-green/60 normal-case">
                 — live from GitHub
               </span>
             ) : null}
@@ -209,7 +200,7 @@ export function OpenSource({ stats, contributions }: Props) {
                 return (
                   <div
                     key={`${col}-${row}`}
-                    className="aspect-square rounded-sm min-w-[10px] cursor-pointer transition-shadow hover:ring-1 hover:ring-inset hover:ring-(--foreground)"
+                    className="aspect-square min-w-[10px] cursor-pointer rounded-sm transition-shadow hover:ring-1 hover:ring-(--foreground) hover:ring-inset"
                     style={{ backgroundColor: levelColor[day.level] }}
                     onMouseEnter={(e) => {
                       const r = e.currentTarget.getBoundingClientRect();
@@ -222,10 +213,10 @@ export function OpenSource({ stats, contributions }: Props) {
                     onMouseLeave={() => setTooltip(null)}
                   />
                 );
-              })
+              }),
             )}
           </div>
-          <div className="flex items-center gap-1.5 mt-3 justify-end">
+          <div className="mt-3 flex items-center justify-end gap-1.5">
             <span className="text-xs text-(--muted)">Less</span>
             {([0, 1, 2, 3, 4] as const).map((l) => (
               <div
@@ -240,7 +231,7 @@ export function OpenSource({ stats, contributions }: Props) {
             ? createPortal(
                 <div
                   role="tooltip"
-                  className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-full rounded-md border border-(--border) bg-(--surface) px-2.5 py-1.5 text-xs font-medium text-(--foreground) shadow-lg whitespace-nowrap"
+                  className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-full rounded-md border border-(--border) bg-(--surface) px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-(--foreground) shadow-lg"
                   style={{ left: tooltip.x, top: tooltip.y - 8 }}
                 >
                   {tooltip.text}
@@ -252,17 +243,13 @@ export function OpenSource({ stats, contributions }: Props) {
 
         {/* CI Stack */}
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <span className="text-xs text-(--muted) uppercase tracking-wider mr-2">
-            CI Stack:
-          </span>
+          <span className="mr-2 text-xs tracking-wider text-(--muted) uppercase">CI Stack:</span>
           {ciTools.map((tool) => (
             <span
               key={tool.name}
-              className="inline-flex items-center gap-1.5 rounded-full bg-(--surface) border border-(--border) px-3 py-1 text-xs text-(--muted)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-(--border) bg-(--surface) px-3 py-1 text-xs text-(--muted)"
             >
-              {tool.icon && (
-                <SiIcon slug={tool.icon} className="h-3 w-3" />
-              )}
+              {tool.icon && <SiIcon slug={tool.icon} className="h-3 w-3" />}
               {tool.name}
             </span>
           ))}

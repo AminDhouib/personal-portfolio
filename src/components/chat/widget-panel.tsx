@@ -81,15 +81,7 @@ function ChatActions({ pathname }: { pathname: string }) {
         required: false,
       },
     ],
-    handler: async ({
-      name,
-      email,
-      note,
-    }: {
-      name: string;
-      email: string;
-      note?: string;
-    }) => {
+    handler: async ({ name, email, note }: { name: string; email: string; note?: string }) => {
       try {
         const res = await fetch("/api/leads", {
           method: "POST",
@@ -180,8 +172,7 @@ export function ChatWidgetPanel({
         instructions={INSTRUCTIONS}
         labels={{
           title: "Amin AI",
-          initial:
-            "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
+          initial: "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
           placeholder: "Ask about Amin's projects, skills...",
         }}
         defaultOpen={Boolean(initiallyOpen)}

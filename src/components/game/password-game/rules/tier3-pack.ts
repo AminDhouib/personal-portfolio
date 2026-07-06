@@ -21,8 +21,20 @@ export const anagramRule: RuleDef = {
 };
 
 const REVERSE_WORDS = [
-  "hello", "world", "night", "today", "knife", "dream", "river", "magic",
-  "cloud", "storm", "music", "tiger", "piano", "ocean",
+  "hello",
+  "world",
+  "night",
+  "today",
+  "knife",
+  "dream",
+  "river",
+  "magic",
+  "cloud",
+  "storm",
+  "music",
+  "tiger",
+  "piano",
+  "ocean",
 ];
 
 export const reverseRule: RuleDef = {

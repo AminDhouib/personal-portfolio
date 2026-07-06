@@ -16,10 +16,19 @@ interface CounterProps {
   decimals?: number;
 }
 
-function Counter({ target, prefix = "", suffix = "", label, subtitle, color, inView, decimals = 0 }: CounterProps) {
+function Counter({
+  target,
+  prefix = "",
+  suffix = "",
+  label,
+  subtitle,
+  color,
+  inView,
+  decimals = 0,
+}: CounterProps) {
   const count = useMotionValue(0);
   const display = useTransform(count, (v) =>
-    decimals > 0 ? v.toFixed(decimals) : Math.round(v).toString()
+    decimals > 0 ? v.toFixed(decimals) : Math.round(v).toString(),
   );
 
   useEffect(() => {
@@ -34,21 +43,14 @@ function Counter({ target, prefix = "", suffix = "", label, subtitle, color, inV
 
   return (
     <div className="text-center">
-      <div className="font-display text-3xl sm:text-4xl font-black tracking-tight mb-1">
+      <div className="mb-1 font-display text-3xl font-black tracking-tight sm:text-4xl">
         {prefix}
         <motion.span>{display}</motion.span>
         {suffix}
       </div>
-      <div className="text-xs text-(--muted) uppercase tracking-wider mb-2">
-        {label}
-      </div>
-      <div
-        className="mx-auto h-0.5 w-10 rounded-full mb-2"
-        style={{ backgroundColor: color }}
-      />
-      <div className="text-[11px] text-(--muted)/70 leading-snug max-w-45 mx-auto">
-        {subtitle}
-      </div>
+      <div className="mb-2 text-xs tracking-wider text-(--muted) uppercase">{label}</div>
+      <div className="mx-auto mb-2 h-0.5 w-10 rounded-full" style={{ backgroundColor: color }} />
+      <div className="mx-auto max-w-45 text-[11px] leading-snug text-(--muted)/70">{subtitle}</div>
     </div>
   );
 }
@@ -99,10 +101,10 @@ export function ProofBar() {
   ];
 
   return (
-    <section ref={ref} className="py-20 border-y border-(--border)">
+    <section ref={ref} className="border-y border-(--border) py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8"
+          className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:grid-cols-5"
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
@@ -111,18 +113,18 @@ export function ProofBar() {
             <div key={m.label} className="flex flex-col items-center">
               {"isStar" in m && m.isStar ? (
                 <div className="text-center">
-                  <div className="font-display text-3xl sm:text-4xl font-black tracking-tight mb-1 flex items-center justify-center gap-1">
+                  <div className="mb-1 flex items-center justify-center gap-1 font-display text-3xl font-black tracking-tight sm:text-4xl">
                     5.0
                     <Star className="h-5 w-5 fill-accent-amber text-accent-amber" />
                   </div>
-                  <div className="text-xs text-(--muted) uppercase tracking-wider mb-2">
+                  <div className="mb-2 text-xs tracking-wider text-(--muted) uppercase">
                     {m.label}
                   </div>
                   <div
-                    className="mx-auto h-0.5 w-10 rounded-full mb-2"
+                    className="mx-auto mb-2 h-0.5 w-10 rounded-full"
                     style={{ backgroundColor: m.color }}
                   />
-                  <div className="text-[11px] text-(--muted)/70 leading-snug max-w-45 mx-auto">
+                  <div className="mx-auto max-w-45 text-[11px] leading-snug text-(--muted)/70">
                     {m.subtitle}
                   </div>
                 </div>
@@ -151,9 +153,7 @@ export function ProofBar() {
         >
           <div className="flex items-center gap-2 text-(--muted)">
             <Server className="h-4 w-4 shrink-0" />
-            <span className="text-sm">
-              Did you know this site runs on my home server?
-            </span>
+            <span className="text-sm">Did you know this site runs on my home server?</span>
           </div>
           <p className="text-xs text-(--muted)/60">
             Docker Swarm &nbsp;/&nbsp; Tailscale &nbsp;/&nbsp; Cloudflared

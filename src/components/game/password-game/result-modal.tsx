@@ -14,7 +14,11 @@ interface Props {
   onClose: () => void;
 }
 
-type SubmitState = { kind: "idle" } | { kind: "sending" } | { kind: "sent"; rank: number } | { kind: "error"; message: string };
+type SubmitState =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "sent"; rank: number }
+  | { kind: "error"; message: string };
 
 export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onClose }: Props) {
   const [name, setName] = useState("");
@@ -46,7 +50,10 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setSubmit({ kind: "error", message: (data as { error?: string }).error ?? "submit failed" });
+        setSubmit({
+          kind: "error",
+          message: (data as { error?: string }).error ?? "submit failed",
+        });
         return;
       }
       const data = (await res.json()) as { rank: number };
@@ -66,18 +73,18 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-md rounded-2xl border border-(--border) bg-(--card) p-6 shadow-2xl">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 text-(--muted) hover:text-(--foreground)"
+          className="absolute top-4 right-4 text-(--muted) hover:text-(--foreground)"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center gap-2 mb-4">
+        <div className="mb-4 flex items-center gap-2">
           <Trophy className="h-5 w-5 text-accent-amber" />
           <h2 className="font-display text-xl font-bold">{title}</h2>
         </div>
@@ -86,27 +93,27 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
           ref={canvasRef}
           width={600}
           height={360}
-          className="w-full rounded-lg border border-(--border) mb-4"
+          className="mb-4 w-full rounded-lg border border-(--border)"
         />
 
-        <div className="grid grid-cols-3 gap-3 text-center text-sm mb-4">
+        <div className="mb-4 grid grid-cols-3 gap-3 text-center text-sm">
           <div>
-            <div className="text-(--muted) text-xs">Time</div>
+            <div className="text-xs text-(--muted)">Time</div>
             <div className="font-mono font-bold">{formatTime(timeSeconds)}</div>
           </div>
           <div>
-            <div className="text-(--muted) text-xs">Rules</div>
+            <div className="text-xs text-(--muted)">Rules</div>
             <div className="font-mono font-bold">{rulesCleared}</div>
           </div>
           <div>
-            <div className="text-(--muted) text-xs">Difficulty</div>
+            <div className="text-xs text-(--muted)">Difficulty</div>
             <div className="font-mono font-bold">{"*".repeat(difficulty)}</div>
           </div>
         </div>
 
         {submit.kind !== "sent" ? (
           <div className="space-y-2">
-            <label className="flex gap-2 items-center">
+            <label className="flex items-center gap-2">
               <input
                 type="text"
                 value={name}
@@ -120,9 +127,13 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
                 type="button"
                 onClick={handleSubmit}
                 disabled={submit.kind === "sending"}
-                className="inline-flex items-center gap-1 rounded-md border border-accent-pink/50 bg-accent-pink/10 text-accent-pink px-3 py-2 text-sm font-medium hover:bg-accent-pink/20 disabled:opacity-60"
+                className="inline-flex items-center gap-1 rounded-md border border-accent-pink/50 bg-accent-pink/10 px-3 py-2 text-sm font-medium text-accent-pink hover:bg-accent-pink/20 disabled:opacity-60"
               >
-                {submit.kind === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {submit.kind === "sending" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
                 Submit
               </button>
             </label>
@@ -137,18 +148,18 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
           </div>
         )}
 
-        <div className="flex gap-2 mt-4">
+        <div className="mt-4 flex gap-2">
           <button
             type="button"
             onClick={handleDownload}
-            className="flex-1 inline-flex items-center justify-center gap-1 rounded-md border border-(--border) px-3 py-2 text-sm hover:bg-(--background)"
+            className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-(--border) px-3 py-2 text-sm hover:bg-(--background)"
           >
             <Download className="h-4 w-4" />
             Download card
           </button>
           <Link
             href="/games/password-game/leaderboard"
-            className="flex-1 inline-flex items-center justify-center gap-1 rounded-md border border-(--border) px-3 py-2 text-sm hover:bg-(--background)"
+            className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-(--border) px-3 py-2 text-sm hover:bg-(--background)"
           >
             <Trophy className="h-4 w-4" />
             Leaderboard
@@ -215,7 +226,13 @@ function drawCard(canvas: HTMLCanvasElement, d: DrawInput) {
   ctx.fillText("amindhou.com/games/password-game", w - 20, h - 20);
 }
 
-function drawStat(ctx: CanvasRenderingContext2D, label: string, value: string, x: number, y: number) {
+function drawStat(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+) {
   ctx.fillStyle = "#888888";
   ctx.font = "12px system-ui, sans-serif";
   ctx.textAlign = "left";

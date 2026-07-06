@@ -1,8 +1,25 @@
 // 6-letter common words. Kept short so anagram-guessing is tractable.
 export const ANAGRAM_WORDS: readonly string[] = Object.freeze([
-  "candle", "bridge", "guitar", "monkey", "rocket", "turtle", "winter", "silver",
-  "garden", "pencil", "window", "forest", "galaxy", "planet", "purple", "cookie",
-  "button", "hammer", "orange", "potato",
+  "candle",
+  "bridge",
+  "guitar",
+  "monkey",
+  "rocket",
+  "turtle",
+  "winter",
+  "silver",
+  "garden",
+  "pencil",
+  "window",
+  "forest",
+  "galaxy",
+  "planet",
+  "purple",
+  "cookie",
+  "button",
+  "hammer",
+  "orange",
+  "potato",
 ]);
 
 export function scramble(word: string, rng: () => number): string {

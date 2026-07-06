@@ -26,11 +26,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: [
-      "lucide-react",
-      "framer-motion",
-      "@radix-ui/react-dialog",
-    ],
+    optimizePackageImports: ["lucide-react", "framer-motion", "@radix-ui/react-dialog"],
   },
   async headers() {
     return [
@@ -41,9 +37,7 @@ const nextConfig: NextConfig = {
       {
         // Immutable cache for hashed Next.js static assets
         source: "/_next/static/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       {
         // Long-lived cache for public images/fonts

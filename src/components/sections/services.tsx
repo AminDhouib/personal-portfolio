@@ -11,11 +11,7 @@ export function Services() {
   return (
     <section id="services" className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading
-          number="05"
-          title="Services"
-          color="var(--color-accent-purple)"
-        />
+        <SectionHeading number="05" title="Services" color="var(--color-accent-purple)" />
 
         <div className="space-y-0">
           {services.map((service, i) => {
@@ -27,28 +23,23 @@ export function Services() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="group flex items-start gap-5 py-6 border-b border-(--border) last:border-b-0"
+                className="group flex items-start gap-5 border-b border-(--border) py-6 last:border-b-0"
               >
                 {/* Accent bar + icon */}
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex shrink-0 items-center gap-3">
                   <div
-                    className="w-0.5 h-10 rounded-full"
+                    className="h-10 w-0.5 rounded-full"
                     style={{ backgroundColor: service.accentColor }}
                   />
-                  <Icon
-                    className="h-5 w-5"
-                    style={{ color: service.accentColor }}
-                  />
+                  <Icon className="h-5 w-5" style={{ color: service.accentColor }} />
                 </div>
 
                 {/* Content */}
                 <div>
-                  <h3 className="font-display text-lg font-bold tracking-tight mb-1">
+                  <h3 className="mb-1 font-display text-lg font-bold tracking-tight">
                     {service.title}
                   </h3>
-                  <p className="text-sm text-(--muted) mb-1">
-                    {service.description}
-                  </p>
+                  <p className="mb-1 text-sm text-(--muted)">{service.description}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
                     {service.tools.map((tool) => (
                       <span key={tool} className="text-xs text-(--muted)/60">
@@ -74,7 +65,7 @@ export function Services() {
             href={BOOKING_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-green hover:brightness-110 transition-all"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-green transition-all hover:brightness-110"
           >
             Book a Call
             <ArrowRight className="h-4 w-4" />

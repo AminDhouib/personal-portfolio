@@ -17,13 +17,13 @@ interface MixPair {
 }
 
 const MIX_PAIRS: readonly MixPair[] = Object.freeze([
-  { a: "red",    b: "yellow", result: "orange" },
-  { a: "red",    b: "blue",   result: "purple" },
-  { a: "yellow", b: "blue",   result: "green" },
-  { a: "white",  b: "black",  result: "gray" },
-  { a: "red",    b: "white",  result: "pink" },
-  { a: "yellow", b: "red",    result: "orange" },
-  { a: "blue",   b: "yellow", result: "green" },
+  { a: "red", b: "yellow", result: "orange" },
+  { a: "red", b: "blue", result: "purple" },
+  { a: "yellow", b: "blue", result: "green" },
+  { a: "white", b: "black", result: "gray" },
+  { a: "red", b: "white", result: "pink" },
+  { a: "yellow", b: "red", result: "orange" },
+  { a: "blue", b: "yellow", result: "green" },
 ]);
 
 export const colorMixRule: RuleDef = {

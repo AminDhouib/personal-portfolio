@@ -94,8 +94,7 @@ export const projects: readonly Project[] = Object.freeze([
     logoHeight: 129,
     url: "https://unotes.net",
     isOSS: false,
-    contraUrl:
-      "https://contra.com/p/bve7Lces-nextjs-typescript-aws-u-notes",
+    contraUrl: "https://contra.com/p/bve7Lces-nextjs-typescript-aws-u-notes",
     mauFallback: 5000,
     gaPropertyDomain: "unotes.net",
     platforms: [
@@ -214,9 +213,7 @@ export const projects: readonly Project[] = Object.freeze([
     isOSS: false,
     mauFallback: 500,
     gaPropertyDomain: "nowgetitdone.com",
-    platforms: [
-      { name: "Web", icon: "globe", url: "https://nowgetitdone.com" },
-    ],
+    platforms: [{ name: "Web", icon: "globe", url: "https://nowgetitdone.com" }],
     techStack: ["Next.js", "TypeScript", "Prisma"],
     story: [
       "GetItDone came from managing multiple development teams at Devino Solutions. Between Jira, Slack standups, time trackers, and task boards, the overhead was killing productivity.",

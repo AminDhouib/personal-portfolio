@@ -39,7 +39,7 @@ export const bracketBalanceRule: RuleDef = {
       params: { min },
       validate(state) {
         const bracketCount = [...state.password].filter(
-          (c) => OPENS.has(c) || CLOSES.has(c)
+          (c) => OPENS.has(c) || CLOSES.has(c),
         ).length;
         return {
           passed: bracketsBalancedAndAtLeast(state.password, min),

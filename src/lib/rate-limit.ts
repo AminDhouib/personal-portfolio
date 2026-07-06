@@ -98,8 +98,7 @@ export function isSameOrigin(request: Request): boolean {
   }
   if (!originHost) return false;
 
-  const requestHost =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   if (requestHost && originHost === requestHost) return true;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;

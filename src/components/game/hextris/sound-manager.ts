@@ -19,10 +19,10 @@ export class HextrisSounds {
   // Each entry gives the sub-bass octave, bass root, and triad third/fifth
   // for the bar so we can build bass lines + lead lines with harmonic shape.
   private static readonly CHORD_PROGRESSION = [
-    { sub: 55, root: 110, third: 130.81, fifth: 164.81 },   // Am (A2, A2, C3, E3)
+    { sub: 55, root: 110, third: 130.81, fifth: 164.81 }, // Am (A2, A2, C3, E3)
     { sub: 43.65, root: 87.31, third: 110, fifth: 130.81 }, // F  (F1, F2, A2, C3)
-    { sub: 49, root: 98, third: 123.47, fifth: 146.83 },    // G  (G1, G2, B2, D3)
-    { sub: 55, root: 110, third: 130.81, fifth: 164.81 },   // Am return
+    { sub: 49, root: 98, third: 123.47, fifth: 146.83 }, // G  (G1, G2, B2, D3)
+    { sub: 55, root: 110, third: 130.81, fifth: 164.81 }, // Am return
   ];
 
   setEnabled(v: boolean) {
@@ -43,8 +43,7 @@ export class HextrisSounds {
     try {
       const Ctor =
         window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!Ctor) return;
       this.ctx = new Ctor();
       this.sfxGain = this.ctx.createGain();
@@ -60,12 +59,7 @@ export class HextrisSounds {
 
   // ─── SFX ────────────────────────────────────────────────
 
-  private playTone(
-    freq: number,
-    durationMs: number,
-    type: OscillatorType = "sine",
-    gain = 0.25,
-  ) {
+  private playTone(freq: number, durationMs: number, type: OscillatorType = "sine", gain = 0.25) {
     if (!this.enabled) return;
     this.ensureCtx();
     if (!this.ctx || !this.sfxGain) return;
@@ -195,7 +189,11 @@ export class HextrisSounds {
   destroy() {
     this.stopMusic();
     if (this.ctx) {
-      try { this.ctx.close(); } catch { /* ignore */ }
+      try {
+        this.ctx.close();
+      } catch {
+        /* ignore */
+      }
       this.ctx = null;
     }
   }
@@ -261,8 +259,7 @@ export class HextrisSounds {
       this.scheduleStepAt(this.currentStep, this.nextNoteTime);
       const secondsPer16th = 60 / this.tempo / 4;
       this.nextNoteTime += secondsPer16th;
-      this.currentStep =
-        (this.currentStep + 1) % HextrisSounds.PATTERN_LEN;
+      this.currentStep = (this.currentStep + 1) % HextrisSounds.PATTERN_LEN;
     }
     this.schedulerTimer = window.setTimeout(this.runScheduler, 25);
   };

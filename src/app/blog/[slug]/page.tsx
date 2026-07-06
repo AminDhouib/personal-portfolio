@@ -14,11 +14,7 @@ export async function generateStaticParams() {
   return getAllBlogSlugs().map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) return {};
@@ -33,11 +29,7 @@ const prettyCodeOptions: Options = {
   keepBackground: false,
 };
 
-export default async function BlogPostPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) notFound();
@@ -50,7 +42,7 @@ export default async function BlogPostPage({
         {/* Back link */}
         <Link
           href="/blog"
-          className="inline-flex items-center gap-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors mb-8"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Blog
@@ -58,15 +50,13 @@ export default async function BlogPostPage({
 
         {/* Header — full width */}
         <header className="mb-10 max-w-3xl">
-          <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight mb-4">
+          <h1 className="mb-4 font-display text-3xl font-black tracking-tight sm:text-4xl">
             {post.title}
           </h1>
           <div className="flex flex-wrap items-center gap-3 text-sm text-(--muted)">
             {post.date && (
-                    <span title={formatDate(post.date)}>
-                      {formatRelativeDate(post.date)}
-                    </span>
-                  )}
+              <span title={formatDate(post.date)}>{formatRelativeDate(post.date)}</span>
+            )}
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
               {post.readingTime}
@@ -78,7 +68,7 @@ export default async function BlogPostPage({
                   <Link
                     key={tag}
                     href={`/blog?tag=${encodeURIComponent(tag)}`}
-                    className="rounded-full bg-(--surface) border border-(--border) px-2.5 py-0.5 text-xs hover:border-accent-blue/30 hover:text-(--foreground) transition-colors"
+                    className="rounded-full border border-(--border) bg-(--surface) px-2.5 py-0.5 text-xs transition-colors hover:border-accent-blue/30 hover:text-(--foreground)"
                   >
                     {tag}
                   </Link>
@@ -115,10 +105,10 @@ export default async function BlogPostPage({
         </div>
 
         {/* Footer */}
-        <div className="mt-16 pt-8 border-t border-(--border) flex items-center justify-between">
+        <div className="mt-16 flex items-center justify-between border-t border-(--border) pt-8">
           <Link
             href="/blog"
-            className="inline-flex items-center gap-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
           >
             <ArrowLeft className="h-4 w-4" />
             All posts
@@ -129,4 +119,3 @@ export default async function BlogPostPage({
     </div>
   );
 }
-

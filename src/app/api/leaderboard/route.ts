@@ -42,7 +42,10 @@ const SCORE_CAP = 10_000_000;
 
 function sanitizeGame(raw: unknown): string {
   if (typeof raw !== "string") return "space-shooter";
-  const cleaned = raw.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 40);
   return cleaned.length > 0 ? cleaned : "space-shooter";
 }
 
@@ -95,14 +98,22 @@ export async function POST(req: Request) {
     name: store.sanitizeName(o.name),
     score,
     level,
-    seconds: typeof o.seconds === "number" && o.seconds >= 0 && o.seconds < 24 * 3600
-      ? Math.floor(o.seconds) : undefined,
-    kills: typeof o.kills === "number" && o.kills >= 0 && o.kills < 100_000
-      ? Math.floor(o.kills) : undefined,
-    distance: typeof o.distance === "number" && o.distance >= 0 && o.distance < 1_000_000
-      ? Math.floor(o.distance) : undefined,
-    region: typeof o.region === "string" && o.region.length > 0 && o.region.length <= 60
-      ? o.region.replace(/[\u0000-\u001f]/g, "").slice(0, 60) : undefined,
+    seconds:
+      typeof o.seconds === "number" && o.seconds >= 0 && o.seconds < 24 * 3600
+        ? Math.floor(o.seconds)
+        : undefined,
+    kills:
+      typeof o.kills === "number" && o.kills >= 0 && o.kills < 100_000
+        ? Math.floor(o.kills)
+        : undefined,
+    distance:
+      typeof o.distance === "number" && o.distance >= 0 && o.distance < 1_000_000
+        ? Math.floor(o.distance)
+        : undefined,
+    region:
+      typeof o.region === "string" && o.region.length > 0 && o.region.length <= 60
+        ? o.region.replace(/[\u0000-\u001f]/g, "").slice(0, 60)
+        : undefined,
     game: sanitizeGame(o.game),
     createdAt: new Date().toISOString(),
   };

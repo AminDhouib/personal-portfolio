@@ -2,13 +2,7 @@
 // src/utils/constants.ts — COLORS and LEVELS table (1:1).
 // ---------------------------------------------------------------------------
 
-export const COLORS: string[] = [
-  "#e77352",
-  "#5eae43",
-  "#efa539",
-  "#3194ff",
-  "#c872e7",
-];
+export const COLORS: string[] = ["#e77352", "#5eae43", "#efa539", "#3194ff", "#c872e7"];
 
 export type FlagValues = { 1: boolean; 2: boolean; 3: boolean; V: boolean };
 

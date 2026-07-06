@@ -14,16 +14,14 @@ export default function GamesPage() {
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm text-(--muted) hover:text-(--foreground) transition-colors mb-8"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <ArrowLeft className="h-4 w-4" />
           Back Home
         </Link>
 
-        <h1 className="font-display text-4xl font-black tracking-tight mb-2">
-          Games
-        </h1>
-        <p className="text-(--muted) mb-12">
+        <h1 className="mb-2 font-display text-4xl font-black tracking-tight">Games</h1>
+        <p className="mb-12 text-(--muted)">
           Mini-games using the same wireframe shapes from this site. Click / tap to play.
         </p>
 
@@ -34,4 +32,3 @@ export default function GamesPage() {
     </div>
   );
 }
-

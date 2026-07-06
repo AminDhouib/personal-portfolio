@@ -48,7 +48,15 @@ export const services: readonly Service[] = Object.freeze([
   {
     title: "SEO & Analytics",
     description: "Rank higher, track what matters",
-    tools: ["Google Analytics", "Google Search Console", "Google Tag Manager", "SEMrush", "Ahrefs", "Hotjar", "Lighthouse"],
+    tools: [
+      "Google Analytics",
+      "Google Search Console",
+      "Google Tag Manager",
+      "SEMrush",
+      "Ahrefs",
+      "Hotjar",
+      "Lighthouse",
+    ],
     icon: TrendingUp,
     accentColor: "var(--color-accent-pink)",
   },

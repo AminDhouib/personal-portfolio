@@ -1,6 +1,14 @@
 import * as THREE from "three";
 import type { GameRefs, Obstacle, BulletStyle, PowerUp } from "./types";
-import { ARENA_W, ARENA_H, SPAWN_Z, MAX_BULLETS, POWERUP_TYPES, nextId, isPowerUpActive } from "./types";
+import {
+  ARENA_W,
+  ARENA_H,
+  SPAWN_Z,
+  MAX_BULLETS,
+  POWERUP_TYPES,
+  nextId,
+  isPowerUpActive,
+} from "./types";
 import { difficulty, elapsedSeconds, unlockedVariants } from "./difficulty";
 import type { SoundManager } from "./sound-manager";
 
@@ -42,8 +50,16 @@ export function spawnObstacle(g: GameRefs): Obstacle {
   const aimAtPlayer = Math.random() < 0.35;
   let x: number, y: number;
   if (aimAtPlayer) {
-    x = THREE.MathUtils.clamp(g.shipX + (Math.random() - 0.5) * aimOffsetX * 2, -spawnHalfW, spawnHalfW);
-    y = THREE.MathUtils.clamp(g.shipY + (Math.random() - 0.5) * aimOffsetY * 2, -spawnHalfH, spawnHalfH);
+    x = THREE.MathUtils.clamp(
+      g.shipX + (Math.random() - 0.5) * aimOffsetX * 2,
+      -spawnHalfW,
+      spawnHalfW,
+    );
+    y = THREE.MathUtils.clamp(
+      g.shipY + (Math.random() - 0.5) * aimOffsetY * 2,
+      -spawnHalfH,
+      spawnHalfH,
+    );
   } else {
     x = (Math.random() - 0.5) * 2 * spawnHalfW;
     y = (Math.random() - 0.5) * 2 * spawnHalfH;
@@ -68,7 +84,7 @@ export function spawnObstacle(g: GameRefs): Obstacle {
     speed = baseSpeed * 0.55; // slow — gives the player time to dodge its shots
   } else if (variant === "zapper") {
     size = 0.6 + Math.random() * 0.2;
-    hp = 3;                   // tougher than shooter, incentivizes dodging
+    hp = 3; // tougher than shooter, incentivizes dodging
     speed = baseSpeed * 0.6;
   } else if (variant === "drone") {
     size = 0.5 + Math.random() * 0.15;
@@ -92,7 +108,8 @@ export function spawnObstacle(g: GameRefs): Obstacle {
   return {
     id: nextId(g),
     variant,
-    x, y,
+    x,
+    y,
     z: SPAWN_Z - Math.random() * 8,
     rx: Math.random() * Math.PI,
     ry: Math.random() * Math.PI,
@@ -100,8 +117,11 @@ export function spawnObstacle(g: GameRefs): Obstacle {
     rsx: (Math.random() - 0.5) * 1.8,
     rsy: (Math.random() - 0.5) * 1.8,
     rsz: (Math.random() - 0.5) * 1.8,
-    vx, vy, vz: speed,
-    size, hp,
+    vx,
+    vy,
+    vz: speed,
+    size,
+    hp,
     shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
     closestApproach: Infinity,
     brushed: false,
@@ -139,8 +159,8 @@ export function pickWallGapX(playerX: number, arenaW: number): number {
 // Z with a single gap. Forces the player to move into the gap — breaks the
 // "camp at the edge and let auto-fire clear everything" exploit.
 export function spawnWall(g: GameRefs) {
-  const WALL_COUNT = 6;           // 6 asteroid slots evenly spaced across ARENA_W
-  const ROWS = 3;                 // 3 stacked rows so the gap is a full-height Y column
+  const WALL_COUNT = 6; // 6 asteroid slots evenly spaced across ARENA_W
+  const ROWS = 3; // 3 stacked rows so the gap is a full-height Y column
   const gapX = pickWallGapX(g.shipX, ARENA_W);
   const slotWidth = ARENA_W / WALL_COUNT;
   const baseSpeed = 10 + difficulty(g) * 3;
@@ -153,7 +173,10 @@ export function spawnWall(g: GameRefs) {
   for (let i = 0; i < WALL_COUNT; i++) {
     const x = -ARENA_W / 2 + (i + 0.5) * slotWidth;
     const d = Math.abs(x - gapX);
-    if (d < gapBestDist) { gapBestDist = d; gapIndex = i; }
+    if (d < gapBestDist) {
+      gapBestDist = d;
+      gapIndex = i;
+    }
   }
   // Row Y positions span the full arena height: top, middle, bottom.
   const rowYs = [-ARENA_H / 3, 0, ARENA_H / 3];
@@ -174,12 +197,13 @@ export function spawnWall(g: GameRefs) {
         rsx: (Math.random() - 0.5) * 1.8,
         rsy: (Math.random() - 0.5) * 1.8,
         rsz: (Math.random() - 0.5) * 1.8,
-        vx: 0, vy: 0,
+        vx: 0,
+        vy: 0,
         vz: baseSpeed,
         size: 0.8,
         hp: 999, // wall pieces are bullet-immune (variant === "wall" skips
-                 // the collision), so HP is a no-op — high value avoids any
-                 // edge case where despawn logic might read it
+        // the collision), so HP is a no-op — high value avoids any
+        // edge case where despawn logic might read it
         shape: Math.floor(Math.random() * 3) as 0 | 1 | 2,
         closestApproach: Infinity,
         brushed: false,
@@ -193,9 +217,14 @@ export function spawnWall(g: GameRefs) {
 export function spawnCoin(g: GameRefs, x: number, y: number, z: number, value: number) {
   g.coins.push({
     id: nextId(g),
-    x, y, z,
-    rx: 0, ry: 0, rz: 0,
-    vx: 0, vy: 0,
+    x,
+    y,
+    z,
+    rx: 0,
+    ry: 0,
+    rz: 0,
+    vx: 0,
+    vy: 0,
     value,
   });
 }
@@ -208,7 +237,9 @@ export function spawnPowerUp(g: GameRefs): PowerUp {
     x: (Math.random() - 0.5) * (ARENA_W * 0.7),
     y: (Math.random() - 0.5) * (ARENA_H * 0.7),
     z: SPAWN_Z - 4,
-    rx: 0, ry: 0, rz: 0,
+    rx: 0,
+    ry: 0,
+    rz: 0,
   };
 }
 
@@ -234,10 +265,17 @@ export function fireBullets(g: GameRefs, now: number, sounds: SoundManager) {
   const make = (vx: number, sx: number, sizeMul = 1, hp = 1) => {
     g.bullets.push({
       id: nextId(g),
-      x: g.shipX + sx, y: g.shipY + 0.05, z: 1.5,
-      vx, vy: 0, vz: -55,
+      x: g.shipX + sx,
+      y: g.shipY + 0.05,
+      z: 1.5,
+      vx,
+      vy: 0,
+      vz: -55,
       size: baseSize * sizeMul,
-      damage: dmg, color, hp, style,
+      damage: dmg,
+      color,
+      hp,
+      style,
     });
   };
   if (isPowerUpActive(g, "mega")) {
@@ -253,20 +291,38 @@ export function fireBullets(g: GameRefs, now: number, sounds: SoundManager) {
   sounds.play("laser");
 }
 
-export function spawnExplosion(g: GameRefs, x: number, y: number, z: number, color: string, duration = 600, scale = 0.3) {
+export function spawnExplosion(
+  g: GameRefs,
+  x: number,
+  y: number,
+  z: number,
+  color: string,
+  duration = 600,
+  scale = 0.3,
+) {
   // Reduced-motion: drop ~80% of small cosmetic sparks (< 400ms duration).
   // Keep bigger, narratively important bursts (death, boss defeat) untouched.
   if (g.prefs.reducedMotion && duration < 400 && Math.random() > 0.2) return;
   g.explosions.push({
-    id: nextId(g), x, y, z,
+    id: nextId(g),
+    x,
+    y,
+    z,
     startedAt: performance.now(),
-    color, scale, opacity: 1, duration,
+    color,
+    scale,
+    opacity: 1,
+    duration,
   });
 }
 
 export function spawnScorePopup(g: GameRefs, x: number, y: number, z: number, amount: number) {
   g.scorePopups.push({
-    id: nextId(g), x, y, z, amount,
+    id: nextId(g),
+    x,
+    y,
+    z,
+    amount,
     spawnedAt: performance.now(),
     ttl: 1100,
   });
@@ -281,10 +337,15 @@ export function spawnShipDebris(g: GameRefs) {
   const baseVz = g.deathVelZ;
   const now = performance.now();
   const make = (
-    offsetX: number, offsetY: number, offsetZ: number,
+    offsetX: number,
+    offsetY: number,
+    offsetZ: number,
     color: string,
-    sx: number, sy: number, sz: number,
-    kickX: number, kickY: number,
+    sx: number,
+    sy: number,
+    sz: number,
+    kickX: number,
+    kickY: number,
   ) => {
     g.debris.push({
       id: nextId(g),
@@ -294,7 +355,9 @@ export function spawnShipDebris(g: GameRefs) {
       vx: baseVx + kickX,
       vy: baseVy + kickY,
       vz: baseVz * 0.7 + (Math.random() - 0.5) * 2,
-      rx: 0, ry: 0, rz: 0,
+      rx: 0,
+      ry: 0,
+      rz: 0,
       rsx: (Math.random() - 0.5) * 8,
       rsy: (Math.random() - 0.5) * 8,
       rsz: (Math.random() - 0.5) * 8,

@@ -41,7 +41,7 @@ function drawWireframeCircle(
   x: number,
   y: number,
   r: number,
-  color: string
+  color: string,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
@@ -56,7 +56,7 @@ function drawWireframeTriangle(
   y: number,
   size: number,
   rotation: number,
-  color: string
+  color: string,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
@@ -82,7 +82,7 @@ function drawWireframeDiamond(
   y: number,
   size: number,
   rotation: number,
-  color: string
+  color: string,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
@@ -104,7 +104,7 @@ function drawPlayerTriangle(
   x: number,
   y: number,
   size: number,
-  pulse: number
+  pulse: number,
 ) {
   const glowAlpha = 0.2 + Math.sin(pulse) * 0.1;
   // Glow
@@ -151,19 +151,22 @@ export function GeometricFlowGame() {
     return padding + (lane / (LANES - 1)) * usable;
   }, []);
 
-  const spawnShape = useCallback((canvas: HTMLCanvasElement) => {
-    const types: Shape["type"][] = ["circle", "triangle", "diamond"];
-    const lane = Math.floor(Math.random() * LANES);
-    shapesRef.current.push({
-      x: canvas.width + 60,
-      y: getLaneY(canvas, lane),
-      size: 22 + Math.random() * 16,
-      type: types[Math.floor(Math.random() * 3)],
-      speed: (180 + Math.random() * 80) * speedMultiplierRef.current,
-      rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 2,
-    });
-  }, [getLaneY]);
+  const spawnShape = useCallback(
+    (canvas: HTMLCanvasElement) => {
+      const types: Shape["type"][] = ["circle", "triangle", "diamond"];
+      const lane = Math.floor(Math.random() * LANES);
+      shapesRef.current.push({
+        x: canvas.width + 60,
+        y: getLaneY(canvas, lane),
+        size: 22 + Math.random() * 16,
+        type: types[Math.floor(Math.random() * 3)],
+        speed: (180 + Math.random() * 80) * speedMultiplierRef.current,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 2,
+      });
+    },
+    [getLaneY],
+  );
 
   const resetGame = useCallback(() => {
     const canvas = canvasRef.current;
@@ -215,7 +218,7 @@ export function GeometricFlowGame() {
       canvas.width * 0.3 + Math.sin(t) * 20,
       canvas.height * 0.4,
       28,
-      "rgba(6,182,212,0.35)"
+      "rgba(6,182,212,0.35)",
     );
     drawWireframeTriangle(
       ctx,
@@ -223,7 +226,7 @@ export function GeometricFlowGame() {
       canvas.height * 0.55 + Math.cos(t * 0.8) * 15,
       22,
       t * 0.5,
-      "rgba(99,102,241,0.35)"
+      "rgba(99,102,241,0.35)",
     );
     drawWireframeDiamond(
       ctx,
@@ -231,7 +234,7 @@ export function GeometricFlowGame() {
       canvas.height * 0.25,
       18,
       t * 0.7,
-      "rgba(167,139,250,0.35)"
+      "rgba(167,139,250,0.35)",
     );
   }
 
@@ -249,14 +252,10 @@ export function GeometricFlowGame() {
         ctx.setLineDash([]);
       }
     },
-    [getLaneY]
+    [getLaneY],
   );
 
-  function drawHUD(
-    ctx: CanvasRenderingContext2D,
-    canvas: HTMLCanvasElement,
-    gs: GameState
-  ) {
+  function drawHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gs: GameState) {
     ctx.fillStyle = "rgba(255,255,255,0.7)";
     ctx.font = "700 14px 'Space Grotesk', sans-serif";
     ctx.textAlign = "left";
@@ -267,11 +266,7 @@ export function GeometricFlowGame() {
     ctx.textAlign = "left";
   }
 
-  function drawDeadScreen(
-    ctx: CanvasRenderingContext2D,
-    canvas: HTMLCanvasElement,
-    gs: GameState
-  ) {
+  function drawDeadScreen(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gs: GameState) {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -285,7 +280,7 @@ export function GeometricFlowGame() {
     ctx.fillText(
       `Score: ${Math.floor(gs.score)}  |  Best: ${Math.floor(gs.highScore)}`,
       canvas.width / 2,
-      canvas.height / 2 + 2
+      canvas.height / 2 + 2,
     );
 
     ctx.fillStyle = "rgba(34,197,94,0.8)";
@@ -366,8 +361,7 @@ export function GeometricFlowGame() {
         // Draw shapes
         for (const s of shapesRef.current) {
           const shapeColor = "rgba(99,102,241,0.6)";
-          if (s.type === "circle")
-            drawWireframeCircle(ctx!, s.x, s.y, s.size, shapeColor);
+          if (s.type === "circle") drawWireframeCircle(ctx!, s.x, s.y, s.size, shapeColor);
           else if (s.type === "triangle")
             drawWireframeTriangle(ctx!, s.x, s.y, s.size, s.rotation, shapeColor);
           else drawWireframeDiamond(ctx!, s.x, s.y, s.size, s.rotation, shapeColor);
@@ -395,7 +389,7 @@ export function GeometricFlowGame() {
         ref={canvasRef}
         width={800}
         height={CANVAS_HEIGHT}
-        className="w-full rounded-xl border border-(--border) bg-(--card) cursor-pointer touch-none"
+        className="w-full cursor-pointer touch-none rounded-xl border border-(--border) bg-(--card)"
         style={{ maxHeight: CANVAS_HEIGHT }}
         onClick={handleInput}
         onTouchStart={(e) => {
@@ -404,7 +398,7 @@ export function GeometricFlowGame() {
         }}
       />
       {uiState.state === "idle" && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" />
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center" />
       )}
     </div>
   );

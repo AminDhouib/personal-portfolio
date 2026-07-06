@@ -30,7 +30,9 @@ describe("computeDifficultyRating", () => {
 
 describe("pickResultTitle", () => {
   it("returns a string title", () => {
-    expect(typeof pickResultTitle({ timeSeconds: 60, rulesCleared: 7, tiers: [1, 1, 2, 2] })).toBe("string");
+    expect(typeof pickResultTitle({ timeSeconds: 60, rulesCleared: 7, tiers: [1, 1, 2, 2] })).toBe(
+      "string",
+    );
   });
 
   it("gives different titles for very fast vs very slow runs", () => {

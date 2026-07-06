@@ -1,4 +1,5 @@
-export type SoundType = "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff" | "warp" | "purchase";
+export type SoundType =
+  "laser" | "boom" | "chime" | "crash" | "shieldOn" | "shieldOff" | "warp" | "purchase";
 
 export class SoundManager {
   private ctx: AudioContext | null = null;
@@ -6,10 +7,22 @@ export class SoundManager {
   private sfxEnabled = true;
   private musicEnabled = true;
   private lastPlay: Record<SoundType, number> = {
-    laser: 0, boom: 0, chime: 0, crash: 0, shieldOn: 0, shieldOff: 0, warp: 0, purchase: 0,
+    laser: 0,
+    boom: 0,
+    chime: 0,
+    crash: 0,
+    shieldOn: 0,
+    shieldOff: 0,
+    warp: 0,
+    purchase: 0,
   };
   // Sustained warp whoosh that loops while warp power-up is active
-  private warpLoop: { src: AudioBufferSourceNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode } | null = null;
+  private warpLoop: {
+    src: AudioBufferSourceNode;
+    gain: GainNode;
+    lfo?: OscillatorNode;
+    lfoGain?: GainNode;
+  } | null = null;
   // Music subsystem — only one track at a time, with crossfades.
   private music: {
     track: "gameplay" | "leaderboard";
@@ -37,14 +50,18 @@ export class SoundManager {
       return;
     }
     try {
-      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const Ctor =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new Ctor();
     } catch {
       this.ctx = null;
     }
   }
 
-  setSfxEnabled(v: boolean) { this.sfxEnabled = v; }
+  setSfxEnabled(v: boolean) {
+    this.sfxEnabled = v;
+  }
   setMusicEnabled(v: boolean) {
     this.musicEnabled = v;
     if (!v) this.stopMusic(0.2);
@@ -59,14 +76,30 @@ export class SoundManager {
     if (type === "laser" && now - this.lastPlay.laser < 70) return;
     this.lastPlay[type] = now;
     switch (type) {
-      case "laser": this.playLaser(); break;
-      case "boom": this.playBoom(); break;
-      case "chime": this.playChime(); break;
-      case "crash": this.playCrash(); break;
-      case "shieldOn": this.playShieldOn(); break;
-      case "shieldOff": this.playShieldOff(); break;
-      case "warp": this.playWarp(); break;
-      case "purchase": this.playPurchase(); break;
+      case "laser":
+        this.playLaser();
+        break;
+      case "boom":
+        this.playBoom();
+        break;
+      case "chime":
+        this.playChime();
+        break;
+      case "crash":
+        this.playCrash();
+        break;
+      case "shieldOn":
+        this.playShieldOn();
+        break;
+      case "shieldOff":
+        this.playShieldOff();
+        break;
+      case "warp":
+        this.playWarp();
+        break;
+      case "purchase":
+        this.playPurchase();
+        break;
     }
   }
 
@@ -140,7 +173,8 @@ export class SoundManager {
       const sd = 0.06;
       const sb = ctx.createBuffer(1, ctx.sampleRate * sd, ctx.sampleRate);
       const sdata = sb.getChannelData(0);
-      for (let k = 0; k < sdata.length; k++) sdata[k] = (Math.random() - 0.5) * 2 * Math.exp((-k / sdata.length) * 10);
+      for (let k = 0; k < sdata.length; k++)
+        sdata[k] = (Math.random() - 0.5) * 2 * Math.exp((-k / sdata.length) * 10);
       const ss = ctx.createBufferSource();
       ss.buffer = sb;
       const sf = ctx.createBiquadFilter();
@@ -264,7 +298,7 @@ export class SoundManager {
     crackFilt.type = "highpass";
     crackFilt.frequency.value = 1500;
     const crackGain = ctx.createGain();
-    crackGain.gain.setValueAtTime(0.10, t);
+    crackGain.gain.setValueAtTime(0.1, t);
     crackGain.gain.exponentialRampToValueAtTime(0.001, t + crackDur);
     crackSrc.connect(crackFilt).connect(crackGain).connect(ctx.destination);
     crackSrc.start(t);
@@ -442,8 +476,16 @@ export class SoundManager {
     gain.gain.setValueAtTime(gain.gain.value, t);
     gain.gain.linearRampToValueAtTime(0, t + 0.18);
     setTimeout(() => {
-      try { src.stop(); } catch { /* ignore */ }
-      try { lfo?.stop(); } catch { /* ignore */ }
+      try {
+        src.stop();
+      } catch {
+        /* ignore */
+      }
+      try {
+        lfo?.stop();
+      } catch {
+        /* ignore */
+      }
     }, 220);
     this.warpLoop = null;
   }
@@ -469,56 +511,56 @@ export class SoundManager {
     // "Hyperdrive" — Am, establish pulse
     {
       lead: [440, 0, 659.25, 880, 0, 659.25, 0, 440],
-      arp:  [440, 659.25, 880, 1318.5, 880, 659.25, 523.25, 329.63],
+      arp: [440, 659.25, 880, 1318.5, 880, 659.25, 523.25, 329.63],
       bass: [55, 55, 55, 55, 55, 55, 55, 55],
       leadType: "sawtooth",
     },
     // "Event Horizon" — F
     {
       lead: [349.23, 0, 523.25, 698.46, 0, 523.25, 0, 349.23],
-      arp:  [349.23, 523.25, 698.46, 1046.5, 698.46, 523.25, 440, 261.63],
+      arp: [349.23, 523.25, 698.46, 1046.5, 698.46, 523.25, 440, 261.63],
       bass: [43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65],
       leadType: "sawtooth",
     },
     // "Wormhole" — G
     {
       lead: [392, 0, 587.33, 784, 0, 587.33, 0, 392],
-      arp:  [392, 587.33, 784, 1174.66, 784, 587.33, 493.88, 293.66],
+      arp: [392, 587.33, 784, 1174.66, 784, 587.33, 493.88, 293.66],
       bass: [49, 49, 49, 49, 49, 49, 49, 49],
       leadType: "sawtooth",
     },
     // "Gravity Well" — Em
     {
       lead: [329.63, 0, 493.88, 659.25, 0, 493.88, 0, 329.63],
-      arp:  [329.63, 493.88, 659.25, 987.77, 659.25, 493.88, 392, 246.94],
+      arp: [329.63, 493.88, 659.25, 987.77, 659.25, 493.88, 392, 246.94],
       bass: [41.2, 41.2, 41.2, 41.2, 41.2, 41.2, 41.2, 41.2],
       leadType: "sawtooth",
     },
     // "Starfield Rush" — C, bright major uplift
     {
       lead: [523.25, 0, 784, 1046.5, 0, 784, 0, 523.25],
-      arp:  [523.25, 659.25, 784, 1046.5, 784, 659.25, 523.25, 392],
+      arp: [523.25, 659.25, 784, 1046.5, 784, 659.25, 523.25, 392],
       bass: [32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7],
       leadType: "sawtooth",
     },
     // "Reentry" — Dm
     {
       lead: [293.66, 0, 440, 587.33, 0, 440, 0, 293.66],
-      arp:  [293.66, 440, 587.33, 880, 587.33, 440, 349.23, 220],
+      arp: [293.66, 440, 587.33, 880, 587.33, 440, 349.23, 220],
       bass: [36.71, 36.71, 36.71, 36.71, 36.71, 36.71, 36.71, 36.71],
       leadType: "sawtooth",
     },
     // "Pulsar" — Am climax, lead octave up
     {
       lead: [880, 0, 1318.5, 1760, 0, 1318.5, 0, 880],
-      arp:  [880, 1046.5, 1318.5, 1760, 1318.5, 1046.5, 880, 659.25],
+      arp: [880, 1046.5, 1318.5, 1760, 1318.5, 1046.5, 880, 659.25],
       bass: [55, 55, 65.41, 65.41, 73.42, 73.42, 82.41, 82.41],
       leadType: "sawtooth",
     },
     // "Afterburner" — G → Am resolve
     {
       lead: [392, 440, 587.33, 659.25, 784, 880, 1318.5, 880],
-      arp:  [440, 523.25, 659.25, 880, 659.25, 523.25, 440, 329.63],
+      arp: [440, 523.25, 659.25, 880, 659.25, 523.25, 440, 329.63],
       bass: [49, 49, 49, 49, 55, 55, 55, 55],
       leadType: "sawtooth",
     },
@@ -533,35 +575,40 @@ export class SoundManager {
     // "Aftermath" — Am, slow synth pad
     {
       lead: [440, 0, 0, 659.25, 0, 523.25, 0, 440],
-      arp:  [440, 659.25, 880, 659.25, 0, 523.25, 440, 329.63],
+      arp: [440, 659.25, 880, 659.25, 0, 523.25, 440, 329.63],
       bass: [55, 55, 55, 55, 55, 55, 55, 55],
       leadType: "sawtooth",
     },
     // "Memory" — F
     {
       lead: [349.23, 0, 0, 523.25, 0, 440, 0, 349.23],
-      arp:  [349.23, 523.25, 698.46, 523.25, 0, 440, 349.23, 261.63],
+      arp: [349.23, 523.25, 698.46, 523.25, 0, 440, 349.23, 261.63],
       bass: [43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65, 43.65],
       leadType: "sawtooth",
     },
     // "Stars" — C, bright hopeful
     {
       lead: [523.25, 0, 0, 784, 0, 659.25, 0, 523.25],
-      arp:  [523.25, 659.25, 784, 659.25, 0, 523.25, 392, 261.63],
+      arp: [523.25, 659.25, 784, 659.25, 0, 523.25, 392, 261.63],
       bass: [32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7, 32.7],
       leadType: "sawtooth",
     },
     // "Home" — G → Am resolve
     {
       lead: [392, 0, 440, 0, 523.25, 0, 659.25, 440],
-      arp:  [392, 493.88, 587.33, 784, 587.33, 493.88, 392, 293.66],
+      arp: [392, 493.88, 587.33, 784, 587.33, 493.88, 392, 293.66],
       bass: [49, 49, 49, 49, 55, 55, 55, 55],
       leadType: "sawtooth",
     },
   ];
 
   // Drone pad node — a sustained low hum under the music
-  private dronePad: { osc1: OscillatorNode; osc2: OscillatorNode; lfo: OscillatorNode; gain: GainNode } | null = null;
+  private dronePad: {
+    osc1: OscillatorNode;
+    osc2: OscillatorNode;
+    lfo: OscillatorNode;
+    gain: GainNode;
+  } | null = null;
 
   startGameplayMusic() {
     if (!this.musicEnabled) return;
@@ -624,9 +671,21 @@ export class SoundManager {
     gain.gain.setValueAtTime(gain.gain.value, t);
     gain.gain.linearRampToValueAtTime(0, t + 0.5);
     setTimeout(() => {
-      try { osc1.stop(); } catch { /* */ }
-      try { osc2.stop(); } catch { /* */ }
-      try { lfo.stop(); } catch { /* */ }
+      try {
+        osc1.stop();
+      } catch {
+        /* */
+      }
+      try {
+        osc2.stop();
+      } catch {
+        /* */
+      }
+      try {
+        lfo.stop();
+      } catch {
+        /* */
+      }
     }, 600);
     this.dronePad = null;
   }
@@ -756,7 +815,10 @@ export class SoundManager {
         leadFilt.type = "lowpass";
         leadFilt.Q.value = 6;
         leadFilt.frequency.setValueAtTime(Math.min(leadF * 10, 12000), now);
-        leadFilt.frequency.exponentialRampToValueAtTime(Math.max(leadF * 2.2, 600), now + sustain * 0.6);
+        leadFilt.frequency.exponentialRampToValueAtTime(
+          Math.max(leadF * 2.2, 600),
+          now + sustain * 0.6,
+        );
         const leadGain = this.ctx.createGain();
         leadGain.gain.setValueAtTime(0, now);
         leadGain.gain.linearRampToValueAtTime(0.24, now + 0.01);
@@ -787,7 +849,7 @@ export class SoundManager {
         const harmGain = this.ctx.createGain();
         harmOsc.type = "sine";
         harmOsc.frequency.value = leadF * 1.5;
-        harmGain.gain.setValueAtTime(0.10, now);
+        harmGain.gain.setValueAtTime(0.1, now);
         harmGain.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.6);
         harmOsc.connect(harmGain).connect(masterGain);
         harmOsc.start(now);
@@ -947,9 +1009,16 @@ export class SoundManager {
     masterGain.gain.setValueAtTime(masterGain.gain.value, t);
     masterGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
     const g = masterGain;
-    setTimeout(() => {
-      try { g.disconnect(); } catch { /* ignore */ }
-    }, Math.max(40, fadeSec * 1000 + 60));
+    setTimeout(
+      () => {
+        try {
+          g.disconnect();
+        } catch {
+          /* ignore */
+        }
+      },
+      Math.max(40, fadeSec * 1000 + 60),
+    );
     this.music = null;
   }
 
@@ -960,7 +1029,7 @@ export class SoundManager {
     if (!this.ctx) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
-    const notes = [493.88, 392.00, 311.13]; // B4 → G4 → D#4 (sad descent)
+    const notes = [493.88, 392.0, 311.13]; // B4 → G4 → D#4 (sad descent)
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -978,7 +1047,11 @@ export class SoundManager {
     this.stopWarpLoop();
     this.stopMusic(0);
     if (this.ctx) {
-      try { this.ctx.close(); } catch { /* ignore */ }
+      try {
+        this.ctx.close();
+      } catch {
+        /* ignore */
+      }
       this.ctx = null;
     }
     this.enabled = false;
