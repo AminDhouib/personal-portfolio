@@ -113,7 +113,11 @@ function pickMissionsForDate(dateIso: string): MissionProgress[] {
   const pool = [...MISSION_POOL];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    const a = pool[i];
+    const b = pool[j];
+    if (!a || !b) continue; // i, j are always in bounds; guard never fires
+    pool[i] = b;
+    pool[j] = a;
   }
   return pool.slice(0, 3).map((m) => ({ id: m.id, progress: 0, claimed: false }));
 }

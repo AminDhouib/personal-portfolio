@@ -30,6 +30,7 @@ export function selectRulesForRun(
     let kept = 0;
     for (let i = 0; i < candidates.length && kept < count; i++) {
       const def = candidates[i];
+      if (!def) continue;
       const conflicts = def.conflictsWith ?? [];
       const hasConflict = conflicts.some((id) => pickedIds.has(id));
       if (hasConflict) continue;
@@ -52,7 +53,9 @@ export function validateRules(state: GameState): ValidationResult[] {
  */
 export function computeActiveRuleIndex(state: GameState): number {
   for (let i = 0; i < state.rules.length; i++) {
-    if (!state.rules[i].validate(state).passed) return i;
+    const rule = state.rules[i];
+    if (!rule) continue;
+    if (!rule.validate(state).passed) return i;
   }
   return -1;
 }

@@ -26,7 +26,11 @@ export function scramble(word: string, rng: () => number): string {
   const chars = [...word];
   for (let i = chars.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [chars[i], chars[j]] = [chars[j], chars[i]];
+    const ci = chars[i];
+    const cj = chars[j];
+    if (ci === undefined || cj === undefined) continue;
+    chars[i] = cj;
+    chars[j] = ci;
   }
   const scrambled = chars.join("");
   // If we happened to not scramble at all, just reverse as fallback.

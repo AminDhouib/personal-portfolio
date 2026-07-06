@@ -903,12 +903,12 @@ export function SpaceShooterGame() {
       updateTarget(e.clientX, e.clientY);
     };
     const onTouch = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        e.preventDefault();
-        ensureAudio();
-        tryUnpause();
-        updateTarget(e.touches[0].clientX, e.touches[0].clientY);
-      }
+      const touch = e.touches[0];
+      if (!touch) return;
+      e.preventDefault();
+      ensureAudio();
+      tryUnpause();
+      updateTarget(touch.clientX, touch.clientY);
     };
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerdown", onDown);
@@ -959,7 +959,8 @@ export function SpaceShooterGame() {
         const nextIdx = (currentIdx + 1) % bossIds.length;
         g.boss = null;
         g.bossProjectiles.length = 0;
-        spawnBoss(g, bossIds[nextIdx], 0);
+        // nextIdx is always a valid modulo of bossIds.length; fallback never fires.
+        spawnBoss(g, bossIds[nextIdx] ?? "sentinel", 0);
         return;
       }
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {

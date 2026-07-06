@@ -802,9 +802,10 @@ export class SoundManager {
       if (!this.ctx || !this.music || this.music.track !== track) return;
       const now = this.ctx.currentTime;
       const sec = cfg.sections[sectionIdx % cfg.sections.length];
+      if (!sec) return;
       const sectionStep = step % cfg.stepsPerSection;
-      const leadF = sec.lead[sectionStep % sec.lead.length];
-      const bassF = sec.bass[sectionStep % sec.bass.length];
+      const leadF = sec.lead[sectionStep % sec.lead.length] ?? 0;
+      const bassF = sec.bass[sectionStep % sec.bass.length] ?? 0;
       const dur = beatMs / 1000;
       // Lead — supersaw (3 detuned sawtooths) through a lowpass filter sweep.
       // Classic synthwave lead: bright attack → mellow tail, detuning gives
@@ -877,8 +878,8 @@ export class SoundManager {
           o.start(at);
           o.stop(at + dur * 0.55);
         };
-        const a1 = sec.arp[(step * 2) % arpLen];
-        const a2 = sec.arp[(step * 2 + 1) % arpLen];
+        const a1 = sec.arp[(step * 2) % arpLen] ?? 0;
+        const a2 = sec.arp[(step * 2 + 1) % arpLen] ?? 0;
         playArp(a1, now);
         playArp(a2, now + dur * 0.5);
       }

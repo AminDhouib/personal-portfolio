@@ -325,7 +325,7 @@ export function HextrisGame() {
     destroyedRef.current = false;
 
     // ─── GAME STATE ──────────────────────────────────────────
-    const colors = [...COLORS];
+    const colors = [...COLORS] as const;
 
     const settings = {
       startDist: 340,
@@ -428,6 +428,7 @@ export function HextrisGame() {
     function updateAndDrawShockwaves(dt: number) {
       for (let i = shockwaves.length - 1; i >= 0; i--) {
         const s = shockwaves[i];
+        if (!s) continue;
         s.age += dt;
         if (s.age >= s.maxAge) {
           shockwaves.splice(i, 1);
@@ -463,6 +464,7 @@ export function HextrisGame() {
     function updateAndDrawParticles(dt: number) {
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
+        if (!p) continue;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.vx *= 0.92;
@@ -533,7 +535,7 @@ export function HextrisGame() {
       dy: 0,
       dt: 1 as number,
       ct: 0,
-      blocks: [[], [], [], [], [], []] as Block[][],
+      blocks: [[], [], [], [], [], []] as [Block[], Block[], Block[], Block[], Block[], Block[]],
       texts: [] as TextObj[],
       shakes: [] as Shake[],
       lastCombo: -settings.comboTime,
@@ -568,8 +570,11 @@ export function HextrisGame() {
       });
       lane += mainHex.position;
       lane = ((lane % mainHex.sides) + mainHex.sides) % mainHex.sides;
-      block.distFromHex = hexSurfaceDist() + block.height * mainHex.blocks[lane].length;
-      mainHex.blocks[lane].push(block);
+      const attachLane = mainHex.blocks[lane];
+      if (attachLane) {
+        block.distFromHex = hexSurfaceDist() + block.height * attachLane.length;
+        attachLane.push(block);
+      }
       block.attachedLane = lane;
       block.checked = 1;
       if (gameState === 1) sounds.settle();
@@ -593,16 +598,17 @@ export function HextrisGame() {
             block.iter = 1.5 + (waveGen.difficulty / 15) * 3;
           }
         } else {
+          const prev = tArr[position - 1];
           if (
-            tArr[position - 1] &&
-            tArr[position - 1].settled &&
+            prev &&
+            prev.settled &&
             block.distFromHex -
               block.iter * mainHex.dt * settings.scale -
-              tArr[position - 1].distFromHex -
-              tArr[position - 1].height <=
+              prev.distFromHex -
+              prev.height <=
               0
           ) {
-            block.distFromHex = tArr[position - 1].distFromHex + tArr[position - 1].height;
+            block.distFromHex = prev.distFromHex + prev.height;
             block.settled = 1;
             block.checked = 1;
           } else {
@@ -616,9 +622,11 @@ export function HextrisGame() {
         lane += mainHex.position;
         lane = ((lane % mainHex.sides) + mainHex.sides) % mainHex.sides;
         const arr = mainHex.blocks[lane];
+        if (!arr) return;
 
         if (arr.length > 0) {
           const top = arr[arr.length - 1];
+          if (!top) return;
           if (
             block.distFromHex -
               block.iter * mainHex.dt * settings.scale -
@@ -669,7 +677,9 @@ export function HextrisGame() {
       gdx = 0;
       gdy = 0;
       for (let i = mainHex.shakes.length - 1; i >= 0; i--) {
-        hexShake(mainHex.shakes[i]);
+        const shake = mainHex.shakes[i];
+        if (!shake) continue;
+        hexShake(shake);
       }
 
       // Shortest-arc normalization so rapid rotations don't accumulate.
@@ -766,7 +776,11 @@ export function HextrisGame() {
         waveGen.ct++;
         waveGen.lastGen = waveGen.dt;
         const fv = randInt(0, mainHex.sides);
-        addNewBlock(fv, colors[randInt(0, colors.length)], 1.6 + (waveGen.difficulty / 15) * 3);
+        addNewBlock(
+          fv,
+          colors[randInt(0, colors.length)] ?? colors[0],
+          1.6 + (waveGen.difficulty / 15) * 3,
+        );
         if (waveGen.ct > 5) {
           const next = randInt(0, 24);
           if (next > 15) {
@@ -792,10 +806,14 @@ export function HextrisGame() {
     function wgDoubleGeneration() {
       if (waveGen.dt - waveGen.lastGen > waveGen.nextGen) {
         const i = randInt(0, mainHex.sides);
-        addNewBlock(i, colors[randInt(0, colors.length)], 1.5 + (waveGen.difficulty / 15) * 3);
+        addNewBlock(
+          i,
+          colors[randInt(0, colors.length)] ?? colors[0],
+          1.5 + (waveGen.difficulty / 15) * 3,
+        );
         addNewBlock(
           (i + 1) % mainHex.sides,
-          colors[randInt(0, colors.length)],
+          colors[randInt(0, colors.length)] ?? colors[0],
           1.5 + (waveGen.difficulty / 15) * 3,
         );
         waveGen.ct += 2;
@@ -810,13 +828,13 @@ export function HextrisGame() {
         if (dir) {
           addNewBlock(
             5 - (waveGen.ct % mainHex.sides),
-            colors[randInt(0, colors.length)],
+            colors[randInt(0, colors.length)] ?? colors[0],
             1.5 + (waveGen.difficulty / 15) * 1.5,
           );
         } else {
           addNewBlock(
             waveGen.ct % mainHex.sides,
-            colors[randInt(0, colors.length)],
+            colors[randInt(0, colors.length)] ?? colors[0],
             1.5 + (waveGen.difficulty / 15) * 1.5,
           );
         }
@@ -835,15 +853,17 @@ export function HextrisGame() {
         for (let i = 0; i < numColors; i++) {
           let q = randInt(0, colors.length);
           let attempts = 0;
-          while (colorList.includes(colors[q]) && attempts < 10) {
+          while (colorList.includes(colors[q] ?? colors[0]) && attempts < 10) {
             q = randInt(0, colors.length);
             attempts++;
           }
-          colorList.push(colors[q]);
+          colorList.push(colors[q] ?? colors[0]);
         }
 
         for (let i = 0; i < mainHex.sides; i++) {
-          addNewBlock(i, colorList[i % numColors], 1.5 + (waveGen.difficulty / 15) * 3);
+          const col = colorList[i % numColors];
+          if (!col) continue;
+          addNewBlock(i, col, 1.5 + (waveGen.difficulty / 15) * 3);
         }
         waveGen.ct += 15;
         waveGen.lastGen = waveGen.dt;
@@ -854,14 +874,16 @@ export function HextrisGame() {
     function wgHalfCircleGeneration() {
       if (waveGen.dt - waveGen.lastGen > (waveGen.nextGen + 500) / 2) {
         const numColors = randInt(1, 3);
-        const c = colors[randInt(0, colors.length)];
+        const c = colors[randInt(0, colors.length)] ?? colors[0];
         let colorList = [c, c, c];
         if (numColors === 2) {
-          colorList = [c, colors[randInt(0, colors.length)], c];
+          colorList = [c, colors[randInt(0, colors.length)] ?? colors[0], c];
         }
         const d = randInt(0, 6);
         for (let i = 0; i < 3; i++) {
-          addNewBlock((d + i) % 6, colorList[i], 1.5 + (waveGen.difficulty / 15) * 3);
+          const color = colorList[i];
+          if (!color) continue;
+          addNewBlock((d + i) % 6, color, 1.5 + (waveGen.difficulty / 15) * 3);
         }
         waveGen.ct += 8;
         waveGen.lastGen = waveGen.dt;
@@ -872,9 +894,10 @@ export function HextrisGame() {
     function wgCrosswiseGeneration() {
       if (waveGen.dt - waveGen.lastGen > waveGen.nextGen) {
         const ri = randInt(0, colors.length);
+        const color = colors[ri] ?? colors[0];
         const i = randInt(0, mainHex.sides);
-        addNewBlock(i, colors[ri], 0.6 + (waveGen.difficulty / 15) * 3);
-        addNewBlock((i + 3) % mainHex.sides, colors[ri], 0.6 + (waveGen.difficulty / 15) * 3);
+        addNewBlock(i, color, 0.6 + (waveGen.difficulty / 15) * 3);
+        addNewBlock((i + 3) % mainHex.sides, color, 0.6 + (waveGen.difficulty / 15) * 3);
         waveGen.ct += 1.5;
         waveGen.lastGen = waveGen.dt;
         wgShouldChangePattern(false);
@@ -925,7 +948,9 @@ export function HextrisGame() {
 
     function floodSearch(twoD: number[][], oneD: number[]): boolean {
       for (let i = 0; i < twoD.length; i++) {
-        if (twoD[i][0] === oneD[0] && twoD[i][1] === oneD[1]) return true;
+        const row = twoD[i];
+        if (!row) continue;
+        if (row[0] === oneD[0] && row[1] === oneD[1]) return true;
       }
       return false;
     }
@@ -971,7 +996,9 @@ export function HextrisGame() {
     }
 
     function consolidateBlocks(side: number, index: number) {
-      const startBlock = mainHex.blocks[side][index];
+      const startLane = mainHex.blocks[side];
+      const startBlock = startLane?.[index];
+      if (!startBlock) return;
       // If the chain-start is a rainbow block, try each color and pick
       // whichever produces the biggest match group.
       let deleting: number[][] = [];
@@ -991,13 +1018,18 @@ export function HextrisGame() {
       // Bomb explosions: if ANY block in the matched group is a bomb, add
       // every other non-deleted block on that bomb's side to the deletion set.
       const bombsToExplode: number[] = [];
-      for (const [s, i] of deleting) {
-        if (mainHex.blocks[s][i]?.special === "bomb") {
+      for (const pair of deleting) {
+        const s = pair[0];
+        const i = pair[1];
+        if (s === undefined || i === undefined) continue;
+        const laneS = mainHex.blocks[s];
+        if (laneS?.[i]?.special === "bomb") {
           if (!bombsToExplode.includes(s)) bombsToExplode.push(s);
         }
       }
       for (const s of bombsToExplode) {
         const laneBlocks = mainHex.blocks[s];
+        if (!laneBlocks) continue;
         // Find the first bomb on this side to anchor the shockwave + extra particles.
         let bombAnchor: Block | null = null;
         for (const b of laneBlocks) {
@@ -1019,7 +1051,9 @@ export function HextrisGame() {
           emitParticles(ax, ay, "#ef4444", 18);
         }
         for (let i = 0; i < laneBlocks.length; i++) {
-          if (laneBlocks[i].deleted === 0 && !floodSearch(deleting, [s, i])) {
+          const lb = laneBlocks[i];
+          if (!lb) continue;
+          if (lb.deleted === 0 && !floodSearch(deleting, [s, i])) {
             deleting.push([s, i]);
           }
         }
@@ -1027,10 +1061,16 @@ export function HextrisGame() {
 
       const deletedBlocks: Block[] = [];
       for (const arr of deleting) {
-        if (arr && arr.length === 2) {
-          mainHex.blocks[arr[0]][arr[1]].deleted = 1;
-          deletedBlocks.push(mainHex.blocks[arr[0]][arr[1]]);
-        }
+        if (arr.length !== 2) continue;
+        const s = arr[0];
+        const i = arr[1];
+        if (s === undefined || i === undefined) continue;
+        const lane = mainHex.blocks[s];
+        if (!lane) continue;
+        const blk = lane[i];
+        if (!blk) continue;
+        blk.deleted = 1;
+        deletedBlocks.push(blk);
       }
 
       // Scoring with combo. A match within ~30 ticks of the previous one is a
@@ -1072,18 +1112,20 @@ export function HextrisGame() {
       sounds.match(mainHex.comboMultiplier);
 
       const adder = deleting.length * deleting.length * mainHex.comboMultiplier;
+      const firstDeleted = deletedBlocks[0];
+      if (!firstDeleted) return;
       mainHex.texts.push({
         x: mainHex.x,
         y: mainHex.y,
         text: "+ " + adder,
-        color: deletedBlocks[0].color,
+        color: firstDeleted.color,
         opacity: 1,
         alive: 1,
       });
       // Prefer a non-special block's color for the combo timer. If the only
       // blocks in the group were special (rainbow/bomb), fall back to their
       // backing color.
-      const chainColorBlock = deletedBlocks.find((b) => !b.special) ?? deletedBlocks[0];
+      const chainColorBlock = deletedBlocks.find((b) => !b.special) ?? firstDeleted;
       mainHex.lastColorScored = chainColorBlock.color;
       score += adder;
       // Momentum: earn ~1.5 per block cleared, plus combo bonus. Caps at 100.
@@ -1099,7 +1141,9 @@ export function HextrisGame() {
       // pre-match so an empty board isn't a false positive.
       let livingCount = 0;
       for (let s = 0; s < 6; s++) {
-        for (const b of mainHex.blocks[s]) {
+        const sideBlocks = mainHex.blocks[s];
+        if (!sideBlocks) continue;
+        for (const b of sideBlocks) {
           if (b.deleted === 0) {
             livingCount++;
             break;
@@ -1137,7 +1181,9 @@ export function HextrisGame() {
       if (momentum < 100 || gameState !== 1) return;
       let purged = 0;
       for (let s = 0; s < 6; s++) {
-        for (const b of mainHex.blocks[s]) {
+        const sideBlocks = mainHex.blocks[s];
+        if (!sideBlocks) continue;
+        for (const b of sideBlocks) {
           if (b.deleted === 0) {
             b.deleted = 1;
             purged++;
@@ -1351,13 +1397,15 @@ export function HextrisGame() {
         ctx.shadowBlur = (18 + pulse * 8) * settings.scale;
       } else {
         // Normal: use tinted on the start-screen, glow during play
-        if (gameState === 0 && TINTED[block.color]) {
-          ctx.fillStyle = TINTED[block.color];
+        const tinted = TINTED[block.color];
+        if (gameState === 0 && tinted) {
+          ctx.fillStyle = tinted;
         } else {
           ctx.fillStyle = block.color;
         }
-        if (gameState !== 0 && GLOW[block.color]) {
-          ctx.shadowColor = GLOW[block.color];
+        const glow = GLOW[block.color];
+        if (gameState !== 0 && glow) {
+          ctx.shadowColor = glow;
           ctx.shadowBlur = 12 * settings.scale;
         }
       }
@@ -1408,7 +1456,7 @@ export function HextrisGame() {
       endVertex: number,
       fraction: number,
       offset: number,
-    ): number[][] {
+    ): [[number, number], [number, number]] {
       startVertex = (startVertex + offset) % 12;
       endVertex = (endVertex + offset) % 12;
 
@@ -1416,7 +1464,7 @@ export function HextrisGame() {
       const halfRadius = radius / 2;
       const triHeight = radius * (Math.sqrt(3) / 2);
 
-      const vertexes = [
+      const vertexes: [number, number][] = [
         [halfRadius, triHeight],
         [0, triHeight],
         [-halfRadius, triHeight],
@@ -1431,10 +1479,18 @@ export function HextrisGame() {
         [(halfRadius * 3) / 2, triHeight / 2],
       ];
 
-      const sx = trueCanvas.width / 2 + vertexes[startVertex][0];
-      const sy = trueCanvas.height / 2 + vertexes[startVertex][1];
-      const ex = trueCanvas.width / 2 + vertexes[endVertex][0];
-      const ey = trueCanvas.height / 2 + vertexes[endVertex][1];
+      const sv = vertexes[startVertex];
+      const ev = vertexes[endVertex];
+      if (!sv || !ev) {
+        return [
+          [0, 0],
+          [0, 0],
+        ];
+      }
+      const sx = trueCanvas.width / 2 + sv[0];
+      const sy = trueCanvas.height / 2 + sv[1];
+      const ex = trueCanvas.width / 2 + ev[0];
+      const ey = trueCanvas.height / 2 + ev[1];
 
       return [
         [sx, sy],
@@ -1442,7 +1498,7 @@ export function HextrisGame() {
       ];
     }
 
-    function drawTimerSide(vertexes: number[][][]) {
+    function drawTimerSide(vertexes: [[number, number], [number, number]][]) {
       if (gameState === 0) {
         ctx.strokeStyle = TINTED[mainHex.lastColorScored] || mainHex.lastColorScored;
       } else {
@@ -1450,18 +1506,22 @@ export function HextrisGame() {
       }
       ctx.lineWidth = 4 * settings.scale;
       ctx.beginPath();
-      ctx.moveTo(vertexes[0][0][0], vertexes[0][0][1]);
-      ctx.lineTo(vertexes[0][1][0], vertexes[0][1][1]);
+      const first = vertexes[0];
+      if (!first) return;
+      ctx.moveTo(first[0][0], first[0][1]);
+      ctx.lineTo(first[1][0], first[1][1]);
       for (let i = 1; i < vertexes.length; i++) {
-        ctx.lineTo(vertexes[i][1][0], vertexes[i][1][1]);
+        const seg = vertexes[i];
+        if (!seg) continue;
+        ctx.lineTo(seg[1][0], seg[1][1]);
       }
       ctx.stroke();
     }
 
     function drawTimer() {
       if (gameState !== 1) return;
-      const leftV: number[][][] = [];
-      const rightV: number[][][] = [];
+      const leftV: [[number, number], [number, number]][] = [];
+      const rightV: [[number, number], [number, number]][] = [];
 
       if (mainHex.ct - mainHex.lastCombo < settings.comboTime) {
         for (let i = 0; i < 6; i++) {
@@ -1485,11 +1545,15 @@ export function HextrisGame() {
 
     function isInfringing(): boolean {
       for (let i = 0; i < mainHex.sides; i++) {
+        const lane = mainHex.blocks[i];
+        if (!lane) continue;
         let subTotal = 0;
-        for (let j = 0; j < mainHex.blocks[i].length; j++) {
-          subTotal += mainHex.blocks[i][j].deleted ? 1 : 0;
+        for (let j = 0; j < lane.length; j++) {
+          const blk = lane[j];
+          if (!blk) continue;
+          subTotal += blk.deleted ? 1 : 0;
         }
-        if (mainHex.blocks[i].length - subTotal > settings.rows) {
+        if (lane.length - subTotal > settings.rows) {
           return true;
         }
       }
@@ -1522,32 +1586,41 @@ export function HextrisGame() {
 
       // 1. Check falling blocks for collision, move inward
       for (let i = 0; i < blocks.length; i++) {
-        hexDoesBlockCollide(blocks[i]);
-        if (!blocks[i].settled) {
-          if (!blocks[i].initializing) {
-            blocks[i].distFromHex -= blocks[i].iter * dt * settings.scale;
+        const b = blocks[i];
+        if (!b) continue;
+        hexDoesBlockCollide(b);
+        if (!b.settled) {
+          if (!b.initializing) {
+            b.distFromHex -= b.iter * dt * settings.scale;
           }
-        } else if (!blocks[i].removed) {
-          blocks[i].removed = 1;
+        } else if (!b.removed) {
+          b.removed = 1;
         }
       }
 
       // 2. Check settled blocks for matches
       for (let i = 0; i < mainHex.blocks.length; i++) {
-        for (let j = 0; j < mainHex.blocks[i].length; j++) {
-          if (mainHex.blocks[i][j].checked === 1) {
+        const lane = mainHex.blocks[i];
+        if (!lane) continue;
+        for (let j = 0; j < lane.length; j++) {
+          const blk = lane[j];
+          if (!blk) continue;
+          if (blk.checked === 1) {
             consolidateBlocks(i, j);
-            mainHex.blocks[i][j].checked = 0;
+            blk.checked = 0;
           }
         }
       }
 
       // 3. Remove fully deleted blocks
       for (let i = 0; i < mainHex.blocks.length; i++) {
+        const lane = mainHex.blocks[i];
+        if (!lane) continue;
         let lowestDeletedIndex = 99;
-        for (let j = 0; j < mainHex.blocks[i].length; j++) {
-          if (mainHex.blocks[i][j].deleted === 2) {
-            const block = mainHex.blocks[i][j];
+        for (let j = 0; j < lane.length; j++) {
+          const block = lane[j];
+          if (!block) continue;
+          if (block.deleted === 2) {
             // Spawn a burst of particles at the block's screen position
             const ang = (block.angle * Math.PI) / 180;
             const px =
@@ -1555,7 +1628,7 @@ export function HextrisGame() {
             const py =
               trueCanvas.height / 2 - Math.cos(ang) * (block.distFromHex + block.height / 2);
             emitParticles(px, py, block.color, 10);
-            mainHex.blocks[i].splice(j, 1);
+            lane.splice(j, 1);
             blockDestroyed();
             piecesCleared++;
             if (mainHex.comboMultiplier > maxComboSeen) {
@@ -1566,27 +1639,34 @@ export function HextrisGame() {
           }
         }
         // Unsettle blocks above deleted position
-        if (lowestDeletedIndex < mainHex.blocks[i].length) {
-          for (let j = lowestDeletedIndex; j < mainHex.blocks[i].length; j++) {
-            mainHex.blocks[i][j].settled = 0;
+        if (lowestDeletedIndex < lane.length) {
+          for (let j = lowestDeletedIndex; j < lane.length; j++) {
+            const above = lane[j];
+            if (!above) continue;
+            above.settled = 0;
           }
         }
       }
 
       // 4. Re-check settled blocks and move unsettled inward
       for (let i = 0; i < mainHex.blocks.length; i++) {
-        for (let j = 0; j < mainHex.blocks[i].length; j++) {
-          const block = mainHex.blocks[i][j];
-          hexDoesBlockCollide(block, j, mainHex.blocks[i]);
-          if (!mainHex.blocks[i][j].settled) {
-            mainHex.blocks[i][j].distFromHex -= block.iter * dt * settings.scale;
+        const lane = mainHex.blocks[i];
+        if (!lane) continue;
+        for (let j = 0; j < lane.length; j++) {
+          const block = lane[j];
+          if (!block) continue;
+          hexDoesBlockCollide(block, j, lane);
+          if (!block.settled) {
+            block.distFromHex -= block.iter * dt * settings.scale;
           }
         }
       }
 
       // 5. Clean up removed falling blocks
       for (let i = blocks.length - 1; i >= 0; i--) {
-        if (blocks[i].removed === 1) {
+        const b = blocks[i];
+        if (!b) continue;
+        if (b.removed === 1) {
           blocks.splice(i, 1);
         }
       }
@@ -1660,14 +1740,20 @@ export function HextrisGame() {
 
       // Draw settled blocks
       for (let i = 0; i < mainHex.blocks.length; i++) {
-        for (let j = 0; j < mainHex.blocks[i].length; j++) {
-          drawBlock(mainHex.blocks[i][j]);
+        const lane = mainHex.blocks[i];
+        if (!lane) continue;
+        for (let j = 0; j < lane.length; j++) {
+          const block = lane[j];
+          if (!block) continue;
+          drawBlock(block);
         }
       }
 
       // Draw falling blocks
       for (let i = 0; i < blocks.length; i++) {
-        drawBlock(blocks[i]);
+        const block = blocks[i];
+        if (!block) continue;
+        drawBlock(block);
       }
 
       // Draw shockwaves under particles (so particles read on top)
@@ -1707,6 +1793,7 @@ export function HextrisGame() {
       // Draw floating texts
       for (let i = mainHex.texts.length - 1; i >= 0; i--) {
         const t = mainHex.texts[i];
+        if (!t) continue;
         if (t.alive > 0) {
           ctx.globalAlpha = t.opacity;
           renderText(t.x + gdx, t.y + gdy, 30, t.color, t.text);
@@ -1833,11 +1920,13 @@ export function HextrisGame() {
             "#ec4899", // pink
           ];
           const color = palette[(currentCombo - 2) % palette.length];
-          setMilestone({
-            id: Date.now(),
-            text: `×${currentCombo} COMBO!`,
-            color,
-          });
+          if (color) {
+            setMilestone({
+              id: Date.now(),
+              text: `×${currentCombo} COMBO!`,
+              color,
+            });
+          }
         }
         lastSyncedCombo = currentCombo;
         setUiCombo(currentCombo);

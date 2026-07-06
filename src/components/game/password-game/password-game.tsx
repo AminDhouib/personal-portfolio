@@ -55,7 +55,7 @@ function fireRandomSurprise(): void {
   const glyphs = "!?#*█▓░◆⚠✦∎";
   const el = document.createElement("div");
   el.className = "pg-glyph-flash";
-  el.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+  el.textContent = glyphs[Math.floor(Math.random() * glyphs.length)] ?? "";
   root.appendChild(el);
   window.setTimeout(() => el.remove(), 360);
 }
@@ -268,10 +268,12 @@ export function PasswordGame() {
       const cards = containerRef.current?.querySelectorAll<HTMLElement>(".pg-rule-card");
       if (cards && cards.length > 0) {
         const newest = cards[cards.length - 1];
-        newest.classList.remove("pg-card-enter");
-        void newest.offsetWidth;
-        newest.classList.add("pg-card-enter");
-        window.setTimeout(() => newest.classList.remove("pg-card-enter"), 560);
+        if (newest) {
+          newest.classList.remove("pg-card-enter");
+          void newest.offsetWidth;
+          newest.classList.add("pg-card-enter");
+          window.setTimeout(() => newest.classList.remove("pg-card-enter"), 560);
+        }
       }
     }
     prevActive.current = activeIdx;
@@ -437,21 +439,25 @@ export function PasswordGame() {
         <div className="mt-1 text-xs text-(--muted)">{[...password].length} characters</div>
 
         <div className="mt-5 space-y-2">
-          {visibleRules.map((rule, i) => (
-            <div
-              key={`${rule.id}-${i}`}
-              className="pg-rule-card"
-              style={{ ["--pg-card-idx" as string]: i }}
-            >
-              <RuleCard
-                rule={rule}
-                result={visibleResults[i]}
-                index={i}
-                isActive={i === activeIdx}
-                chaos={chaosLevel}
-              />
-            </div>
-          ))}
+          {visibleRules.map((rule, i) => {
+            const result = visibleResults[i];
+            if (!result) return null;
+            return (
+              <div
+                key={`${rule.id}-${i}`}
+                className="pg-rule-card"
+                style={{ ["--pg-card-idx" as string]: i }}
+              >
+                <RuleCard
+                  rule={rule}
+                  result={result}
+                  index={i}
+                  isActive={i === activeIdx}
+                  chaos={chaosLevel}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {allPassed && (

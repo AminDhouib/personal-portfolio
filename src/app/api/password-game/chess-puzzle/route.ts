@@ -67,7 +67,9 @@ function fenToBoard(fen: string): string[] {
 function themeToHint(themes: readonly string[] | undefined): string {
   if (!themes || themes.length === 0) return "Find the best move.";
   const ordered = themes.slice().sort((a, b) => a.length - b.length);
-  const top = ordered[0]
+  const first = ordered[0];
+  if (!first) return "Find the best move.";
+  const top = first
     .replace(/([A-Z])/g, " $1")
     .replace(/^\s+/, "")
     .toLowerCase();
@@ -97,6 +99,7 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
     const replay = new Chess();
     for (let i = 0; i < puzzle.initialPly; i++) {
       const move = history[i];
+      if (!move) continue;
       replay.move({ from: move.from, to: move.to, promotion: move.promotion });
     }
 
@@ -107,6 +110,7 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
     // Convert the first UCI solution move into SAN, collecting every legal
     // notation variant so the validator accepts all common forms.
     const firstUci = puzzle.solution[0];
+    if (!firstUci) return null;
     const from = firstUci.slice(0, 2);
     const to = firstUci.slice(2, 4);
     const promotion = firstUci.length > 4 ? firstUci.slice(4) : undefined;

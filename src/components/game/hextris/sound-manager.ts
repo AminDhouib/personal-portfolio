@@ -297,6 +297,7 @@ export class HextrisSounds {
     const arp = [440, 523.25, 659.25, 523.25, 440, 523.25, 659.25, 784];
     if (step % 4 === 0) {
       const note = arp[(step / 4) % arp.length];
+      if (note === undefined) return; // provably never fires: index always in [0, arp.length)
       const osc = ctx.createOscillator();
       const env = ctx.createGain();
       osc.type = "triangle";
@@ -330,8 +331,8 @@ export class HextrisSounds {
       // Bar 4 Am — resolve with walk-down fill
       [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 2, 0, 1, 1, 0, 1],
     ];
-    const b = bassPatterns[bar][inBar];
-    if (b > 0) {
+    const b = bassPatterns[bar]?.[inBar];
+    if (chord && b !== undefined && b > 0) {
       const freq = b === 2 ? chord.fifth : chord.root;
       this.playMusicNote(freq, time, 0.16, "square", 0.12);
       this.playMusicNote(chord.sub, time, 0.12, "sine", 0.08);
@@ -364,8 +365,8 @@ export class HextrisSounds {
       // Bar 4 Am: A – C – E climax + E4 resolve
       [0, 0, 523.25, 0, 659.25, 0, 0, 784, 0, 659.25, 0, 587.33, 523.25, 0, 440, 329.63],
     ];
-    const lead = leadPatterns[bar][inBar];
-    if (lead > 0) {
+    const lead = leadPatterns[bar]?.[inBar];
+    if (lead !== undefined && lead > 0) {
       this.playMusicNote(lead, time, 0.11, "triangle", 0.07);
     }
 

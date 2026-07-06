@@ -59,6 +59,7 @@ export function TableOfContents({
       if (!el) return;
       const observer = new IntersectionObserver(
         ([entry]) => {
+          if (!entry) return;
           if (entry.isIntersecting) setActiveId(id);
         },
         { rootMargin: "-20% 0px -70% 0px" },

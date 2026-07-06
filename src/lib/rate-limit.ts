@@ -55,8 +55,13 @@ export function checkRateLimit(key: string, opts: RateLimitOptions): RateLimitRe
 
   if (hits.length >= opts.limit) {
     const oldest = hits[0];
+    const newest = hits[hits.length - 1];
+    // Unreachable: hits.length >= opts.limit (always >= 1 for real callers) means hits is non-empty.
+    if (oldest === undefined || newest === undefined) {
+      return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil(opts.windowMs / 1000)) };
+    }
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + opts.windowMs - now) / 1000));
-    buckets.set(key, { hits, expiresAt: hits[hits.length - 1] + opts.windowMs });
+    buckets.set(key, { hits, expiresAt: newest + opts.windowMs });
     return { allowed: false, retryAfterSeconds };
   }
 

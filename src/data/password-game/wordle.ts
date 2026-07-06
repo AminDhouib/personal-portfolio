@@ -4,7 +4,7 @@
  * local in-memory cache plus a deterministic offline fallback so rule
  * creation stays synchronous.
  */
-export const WORDLE_WORDS: readonly string[] = Object.freeze([
+export const WORDLE_WORDS: readonly [string, ...string[]] = Object.freeze([
   "FLAME",
   "GLINT",
   "BRAVE",
@@ -126,7 +126,7 @@ function fallbackOfTheDay(date: Date): string {
   const diff = date.getTime() - start;
   const day = Math.floor(diff / (1000 * 60 * 60 * 24));
   const idx = (day + y) % WORDLE_WORDS.length;
-  return WORDLE_WORDS[idx];
+  return WORDLE_WORDS[idx] ?? WORDLE_WORDS[0];
 }
 
 /** Today's word — real NYT answer when available, fallback otherwise. */

@@ -88,6 +88,7 @@ export function Navbar() {
 
       const observer = new IntersectionObserver(
         ([entry]) => {
+          if (!entry) return;
           if (entry.isIntersecting) setActiveSection(id);
         },
         { rootMargin: "-40% 0px -50% 0px" },

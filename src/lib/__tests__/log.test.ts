@@ -18,7 +18,9 @@ describe("logWarn / logError", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     logWarn("github", "fetchRepoStats failed");
     expect(spy).toHaveBeenCalledOnce();
-    const [line] = spy.mock.calls[0];
+    const call = spy.mock.calls[0];
+    if (!call) throw new Error("expected console.warn to have been called");
+    const [line] = call;
     expect(line).toContain("[github]");
     expect(line).toContain("fetchRepoStats failed");
     spy.mockRestore();
@@ -126,7 +128,9 @@ describe("captureException", () => {
       }),
     );
     expect(mockCaptureException).toHaveBeenCalledOnce();
-    const [capturedError, distinctId, properties] = mockCaptureException.mock.calls[0];
+    const call = mockCaptureException.mock.calls[0];
+    if (!call) throw new Error("expected captureException to have been called");
+    const [capturedError, distinctId, properties] = call;
     expect(capturedError).toBe(err);
     expect(distinctId).toBe("server");
     expect(properties).toMatchObject({ scope: "leaderboard" });

@@ -33,7 +33,9 @@ export function bulletDamage(g: GameRefs): number {
 export function spawnObstacle(g: GameRefs): Obstacle {
   const seconds = elapsedSeconds(g);
   const variants = unlockedVariants(seconds);
-  const variant = variants[Math.floor(Math.random() * variants.length)];
+  // unlockedVariants() always starts from ["basic"], so this is never empty
+  // and the fallback below never fires.
+  const variant = variants[Math.floor(Math.random() * variants.length)] ?? "basic";
 
   // Anti-camp: 35% of asteroids are loosely aimed at the player's wider
   // neighborhood (±3 X, ±2 Y), 65% uniform across the arena. The wider band
@@ -188,8 +190,9 @@ export function spawnWall(g: GameRefs) {
         id: nextId(g),
         variant: "wall",
         x,
-        // Small per-piece jitter so the rows don't look like a perfect grid
-        y: rowYs[r] + (Math.random() - 0.5) * 0.4,
+        // Small per-piece jitter so the rows don't look like a perfect grid.
+        // r < ROWS === rowYs.length always, so ?? 0 never fires.
+        y: (rowYs[r] ?? 0) + (Math.random() - 0.5) * 0.4,
         z: SPAWN_Z - r * 0.3, // minor Z stagger so bullets can pick through row-by-row
         rx: Math.random() * Math.PI,
         ry: Math.random() * Math.PI,
@@ -230,7 +233,8 @@ export function spawnCoin(g: GameRefs, x: number, y: number, z: number, value: n
 }
 
 export function spawnPowerUp(g: GameRefs): PowerUp {
-  const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+  // POWERUP_TYPES is a fixed non-empty literal, so this fallback never fires.
+  const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)] ?? "shield";
   return {
     id: nextId(g),
     type,

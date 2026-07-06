@@ -66,8 +66,11 @@ export function extractToc(content: string): TocEntry[] {
   const entries: TocEntry[] = [];
   let match: RegExpExecArray | null;
   while ((match = headingRe.exec(content)) !== null) {
-    const level = match[1].length as 2 | 3;
-    const text = match[2].trim();
+    const marker = match[1];
+    const heading = match[2];
+    if (!marker || !heading) continue;
+    const level = marker.length as 2 | 3;
+    const text = heading.trim();
     const id = text
       .toLowerCase()
       .replace(/[^\w\s-]/g, "")

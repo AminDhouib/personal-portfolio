@@ -14,7 +14,7 @@ export interface ZodiacSign {
 
 const TEXT_VS = "\uFE0E";
 
-export const ZODIAC_SIGNS: readonly ZodiacSign[] = Object.freeze([
+export const ZODIAC_SIGNS: readonly [ZodiacSign, ...ZodiacSign[]] = Object.freeze([
   { name: "Capricorn", glyph: `\u2651${TEXT_VS}`, startMonth: 12, startDay: 22 },
   { name: "Aquarius", glyph: `\u2652${TEXT_VS}`, startMonth: 1, startDay: 20 },
   { name: "Pisces", glyph: `\u2653${TEXT_VS}`, startMonth: 2, startDay: 19 },
@@ -38,7 +38,7 @@ export function zodiacForDate(date: Date = new Date()): ZodiacSign {
   for (const sign of ZODIAC_SIGNS) {
     const { startMonth: sm, startDay: sd } = sign;
     const nextIdx = (ZODIAC_SIGNS.indexOf(sign) + 1) % ZODIAC_SIGNS.length;
-    const next = ZODIAC_SIGNS[nextIdx];
+    const next = ZODIAC_SIGNS[nextIdx] ?? ZODIAC_SIGNS[0];
     const afterStart = m > sm || (m === sm && d >= sd);
     const beforeNext = m < next.startMonth || (m === next.startMonth && d < next.startDay);
     // Capricorn's range wraps across the year boundary.

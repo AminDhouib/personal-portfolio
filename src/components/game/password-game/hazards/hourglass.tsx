@@ -49,12 +49,15 @@ export const hourglassRule: RuleDef = {
         const chars = [...state.password];
         const vowelIdx: number[] = [];
         for (let i = 0; i < chars.length; i++) {
-          if (VOWEL_RE.test(chars[i])) vowelIdx.push(i);
+          const ch = chars[i];
+          if (ch === undefined) continue;
+          if (VOWEL_RE.test(ch)) vowelIdx.push(i);
         }
         if (vowelIdx.length === 0) {
           return { ruleState: { ...rs, lastCorruptionAt: now } };
         }
         const pick = vowelIdx[Math.floor(Math.random() * vowelIdx.length)];
+        if (pick === undefined) return null;
         chars[pick] = "_";
         return {
           password: chars.join(""),

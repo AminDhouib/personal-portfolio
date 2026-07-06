@@ -45,7 +45,7 @@ const noLetter: RuleDef = {
   id: "no-letter",
   tier: 5,
   create(rng) {
-    const letter = BAD_LETTERS[rangeInt(rng, 0, BAD_LETTERS.length - 1)];
+    const letter = BAD_LETTERS[rangeInt(rng, 0, BAD_LETTERS.length - 1)] ?? "";
     return {
       id: "no-letter",
       tier: 5,

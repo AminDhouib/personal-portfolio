@@ -65,6 +65,7 @@ function contributionLabel(day: ContributionDay): string {
     day.count === 0 ? "No contributions" : `${day.count} contribution${day.count === 1 ? "" : "s"}`;
   if (!day.date) return phrase;
   const [y, m, d] = day.date.split("-").map(Number);
+  if (y === undefined || m === undefined || d === undefined) return phrase;
   // Parse as UTC so the weekday/label never shifts by the viewer's timezone.
   const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   return `${phrase} on ${weekday}, ${MONTHS[m - 1]} ${d}, ${y}`;

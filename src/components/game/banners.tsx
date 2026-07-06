@@ -276,7 +276,7 @@ function HextrisBanner() {
   const BLOCK_H = 6.5;
   // Slot 0 centers half-a-block out from the face; each next slot stacks
   // one block-height further out.
-  const SLOT_R = [
+  const SLOT_R: [number, number, number] = [
     APOTHEM + BLOCK_H / 2,
     APOTHEM + BLOCK_H / 2 + BLOCK_H,
     APOTHEM + BLOCK_H / 2 + 2 * BLOCK_H,
@@ -286,8 +286,8 @@ function HextrisBanner() {
   // Keyframe times normalized to CYCLE. Three blocks fall sequentially,
   // land in order, pop+clear, then a buffer + hex rotation closes the cycle.
   //   drops (0.00 → 0.60)  clear (0.60 → 0.70)  buffer+rotation (0.70 → 1.0)
-  const t_release = [0.001, 0.18, 0.36];
-  const t_landed = [0.18, 0.36, 0.54];
+  const t_release: [number, number, number] = [0.001, 0.18, 0.36];
+  const t_landed: [number, number, number] = [0.18, 0.36, 0.54];
   const t_rest_end = 0.58;
   const t_pop = 0.62;
   const t_clear = 0.7;
@@ -357,7 +357,7 @@ function HextrisBanner() {
   // transform on the group.
   const renderBlock = (
     angleDeg: number,
-    slot: number,
+    slot: 0 | 1 | 2,
     color: string,
     delay: number,
     key: string,
@@ -458,7 +458,7 @@ function HextrisBanner() {
           />
           {/* Three faces running the full match-and-clear cycle */}
           {faces.flatMap((f) =>
-            [0, 1, 2].map((slot) =>
+            ([0, 1, 2] as const).map((slot) =>
               renderBlock(f.angleDeg, slot, f.color, f.delay, `${f.angleDeg}-${slot}`),
             ),
           )}

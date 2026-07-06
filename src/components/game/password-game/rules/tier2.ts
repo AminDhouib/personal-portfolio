@@ -24,7 +24,7 @@ const natoPhonetic: RuleDef = {
   tier: 2,
   create(rng) {
     const letter = pickOne(rng, NATO_LETTERS);
-    const word = NATO_ALPHABET[letter];
+    const word = NATO_ALPHABET[letter] ?? "";
     return {
       id: "nato-phonetic",
       tier: 2,
@@ -55,7 +55,7 @@ const mathEquation: RuleDef = {
   tier: 2,
   create(rng) {
     const ops: MathOp[] = ["+", "-", "*"];
-    const op = ops[Math.floor(rng() * ops.length)];
+    const op = ops[Math.floor(rng() * ops.length)] ?? "+";
     const a = op === "*" ? rangeInt(rng, 2, 9) : rangeInt(rng, 10, 50);
     const b = op === "*" ? rangeInt(rng, 2, 9) : rangeInt(rng, 1, 20);
     const answer = evalMath(a, op, b);
@@ -106,7 +106,8 @@ function fromRoman(s: string): number {
   let total = 0;
   let prev = 0;
   for (let i = s.length - 1; i >= 0; i--) {
-    const v = map[s[i]] ?? 0;
+    const ch = s[i] ?? "";
+    const v = map[ch] ?? 0;
     if (v === 0) return NaN;
     if (v < prev) total -= v;
     else total += v;

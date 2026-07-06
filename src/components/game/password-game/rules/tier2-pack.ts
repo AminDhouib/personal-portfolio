@@ -82,7 +82,9 @@ function numberToWords(n: number): string {
   if (n < 100) {
     const tens = Math.floor(n / 10);
     const ones = n % 10;
-    return ones === 0 ? TENS_WORDS[tens] : TENS_WORDS[tens] + NUM_WORDS[ones];
+    const tensWord = TENS_WORDS[tens] ?? "";
+    const onesWord = NUM_WORDS[ones] ?? "";
+    return ones === 0 ? tensWord : tensWord + onesWord;
   }
   if (n === 100) return "onehundred";
   return String(n);
@@ -119,7 +121,7 @@ export const captchaRule: RuleDef = {
     const len = 4;
     const chars = Array.from(
       { length: len },
-      () => CAPTCHA_ALPHABET[Math.floor(rng() * CAPTCHA_ALPHABET.length)],
+      () => CAPTCHA_ALPHABET[Math.floor(rng() * CAPTCHA_ALPHABET.length)] ?? "",
     );
     // Randomly upper/lowercase each character.
     const code = chars.map((c) => (Math.floor(rng() * 2) === 0 ? c : c.toLowerCase())).join("");

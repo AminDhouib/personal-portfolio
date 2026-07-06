@@ -18,9 +18,13 @@ export function nextWallTimeMs(now: number): number {
 }
 
 export function pickRandomBiome(exclude: Environment | null): Environment {
-  if (!exclude) return ENVIRONMENTS[Math.floor(Math.random() * ENVIRONMENTS.length)];
+  if (!exclude) {
+    const idx = Math.floor(Math.random() * ENVIRONMENTS.length);
+    return ENVIRONMENTS[idx] ?? ENVIRONMENTS[0];
+  }
   const others = ENVIRONMENTS.filter((e) => e !== exclude);
-  return others[Math.floor(Math.random() * others.length)];
+  const idx = Math.floor(Math.random() * others.length);
+  return others[idx] ?? exclude;
 }
 
 export function createRefs(): GameRefs {
@@ -166,6 +170,7 @@ export function startRun(g: GameRefs): boolean {
 
   // Equipped ship stats
   const ship = shipById(profile.equippedShip) ?? SHIPS[0];
+  if (!ship) return false;
   g.shipId = ship.id;
   g.shipFireRateMul = ship.fireRateMul;
   g.shipDamageMul = ship.damageMul;
@@ -230,8 +235,11 @@ export function startRun(g: GameRefs): boolean {
       const p2 = loadProfile();
       p2.consumableInventory["lucky-start"] = (p2.consumableInventory["lucky-start"] ?? 0) - 1;
       saveProfile(p2);
-      const luckyTypes: PowerUpType[] = ["shield", "triple", "rapid", "mega", "warp"];
-      const pick = luckyTypes[Math.floor(Math.random() * luckyTypes.length)];
+      // `as const` keeps luckyTypes[0] a definite literal (not T | undefined),
+      // so the fallback below type-checks without ever actually firing.
+      const luckyTypes = ["shield", "triple", "rapid", "mega", "warp"] as const;
+      const pick: PowerUpType =
+        luckyTypes[Math.floor(Math.random() * luckyTypes.length)] ?? luckyTypes[0];
       g.activePowerUps.push({ type: pick, expiresAt: now + POWERUP_DURATION_MS });
     }
   } catch {

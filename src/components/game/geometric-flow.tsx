@@ -159,7 +159,7 @@ export function GeometricFlowGame() {
         x: canvas.width + 60,
         y: getLaneY(canvas, lane),
         size: 22 + Math.random() * 16,
-        type: types[Math.floor(Math.random() * 3)],
+        type: types[Math.floor(Math.random() * 3)] ?? "circle",
         speed: (180 + Math.random() * 80) * speedMultiplierRef.current,
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 2,
@@ -331,6 +331,7 @@ export function GeometricFlowGame() {
         // Move shapes
         for (let i = shapesRef.current.length - 1; i >= 0; i--) {
           const s = shapesRef.current[i];
+          if (!s) continue;
           s.x -= s.speed * dt;
           s.rotation += s.rotationSpeed * dt;
           if (s.x < -100) {

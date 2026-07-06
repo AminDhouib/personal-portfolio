@@ -73,6 +73,6 @@ describe("fetchContributionGraph", () => {
     const result = await fetchContributionGraph("AminDhouib");
     expect(result).toHaveLength(3);
     expect(result[0]).toEqual({ date: "2025-06-15", count: 3, level: 1 });
-    expect(result[2].level).toBe(4);
+    expect(result[2]?.level).toBe(4);
   });
 });

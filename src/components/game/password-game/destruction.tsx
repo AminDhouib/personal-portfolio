@@ -304,7 +304,14 @@ function FractureWeb({ seed }: { seed: number }) {
     const h = ((seed ^ (n * 0x9e3779b1)) * 0x85ebca6b) >>> 0;
     return ((h % 1000) / 1000 - 0.5) * 8; // ±4% jitter
   };
-  const j = [jitter(1), jitter(2), jitter(3), jitter(4), jitter(5), jitter(6)];
+  const j: [number, number, number, number, number, number] = [
+    jitter(1),
+    jitter(2),
+    jitter(3),
+    jitter(4),
+    jitter(5),
+    jitter(6),
+  ];
   const BG = "var(--background, #0a0a0f)";
   return (
     <svg className="pg-fracture-web" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>

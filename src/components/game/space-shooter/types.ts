@@ -42,7 +42,7 @@ export interface Environment {
   starColor: string;
 }
 
-export const ENVIRONMENTS: Environment[] = [
+export const ENVIRONMENTS: readonly [Environment, ...Environment[]] = [
   {
     name: "Deep Space",
     fog: "#0a0a1a",
@@ -92,7 +92,8 @@ export const INVERTED_ARMED_ENV: Environment = {
 };
 
 export function envForTime(seconds: number): Environment {
-  return ENVIRONMENTS[Math.floor(seconds / 35) % ENVIRONMENTS.length];
+  const idx = Math.floor(seconds / 35) % ENVIRONMENTS.length;
+  return ENVIRONMENTS[idx] ?? ENVIRONMENTS[0];
 }
 
 // ---------- power-up defs ----------

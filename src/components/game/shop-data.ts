@@ -19,7 +19,8 @@ export interface UpgradeDef {
 
 function stdCost(level: number): number {
   const table = [0, 100, 300, 800, 2000, 5000];
-  return table[Math.max(0, Math.min(level, table.length - 1))];
+  // Clamp always keeps the index within [0, table.length - 1]; ?? 0 never fires.
+  return table[Math.max(0, Math.min(level, table.length - 1))] ?? 0;
 }
 
 export const UPGRADES: UpgradeDef[] = [

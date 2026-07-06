@@ -57,7 +57,8 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   // Extract media markers before normal text processing.
   const flagMatch = text.match(/\[\[FLAG:([A-Za-z ]+)\]\]/);
   if (flagMatch) {
-    const flag = FLAGS.find((f) => f.country === flagMatch[1].trim());
+    const country = flagMatch[1] ?? "";
+    const flag = FLAGS.find((f) => f.country === country.trim());
     const before = text.slice(0, flagMatch.index);
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
@@ -91,7 +92,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const shapesMatch = text.match(/\[\[SHAPES:([TCS]{16}):([TCS])\]\]/);
   if (shapesMatch) {
     const before = text.slice(0, shapesMatch.index);
-    const cells = [...shapesMatch[1]] as ReadonlyArray<"T" | "C" | "S">;
+    const cells = [...(shapesMatch[1] ?? "")] as ReadonlyArray<"T" | "C" | "S">;
     return (
       <>
         <GlitchText text={before} chaos={chaos} />
@@ -103,7 +104,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const diceMatch = text.match(/\[\[DICE:(\d+(?:,\d+)*)\]\]/);
   if (diceMatch) {
     const before = text.slice(0, diceMatch.index);
-    const faces = diceMatch[1]
+    const faces = (diceMatch[1] ?? "")
       .split(",")
       .map(Number)
       .filter((n) => n >= 1 && n <= 6);
@@ -122,7 +123,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const binaryMatch = text.match(/\[\[BINARY:([01]{8})\]\]/);
   if (binaryMatch) {
     const before = text.slice(0, binaryMatch.index);
-    const bits = binaryMatch[1];
+    const bits = binaryMatch[1] ?? "";
     return (
       <>
         <GlitchText text={before} chaos={chaos} />
@@ -149,10 +150,12 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const clockMatch = text.match(/\[\[CLOCK:(\d{2}):(\d{2})\]\]/);
   if (clockMatch) {
     const before = text.slice(0, clockMatch.index);
+    const hh = clockMatch[1] ?? "";
+    const mm = clockMatch[2] ?? "";
     return (
       <>
         <GlitchText text={before} chaos={chaos} />
-        <SevenSegClock hh={clockMatch[1]} mm={clockMatch[2]} />
+        <SevenSegClock hh={hh} mm={mm} />
       </>
     );
   }
@@ -160,10 +163,12 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const mixMatch = text.match(/\[\[MIX:([a-z]+):([a-z]+)\]\]/);
   if (mixMatch) {
     const before = text.slice(0, mixMatch.index);
+    const colorA = mixMatch[1] ?? "";
+    const colorB = mixMatch[2] ?? "";
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
         <GlitchText text={before} chaos={chaos} />
-        <ColorMixBadge a={mixMatch[1]} b={mixMatch[2]} />
+        <ColorMixBadge a={colorA} b={colorB} />
       </span>
     );
   }
@@ -211,7 +216,7 @@ function RuleDescription({ text, chaos }: { text: string; chaos: number }) {
   const magicMatch = text.match(/\[\[MAGIC:([0-9?,]+)\]\]/);
   if (magicMatch) {
     const before = text.slice(0, magicMatch.index);
-    const cells = magicMatch[1].split(",");
+    const cells = (magicMatch[1] ?? "").split(",");
     return (
       <>
         <GlitchText text={before} chaos={chaos} />
@@ -673,8 +678,9 @@ function GlitchText({ text, chaos }: { text: string; chaos: number }) {
       const chars = [...text];
       for (let i = 0; i < count; i++) {
         const pos = Math.floor(Math.random() * chars.length);
-        if (chars[pos] !== " " && chars[pos] !== "\n") {
-          chars[pos] = GLITCH_GLYPHS[Math.floor(Math.random() * GLITCH_GLYPHS.length)];
+        const glyph = GLITCH_GLYPHS[Math.floor(Math.random() * GLITCH_GLYPHS.length)];
+        if (chars[pos] !== " " && chars[pos] !== "\n" && glyph) {
+          chars[pos] = glyph;
         }
       }
       setDisplay(chars.join(""));

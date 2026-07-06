@@ -35,7 +35,7 @@ import {
 } from "./super-voltorb-flip/audio";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
-import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
+import { COLORS, type Cell, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
 import {
   VoltorbIcon,
@@ -551,8 +551,11 @@ const Gameboard = ({
     // delay below resolves. Mirrors voltorb_flip.c, which freezes input
     // for the duration of the fanfare.
     if (warningTileRef.current) return;
+    const rowCells = game.cells[row];
+    if (!rowCells) return; // provably never fires: row is always a valid grid index
     if (memoFlags.size > 0) {
-      const cell = game.cells[row][col];
+      const cell = rowCells[col];
+      if (!cell) return; // provably never fires: col is always a valid grid index
       // Tapping an already-revealed tile while memo is open does nothing
       // — same DP_BOX03 thunk as the non-memo case.
       if (cell.isFlipped) {
@@ -570,7 +573,8 @@ const Gameboard = ({
       });
       return;
     }
-    const cell = game.cells[row][col];
+    const cell = rowCells[col];
+    if (!cell) return; // provably never fires: col is always a valid grid index
     // Already-flipped tile: HG/SS plays an "invalid action" thunk and
     // does nothing. Mirror that here.
     if (cell.isFlipped) {
@@ -588,8 +592,7 @@ const Gameboard = ({
     // direction means it's a guaranteed Voltorb — in either case the
     // outcome isn't "uncertain", so the warning would just feel wrong.
     const N = game.cells.length;
-    const rowCells = game.cells[row];
-    const colCells = game.cells.map((r) => r[col]);
+    const colCells = game.cells.map((r) => r[col]).filter((c): c is Cell => c !== undefined);
     const flippedInRow = rowCells.filter((c) => c.isFlipped).length;
     const flippedInCol = colCells.filter((c) => c.isFlipped).length;
     const voltorbsInRow = game.rowValues[row]?.voltorbs ?? 0;
@@ -679,9 +682,11 @@ const Gameboard = ({
             // PANERU_MEKURU once per column (not per card) — the cards in
             // a column flip together, so a single SE matches the visual.
             if (!muted) sfx.flip();
+            const activeColumn = columns[col];
+            if (!activeColumn) return; // provably never fires: col < 5 === columns.length
             setCardsFlipped((prev) =>
               prev.map((card, index) =>
-                columns[col].includes(index) ? { isFlipped: false } : card,
+                activeColumn.includes(index) ? { isFlipped: false } : card,
               ),
             );
           }, stagger);

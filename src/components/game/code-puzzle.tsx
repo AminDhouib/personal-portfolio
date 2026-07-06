@@ -119,6 +119,16 @@ CMD ["node", "server.js"]`,
 
 type Answer = { selected: number; correct: boolean } | null;
 
+// PUZZLES is a fixed non-empty literal and `idx` is always kept in bounds by
+// `next()` below, so this fallback is a type-safety guard that never actually
+// fires at runtime.
+function firstOf<T>(arr: T[]): T {
+  const first = arr[0];
+  if (!first) throw new Error("expected a non-empty array");
+  return first;
+}
+const FIRST_PUZZLE = firstOf(PUZZLES);
+
 export function CodePuzzleGame() {
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState<Answer>(null);
@@ -126,7 +136,7 @@ export function CodePuzzleGame() {
   const [total, setTotal] = useState(0);
   const [finished, setFinished] = useState(false);
 
-  const puzzle = PUZZLES[idx];
+  const puzzle = PUZZLES[idx] ?? FIRST_PUZZLE;
 
   const handleSelect = useCallback(
     (optionIdx: number) => {

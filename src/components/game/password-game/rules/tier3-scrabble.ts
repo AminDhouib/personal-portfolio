@@ -42,7 +42,8 @@ function hasWordWithScore(password: string, target: number): boolean {
     for (let start = 0; start < run.length; start++) {
       let sum = 0;
       for (let end = start; end < run.length; end++) {
-        sum += SCORES[run[end].toLowerCase()] ?? 0;
+        const ch = run[end] ?? "";
+        sum += SCORES[ch.toLowerCase()] ?? 0;
         if (sum > target) break;
         if (end - start + 1 >= 3 && sum === target) return true;
       }

@@ -72,7 +72,7 @@ export interface LeaderboardEntry {
 // ═══════════════════════════════════════════════════════════════
 
 // Portfolio accent palette — matches --color-accent-* in globals.css
-export const COLORS = ["#ec4899", "#f59e0b", "#6366f1", "#22c55e"]; // pink, amber, blue, green
+export const COLORS = ["#ec4899", "#f59e0b", "#6366f1", "#22c55e"] as const; // pink, amber, blue, green
 export const TINTED: Record<string, string> = {
   "#ec4899": "rgba(236,72,153,0.35)",
   "#f59e0b": "rgba(245,158,11,0.35)",

@@ -32,6 +32,15 @@ const SENTENCES = [
   "The fog rolled in slowly like a cat deciding whether to stay.",
 ];
 
+// SENTENCES is a fixed non-empty literal, so this fallback (used below for
+// the random-index lookup) is a type-safety guard that never actually fires.
+function firstOf<T>(arr: T[]): T {
+  const first = arr[0];
+  if (!first) throw new Error("expected a non-empty array");
+  return first;
+}
+const FIRST_SENTENCE = firstOf(SENTENCES);
+
 type GameState = "idle" | "playing" | "done";
 
 function calcWPM(typedChars: number, elapsedMs: number): number {
@@ -45,10 +54,10 @@ function calcAccuracy(correct: number, total: number): number {
 }
 
 function pickSentence(exclude?: string): string {
-  let s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)];
+  let s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)] ?? FIRST_SENTENCE;
   let tries = 0;
   while (s === exclude && tries < 5) {
-    s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)];
+    s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)] ?? FIRST_SENTENCE;
     tries++;
   }
   return s;
@@ -253,7 +262,7 @@ export function TypingSpeedGame() {
       while (i < target.length && target[i] !== " ") i++;
       const wordEnd = i;
       const chars: React.ReactNode[] = [];
-      for (let k = wordStart; k < wordEnd; k++) chars.push(renderChar(target[k], k));
+      for (let k = wordStart; k < wordEnd; k++) chars.push(renderChar(target[k] ?? "", k));
       nodes.push(
         <span key={`w${wordKey++}`} className="inline-block">
           {chars}

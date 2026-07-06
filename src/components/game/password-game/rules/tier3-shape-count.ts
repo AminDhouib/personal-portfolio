@@ -22,7 +22,11 @@ export const shapeCountRule: RuleDef = {
   create(rng) {
     // Fill 16 cells, each weighted toward roughly-equal distribution.
     const cells: Shape[] = [];
-    for (let i = 0; i < 16; i++) cells.push(SHAPES[rangeInt(rng, 0, 2)]);
+    for (let i = 0; i < 16; i++) {
+      const shape = SHAPES[rangeInt(rng, 0, 2)];
+      if (!shape) continue;
+      cells.push(shape);
+    }
     const target = pickOne(rng, SHAPES);
     const count = cells.filter((c) => c === target).length;
     const encoded = cells.join("");

@@ -16,7 +16,11 @@ export function pickOne<T>(rng: Rng, arr: readonly T[]): T {
   if (arr.length === 0) {
     throw new Error("pickOne: array is empty");
   }
-  return arr[Math.floor(rng() * arr.length)];
+  const picked = arr[Math.floor(rng() * arr.length)];
+  if (picked === undefined) {
+    throw new Error("pickOne: index out of range");
+  }
+  return picked;
 }
 
 export function pickN<T>(rng: Rng, arr: readonly T[], n: number): T[] {
@@ -25,7 +29,9 @@ export function pickN<T>(rng: Rng, arr: readonly T[], n: number): T[] {
   const count = Math.min(n, pool.length);
   for (let i = 0; i < count; i++) {
     const idx = Math.floor(rng() * pool.length);
-    out.push(pool[idx]);
+    const picked = pool[idx];
+    if (picked === undefined) continue;
+    out.push(picked);
     pool.splice(idx, 1);
   }
   return out;

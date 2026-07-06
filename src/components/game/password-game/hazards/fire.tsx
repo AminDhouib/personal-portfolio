@@ -64,12 +64,16 @@ export const fireRule: RuleDef = {
           if (currentFires > 0 && currentFires <= ruleState.maxFires) {
             const fireIndexes = chars.map((c, i) => (c === FIRE ? i : -1)).filter((i) => i >= 0);
             const anchor = fireIndexes[Math.floor(Math.random() * fireIndexes.length)];
+            if (anchor === undefined) return null;
             // Try spreading left or right to a letter.
-            const candidates = [anchor - 1, anchor + 1].filter(
-              (i) => i >= 0 && i < chars.length && /[a-zA-Z]/.test(chars[i]),
-            );
+            const candidates = [anchor - 1, anchor + 1].filter((i) => {
+              if (i < 0 || i >= chars.length) return false;
+              const ch = chars[i];
+              return ch !== undefined && /[a-zA-Z]/.test(ch);
+            });
             if (candidates.length > 0) {
               const target = candidates[Math.floor(Math.random() * candidates.length)];
+              if (target === undefined) return null;
               chars[target] = FIRE;
               return {
                 password: chars.join(""),

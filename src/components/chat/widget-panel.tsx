@@ -14,6 +14,12 @@ const ossByKey: Record<string, OssProject> = Object.fromEntries(
   ossProjects.map((p) => [p.key, p] as const),
 );
 
+const caramelProject = ossByKey.caramel;
+const upupProject = ossByKey.upup;
+if (!caramelProject || !upupProject) {
+  throw new Error("oss-projects.ts is missing the caramel/upup entries");
+}
+
 const INSTRUCTIONS = `You are Amin Dhouib's personal AI assistant on his portfolio site amindhou.com.
 You are friendly, concise, and knowledgeable about Amin's work. Keep responses short — this is a chat widget.
 
@@ -28,8 +34,8 @@ Key stats: $1M+ revenue, 50+ clients, 30K+ MAU across apps, 5.0/5.0 rating, 99.9
 Apps:
 - Shorty (aishorty.com) — AI YouTube & Spotify summarizer. 2.1K MAU, +50% MoM.
 - uNotes (unotes.net) — Community university notes platform. 5K MAU.
-- Caramel (grabcaramel.com) — ${ossByKey.caramel.description} browser ext.
-- UpUp (useupup.com) — ${ossByKey.upup.description}.
+- Caramel (grabcaramel.com) — ${caramelProject.description} browser ext.
+- UpUp (useupup.com) — ${upupProject.description}.
 - GetItDone (nowgetitdone.com) — Team standups & time tracking.
 
 Services: AI Automation, Full Stack Dev, DevOps/Cloud, Database, Security/DevSecOps.
@@ -115,7 +121,8 @@ function pulseOpenWindow() {
   let i = 0;
   const tick = () => {
     win.classList.remove(...HIGHLIGHT_CLASSES);
-    win.classList.add(HIGHLIGHT_CLASSES[i % HIGHLIGHT_CLASSES.length]);
+    const cls = HIGHLIGHT_CLASSES[i % HIGHLIGHT_CLASSES.length];
+    if (cls) win.classList.add(cls);
     i++;
   };
 

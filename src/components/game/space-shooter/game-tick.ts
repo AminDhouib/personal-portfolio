@@ -63,9 +63,13 @@ function nextWallTimeMs(now: number): number {
 }
 
 function pickRandomBiome(exclude: Environment | null): Environment {
-  if (!exclude) return ENVIRONMENTS[Math.floor(Math.random() * ENVIRONMENTS.length)];
+  if (!exclude) {
+    const picked = ENVIRONMENTS[Math.floor(Math.random() * ENVIRONMENTS.length)];
+    return picked ?? INVERTED_ARMED_ENV;
+  }
   const others = ENVIRONMENTS.filter((e) => e !== exclude);
-  return others[Math.floor(Math.random() * others.length)];
+  const picked = others[Math.floor(Math.random() * others.length)];
+  return picked ?? exclude;
 }
 
 // ---------- runTick ----------
@@ -111,6 +115,7 @@ export function runTick(
   // Always advance explosions
   for (let i = g.explosions.length - 1; i >= 0; i--) {
     const e = g.explosions[i];
+    if (!e) continue;
     const age = (now - e.startedAt) / e.duration;
     if (age >= 1) {
       g.explosions.splice(i, 1);
@@ -123,6 +128,7 @@ export function runTick(
   // Always advance score popups (drift up, fade out)
   for (let i = g.scorePopups.length - 1; i >= 0; i--) {
     const p = g.scorePopups[i];
+    if (!p) continue;
     if (now - p.spawnedAt > p.ttl) g.scorePopups.splice(i, 1);
     else {
       const ageS = (now - p.spawnedAt) / 1000;
@@ -184,6 +190,7 @@ export function runTick(
     // Update debris while dying
     for (let i = g.debris.length - 1; i >= 0; i--) {
       const d = g.debris[i];
+      if (!d) continue;
       d.vy -= step * 6.5;
       d.x += d.vx * step;
       d.y += d.vy * step;
@@ -287,7 +294,9 @@ export function runTick(
 
   // Expire active power-ups
   for (let i = g.activePowerUps.length - 1; i >= 0; i--) {
-    if (g.activePowerUps[i].expiresAt <= now) g.activePowerUps.splice(i, 1);
+    const ap = g.activePowerUps[i];
+    if (!ap) continue;
+    if (ap.expiresAt <= now) g.activePowerUps.splice(i, 1);
   }
 
   // Combo decay: if no new kill within the effective window (upgrade overrides base), drop to 1
@@ -321,7 +330,7 @@ export function runTick(
   // Boss scheduling check — only if no boss active
   if (!g.boss && g.bossScheduleIdx < g.bossSchedule.length) {
     const next = g.bossSchedule[g.bossScheduleIdx];
-    if (g.distance >= next.distance) {
+    if (next && g.distance >= next.distance) {
       const recycleCount = Math.floor(g.bossScheduleIdx / 8);
       spawnBoss(g, next.bossId, recycleCount);
       g.bossScheduleIdx += 1;
@@ -385,6 +394,7 @@ export function runTick(
   // Update + collide boss projectiles each frame
   for (let i = g.bossProjectiles.length - 1; i >= 0; i--) {
     const p = g.bossProjectiles[i];
+    if (!p) continue;
     if (p.homing) {
       const dx0 = g.shipX - p.position[0];
       const dy0 = g.shipY - p.position[1];
@@ -460,6 +470,7 @@ export function runTick(
   // Move bullets
   for (let i = g.bullets.length - 1; i >= 0; i--) {
     const b = g.bullets[i];
+    if (!b) continue;
     b.x += b.vx * step;
     b.y += b.vy * step;
     b.z += b.vz * step;
@@ -469,6 +480,7 @@ export function runTick(
       let droneHit = false;
       for (let s = subs.length - 1; s >= 0; s--) {
         const d = subs[s];
+        if (!d) continue;
         if (d.type !== "drone") continue;
         const dx = b.x - d.position[0];
         const dy = b.y - d.position[1];
@@ -510,6 +522,7 @@ export function runTick(
     let bulletConsumed = false;
     for (let pi = g.bossProjectiles.length - 1; pi >= 0; pi--) {
       const p = g.bossProjectiles[pi];
+      if (!p) continue;
       if (p.shielded) continue;
       const dx = b.x - p.position[0];
       const dy = b.y - p.position[1];
@@ -535,6 +548,7 @@ export function runTick(
   const obstacleSpeedMul = THREE.MathUtils.lerp(1, 5, wi);
   for (let i = g.obstacles.length - 1; i >= 0; i--) {
     const o = g.obstacles[i];
+    if (!o) continue;
     o.x += o.vx * step * obstacleSpeedMul;
     o.y += o.vy * step * obstacleSpeedMul;
     o.z += o.vz * step * obstacleSpeedMul;
@@ -670,6 +684,7 @@ export function runTick(
     if (o.variant !== "wall") {
       for (let j = g.bullets.length - 1; j >= 0; j--) {
         const b = g.bullets[j];
+        if (!b) continue;
         const dx = b.x - o.x;
         const dy = b.y - o.y;
         const dz = b.z - o.z;
@@ -713,6 +728,7 @@ export function runTick(
   const magnetRange = isPowerUpActive(g, "magnet") ? 6 : 2 + g.coinMagnetExtra;
   for (let i = g.coins.length - 1; i >= 0; i--) {
     const c = g.coins[i];
+    if (!c) continue;
     c.z += 8 * step * obstacleSpeedMul;
     c.rx += step * 2;
     c.ry += step * 2.5;
@@ -763,6 +779,7 @@ export function runTick(
   // Move power-ups + collect
   for (let i = g.powerUps.length - 1; i >= 0; i--) {
     const p = g.powerUps[i];
+    if (!p) continue;
     p.z += 9 * step;
     p.rx += step * 1.4;
     p.ry += step * 1.6;
@@ -806,6 +823,7 @@ export function runTick(
             sounds.play("shieldOn");
             for (let k = g.obstacles.length - 1; k >= 0; k--) {
               const other = g.obstacles[k];
+              if (!other) continue;
               const d2 =
                 (other.x - g.shipX) ** 2 + (other.y - g.shipY) ** 2 + (other.z - g.shipZ) ** 2;
               if (d2 < 9 && other.variant !== "wall") g.obstacles.splice(k, 1);

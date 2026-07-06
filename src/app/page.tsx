@@ -29,7 +29,7 @@ export default async function Home() {
     fetchContributionGraph("AminDhouib"),
   ]);
   const ossStats: Record<string, RepoStats | null> = Object.fromEntries(
-    ossProjects.map((p, i) => [p.key, ossRepoStats[i]]),
+    ossProjects.map((p, i) => [p.key, ossRepoStats[i] ?? null]),
   );
   const blogPosts = getAllBlogPosts();
 

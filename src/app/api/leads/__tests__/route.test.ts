@@ -66,7 +66,9 @@ describe("POST /api/leads", () => {
     const appendFile = vi.mocked(fs.appendFile);
     expect(mkdir).toHaveBeenCalledOnce();
     expect(appendFile).toHaveBeenCalledOnce();
-    const [filePath, line] = appendFile.mock.calls[0];
+    const call = appendFile.mock.calls[0];
+    if (!call) throw new Error("expected fs.appendFile to have been called");
+    const [filePath, line] = call;
     expect(String(filePath)).toContain("leads.jsonl");
     const record = JSON.parse(String(line).trim());
     expect(record).toMatchObject({
@@ -133,7 +135,9 @@ describe("POST /api/leads", () => {
     const res = await POST(makeReq({ name: "Ada", email: "ada@example.com", note: bigNote }));
 
     expect(res.status).toBe(200);
-    const [, line] = vi.mocked(fs.appendFile).mock.calls[0];
+    const call = vi.mocked(fs.appendFile).mock.calls[0];
+    if (!call) throw new Error("expected fs.appendFile to have been called");
+    const [, line] = call;
     const record = JSON.parse(String(line).trim());
     expect(record.note.length).toBe(5000);
   });

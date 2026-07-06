@@ -93,7 +93,11 @@ export function shuffle<T>(arr: T[]): T[] {
   const out = arr.slice();
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
+    const a = out[i];
+    const b = out[j];
+    if (a === undefined || b === undefined) continue; // provably never fires: i, j always in-bounds
+    out[i] = b;
+    out[j] = a;
   }
   return out;
 }
@@ -120,7 +124,8 @@ export class Board {
   }
 
   public flagCell(row: number, col: number, flag: CellValue): void {
-    const cell: Cell = this._board[row][col];
+    const cell = this._board[row]?.[col];
+    if (!cell) return; // provably never fires: row/col are always valid board indices
     if (cell.isFlipped) return;
 
     cell.flags[flag] = !cell.flags[flag];
@@ -128,11 +133,12 @@ export class Board {
   }
 
   public flipCell(row: number, col: number): CellValue {
-    if (row < 0 || row >= this._board.length || col < 0 || col >= this._board[0].length) {
+    if (row < 0 || row >= this._board.length || col < 0 || col >= this._size) {
       throw new Error(`Invalid row or column: (${row}, ${col})`);
     }
 
-    const cell: Cell = this._board[row][col];
+    const cell = this._board[row]?.[col];
+    if (!cell) throw new Error(`Invalid row or column: (${row}, ${col})`); // unreachable: bounds already checked above
     if (cell.isFlipped) {
       return 1;
     } else {
@@ -160,7 +166,12 @@ export class Board {
 
     let index = 0;
     for (let row = 0; row < size; row++) {
+      const rowValues = this._rowValues[row];
+      const boardRow = board[row];
+      if (!rowValues || !boardRow) continue; // provably never fires: row < size === length of both arrays
       for (let col = 0; col < size; col++) {
+        const colValues = this._colValues[col];
+        if (!colValues) continue; // provably never fires: col < size === _colValues.length
         const cell = {
           value: shuffledValuesArray[index],
           flags: { 1: false, 2: false, 3: false, V: false },
@@ -169,14 +180,14 @@ export class Board {
         } as Cell;
 
         if (cell.value === "V") {
-          this._rowValues[row].voltorbs += 1;
-          this._colValues[col].voltorbs += 1;
+          rowValues.voltorbs += 1;
+          colValues.voltorbs += 1;
         } else {
-          this._rowValues[row].coins += cell.value;
-          this._colValues[col].coins += cell.value;
+          rowValues.coins += cell.value;
+          colValues.coins += cell.value;
         }
 
-        board[row][col] = cell;
+        boardRow[col] = cell;
         index++;
       }
     }

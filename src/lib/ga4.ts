@@ -62,7 +62,9 @@ export async function fetchAllMAU(): Promise<Record<string, number | null>> {
   return Object.fromEntries(
     slugs.map((slug, i) => {
       const r = results[i];
-      return [slug, r.status === "fulfilled" ? r.value : null];
+      if (!r) return [slug, null];
+      if (r.status === "fulfilled") return [slug, r.value];
+      return [slug, null];
     }),
   );
 }

@@ -26,9 +26,9 @@ interface TitleInput {
   tiers: number[];
 }
 
-const FAST_TITLES = ["The Unbreakable", "Speed Demon", "Machine-Fast"];
-const AVERAGE_TITLES = ["Survivor", "Password Adept", "Chaos Tamer"];
-const SLOW_TITLES = ["Persistent", "Barely Survived", "Methodical"];
+const FAST_TITLES: readonly [string, ...string[]] = ["The Unbreakable", "Speed Demon", "Machine-Fast"];
+const AVERAGE_TITLES: readonly [string, ...string[]] = ["Survivor", "Password Adept", "Chaos Tamer"];
+const SLOW_TITLES: readonly [string, ...string[]] = ["Persistent", "Barely Survived", "Methodical"];
 
 export function pickResultTitle(input: TitleInput): string {
   const avgPerRule = input.timeSeconds / Math.max(1, input.rulesCleared);
@@ -36,5 +36,5 @@ export function pickResultTitle(input: TitleInput): string {
   // gets the same title (not true randomness here; avoids PRNG dependency).
   const bucket = avgPerRule < 6 ? FAST_TITLES : avgPerRule < 30 ? AVERAGE_TITLES : SLOW_TITLES;
   const idx = (input.tiers.reduce((a, b) => a + b, 0) + input.rulesCleared) % bucket.length;
-  return bucket[idx];
+  return bucket[idx] ?? bucket[0];
 }

@@ -94,6 +94,7 @@ export function runWardenBehavior(g: GameRefs, boss: BossState, now: number, ste
   }
   for (let i = segs.length - 1; i >= 0; i--) {
     const s = segs[i];
+    if (!s) continue;
     s.position[0] += s.velocity[0] * step;
     s.position[1] += s.velocity[1] * step;
     s.position[2] += s.velocity[2] * step;
@@ -130,6 +131,7 @@ export function runWardenBehavior(g: GameRefs, boss: BossState, now: number, ste
 export function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, step: number): void {
   for (let i = boss.subEntities.length - 1; i >= 0; i--) {
     const d = boss.subEntities[i];
+    if (!d) continue;
     if (d.type !== "drone") continue;
     const dir = normalizeVec3([
       g.shipX - d.position[0],
@@ -399,6 +401,7 @@ export function runSwarmMotherBehavior(
   }
   for (let i = boss.subEntities.length - 1; i >= 0; i--) {
     const d = boss.subEntities[i];
+    if (!d) continue;
     if (d.type !== "drone") continue;
     const dir = normalizeVec3([
       g.shipX - d.position[0],
