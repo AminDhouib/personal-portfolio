@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: Quality
+  lint-and-test:
+    name: Lint, Typecheck, Test, Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -30,32 +30,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
+      - name: Prettier format check
         run: pnpm format:check
 
-      - name: Oxlint
+      - name: Oxlint (fast correctness)
         run: pnpm exec oxlint -c .oxlintrc.json .
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
+      - name: ESLint (type-aware + custom rules)
         run: pnpm lint
 
-      - name: Env drift check
+      - name: TypeScript strict check (tsc --noEmit)
+        run: pnpm typecheck
+
+      - name: Env schema drift check (env.ts vs .env.example)
         run: node scripts/check-env-drift.mjs
 
-      - name: Test
+      - name: Vitest unit + integration tests
         run: pnpm test
 
-      - name: Build
+      - name: Next.js production build
         run: pnpm build
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
   deploy:
-    name: Deploy
-    needs: quality
+    name: Deploy to Dokploy
+    needs: lint-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
