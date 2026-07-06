@@ -5,6 +5,7 @@ import path from "node:path";
 import { Resend } from "resend";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 import { captureException } from "@/lib/log";
+import { env } from "@/env";
 
 export interface LeadPayload {
   name: string;
@@ -30,7 +31,7 @@ const leadSchema = z.object({
 });
 
 function leadsPaths(): { dataDir: string; filePath: string } {
-  const dataDir = process.env.LEADS_DATA_DIR ?? path.join(process.cwd(), ".data");
+  const dataDir = env.LEADS_DATA_DIR ?? path.join(process.cwd(), ".data");
   return { dataDir, filePath: path.join(dataDir, "leads.jsonl") };
 }
 
@@ -95,9 +96,9 @@ export async function POST(req: NextRequest) {
   }
 
   let emailOk = false;
-  if (process.env.RESEND_API_KEY) {
+  if (env.RESEND_API_KEY) {
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
+      const resend = new Resend(env.RESEND_API_KEY);
       await resend.emails.send({
         from: "Amin AI <leads@amindhou.com>",
         to: "amin@devino.ca",

@@ -6,6 +6,8 @@
  * a module-level Map and resets on redeploy, which is fine for abuse throttling.
  */
 
+import { env } from "@/env";
+
 export interface RateLimitOptions {
   /** Maximum number of requests permitted within the window. */
   limit: number;
@@ -107,7 +109,7 @@ export function isSameOrigin(request: Request): boolean {
   const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   if (requestHost && originHost === requestHost) return true;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = env.NEXT_PUBLIC_SITE_URL;
   if (siteUrl) {
     try {
       if (originHost === new URL(siteUrl).host) return true;

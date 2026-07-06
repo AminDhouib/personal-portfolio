@@ -1,6 +1,7 @@
 import { logWarn } from "@/lib/log";
+import { env } from "@/env";
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_TOKEN = env.GITHUB_TOKEN;
 const BASE = "https://api.github.com";
 const GITHUB_REVALIDATE_SECONDS = 86400;
 // Every upstream call gets this timeout so a hung GitHub (or mirror) request

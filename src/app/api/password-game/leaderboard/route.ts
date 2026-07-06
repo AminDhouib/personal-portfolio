@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createLeaderboardStore } from "@/lib/leaderboard-store";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { env } from "@/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ function isEntry(x: unknown): x is Entry {
 }
 
 const store = createLeaderboardStore<Entry>({
-  dataDirEnv: "PG_LEADERBOARD_DIR",
+  dataDir: env.PG_LEADERBOARD_DIR,
   fileName: "password-game-leaderboard.json",
   maxEntries: 500,
   returnLimit: 50,

@@ -4,7 +4,7 @@ import { captureException } from "@/lib/log";
 import { safeJsonParse } from "@/lib/safe-json";
 
 export interface LeaderboardConfig<T> {
-  dataDirEnv?: string;
+  dataDir?: string;
   fileName: string;
   maxEntries: number;
   returnLimit: number;
@@ -14,8 +14,7 @@ export interface LeaderboardConfig<T> {
 }
 
 export function createLeaderboardStore<T>(config: LeaderboardConfig<T>) {
-  const dataDir =
-    (config.dataDirEnv && process.env[config.dataDirEnv]) ?? path.join(process.cwd(), ".data");
+  const dataDir = config.dataDir ?? path.join(process.cwd(), ".data");
   const filePath = path.join(dataDir, config.fileName);
 
   let tmpCounter = 0;

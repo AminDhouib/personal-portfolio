@@ -6,6 +6,7 @@
  */
 
 import { PostHog } from "posthog-node";
+import { env } from "@/env";
 
 // Stable identity for server-originated events; there's no per-visitor
 // distinct ID to attach these to.
@@ -45,8 +46,8 @@ let posthogClient: PostHog | null = null;
 function getPostHogClient(): PostHog | null {
   if (posthogClient) return posthogClient;
 
-  const apiKey = process.env.POSTHOG_KEY;
-  const host = process.env.POSTHOG_HOST;
+  const apiKey = env.POSTHOG_KEY;
+  const host = env.POSTHOG_HOST;
   if (!apiKey || !host) return null;
 
   try {

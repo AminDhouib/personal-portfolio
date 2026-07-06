@@ -73,6 +73,14 @@ export default defineConfig([
       "local/no-unknown-in-public-api": "error",
 
       // Tier 2 — option-heavy restrict rules (guaranteed-compatible in eslint)
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "process",
+          property: "env",
+          message: "Import `env` from `@/env` instead of reading process.env directly.",
+        },
+      ],
       "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX],
       "no-restricted-imports": [
         "error",
@@ -107,6 +115,17 @@ export default defineConfig([
     rules: { "no-restricted-imports": "off" },
   },
 
+  // ---- env gateway + framework config: allowed to read process.env directly ----
+  {
+    files: [
+      "src/env.ts",
+      "next.config.ts",
+      "instrumentation.ts",
+      "src/components/game/space-shooter.tsx",
+    ],
+    rules: { "no-restricted-properties": "off" },
+  },
+
   // ---- tests + scripts: different trust level ----
   {
     files: TEST_AND_SCRIPT_GLOBS,
@@ -115,6 +134,7 @@ export default defineConfig([
       "local/no-unknown-in-public-api": "off",
       "no-restricted-syntax": "off",
       "no-restricted-imports": "off",
+      "no-restricted-properties": "off",
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/no-misused-promises": "off",
     },

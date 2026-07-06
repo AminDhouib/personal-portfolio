@@ -6,6 +6,7 @@ import {
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { env } from "@/env";
 
 const runtime = new CopilotRuntime();
 
@@ -30,7 +31,7 @@ export const POST = async (req: NextRequest) => {
     });
   }
 
-  const openrouterKey = process.env.OPENROUTER_KEY;
+  const openrouterKey = env.OPENROUTER_KEY;
   if (!openrouterKey) {
     return new Response(JSON.stringify({ error: "OPENROUTER_KEY not configured" }), {
       status: 503,

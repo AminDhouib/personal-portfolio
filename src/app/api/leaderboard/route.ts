@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createLeaderboardStore } from "@/lib/leaderboard-store";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 import { logWarn } from "@/lib/log";
+import { env } from "@/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ function isEntry(x: unknown): x is Entry {
 }
 
 const store = createLeaderboardStore<Entry>({
-  dataDirEnv: "LEADERBOARD_DATA_DIR",
+  dataDir: env.LEADERBOARD_DATA_DIR,
   fileName: "leaderboard.json",
   maxEntries: 100,
   returnLimit: 25,

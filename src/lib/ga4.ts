@@ -1,14 +1,14 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import { logWarn } from "@/lib/log";
 import { safeJsonParse } from "@/lib/safe-json";
+import { env } from "@/env";
 
-// Property IDs for each app (set in .env.local)
 const propertyIds: Record<string, string | undefined> = {
-  shorty: process.env.GA4_PROPERTY_SHORTY,
-  unotes: process.env.GA4_PROPERTY_UNOTES,
-  caramel: process.env.GA4_PROPERTY_CARAMEL,
-  upup: process.env.GA4_PROPERTY_UPUP,
-  getitdone: process.env.GA4_PROPERTY_GETITDONE,
+  shorty: env.GA4_PROPERTY_SHORTY,
+  unotes: env.GA4_PROPERTY_UNOTES,
+  caramel: env.GA4_PROPERTY_CARAMEL,
+  upup: env.GA4_PROPERTY_UPUP,
+  getitdone: env.GA4_PROPERTY_GETITDONE,
 };
 
 // Client-side timeout for GA4 Data API calls so a slow/hung upstream request
@@ -18,7 +18,7 @@ const GA4_TIMEOUT_MS = 8000;
 let _client: BetaAnalyticsDataClient | null = null;
 
 function getClient(): BetaAnalyticsDataClient | null {
-  const keyJson = process.env.GA4_SERVICE_ACCOUNT_KEY;
+  const keyJson = env.GA4_SERVICE_ACCOUNT_KEY;
   if (!keyJson) return null;
   if (_client) return _client;
   const credentials = safeJsonParse<{ client_email: string; private_key: string }>(keyJson, "ga4");
