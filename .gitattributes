@@ -1,0 +1,19 @@
+# Normalize line endings to LF on all platforms so the prettier/format gate is
+# deterministic. Without this, Windows core.autocrlf=true checks files out as
+# CRLF, and `format:check` passes on CI (Linux/LF) but fails on a fresh local
+# checkout — the exact cross-platform drift these gates exist to prevent.
+* text=auto eol=lf
+
+# Binary safety net for the media-heavy asset/research dirs (git normally
+# auto-detects these, but be explicit so no EOL filter ever touches them).
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.mp4   binary

@@ -1,0 +1,14 @@
+# Build output
+.next/
+out/
+build/
+coverage/
+
+# Dependencies + lockfile
+node_modules/
+pnpm-lock.yaml
+
+# Generated / vendored
+next-env.d.ts
+*.tsbuildinfo
+public/
