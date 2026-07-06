@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\"",
+    "prepare": "husky"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.50",
@@ -60,8 +61,10 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "eslint-plugin-oxlint": "^1.72.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.2",
     "knip": "^6.24.0",
+    "lint-staged": "^17.0.8",
     "oxlint": "^1.72.0",
     "prettier": "^3.9.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
@@ -69,5 +72,14 @@
     "typescript": "^5",
     "typescript-eslint": "^8.63.0",
     "vitest": "^4.1.4"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mts}": [
+      "prettier --write",
+      "oxlint -c .oxlintrc.json"
+    ],
+    "*.{css,json,md,yml,yaml,mjs}": [
+      "prettier --write"
+    ]
   }
 }
