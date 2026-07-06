@@ -1,0 +1,58 @@
+{
+  "plugins": ["typescript", "unicorn", "import", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "eqeqeq": "error",
+    "no-console": "error",
+    "no-fallthrough": "error",
+    "no-empty": "error",
+    "prefer-promise-reject-errors": "error",
+    "unicorn/error-message": "error",
+    "import/no-cycle": "error"
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__tests__/**",
+        "scripts/**",
+        "next.config.ts",
+        "instrumentation.ts",
+        "*.config.ts",
+        "*.config.mjs",
+        "src/lib/log.ts",
+        "src/app/api/leads/route.ts"
+      ],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["src/components/game/**"],
+      "rules": {
+        "oxc/erasing-op": "off"
+      }
+    },
+    {
+      "files": ["src/lib/leaderboard-store.ts", "src/app/api/leaderboard/route.ts"],
+      "rules": {
+        "no-control-regex": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "**/graphify-out/**",
+    "_to-remove-voltorb/**",
+    "public/**",
+    "node_modules/**",
+    "audit/**",
+    ".data/**"
+  ]
+}

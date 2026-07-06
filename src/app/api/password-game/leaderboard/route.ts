@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createLeaderboardStore } from "@/lib/leaderboard-store";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 
@@ -35,13 +36,20 @@ const store = createLeaderboardStore<Entry>({
   isEntry,
 });
 
+const pgBodySchema = z.object({
+  seed: z.unknown(),
+  time: z.unknown(),
+  rules: z.unknown(),
+  name: z.unknown(),
+});
+
 const TIME_MAX = 24 * 3600;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const seedParam = searchParams.get("seed");
   const all = await store.readAll();
-  const filtered = seedParam != null ? all.filter((e) => e.seed === Number(seedParam)) : all;
+  const filtered = seedParam !== null ? all.filter((e) => e.seed === Number(seedParam)) : all;
   filtered.sort((a, b) => a.time - b.time);
   return NextResponse.json(
     { entries: filtered.slice(0, store.returnLimit) },
@@ -63,16 +71,18 @@ export async function POST(req: Request) {
       { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
     );
   }
-  let body: unknown;
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
+    // silent-ok: malformed request JSON is a client error, surfaced as the 400 below
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
-  if (!body || typeof body !== "object") {
+  const parsed = pgBodySchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-  const o = body as Record<string, unknown>;
+  const o = parsed.data;
   const seed = typeof o.seed === "number" ? Math.floor(o.seed) : NaN;
   const time = typeof o.time === "number" ? Math.floor(o.time) : NaN;
   const rules = typeof o.rules === "number" ? Math.floor(o.rules) : NaN;

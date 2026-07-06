@@ -19,8 +19,7 @@ export default function Error({
   unstable_retry: () => void;
 }) {
   useEffect(() => {
-    // Surface the error for client console / server logs (matched via digest).
-    console.error(error);
+    reportError(error);
   }, [error]);
 
   return (

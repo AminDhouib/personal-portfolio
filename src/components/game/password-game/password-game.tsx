@@ -175,11 +175,17 @@ export function PasswordGame() {
   // the APIs are unreachable.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const results = await Promise.allSettled([
-        fetch("/api/password-game/wordle").then((r) => r.json()),
-        fetch("/api/password-game/chess-puzzle").then((r) => r.json()),
-        fetch("/api/password-game/countries").then((r) => r.json()),
+        fetch("/api/password-game/wordle", { signal: AbortSignal.timeout(8000) }).then((r) =>
+          r.json(),
+        ),
+        fetch("/api/password-game/chess-puzzle", { signal: AbortSignal.timeout(8000) }).then((r) =>
+          r.json(),
+        ),
+        fetch("/api/password-game/countries", { signal: AbortSignal.timeout(8000) }).then((r) =>
+          r.json(),
+        ),
       ]);
       if (cancelled) return;
       let changed = false;

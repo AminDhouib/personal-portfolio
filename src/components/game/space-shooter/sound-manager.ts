@@ -46,15 +46,16 @@ export class SoundManager {
 
   ensure() {
     if (this.ctx) {
-      if (this.ctx.state === "suspended") this.ctx.resume();
+      if (this.ctx.state === "suspended") void this.ctx.resume();
       return;
     }
     try {
       const Ctor =
         window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       this.ctx = new Ctor();
     } catch {
+      // silent-ok: best-effort AudioContext construction; a blocked/unsupported AudioContext must not break the render loop
       this.ctx = null;
     }
   }
@@ -479,12 +480,12 @@ export class SoundManager {
       try {
         src.stop();
       } catch {
-        /* ignore */
+        // silent-ok: stopping an AudioBufferSourceNode that already finished/stopped throws; cleanup proceeds regardless
       }
       try {
         lfo?.stop();
       } catch {
-        /* ignore */
+        // silent-ok: stopping an OscillatorNode that already finished/stopped throws; cleanup proceeds regardless
       }
     }, 220);
     this.warpLoop = null;
@@ -674,17 +675,17 @@ export class SoundManager {
       try {
         osc1.stop();
       } catch {
-        /* */
+        // silent-ok: stopping the drone-pad oscillator after it already finished/stopped throws; cleanup proceeds regardless
       }
       try {
         osc2.stop();
       } catch {
-        /* */
+        // silent-ok: stopping the drone-pad detuned oscillator after it already finished/stopped throws; cleanup proceeds regardless
       }
       try {
         lfo.stop();
       } catch {
-        /* */
+        // silent-ok: stopping the drone-pad vibrato LFO after it already finished/stopped throws; cleanup proceeds regardless
       }
     }, 600);
     this.dronePad = null;
@@ -1015,7 +1016,7 @@ export class SoundManager {
         try {
           g.disconnect();
         } catch {
-          /* ignore */
+          // silent-ok: disconnecting an already-disconnected gain node throws; the node is being torn down anyway
         }
       },
       Math.max(40, fadeSec * 1000 + 60),
@@ -1049,9 +1050,9 @@ export class SoundManager {
     this.stopMusic(0);
     if (this.ctx) {
       try {
-        this.ctx.close();
+        void this.ctx.close();
       } catch {
-        /* ignore */
+        // silent-ok: closing an already-closed/closing AudioContext throws; the manager is being torn down anyway
       }
       this.ctx = null;
     }

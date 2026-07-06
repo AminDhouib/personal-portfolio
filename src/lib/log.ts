@@ -21,6 +21,8 @@ function renderDetail(detail: unknown): string {
   try {
     return JSON.stringify(detail);
   } catch {
+    // silent-ok: this is the logger's own formatter; a stringify failure (e.g.
+    // circular ref) falls back to String() -- reporting here would recurse.
     return String(detail);
   }
 }

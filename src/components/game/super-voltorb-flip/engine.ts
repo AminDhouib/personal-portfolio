@@ -1,4 +1,5 @@
 import type { Cell, CellValue, RowColValues, GameStatus } from "./types";
+import { safeJsonParse } from "@/lib/safe-json";
 
 // ---------------------------------------------------------------------------
 // src/utils/helpers.ts (1:1).
@@ -322,15 +323,16 @@ export class VoltorbFlip {
 // where the class identity changes), so we rely on well-known property
 // names instead of instanceof.
 export function cloneGame(g: VoltorbFlip): VoltorbFlip {
-  const deepClone: <T>(x: T) => T =
-    typeof structuredClone === "function" ? structuredClone : (x) => JSON.parse(JSON.stringify(x));
+  const deepClone = <T>(x: T): T =>
+    typeof structuredClone === "function"
+      ? structuredClone(x)
+      : (safeJsonParse<T>(JSON.stringify(x), "voltorb:cloneGame") ?? x);
 
-  const src = g as unknown as Record<string, unknown>;
   const data: Record<string, unknown> = {};
-  for (const k of Object.keys(src)) {
-    data[k] = deepClone(src[k]);
+  for (const [k, v] of Object.entries(g)) {
+    data[k] = deepClone(v);
   }
-  Object.setPrototypeOf(data, VoltorbFlip.prototype);
+  const cloned = Object.setPrototypeOf(data, VoltorbFlip.prototype) as VoltorbFlip;
 
   const boardLike = data._board as Record<string, unknown> | undefined;
   if (boardLike) Object.setPrototypeOf(boardLike, Board.prototype);
@@ -338,5 +340,5 @@ export function cloneGame(g: VoltorbFlip): VoltorbFlip {
   const levelLike = data._level as Record<string, unknown> | undefined;
   if (levelLike) Object.setPrototypeOf(levelLike, Level.prototype);
 
-  return data as unknown as VoltorbFlip;
+  return cloned;
 }

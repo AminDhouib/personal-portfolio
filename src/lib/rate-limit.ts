@@ -99,6 +99,7 @@ export function isSameOrigin(request: Request): boolean {
   try {
     originHost = new URL(origin).host;
   } catch {
+    // silent-ok: malformed Origin header is a client error; rejecting is the correct behavior
     return false;
   }
   if (!originHost) return false;
@@ -111,7 +112,7 @@ export function isSameOrigin(request: Request): boolean {
     try {
       if (originHost === new URL(siteUrl).host) return true;
     } catch {
-      // Ignore a malformed NEXT_PUBLIC_SITE_URL and fall through to reject.
+      // silent-ok: malformed NEXT_PUBLIC_SITE_URL is a deploy-time config issue; fall through to reject
     }
   }
 

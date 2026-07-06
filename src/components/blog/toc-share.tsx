@@ -13,7 +13,7 @@ export function ShareButton({ title }: { title: string }) {
         await navigator.share({ title, url });
         return;
       } catch {
-        // fallthrough to clipboard
+        // silent-ok: navigator.share rejects when the user dismisses the sheet; fall through to clipboard
       }
     }
     await navigator.clipboard.writeText(url);
@@ -23,7 +23,9 @@ export function ShareButton({ title }: { title: string }) {
 
   return (
     <button
-      onClick={handleShare}
+      onClick={() => {
+        void handleShare();
+      }}
       className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) transition-all hover:border-(--muted)/40 hover:text-(--foreground)"
       title="Share this post"
     >

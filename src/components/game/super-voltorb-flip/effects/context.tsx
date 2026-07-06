@@ -14,7 +14,7 @@ export function EffectsProvider({
 }) {
   const [theme, setTheme] = useState<EffectTheme | null>(null);
   useEffect(() => {
-    themes[themeName]?.().then(setTheme);
+    themes[themeName]?.().then(setTheme).catch(reportError);
   }, [themeName]);
   if (!theme) return <>{children}</>;
   return <EffectsCtx.Provider value={theme}>{children}</EffectsCtx.Provider>;

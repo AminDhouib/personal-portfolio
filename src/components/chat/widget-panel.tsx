@@ -93,10 +93,12 @@ function ChatActions({ pathname }: { pathname: string }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, email, note, source: "chatbot" }),
+          signal: AbortSignal.timeout(8000),
         });
         if (!res.ok) throw new Error("Failed to save lead");
         return `Lead saved for ${name} (${email}). Amin will be in touch soon!`;
-      } catch {
+      } catch (err) {
+        reportError(err);
         return "Sorry, there was an issue saving your contact details. Please try emailing amin@devino.ca directly.";
       }
     },

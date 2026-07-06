@@ -64,6 +64,7 @@ import {
   POWERUP_DEFS,
   tryDash,
 } from "./space-shooter/types";
+import { safeJsonParse } from "@/lib/safe-json";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
 import { buildBossSchedule, BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
@@ -132,7 +133,7 @@ interface SubmitResult {
 }
 
 function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-  return fetch("/api/leaderboard", { cache: "no-store" })
+  return fetch("/api/leaderboard", { cache: "no-store", signal: AbortSignal.timeout(8000) })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
     .then((data) => (Array.isArray(data?.entries) ? (data.entries as LeaderboardEntry[]) : []))
     .catch(() => []);
@@ -153,11 +154,13 @@ async function submitScore(params: SubmitParams): Promise<SubmitResult> {
         distance: params.distance,
         region: params.region,
       }),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { ok: false };
     const data = await res.json();
     return { ok: true, rank: typeof data?.rank === "number" ? data.rank : undefined };
-  } catch {
+  } catch (err) {
+    reportError(err);
     return { ok: false };
   }
 }
@@ -166,13 +169,16 @@ async function submitScore(params: SubmitParams): Promise<SubmitResult> {
 // required. Falls back to "" silently if blocked.
 async function detectRegion(): Promise<string> {
   try {
-    const r = await fetch("https://ipapi.co/json/", { cache: "force-cache" });
+    const r = await fetch("https://ipapi.co/json/", {
+      cache: "force-cache",
+      signal: AbortSignal.timeout(10000),
+    });
     if (!r.ok) return "";
     const j = await r.json();
     if (typeof j?.country_name === "string" && j.country_name) return j.country_name;
     if (typeof j?.country_code === "string") return j.country_code;
   } catch {
-    // ignored
+    // silent-ok: region/geo lookup is best-effort; the leaderboard just omits the region on failure
   }
   return "";
 }
@@ -312,13 +318,17 @@ function loadInitialPrefs(): SpaceShooterPrefs {
 
     if (typeof window !== "undefined") {
       const raw = window.localStorage.getItem("orbital-dodge-prefs");
-      if (raw) return { ...prefs, ...(JSON.parse(raw) as Partial<SpaceShooterPrefs>) };
+      if (raw) {
+        const parsed = safeJsonParse<Partial<SpaceShooterPrefs>>(raw, "space-shooter:prefs");
+        if (parsed) return { ...prefs, ...parsed };
+        return prefs;
+      }
 
       const osReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
       if (osReduced) return { ...prefs, reducedMotion: true };
     }
   } catch {
-    // Keep defaults when profile/localStorage is unavailable.
+    // silent-ok: best-effort profile/localStorage read; fall back to default prefs
   }
 
   return prefs;
@@ -405,7 +415,7 @@ export function SpaceShooterGame() {
       setIsRecording(true);
       setRecordingBlob(null);
     } catch (err) {
-      console.warn("Recording failed to start:", err);
+      reportError(err);
     }
   }, []);
   const stopRecording = useCallback(() => {
@@ -447,8 +457,10 @@ export function SpaceShooterGame() {
   const [gyroPermission, setGyroPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   const requestGyroPermission = useCallback(async (): Promise<boolean> => {
     const DOE = (
-      window as unknown as {
-        DeviceOrientationEvent?: { requestPermission?: () => Promise<string> };
+      window as {
+        DeviceOrientationEvent?: typeof DeviceOrientationEvent & {
+          requestPermission?: () => Promise<"granted" | "denied">;
+        };
       }
     ).DeviceOrientationEvent;
     if (DOE && typeof DOE.requestPermission === "function") {
@@ -457,6 +469,7 @@ export function SpaceShooterGame() {
         setGyroPermission(result === "granted" ? "granted" : "denied");
         return result === "granted";
       } catch {
+        // silent-ok: iOS motion-permission prompt dismissed/denied by the user; gyro controls simply stay off
         setGyroPermission("denied");
         return false;
       }
@@ -467,7 +480,7 @@ export function SpaceShooterGame() {
   useEffect(() => {
     if (!gyroSupported || !prefs.gyroEnabled || gyroPermission !== "granted") return;
     const handler = (e: DeviceOrientationEvent) => {
-      if (e.gamma == null || e.beta == null) return;
+      if (e.gamma === null || e.beta === null) return;
       const clampedGamma = Math.max(-30, Math.min(30, e.gamma));
       const clampedBeta = Math.max(-30, Math.min(30, e.beta - 45));
       gameRefs.current.gyroTilt.x = clampedGamma / 30;
@@ -491,10 +504,11 @@ export function SpaceShooterGame() {
       p.preferences = { ...p.preferences, ...prefs };
       saveProfile(p);
     } catch {
+      // silent-ok: best-effort settings persistence via the profile store; fall back to a plain localStorage write
       try {
         localStorage.setItem("orbital-dodge-prefs", JSON.stringify(prefs));
       } catch {
-        /* noop */
+        // silent-ok: localStorage may be unavailable (private browsing/quota); in-session settings still apply
       }
     }
     gameRefs.current.prefs = { ...prefs };
@@ -506,7 +520,7 @@ export function SpaceShooterGame() {
       try {
         window.localStorage.setItem("orbital-dodge-first-boss-seen", "1");
       } catch {
-        /* noop */
+        // silent-ok: best-effort localStorage write for the first-boss-seen flag; in-session React state still updates below
       }
       const id = window.setTimeout(() => setFirstBossSeen(true), 0);
       return () => window.clearTimeout(id);
@@ -549,11 +563,10 @@ export function SpaceShooterGame() {
     const el = containerRef.current;
     if (!el) return;
     if (!document.fullscreenElement) {
-      el.requestFullscreen?.().catch(() => {
-        /* user denied or unsupported */
-      });
+      // silent-ok: fullscreen request denied by the user or unsupported; the game still renders windowed
+      el.requestFullscreen?.().catch(() => void 0);
     } else {
-      document.exitFullscreen?.();
+      void document.exitFullscreen?.();
     }
   }, []);
 
@@ -629,18 +642,18 @@ export function SpaceShooterGame() {
     const nav = navigator as Navigator & { wakeLock?: WakeLockAPI };
     if (!nav.wakeLock || ui.status !== "playing") return;
     let lock: WakeLockSentinel | null = null;
-    (async () => {
+    void (async () => {
       try {
         lock = await nav.wakeLock!.request("screen");
       } catch {
-        /* ignore */
+        // silent-ok: wake-lock request commonly rejected or unsupported; the screen just won't stay awake during play
       }
     })();
     return () => {
       try {
-        lock?.release();
+        void lock?.release();
       } catch {
-        /* ignore */
+        // silent-ok: releasing an already-released wake lock throws; the lock is torn down with the page regardless
       }
     };
   }, [ui.status]);
@@ -699,7 +712,7 @@ export function SpaceShooterGame() {
         setAchievementToasts((t) => [...t, ...earned.map((a) => ({ ...a, firedAt: Date.now() }))]);
       }
     } catch {
-      /* noop */
+      // silent-ok: best-effort profile/localStorage persistence for boss-defeat stats and achievement grants; must not block the death screen
     }
     // Update mission progress using this run's stats (max-of so multi-run peaks count)
     try {
@@ -728,7 +741,7 @@ export function SpaceShooterGame() {
       }
       saveProfile(p);
     } catch {
-      /* noop */
+      // silent-ok: best-effort profile/localStorage persistence for daily mission progress; must not block the death screen
     }
     const final = Math.floor(g.score * g.scoreMultiplier);
     // Compare against the current state value synchronously so the celebration
@@ -747,7 +760,7 @@ export function SpaceShooterGame() {
     }));
     setSubmitted(false);
     setCelebration(isPersonalBest ? "personal" : null);
-    fetchLeaderboard().then(setLeaderboard);
+    void fetchLeaderboard().then(setLeaderboard);
     refreshProfile();
   }, [highScore, refreshProfile]);
 
@@ -851,8 +864,8 @@ export function SpaceShooterGame() {
 
   // Initial leaderboard load + region detection
   useEffect(() => {
-    fetchLeaderboard().then(setLeaderboard);
-    detectRegion().then(setRegion);
+    void fetchLeaderboard().then(setLeaderboard);
+    void detectRegion().then(setRegion);
   }, []);
 
   // Sound toggle persistence
@@ -1701,12 +1714,14 @@ export function SpaceShooterGame() {
                     <SettingsToggle
                       label="Gyro controls"
                       checked={prefs.gyroEnabled}
-                      onChange={async (v) => {
-                        if (v && gyroPermission !== "granted") {
-                          const ok = await requestGyroPermission();
-                          if (!ok) return;
-                        }
-                        setPrefs((p) => ({ ...p, gyroEnabled: v }));
+                      onChange={(v) => {
+                        void (async () => {
+                          if (v && gyroPermission !== "granted") {
+                            const ok = await requestGyroPermission();
+                            if (!ok) return;
+                          }
+                          setPrefs((p) => ({ ...p, gyroEnabled: v }));
+                        })();
                       }}
                     />
                     {gyroPermission === "denied" && (
@@ -1958,7 +1973,9 @@ export function SpaceShooterGame() {
                 <motion.button
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
-                  onClick={submit}
+                  onClick={() => {
+                    void submit();
+                  }}
                   disabled={submitted}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
                 >
@@ -2036,42 +2053,44 @@ export function SpaceShooterGame() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={async () => {
-                    const blob = await captureShareImage({
-                      score: ui.score,
-                      distance: ui.distance,
-                      kills: ui.kills,
-                    });
-                    if (!blob) return;
-                    const file = new File([blob], `orbital-dodge-${Date.now()}.png`, {
-                      type: "image/png",
-                    });
-                    const nav = navigator as Navigator & {
-                      canShare?: (d: { files: File[] }) => boolean;
-                      share?: (d: {
-                        files: File[];
-                        title?: string;
-                        text?: string;
-                      }) => Promise<void>;
-                    };
-                    if (nav.canShare?.({ files: [file] }) && nav.share) {
-                      try {
-                        await nav.share({
-                          title: "Orbital Dodge",
-                          text: `Score: ${ui.score}`,
-                          files: [file],
-                        });
-                        return;
-                      } catch {
-                        /* fall through to download */
+                  onClick={() => {
+                    void (async () => {
+                      const blob = await captureShareImage({
+                        score: ui.score,
+                        distance: ui.distance,
+                        kills: ui.kills,
+                      });
+                      if (!blob) return;
+                      const file = new File([blob], `orbital-dodge-${Date.now()}.png`, {
+                        type: "image/png",
+                      });
+                      const nav = navigator as Navigator & {
+                        canShare?: (d: { files: File[] }) => boolean;
+                        share?: (d: {
+                          files: File[];
+                          title?: string;
+                          text?: string;
+                        }) => Promise<void>;
+                      };
+                      if (nav.canShare?.({ files: [file] }) && nav.share) {
+                        try {
+                          await nav.share({
+                            title: "Orbital Dodge",
+                            text: `Score: ${ui.score}`,
+                            files: [file],
+                          });
+                          return;
+                        } catch {
+                          // silent-ok: Web Share API rejected (user cancelled or unsupported); falls through to direct download below
+                        }
                       }
-                    }
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = file.name;
-                    a.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = file.name;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    })();
                   }}
                   className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-xs font-bold tracking-wider text-emerald-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
                 >

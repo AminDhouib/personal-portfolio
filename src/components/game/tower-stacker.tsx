@@ -90,6 +90,9 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
       const d = e.data as TsMessage | null;
       if (!d || typeof d !== "object" || typeof d.type !== "string") return;
       switch (d.type) {
+        case "ts:ready":
+          // iframe readiness handshake; no parent state to sync
+          break;
         case "ts:started":
           setState({ ...INITIAL, started: true });
           break;
@@ -160,14 +163,16 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
             level: Math.max(1, state.blocks),
             game: "tower-stacker",
           }),
+          signal: AbortSignal.timeout(8000),
         });
         if (res.ok) {
           const json = (await res.json()) as { rank?: number };
           setSubmitRank(typeof json.rank === "number" ? json.rank : null);
           setSubmitted(true);
         }
-      } catch {
-        // Silent — a failed submit shouldn't break the UI.
+      } catch (err) {
+        // A failed submit shouldn't break the UI; report to the tracker but stay silent to the player.
+        reportError(err);
       } finally {
         setSubmitting(false);
       }
@@ -338,7 +343,12 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
               </div>
 
               {!submitted ? (
-                <form onSubmit={handleSubmit} className="mb-3">
+                <form
+                  onSubmit={(e) => {
+                    void handleSubmit(e);
+                  }}
+                  className="mb-3"
+                >
                   <input
                     type="text"
                     value={name}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Chess } from "chess.js";
+import { captureException } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -81,6 +82,7 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
     const res = await fetch("https://lichess.org/api/puzzle/daily", {
       headers: { "User-Agent": "password-game-portfolio/1.0" },
       next: { revalidate: 60 * 60 * 12 },
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
     const data: LichessDaily = await res.json();
@@ -131,7 +133,8 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
       rating: puzzle.rating,
       themes: puzzle.themes,
     };
-  } catch {
+  } catch (err) {
+    captureException("api:chess-puzzle", err);
     return null;
   }
 }

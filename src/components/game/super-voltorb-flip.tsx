@@ -321,7 +321,7 @@ type CardProps = {
   children: React.ReactNode;
   fake?: boolean;
   isFlipped?: boolean;
-  flipCard?: React.MouseEventHandler<HTMLDivElement>;
+  flipCard?: () => void;
   row?: number;
   col?: number;
   flags?: FlagValues;
@@ -354,8 +354,7 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }:
       }
       onClick={flipCard}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ")
-          flipCard?.(e as unknown as React.MouseEvent<HTMLDivElement>);
+        if (e.key === "Enter" || e.key === " ") flipCard?.();
       }}
     >
       {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
@@ -559,7 +558,7 @@ const Gameboard = ({
       // Tapping an already-revealed tile while memo is open does nothing
       // — same DP_BOX03 thunk as the non-memo case.
       if (cell.isFlipped) {
-        if (!muted) sfx.invalidTap();
+        if (!muted) void sfx.invalidTap();
         return;
       }
       // Apply the selected memo flag to the tile. memoFlags is radio
@@ -567,7 +566,7 @@ const Gameboard = ({
       // (VoltorbFlip_TryToggleCardMemo takes a single memoId). The loop
       // is kept since flagCell already toggles, but it runs at most
       // once. HG/SS plays DP_BOX01 each time a memo flag lands on a tile.
-      if (!muted) sfx.memoToggle();
+      if (!muted) void sfx.memoToggle();
       updateGame((g) => {
         for (const f of memoFlags) g.flagCell(row, col, f);
       });
@@ -578,7 +577,7 @@ const Gameboard = ({
     // Already-flipped tile: HG/SS plays an "invalid action" thunk and
     // does nothing. Mirror that here.
     if (cell.isFlipped) {
-      if (!muted) sfx.invalidTap();
+      if (!muted) void sfx.invalidTap();
       return;
     }
     // Visual: voltorbs explode, every coin tile (1/2/3) sparkles.
@@ -613,10 +612,10 @@ const Gameboard = ({
         setEffects((prev) => [...prev, { id, kind, row, col, onDone }]);
       }
       if (!muted) {
-        sfx.flip();
+        void sfx.flip();
         if (kind === "bomb") {
           // Stagger the buzzer so the flip click is audible first.
-          window.setTimeout(() => sfx.voltorbPop(), 140);
+          window.setTimeout(() => void sfx.voltorbPop(), 140);
         }
       }
       updateGame((g) => g.flipCell(row, col));
@@ -636,7 +635,7 @@ const Gameboard = ({
         commitFlip();
       };
       if (!muted) {
-        sfx.riskWarning().then(() => {
+        void sfx.riskWarning().then(() => {
           window.setTimeout(release, 500);
         });
       } else {
@@ -653,7 +652,7 @@ const Gameboard = ({
   const flipCardsUp = useCallback(() => {
     // HG/SS plays the panel-flip SE once at the start of RevealBoard_Main
     // (voltorb_flip.c:1077) — covers the win/lose whole-board reveal.
-    if (!muted) sfx.flip();
+    if (!muted) void sfx.flip();
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         setCardsFlipped((prev) => prev.map(() => ({ isFlipped: true })));
@@ -681,7 +680,7 @@ const Gameboard = ({
           setTimeout(() => {
             // PANERU_MEKURU once per column (not per card) — the cards in
             // a column flip together, so a single SE matches the visual.
-            if (!muted) sfx.flip();
+            if (!muted) void sfx.flip();
             const activeColumn = columns[col];
             if (!activeColumn) return; // provably never fires: col < 5 === columns.length
             setCardsFlipped((prev) =>
@@ -712,7 +711,7 @@ const Gameboard = ({
       //   3. parent's runPostFanfare         — payout BGM + counter SE chain
       //   4. onFlipDownStart("up")           — level-up flash + SLOT01 SE
       //   5. flipCardsDown                   — fold cards, restartGame fires
-      flipCardsUp().then(async () => {
+      void flipCardsUp().then(async () => {
         // 2. Fanfare (or silent equivalent).
         await new Promise<void>((resolve) => {
           if (muted) {
@@ -738,7 +737,7 @@ const Gameboard = ({
       // Lose sequence: reveal → CARDGAME2 fanfare via playGameOver (parent)
       // → wait for click (or instant) → level-down flash synchronized to
       // the first card folding back down.
-      flipCardsUp().then(async () => {
+      void flipCardsUp().then(async () => {
         if (waitForClick) {
           await waitForUserInteraction();
         }
@@ -1225,7 +1224,7 @@ export function SuperVoltorbFlipGame() {
   const [memoFlags, setMemoFlags] = useState<MemoFlagSet>(() => new Set<MemoFlag>());
   const toggleMemoFlag = (f: MemoFlag) => {
     // HG/SS plays DP_SELECT whenever the memo cursor changes button.
-    if (!muted) sfx.cursorMove();
+    if (!muted) void sfx.cursorMove();
     // Radio-style — voltorb_flip.c's VoltorbFlip_TryToggleCardMemo takes
     // exactly one memoId per tap. Picking a new button replaces the
     // previous selection; tapping the same one twice deselects it.
@@ -1236,7 +1235,7 @@ export function SuperVoltorbFlipGame() {
   };
   const clearMemoFlags = useCallback(() => {
     // The "Back" pad button in the memo overlay (HG/SS DP_BUTTON3).
-    if (!muted) sfx.backButton();
+    if (!muted) void sfx.backButton();
     setMemoFlags(new Set<MemoFlag>());
   }, [muted]);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
@@ -1341,7 +1340,7 @@ export function SuperVoltorbFlipGame() {
       tallyTimerRef.current = null;
       setDisplayCurrent((prev) => Math.min(prev + stride, targetCurrent));
       const step = tallyStepRef.current;
-      if (!muted && step % 4 === 0) sfx.payoutTickEarn();
+      if (!muted && step % 4 === 0) void sfx.payoutTickEarn();
       tallyStepRef.current = step + 1;
     }, 17);
 
@@ -1408,8 +1407,8 @@ export function SuperVoltorbFlipGame() {
       setDisplayLevel(newLevel);
       setLevelDir(dir);
       if (!muted) {
-        if (dir === "up") sfx.levelUp();
-        else sfx.levelDown();
+        if (dir === "up") void sfx.levelUp();
+        else void sfx.levelDown();
       }
       window.setTimeout(() => setLevelDir(null), 1200);
     },
@@ -1486,7 +1485,7 @@ export function SuperVoltorbFlipGame() {
       drained = Math.min(earned, drained + coinsPerTick);
       setDisplayCurrent(earned - drained);
       setDisplayTotal(startTotal + drained);
-      if (j % 4 === 0 && !muted) sfx.payoutTickBank();
+      if (j % 4 === 0 && !muted) void sfx.payoutTickBank();
       await tick();
     }
     // Snap to final wallet state — covers both natural completion and skip.
@@ -1495,7 +1494,7 @@ export function SuperVoltorbFlipGame() {
     // COIN_PAYOUT_LAST always closes the chain, including on skip — the
     // closing chime is the audible "money's in the bank" cue and should
     // fire whether the player let it run or tapped through.
-    if (!muted) sfx.payoutFinal();
+    if (!muted) void sfx.payoutFinal();
     // Breathing room so payoutFinal doesn't bleed into the level-up SE.
     // Shorter on skip so it still feels snappy.
     await new Promise<void>((r) => window.setTimeout(r, didSkip ? 160 : 280));

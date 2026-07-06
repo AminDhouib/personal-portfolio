@@ -110,7 +110,8 @@ export function playMusic() {
   music.loop = true;
   music.volume = 0.3;
   music.muted = globalMuted;
-  music.play().catch(() => {});
+  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
+  music.play().catch(() => undefined);
 }
 
 export function stopMusic() {
@@ -140,7 +141,8 @@ export function playGameOver() {
   gameOverAudio = new Audio("/games/super-voltorb-flip/audio/game_over.mp3");
   gameOverAudio.volume = 0.5;
   gameOverAudio.muted = globalMuted;
-  gameOverAudio.play().catch(() => {});
+  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
+  gameOverAudio.play().catch(() => undefined);
 }
 
 export function stopGameOver() {
@@ -155,7 +157,8 @@ export function playLevelWin(onEnded?: () => void): HTMLAudioElement | null {
   levelWinAudio.volume = 0.5;
   levelWinAudio.muted = globalMuted;
   if (onEnded) levelWinAudio.addEventListener("ended", onEnded, { once: true });
-  levelWinAudio.play().catch(() => {});
+  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
+  levelWinAudio.play().catch(() => undefined);
   return levelWinAudio;
 }
 

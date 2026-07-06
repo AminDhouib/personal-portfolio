@@ -25,11 +25,12 @@ function ensureCtx(): AudioContext | null {
   try {
     const Ctor =
       window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     audioCtx = new Ctor();
     return audioCtx;
   } catch {
+    // silent-ok: AudioContext construction can throw (autoplay policy/unsupported); caller handles null
     return null;
   }
 }
@@ -50,11 +51,7 @@ export function isSoundEnabled(): boolean {
 export function closeSound(): void {
   enabled = false;
   if (audioCtx) {
-    try {
-      audioCtx.close();
-    } catch {
-      /* ignore */
-    }
+    audioCtx.close().catch(() => undefined);
     audioCtx = null;
   }
 }

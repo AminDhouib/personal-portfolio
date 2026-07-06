@@ -48,6 +48,9 @@ export function GameLoader({ slug }: { slug: GameSlug }) {
       return <SuperVoltorbFlipGame />;
     case "tower-stacker":
       return <TowerStacker initialSeed={towerSeed} />;
+    case "password-game":
+      // password-game has a dedicated page and is not rendered through GameLoader
+      return null;
     default:
       return null;
   }

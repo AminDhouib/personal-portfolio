@@ -145,7 +145,7 @@ export function applyFormatRange(
   const out: CharFormatting[] = [];
   const neededLen = Math.max(fmt.length, end);
   for (let i = 0; i < neededLen; i++) {
-    const existing: CharFormatting = { ...(fmt[i] ?? {}) };
+    const existing: CharFormatting = { ...fmt[i] };
     if (i >= start && i < end) {
       for (const [k, v] of Object.entries(attrs) as [keyof CharFormatting, boolean | undefined][]) {
         if (v === true) existing[k] = true;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { captureException } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,7 @@ async function fetchAll(): Promise<CountryCapital[]> {
     const res = await fetch("https://restcountries.com/v3.1/all?fields=name,capital", {
       headers: { "User-Agent": "password-game-portfolio/1.0" },
       next: { revalidate: 60 * 60 * 24 * 7 },
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return [];
     const data: RestCountry[] = await res.json();
@@ -46,7 +48,8 @@ async function fetchAll(): Promise<CountryCapital[]> {
     }
     out.sort((a, b) => a.country.localeCompare(b.country));
     return out;
-  } catch {
+  } catch (err) {
+    captureException("api:countries", err);
     return [];
   }
 }

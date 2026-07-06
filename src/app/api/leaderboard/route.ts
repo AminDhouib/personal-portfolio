@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createLeaderboardStore } from "@/lib/leaderboard-store";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { logWarn } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,14 +42,26 @@ const store = createLeaderboardStore<Entry>({
 
 const SCORE_CAP = 10_000_000;
 
-function sanitizeGame(raw: unknown): string {
-  if (typeof raw !== "string") return "space-shooter";
-  const cleaned = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "")
-    .slice(0, 40);
-  return cleaned.length > 0 ? cleaned : "space-shooter";
-}
+// DD1-001, PRESERVED ON PURPOSE. A missing / non-string / empty `game` silently
+// buckets into "space-shooter". The legacy space-shooter and hextris clients send
+// no `game` field at all, so this default is the COMMON path, not a rare one --
+// which is exactly the bug (their scores share one board). The real fix
+// (reject-or-require `game`) is refactor batch P2, sequenced under P1's pinning
+// tests; doing it here would change routing on an untested path. Routing is left
+// identical, but every bucket is now made LOUD via logWarn so DD1-001's true
+// frequency is visible in logs. (logWarn, not captureException: an $exception per
+// submit would flood the tracker since the bucket path fires on normal traffic.)
+const gameSchema = z.unknown().transform((raw): string => {
+  if (typeof raw === "string") {
+    const cleaned = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "")
+      .slice(0, 40);
+    if (cleaned.length > 0) return cleaned;
+  }
+  logWarn("api:leaderboard", "game missing/invalid; bucketed to space-shooter (DD1-001)", raw);
+  return "space-shooter";
+});
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -80,6 +94,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
+    // silent-ok: a malformed request body is a client error, surfaced as the 400 below
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
   if (!body || typeof body !== "object") {
@@ -114,7 +129,7 @@ export async function POST(req: Request) {
       typeof o.region === "string" && o.region.length > 0 && o.region.length <= 60
         ? o.region.replace(/[\u0000-\u001f]/g, "").slice(0, 60)
         : undefined,
-    game: sanitizeGame(o.game),
+    game: gameSchema.parse(o.game),
     createdAt: new Date().toISOString(),
   };
   const rank = await store.withWriteLock(async () => {

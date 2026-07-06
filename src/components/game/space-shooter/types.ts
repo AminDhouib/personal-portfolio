@@ -270,6 +270,10 @@ export interface BossState {
   difficultyMult: number;
   subEntities: SubEntity[];
   rng: () => number;
+  // Warden-only: scrolling wall-gate segments (lazily initialized on first tick).
+  wallSegments?: BossWallSegment[];
+  // Harvester-only: tractor-beam state (lazily initialized on first tick).
+  tractorBeam?: TractorBeam;
 }
 
 export interface BossProjectile {
@@ -488,7 +492,7 @@ export function tryDash(g: GameRefs, direction: "left" | "right", now: number): 
       pp.totalDashes = (pp.totalDashes ?? 0) + 1;
       saveProfile(p);
     } catch {
-      /* noop */
+      // silent-ok: best-effort lifetime dash-counter persistence via localStorage; must not block the dash itself
     }
     return true;
   }

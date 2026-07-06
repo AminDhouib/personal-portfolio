@@ -212,9 +212,10 @@ export function Navbar() {
               <button
                 onClick={() => {
                   if (navigator.share) {
+                    // silent-ok: navigator.share rejects when the user dismisses the share sheet
                     navigator
                       .share({ title: document.title, url: window.location.href })
-                      .catch(() => {});
+                      .catch(() => undefined);
                   } else {
                     alert("Press Ctrl+D (Cmd+D on Mac) to bookmark this page!");
                   }

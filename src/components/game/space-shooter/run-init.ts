@@ -243,7 +243,7 @@ export function startRun(g: GameRefs): boolean {
       g.activePowerUps.push({ type: pick, expiresAt: now + POWERUP_DURATION_MS });
     }
   } catch {
-    /* noop */
+    // silent-ok: best-effort consumable-inventory persistence via localStorage; a run should still start even if this fails
   }
 
   sounds.startGameplayMusic();

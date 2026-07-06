@@ -4,6 +4,8 @@
 // All profile state for Orbital Dodge lives here — no other file writes to
 // the profile key directly. Schema is versioned so we can migrate additively.
 
+import { safeJsonParse } from "@/lib/safe-json";
+
 const STORAGE_KEY = "orbital-dodge-profile";
 const CURRENT_VERSION = 1;
 
@@ -65,10 +67,11 @@ export function loadProfile(): Profile {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultProfile();
-    const parsed = JSON.parse(raw);
+    const parsed = safeJsonParse<Partial<Profile>>(raw, "profile.load");
     if (typeof parsed !== "object" || !parsed) return defaultProfile();
     return { ...defaultProfile(), ...parsed, v: CURRENT_VERSION };
   } catch {
+    // silent-ok: localStorage.getItem can throw (SecurityError in sandboxed/private contexts); fall back to default
     return defaultProfile();
   }
 }
@@ -78,7 +81,7 @@ export function saveProfile(p: Profile): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
   } catch {
-    // Storage may be full or blocked; fail silently.
+    // silent-ok: localStorage write may fail (quota exceeded/blocked); profile persistence is non-critical
   }
 }
 

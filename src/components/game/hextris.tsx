@@ -27,6 +27,7 @@ import {
   AV_CONST,
 } from "./hextris/types";
 import { rotatePoint, randInt } from "./hextris/logic";
+import { safeJsonParse } from "@/lib/safe-json";
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT
@@ -55,6 +56,7 @@ export function HextrisGame() {
     try {
       return localStorage.getItem("hextris_sound") !== "off";
     } catch {
+      // silent-ok: best-effort localStorage read; default sound-on if unavailable (e.g. private mode)
       return true;
     }
   });
@@ -75,6 +77,7 @@ export function HextrisGame() {
     try {
       return localStorage.getItem("hextris_name") || "";
     } catch {
+      // silent-ok: best-effort localStorage read; empty name just re-prompts the player
       return "";
     }
   });
@@ -86,7 +89,7 @@ export function HextrisGame() {
   const submittedOnceRef = useRef(false);
 
   // Sound manager — created once per component lifetime
-  const soundsRef = useRef<HextrisSounds>(null as unknown as HextrisSounds);
+  const soundsRef = useRef<HextrisSounds | null>(null);
   if (!soundsRef.current) soundsRef.current = new HextrisSounds();
 
   const restartRef = useRef<() => void>(() => {});
@@ -95,11 +98,11 @@ export function HextrisGame() {
 
   // Sync sound enabled state to the manager + persist
   useEffect(() => {
-    soundsRef.current.setEnabled(soundEnabled);
+    soundsRef.current!.setEnabled(soundEnabled);
     try {
       localStorage.setItem("hextris_sound", soundEnabled ? "on" : "off");
     } catch {
-      /* empty */
+      // silent-ok: best-effort persistence; sound preference just won't survive a reload
     }
   }, [soundEnabled]);
 
@@ -130,7 +133,7 @@ export function HextrisGame() {
         await containerRef.current!.requestFullscreen();
         return;
       } catch {
-        /* fall through to pseudo-fullscreen */
+        // silent-ok: best-effort native fullscreen; falls through to CSS pseudo-fullscreen below
       }
     }
     setMobileImmersive(true);
@@ -142,7 +145,7 @@ export function HextrisGame() {
       try {
         await document.exitFullscreen();
       } catch {
-        /* ignore */
+        // silent-ok: best-effort fullscreen exit; UI state is reset regardless below
       }
     }
     setMobileImmersive(false);
@@ -161,7 +164,7 @@ export function HextrisGame() {
   useEffect(() => {
     if (!isTouchDevice) return;
     if (uiState === "playing" && !isFullscreen && !mobileImmersive) {
-      enterImmersive();
+      void enterImmersive();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiState, isTouchDevice]);
@@ -189,7 +192,7 @@ export function HextrisGame() {
   useEffect(() => {
     if (hasInteracted) return;
     const onInteract = () => {
-      soundsRef.current.resume();
+      soundsRef.current!.resume();
       setHasInteracted(true);
     };
     window.addEventListener("pointerdown", onInteract);
@@ -203,7 +206,7 @@ export function HextrisGame() {
   // Drive music from uiState transitions (only after first interaction)
   useEffect(() => {
     if (!hasInteracted) return;
-    const s = soundsRef.current;
+    const s = soundsRef.current!;
     if (uiState === "menu") s.startMenuMusic();
     else if (uiState === "playing") s.startGameplayMusic();
     else if (uiState === "paused") s.stopMusic();
@@ -213,7 +216,7 @@ export function HextrisGame() {
   // Stop music on unmount to prevent leaks if user switches tabs
   useEffect(() => {
     return () => {
-      soundsRef.current.stopMusic();
+      soundsRef.current?.stopMusic();
     };
   }, []);
 
@@ -249,7 +252,7 @@ export function HextrisGame() {
       try {
         localStorage.setItem("hextris_name", playerName);
       } catch {
-        /* empty */
+        // silent-ok: best-effort persistence; name just won't be remembered next visit
       }
     }
   }, [playerName]);
@@ -257,12 +260,15 @@ export function HextrisGame() {
   // Fetch leaderboard entries (top 25; we show 8)
   async function fetchLeaderboard() {
     try {
-      const res = await fetch("/api/leaderboard", { cache: "no-store" });
+      const res = await fetch("/api/leaderboard", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
       if (!res.ok) return;
       const data = (await res.json()) as { entries?: LeaderboardEntry[] };
       if (Array.isArray(data.entries)) setLeaderboard(data.entries);
-    } catch {
-      /* ignore */
+    } catch (err) {
+      reportError(err);
     }
   }
 
@@ -281,6 +287,7 @@ export function HextrisGame() {
           seconds: uiStats.seconds,
           kills: uiStats.pieces,
         }),
+        signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) {
         setSubmitState("failed");
@@ -295,7 +302,8 @@ export function HextrisGame() {
       } else {
         setSubmitState("failed");
       }
-    } catch {
+    } catch (err) {
+      reportError(err);
       setSubmitState("failed");
     }
   }
@@ -303,9 +311,9 @@ export function HextrisGame() {
   // On game-over: fetch leaderboard + auto-submit once (if name saved)
   useEffect(() => {
     if (uiState === "gameover") {
-      fetchLeaderboard();
+      void fetchLeaderboard();
       if (playerName.trim() && !submittedOnceRef.current) {
-        submitScore(playerName);
+        void submitScore(playerName);
       }
     }
     if (uiState === "playing") {
@@ -357,9 +365,12 @@ export function HextrisGame() {
     let highscores: number[] = [];
     try {
       const hs = localStorage.getItem("hextris_highscores");
-      if (hs) highscores = JSON.parse(hs);
+      if (hs) {
+        const parsed = safeJsonParse<number[]>(hs, "hextris:highscores");
+        if (parsed) highscores = parsed;
+      }
     } catch {
-      /* empty */
+      // silent-ok: best-effort localStorage read; missing/corrupt highscores just start empty
     }
     let lastSyncedScore = 0;
 
@@ -388,7 +399,7 @@ export function HextrisGame() {
     // purge the board for score. Strategic oh-shit button for tight spots.
     let momentum = 0;
     let lastSyncedMomentum = 0;
-    const sounds = soundsRef.current;
+    const sounds = soundsRef.current!;
 
     // Haptic feedback helper — no-op on desktop / unsupported devices.
     // We silently swallow failures since some browsers (iOS Safari) throw.
@@ -398,7 +409,7 @@ export function HextrisGame() {
           navigator.vibrate(pattern);
         }
       } catch {
-        /* some browsers throw when not in response to a user gesture */
+        // silent-ok: haptic feedback is cosmetic; some browsers throw vibrate() outside a user gesture
       }
     }
 
@@ -1568,7 +1579,7 @@ export function HextrisGame() {
         try {
           localStorage.setItem("hextris_highscores", JSON.stringify(highscores));
         } catch {
-          /* empty */
+          // silent-ok: best-effort persistence; high score just won't survive a reload
         }
         return true;
       }
@@ -2398,7 +2409,9 @@ export function HextrisGame() {
         </button>
         <button
           type="button"
-          onClick={toggleFullscreen}
+          onClick={() => {
+            void toggleFullscreen();
+          }}
           className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
           aria-label={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
           title={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
@@ -2602,7 +2615,9 @@ export function HextrisGame() {
               />
               <button
                 type="button"
-                onClick={() => submitScore(playerName)}
+                onClick={() => {
+                  void submitScore(playerName);
+                }}
                 disabled={
                   submitState === "submitting" || submitState === "submitted" || !playerName.trim()
                 }

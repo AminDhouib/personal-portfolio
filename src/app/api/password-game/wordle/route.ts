@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { WORDLE_WORDS, wordleOfTheDay } from "../../../../data/password-game/wordle";
+import { captureException } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,7 @@ async function fetchNyt(dateIso: string): Promise<string | null> {
     const res = await fetch(`https://www.nytimes.com/svc/wordle/v2/${dateIso}.json`, {
       headers: { "User-Agent": "password-game-portfolio/1.0" },
       next: { revalidate: 60 * 60 * 12 },
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
     const data: NytWordle = await res.json();
@@ -39,7 +41,8 @@ async function fetchNyt(dateIso: string): Promise<string | null> {
     const word = raw.toUpperCase();
     if (!/^[A-Z]{5}$/.test(word)) return null;
     return word;
-  } catch {
+  } catch (err) {
+    captureException("api:wordle", err);
     return null;
   }
 }

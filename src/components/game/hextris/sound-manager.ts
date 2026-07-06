@@ -2,6 +2,13 @@
 // SOUND — self-contained WebAudio synthesis, no asset files
 // ═══════════════════════════════════════════════════════════════
 
+// Safari (pre-14.1) only exposes the constructor under this vendor-prefixed
+// name; it was never added to lib.dom.d.ts. Declared as an optional field on
+// a real Window subtype instead of an `unknown` cast.
+interface WindowWithWebkitAudio extends Window {
+  webkitAudioContext?: typeof AudioContext;
+}
+
 export class HextrisSounds {
   private ctx: AudioContext | null = null;
   private sfxGain: GainNode | null = null;
@@ -34,16 +41,15 @@ export class HextrisSounds {
   resume() {
     this.ensureCtx();
     if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume().catch(() => {});
+      // silent-ok: best-effort resume; a blocked AudioContext must not break the render loop
+      void this.ctx.resume();
     }
   }
 
   private ensureCtx() {
     if (this.ctx) return;
     try {
-      const Ctor =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const Ctor = window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext;
       if (!Ctor) return;
       this.ctx = new Ctor();
       this.sfxGain = this.ctx.createGain();
@@ -53,7 +59,7 @@ export class HextrisSounds {
       this.musicGain.gain.value = this.enabled ? 0.22 : 0;
       this.musicGain.connect(this.ctx.destination);
     } catch {
-      /* no audio available */
+      // silent-ok: no audio available (unsupported/blocked); game still renders without sound
     }
   }
 
@@ -190,9 +196,9 @@ export class HextrisSounds {
     this.stopMusic();
     if (this.ctx) {
       try {
-        this.ctx.close();
+        void this.ctx.close();
       } catch {
-        /* ignore */
+        // silent-ok: closing an already-closed/closing AudioContext throws; the manager is being torn down anyway
       }
       this.ctx = null;
     }

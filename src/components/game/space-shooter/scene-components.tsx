@@ -4,7 +4,6 @@ import * as THREE from "three";
 import {
   type Environment,
   type ObstacleVariant,
-  type BossWallSegment,
   type GameRefs,
   POWERUP_DURATION_MS,
   POWERUP_DEFS,
@@ -1075,7 +1074,7 @@ export function BossMesh({
     );
   }
   if (boss.id === "harvester") {
-    const beam = (boss as unknown as { tractorBeam?: { active: boolean } }).tractorBeam;
+    const beam = boss.tractorBeam;
     return (
       <group ref={groupRef}>
         <mesh>
@@ -1175,7 +1174,7 @@ export function BossWalls({
 }) {
   const boss = gameRefs.current?.boss;
   if (!boss || boss.id !== "warden") return null;
-  const segs = (boss as unknown as { wallSegments?: BossWallSegment[] }).wallSegments ?? [];
+  const segs = boss.wallSegments ?? [];
   return (
     <group>
       {segs.map((s) =>

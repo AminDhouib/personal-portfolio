@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { captureException } from "@/lib/log";
+import { safeJsonParse } from "@/lib/safe-json";
 
 export interface LeaderboardConfig<T> {
   dataDirEnv?: string;
@@ -33,12 +34,11 @@ export function createLeaderboardStore<T>(config: LeaderboardConfig<T>) {
   async function readAll(): Promise<T[]> {
     try {
       const buf = await fs.readFile(filePath, "utf-8");
-      const parsed = JSON.parse(buf);
+      const parsed = safeJsonParse(buf, "leaderboard");
       if (!Array.isArray(parsed)) return [];
       return parsed.filter(config.isEntry);
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
-      console.warn(`[leaderboard] Failed to read ${config.fileName}:`, e);
       captureException("leaderboard", e);
       return [];
     }

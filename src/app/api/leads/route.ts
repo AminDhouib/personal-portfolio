@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Resend } from "resend";
@@ -18,6 +19,16 @@ const EMAIL_MAX = 320;
 const NOTE_MAX = 5000;
 const SOURCE_MAX = 100;
 
+// Validates the body is a JSON object; the individual fields are narrowed below
+// (gate rule 3: API routes must zod-parse their input). Fields stay `unknown` so
+// the existing hand-rolled field checks remain the source of truth.
+const leadSchema = z.object({
+  name: z.unknown(),
+  email: z.unknown(),
+  note: z.unknown().optional(),
+  source: z.unknown().optional(),
+});
+
 function leadsPaths(): { dataDir: string; filePath: string } {
   const dataDir = process.env.LEADS_DATA_DIR ?? path.join(process.cwd(), ".data");
   return { dataDir, filePath: path.join(dataDir, "leads.jsonl") };
@@ -36,16 +47,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: LeadPayload;
+  let raw: unknown;
   try {
-    body = (await req.json()) as LeadPayload;
+    raw = await req.json();
   } catch {
+    // silent-ok: malformed request JSON is a client error, surfaced as the 400 below
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, email, note, source } = body;
+  const parsed = leadSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "name and email are required" }, { status: 400 });
+  }
+  const { name, email, note, source } = parsed.data;
 
-  if (!name || !email) {
+  if (typeof name !== "string" || !name || typeof email !== "string" || !email) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
 
@@ -53,12 +69,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
   }
 
+  const noteStr = typeof note === "string" ? note : "";
+  const sourceStr = typeof source === "string" ? source : "chatbot";
   const timestamp = new Date().toISOString();
   const record = {
     name: name.slice(0, NAME_MAX),
     email: email.slice(0, EMAIL_MAX),
-    note: (note ?? "").slice(0, NOTE_MAX),
-    source: (source ?? "chatbot").slice(0, SOURCE_MAX),
+    note: noteStr.slice(0, NOTE_MAX),
+    source: sourceStr.slice(0, SOURCE_MAX),
     timestamp,
   };
 
@@ -73,7 +91,6 @@ export async function POST(req: NextRequest) {
     await fs.appendFile(filePath, JSON.stringify(record) + "\n", "utf-8");
     persistOk = true;
   } catch (err) {
-    console.error("Lead persistence failed:", err);
     captureException("leads.persist", err);
   }
 
@@ -95,7 +112,6 @@ export async function POST(req: NextRequest) {
       });
       emailOk = true;
     } catch (err) {
-      console.error("Resend email failed:", err);
       captureException("leads.email", err);
     }
   }

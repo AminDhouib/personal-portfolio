@@ -219,9 +219,11 @@ export function useFullscreen(targetRef: React.RefObject<HTMLElement | null>) {
   const toggle = useCallback(() => {
     if (typeof document === "undefined") return;
     if (document.fullscreenElement) {
-      document.exitFullscreen?.();
+      // silent-ok: exit-fullscreen rejection is non-actionable; the game still renders windowed
+      document.exitFullscreen?.().catch(() => undefined);
     } else {
-      targetRef.current?.requestFullscreen?.();
+      // silent-ok: fullscreen request denied by the user or unsupported; the game still renders windowed
+      targetRef.current?.requestFullscreen?.().catch(() => undefined);
     }
   }, [targetRef]);
   return [active, toggle] as const;

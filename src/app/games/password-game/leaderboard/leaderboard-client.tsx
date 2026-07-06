@@ -27,11 +27,12 @@ export function LeaderboardClient() {
       const url = seed.trim()
         ? `/api/password-game/leaderboard?seed=${encodeURIComponent(seed.trim())}`
         : `/api/password-game/leaderboard`;
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { entries: Entry[] };
       setEntries(data.entries);
     } catch (err) {
+      reportError(err);
       setError(err instanceof Error ? err.message : "failed to load");
     } finally {
       setLoading(false);
@@ -39,14 +40,14 @@ export function LeaderboardClient() {
   };
 
   useEffect(() => {
-    fetchEntries("");
+    void fetchEntries("");
   }, []);
 
   useEffect(() => {
     if (tab === "daily") {
-      fetchEntries(String(dailySeed(todayDateString())));
+      void fetchEntries(String(dailySeed(todayDateString())));
     } else {
-      fetchEntries("");
+      void fetchEntries("");
     }
   }, [tab]);
 
@@ -87,7 +88,9 @@ export function LeaderboardClient() {
           />
           <button
             type="button"
-            onClick={() => fetchEntries(seedFilter)}
+            onClick={() => {
+              void fetchEntries(seedFilter);
+            }}
             disabled={loading}
             className="inline-flex items-center justify-center gap-1 rounded-md border border-accent-pink/50 bg-accent-pink/10 px-4 py-2 text-sm font-medium text-accent-pink hover:bg-accent-pink/20"
           >

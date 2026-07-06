@@ -47,6 +47,7 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
           time: timeSeconds,
           rules: rulesCleared,
         }),
+        signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -59,6 +60,7 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
       const data = (await res.json()) as { rank: number };
       setSubmit({ kind: "sent", rank: data.rank });
     } catch (err) {
+      reportError(err);
       setSubmit({ kind: "error", message: err instanceof Error ? err.message : "unknown error" });
     }
   };
@@ -125,7 +127,9 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
               />
               <button
                 type="button"
-                onClick={handleSubmit}
+                onClick={() => {
+                  void handleSubmit();
+                }}
                 disabled={submit.kind === "sending"}
                 className="inline-flex items-center gap-1 rounded-md border border-accent-pink/50 bg-accent-pink/10 px-3 py-2 text-sm font-medium text-accent-pink hover:bg-accent-pink/20 disabled:opacity-60"
               >

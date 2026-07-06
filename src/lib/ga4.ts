@@ -1,5 +1,6 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import { logWarn } from "@/lib/log";
+import { safeJsonParse } from "@/lib/safe-json";
 
 // Property IDs for each app (set in .env.local)
 const propertyIds: Record<string, string | undefined> = {
@@ -20,15 +21,13 @@ function getClient(): BetaAnalyticsDataClient | null {
   const keyJson = process.env.GA4_SERVICE_ACCOUNT_KEY;
   if (!keyJson) return null;
   if (_client) return _client;
+  const credentials = safeJsonParse<{ client_email: string; private_key: string }>(keyJson, "ga4");
+  if (!credentials) return null;
   try {
-    const credentials = JSON.parse(keyJson) as {
-      client_email: string;
-      private_key: string;
-    };
     _client = new BetaAnalyticsDataClient({ credentials });
     return _client;
   } catch (err) {
-    logWarn("ga4", "failed to parse GA4_SERVICE_ACCOUNT_KEY / init client", err);
+    logWarn("ga4", "failed to init BetaAnalyticsDataClient", err);
     return null;
   }
 }

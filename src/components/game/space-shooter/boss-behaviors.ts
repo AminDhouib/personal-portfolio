@@ -1,4 +1,4 @@
-import type { GameRefs, BossState, BossId, BossWallSegment, TractorBeam } from "./types";
+import type { GameRefs, BossState, BossId } from "./types";
 import { isPowerUpActive } from "./types";
 import { spawnExplosion, spawnShipDebris } from "./spawning";
 import { sounds } from "./sound-manager";
@@ -73,9 +73,8 @@ export function runWardenBehavior(g: GameRefs, boss: BossState, now: number, ste
   boss.position[0] = 0;
   boss.position[1] = 4;
   boss.position[2] = -15;
-  const holder = boss as unknown as { wallSegments?: BossWallSegment[] };
-  if (!holder.wallSegments) holder.wallSegments = [];
-  const segs = holder.wallSegments;
+  if (!boss.wallSegments) boss.wallSegments = [];
+  const segs = boss.wallSegments;
   const shotInterval = 4000 / boss.difficultyMult;
   if (now - boss.lastShotAt >= shotInterval) {
     const wallGroupId = Math.floor(now);
@@ -285,11 +284,10 @@ export function runHarvesterBehavior(
   boss.position[0] = Math.sin((now - boss.phaseStartAt) * 0.0004) * 4;
   boss.position[1] = 5;
   boss.position[2] = -14;
-  const beamHolder = boss as unknown as { tractorBeam?: TractorBeam };
-  if (!beamHolder.tractorBeam) {
-    beamHolder.tractorBeam = { active: false, startAt: 0, durationMs: 2000, shipOverlapAccum: 0 };
+  if (!boss.tractorBeam) {
+    boss.tractorBeam = { active: false, startAt: 0, durationMs: 2000, shipOverlapAccum: 0 };
   }
-  const beam = beamHolder.tractorBeam;
+  const beam = boss.tractorBeam;
   const CYCLE_MS = 4000 / boss.difficultyMult;
   const cycleAge = (now - boss.phaseStartAt) % CYCLE_MS;
   const deltaMs = step * 1000;
