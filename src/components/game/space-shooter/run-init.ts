@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { GameRefs, Environment, PowerUpType } from "./types";
+import type { GameRefs, PowerUpType } from "./types";
 import { ENVIRONMENTS, POWERUP_DURATION_MS, START_INVULN_MS } from "./types";
 import { buildBossSchedule } from "./boss-behaviors";
 import { sounds } from "./sound-manager";
@@ -11,21 +11,8 @@ export function pickNextBiomeDistance(currentDist: number): number {
   return currentDist + 700 + Math.random() * 900; // 700-1600m further
 }
 
-// Walls trigger every 25-40s of real time. Randomized so the player can't
-// memorize the cadence.
-export function nextWallTimeMs(now: number): number {
-  return now + 25_000 + Math.random() * 15_000;
-}
-
-export function pickRandomBiome(exclude: Environment | null): Environment {
-  if (!exclude) {
-    const idx = Math.floor(Math.random() * ENVIRONMENTS.length);
-    return ENVIRONMENTS[idx] ?? ENVIRONMENTS[0];
-  }
-  const others = ENVIRONMENTS.filter((e) => e !== exclude);
-  const idx = Math.floor(Math.random() * others.length);
-  return others[idx] ?? exclude;
-}
+// TODO: nextWallTimeMs and pickRandomBiome were removed (dead exports --
+// game-tick.ts has its own local copies that are actually used at runtime).
 
 export function createRefs(): GameRefs {
   // Status starts as "armed" -- the run begins on the player's first input.

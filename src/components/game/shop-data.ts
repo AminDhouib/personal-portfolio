@@ -138,9 +138,8 @@ export const CONSUMABLES: ConsumableDef[] = [
   },
 ];
 
-export function consumableById(id: ConsumableId): ConsumableDef | undefined {
-  return CONSUMABLES.find((c) => c.id === id);
-}
+// TODO: consumableById removed (dead -- no callers). Re-add if consumable
+// lookup by ID is needed outside the CONSUMABLES array.
 
 // ---------- Ships ----------
 

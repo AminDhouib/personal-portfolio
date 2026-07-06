@@ -101,14 +101,8 @@ export function spendCoins(n: number): { ok: boolean; profile: Profile } {
   return { ok: true, profile: p };
 }
 
-export function markTutorialComplete(): Profile {
-  const p = loadProfile();
-  if (!p.tutorialComplete) {
-    p.tutorialComplete = true;
-    saveProfile(p);
-  }
-  return p;
-}
+// TODO: markTutorialComplete was removed (dead — tutorial.ts deleted). If a
+// tutorial is re-added, re-implement against the profile schema.
 
 export function markFirstRunCompleted(): Profile {
   const p = loadProfile();
@@ -141,105 +135,12 @@ export function setUpgradeLevel(upgradeId: string, level: number): Profile {
   return p;
 }
 
-export function getUpgradeLevel(upgradeId: string): number {
-  return loadProfile().ownedUpgrades[upgradeId] ?? 0;
-}
+// TODO: getUpgradeLevel, addConsumable, consumeConsumable, getConsumableCount,
+// unlockCosmetic, equipCosmetic, ownsCosmetic, unlockShip were removed (dead --
+// the game reads/writes upgrades, consumables, and cosmetics via loadProfile()/
+// saveProfile() directly; these wrappers were built but never integrated).
+// Re-add if the shop UI starts using dedicated accessors.
 
-// ---------- Consumables ----------
-
-export function addConsumable(id: string, count: number = 1): Profile {
-  const p = loadProfile();
-  p.consumableInventory[id] = (p.consumableInventory[id] ?? 0) + count;
-  saveProfile(p);
-  return p;
-}
-
-export function consumeConsumable(id: string): { ok: boolean; profile: Profile } {
-  const p = loadProfile();
-  const current = p.consumableInventory[id] ?? 0;
-  if (current <= 0) return { ok: false, profile: p };
-  p.consumableInventory[id] = current - 1;
-  saveProfile(p);
-  return { ok: true, profile: p };
-}
-
-export function getConsumableCount(id: string): number {
-  return loadProfile().consumableInventory[id] ?? 0;
-}
-
-// ---------- Cosmetics & ships ----------
-
-export function unlockCosmetic(id: string): Profile {
-  const p = loadProfile();
-  if (!p.ownedCosmetics.includes(id)) {
-    p.ownedCosmetics.push(id);
-    saveProfile(p);
-  }
-  return p;
-}
-
-export function equipCosmetic(
-  slot: "hull" | "engine" | "deathFx" | "ship",
-  id: string | null,
-): Profile {
-  const p = loadProfile();
-  if (slot === "hull") p.equippedHull = id;
-  else if (slot === "engine") p.equippedEngine = id;
-  else if (slot === "deathFx") p.equippedDeathFx = id;
-  else if (slot === "ship" && id) p.equippedShip = id;
-  saveProfile(p);
-  return p;
-}
-
-export function ownsCosmetic(id: string): boolean {
-  return loadProfile().ownedCosmetics.includes(id);
-}
-
-export function unlockShip(id: string): Profile {
-  const p = loadProfile();
-  const key = `ship:${id}`;
-  if (!p.ownedCosmetics.includes(key)) {
-    p.ownedCosmetics.push(key);
-    saveProfile(p);
-  }
-  return p;
-}
-
-// ---------- Missions ----------
-
-export interface MissionProgress {
-  id: string;
-  progress: number;
-  claimed: boolean;
-}
-
-export function getMissions(): MissionProgress[] {
-  return loadProfile().missionsToday;
-}
-
-export function setMissions(missions: MissionProgress[], dateIso: string): Profile {
-  const p = loadProfile();
-  p.missionsToday = missions;
-  p.missionsResetDate = dateIso;
-  saveProfile(p);
-  return p;
-}
-
-export function advanceMission(id: string, delta: number = 1): Profile {
-  const p = loadProfile();
-  const m = p.missionsToday.find((x) => x.id === id);
-  if (m && !m.claimed) {
-    m.progress += delta;
-    saveProfile(p);
-  }
-  return p;
-}
-
-export function claimMission(id: string): { ok: boolean; profile: Profile } {
-  const p = loadProfile();
-  const m = p.missionsToday.find((x) => x.id === id);
-  if (!m || m.claimed) return { ok: false, profile: p };
-  m.claimed = true;
-  saveProfile(p);
-  return { ok: true, profile: p };
-}
+// TODO: getMissions, setMissions, advanceMission, claimMission, MissionProgress
+// were removed (dead -- missions.ts deleted). Re-implement if a daily-mission
+// system is re-added.
