@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logWarn } from "@/lib/log";
 import { safeJsonParse } from "@/lib/safe-json";
-import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { guardRequest } from "@/lib/route-guard";
 
 export const runtime = "nodejs";
 
@@ -26,20 +26,8 @@ const INGEST_URL = "https://sentry.devino.ca/api/35/envelope/";
 const MAX_ENVELOPE_BYTES = 1024 * 1024;
 
 export async function POST(request: NextRequest) {
-  if (!isSameOrigin(request)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
-  const rate = checkRateLimit(`monitoring:${getClientIp(request)}`, {
-    limit: 60,
-    windowMs: 60_000,
-  });
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: "rate limited" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-    );
-  }
+  const blocked = guardRequest(request, { key: "monitoring", limit: 60, windowMs: 60_000 });
+  if (blocked) return blocked;
 
   const body = await request.text();
   if (body.length > MAX_ENVELOPE_BYTES) {
