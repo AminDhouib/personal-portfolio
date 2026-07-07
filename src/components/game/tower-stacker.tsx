@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useLeaderboard } from "@/hooks/use-leaderboard";
 
 /**
  * Tower Stacker — embedded port of iamkun/tower_game (MIT License).
@@ -66,6 +67,9 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitRank, setSubmitRank] = useState<number | null>(null);
+  // Tower Stacker never reads the board (POST-only); fetchOnMount:false
+  // preserves that -- migrating to the hook must not add a new GET.
+  const { submit } = useLeaderboard("tower-stacker", { fetchOnMount: false });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -153,31 +157,20 @@ export default function TowerStacker(_props: { initialSeed?: string } = {}) {
       e.preventDefault();
       if (submitting || submitted) return;
       setSubmitting(true);
-      try {
-        const res = await fetch("/api/leaderboard", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name.trim().slice(0, 12) || "Stacker",
-            score: state.score,
-            level: Math.max(1, state.blocks),
-            game: "tower-stacker",
-          }),
-          signal: AbortSignal.timeout(8000),
-        });
-        if (res.ok) {
-          const json = (await res.json()) as { rank?: number };
-          setSubmitRank(typeof json.rank === "number" ? json.rank : null);
-          setSubmitted(true);
-        }
-      } catch (err) {
-        // A failed submit shouldn't break the UI; report to the tracker but stay silent to the player.
-        reportError(err);
-      } finally {
-        setSubmitting(false);
+      // A failed submit shouldn't break the UI; useLeaderboard.submit already
+      // reports to the tracker internally and resolves to { ok: false } here.
+      const result = await submit({
+        name: name.trim().slice(0, 12) || "Stacker",
+        score: state.score,
+        level: Math.max(1, state.blocks),
+      });
+      if (result.ok) {
+        setSubmitRank(result.rank ?? null);
+        setSubmitted(true);
       }
+      setSubmitting(false);
     },
-    [name, state.score, state.blocks, submitting, submitted],
+    [name, state.score, state.blocks, submitting, submitted, submit],
   );
 
   const showHud = state.started && !state.gameOver;

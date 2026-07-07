@@ -27,6 +27,31 @@ describe("useLeaderboard", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("does not fetch on mount when fetchOnMount is false (tower-stacker: POST-only, never reads the board)", async () => {
+    renderHook(() => useLeaderboard("tower-stacker", { fetchOnMount: false }));
+
+    // Give any stray microtask a chance to run before asserting the negative.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still supports an on-demand refresh() even when fetchOnMount is false", async () => {
+    const { result } = renderHook(() => useLeaderboard("tower-stacker", { fetchOnMount: false }));
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce(
+      okResponse({ entries: [{ name: "Ada", score: 1, level: 1, createdAt: "t" }] }),
+    );
+    let refreshed: unknown;
+    await act(async () => {
+      refreshed = await result.current.refresh();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(refreshed).toHaveLength(1);
+  });
+
   it("parses ok entries into state and clears loading/error", async () => {
     const seed = [{ name: "Ada", score: 10, level: 1, createdAt: "t" }];
     fetchMock.mockResolvedValueOnce(okResponse({ entries: seed }));

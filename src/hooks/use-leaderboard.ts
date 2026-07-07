@@ -58,6 +58,18 @@ function isLeaderboardEntry(x: unknown): x is LeaderboardEntry {
   );
 }
 
+export interface UseLeaderboardOptions {
+  /**
+   * Fetch the board once on mount (and whenever `game` changes). Default
+   * true, matching space-shooter's pre-existing mount-time fetch. hextris
+   * only reads the board on game-over (not on mount) and tower-stacker never
+   * reads it at all (POST-only) -- both pass `false` here and drive `refresh`
+   * themselves, so migrating them to this hook does not add a network call
+   * that did not exist before.
+   */
+  fetchOnMount?: boolean;
+}
+
 /**
  * Owns the read path (`entries`/`loading`/`error`/`refresh`) and provides an
  * imperative `submit` for one leaderboard game. Each game keeps its own
@@ -66,7 +78,8 @@ function isLeaderboardEntry(x: unknown): x is LeaderboardEntry {
  * this hook centralizes only the fetch/timeout/parse/error mechanics that
  * were hand-duplicated across the three call sites (RC-8, CT-006).
  */
-export function useLeaderboard(game: LeaderboardGame) {
+export function useLeaderboard(game: LeaderboardGame, options: UseLeaderboardOptions = {}) {
+  const { fetchOnMount = true } = options;
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,8 +112,8 @@ export function useLeaderboard(game: LeaderboardGame) {
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh, game]);
+    if (fetchOnMount) void refresh();
+  }, [refresh, game, fetchOnMount]);
 
   const submit = useCallback(
     async (payload: LeaderboardSubmitPayload): Promise<LeaderboardSubmitResult> => {
