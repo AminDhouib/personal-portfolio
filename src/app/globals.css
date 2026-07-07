@@ -197,23 +197,6 @@ body {
   }
 }
 
-/* Reduced motion: quiet the remaining page-chrome animations. Game animations
-   (hextris-*, ts-*, and framer-motion inside games) are intentionally exempt -
-   motion is part of gameplay, not decoration. See RC-6 / DESIGN.md. */
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  .pulse-dot,
-  .animate-marquee {
-    animation: none;
-  }
-  .nav-games-shimmer,
-  .copilotKitAssistantMessage {
-    animation: none !important;
-  }
-}
-
 /* Pulsing green dot for live indicators */
 @keyframes pulse-green {
   0%,
@@ -871,6 +854,26 @@ button[aria-label="Copy to clipboard"] {
   box-shadow:
     0 0 0 3px rgb(236, 72, 153),
     0 0 40px 12px rgba(236, 72, 153, 0.6);
+}
+
+/* Reduced motion: quiet the remaining page-chrome animations. Game animations
+   (hextris-*, ts-*, destruction.css, and framer-motion inside games) are
+   intentionally exempt - motion is part of gameplay, not decoration. See RC-6.
+   This block must stay at the END of the file: it wins over the base rules
+   above (.pulse-dot, .animate-marquee, html scroll-behavior) purely by cascade
+   order, since the specificity is equal. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .pulse-dot,
+  .animate-marquee {
+    animation: none;
+  }
+  .nav-games-shimmer,
+  .copilotKitAssistantMessage {
+    animation: none !important;
+  }
 }
 
 @import "../components/game/password-game/destruction.css";
