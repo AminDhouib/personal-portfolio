@@ -56,12 +56,17 @@ async function fetchAll(): Promise<CountryCapital[]> {
 
 export async function GET() {
   const capitals = await fetchAll();
+  // DD3-003: a failure must not be cached like a success — an empty list held
+  // for a week is a self-inflicted outage. Mirror chess-puzzle's short TTL so
+  // the CDN retries within minutes.
+  if (capitals.length === 0) {
+    return NextResponse.json(
+      { capitals, count: 0, source: "unavailable" },
+      { headers: { "cache-control": "public, s-maxage=300" } },
+    );
+  }
   return NextResponse.json(
-    {
-      capitals,
-      count: capitals.length,
-      source: capitals.length > 0 ? "restcountries" : "unavailable",
-    },
+    { capitals, count: capitals.length, source: "restcountries" },
     {
       headers: {
         "cache-control": "public, s-maxage=604800, stale-while-revalidate=86400",
