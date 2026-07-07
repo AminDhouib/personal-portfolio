@@ -28,6 +28,7 @@ import {
 import { rotatePoint, randInt } from "./hextris/logic";
 import { safeJsonParse } from "@/lib/safe-json";
 import { asNumberArray } from "@/lib/safe-storage";
+import { nextGameCrash } from "@/lib/report-game-error";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 
 // ═══════════════════════════════════════════════════════════════
@@ -40,6 +41,7 @@ export function HextrisGame() {
   const animRef = useRef(0);
   const destroyedRef = useRef(false);
   const [uiState, setUiState] = useState<"menu" | "playing" | "paused" | "gameover">("menu");
+  const [crashed, setCrashed] = useState(false);
   const [uiScore, setUiScore] = useState(0);
   const [uiMomentum, setUiMomentum] = useState(0);
   const [uiShrinkWarn, setUiShrinkWarn] = useState<number | null>(null);
@@ -1853,136 +1855,144 @@ export function HextrisGame() {
 
       animRef.current = requestAnimationFrame(animLoop);
 
-      const now = Date.now();
-      let dt = ((now - lastTime) / 16.666) * rush;
-      if (dt > 5) dt = 5; // cap delta to prevent physics explosions
+      try {
+        const now = Date.now();
+        let dt = ((now - lastTime) / 16.666) * rush;
+        if (dt > 5) dt = 5; // cap delta to prevent physics explosions
 
-      if (gameState === 1) {
-        if (mainHex.delay > 0) {
-          mainHex.delay--;
-        } else {
-          update(dt);
-        }
+        if (gameState === 1) {
+          if (mainHex.delay > 0) {
+            mainHex.delay--;
+          } else {
+            update(dt);
+          }
 
-        if (checkGameOver()) {
-          gameState = 2;
-          haptic([80, 40, 80, 40, 80]); // game-over rumble
-          // Game-over music jingle is triggered by the uiState effect
-          setUiState("gameover");
-          setUiScore(score);
-          setUiHigh(highscores[0] || 0);
-          setUiStats({
-            maxCombo: maxComboSeen,
-            pieces: piecesCleared,
-            seconds: Math.floor((Date.now() - gameStartMs) / 1000),
-            difficulty: Math.max(1, Math.floor(waveGen.difficulty)),
-          });
-        }
-      } else if (gameState === 2) {
-        update(dt); // continue death animation
-      }
-
-      render();
-
-      // Sync score to React state when it changes + trigger HUD pulse
-      if (score !== lastSyncedScore) {
-        lastSyncedScore = score;
-        setUiScore(score);
-        setScorePulse((p) => p + 1);
-      }
-
-      // Sync combo. Also reset when the combo window has elapsed so the
-      // HUD chip goes back to 1 once the timer runs out.
-      let currentCombo = mainHex.comboMultiplier;
-      if (mainHex.ct - mainHex.lastCombo >= settings.comboTime) {
-        currentCombo = 1;
-      }
-      if (currentCombo !== lastSyncedCombo) {
-        // Fire a milestone burst on EVERY combo increase (from 2 onward).
-        // Color steps through 6 accents so every new combo feels distinct.
-        // Skip if a CLEAN SWEEP just fired this frame — it should dominate.
-        const sweepRecent = performance.now() - lastCleanSweepMs < 200;
-        if (currentCombo > lastSyncedCombo && currentCombo >= 2 && !sweepRecent) {
-          const palette = [
-            "#6366f1", // blue
-            "#22c55e", // green
-            "#06b6d4", // cyan
-            "#f59e0b", // amber
-            "#a78bfa", // purple
-            "#ec4899", // pink
-          ];
-          const color = palette[(currentCombo - 2) % palette.length];
-          if (color) {
-            setMilestone({
-              id: Date.now(),
-              text: `×${currentCombo} COMBO!`,
-              color,
+          if (checkGameOver()) {
+            gameState = 2;
+            haptic([80, 40, 80, 40, 80]); // game-over rumble
+            // Game-over music jingle is triggered by the uiState effect
+            setUiState("gameover");
+            setUiScore(score);
+            setUiHigh(highscores[0] || 0);
+            setUiStats({
+              maxCombo: maxComboSeen,
+              pieces: piecesCleared,
+              seconds: Math.floor((Date.now() - gameStartMs) / 1000),
+              difficulty: Math.max(1, Math.floor(waveGen.difficulty)),
             });
           }
+        } else if (gameState === 2) {
+          update(dt); // continue death animation
         }
-        lastSyncedCombo = currentCombo;
-        setUiCombo(currentCombo);
-      }
 
-      // Sync momentum to React state. Round to integer to avoid jittery re-renders.
-      const displayMomentum = Math.floor(momentum);
-      if (displayMomentum !== lastSyncedMomentum) {
-        lastSyncedMomentum = displayMomentum;
-        setUiMomentum(displayMomentum);
-      }
+        render();
 
-      // Scale music tempo with game difficulty only (~every 1s). Base 105 →
-      // ~175 BPM at max difficulty 35. The player-controlled rush key must NOT
-      // affect tempo — the music is its own thing, driven by the game itself.
-      if (gameState === 1 && now - lastTempoSync > 1000) {
-        lastTempoSync = now;
-        const difficulty = Math.min(35, waveGen.difficulty);
-        sounds.setMusicTempo(105 + difficulty * 2);
-      }
-
-      // Shrinking boundary — every 60s of play, reduce rows by one until floor.
-      // Show a 5-second countdown warning before each shrink so players can
-      // evacuate the outer ring instead of losing to a sudden wall.
-      if (gameState === 1 && settings.rows > MIN_ROWS) {
-        const untilShrink = nextShrinkMs - now;
-        const warning =
-          untilShrink <= SHRINK_WARN_MS && untilShrink > 0
-            ? Math.max(1, Math.ceil(untilShrink / 1000))
-            : null;
-        if (warning !== lastSyncedShrinkWarn) {
-          lastSyncedShrinkWarn = warning;
-          setUiShrinkWarn(warning);
+        // Sync score to React state when it changes + trigger HUD pulse
+        if (score !== lastSyncedScore) {
+          lastSyncedScore = score;
+          setUiScore(score);
+          setScorePulse((p) => p + 1);
         }
-        // Tick sound on each second of the countdown.
-        if (warning !== null && warning !== lastShrinkTickSec) {
-          lastShrinkTickSec = warning;
-          sounds.rotate();
-          haptic([15]);
+
+        // Sync combo. Also reset when the combo window has elapsed so the
+        // HUD chip goes back to 1 once the timer runs out.
+        let currentCombo = mainHex.comboMultiplier;
+        if (mainHex.ct - mainHex.lastCombo >= settings.comboTime) {
+          currentCombo = 1;
         }
-        if (untilShrink <= 0) {
-          settings.rows -= 1;
-          nextShrinkMs = now + 60000;
-          lastShrinkTickSec = -1;
+        if (currentCombo !== lastSyncedCombo) {
+          // Fire a milestone burst on EVERY combo increase (from 2 onward).
+          // Color steps through 6 accents so every new combo feels distinct.
+          // Skip if a CLEAN SWEEP just fired this frame — it should dominate.
+          const sweepRecent = performance.now() - lastCleanSweepMs < 200;
+          if (currentCombo > lastSyncedCombo && currentCombo >= 2 && !sweepRecent) {
+            const palette = [
+              "#6366f1", // blue
+              "#22c55e", // green
+              "#06b6d4", // cyan
+              "#f59e0b", // amber
+              "#a78bfa", // purple
+              "#ec4899", // pink
+            ];
+            const color = palette[(currentCombo - 2) % palette.length];
+            if (color) {
+              setMilestone({
+                id: Date.now(),
+                text: `×${currentCombo} COMBO!`,
+                color,
+              });
+            }
+          }
+          lastSyncedCombo = currentCombo;
+          setUiCombo(currentCombo);
+        }
+
+        // Sync momentum to React state. Round to integer to avoid jittery re-renders.
+        const displayMomentum = Math.floor(momentum);
+        if (displayMomentum !== lastSyncedMomentum) {
+          lastSyncedMomentum = displayMomentum;
+          setUiMomentum(displayMomentum);
+        }
+
+        // Scale music tempo with game difficulty only (~every 1s). Base 105 →
+        // ~175 BPM at max difficulty 35. The player-controlled rush key must NOT
+        // affect tempo — the music is its own thing, driven by the game itself.
+        if (gameState === 1 && now - lastTempoSync > 1000) {
+          lastTempoSync = now;
+          const difficulty = Math.min(35, waveGen.difficulty);
+          sounds.setMusicTempo(105 + difficulty * 2);
+        }
+
+        // Shrinking boundary — every 60s of play, reduce rows by one until floor.
+        // Show a 5-second countdown warning before each shrink so players can
+        // evacuate the outer ring instead of losing to a sudden wall.
+        if (gameState === 1 && settings.rows > MIN_ROWS) {
+          const untilShrink = nextShrinkMs - now;
+          const warning =
+            untilShrink <= SHRINK_WARN_MS && untilShrink > 0
+              ? Math.max(1, Math.ceil(untilShrink / 1000))
+              : null;
+          if (warning !== lastSyncedShrinkWarn) {
+            lastSyncedShrinkWarn = warning;
+            setUiShrinkWarn(warning);
+          }
+          // Tick sound on each second of the countdown.
+          if (warning !== null && warning !== lastShrinkTickSec) {
+            lastShrinkTickSec = warning;
+            sounds.rotate();
+            haptic([15]);
+          }
+          if (untilShrink <= 0) {
+            settings.rows -= 1;
+            nextShrinkMs = now + 60000;
+            lastShrinkTickSec = -1;
+            lastSyncedShrinkWarn = null;
+            setUiShrinkWarn(null);
+            setMilestone({
+              id: Date.now() + 5,
+              text: "BOUNDARY TIGHTENS",
+              color: "#f59e0b",
+            });
+            lastCleanSweepMs = performance.now();
+            sounds.gameOver();
+            haptic([40, 20, 40]);
+          }
+        } else if (lastSyncedShrinkWarn !== null) {
           lastSyncedShrinkWarn = null;
           setUiShrinkWarn(null);
-          setMilestone({
-            id: Date.now() + 5,
-            text: "BOUNDARY TIGHTENS",
-            color: "#f59e0b",
-          });
-          lastCleanSweepMs = performance.now();
-          sounds.gameOver();
-          haptic([40, 20, 40]);
         }
-      } else if (lastSyncedShrinkWarn !== null) {
-        lastSyncedShrinkWarn = null;
-        setUiShrinkWarn(null);
-      }
 
-      lastTime = now;
+        lastTime = now;
 
-      if (!(gameState === 1 || gameState === 2)) {
-        lastTime = Date.now();
+        if (!(gameState === 1 || gameState === 2)) {
+          lastTime = Date.now();
+        }
+      } catch (err) {
+        cancelAnimationFrame(animRef.current);
+        destroyedRef.current = true;
+        const crash = nextGameCrash("hextris", err);
+        if (crash) reportError(crash);
+        setCrashed(true);
       }
     }
 
@@ -2664,6 +2674,27 @@ export function HextrisGame() {
               className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
             >
               Play again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Crash overlay — the game loop threw and stopped; reload is the
+          honest recovery (a "retry" that reruns the same crashing frame
+          could re-crash). Reuses the game-over card's classes. */}
+      {crashed && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center overflow-auto px-3 py-4 sm:px-4">
+          <div className="hextris-gameover-in pointer-events-auto w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-4 text-center text-white shadow-2xl backdrop-blur-md sm:p-6">
+            <div className="mb-2 font-mono text-[11px] tracking-widest text-accent-pink uppercase">
+              Game Error
+            </div>
+            <div className="mt-2 text-sm text-white/70">This game hit an error and stopped.</div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
+            >
+              Reload
             </button>
           </div>
         </div>
