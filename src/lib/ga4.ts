@@ -1,6 +1,6 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import { logWarn } from "@/lib/log";
-import { safeJsonParse } from "@/lib/safe-json";
+import { safeJsonParseServer } from "@/lib/safe-json-server";
 import { env } from "@/env";
 
 const propertyIds: Record<string, string | undefined> = {
@@ -21,7 +21,10 @@ function getClient(): BetaAnalyticsDataClient | null {
   const keyJson = env.GA4_SERVICE_ACCOUNT_KEY;
   if (!keyJson) return null;
   if (_client) return _client;
-  const credentials = safeJsonParse<{ client_email: string; private_key: string }>(keyJson, "ga4");
+  const credentials = safeJsonParseServer<{ client_email: string; private_key: string }>(
+    keyJson,
+    "ga4",
+  );
   if (!credentials) return null;
   try {
     _client = new BetaAnalyticsDataClient({ credentials });

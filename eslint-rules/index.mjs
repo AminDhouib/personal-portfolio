@@ -57,7 +57,28 @@ function containsUnknown(typeNode) {
   return walk(typeNode, (n) => n.type === "TSUnknownKeyword");
 }
 
-const APPROVED_REPORTERS = new Set(["captureException", "logError", "logWarn", "reportError"]);
+// Reporters that reach a tracker on the SERVER (console + Sentry + PostHog via
+// @/lib/log). The browser-only `reportError` global is NOT here: Node has the
+// global too, but no server SDK listens to it — treating it as a valid server
+// reporter is exactly what let the NF-1 regression pass this gate.
+const SERVER_REPORTERS = new Set(["captureException", "logError", "logWarn"]);
+// In `"use client"` modules, `reportError` reaches window.onerror -> Sentry client.
+const CLIENT_REPORTERS = new Set([...SERVER_REPORTERS, "reportError"]);
+// Shared modules that run in BOTH bundles cannot import @/lib/log (posthog-node
+// breaks client builds); they take an injected reporter and default to the
+// client path, so `reportError` is accepted here. Keep this list to modules
+// whose server entry point injects captureException (see safe-json-server.ts).
+const INJECTED_REPORTER_FILES = ["src/lib/safe-json.ts"];
+
+/** Client component/module per Next.js semantics: leading `"use client"` directive. */
+function isClientModule(sourceCode) {
+  const first = sourceCode.ast.body[0];
+  return (
+    first?.type === "ExpressionStatement" &&
+    typeof first.directive === "string" &&
+    first.directive === "use client"
+  );
+}
 
 /** @type {Record<string, import("eslint").Rule.RuleModule>} */
 const rules = {
@@ -66,16 +87,22 @@ const rules = {
       type: "problem",
       docs: {
         description:
-          "every catch must rethrow, call an approved reporter, or carry a `// silent-ok: <reason>` comment",
+          'every catch must rethrow, call a reporter approved for its environment (server: captureException/logError/logWarn; client `"use client"` modules may also use reportError), or carry a `// silent-ok: <reason>` comment',
       },
       schema: [],
       messages: {
         silent:
-          "Catch swallows the error. Rethrow, call an approved reporter (captureException / logError / logWarn / reportError), or add `// silent-ok: <reason>` inside the block.",
+          "Catch swallows the error. Rethrow, call an approved reporter (server: captureException / logError / logWarn; client modules may also use reportError), or add `// silent-ok: <reason>` inside the block.",
+        clientOnlyReporter:
+          "`reportError` only reaches a tracker in the browser (window.onerror -> Sentry client); in server code it vanishes (NF-1). Use captureException / logError / logWarn here.",
       },
     },
     create(context) {
       const sourceCode = context.sourceCode ?? context.getSourceCode();
+      const filename = context.filename.replace(/\\/g, "/");
+      const clientContext =
+        isClientModule(sourceCode) || INJECTED_REPORTER_FILES.some((f) => filename.endsWith(f));
+      const approved = clientContext ? CLIENT_REPORTERS : SERVER_REPORTERS;
       return {
         CatchClause(node) {
           const block = node.body;
@@ -83,22 +110,30 @@ const rules = {
           const comments = sourceCode.getCommentsInside(block);
           if (comments.some((c) => /\bsilent-ok\b/i.test(c.value))) return;
           // 2) rethrow or approved reporter anywhere in the block
+          let sawClientOnlyReporter = false;
           const handled = walk(block, (n) => {
             if (n.type === "ThrowStatement") return true;
             if (n.type === "CallExpression") {
               const callee = n.callee;
-              if (callee.type === "Identifier" && APPROVED_REPORTERS.has(callee.name)) return true;
-              if (
-                callee.type === "MemberExpression" &&
-                callee.property.type === "Identifier" &&
-                APPROVED_REPORTERS.has(callee.property.name)
-              ) {
-                return true;
+              const name =
+                callee.type === "Identifier"
+                  ? callee.name
+                  : callee.type === "MemberExpression" && callee.property.type === "Identifier"
+                    ? callee.property.name
+                    : null;
+              if (name !== null) {
+                if (approved.has(name)) return true;
+                if (name === "reportError") sawClientOnlyReporter = true;
               }
             }
             return false;
           });
-          if (!handled) context.report({ node, messageId: "silent" });
+          if (!handled) {
+            context.report({
+              node,
+              messageId: sawClientOnlyReporter ? "clientOnlyReporter" : "silent",
+            });
+          }
         },
       };
     },
