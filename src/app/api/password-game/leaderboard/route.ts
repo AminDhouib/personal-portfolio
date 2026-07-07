@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
 import { pgLeaderboardEntrySchema, type PgLeaderboardEntry } from "@/lib/persistence-schemas";
-import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
 import { env } from "@/env";
 
@@ -47,27 +47,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!isSameOrigin(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-  const rate = checkRateLimit(`pg-leaderboard:${getClientIp(req)}`, {
+  const guard = await guardedJsonRoute(req, {
+    key: "pg-leaderboard",
     limit: 10,
     windowMs: 60_000,
   });
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: "too many requests" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-    );
-  }
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    // silent-ok: malformed request JSON is a client error, surfaced as the 400 below
-    return NextResponse.json({ error: "invalid json" }, { status: 400 });
-  }
-  const parsed = pgBodySchema.safeParse(raw);
+  if (!guard.ok) return guard.response;
+  const parsed = pgBodySchema.safeParse(guard.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }

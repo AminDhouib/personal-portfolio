@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
 import { leaderboardEntrySchema, type LeaderboardEntry } from "@/lib/persistence-schemas";
 import { LEADERBOARD_GAMES } from "@/lib/leaderboard-games";
-import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
 import { env } from "@/env";
 
@@ -58,27 +58,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!isSameOrigin(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-  const rate = checkRateLimit(`leaderboard:${getClientIp(req)}`, { limit: 10, windowMs: 60_000 });
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: "too many requests" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-    );
-  }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    // silent-ok: a malformed request body is a client error, surfaced as the 400 below
-    return NextResponse.json({ error: "invalid json" }, { status: 400 });
-  }
-  if (!body || typeof body !== "object") {
+  const guard = await guardedJsonRoute(req, { key: "leaderboard", limit: 10, windowMs: 60_000 });
+  if (!guard.ok) return guard.response;
+  if (!guard.body || typeof guard.body !== "object") {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-  const o = body as Record<string, unknown>;
+  const o = guard.body as Record<string, unknown>;
   const score = typeof o.score === "number" ? Math.floor(o.score) : NaN;
   const level = typeof o.level === "number" ? Math.floor(o.level) : NaN;
   if (!Number.isFinite(score) || score < 0 || score > SCORE_CAP) {

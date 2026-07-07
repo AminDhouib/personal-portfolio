@@ -3,7 +3,7 @@ import { z } from "zod";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Resend } from "resend";
-import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
 import { env } from "@/env";
 
@@ -36,27 +36,10 @@ function leadsPaths(): { dataDir: string; filePath: string } {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isSameOrigin(req)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const guard = await guardedJsonRoute(req, { key: "leads", limit: 5, windowMs: 60_000 });
+  if (!guard.ok) return guard.response;
 
-  const rate = checkRateLimit(`leads:${getClientIp(req)}`, { limit: 5, windowMs: 60_000 });
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-    );
-  }
-
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    // silent-ok: malformed request JSON is a client error, surfaced as the 400 below
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const parsed = leadSchema.safeParse(raw);
+  const parsed = leadSchema.safeParse(guard.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
