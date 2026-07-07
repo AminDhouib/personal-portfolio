@@ -19,6 +19,15 @@ type SfxKind =
 let audioCtx: AudioContext | null = null;
 let enabled = false;
 
+const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+function schedule(fn: () => void, delayMs: number): void {
+  const id = setTimeout(() => {
+    pendingTimers.delete(id);
+    fn();
+  }, delayMs);
+  pendingTimers.add(id);
+}
+
 function ensureCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (audioCtx) return audioCtx;
@@ -50,6 +59,8 @@ export function isSoundEnabled(): boolean {
  */
 export function closeSound(): void {
   enabled = false;
+  for (const id of pendingTimers) clearTimeout(id);
+  pendingTimers.clear();
   if (audioCtx) {
     audioCtx.close().catch(() => undefined);
     audioCtx = null;
@@ -66,7 +77,7 @@ export function play(kind: SfxKind): void {
   switch (kind) {
     case "rule-complete":
       tone(ctx, 880, 0.12, "sine", 0.12);
-      setTimeout(() => tone(ctx, 1320, 0.12, "sine", 0.1), 60);
+      schedule(() => tone(ctx, 1320, 0.12, "sine", 0.1), 60);
       break;
     case "rule-fail":
       tone(ctx, 180, 0.2, "sawtooth", 0.08);
@@ -76,9 +87,9 @@ export function play(kind: SfxKind): void {
       break;
     case "win":
       tone(ctx, 660, 0.12, "sine", 0.12);
-      setTimeout(() => tone(ctx, 880, 0.12, "sine", 0.12), 80);
-      setTimeout(() => tone(ctx, 1100, 0.18, "sine", 0.14), 160);
-      setTimeout(() => tone(ctx, 1320, 0.26, "sine", 0.18), 280);
+      schedule(() => tone(ctx, 880, 0.12, "sine", 0.12), 80);
+      schedule(() => tone(ctx, 1100, 0.18, "sine", 0.14), 160);
+      schedule(() => tone(ctx, 1320, 0.26, "sine", 0.18), 280);
       break;
     case "chaos":
       noise(ctx, 0.25, 0.08);
@@ -86,23 +97,23 @@ export function play(kind: SfxKind): void {
     case "crack":
       // Glass-breaking impression: sharp initial click, then tinkling high burst.
       tone(ctx, 2800, 0.04, "square", 0.15);
-      setTimeout(() => filteredNoise(ctx, 0.22, 0.18, 4500), 15);
-      setTimeout(() => tone(ctx, 3200 + Math.random() * 400, 0.05, "triangle", 0.06), 80);
-      setTimeout(() => tone(ctx, 2600 + Math.random() * 300, 0.05, "triangle", 0.05), 140);
-      setTimeout(() => tone(ctx, 3800 + Math.random() * 200, 0.04, "triangle", 0.04), 200);
+      schedule(() => filteredNoise(ctx, 0.22, 0.18, 4500), 15);
+      schedule(() => tone(ctx, 3200 + Math.random() * 400, 0.05, "triangle", 0.06), 80);
+      schedule(() => tone(ctx, 2600 + Math.random() * 300, 0.05, "triangle", 0.05), 140);
+      schedule(() => tone(ctx, 3800 + Math.random() * 200, 0.04, "triangle", 0.04), 200);
       break;
     case "rumble":
       // Deep low-frequency rumble — felt more than heard. Used to mark a
       // new chaos tier unlocking, under the crack SFX.
       tone(ctx, 55, 0.8, "sine", 0.2);
-      setTimeout(() => tone(ctx, 42, 0.9, "sine", 0.18), 100);
-      setTimeout(() => tone(ctx, 70, 0.6, "sine", 0.1), 250);
+      schedule(() => tone(ctx, 42, 0.9, "sine", 0.18), 100);
+      schedule(() => tone(ctx, 70, 0.6, "sine", 0.1), 250);
       break;
     case "unsatisfy":
       // Descending two-tone "wrong" alert. Fires when a cleared rule becomes
       // unsatisfied again (player typed over a constraint).
       tone(ctx, 420, 0.12, "sawtooth", 0.14);
-      setTimeout(() => tone(ctx, 260, 0.2, "sawtooth", 0.12), 80);
+      schedule(() => tone(ctx, 260, 0.2, "sawtooth", 0.12), 80);
       break;
     case "keypress":
       tone(ctx, 1400 + Math.random() * 200, 0.02, "square", 0.02);
@@ -117,6 +128,7 @@ function tone(
   type: OscillatorType,
   volume: number,
 ): void {
+  if (ctx.state === "closed") return;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = type;
@@ -131,6 +143,7 @@ function tone(
 }
 
 function noise(ctx: AudioContext, duration: number, volume: number): void {
+  if (ctx.state === "closed") return;
   const bufferSize = Math.floor(ctx.sampleRate * duration);
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -154,6 +167,7 @@ function filteredNoise(
   volume: number,
   cutoffHz: number,
 ): void {
+  if (ctx.state === "closed") return;
   const bufferSize = Math.floor(ctx.sampleRate * duration);
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);
