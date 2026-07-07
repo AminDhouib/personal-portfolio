@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { checkRateLimit, getClientIp, isSameOrigin } from "../rate-limit";
 
 describe("checkRateLimit", () => {
@@ -102,17 +102,6 @@ describe("getClientIp", () => {
 });
 
 describe("isSameOrigin", () => {
-  const savedSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-  beforeEach(() => {
-    delete process.env.NEXT_PUBLIC_SITE_URL;
-  });
-
-  afterEach(() => {
-    if (savedSiteUrl === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
-    else process.env.NEXT_PUBLIC_SITE_URL = savedSiteUrl;
-  });
-
   it("accepts when the Origin host matches x-forwarded-host", () => {
     const req = new Request("http://localhost/api/leads", {
       method: "POST",
@@ -125,15 +114,6 @@ describe("isSameOrigin", () => {
     const req = new Request("http://localhost/api/leads", {
       method: "POST",
       headers: { origin: "http://localhost:3000", host: "localhost:3000" },
-    });
-    expect(isSameOrigin(req)).toBe(true);
-  });
-
-  it("accepts an Origin matching NEXT_PUBLIC_SITE_URL even when the host differs", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://amindhou.com";
-    const req = new Request("http://localhost/api/leads", {
-      method: "POST",
-      headers: { origin: "https://amindhou.com", "x-forwarded-host": "internal-proxy:8080" },
     });
     expect(isSameOrigin(req)).toBe(true);
   });

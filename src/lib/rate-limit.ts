@@ -6,8 +6,6 @@
  * a module-level Map and resets on redeploy, which is fine for abuse throttling.
  */
 
-import { env } from "@/env";
-
 export interface RateLimitOptions {
   /** Maximum number of requests permitted within the window. */
   limit: number;
@@ -90,13 +88,12 @@ export function getClientIp(request: Request): string {
 /**
  * Same-origin guard for browser-facing POST endpoints. Requires an Origin header
  * whose host matches the request's own host (x-forwarded-host from Traefik first,
- * then Host). NEXT_PUBLIC_SITE_URL's host is also accepted when configured. A
- * missing Origin is rejected — legitimate browser POSTs always send one.
+ * then Host). A missing Origin is rejected — legitimate browser POSTs always send
+ * one.
  */
 export function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
-
   let originHost: string;
   try {
     originHost = new URL(origin).host;
@@ -105,18 +102,6 @@ export function isSameOrigin(request: Request): boolean {
     return false;
   }
   if (!originHost) return false;
-
   const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (requestHost && originHost === requestHost) return true;
-
-  const siteUrl = env.NEXT_PUBLIC_SITE_URL;
-  if (siteUrl) {
-    try {
-      if (originHost === new URL(siteUrl).host) return true;
-    } catch {
-      // silent-ok: malformed NEXT_PUBLIC_SITE_URL is a deploy-time config issue; fall through to reject
-    }
-  }
-
-  return false;
+  return Boolean(requestHost && originHost === requestHost);
 }

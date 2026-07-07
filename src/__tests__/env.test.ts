@@ -32,7 +32,6 @@ describe("env gateway", () => {
 
   it("treats an empty string as unset (verbatim .env.example copy must not crash)", async () => {
     process.env.SENTRY_DSN = "";
-    process.env.NEXT_PUBLIC_SITE_URL = "";
     await expect(freshImport()).resolves.toBeDefined();
   });
 

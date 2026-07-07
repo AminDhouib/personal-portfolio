@@ -25,7 +25,6 @@ const schema = z.object({
   LEADERBOARD_DATA_DIR: z.string().optional(),
   PG_LEADERBOARD_DIR: z.string().optional(),
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.url().optional()),
-  NEXT_PUBLIC_SITE_URL: z.preprocess(emptyToUndefined, z.url().optional()),
 });
 
 export type Env = z.infer<typeof schema>;
