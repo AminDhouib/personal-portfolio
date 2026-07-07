@@ -14,26 +14,40 @@ Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog,
 
 ## Getting started
 
+Requires Node.js >= 22 (see `.nvmrc` / the `engines` field in `package.json`).
+
 ```bash
 corepack enable
 pnpm install
-cp .env.example .env.local   # optional — see below
+cp -n .env.example .env.local   # optional, see below — -n skips the copy if .env.local exists
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Everything in `.env.example` is optional for local dev: each integration (AI chat, GitHub stats, GA4, lead emails) degrades gracefully — falling back to public/unauthenticated data or simply going quiet — when its variable is unset. See the comments in `.env.example` for the exact fallback behavior of each one.
+`pnpm dev` binds the next free port if 3000 is already taken on your machine (Turbopack prints
+`⚠ Port 3000 is in use ..., using available port XXXX instead`) — read the terminal output for
+the actual URL rather than assuming `localhost:3000`. If you instead see `Another next dev server
+is already running`, a previous `next dev` process is still holding a lock; stop that process
+before starting a new one. A `Warning: Custom Cache-Control headers detected for the following
+routes` notice on startup is also expected — this repo sets custom cache headers on purpose; it
+isn't a misconfiguration.
+
+Everything in `.env.example` is optional for local dev: each integration (AI chat, GitHub stats, GA4, lead emails) degrades gracefully — falling back to public/unauthenticated data or simply going quiet — when its variable is unset. See the comments in `.env.example` for the exact fallback behavior of each one.
 
 ## Scripts
 
-| Script | Description |
-| --- | --- |
-| `pnpm dev` | Start the dev server (Turbopack) |
-| `pnpm build` | Production build |
-| `pnpm start` | Serve the production build |
-| `pnpm lint` | ESLint |
-| `pnpm typecheck` | Type-check with `tsc --noEmit` |
-| `pnpm test` | Run the test suite once |
-| `pnpm test:watch` | Run tests in watch mode |
+| Script               | Description                                                  |
+| -------------------- | ------------------------------------------------------------ |
+| `pnpm dev`           | Start the dev server (Turbopack)                             |
+| `pnpm build`         | Production build                                             |
+| `pnpm start`         | Serve the production build                                   |
+| `pnpm lint`          | ESLint                                                       |
+| `pnpm typecheck`     | Type-check with `tsc --noEmit`                               |
+| `pnpm format`        | Format the codebase with Prettier                            |
+| `pnpm format:check`  | Check formatting without writing changes                     |
+| `pnpm test`          | Run the test suite once                                      |
+| `pnpm test:watch`    | Run tests in watch mode                                      |
+| `pnpm test:coverage` | Run the test suite once with coverage                        |
+| `pnpm validate:data` | Validate the shape of the persisted `.data` JSON/JSONL files |
 
 ## Project structure
 
