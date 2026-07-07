@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
+import { pgLeaderboardEntrySchema, type PgLeaderboardEntry } from "@/lib/persistence-schemas";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 import { captureException } from "@/lib/log";
 import { env } from "@/env";
@@ -8,24 +9,10 @@ import { env } from "@/env";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface Entry {
-  name: string;
-  seed: number;
-  time: number;
-  rules: number;
-  createdAt: string;
-}
+type Entry = PgLeaderboardEntry;
 
 function isEntry(x: unknown): x is Entry {
-  if (!x || typeof x !== "object") return false;
-  const o = x as Record<string, unknown>;
-  return (
-    typeof o.name === "string" &&
-    typeof o.seed === "number" &&
-    typeof o.time === "number" &&
-    typeof o.rules === "number" &&
-    typeof o.createdAt === "string"
-  );
+  return pgLeaderboardEntrySchema.safeParse(x).success;
 }
 
 const store = createLeaderboardStore<Entry>({
