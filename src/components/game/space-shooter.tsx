@@ -108,8 +108,8 @@ function SettingsToggle({
 
 // ---------- leaderboard helpers ----------
 // fetchLeaderboard/submitScore moved to useLeaderboard("space-shooter")
-// (RC-8, CT-006); the shared hook injects level:1 the same way the old
-// submitScore did (legacy shape so the route validates the old field).
+// (RC-8, CT-006); the hook injects `game`, while the submit call site below
+// still passes level:1 itself (legacy shape so the route validates the old field).
 
 // Detect the player's country/region for the leaderboard. Free, no API key
 // required. Falls back to "" silently if blocked.
