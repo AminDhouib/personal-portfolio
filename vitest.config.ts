@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
@@ -8,6 +8,14 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // vitest 4's defaultExclude is minimal (node_modules, .git only) -- .next
+    // is not covered. A `pnpm build` leaves stale test-file copies under
+    // .next/standalone (Next's file tracing pulls in eslint-rules/*.test.mjs
+    // and scripts/*.test.mjs); without this, a `pnpm test` run after a build
+    // double-counts those files. Spread configDefaults.exclude rather than
+    // replacing it -- setting `exclude` bare drops the node_modules/.git
+    // exclusions too (vitest 4 behavior, confirmed against installed 4.1.4).
+    exclude: [...configDefaults.exclude, "**/.next/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json-summary", "lcov"],
