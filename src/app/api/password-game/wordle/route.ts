@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { WORDLE_WORDS, wordleOfTheDay } from "../../../../data/password-game/wordle";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -34,12 +34,21 @@ async function fetchNyt(dateIso: string): Promise<string | null> {
       next: { revalidate: 60 * 60 * 12 },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      logWarn("api:wordle", "upstream returned a non-OK status", { status: res.status });
+      return null;
+    }
     const data: NytWordle = await res.json();
     const raw = data.solution;
-    if (typeof raw !== "string") return null;
+    if (typeof raw !== "string") {
+      logWarn("api:wordle", "upstream payload missing a solution string");
+      return null;
+    }
     const word = raw.toUpperCase();
-    if (!/^[A-Z]{5}$/.test(word)) return null;
+    if (!/^[A-Z]{5}$/.test(word)) {
+      logWarn("api:wordle", "upstream solution failed the 5-letter validation regex", { word });
+      return null;
+    }
     return word;
   } catch (err) {
     captureException("api:wordle", err);

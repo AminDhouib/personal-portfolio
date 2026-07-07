@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-vi.mock("@/lib/log", () => ({ captureException: vi.fn() }));
+vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn() }));
 
 import { GET } from "../route";
+import { logWarn } from "@/lib/log";
 
 const REST_PAYLOAD = [
   { name: { common: "Japan" }, capital: ["Tokyo"] },
@@ -19,6 +20,7 @@ function fetchResolving(value: { ok: boolean; body?: unknown }) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.mocked(logWarn).mockClear();
 });
 
 describe("GET /api/password-game/countries", () => {
@@ -52,5 +54,14 @@ describe("GET /api/password-game/countries", () => {
     const body = await res.json();
     expect(body.source).toBe("unavailable");
     expect(res.headers.get("cache-control")).toBe("public, s-maxage=300");
+    expect(logWarn).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a warning and treats a malformed (non-array) upstream payload as unavailable", async () => {
+    vi.stubGlobal("fetch", fetchResolving({ ok: true, body: { not: "an array" } }));
+    const res = await GET();
+    const body = await res.json();
+    expect(body.source).toBe("unavailable");
+    expect(logWarn).toHaveBeenCalledTimes(1);
   });
 });

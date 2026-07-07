@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -30,9 +30,15 @@ async function fetchAll(): Promise<CountryCapital[]> {
       next: { revalidate: 60 * 60 * 24 * 7 },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      logWarn("api:countries", "upstream returned a non-OK status", { status: res.status });
+      return [];
+    }
     const data: RestCountry[] = await res.json();
-    if (!Array.isArray(data)) return [];
+    if (!Array.isArray(data)) {
+      logWarn("api:countries", "upstream payload was not an array");
+      return [];
+    }
     const out: CountryCapital[] = [];
     for (const c of data) {
       const country = c.name?.common;

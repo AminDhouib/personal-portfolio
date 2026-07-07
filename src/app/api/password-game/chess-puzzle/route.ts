@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Chess } from "chess.js";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -84,11 +84,15 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
       next: { revalidate: 60 * 60 * 12 },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      logWarn("api:chess-puzzle", "upstream returned a non-OK status", { status: res.status });
+      return null;
+    }
     const data: LichessDaily = await res.json();
     const pgn = data.game?.pgn;
     const puzzle = data.puzzle;
     if (!pgn || !puzzle?.initialPly || !puzzle.solution || puzzle.solution.length === 0) {
+      logWarn("api:chess-puzzle", "upstream payload missing required puzzle fields");
       return null;
     }
 
