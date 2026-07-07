@@ -191,6 +191,14 @@ describe("/api/password-game/leaderboard", () => {
       await expect(fs.stat(FILE_PATH)).rejects.toThrow();
     });
 
+    it("returns 413 for a body over the 16 KiB cap", async () => {
+      const res = await POST(
+        makeReq({ name: "Ada", seed: 1, time: 10, rules: 1, filler: "x".repeat(20_000) }),
+      );
+      expect(res.status).toBe(413);
+      await expect(fs.stat(FILE_PATH)).rejects.toThrow();
+    });
+
     it("rate limits after 10 requests per minute from one IP with 429 + Retry-After", async () => {
       const ip = "61.61.61.61";
       for (let i = 0; i < 10; i++) {

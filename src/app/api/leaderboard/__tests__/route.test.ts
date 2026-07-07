@@ -295,6 +295,20 @@ describe("/api/leaderboard", () => {
       await expect(fs.stat(FILE_PATH)).rejects.toThrow();
     });
 
+    it("returns 413 for a body over the 16 KiB cap", async () => {
+      const res = await POST(
+        makeReq({
+          name: "Ada",
+          score: 10,
+          level: 1,
+          game: "space-shooter",
+          filler: "x".repeat(20_000),
+        }),
+      );
+      expect(res.status).toBe(413);
+      await expect(fs.stat(FILE_PATH)).rejects.toThrow();
+    });
+
     it("rate limits after 10 requests per minute from one IP with 429 + Retry-After", async () => {
       const ip = "60.60.60.60";
       for (let i = 0; i < 10; i++) {

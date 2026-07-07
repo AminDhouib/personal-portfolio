@@ -118,6 +118,15 @@ describe("POST /api/leads", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  it("returns 413 for a body over the 16 KiB cap", async () => {
+    const res = await POST(
+      makeReq({ name: "Ada", email: "ada@example.com", note: "x".repeat(20_000) }),
+    );
+    expect(res.status).toBe(413);
+    expect(vi.mocked(fs.appendFile)).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
   it("rate limits after 5 requests per minute from one IP with 429 + Retry-After", async () => {
     const ip = "55.55.55.55";
     for (let i = 0; i < 5; i++) {

@@ -121,3 +121,150 @@ describe("guardedJsonRoute", () => {
     if (guard.ok) expect(guard.body).toEqual({ hello: "world" });
   });
 });
+
+describe("guardedJsonRoute body-size cap", () => {
+  const DEFAULT_CAP = 16 * 1024;
+
+  it("allows a body exactly at the default 16 KiB cap (happy path unchanged)", async () => {
+    const filler = "x".repeat(DEFAULT_CAP - 8); // `{"a":"` + filler + `"}` = DEFAULT_CAP bytes
+    const body = `{"a":"${filler}"}`;
+    expect(Buffer.byteLength(body, "utf8")).toBe(DEFAULT_CAP);
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body,
+    });
+    const guard = await guardedJsonRoute(req, { key: "gjr-cap-a", limit: 10, windowMs: 60_000 });
+    expect(guard.ok).toBe(true);
+    if (guard.ok) expect((guard.body as { a: string }).a).toHaveLength(DEFAULT_CAP - 8);
+  });
+
+  it("413s a body one byte over the default cap (no explicit maxBytes)", async () => {
+    const filler = "x".repeat(DEFAULT_CAP - 7); // one byte over DEFAULT_CAP
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body: `{"a":"${filler}"}`,
+    });
+    const guard = await guardedJsonRoute(req, { key: "gjr-cap-b", limit: 10, windowMs: 60_000 });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(413);
+  });
+
+  it("returns 413 without reading the body when Content-Length declares over the cap", async () => {
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: {
+        origin: "https://amindhou.com",
+        "x-forwarded-host": "amindhou.com",
+        "content-length": "999999",
+      },
+      body: "short",
+    });
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-cap-c",
+      limit: 10,
+      windowMs: 60_000,
+      maxBytes: 20,
+    });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(413);
+    expect(req.bodyUsed).toBe(false);
+  });
+
+  it("returns 413 after reading when Content-Length is absent but the actual bytes exceed the cap", async () => {
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body: "x".repeat(50),
+    });
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-cap-d",
+      limit: 10,
+      windowMs: 60_000,
+      maxBytes: 20,
+    });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(413);
+    expect(req.bodyUsed).toBe(true);
+  });
+
+  it("returns 413 after reading when Content-Length understates the actual bytes (lying-low header)", async () => {
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: {
+        origin: "https://amindhou.com",
+        "x-forwarded-host": "amindhou.com",
+        "content-length": "5",
+      },
+      body: "x".repeat(50),
+    });
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-cap-e",
+      limit: 10,
+      windowMs: 60_000,
+      maxBytes: 20,
+    });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(413);
+    expect(req.bodyUsed).toBe(true);
+  });
+
+  it("returns 400 for malformed JSON under the cap (size check does not shadow parse errors)", async () => {
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body: "{not json",
+    });
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-cap-f",
+      limit: 10,
+      windowMs: 60_000,
+      maxBytes: 20,
+    });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(400);
+  });
+
+  it("rejects a cross-origin over-cap body with 403 (origin wins over size)", async () => {
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://evil.example", "x-forwarded-host": "amindhou.com" },
+      body: "x".repeat(50),
+    });
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-cap-g",
+      limit: 10,
+      windowMs: 60_000,
+      maxBytes: 20,
+    });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(403);
+  });
+
+  it("rejects an over-cap body with 429 once already rate-limited (rate wins over size)", async () => {
+    const ip = uniqueIp();
+    const key = "gjr-cap-h";
+    for (let i = 0; i < 2; i++) {
+      const guard = await guardedJsonRoute(makeReq({ ip, body: {} }), {
+        key,
+        limit: 2,
+        windowMs: 60_000,
+        maxBytes: 20,
+      });
+      expect(guard.ok).toBe(true);
+    }
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: {
+        origin: "https://amindhou.com",
+        "x-forwarded-host": "amindhou.com",
+        "x-forwarded-for": ip,
+      },
+      body: "x".repeat(50),
+    });
+    const guard = await guardedJsonRoute(req, { key, limit: 2, windowMs: 60_000, maxBytes: 20 });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(429);
+  });
+});
