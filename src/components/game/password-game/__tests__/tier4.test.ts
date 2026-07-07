@@ -46,10 +46,6 @@ describe("Tier 4 — length bomb rule", () => {
 describe("Tier 4 — clock rule", () => {
   const def = TIER_4_RULES.find((r) => r.id === "clock")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("passes when password contains HH:MM matching current local time", () => {
     const rule = def.create(mulberry32(1));
     const now = new Date();
@@ -67,10 +63,6 @@ describe("Tier 4 — clock rule", () => {
 
 describe("Tier 4 — forbidden vowel rule", () => {
   const def = TIER_4_RULES.find((r) => r.id === "forbidden-vowel")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("params include a single vowel", () => {
     const rule = def.create(mulberry32(1));
@@ -93,10 +85,6 @@ describe("Tier 4 — forbidden vowel rule", () => {
 
 describe("Tier 4 — mystery rule", () => {
   const def = TIER_4_RULES.find((r) => r.id === "mystery")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("description contains a redacted marker", () => {
     const rule = def.create(mulberry32(1));

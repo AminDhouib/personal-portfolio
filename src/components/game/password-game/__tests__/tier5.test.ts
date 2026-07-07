@@ -42,10 +42,6 @@ describe("Tier 5 — mirror input rule", () => {
 describe("Tier 5 — blurred input rule", () => {
   const def = TIER_5_RULES.find((r) => r.id === "blurred-input")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("passes when password contains the target phrase", () => {
     const rule = def.create(mulberry32(1));
     const target = rule.params.target as string;
@@ -55,10 +51,6 @@ describe("Tier 5 — blurred input rule", () => {
 
 describe("Tier 5 — no-letter rule", () => {
   const def = TIER_5_RULES.find((r) => r.id === "no-letter")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("params include a banned letter", () => {
     const rule = def.create(mulberry32(1));
@@ -82,10 +74,6 @@ describe("Tier 5 — no-letter rule", () => {
 
 describe("Tier 5 — last word length rule", () => {
   const def = TIER_5_RULES.find((r) => r.id === "last-word-length")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("params include a target length 4-7", () => {
     for (let seed = 1; seed < 50; seed++) {

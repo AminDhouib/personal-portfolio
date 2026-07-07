@@ -17,10 +17,6 @@ function makeState(password: string, rule: Rule): GameState {
 describe("Tier 1 — min length rule", () => {
   const def = TIER_1_RULES.find((r) => r.id === "min-length")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("fails short passwords", () => {
     const rule = def.create(mulberry32(1));
     expect(rule.validate(makeState("ab", rule)).passed).toBe(false);
@@ -49,10 +45,6 @@ describe("Tier 1 — min length rule", () => {
 
 describe("Tier 1 — digit count rule", () => {
   const def = TIER_1_RULES.find((r) => r.id === "digit-count")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("fails if too few digits", () => {
     const rule = def.create(mulberry32(1));

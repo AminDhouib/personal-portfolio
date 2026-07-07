@@ -50,10 +50,6 @@ describe("Tier 2 — NATO phonetic rule", () => {
 describe("Tier 2 — math equation rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "math-equation")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("description contains the equation and the expected answer type is a number", () => {
     const rule = def.create(mulberry32(3));
     expect(typeof rule.params.answer).toBe("number");
@@ -77,10 +73,6 @@ describe("Tier 2 — math equation rule", () => {
 
 describe("Tier 2 — Roman numeral range rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "roman-range")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("params include numeric min/max bounds with min < max", () => {
     const rule = def.create(mulberry32(5));
@@ -109,10 +101,6 @@ describe("Tier 2 — Roman numeral range rule", () => {
 describe("Tier 2 — periodic element rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "periodic-element")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("params include an atomic number range (min, max)", () => {
     const rule = def.create(mulberry32(11));
     const min = rule.params.min as number;
@@ -139,16 +127,17 @@ describe("Tier 2 — periodic element rule", () => {
 describe("Tier 2 — foreign word rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "foreign-word")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("params reference a real entry from the pool", () => {
     const rule = def.create(mulberry32(17));
     const entry = FOREIGN_WORDS.find(
       (w) => w.translation === rule.params.translation && w.language === rule.params.language,
     );
-    expect(entry).toBeDefined();
+    expect(entry).toEqual(
+      expect.objectContaining({
+        translation: rule.params.translation,
+        language: rule.params.language,
+      }),
+    );
   });
 
   it("passes when password contains the translation (case-insensitive)", () => {
@@ -167,16 +156,14 @@ describe("Tier 2 — foreign word rule", () => {
 describe("Tier 2 — capital city rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "capital-city")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("params reference a known country and capital", () => {
     const rule = def.create(mulberry32(23));
     const entry = COUNTRY_CAPITALS.find(
       (c) => c.country === rule.params.country && c.capital === rule.params.capital,
     );
-    expect(entry).toBeDefined();
+    expect(entry).toEqual(
+      expect.objectContaining({ country: rule.params.country, capital: rule.params.capital }),
+    );
   });
 
   it("passes when password contains the capital (case-insensitive)", () => {
@@ -195,16 +182,14 @@ describe("Tier 2 — capital city rule", () => {
 describe("Tier 2 — hex color rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "hex-color")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("params reference a known named color", () => {
     const rule = def.create(mulberry32(29));
     const entry = NAMED_COLORS.find(
       (c) => c.hex === rule.params.hex && c.name === rule.params.name,
     );
-    expect(entry).toBeDefined();
+    expect(entry).toEqual(
+      expect.objectContaining({ hex: rule.params.hex, name: rule.params.name }),
+    );
   });
 
   it("passes with the name in the password (case-insensitive)", () => {
@@ -222,16 +207,14 @@ describe("Tier 2 — hex color rule", () => {
 describe("Tier 2 — code snippet rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "code-snippet")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("params reference a real snippet and language from the pool", () => {
     const rule = def.create(mulberry32(31));
     const entry = CODE_SNIPPETS.find(
       (s) => s.language === rule.params.language && s.snippet === rule.params.snippet,
     );
-    expect(entry).toBeDefined();
+    expect(entry).toEqual(
+      expect.objectContaining({ language: rule.params.language, snippet: rule.params.snippet }),
+    );
   });
 
   it("passes when password contains the language name (case-insensitive)", () => {

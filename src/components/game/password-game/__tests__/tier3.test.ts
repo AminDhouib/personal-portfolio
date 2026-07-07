@@ -67,10 +67,6 @@ describe("Tier 3 — every-nth-uppercase rule", () => {
 describe("Tier 3 — strict word count rule", () => {
   const def = TIER_3_RULES.find((r) => r.id === "word-count-strict")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("target n is 5-8 (higher than tier 1)", () => {
     for (let seed = 1; seed < 50; seed++) {
       const rule = def.create(mulberry32(seed));
@@ -90,10 +86,6 @@ describe("Tier 3 — strict word count rule", () => {
 
 describe("Tier 3 — alternating case rule", () => {
   const def = TIER_3_RULES.find((r) => r.id === "alternating-case")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("passes with strict alternation (lower, upper, lower, upper...)", () => {
     const rule = def.create(mulberry32(1));
@@ -118,10 +110,6 @@ describe("Tier 3 — alternating case rule", () => {
 
 describe("Tier 3 — bold count rule", () => {
   const def = TIER_3_RULES.find((r) => r.id === "bold-count")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("target n is 3-6", () => {
     for (let seed = 1; seed < 50; seed++) {
@@ -155,10 +143,6 @@ describe("Tier 3 — bold count rule", () => {
 describe("Tier 3 — italic count rule", () => {
   const def = TIER_3_RULES.find((r) => r.id === "italic-count")!;
 
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
-
   it("passes when enough chars are italic", () => {
     const rule = def.create(mulberry32(1));
     const n = rule.params.n as number;
@@ -176,10 +160,6 @@ describe("Tier 3 — italic count rule", () => {
 
 describe("Tier 3 — bold/italic parity rule", () => {
   const def = TIER_3_RULES.find((r) => r.id === "bold-italic-parity")!;
-
-  it("exists", () => {
-    expect(def).toBeDefined();
-  });
 
   it("passes when bold and italic counts match (both >= 1)", () => {
     const rule = def.create(mulberry32(1));
