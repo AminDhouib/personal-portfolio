@@ -65,6 +65,7 @@ import {
   tryDash,
 } from "./space-shooter/types";
 import { safeJsonParse } from "@/lib/safe-json";
+import { useLeaderboard } from "@/hooks/use-leaderboard";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
 import { buildBossSchedule, BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
@@ -106,64 +107,9 @@ function SettingsToggle({
 }
 
 // ---------- leaderboard helpers ----------
-
-interface LeaderboardEntry {
-  name: string;
-  score: number;
-  level: number; // legacy from levelled mode — kept so old data still parses
-  seconds?: number;
-  kills?: number;
-  distance?: number;
-  region?: string;
-  createdAt: string;
-}
-
-interface SubmitParams {
-  name: string;
-  score: number;
-  seconds: number;
-  kills: number;
-  distance: number;
-  region: string;
-}
-
-interface SubmitResult {
-  ok: boolean;
-  rank?: number;
-}
-
-function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-  return fetch("/api/leaderboard", { cache: "no-store", signal: AbortSignal.timeout(8000) })
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
-    .then((data) => (Array.isArray(data?.entries) ? (data.entries as LeaderboardEntry[]) : []))
-    .catch(() => []);
-}
-
-async function submitScore(params: SubmitParams): Promise<SubmitResult> {
-  try {
-    const res = await fetch("/api/leaderboard", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: params.name,
-        score: params.score,
-        // keep legacy shape on `level` so the route validates the old field
-        level: 1,
-        seconds: params.seconds,
-        kills: params.kills,
-        distance: params.distance,
-        region: params.region,
-      }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return { ok: false };
-    const data = await res.json();
-    return { ok: true, rank: typeof data?.rank === "number" ? data.rank : undefined };
-  } catch (err) {
-    reportError(err);
-    return { ok: false };
-  }
-}
+// fetchLeaderboard/submitScore moved to useLeaderboard("space-shooter")
+// (RC-8, CT-006); the shared hook injects level:1 the same way the old
+// submitScore did (legacy shape so the route validates the old field).
 
 // Detect the player's country/region for the leaderboard. Free, no API key
 // required. Falls back to "" silently if blocked.
@@ -360,7 +306,15 @@ export function SpaceShooterGame() {
     return window.localStorage.getItem(NAME_KEY) ?? "";
   });
   const [submitted, setSubmitted] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  // fetchOnMount:true preserves the pre-existing mount-time fetch (below,
+  // "Initial leaderboard load + region detection"); bucket unchanged from
+  // before (space-shooter keeps sending game:"space-shooter", so the
+  // merged-legacy board is preserved per the ruling).
+  const {
+    entries: leaderboard,
+    refresh: refreshLeaderboard,
+    submit: submitScoreToLeaderboard,
+  } = useLeaderboard("space-shooter");
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
     // Sound is ON by default — but localStorage "0" persists explicit mute.
     if (typeof window === "undefined") return true;
@@ -760,9 +714,9 @@ export function SpaceShooterGame() {
     }));
     setSubmitted(false);
     setCelebration(isPersonalBest ? "personal" : null);
-    void fetchLeaderboard().then(setLeaderboard);
+    void refreshLeaderboard();
     refreshProfile();
-  }, [highScore, refreshProfile]);
+  }, [highScore, refreshProfile, refreshLeaderboard]);
 
   // "Fly again" — reset everything to the armed state. The next mouse/touch
   // /key press starts a fresh run.
@@ -843,9 +797,11 @@ export function SpaceShooterGame() {
   const submit = useCallback(async () => {
     const trimmed = name.trim().slice(0, 12) || "Pilot";
     window.localStorage.setItem(NAME_KEY, trimmed);
-    const result = await submitScore({
+    const result = await submitScoreToLeaderboard({
       name: trimmed,
       score: ui.score,
+      // keep legacy shape on `level` so the route validates the old field
+      level: 1,
       seconds: Math.floor(ui.seconds),
       kills: ui.kills,
       distance: ui.distance,
@@ -853,18 +809,26 @@ export function SpaceShooterGame() {
     });
     if (result.ok) {
       setSubmitted(true);
-      const fresh = await fetchLeaderboard();
-      setLeaderboard(fresh);
+      await refreshLeaderboard();
       // World record overrides personal best celebration
       if (result.rank === 1 && ui.score > 0) {
         setCelebration("world");
       }
     }
-  }, [name, ui.score, ui.seconds, ui.kills, ui.distance, region]);
+  }, [
+    name,
+    ui.score,
+    ui.seconds,
+    ui.kills,
+    ui.distance,
+    region,
+    submitScoreToLeaderboard,
+    refreshLeaderboard,
+  ]);
 
-  // Initial leaderboard load + region detection
+  // Initial leaderboard load + region detection (useLeaderboard's
+  // fetchOnMount:true default handles the leaderboard fetch)
   useEffect(() => {
-    void fetchLeaderboard().then(setLeaderboard);
     void detectRegion().then(setRegion);
   }, []);
 
