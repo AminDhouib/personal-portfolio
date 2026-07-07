@@ -118,6 +118,18 @@ describe("/api/leaderboard", () => {
       expect(body.entries.map((e) => e.name)).toEqual(["A"]);
     });
 
+    it("coalesces an explicit game:'space-shooter' the same as an absent game field", async () => {
+      const seed: LeaderboardEntryDTO[] = [
+        { name: "A", score: 10, level: 1, createdAt: "t", game: "space-shooter" },
+        { name: "B", score: 30, level: 1, createdAt: "t" }, // no game field at all
+        { name: "C", score: 20, level: 1, createdAt: "t", game: "hextris" },
+      ];
+      await fs.writeFile(FILE_PATH, JSON.stringify(seed), "utf-8");
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=space-shooter"));
+      const body = (await res.json()) as LeaderboardGetResponse;
+      expect(body.entries.map((e) => e.name).sort()).toEqual(["A", "B"]);
+    });
+
     it("caps results to the store's returnLimit", async () => {
       const seed: LeaderboardEntryDTO[] = Array.from({ length: 30 }, (_, i) => ({
         name: `p${i}`,
@@ -178,6 +190,47 @@ describe("/api/leaderboard", () => {
       expect(res.status).toBe(400);
     });
 
+    it("accepts in-range seconds/kills/distance/region and drops out-of-range ones", async () => {
+      const res = await POST(
+        makeReq({
+          name: "Ada",
+          score: 10,
+          level: 1,
+          seconds: 42,
+          kills: 7,
+          distance: 1000,
+          region: "CA",
+        }),
+      );
+      expect(res.status).toBe(200);
+      const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as LeaderboardEntryDTO[];
+      const entry = stored[0];
+      if (!entry) throw new Error("expected an entry to have been persisted");
+      expect(entry).toMatchObject({ seconds: 42, kills: 7, distance: 1000, region: "CA" });
+    });
+
+    it("drops seconds/kills/distance/region that are out of bounds instead of storing them", async () => {
+      const res = await POST(
+        makeReq({
+          name: "Ada",
+          score: 10,
+          level: 1,
+          seconds: -1,
+          kills: -1,
+          distance: -1,
+          region: "",
+        }),
+      );
+      expect(res.status).toBe(200);
+      const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as LeaderboardEntryDTO[];
+      const entry = stored[0] as unknown as Record<string, unknown>;
+      if (!entry) throw new Error("expected an entry to have been persisted");
+      expect(entry.seconds).toBeUndefined();
+      expect(entry.kills).toBeUndefined();
+      expect(entry.distance).toBeUndefined();
+      expect(entry.region).toBeUndefined();
+    });
+
     it("returns 400 for malformed JSON", async () => {
       const res = await POST(makeReq("{not json"));
       expect(res.status).toBe(400);
@@ -205,6 +258,35 @@ describe("/api/leaderboard", () => {
       const limited = await POST(makeReq({ name: "Ada", score: 1, level: 1 }, { ip }));
       expect(limited.status).toBe(429);
       expect(limited.headers.get("Retry-After")).toBeTruthy();
+    });
+
+    it("trims each game bucket independently to the store's maxEntries, keeping the highest scores", async () => {
+      // Seed 100 space-shooter entries (scores 1..100) plus one untouched
+      // hextris entry, then push a 101st space-shooter score that should
+      // bump the lowest space-shooter score out while hextris is unaffected.
+      const seed: LeaderboardEntryDTO[] = [
+        ...Array.from({ length: 100 }, (_, i) => ({
+          name: `p${i}`,
+          score: i + 1,
+          level: 1,
+          createdAt: "t",
+          game: "space-shooter",
+        })),
+        { name: "H", score: 5, level: 1, createdAt: "t", game: "hextris" },
+      ];
+      await fs.writeFile(FILE_PATH, JSON.stringify(seed), "utf-8");
+
+      const res = await POST(makeReq({ name: "New", score: 500, level: 1 }));
+      expect(res.status).toBe(200);
+
+      const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as LeaderboardEntryDTO[];
+      const spaceShooter = stored.filter((e) => (e.game ?? "space-shooter") === "space-shooter");
+      const hextris = stored.filter((e) => e.game === "hextris");
+      expect(spaceShooter).toHaveLength(100);
+      expect(hextris).toHaveLength(1);
+      // The lowest original score (1, name "p0") was trimmed out.
+      expect(spaceShooter.some((e) => e.name === "p0")).toBe(false);
+      expect(spaceShooter.some((e) => e.name === "New")).toBe(true);
     });
   });
 
