@@ -6,7 +6,7 @@ import { GameBanner } from "./banners";
 import type { GameMeta } from "@/app/games/games-meta";
 
 export function GameCard({ game, size = "lg" }: { game: GameMeta; size?: "lg" | "sm" }) {
-  const href = game.external ? `/games/${game.slug}` : `/games/${game.slug}`;
+  const href = `/games/${game.slug}`;
   const aspect = size === "lg" ? "aspect-[5/3]" : "aspect-[4/3]";
   const titleSize = size === "lg" ? "text-xl sm:text-2xl" : "text-base sm:text-lg";
   const taglineSize = size === "lg" ? "text-sm" : "text-xs";
