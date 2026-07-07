@@ -55,6 +55,7 @@
     "public/**",
     "node_modules/**",
     "audit/**",
-    ".data/**"
+    ".data/**",
+    "coverage/**"
   ]
 }

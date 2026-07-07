@@ -154,5 +154,6 @@ export default defineConfig([
     "_to-remove-voltorb/**",
     "public/tower_stacker/**",
     "audit/**",
+    "coverage/**",
   ]),
 ]);
