@@ -36,6 +36,9 @@ const FS_ALLOWLIST = [
   "src/app/apple-icon.tsx",
   "src/app/icon.tsx",
   "src/app/api/leads/route.ts",
+  // Non-mutating W_OK probe on the persistence-adjacent .data directory for the
+  // liveness/readiness check (P4) -- reads no application data, writes nothing.
+  "src/app/api/health/route.ts",
 ];
 
 const TEST_AND_SCRIPT_GLOBS = ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", "scripts/**"];
