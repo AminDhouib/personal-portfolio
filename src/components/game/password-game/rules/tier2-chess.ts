@@ -14,7 +14,6 @@ import { CHESS_PUZZLES, getDailyChessPuzzle } from "../../../../data/password-ga
  * Marker format: `[[CHESS:${id}]]` — replaced by the rule-card with a
  * rendered board looked up from CHESS_PUZZLES (or the injected daily).
  */
-export const CHESS_MARKER_RE = /\[\[CHESS:([\w-]+)\]\]/;
 
 export const chessRule: RuleDef = {
   id: "chess",

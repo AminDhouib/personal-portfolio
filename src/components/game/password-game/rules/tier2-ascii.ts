@@ -7,7 +7,6 @@ import { ASCII_ART } from "../../../../data/password-game/ascii-art";
  * the player to name what it is. Accepts any synonym from the entry's
  * `answers` list (case-insensitive substring match).
  */
-export const ASCII_MARKER_RE = /\[\[ASCII:([\w-]+)\]\]/;
 
 export const asciiRule: RuleDef = {
   id: "ascii-art",

@@ -8,7 +8,6 @@ import { zodiacForDate } from "../../../../data/password-game/zodiac";
  * Marker format: `[[ZODIAC:Name]]` — replaced by the rule-card with the
  * glyph rendered as text (not emoji).
  */
-export const ZODIAC_MARKER_RE = /\[\[ZODIAC:([A-Za-z]+)\]\]/;
 
 export const zodiacRule: RuleDef = {
   id: "zodiac",

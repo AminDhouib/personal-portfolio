@@ -8,7 +8,6 @@ import { rangeInt } from "../prng";
  * Marker format: `[[BINARY:bits]]` where `bits` is the 8-char 0/1 string.
  * Accepts the decimal number as a standalone integer in the password.
  */
-export const BINARY_MARKER_RE = /\[\[BINARY:([01]{8})\]\]/;
 
 export const binaryDecodeRule: RuleDef = {
   id: "binary-decode",

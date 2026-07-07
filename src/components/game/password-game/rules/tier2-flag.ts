@@ -13,7 +13,6 @@ import { FLAGS, type FlagDef } from "../../../../data/password-game/flags";
  * from the FlagDef lookup. We export the data with the marker so validation
  * and display stay in one place.
  */
-export const FLAG_MARKER_RE = /\[\[FLAG:([A-Za-z ]+)\]\]/;
 
 export const flagRule: RuleDef = {
   id: "flag",

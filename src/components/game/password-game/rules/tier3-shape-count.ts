@@ -14,8 +14,6 @@ type Shape = (typeof SHAPES)[number];
 
 const SHAPE_NAMES: Record<Shape, string> = { T: "triangle", C: "circle", S: "square" };
 
-export const SHAPES_MARKER_RE = /\[\[SHAPES:([TCS]{16}):([TCS])\]\]/;
-
 export const shapeCountRule: RuleDef = {
   id: "shape-count",
   tier: 3,

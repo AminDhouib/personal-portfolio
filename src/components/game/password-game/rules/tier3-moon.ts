@@ -7,7 +7,6 @@ import { moonPhaseFraction, moonPhaseName } from "../../../../data/password-game
  * rule-card renderer reads the `[[MOON:fraction]]` marker and draws an SVG
  * moon that matches the phase visually.
  */
-export const MOON_MARKER_RE = /\[\[MOON:([0-9.]+)\]\]/;
 
 export const moonPhaseRule: RuleDef = {
   id: "moon-phase",

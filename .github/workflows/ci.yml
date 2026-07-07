@@ -45,6 +45,9 @@ jobs:
       - name: Env schema drift check (env.ts vs .env.example)
         run: node scripts/check-env-drift.mjs
 
+      - name: Knip (dead files, exports, dependencies)
+        run: pnpm exec knip
+
       - name: Vitest unit + integration tests
         run: pnpm test
 

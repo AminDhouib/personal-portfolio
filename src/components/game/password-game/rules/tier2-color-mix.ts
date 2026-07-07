@@ -8,7 +8,6 @@ import { pickOne } from "../prng";
  *
  * Subtractive (paint-style) mixing because it matches everyday intuition.
  */
-export const MIX_MARKER_RE = /\[\[MIX:([a-z]+):([a-z]+)\]\]/;
 
 interface MixPair {
   a: "red" | "yellow" | "blue" | "white" | "black";

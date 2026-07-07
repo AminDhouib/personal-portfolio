@@ -16,8 +16,6 @@ const MAGIC_SQUARES: readonly (readonly number[])[] = [
   [6, 7, 2, 1, 5, 9, 8, 3, 4],
 ];
 
-export const MAGIC_MARKER_RE = /\[\[MAGIC:([0-9?,]+)\]\]/;
-
 export const magicSquareRule: RuleDef = {
   id: "magic-square",
   tier: 3,

@@ -9,7 +9,6 @@ import { rangeInt } from "../prng";
  *
  * Accepted answers: "14:25", "1425", "14 25".
  */
-export const CLOCK_MARKER_RE = /\[\[CLOCK:(\d{2}):(\d{2})\]\]/;
 
 export const clockRule: RuleDef = {
   id: "digital-clock",

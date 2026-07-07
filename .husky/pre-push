@@ -1,1 +1,1 @@
-pnpm exec tsc --noEmit && node scripts/check-env-drift.mjs
+pnpm exec tsc --noEmit && node scripts/check-env-drift.mjs && pnpm exec knip

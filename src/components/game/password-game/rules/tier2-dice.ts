@@ -8,7 +8,6 @@ import { rangeInt } from "../prng";
  *
  * Marker format: `[[DICE:v1,v2,v3]]` — comma-separated face values.
  */
-export const DICE_MARKER_RE = /\[\[DICE:(\d+(?:,\d+)*)\]\]/;
 
 export const diceRule: RuleDef = {
   id: "dice-roll",

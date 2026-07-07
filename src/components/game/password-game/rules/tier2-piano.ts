@@ -7,7 +7,6 @@ import { PIANO_KEYS } from "../../../../data/password-game/piano";
  * the description. The player must include the name of the highlighted note
  * (C, C#, D, etc.). Sharp/flat aliases are accepted (C# or Db).
  */
-export const PIANO_MARKER_RE = /\[\[PIANO:(\d+)\]\]/;
 
 export const pianoRule: RuleDef = {
   id: "piano",
