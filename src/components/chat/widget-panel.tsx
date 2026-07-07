@@ -2,10 +2,11 @@
 
 import { useEffect } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
-import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
+import { useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 import { ossProjects, type OssProject } from "@/data/oss-projects";
+import { useLeadCollectorAction } from "@/hooks/use-lead-collector-action";
 
 // Open-source project facts (Caramel, UpUp below) are sourced from the single
 // source of truth in src/data/oss-projects.ts so they can't drift out of sync
@@ -63,46 +64,7 @@ function ChatActions({ pathname }: { pathname: string }) {
     value: pathname === "/" ? "homepage (portfolio overview)" : pathname,
   });
 
-  useCopilotAction({
-    name: "collectLead",
-    description:
-      "Collect a visitor's name and email when they express interest in hiring or working with Amin. Use this after they decline or can't use the booking link.",
-    parameters: [
-      {
-        name: "name",
-        type: "string",
-        description: "The visitor's full name",
-        required: true,
-      },
-      {
-        name: "email",
-        type: "string",
-        description: "The visitor's email address",
-        required: true,
-      },
-      {
-        name: "note",
-        type: "string",
-        description: "Brief note about what they're looking for (optional)",
-        required: false,
-      },
-    ],
-    handler: async ({ name, email, note }: { name: string; email: string; note?: string }) => {
-      try {
-        const res = await fetch("/api/leads", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, note, source: "chatbot" }),
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!res.ok) throw new Error("Failed to save lead");
-        return `Lead saved for ${name} (${email}). Amin will be in touch soon!`;
-      } catch (err) {
-        reportError(err);
-        return "Sorry, there was an issue saving your contact details. Please try emailing amin@devino.ca directly.";
-      }
-    },
-  });
+  useLeadCollectorAction("chatbot");
 
   useCopilotChatSuggestions(
     {
