@@ -27,6 +27,7 @@ import {
 } from "./hextris/types";
 import { rotatePoint, randInt } from "./hextris/logic";
 import { safeJsonParse } from "@/lib/safe-json";
+import { asNumberArray } from "@/lib/safe-storage";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 
 // ═══════════════════════════════════════════════════════════════
@@ -346,8 +347,8 @@ export function HextrisGame() {
     try {
       const hs = localStorage.getItem("hextris_highscores");
       if (hs) {
-        const parsed = safeJsonParse<number[]>(hs, "hextris:highscores");
-        if (parsed) highscores = parsed;
+        const parsed = safeJsonParse<unknown>(hs, "hextris:highscores");
+        highscores = asNumberArray(parsed);
       }
     } catch {
       // silent-ok: best-effort localStorage read; missing/corrupt highscores just start empty
