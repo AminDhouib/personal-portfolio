@@ -66,6 +66,7 @@ import {
 } from "./space-shooter/types";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { nextGameCrash } from "@/lib/report-game-error";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
@@ -294,6 +295,7 @@ export function SpaceShooterGame() {
   const [tick, setTick] = useState(0);
   const [ui, setUi] = useState<UiState>(createInitialUiState);
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
+  const [crashed, setCrashed] = useState(false);
   const [region, setRegion] = useState<string>("");
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
   const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
@@ -632,91 +634,100 @@ export function SpaceShooterGame() {
   }, []);
 
   const onDeath = useCallback(() => {
-    const g = gameRefs.current;
-    // Stop any sustained sound loops that might still be playing
-    sounds.stopWarpLoop();
-    g.warpActiveLast = false;
-    // Losing jingle was played at collision; give it ~1s before crossfading
-    // into the leaderboard track so the two don't talk over each other.
-    setTimeout(() => sounds.startLeaderboardMusic(), 1100);
-    // Persist everything that compounds across runs.
-    addCoins(g.coinsThisRun);
-    addRunStats({ asteroidsDestroyed: g.kills, distance: Math.floor(g.distance) });
-    incrementRunsPlayed();
-    markFirstRunCompleted();
-    // Bump totalBossesDefeated + evaluate achievements
     try {
-      const p = loadProfile();
-      p.totalBossesDefeated = (p.totalBossesDefeated ?? 0) + g.bossesDefeatedThisRun;
-      saveProfile(p);
-      const runSnapshot = {
-        finalScore: Math.floor(g.score * g.scoreMultiplier),
-        finalDistance: Math.floor(g.distance),
-        finalCombo: g.combo,
-        asteroidsDestroyed: g.kills,
-        bossesDefeated: g.bossesDefeatedThisRun,
-        runSurvivalSeconds: Math.floor(((g.dyingAt || performance.now()) - g.startedAt) / 1000),
-        peakCombo: g.comboPeak,
-        coinsCollectedThisRun: g.coinsThisRun,
-        damageTakenThisRun: g.damageTakenThisRun,
-      };
-      const fresh = loadProfile();
-      const earned = checkAchievements(fresh, runSnapshot);
-      if (earned.length > 0) {
-        grantAchievements(earned);
-        setAchievementToasts((t) => [...t, ...earned.map((a) => ({ ...a, firedAt: Date.now() }))]);
+      const g = gameRefs.current;
+      // Stop any sustained sound loops that might still be playing
+      sounds.stopWarpLoop();
+      g.warpActiveLast = false;
+      // Losing jingle was played at collision; give it ~1s before crossfading
+      // into the leaderboard track so the two don't talk over each other.
+      setTimeout(() => sounds.startLeaderboardMusic(), 1100);
+      // Persist everything that compounds across runs.
+      addCoins(g.coinsThisRun);
+      addRunStats({ asteroidsDestroyed: g.kills, distance: Math.floor(g.distance) });
+      incrementRunsPlayed();
+      markFirstRunCompleted();
+      // Bump totalBossesDefeated + evaluate achievements
+      try {
+        const p = loadProfile();
+        p.totalBossesDefeated = (p.totalBossesDefeated ?? 0) + g.bossesDefeatedThisRun;
+        saveProfile(p);
+        const runSnapshot = {
+          finalScore: Math.floor(g.score * g.scoreMultiplier),
+          finalDistance: Math.floor(g.distance),
+          finalCombo: g.combo,
+          asteroidsDestroyed: g.kills,
+          bossesDefeated: g.bossesDefeatedThisRun,
+          runSurvivalSeconds: Math.floor(((g.dyingAt || performance.now()) - g.startedAt) / 1000),
+          peakCombo: g.comboPeak,
+          coinsCollectedThisRun: g.coinsThisRun,
+          damageTakenThisRun: g.damageTakenThisRun,
+        };
+        const fresh = loadProfile();
+        const earned = checkAchievements(fresh, runSnapshot);
+        if (earned.length > 0) {
+          grantAchievements(earned);
+          setAchievementToasts((t) => [
+            ...t,
+            ...earned.map((a) => ({ ...a, firedAt: Date.now() })),
+          ]);
+        }
+      } catch {
+        // silent-ok: best-effort profile/localStorage persistence for boss-defeat stats and achievement grants; must not block the death screen
       }
-    } catch {
-      // silent-ok: best-effort profile/localStorage persistence for boss-defeat stats and achievement grants; must not block the death screen
-    }
-    // Update mission progress using this run's stats (max-of so multi-run peaks count)
-    try {
-      const p = loadProfile();
-      const seconds = Math.floor(((g.dyingAt || performance.now()) - g.startedAt) / 1000);
-      for (const m of p.missionsToday) {
-        if (m.claimed) continue;
-        // Bump by the greater of existing progress and this run's stat
-        const nextVal =
-          m.id === "kill-20-heavies"
-            ? Math.max(m.progress, g.kills)
-            : m.id === "kill-50"
+      // Update mission progress using this run's stats (max-of so multi-run peaks count)
+      try {
+        const p = loadProfile();
+        const seconds = Math.floor(((g.dyingAt || performance.now()) - g.startedAt) / 1000);
+        for (const m of p.missionsToday) {
+          if (m.claimed) continue;
+          // Bump by the greater of existing progress and this run's stat
+          const nextVal =
+            m.id === "kill-20-heavies"
               ? Math.max(m.progress, g.kills)
-              : m.id === "reach-2km"
-                ? Math.max(m.progress, Math.floor(g.distance))
-                : m.id === "reach-5km"
+              : m.id === "kill-50"
+                ? Math.max(m.progress, g.kills)
+                : m.id === "reach-2km"
                   ? Math.max(m.progress, Math.floor(g.distance))
-                  : m.id === "score-5k"
-                    ? Math.max(m.progress, Math.floor(g.score))
-                    : m.id === "score-10k"
+                  : m.id === "reach-5km"
+                    ? Math.max(m.progress, Math.floor(g.distance))
+                    : m.id === "score-5k"
                       ? Math.max(m.progress, Math.floor(g.score))
-                      : m.id === "survive-180-clean"
-                        ? Math.max(m.progress, seconds)
-                        : m.progress;
-        m.progress = nextVal;
+                      : m.id === "score-10k"
+                        ? Math.max(m.progress, Math.floor(g.score))
+                        : m.id === "survive-180-clean"
+                          ? Math.max(m.progress, seconds)
+                          : m.progress;
+          m.progress = nextVal;
+        }
+        saveProfile(p);
+      } catch {
+        // silent-ok: best-effort profile/localStorage persistence for daily mission progress; must not block the death screen
       }
-      saveProfile(p);
-    } catch {
-      // silent-ok: best-effort profile/localStorage persistence for daily mission progress; must not block the death screen
+      const final = Math.floor(g.score * g.scoreMultiplier);
+      // Compare against the current state value synchronously so the celebration
+      // flag is correct in the same render cycle.
+      const isPersonalBest = final > highScore && final > 0;
+      if (isPersonalBest) {
+        safeLocalSet(HS_KEY, String(final));
+        setHighScore(final);
+      }
+      setUi((u) => ({
+        ...u,
+        status: "dead",
+        score: final,
+        kills: g.kills,
+        distance: Math.floor(g.distance),
+      }));
+      setSubmitted(false);
+      setCelebration(isPersonalBest ? "personal" : null);
+      void refreshLeaderboard();
+      refreshProfile();
+    } catch (err) {
+      const crash = nextGameCrash("space-shooter", err);
+      if (crash) reportError(crash);
+      setCrashed(true);
     }
-    const final = Math.floor(g.score * g.scoreMultiplier);
-    // Compare against the current state value synchronously so the celebration
-    // flag is correct in the same render cycle.
-    const isPersonalBest = final > highScore && final > 0;
-    if (isPersonalBest) {
-      safeLocalSet(HS_KEY, String(final));
-      setHighScore(final);
-    }
-    setUi((u) => ({
-      ...u,
-      status: "dead",
-      score: final,
-      kills: g.kills,
-      distance: Math.floor(g.distance),
-    }));
-    setSubmitted(false);
-    setCelebration(isPersonalBest ? "personal" : null);
-    void refreshLeaderboard();
-    refreshProfile();
   }, [highScore, refreshProfile, refreshLeaderboard]);
 
   // "Fly again" — reset everything to the armed state. The next mouse/touch
@@ -960,19 +971,26 @@ export function SpaceShooterGame() {
 
     let raf = 0;
     const loop = () => {
-      const g = gameRefs.current;
-      if (g.status === "playing") {
-        const speed = 0.14;
-        let dx = 0;
-        let dy = 0;
-        if (keys.has("arrowleft") || keys.has("a")) dx -= speed;
-        if (keys.has("arrowright") || keys.has("d")) dx += speed;
-        if (keys.has("arrowup") || keys.has("w")) dy += speed;
-        if (keys.has("arrowdown") || keys.has("s")) dy -= speed;
-        g.targetX += dx;
-        g.targetY += dy;
+      try {
+        const g = gameRefs.current;
+        if (g.status === "playing") {
+          const speed = 0.14;
+          let dx = 0;
+          let dy = 0;
+          if (keys.has("arrowleft") || keys.has("a")) dx -= speed;
+          if (keys.has("arrowright") || keys.has("d")) dx += speed;
+          if (keys.has("arrowup") || keys.has("w")) dy += speed;
+          if (keys.has("arrowdown") || keys.has("s")) dy -= speed;
+          g.targetX += dx;
+          g.targetY += dy;
+        }
+        raf = requestAnimationFrame(loop);
+      } catch (err) {
+        // No cancel needed: not rescheduling here is what stops the loop.
+        const crash = nextGameCrash("space-shooter", err);
+        if (crash) reportError(crash);
+        setCrashed(true);
       }
-      raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
 
@@ -2066,6 +2084,28 @@ export function SpaceShooterGame() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Crash overlay — a game-loop or death-handler throw stopped play;
+            reload is the honest recovery (a "retry" that reruns the same
+            crashing frame could re-crash). Reuses the death overlay's classes. */}
+        {crashed && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/70 p-4 backdrop-blur-md">
+            <div className="text-center">
+              <div className="text-xs font-bold tracking-[0.3em] text-red-400 uppercase">
+                Game Error
+              </div>
+              <div className="mt-2 text-sm text-white/70">This game hit an error and stopped.</div>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reload
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-(--muted)">
