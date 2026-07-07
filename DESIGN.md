@@ -32,7 +32,7 @@ extracted modules (`spawning.ts`, `boss-behaviors.ts`, `sound-manager.ts`, `run-
 `space-shooter.tsx` and `hextris.tsx` still carry the bulk of their engine logic inline in the
 component. See Extract-before-edit doctrine below before touching either.
 
-`src/env.ts` is the sole `process.env` gateway for everything except three narrow, allowlisted
+`src/env.ts` is the sole `process.env` gateway for everything except four narrow, allowlisted
 exceptions (`next.config.ts`, `src/instrumentation.ts`, `src/instrumentation-client.ts`, and
 `src/components/game/space-shooter.tsx` for `NODE_ENV`-gated dev-only affordances — an FPS
 overlay and a boss-cycle hotkey, not a schema-covered integration var). Everywhere else,
