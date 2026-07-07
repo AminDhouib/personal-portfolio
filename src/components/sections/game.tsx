@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
+import { motion, MotionConfig } from "framer-motion";
 import { Gamepad2, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -41,7 +41,11 @@ export function Game() {
             </div>
           </div>
 
-          <SpaceShooterGame />
+          {/* This embed is the real playable game, not a teaser; exempt from
+              reduced-motion by ruling like the /games/space-shooter route. */}
+          <MotionConfig reducedMotion="never">
+            <SpaceShooterGame />
+          </MotionConfig>
 
           <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
             {FEATURED_BELOW_SHOOTER.map((slug) => (

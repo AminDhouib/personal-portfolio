@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import type { ReactElement } from "react";
+import type { ComponentProps, ReactElement } from "react";
+import { MotionConfig } from "framer-motion";
 import { GameLoader } from "../game-loader";
 import { GAMES, type GameSlug } from "@/app/games/games-meta";
 
@@ -11,10 +12,13 @@ const renderableGames = GAMES.filter((g) => !g.external);
 
 describe("GameLoader", () => {
   it.each(renderableGames.map((g) => [g.slug, g] as const))(
-    "returns a non-null element for slug %s",
+    "wraps slug %s in a MotionConfig pinned to reducedMotion=never (games are exempt)",
     (_slug, game) => {
-      const element = GameLoader({ slug: game.slug });
+      const element = GameLoader({ slug: game.slug }) as ReactElement;
       expect(element).not.toBeNull();
+      expect(element.type).toBe(MotionConfig);
+      const props = element.props as ComponentProps<typeof MotionConfig>;
+      expect(props.reducedMotion).toBe("never");
     },
   );
 
@@ -26,8 +30,12 @@ describe("GameLoader", () => {
     expect(() => GameLoader({ slug: "not-a-real-slug" as GameSlug })).toThrow();
   });
 
-  it("maps the renderable slugs to distinct component identities", () => {
-    const types = renderableGames.map((g) => (GameLoader({ slug: g.slug }) as ReactElement).type);
+  it("maps the renderable slugs to distinct component identities inside the MotionConfig wrapper", () => {
+    const types = renderableGames.map((g) => {
+      const element = GameLoader({ slug: g.slug }) as ReactElement;
+      const props = element.props as ComponentProps<typeof MotionConfig>;
+      return (props.children as ReactElement).type;
+    });
     expect(new Set(types).size).toBe(renderableGames.length);
   });
 });

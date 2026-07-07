@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { MotionConfig } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import type { GameSlug } from "@/app/games/games-meta";
 import { assertNever } from "@/lib/assert-never";
@@ -34,10 +35,7 @@ const TowerStacker = dynamic(() => import("./tower-stacker"), {
   loading: () => <GameSkeleton />,
 });
 
-export function GameLoader({ slug }: { slug: GameSlug }) {
-  const searchParams = useSearchParams();
-  const towerSeed = searchParams?.get("tower-seed") ?? undefined;
-
+function renderGame(slug: GameSlug, towerSeed: string | undefined) {
   switch (slug) {
     case "typing-speed":
       return <TypingSpeedGame />;
@@ -55,4 +53,16 @@ export function GameLoader({ slug }: { slug: GameSlug }) {
     default:
       return assertNever(slug, "game-loader: no renderer registered for slug");
   }
+}
+
+export function GameLoader({ slug }: { slug: GameSlug }) {
+  const searchParams = useSearchParams();
+  const towerSeed = searchParams?.get("tower-seed") ?? undefined;
+
+  const game = renderGame(slug, towerSeed);
+  if (game === null) return null;
+
+  // Games are exempt from reduced-motion by ruling; "never" pins full motion
+  // regardless of the OS preference honored by the root MotionConfig (providers.tsx).
+  return <MotionConfig reducedMotion="never">{game}</MotionConfig>;
 }
