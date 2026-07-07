@@ -87,7 +87,7 @@ export function Experience() {
                   {job.current ? (
                     <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5" aria-hidden="true">
                       <span
-                        className="absolute inline-flex h-full w-full animate-ping rounded-full"
+                        className="absolute inline-flex h-full w-full animate-ping rounded-full motion-reduce:animate-none"
                         style={{ backgroundColor: "var(--a)", opacity: 0.7 }}
                       />
                       <span
@@ -131,7 +131,7 @@ export function Experience() {
                           >
                             <span className="relative flex h-1.5 w-1.5">
                               <span
-                                className="absolute inline-flex h-full w-full animate-ping rounded-full"
+                                className="absolute inline-flex h-full w-full animate-ping rounded-full motion-reduce:animate-none"
                                 style={{ backgroundColor: "var(--a)", opacity: 0.7 }}
                               />
                               <span

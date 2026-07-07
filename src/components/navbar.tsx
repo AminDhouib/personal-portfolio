@@ -121,7 +121,7 @@ export function Navbar() {
               <>
                 AMIN{" "}
                 <span
-                  className="bg-clip-text text-transparent"
+                  className="nav-games-shimmer bg-clip-text text-transparent"
                   style={{
                     backgroundImage:
                       "linear-gradient(90deg, #ec4899, #f59e0b, #22c55e, #6366f1, #ec4899)",
@@ -145,7 +145,7 @@ export function Navbar() {
                 const sharedClass = `relative flex items-center gap-1.5 text-sm font-medium transition-colors duration-200`;
                 const aiContent = (
                   <span
-                    className="flex items-center gap-1.5 bg-clip-text font-semibold text-transparent"
+                    className="nav-games-shimmer flex items-center gap-1.5 bg-clip-text font-semibold text-transparent"
                     style={{
                       backgroundImage:
                         "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
@@ -321,7 +321,7 @@ export function Navbar() {
                           className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors hover:bg-(--surface)"
                         >
                           <span
-                            className="flex items-center gap-2 bg-clip-text font-semibold text-transparent"
+                            className="nav-games-shimmer flex items-center gap-2 bg-clip-text font-semibold text-transparent"
                             style={{
                               backgroundImage:
                                 "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",

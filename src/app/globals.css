@@ -197,6 +197,23 @@ body {
   }
 }
 
+/* Reduced motion: quiet the remaining page-chrome animations. Game animations
+   (hextris-*, ts-*, and framer-motion inside games) are intentionally exempt -
+   motion is part of gameplay, not decoration. See RC-6 / DESIGN.md. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .pulse-dot,
+  .animate-marquee {
+    animation: none;
+  }
+  .nav-games-shimmer,
+  .copilotKitAssistantMessage {
+    animation: none !important;
+  }
+}
+
 /* Pulsing green dot for live indicators */
 @keyframes pulse-green {
   0%,
