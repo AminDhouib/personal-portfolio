@@ -1,6 +1,8 @@
-// Game registry. Single source of truth for slugs, titles, blurbs, and accent
-// colors. Server-safe — contains no component imports. Game components and
-// banners are resolved client-side via games-registry.tsx.
+// Game metadata: the GameSlug union, titles, blurbs, and accent colors.
+// Server-safe — no component imports. This is not the only place a game is
+// registered: the rendered component is dispatched by the switch in
+// game-loader.tsx and the animated banner by the BANNERS record in banners.tsx
+// (both client-side). Adding a game means editing all three.
 
 export type GameSlug =
   | "space-shooter"
