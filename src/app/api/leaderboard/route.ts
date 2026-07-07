@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
 import { leaderboardEntrySchema, type LeaderboardEntry } from "@/lib/persistence-schemas";
+import { LEADERBOARD_GAMES } from "@/lib/leaderboard-games";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
-import { captureException, logWarn } from "@/lib/log";
+import { captureException } from "@/lib/log";
 import { env } from "@/env";
 
 export const runtime = "nodejs";
@@ -27,36 +28,28 @@ const store = createLeaderboardStore<Entry>({
 
 const SCORE_CAP = 10_000_000;
 
-// DD1-001, PRESERVED ON PURPOSE. A missing / non-string / empty `game` silently
-// buckets into "space-shooter". The legacy space-shooter and hextris clients send
-// no `game` field at all, so this default is the COMMON path, not a rare one --
-// which is exactly the bug (their scores share one board). The real fix
-// (reject-or-require `game`) is refactor batch P2, sequenced under P1's pinning
-// tests; doing it here would change routing on an untested path. Routing is left
-// identical, but every bucket is now made LOUD via logWarn so DD1-001's true
-// frequency is visible in logs. (logWarn, not captureException: an $exception per
-// submit would flood the tracker since the bucket path fires on normal traffic.)
-const gameSchema = z.unknown().transform((raw): string => {
-  if (typeof raw === "string") {
-    const cleaned = raw
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "")
-      .slice(0, 40);
-    if (cleaned.length > 0) return cleaned;
-  }
-  logWarn("api:leaderboard", "game missing/invalid; bucketed to space-shooter (DD1-001)", raw);
-  return "space-shooter";
-});
+// RC-1 / DD1-001 fix: a missing/invalid `game` is now REJECTED (400), not
+// silently bucketed into "space-shooter". All three in-repo clients
+// (space-shooter, hextris, tower-stacker) migrated to send a valid `game` in
+// P2 steps 3-5 before this flip landed, so there is no live traffic that
+// relied on the old silent default. A closed enum (not "any non-empty
+// string") is deliberate: a client typo would otherwise create a new silent
+// junk bucket, reopening a narrower version of the same bug this fixes.
+const gameSchema = z.enum(LEADERBOARD_GAMES);
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const game = url.searchParams.get("game");
-  let entries = await store.readAll();
-  if (game) {
-    entries = entries.filter((e) => (e.game ?? "space-shooter") === game);
-  } else {
-    entries = entries.filter((e) => (e.game ?? "space-shooter") === "space-shooter");
+  // Decision 1 (P2 plan gate): require ?game= for a consistent no-silent-
+  // default contract, matching the POST-side reject. Deliberately NOT
+  // enum-validated here: an unknown slug just filters to [] (harmless), so
+  // a future 4th game or a stale client requesting an old slug never 400s
+  // on read -- only a genuinely missing `game` is an error.
+  if (!game) {
+    return NextResponse.json({ error: "missing game" }, { status: 400 });
   }
+  let entries = await store.readAll();
+  entries = entries.filter((e) => (e.game ?? "space-shooter") === game);
   entries.sort((a, b) => b.score - a.score);
   return NextResponse.json(
     { entries: entries.slice(0, store.returnLimit) },
@@ -94,6 +87,10 @@ export async function POST(req: Request) {
   if (!Number.isFinite(level) || level < 1 || level > 1000) {
     return NextResponse.json({ error: "invalid level" }, { status: 400 });
   }
+  const parsedGame = gameSchema.safeParse(o.game);
+  if (!parsedGame.success) {
+    return NextResponse.json({ error: "invalid game" }, { status: 400 });
+  }
   const entry: Entry = {
     name: store.sanitizeName(o.name),
     score,
@@ -114,7 +111,7 @@ export async function POST(req: Request) {
       typeof o.region === "string" && o.region.length > 0 && o.region.length <= 60
         ? o.region.replace(/[\u0000-\u001f]/g, "").slice(0, 60)
         : undefined,
-    game: gameSchema.parse(o.game),
+    game: parsedGame.data,
     createdAt: new Date().toISOString(),
   };
   let rank: number;

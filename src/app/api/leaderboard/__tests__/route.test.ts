@@ -74,7 +74,9 @@ describe("/api/leaderboard", () => {
     if (!DATA_DIR.startsWith(os.tmpdir())) {
       throw new Error(`expected temp data dir under ${os.tmpdir()}, got ${DATA_DIR}`);
     }
-    const probe = await POST(makeReq({ name: "wiring-probe", score: 1, level: 1 }));
+    const probe = await POST(
+      makeReq({ name: "wiring-probe", score: 1, level: 1, game: "space-shooter" }),
+    );
     if (probe.status !== 200) {
       throw new Error(`wiring probe POST failed with status ${probe.status}`);
     }
@@ -94,17 +96,33 @@ describe("/api/leaderboard", () => {
   });
 
   describe("GET", () => {
-    it("returns the default space-shooter bucket sorted by score desc", async () => {
+    it("returns the space-shooter bucket sorted by score desc when ?game=space-shooter", async () => {
       const seed: LeaderboardEntryDTO[] = [
         { name: "A", score: 10, level: 1, createdAt: "t" },
         { name: "B", score: 30, level: 1, createdAt: "t" },
         { name: "C", score: 20, level: 1, createdAt: "t" },
       ];
       await fs.writeFile(FILE_PATH, JSON.stringify(seed), "utf-8");
-      const res = await GET(new Request("https://amindhou.com/api/leaderboard"));
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=space-shooter"));
       expect(res.status).toBe(200);
       const body = (await res.json()) as LeaderboardGetResponse;
       expect(body.entries.map((e) => e.name)).toEqual(["B", "C", "A"]);
+    });
+
+    it("returns 400 when ?game= is absent (Decision 1: no silent read-side default)", async () => {
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard"));
+      expect(res.status).toBe(400);
+    });
+
+    it("returns an empty list (not a 400) for an unrecognized ?game= slug", async () => {
+      const seed: LeaderboardEntryDTO[] = [
+        { name: "A", score: 10, level: 1, createdAt: "t", game: "space-shooter" },
+      ];
+      await fs.writeFile(FILE_PATH, JSON.stringify(seed), "utf-8");
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=not-a-game"));
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as LeaderboardGetResponse;
+      expect(body.entries).toEqual([]);
     });
 
     it("filters to the requested game bucket via ?game=", async () => {
@@ -138,20 +156,20 @@ describe("/api/leaderboard", () => {
         createdAt: "t",
       }));
       await fs.writeFile(FILE_PATH, JSON.stringify(seed), "utf-8");
-      const res = await GET(new Request("https://amindhou.com/api/leaderboard"));
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=space-shooter"));
       const body = (await res.json()) as LeaderboardGetResponse;
       expect(body.entries).toHaveLength(25);
     });
 
     it("sets a short public cache header", async () => {
-      const res = await GET(new Request("https://amindhou.com/api/leaderboard"));
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=space-shooter"));
       expect(res.headers.get("Cache-Control")).toBe("s-maxage=10, stale-while-revalidate=30");
     });
   });
 
   describe("POST", () => {
     it("persists a valid score and returns ok:true + rank", async () => {
-      const res = await POST(makeReq({ name: "Ada", score: 500, level: 3 }));
+      const res = await POST(makeReq({ name: "Ada", score: 500, level: 3, game: "space-shooter" }));
       expect(res.status).toBe(200);
       const body = (await res.json()) as PostResponse;
       expect(body).toMatchObject({ ok: true, rank: 1 });
@@ -163,7 +181,9 @@ describe("/api/leaderboard", () => {
     });
 
     it("sanitizes the submitted name", async () => {
-      const res = await POST(makeReq({ name: "  Ada  ", score: 10, level: 1 }));
+      const res = await POST(
+        makeReq({ name: "  Ada  ", score: 10, level: 1, game: "space-shooter" }),
+      );
       expect(res.status).toBe(200);
       const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as LeaderboardEntryDTO[];
       const entry = stored[0];
@@ -171,22 +191,43 @@ describe("/api/leaderboard", () => {
       expect(entry.name).toBe("Ada");
     });
 
-    it("defaults a missing game to space-shooter (DD1-001, pinned as current behavior for P2)", async () => {
+    it("rejects a missing game with 400 (RC-1 / DD1-001: no more silent space-shooter default)", async () => {
       const res = await POST(makeReq({ name: "Ada", score: 10, level: 1 }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as PostResponse;
+      expect(body.error).toBe("invalid game");
+      await expect(fs.stat(FILE_PATH)).rejects.toThrow();
+    });
+
+    it("rejects an unrecognized game slug with 400 (closed enum, Decision 2)", async () => {
+      const res = await POST(
+        makeReq({ name: "Ada", score: 10, level: 1, game: "not-a-real-game" }),
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as PostResponse;
+      expect(body.error).toBe("invalid game");
+    });
+
+    it("accepts each of the three closed-enum game slugs into its own bucket", async () => {
+      for (const game of ["space-shooter", "hextris", "tower-stacker"]) {
+        const res = await POST(makeReq({ name: "Ada", score: 10, level: 1, game }));
+        expect(res.status).toBe(200);
+      }
       const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as LeaderboardEntryDTO[];
-      const entry = stored[0];
-      if (!entry) throw new Error("expected an entry to have been persisted");
-      expect(entry.game).toBe("space-shooter");
+      expect(stored.map((e) => e.game).sort()).toEqual([
+        "hextris",
+        "space-shooter",
+        "tower-stacker",
+      ]);
     });
 
     it("returns 400 for an invalid score", async () => {
-      const res = await POST(makeReq({ name: "Ada", score: -1, level: 1 }));
+      const res = await POST(makeReq({ name: "Ada", score: -1, level: 1, game: "space-shooter" }));
       expect(res.status).toBe(400);
     });
 
     it("returns 400 for an invalid level", async () => {
-      const res = await POST(makeReq({ name: "Ada", score: 10, level: 0 }));
+      const res = await POST(makeReq({ name: "Ada", score: 10, level: 0, game: "space-shooter" }));
       expect(res.status).toBe(400);
     });
 
@@ -196,6 +237,7 @@ describe("/api/leaderboard", () => {
           name: "Ada",
           score: 10,
           level: 1,
+          game: "space-shooter",
           seconds: 42,
           kills: 7,
           distance: 1000,
@@ -215,6 +257,7 @@ describe("/api/leaderboard", () => {
           name: "Ada",
           score: 10,
           level: 1,
+          game: "space-shooter",
           seconds: -1,
           kills: -1,
           distance: -1,
@@ -243,7 +286,10 @@ describe("/api/leaderboard", () => {
 
     it("rejects a cross-origin request with 403 before touching disk", async () => {
       const res = await POST(
-        makeReq({ name: "Ada", score: 10, level: 1 }, { origin: "https://evil.example" }),
+        makeReq(
+          { name: "Ada", score: 10, level: 1, game: "space-shooter" },
+          { origin: "https://evil.example" },
+        ),
       );
       expect(res.status).toBe(403);
       await expect(fs.stat(FILE_PATH)).rejects.toThrow();
@@ -252,10 +298,14 @@ describe("/api/leaderboard", () => {
     it("rate limits after 10 requests per minute from one IP with 429 + Retry-After", async () => {
       const ip = "60.60.60.60";
       for (let i = 0; i < 10; i++) {
-        const ok = await POST(makeReq({ name: "Ada", score: i, level: 1 }, { ip }));
+        const ok = await POST(
+          makeReq({ name: "Ada", score: i, level: 1, game: "space-shooter" }, { ip }),
+        );
         expect(ok.status).toBe(200);
       }
-      const limited = await POST(makeReq({ name: "Ada", score: 1, level: 1 }, { ip }));
+      const limited = await POST(
+        makeReq({ name: "Ada", score: 1, level: 1, game: "space-shooter" }, { ip }),
+      );
       expect(limited.status).toBe(429);
       expect(limited.headers.get("Retry-After")).toBeTruthy();
     });
@@ -276,7 +326,7 @@ describe("/api/leaderboard", () => {
       ];
       await fs.writeFile(FILE_PATH, JSON.stringify(seed), "utf-8");
 
-      const res = await POST(makeReq({ name: "New", score: 500, level: 1 }));
+      const res = await POST(makeReq({ name: "New", score: 500, level: 1, game: "space-shooter" }));
       expect(res.status).toBe(200);
 
       const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as LeaderboardEntryDTO[];
@@ -295,7 +345,7 @@ describe("/api/leaderboard", () => {
       const originalBytes = "{ not json";
       await fs.writeFile(FILE_PATH, originalBytes, "utf-8");
 
-      const res = await POST(makeReq({ name: "Ada", score: 10, level: 1 }));
+      const res = await POST(makeReq({ name: "Ada", score: 10, level: 1, game: "space-shooter" }));
       expect(res.status).toBe(503);
       const body = (await res.json()) as PostResponse;
       expect(body.error).toBe("leaderboard temporarily unavailable");
@@ -312,13 +362,15 @@ describe("/api/leaderboard", () => {
 
       // Self-heal: the corrupt file is gone, so the next submit sees ENOENT
       // and starts a fresh board.
-      const followUp = await POST(makeReq({ name: "Bea", score: 20, level: 1 }));
+      const followUp = await POST(
+        makeReq({ name: "Bea", score: 20, level: 1, game: "space-shooter" }),
+      );
       expect(followUp.status).toBe(200);
     });
 
     it("returns 500 (never ok:true) when the write itself fails", async () => {
       const renameSpy = vi.spyOn(fs, "rename").mockRejectedValueOnce(new Error("disk full"));
-      const res = await POST(makeReq({ name: "Ada", score: 10, level: 1 }));
+      const res = await POST(makeReq({ name: "Ada", score: 10, level: 1, game: "space-shooter" }));
       renameSpy.mockRestore();
 
       expect(res.status).toBe(500);
