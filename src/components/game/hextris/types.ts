@@ -57,16 +57,6 @@ export interface Particle {
   color: string;
 }
 
-export interface LeaderboardEntry {
-  name: string;
-  score: number;
-  level: number;
-  seconds?: number;
-  kills?: number;
-  region?: string;
-  createdAt: string;
-}
-
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════

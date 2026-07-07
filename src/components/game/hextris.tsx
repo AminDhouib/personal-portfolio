@@ -19,7 +19,6 @@ import {
   type TextObj,
   type Shake,
   type Particle,
-  type LeaderboardEntry,
   COLORS,
   TINTED,
   GLOW,
@@ -28,6 +27,7 @@ import {
 } from "./hextris/types";
 import { rotatePoint, randInt } from "./hextris/logic";
 import { safeJsonParse } from "@/lib/safe-json";
+import { useLeaderboard } from "@/hooks/use-leaderboard";
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT
@@ -81,7 +81,17 @@ export function HextrisGame() {
       return "";
     }
   });
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  // hextris starts a fresh board under its own game slug (RC-1 / DD1-001):
+  // previously this had no `game` field and silently shared the
+  // space-shooter bucket. fetchOnMount:false preserves the pre-existing
+  // timing (hextris only read the board on game-over, never on mount).
+  const {
+    entries: leaderboard,
+    refresh: refreshLeaderboard,
+    submit,
+  } = useLeaderboard("hextris", {
+    fetchOnMount: false,
+  });
   const [rank, setRank] = useState<number | null>(null);
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "submitted" | "failed">(
     "idle",
@@ -257,53 +267,23 @@ export function HextrisGame() {
     }
   }, [playerName]);
 
-  // Fetch leaderboard entries (top 25; we show 8)
-  async function fetchLeaderboard() {
-    try {
-      const res = await fetch("/api/leaderboard", {
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as { entries?: LeaderboardEntry[] };
-      if (Array.isArray(data.entries)) setLeaderboard(data.entries);
-    } catch (err) {
-      reportError(err);
-    }
-  }
-
   async function submitScore(name: string) {
     if (submitState === "submitting") return;
     const trimmedName = name.trim().slice(0, 12) || "Player";
     setSubmitState("submitting");
-    try {
-      const res = await fetch("/api/leaderboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmedName,
-          score: uiScore,
-          level: Math.max(1, uiStats.difficulty),
-          seconds: uiStats.seconds,
-          kills: uiStats.pieces,
-        }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) {
-        setSubmitState("failed");
-        return;
-      }
-      const data = (await res.json()) as { ok?: boolean; rank?: number };
-      if (data.ok && typeof data.rank === "number") {
-        setRank(data.rank);
-        setSubmitState("submitted");
-        submittedOnceRef.current = true;
-        await fetchLeaderboard();
-      } else {
-        setSubmitState("failed");
-      }
-    } catch (err) {
-      reportError(err);
+    const result = await submit({
+      name: trimmedName,
+      score: uiScore,
+      level: Math.max(1, uiStats.difficulty),
+      seconds: uiStats.seconds,
+      kills: uiStats.pieces,
+    });
+    if (result.ok && typeof result.rank === "number") {
+      setRank(result.rank);
+      setSubmitState("submitted");
+      submittedOnceRef.current = true;
+      await refreshLeaderboard();
+    } else {
       setSubmitState("failed");
     }
   }
@@ -311,7 +291,7 @@ export function HextrisGame() {
   // On game-over: fetch leaderboard + auto-submit once (if name saved)
   useEffect(() => {
     if (uiState === "gameover") {
-      void fetchLeaderboard();
+      void refreshLeaderboard();
       if (playerName.trim() && !submittedOnceRef.current) {
         void submitScore(playerName);
       }
