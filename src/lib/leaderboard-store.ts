@@ -75,8 +75,7 @@ export function createLeaderboardStore<T>(config: LeaderboardConfig<T>) {
    * this never lets an unreadable/corrupt file seed a whole-file overwrite:
    * a genuinely absent file is an empty base (first-ever write), but a
    * present-and-unreadable one is quarantined and reported instead of
-   * silently treated as empty (PM-004 / IN-007). See docs/backup-and-
-   * restore.md for the operational story; do not merge this back into
+   * silently treated as empty (PM-004 / IN-007). Do not merge this back into
    * `readAll` -- that would make GET 500 the public board on a bad file.
    */
   async function readForUpdate(): Promise<T[]> {
