@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { asNumberArray } from "@/lib/safe-storage";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
 
 describe("asNumberArray", () => {
   it("passes through an array of numbers", () => {
@@ -28,5 +28,37 @@ describe("asNumberArray", () => {
 
   it("returns [] for a string", () => {
     expect(asNumberArray("1,2,3")).toEqual([]);
+  });
+});
+
+describe("safeLocalSet", () => {
+  afterEach(() => {
+    // Restore the real window FIRST: clearing storage or restoring mocks
+    // while a test has stubbed `window` to undefined would itself throw.
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("writes through when storage works", () => {
+    expect(safeLocalSet("p5-test-key", "v")).toBe(true);
+    expect(window.localStorage.getItem("p5-test-key")).toBe("v");
+  });
+
+  it("returns false and does not throw when setItem throws", () => {
+    // Spy on Storage.prototype, not the window.localStorage instance:
+    // jsdom's Storage object does not let an own-property override on the
+    // instance shadow the method actually invoked by `.setItem(...)`.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+    expect(() => safeLocalSet("p5-test-key", "v")).not.toThrow();
+    expect(safeLocalSet("p5-test-key", "v")).toBe(false);
+  });
+
+  it("does not throw when window is unavailable (SSR/absent window)", () => {
+    vi.stubGlobal("window", undefined);
+    expect(() => safeLocalSet("p5-test-key", "v")).not.toThrow();
+    expect(safeLocalSet("p5-test-key", "v")).toBe(false);
   });
 });

@@ -65,6 +65,7 @@ import {
   tryDash,
 } from "./space-shooter/types";
 import { safeJsonParse } from "@/lib/safe-json";
+import { safeLocalSet } from "@/lib/safe-storage";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
@@ -702,7 +703,7 @@ export function SpaceShooterGame() {
     // flag is correct in the same render cycle.
     const isPersonalBest = final > highScore && final > 0;
     if (isPersonalBest) {
-      window.localStorage.setItem(HS_KEY, String(final));
+      safeLocalSet(HS_KEY, String(final));
       setHighScore(final);
     }
     setUi((u) => ({
@@ -796,7 +797,7 @@ export function SpaceShooterGame() {
 
   const submit = useCallback(async () => {
     const trimmed = name.trim().slice(0, 12) || "Pilot";
-    window.localStorage.setItem(NAME_KEY, trimmed);
+    safeLocalSet(NAME_KEY, trimmed);
     const result = await submitScoreToLeaderboard({
       name: trimmed,
       score: ui.score,
@@ -837,7 +838,7 @@ export function SpaceShooterGame() {
     setSoundEnabledState((prev) => {
       const next = !prev;
       // Persist explicit choice; "1" = on, "0" = off (default-on if missing)
-      window.localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+      safeLocalSet(SOUND_KEY, next ? "1" : "0");
       return next;
     });
   }, []);

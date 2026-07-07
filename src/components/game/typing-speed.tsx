@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
+import { safeLocalSet } from "@/lib/safe-storage";
 
 const SENTENCES = [
   "The quick brown fox jumps over the lazy dog near the riverbank.",
@@ -197,7 +198,7 @@ export function TypingSpeedGame() {
         const wpm = calcWPM(target.length, finalElapsed);
         if (wpm > highScore) {
           setHighScore(wpm);
-          localStorage.setItem("typing-high-score", String(wpm));
+          safeLocalSet("typing-high-score", String(wpm));
         }
       }
     },
