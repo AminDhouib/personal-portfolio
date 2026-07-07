@@ -52,7 +52,7 @@ jobs:
         run: pnpm exec knip
 
       - name: Vitest unit + integration tests
-        run: pnpm test
+        run: pnpm test:coverage
 
       - name: Next.js production build
         run: pnpm build

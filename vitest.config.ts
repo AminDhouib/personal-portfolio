@@ -23,7 +23,24 @@ export default defineConfig({
         "*.config.{ts,mjs}",
         "**/types.ts",
       ],
-      // thresholds are added once the richest suite is measured (see P7 step 4)
+      // Ratcheted floor: floor(measured %) - margin, measured over the
+      // richest suite (P1-P7 landed). Margin is 2 for lines/statements/
+      // functions and 3 for branches (absorbs run-to-run branch variance
+      // from the voltorb randomized-invariant tests -- those tests exercise
+      // the same lines/branches regardless of the random values drawn, so
+      // only branch coverage can wobble slightly).
+      //
+      // Ratchet policy: raise the floor in a dedicated commit whenever
+      // measured coverage rises. Never lower it except with a stated reason
+      // in that commit's message -- lowering the floor silently is a
+      // gate-weakening move.
+      thresholds: {
+        autoUpdate: false,
+        lines: 67,
+        statements: 63,
+        functions: 61,
+        branches: 54,
+      },
     },
   },
   resolve: {
