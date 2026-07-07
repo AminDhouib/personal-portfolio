@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockHandleRequest = vi.hoisted(() => vi.fn());
+const mockCreateOpenAI = vi.hoisted(() => vi.fn((_options: unknown) => ({ chat: vi.fn() })));
 
 vi.mock("@copilotkit/runtime", () => ({
   CopilotRuntime: class MockCopilotRuntime {},
@@ -9,6 +10,10 @@ vi.mock("@copilotkit/runtime", () => ({
   copilotRuntimeNextJSAppRouterEndpoint: vi.fn(() => ({
     handleRequest: mockHandleRequest,
   })),
+}));
+
+vi.mock("@ai-sdk/openai", () => ({
+  createOpenAI: mockCreateOpenAI,
 }));
 
 import { POST } from "../route";
@@ -34,6 +39,7 @@ describe("POST /api/copilotkit", () => {
     savedKey = process.env.OPENROUTER_KEY;
     delete process.env.OPENROUTER_KEY;
     mockHandleRequest.mockReset();
+    mockCreateOpenAI.mockClear();
   });
 
   afterEach(() => {
@@ -75,6 +81,19 @@ describe("POST /api/copilotkit", () => {
     const req = makeReq({}, { ip: "10.30.0.4" });
     await POST(req);
     expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
+  it("wires a deadline fetch into createOpenAI on the key-set path (RC-10)", async () => {
+    process.env.OPENROUTER_KEY = "test-key-abc";
+    mockHandleRequest.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    await POST(makeReq({ message: "hello" }, { ip: "10.30.0.6" }));
+
+    expect(mockCreateOpenAI).toHaveBeenCalledOnce();
+    const call = mockCreateOpenAI.mock.calls[0];
+    if (!call) throw new Error("expected createOpenAI to have been called");
+    const options = call[0] as { fetch?: unknown };
+    expect(typeof options.fetch).toBe("function");
   });
 
   it("returns 403 for a cross-origin request and never reaches the runtime", async () => {
