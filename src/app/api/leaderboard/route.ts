@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createLeaderboardStore } from "@/lib/leaderboard-store";
+import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
-import { logWarn } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 import { env } from "@/env";
 
 export const runtime = "nodejs";
@@ -133,22 +133,32 @@ export async function POST(req: Request) {
     game: gameSchema.parse(o.game),
     createdAt: new Date().toISOString(),
   };
-  const rank = await store.withWriteLock(async () => {
-    const all = await store.readAll();
-    all.push(entry);
-    all.sort((a, b) => b.score - a.score);
-    const byGame = new Map<string, Entry[]>();
-    for (const e of all) {
-      const key = e.game ?? "space-shooter";
-      if (!byGame.has(key)) byGame.set(key, []);
-      byGame.get(key)!.push(e);
-    }
-    const trimmed: Entry[] = [];
-    for (const [, list] of byGame) trimmed.push(...list.slice(0, store.maxEntries));
-    trimmed.sort((a, b) => b.score - a.score);
-    await store.writeAll(trimmed);
-    const gameList = byGame.get(entry.game ?? "space-shooter") ?? [];
-    return gameList.indexOf(entry) + 1;
-  });
+  let rank: number;
+  try {
+    rank = await store.withWriteLock(async () => {
+      const all = await store.readForUpdate();
+      all.push(entry);
+      all.sort((a, b) => b.score - a.score);
+      const byGame = new Map<string, Entry[]>();
+      for (const e of all) {
+        const key = e.game ?? "space-shooter";
+        if (!byGame.has(key)) byGame.set(key, []);
+        byGame.get(key)!.push(e);
+      }
+      const trimmed: Entry[] = [];
+      for (const [, list] of byGame) trimmed.push(...list.slice(0, store.maxEntries));
+      trimmed.sort((a, b) => b.score - a.score);
+      await store.writeAll(trimmed);
+      const gameList = byGame.get(entry.game ?? "space-shooter") ?? [];
+      return gameList.indexOf(entry) + 1;
+    });
+  } catch (err) {
+    captureException("api:leaderboard.write", err);
+    const status = err instanceof LeaderboardCorruptError ? 503 : 500;
+    return NextResponse.json(
+      { error: status === 503 ? "leaderboard temporarily unavailable" : "could not save score" },
+      { status },
+    );
+  }
   return NextResponse.json({ ok: true, rank });
 }

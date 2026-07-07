@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { mkdtempSync, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -205,6 +205,44 @@ describe("/api/leaderboard", () => {
       const limited = await POST(makeReq({ name: "Ada", score: 1, level: 1 }, { ip }));
       expect(limited.status).toBe(429);
       expect(limited.headers.get("Retry-After")).toBeTruthy();
+    });
+  });
+
+  describe("POST write-guard", () => {
+    it("returns 503, quarantines the corrupt file without overwriting it, then self-heals", async () => {
+      const originalBytes = "{ not json";
+      await fs.writeFile(FILE_PATH, originalBytes, "utf-8");
+
+      const res = await POST(makeReq({ name: "Ada", score: 10, level: 1 }));
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as PostResponse;
+      expect(body.error).toBe("leaderboard temporarily unavailable");
+
+      // Quarantined: the original path is gone, and a *.corrupt-* sidecar
+      // holds the exact original bytes -- the new entry was never written
+      // over them.
+      await expect(fs.stat(FILE_PATH)).rejects.toThrow();
+      const files = await fs.readdir(DATA_DIR);
+      const sidecar = files.find((f) => f.includes(".corrupt-"));
+      if (!sidecar) throw new Error("expected a *.corrupt-* sidecar to exist");
+      const sidecarContent = await fs.readFile(path.join(DATA_DIR, sidecar), "utf-8");
+      expect(sidecarContent).toBe(originalBytes);
+
+      // Self-heal: the corrupt file is gone, so the next submit sees ENOENT
+      // and starts a fresh board.
+      const followUp = await POST(makeReq({ name: "Bea", score: 20, level: 1 }));
+      expect(followUp.status).toBe(200);
+    });
+
+    it("returns 500 (never ok:true) when the write itself fails", async () => {
+      const renameSpy = vi.spyOn(fs, "rename").mockRejectedValueOnce(new Error("disk full"));
+      const res = await POST(makeReq({ name: "Ada", score: 10, level: 1 }));
+      renameSpy.mockRestore();
+
+      expect(res.status).toBe(500);
+      const body = (await res.json()) as PostResponse;
+      expect(body.error).toBe("could not save score");
+      expect(body.ok).toBeUndefined();
     });
   });
 });

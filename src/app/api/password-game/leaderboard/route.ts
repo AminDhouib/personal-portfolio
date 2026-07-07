@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createLeaderboardStore } from "@/lib/leaderboard-store";
+import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { captureException } from "@/lib/log";
 import { env } from "@/env";
 
 export const runtime = "nodejs";
@@ -106,13 +107,23 @@ export async function POST(req: Request) {
     createdAt: new Date().toISOString(),
   };
 
-  const rank = await store.withWriteLock(async () => {
-    const all = await store.readAll();
-    all.push(entry);
-    all.sort((a, b) => a.time - b.time);
-    const trimmed = all.slice(0, store.maxEntries);
-    await store.writeAll(trimmed);
-    return trimmed.indexOf(entry) + 1;
-  });
+  let rank: number;
+  try {
+    rank = await store.withWriteLock(async () => {
+      const all = await store.readForUpdate();
+      all.push(entry);
+      all.sort((a, b) => a.time - b.time);
+      const trimmed = all.slice(0, store.maxEntries);
+      await store.writeAll(trimmed);
+      return trimmed.indexOf(entry) + 1;
+    });
+  } catch (err) {
+    captureException("api:leaderboard.write", err);
+    const status = err instanceof LeaderboardCorruptError ? 503 : 500;
+    return NextResponse.json(
+      { error: status === 503 ? "leaderboard temporarily unavailable" : "could not save score" },
+      { status },
+    );
+  }
   return NextResponse.json({ ok: true, rank });
 }
