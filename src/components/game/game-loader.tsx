@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import type { GameSlug } from "@/app/games/games-meta";
+import { assertNever } from "@/lib/assert-never";
 
 function GameSkeleton() {
   return (
@@ -52,6 +53,6 @@ export function GameLoader({ slug }: { slug: GameSlug }) {
       // password-game has a dedicated page and is not rendered through GameLoader
       return null;
     default:
-      return null;
+      return assertNever(slug, "game-loader: no renderer registered for slug");
   }
 }
