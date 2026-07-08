@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   description:
     "Personal portfolio of Amin Dhouib — CEO & CTO of Devino Solutions. I build apps people actually use, then self-host them on my home server.",
   metadataBase: new URL("https://amindhou.com"),
+  alternates: {
+    types: {
+      "application/rss+xml": "/feed.xml",
+    },
+  },
   keywords: [
     "Amin Dhouib",
     "Full Stack Developer",

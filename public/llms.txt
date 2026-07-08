@@ -1,0 +1,36 @@
+# Amin Dhouib
+
+Personal portfolio of Amin Dhouib, CEO and CTO of Devino Solutions, an AI and software consultancy based in Ottawa, Canada. Amin is a full-stack engineer who builds products and self-hosts them on a home server. This site covers his writing, work, services, and a set of playable browser games. The base URL is https://amindhou.com.
+
+## Blog
+
+Long-form writing on engineering, self-hosting, open source, and building products.
+
+- [5 Apps, 5 Lessons: What I Learned Shipping Products Nobody Asked For](https://amindhou.com/blog/5-apps-5-lessons)
+- [My Full DevSecOps Pipeline: ESLint, knip, CodeRabbit, and Beyond](https://amindhou.com/blog/devsecops-pipeline)
+- [From $0 to $1M: What I Learned Building Devino Solutions](https://amindhou.com/blog/devino-solutions-lessons)
+- [Why I Use AI Agents to Automate My Entire Dev Workflow](https://amindhou.com/blog/ai-agents-dev-workflow)
+- [Building an Open-Source Honey Alternative: The Caramel Story](https://amindhou.com/blog/caramel-open-source-story)
+- [How I Self-Host Everything on a Home Server with 99.99% Uptime](https://amindhou.com/blog/self-hosting-home-server)
+- [Blog index](https://amindhou.com/blog)
+- [RSS feed](https://amindhou.com/feed.xml)
+
+## Work and services
+
+- [Selected work and projects](https://amindhou.com/work)
+- [Reviews and testimonials](https://amindhou.com/reviews)
+
+## Games
+
+Playable browser games, each self-contained.
+
+- [Games index](https://amindhou.com/games)
+
+## Interactive
+
+- AI chat: a CopilotKit-based assistant embedded on the site for questions about Amin's work.
+
+## Endpoints
+
+- [Health status endpoint (JSON)](https://amindhou.com/api/health)
+- [Sitemap](https://amindhou.com/sitemap.xml)
