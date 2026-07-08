@@ -7,12 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "docker compose up",
-    "dev:bare": "next dev",
+    "dev": "docker compose up --build",
     "build": "next build",
     "build:docker": "docker compose build app",
-    "start": "docker compose -f compose.yml up",
-    "start:bare": "next start",
+    "start": "docker compose up -d",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

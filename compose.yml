@@ -1,6 +1,5 @@
-# THE infrastructure contract. Dev, CI, and prod all build from this file.
-# `docker compose up` = dev (compose.override.yml auto-applied).
-# Dokploy deploys this as a compose-type application.
+# THE infrastructure contract. Local, CI, and prod all use this exact file.
+# `docker compose up` builds and runs the same image everywhere.
 
 services:
   db:
@@ -25,7 +24,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runner
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
