@@ -43,7 +43,7 @@ access — it is not exposed through the Dokploy API surface available to agents
   self-hosted Sentry, and additionally forwards a PostHog `$exception` event when both
   `POSTHOG_KEY` and `POSTHOG_HOST` are configured (silently skipped otherwise — there is no
   separate pageview/analytics client wired in; PostHog here is exception-forwarding only).
-  Client-side game crashes go through a different path: `nextGameCrash`
+  Client-side game crashes go through a different path: `gameCrashToReport`
   (`src/lib/report-game-error.ts`) wraps the error and callers pass it to the browser's native
   `reportError()` DOM global — not a custom function — which the already-installed Sentry client
   SDK picks up via its own `window.onerror` listener.

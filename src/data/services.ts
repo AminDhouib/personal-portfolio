@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Bot, Code2, Cloud, Database, ShieldCheck, TrendingUp } from "lucide-react";
 
-export interface Service {
+export interface ServiceOffering {
   title: string;
   description: string;
   tools: string[];
@@ -9,7 +9,7 @@ export interface Service {
   accentColor: string;
 }
 
-export const services: readonly Service[] = Object.freeze([
+export const services: readonly ServiceOffering[] = Object.freeze([
   {
     title: "AI Automation",
     description: "Web scraping, AI agents, orchestration",

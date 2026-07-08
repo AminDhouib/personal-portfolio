@@ -17,7 +17,7 @@ export interface CharFormatting {
 export type FormattingMap = readonly CharFormatting[];
 
 /** Runtime state that rules can inspect or mutate (e.g. timers). */
-export interface GameState {
+export interface RuleEngineState {
   /** Current password value. */
   password: string;
   /**
@@ -55,13 +55,13 @@ export interface Rule {
   /** Rule parameters resolved from the seed (e.g. { n: 7 }). */
   params: Record<string, unknown>;
   /** Pure validator. Must not mutate inputs. */
-  validate(state: GameState): ValidationResult;
+  validate(state: RuleEngineState): ValidationResult;
   /**
    * Called every ~100ms while this rule is active or revealed. May mutate
    * password/formatting (e.g. burn characters, remove dead pet). Returns
    * null or undefined to indicate no mutation.
    */
-  onTick?(state: GameState, deltaMs: number, ruleState: unknown): TickResult | null;
+  onTick?(state: RuleEngineState, deltaMs: number, ruleState: unknown): TickResult | null;
 }
 
 /** Factory that produces a Rule using the RNG for parameterization. */

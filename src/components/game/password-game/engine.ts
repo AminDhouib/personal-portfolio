@@ -1,5 +1,12 @@
 import { mulberry32, pickN } from "./prng";
-import type { FormattingMap, GameState, Rule, RuleDef, Tier, ValidationResult } from "./types";
+import type {
+  FormattingMap,
+  RuleEngineState,
+  Rule,
+  RuleDef,
+  Tier,
+  ValidationResult,
+} from "./types";
 import type { TickResult } from "./types";
 
 export type RuleCountsPerTier = Partial<Record<Tier, number>>;
@@ -43,7 +50,7 @@ export function selectRulesForRun(
   return out;
 }
 
-export function validateRules(state: GameState): ValidationResult[] {
+export function validateRules(state: RuleEngineState): ValidationResult[] {
   return state.rules.map((rule) => rule.validate(state));
 }
 
@@ -51,7 +58,7 @@ export function validateRules(state: GameState): ValidationResult[] {
  * The active rule is the first unsatisfied rule. Earlier rules must be
  * satisfied first (Neal-style progressive reveal). Returns -1 when all pass.
  */
-export function computeActiveRuleIndex(state: GameState): number {
+export function computeActiveRuleIndex(state: RuleEngineState): number {
   for (let i = 0; i < state.rules.length; i++) {
     const rule = state.rules[i];
     if (!rule) continue;
@@ -72,7 +79,7 @@ export interface TickedState {
  * state is threaded back in for the next tick.
  */
 export function runTicks(
-  state: GameState,
+  state: RuleEngineState,
   deltaMs: number,
   ruleStates: Record<string, unknown>,
 ): TickedState {

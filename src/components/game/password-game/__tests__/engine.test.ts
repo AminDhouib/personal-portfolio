@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeActiveRuleIndex, selectRulesForRun, validateRules } from "../engine";
 import { TIER_1_RULES } from "../rules/tier1";
-import type { GameState } from "../types";
+import type { RuleEngineState } from "../types";
 
 describe("selectRulesForRun", () => {
   it("draws the requested count of rules per tier", () => {
@@ -31,7 +31,7 @@ describe("selectRulesForRun", () => {
   });
 });
 
-function state(password: string, rules: ReturnType<typeof selectRulesForRun>): GameState {
+function state(password: string, rules: ReturnType<typeof selectRulesForRun>): RuleEngineState {
   return { password, formatting: [], elapsedSeconds: 0, activeRuleIndex: 0, rules, seed: 1 };
 }
 

@@ -66,7 +66,7 @@ import {
 } from "./space-shooter/types";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
-import { nextGameCrash } from "@/lib/report-game-error";
+import { gameCrashToReport } from "@/lib/report-game-error";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
@@ -724,7 +724,7 @@ export function SpaceShooterGame() {
       void refreshLeaderboard();
       refreshProfile();
     } catch (err) {
-      const crash = nextGameCrash("space-shooter", err);
+      const crash = gameCrashToReport("space-shooter", err);
       if (crash) reportError(crash);
       setCrashed(true);
     }
@@ -987,7 +987,7 @@ export function SpaceShooterGame() {
         raf = requestAnimationFrame(loop);
       } catch (err) {
         // No cancel needed: not rescheduling here is what stops the loop.
-        const crash = nextGameCrash("space-shooter", err);
+        const crash = gameCrashToReport("space-shooter", err);
         if (crash) reportError(crash);
         setCrashed(true);
       }

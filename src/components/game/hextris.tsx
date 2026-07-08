@@ -28,7 +28,7 @@ import {
 import { rotatePoint, randInt } from "./hextris/logic";
 import { safeJsonParse } from "@/lib/safe-json";
 import { asNumberArray } from "@/lib/safe-storage";
-import { nextGameCrash } from "@/lib/report-game-error";
+import { gameCrashToReport } from "@/lib/report-game-error";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 
 // ═══════════════════════════════════════════════════════════════
@@ -1990,7 +1990,7 @@ export function HextrisGame() {
       } catch (err) {
         cancelAnimationFrame(animRef.current);
         destroyedRef.current = true;
-        const crash = nextGameCrash("hextris", err);
+        const crash = gameCrashToReport("hextris", err);
         if (crash) reportError(crash);
         setCrashed(true);
       }

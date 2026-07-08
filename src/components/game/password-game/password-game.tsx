@@ -19,7 +19,7 @@ import { RichInput } from "./rich-input";
 import { setTodayWord } from "../../../data/password-game/wordle";
 import { setDailyChessPuzzle } from "../../../data/password-game/chess";
 import { setExtendedCapitals } from "../../../data/password-game/capitals";
-import type { GameState, Rule, FormattingMap } from "./types";
+import type { RuleEngineState, Rule, FormattingMap } from "./types";
 
 function makeSeed(): number {
   return Math.floor(Math.random() * 0xffffffff) >>> 0;
@@ -120,7 +120,7 @@ export function PasswordGame() {
     [seed, wordleVersion],
   );
 
-  const state: GameState = useMemo(
+  const state: RuleEngineState = useMemo(
     () => ({
       password,
       formatting,
@@ -312,7 +312,7 @@ export function PasswordGame() {
   useEffect(() => {
     if (!timerRunning) return;
     const id = window.setInterval(() => {
-      const currentState: GameState = {
+      const currentState: RuleEngineState = {
         password,
         formatting,
         elapsedSeconds,

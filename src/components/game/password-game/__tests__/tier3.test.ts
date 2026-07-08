@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { TIER_3_RULES } from "../rules/tier3";
-import type { GameState } from "../types";
+import type { RuleEngineState } from "../types";
 import { makeState } from "./helpers";
 
 describe("Tier 3 — every-nth-uppercase rule", () => {
@@ -113,7 +113,7 @@ describe("Tier 3 — bold count rule", () => {
   it("passes when enough chars are bold", () => {
     const rule = def.create(mulberry32(1));
     const n = rule.params.n as number;
-    const state: GameState = {
+    const state: RuleEngineState = {
       password: "xxxxxx",
       formatting: Array.from({ length: 6 }, (_, i) => (i < n ? { bold: true } : {})),
       elapsedSeconds: 0,
@@ -136,7 +136,7 @@ describe("Tier 3 — italic count rule", () => {
   it("passes when enough chars are italic", () => {
     const rule = def.create(mulberry32(1));
     const n = rule.params.n as number;
-    const state: GameState = {
+    const state: RuleEngineState = {
       password: "xxxxxxxx",
       formatting: Array.from({ length: 8 }, (_, i) => (i < n ? { italic: true } : {})),
       elapsedSeconds: 0,
@@ -153,7 +153,7 @@ describe("Tier 3 — bold/italic parity rule", () => {
 
   it("passes when bold and italic counts match (both >= 1)", () => {
     const rule = def.create(mulberry32(1));
-    const state: GameState = {
+    const state: RuleEngineState = {
       password: "xxxxxx",
       formatting: [{ bold: true }, { bold: true }, { italic: true }, { italic: true }, {}, {}],
       elapsedSeconds: 0,
@@ -166,7 +166,7 @@ describe("Tier 3 — bold/italic parity rule", () => {
 
   it("fails when counts differ", () => {
     const rule = def.create(mulberry32(1));
-    const state: GameState = {
+    const state: RuleEngineState = {
       password: "xxx",
       formatting: [{ bold: true }, { italic: true }, { italic: true }],
       elapsedSeconds: 0,
