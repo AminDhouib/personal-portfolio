@@ -53,3 +53,84 @@ describe("env gateway", () => {
     expect(env.GITHUB_TOKEN).toBeUndefined();
   });
 });
+
+describe("validateRequiredEnv (strict boot gate)", () => {
+  // Sets every required var to a format-valid value; individual tests then
+  // knock specific ones back out.
+  async function armAllRequired() {
+    const mod = await freshImport();
+    for (const name of mod.REQUIRED_ENV_VARS) {
+      process.env[name] = name.endsWith("_HOST") || name.endsWith("_DSN") ? "https://x.test" : "x";
+    }
+    delete process.env[mod.ENV_BYPASS_VAR];
+    return mod;
+  }
+
+  beforeEach(() => {
+    restoreEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
+  });
+
+  it("passes silently when every required var is set", async () => {
+    const { validateRequiredEnv } = await armAllRequired();
+    expect(() => validateRequiredEnv()).not.toThrow();
+  });
+
+  it("throws naming the exact missing variable", async () => {
+    const mod = await armAllRequired();
+    delete process.env.OPENROUTER_KEY;
+    expect(() => mod.validateRequiredEnv()).toThrow(/OPENROUTER_KEY/);
+  });
+
+  it("lists ALL missing variables, not just the first", async () => {
+    const mod = await armAllRequired();
+    delete process.env.SENTRY_DSN;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.GA4_PROPERTY_UPUP;
+    expect(() => mod.validateRequiredEnv()).toThrow(
+      /SENTRY_DSN, RESEND_API_KEY[\s\S]*GA4_PROPERTY_UPUP/,
+    );
+  });
+
+  it("treats an empty string as missing", async () => {
+    const mod = await armAllRequired();
+    process.env.GITHUB_TOKEN = "";
+    expect(() => mod.validateRequiredEnv()).toThrow(/GITHUB_TOKEN/);
+  });
+
+  it("the exact sentinel pair bypasses with a loud warning", async () => {
+    const mod = await armAllRequired();
+    delete process.env.OPENROUTER_KEY;
+    process.env[mod.ENV_BYPASS_VAR] = mod.ENV_BYPASS_VALUE;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => mod.validateRequiredEnv()).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("OPENROUTER_KEY"));
+    warn.mockRestore();
+  });
+
+  it.each([["true"], ["1"], ["yes"], ["skip"], ["disabled"]])(
+    "rejects boolean-style bypass value %j",
+    async (value) => {
+      const mod = await armAllRequired();
+      delete process.env.OPENROUTER_KEY;
+      process.env[mod.ENV_BYPASS_VAR] = value;
+      expect(() => mod.validateRequiredEnv()).toThrow(/not the exact required sentinel/);
+    },
+  );
+
+  it("rejects the sentinel with a trailing space (no trimming, exact match only)", async () => {
+    const mod = await armAllRequired();
+    delete process.env.OPENROUTER_KEY;
+    process.env[mod.ENV_BYPASS_VAR] = mod.ENV_BYPASS_VALUE + " ";
+    expect(() => mod.validateRequiredEnv()).toThrow(/not the exact required sentinel/);
+  });
+
+  it("ignores the bypass entirely when nothing is missing", async () => {
+    const mod = await armAllRequired();
+    process.env[mod.ENV_BYPASS_VAR] = "garbage";
+    expect(() => mod.validateRequiredEnv()).not.toThrow();
+  });
+});

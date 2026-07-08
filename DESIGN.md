@@ -11,17 +11,19 @@ See `RUNBOOK.md` for operations and `README.md` for the human quickstart.
 
 Routes call into `lib`; `lib` does not call back into routes or components. Direct filesystem
 access is banned everywhere except a small, explicit allowlist (`FS_ALLOWLIST` in
-`eslint.config.mjs`): `src/lib/blog.ts`, `src/lib/leaderboard-store.ts`,
-`src/app/apple-icon.tsx`, `src/app/icon.tsx`, `src/app/api/leads/route.ts`, and
-`src/app/api/health/route.ts` (a non-mutating write-access probe, not a data read). Everything
-else that needs persistence goes through a store module — `fs`/`node:fs`/`fs/promises` imports
-are lint errors outside that list.
+`eslint.config.mjs`): `src/lib/blog.ts`, `src/lib/json-file-store.ts`, `src/lib/leads-store.ts`,
+`src/app/apple-icon.tsx`, `src/app/icon.tsx`, and `src/app/api/health/route.ts` (a non-mutating
+write-access probe, not a data read). Everything else that needs persistence goes through a
+store module — `fs`/`node:fs`/`fs/promises` imports are lint errors outside that list.
 
-Leaderboard and password-game persistence goes **only** through `createLeaderboardStore`
-(`src/lib/leaderboard-store.ts`): `readAll()` for GET requests (lenient — a corrupt file renders
-an empty board rather than 500ing), `readForUpdate()` for the write path (strict — a corrupt file
-throws `LeaderboardCorruptError` and the write aborts instead of overwriting real data). See
-`RUNBOOK.md`'s Data surgery section for the operational side of this.
+Leaderboard and password-game persistence goes **only** through `createJsonFileStore`
+(`src/lib/json-file-store.ts`), instantiated per file with a zod schema from
+`src/lib/persistence-schemas.ts`: `readFile()` for GET requests (lenient — a corrupt or
+version-mismatched file renders as empty rather than 500ing, and GET never mutates disk),
+`readFileForUpdate()` for the write path (strict — a corrupt file throws `JsonFileCorruptError`
+and the write aborts instead of overwriting real data; a version-mismatched file is archived to
+`.schema-mismatch-N` and replaced with a fresh empty file). Leads append through
+`src/lib/leads-store.ts`. See `RUNBOOK.md`'s Data surgery section for the operational side.
 
 Games are self-contained under `src/components/game/`. Most games are a single top-level
 component file (`hextris.tsx`, `tower-stacker.tsx`, `typing-speed.tsx`); non-component logic is
@@ -66,7 +68,7 @@ style suggestions.
   `// silent-ok: <reason>` comment explaining why swallowing it is correct (e.g. best-effort
   temp-file cleanup where the original error is already being rethrown).
 - **Client game code** uses two small helpers instead of ad hoc error/storage handling:
-  `nextGameCrash` (`src/lib/report-game-error.ts`) for RAF-loop catches — it dedupes to
+  `gameCrashToReport` (`src/lib/report-game-error.ts`) for RAF-loop catches — it dedupes to
   once-per-game-per-session and returns an `Error` the caller passes to a literal `reportError(...)`
   call (so `no-silent-catch` sees a real reporter at the call site); `safeLocalSet`/`asNumberArray`
   (`src/lib/safe-storage.ts`) for `localStorage` reads/writes that must never throw or trust an
@@ -76,10 +78,12 @@ style suggestions.
   `game-loader.tsx` switch's default case calls `assertNever(slug, ...)` (`src/lib/assert-never.ts`)
   — because the parameter type is `never`, forgetting to wire up a new slug there is a **compile
   error** (`tsc`/`next build`), not a silent blank page.
-- **Coverage ratchet**: floors in `vitest.config.ts` (lines 67 / statements 63 / functions 61 /
-  branches 54) are measured margins below the richest suite, and may only be **raised**, in a
-  dedicated commit, when measured coverage rises — never lowered except with a stated reason in
-  that commit's message.
+- **Coverage ratchet**: floors in `vitest.config.ts` (lines 18 / statements 17 / functions 16 /
+  branches 12 as of the pass-2 re-base) are measured margins below the current suite over the
+  HONEST scope — coverage `include` is all of `src/`, so untested files count in the
+  denominator. Floors may only be **raised**, in a dedicated commit, when measured coverage
+  rises — never lowered except with a stated reason in that commit's message (the pass-2 drop
+  from 67/63/61/54 was the denominator becoming honest, documented in that commit).
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
@@ -106,13 +110,18 @@ current tree on 2026-07-07.
   the unauthenticated REST API and the contribution graph falls back from the authenticated
   GraphQL calendar to a token-free public mirror (`github-contributions-api.jogruber.de`) — the
   graph still renders real data either way, so the token was never provisioned in prod.
-- **The legacy leaderboard bucket stays merged under space-shooter.** Before a fix landed
-  (P2/RC-1), `hextris.tsx` and `space-shooter.tsx` both omitted the leaderboard `game` field, so
-  every hextris submission was silently written into the space-shooter bucket. The API now
-  requires `?game=` explicitly (no silent default — see the GET handler in
-  `src/app/api/leaderboard/route.ts`), but the historical merged rows are not retroactively
-  separable, and resetting the space-shooter board would delete real visitors' scores for vanity
-  data. Ruling: leave the merged history as-is; hextris's own board starts fresh going forward.
+- **Persisted files carry a `schemaVersion` envelope, and a version mismatch archives-then-resets
+  instead of migrating.** Pass-2's break+reset (owner-approved, 0 users): on the first boot after
+  a schema bump, the store moves the old file aside to `<name>.schema-mismatch-N` (never deletes,
+  never migrates in place), reports the reset to Sentry, and starts a fresh empty file. Corrupt
+  JSON is a different case — quarantined to `<name>.corrupt-N` and the write path throws (503).
+  The pre-v2 merged hextris/space-shooter history lives on in the archived v1 file; the v2
+  `boards` record keys every game separately so the merge cannot recur.
+- **`DATA_DIR` is the one env var that is optional under strict validation** — it is a path
+  override with a safe default of `<cwd>/.data` (prod mounts the `portfolio-data` volume there),
+  not an integration credential. Everything else in `REQUIRED_ENV_VARS` fails the boot loudly
+  when missing. Do not add a second "optional because it has a default" var without updating this
+  entry — the exception is meant to stay singular.
 - **Reduced-motion is inverted between chrome and games, on purpose.** The root layout
   (`src/app/providers.tsx`) wraps the whole app in `<MotionConfig reducedMotion="user">`, honoring
   the OS preference for page chrome. Every game explicitly opts back OUT: `game-loader.tsx` and
@@ -240,15 +249,25 @@ trigger revisiting it.
 - **Some defensive branches are provably dead** (audit ref NF(P7)-b) — error paths guarding
   conditions that current callers can no longer produce, left in place as cheap insurance rather
   than removed.
-- **Coverage scope is suite-touched files only, not a whole-repo scan** (audit ref NF(P7)-c) —
-  `vitest.config.ts`'s coverage `include` is unset, which keeps the vitest default (only files the
-  suite actually imports). A file with zero tests importing it doesn't appear in the report at
-  all, rather than appearing at 0%.
-- **Coverage thresholds are repo-wide, not per-file** (audit ref NF(P7)-d) — a single well-tested
-  module can currently offset an untested one; the ratchet only guards the aggregate.
-- **A `LeadRecord` admin-reading surface doesn't exist yet** (audit ref NF-P1-c) — the type in
-  `src/lib/persistence-schemas.ts` is currently consumed only by its own tests; leads are written
-  to disk and emailed (when `RESEND_API_KEY` is set) but there is no in-app UI to read them back.
+- **Coverage thresholds are repo-wide, not per-file** (audit refs NF(P7)-d, P2-TEST-003) — a
+  single well-tested module can currently offset an untested one; the ratchet only guards the
+  aggregate. (The companion scope debt NF(P7)-c is resolved: pass-2 set coverage `include` to all
+  of `src/`, so untested files now count in the denominator instead of being invisible.)
+- **`tower-stacker.tsx` and `typing-speed.tsx` have zero tests** (audit ref P2-TEST-004,
+  deferred) — both are single-file games whose pure math (block overlap/trim, WPM/accuracy)
+  would extract cheaply under the extract-before-edit doctrine. Trigger: any gameplay edit to
+  either file.
+- **No browser-level smoke test runs in CI** (audit ref P2-TEST-005, deferred) — route tests
+  exercise handlers in-process; nothing in CI loads a real page in a browser. The scoped design
+  if revisited: a Playwright job hitting `/`, one game page, and `/api/health` against
+  `next start`. Deferred for CI-time cost, revisit if a shipped page-level breakage escapes the
+  current gates.
+- **A `LeadRecord` admin-reading surface doesn't exist yet** (audit refs NF-P1-c, P2-DATA-005;
+  owner ruling 2026-07-07: document only, do not build yet). The read primitive now exists —
+  `readAllLeads()` in `src/lib/leads-store.ts` (lenient per-line, used by the restore drill) —
+  but there is no in-app way to view leads. The documented design when it is built: a
+  `GET /api/leads` handler gated by an `ADMIN_TOKEN` bearer check, returning `readAllLeads()`
+  output; no UI page. Until then the owner reads the Resend email or the JSONL file directly.
 - **Space-shooter-private settings/profile modules** (audit refs CT-009, CT-010, DD4-002, from the
   P5/P8 plan notes): the reduce-motion change-trace measurement (32 files touched) surfaced that
   cross-cutting client concerns — including space-shooter's own settings/profile state — have no
@@ -257,8 +276,6 @@ trigger revisiting it.
   reads anywhere in `src/` and no entry in `env.ts`'s schema (verified 2026-07-07). Housekeeping:
   remove them from the Dokploy application's environment whenever convenient; nothing depends on
   either.
-- **A root-level junk gate has been proposed but not built** — nothing currently prevents stray
-  files (logs, one-off scripts) from accumulating at the repo root outside `.gitignore`'d paths.
 - **The `typescript-eslint` `no-unsafe-*` rule set is deferred** — not yet adopted; the plan is to
   measure the noise/signal cost on this codebase before turning any of them on.
 - **Stale local branches and an old stash exist on the maintainer's machine**: `dev` and
