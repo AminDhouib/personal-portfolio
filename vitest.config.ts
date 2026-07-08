@@ -20,34 +20,36 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "json-summary", "lcov"],
       reportsDirectory: "./coverage",
-      // No `all` option in vitest 4's CoverageOptions -- scope is controlled
-      // via include/exclude. Leaving `include` unset keeps the vitest default
-      // (only files touched by the suite), i.e. the suite-loaded surface, not
-      // a whole-repo scan. Whole-repo coverage is deferred (NF(P7)-c).
+      // HONEST SCOPE (pass-2 audit P2-TEST-001, resolves NF(P7)-c): every
+      // source file is in the denominator, tested or not. The previous
+      // suite-touched-only default reported 69% while true source coverage
+      // was ~23% -- an untested file was invisible to the metric.
+      include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "**/*.test.{ts,tsx}",
+        "**/__tests__/**",
         "src/test/**",
         "**/*.d.ts",
         "*.config.{ts,mjs}",
         "**/types.ts",
       ],
-      // Ratcheted floor: floor(measured %) - margin, measured over the
-      // richest suite (P1-P7 landed). Margin is 2 for lines/statements/
-      // functions and 3 for branches (absorbs run-to-run branch variance
-      // from the voltorb randomized-invariant tests -- those tests exercise
-      // the same lines/branches regardless of the random values drawn, so
-      // only branch coverage can wobble slightly).
+      // Ratcheted floor: floor(measured %) - margin over the full-src scope.
+      // Margin is 2 for lines/statements/functions and 3 for branches
+      // (absorbs run-to-run branch variance from the voltorb
+      // randomized-invariant tests).
       //
-      // Ratchet policy: raise the floor in a dedicated commit whenever
-      // measured coverage rises. Never lower it except with a stated reason
-      // in that commit's message -- lowering the floor silently is a
-      // gate-weakening move.
+      // The floors DROPPED in the pass-2 re-base commit because the
+      // denominator became honest, not because coverage regressed -- the
+      // measured line count covered went UP in the same change. Ratchet
+      // policy is unchanged: raise the floor in a dedicated commit whenever
+      // measured coverage rises; never lower it without a stated reason in
+      // that commit's message.
       thresholds: {
         autoUpdate: false,
-        lines: 67,
-        statements: 63,
-        functions: 61,
-        branches: 54,
+        lines: 18,
+        statements: 17,
+        functions: 16,
+        branches: 12,
       },
     },
   },
