@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/log", () => ({ logWarn: vi.fn() }));
+vi.mock("@/lib/log", () => ({ logWarn: vi.fn(), captureException: vi.fn() }));
 
 import { POST } from "../route";
-import { logWarn } from "@/lib/log";
+import { logWarn, captureException } from "@/lib/log";
 
 const ALLOWED_DSN = "https://fd4e552a55f694418e7471d92de7873a@sentry.devino.ca/35";
 const INGEST_URL = "https://sentry.devino.ca/api/35/envelope/";
@@ -40,6 +40,7 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     consoleErrorSpy.mockRestore();
     vi.unstubAllGlobals();
     vi.mocked(logWarn).mockClear();
+    vi.mocked(captureException).mockClear();
   });
 
   it("relays a valid envelope to the self-hosted ingest endpoint", async () => {
@@ -67,14 +68,15 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("rejects a garbage envelope header", async () => {
+  it("rejects a garbage envelope header with 400 and reports it", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
     const res = await POST(makeReq("not-json\nstuff"));
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 
   it("rejects cross-origin posts", async () => {

@@ -9,6 +9,7 @@
  * section 2.1 for why one shape does not fit all five routes.
  */
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
 
@@ -28,26 +29,46 @@ export interface GuardOptions {
 }
 
 /**
- * Origin + rate-limit gate. Returns a Response to short-circuit the route, or
- * null to proceed. Reads only headers -- never consumes the request body --
- * so it is safe in front of a handler (like copilotkit's) that must read the
- * body itself exactly once.
+ * Result of {@link guardRequest}: the request id minted for this guarded
+ * request (always present, for correlation/echoing) plus the short-circuit
+ * Response, or a null `response` when the request may proceed.
  */
-export function guardRequest(req: Request, opts: GuardOptions): Response | null {
+export interface GuardResult {
+  /** Per-request correlation id, also set as the Sentry `request_id` tag. */
+  requestId: string;
+  /** A Response to short-circuit the route, or null to proceed. */
+  response: Response | null;
+}
+
+/**
+ * Origin + rate-limit gate. Mints a request id (tagged onto the Sentry
+ * isolation scope so any later capture in this request carries it) and returns
+ * it alongside a Response to short-circuit the route, or a null `response` to
+ * proceed. Reads only headers -- never consumes the request body -- so it is
+ * safe in front of a handler (like copilotkit's) that must read the body itself
+ * exactly once.
+ */
+export function guardRequest(req: Request, opts: GuardOptions): GuardResult {
+  const requestId = crypto.randomUUID();
+  Sentry.getIsolationScope().setTag("request_id", requestId);
+
   if (!isSameOrigin(req)) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return { requestId, response: NextResponse.json({ error: "forbidden" }, { status: 403 }) };
   }
   const rate = checkRateLimit(`${opts.key}:${getClientIp(req)}`, {
     limit: opts.limit,
     windowMs: opts.windowMs,
   });
   if (!rate.allowed) {
-    return NextResponse.json(
-      { error: "too many requests" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
-    );
+    return {
+      requestId,
+      response: NextResponse.json(
+        { error: "too many requests" },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+      ),
+    };
   }
-  return null;
+  return { requestId, response: null };
 }
 
 // Deliberately NOT exported: `body: unknown` here is the sanctioned narrow-me
@@ -57,7 +78,9 @@ export function guardRequest(req: Request, opts: GuardOptions): Response | null 
 // rule's exported-type-alias check out of scope without changing the shape
 // callers see -- guardedJsonRoute's own return-type annotation below carries
 // no literal `unknown` token, so nothing here weakens the rule's intent.
-type GuardedJson = { ok: true; body: unknown } | { ok: false; response: Response };
+type GuardedJson =
+  | { ok: true; requestId: string; body: unknown }
+  | { ok: false; requestId: string; response: Response };
 
 /**
  * guardRequest + a capped JSON body parse. Returns the parsed body (still
@@ -67,14 +90,15 @@ type GuardedJson = { ok: true; body: unknown } | { ok: false; response: Response
  * touching the body, and reject an oversized body before parsing it.
  */
 export async function guardedJsonRoute(req: Request, opts: GuardOptions): Promise<GuardedJson> {
-  const blocked = guardRequest(req, opts);
-  if (blocked) return { ok: false, response: blocked };
+  const { requestId, response: blocked } = guardRequest(req, opts);
+  if (blocked) return { ok: false, requestId, response: blocked };
 
   const cap = opts.maxBytes ?? DEFAULT_JSON_MAX_BYTES;
   const declared = Number(req.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > cap) {
     return {
       ok: false,
+      requestId,
       response: NextResponse.json({ error: "payload too large" }, { status: 413 }),
     };
   }
@@ -84,17 +108,26 @@ export async function guardedJsonRoute(req: Request, opts: GuardOptions): Promis
     text = await req.text();
   } catch {
     // silent-ok: a broken/aborted request stream is a client error, surfaced as the 400 below
-    return { ok: false, response: NextResponse.json({ error: "invalid json" }, { status: 400 }) };
+    return {
+      ok: false,
+      requestId,
+      response: NextResponse.json({ error: "invalid json" }, { status: 400 }),
+    };
   }
   if (Buffer.byteLength(text, "utf8") > cap) {
     return {
       ok: false,
+      requestId,
       response: NextResponse.json({ error: "payload too large" }, { status: 413 }),
     };
   }
   const parsed = safeJsonParseServer<unknown>(text, "route-guard.guardedJsonRoute", PARSE_FAILED);
   if (parsed === PARSE_FAILED) {
-    return { ok: false, response: NextResponse.json({ error: "invalid json" }, { status: 400 }) };
+    return {
+      ok: false,
+      requestId,
+      response: NextResponse.json({ error: "invalid json" }, { status: 400 }),
+    };
   }
-  return { ok: true, body: parsed };
+  return { ok: true, requestId, body: parsed };
 }

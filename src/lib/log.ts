@@ -3,6 +3,19 @@
  *
  * Server-side only (relies on process.env and, for capture, a Node PostHog
  * client) — do not import this from client components.
+ *
+ * Three tiers, chosen by where the signal needs to land:
+ *   - logWarn(scope, message, detail?)  — console.warn only; never reaches
+ *     Sentry or PostHog. For expected, recoverable conditions worth a log
+ *     breadcrumb (a missing optional config, a fallback that succeeded).
+ *   - logError(scope, message, error?)  — console.error only; also never reaches
+ *     Sentry or PostHog. For a real failure handled inline that should not be
+ *     aggregated as an alertable event.
+ *   - captureException(scope, error)    — console.error (via logError) PLUS a
+ *     Sentry event PLUS a PostHog `$exception` event (PostHog only when
+ *     POSTHOG_KEY and POSTHOG_HOST are set). The ONLY tier here that creates a
+ *     Sentry event; reserve it for failures that should surface on the
+ *     dashboards and be investigated.
  */
 
 import { PostHog } from "posthog-node";

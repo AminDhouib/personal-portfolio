@@ -21,3 +21,12 @@ Sentry.init({
   replaysOnErrorSampleRate: 0,
   environment: process.env.NODE_ENV,
 });
+
+// App Router navigation instrumentation: Next.js calls this on every
+// client-side route transition so Sentry can tie spans to the originating
+// navigation. The export name is required by @sentry/nextjs.
+// captureRouterTransitionStart is a client-only export; the import/namespace
+// resolver sees @sentry/nextjs's server build (where it is absent) and false-
+// positives. Next.js compiles this file into the client bundle, where it exists.
+// oxlint-disable-next-line import/namespace -- client-only Sentry export, absent from the resolved server build
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

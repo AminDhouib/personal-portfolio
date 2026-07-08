@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logWarn } from "@/lib/log";
-import { safeJsonParse } from "@/lib/safe-json";
+import { safeJsonParseServer } from "@/lib/safe-json-server";
 import { guardRequest } from "@/lib/route-guard";
 
 export const runtime = "nodejs";
@@ -26,7 +26,11 @@ const INGEST_URL = "https://sentry.devino.ca/api/35/envelope/";
 const MAX_ENVELOPE_BYTES = 1024 * 1024;
 
 export async function POST(request: NextRequest) {
-  const blocked = guardRequest(request, { key: "monitoring", limit: 60, windowMs: 60_000 });
+  const { response: blocked } = guardRequest(request, {
+    key: "monitoring",
+    limit: 60,
+    windowMs: 60_000,
+  });
   if (blocked) return blocked;
 
   const body = await request.text();
@@ -37,8 +41,11 @@ export async function POST(request: NextRequest) {
   // Envelope format: first newline-delimited line is a JSON header with `dsn`.
   const newline = body.indexOf("\n");
   const headerLine = newline === -1 ? body : body.slice(0, newline);
-  const header = safeJsonParse<{ dsn?: string }>(headerLine, "monitoring:envelope-header");
-  if (header?.dsn !== ALLOWED_DSN) {
+  const header = safeJsonParseServer<{ dsn?: string }>(headerLine, "monitoring.envelope");
+  if (!header) {
+    return NextResponse.json({ error: "invalid envelope" }, { status: 400 });
+  }
+  if (header.dsn !== ALLOWED_DSN) {
     return NextResponse.json({ error: "unknown dsn" }, { status: 403 });
   }
 

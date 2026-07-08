@@ -1,8 +1,12 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
-import { logWarn } from "@/lib/log";
+import { captureException } from "@/lib/log";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
 import { env } from "@/env";
 
+// Project slug (matches `slug` in src/data/projects.ts) -> that project's GA4
+// numeric property ID. IDs come only from GA4_PROPERTY_<SLUG> env vars (see
+// src/env), never hard-coded; a slug whose var is unset stays undefined here
+// and fetchMAU/fetchAllMAU report null for it instead of throwing.
 const propertyIds: Record<string, string | undefined> = {
   shorty: env.GA4_PROPERTY_SHORTY,
   unotes: env.GA4_PROPERTY_UNOTES,
@@ -30,7 +34,14 @@ function getClient(): BetaAnalyticsDataClient | null {
     _client = new BetaAnalyticsDataClient({ credentials });
     return _client;
   } catch (err) {
-    logWarn("ga4", "failed to init BetaAnalyticsDataClient", err);
+    // Construction failure disables every MAU lookup (all callers then hit the
+    // `if (!client) return null` path); surface it instead of degrading silently.
+    captureException(
+      "ga4.getClient",
+      new Error("GA4 client init failed: BetaAnalyticsDataClient constructor threw", {
+        cause: err,
+      }),
+    );
     return null;
   }
 }
@@ -53,7 +64,15 @@ export async function fetchMAU(slug: string): Promise<number | null> {
     const value = response.rows?.[0]?.metricValues?.[0]?.value;
     return value ? parseInt(value, 10) : null;
   } catch (err) {
-    logWarn("ga4", `runReport activeUsers failed for slug "${slug}" (property ${propertyId})`, err);
+    // Report the exhausted GA4 call so the null we return (MAU "unavailable")
+    // is not mistaken for a legitimately empty metric.
+    captureException(
+      "ga4.fetchMAU",
+      new Error(
+        `GA4 runReport(activeUsers) failed for slug "${slug}" (property ${propertyId}); returning null`,
+        { cause: err },
+      ),
+    );
     return null;
   }
 }

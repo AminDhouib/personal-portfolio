@@ -27,7 +27,11 @@ export const POST = async (req: NextRequest) => {
   // throttle per client IP so the OpenRouter key can't be drained by abuse.
   // guardRequest reads only headers, never the body -- CopilotKit reads the
   // body itself inside handleRequest below.
-  const blocked = guardRequest(req, { key: "copilotkit", limit: 20, windowMs: 60_000 });
+  const { response: blocked } = guardRequest(req, {
+    key: "copilotkit",
+    limit: 20,
+    windowMs: 60_000,
+  });
   if (blocked) return blocked;
 
   const openrouterKey = env.OPENROUTER_KEY;

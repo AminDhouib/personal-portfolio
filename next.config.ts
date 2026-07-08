@@ -51,7 +51,23 @@ const nextConfig: NextConfig = {
   },
 };
 
+// Sourcemap upload is gated on SENTRY_AUTH_TOKEN: without a token the Sentry
+// bundler plugin cannot authenticate to sentry.devino.ca, so uploading is
+// pointless. When the token is set, org/project/URL come from SENTRY_ORG /
+// SENTRY_PROJECT / SENTRY_URL (self-hosted) — set all of them together in the
+// build environment.
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+
+if (!sentryAuthToken) {
+  console.warn(
+    "[sentry] sourcemap upload disabled: SENTRY_AUTH_TOKEN not set -- prod stack traces will be minified",
+  );
+}
+
 export default withSentryConfig(nextConfig, {
   silent: true,
-  sourcemaps: { disable: true },
+  authToken: sentryAuthToken,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  sourcemaps: { disable: !sentryAuthToken },
 });

@@ -24,7 +24,7 @@ describe("guardRequest", () => {
       limit: 10,
       windowMs: 60_000,
     });
-    expect(res?.status).toBe(403);
+    expect(res.response?.status).toBe(403);
   });
 
   it("returns a 403 for a foreign Origin", () => {
@@ -33,27 +33,27 @@ describe("guardRequest", () => {
       limit: 10,
       windowMs: 60_000,
     });
-    expect(res?.status).toBe(403);
+    expect(res.response?.status).toBe(403);
   });
 
   it("returns null (pass) for a same-origin request within the limit", () => {
     const res = guardRequest(makeReq(), { key: "rg-test-c", limit: 10, windowMs: 60_000 });
-    expect(res).toBeNull();
+    expect(res.response).toBeNull();
   });
 
   it("returns a 429 with Retry-After once the per-key limit is exceeded", () => {
     const ip = uniqueIp();
     for (let i = 0; i < 3; i++) {
       const res = guardRequest(makeReq({ ip }), { key: "rg-test-d", limit: 3, windowMs: 60_000 });
-      expect(res).toBeNull();
+      expect(res.response).toBeNull();
     }
     const limited = guardRequest(makeReq({ ip }), {
       key: "rg-test-d",
       limit: 3,
       windowMs: 60_000,
     });
-    expect(limited?.status).toBe(429);
-    expect(limited?.headers.get("Retry-After")).toBeTruthy();
+    expect(limited.response?.status).toBe(429);
+    expect(limited.response?.headers.get("Retry-After")).toBeTruthy();
   });
 
   it("never reads the request body (safe in front of a handler that reads it itself)", async () => {
@@ -62,6 +62,13 @@ describe("guardRequest", () => {
     expect(req.bodyUsed).toBe(false);
     // the body must still be readable exactly once by the real caller downstream
     await expect(req.json()).resolves.toEqual({ a: 1 });
+  });
+
+  it("returns a uuid requestId on the guard result", () => {
+    const res = guardRequest(makeReq(), { key: "rg-test-f", limit: 10, windowMs: 60_000 });
+    expect(res.requestId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
   });
 });
 
@@ -113,7 +120,12 @@ describe("guardedJsonRoute", () => {
       windowMs: 60_000,
     });
     expect(guard.ok).toBe(true);
-    if (guard.ok) expect(guard.body).toEqual({ hello: "world" });
+    if (guard.ok) {
+      expect(guard.body).toEqual({ hello: "world" });
+      expect(guard.requestId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    }
   });
 });
 
