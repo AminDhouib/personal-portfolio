@@ -43,8 +43,10 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 
 ## Architecture
 
-- `src/app/` — App Router pages plus API routes (`src/app/api/*/route.ts`): leaderboards, leads,
-  the AI chat proxy, health.
+- `src/app/` — App Router pages plus API routes (`src/app/api/*/route.ts`): the games
+  leaderboard, leads, the AI chat proxy, health, and the password-game family
+  (chess-puzzle, countries, wordle, its own leaderboard). `src/app/monitoring/route.ts`
+  is the Sentry browser tunnel (top-level, not under `/api`, so ad blockers don't eat it).
 - `src/lib/` — server-side utilities: persistence stores, the request guard chain, the upstream
   fetch wrapper, structured logging, GitHub/GA4 clients.
 - `src/components/game/` — the games, each self-contained; see DESIGN.md before editing one.

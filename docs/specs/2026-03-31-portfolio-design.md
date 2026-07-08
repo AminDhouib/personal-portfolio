@@ -3,7 +3,9 @@
 **Owner:** Amin Dhouib
 **Domain:** amindhou.com
 **Date:** 2026-03-31
-**Status:** Approved for implementation
+**Status:** Historical design spec — superseded. Kept for provenance; details have
+drifted from the shipped site (e.g. the chatbot shipped as CopilotKit + OpenRouter,
+not Mastra). Current state lives in AGENTS.md, DESIGN.md, and RUNBOOK.md.
 
 ---
 
@@ -18,6 +20,7 @@ The site is self-hosted on Amin's home server via Docker Swarm (Dokploy), secure
 ## Global Design Rules
 
 ### Visual Language
+
 - **Typography:** 900/200 weight contrast. Distinctive display font (NOT Inter/Roboto/system — chosen during implementation). Clean body font via `next/font`.
 - **Colors:** Dark default. Green (#22c55e) as primary accent, blue (#6366f1) secondary, purple (#a78bfa) tertiary, amber (#f59e0b) for highlights.
 - **Geometric shapes:** Wireframe circles, triangles, and diamonds rendered in Three.js. They float through the entire page, parallax on mouse, and morph between sections. They are the connective thread.
@@ -26,6 +29,7 @@ The site is self-hosted on Amin's home server via Docker Swarm (Dokploy), secure
 - **Light/Dark mode:** Toggle in navbar. CSS variables + `next-themes`. Dark is default.
 
 ### No Emojis — Real Assets Only
+
 - **UI Icons:** Lucide React (`lucide-react`) — consistent stroke-based SVG icons for navigation, actions, section markers, game UI.
 - **Brand/Tech Logos:** Simple Icons (`simple-icons`) — 3000+ brand SVGs for GitHub, LinkedIn, React, TypeScript, Docker, AWS, etc.
 - **Product Logos:** Actual image assets from devino.ca (`/public/logos/shorty.png`, `unotes.png`, `upup.png`, `caramel.png`, `getitdone.png`).
@@ -34,6 +38,7 @@ The site is self-hosted on Amin's home server via Docker Swarm (Dokploy), secure
 - **NEVER:** Unicode emojis, placeholder letters, generic stock icons, AI-generated imagery.
 
 ### Date-Proof
+
 - All year references use `new Date().getFullYear()` — never hardcoded.
 - Blog posts show relative time ("2 weeks ago") or dynamically formatted dates.
 - Copyright footer is dynamic.
@@ -61,6 +66,7 @@ The site is self-hosted on Amin's home server via Docker Swarm (Dokploy), secure
 ## Scroll Flow — 11 Beats
 
 ### 01. Hero — The Entrance
+
 **Tags:** Three.js, Above fold, SSR content
 
 ```
@@ -91,6 +97,7 @@ DHOUIB
 ---
 
 ### 02. Proof Bar — The Numbers
+
 **Tags:** Animated counters, Live data
 
 ```
@@ -112,6 +119,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 ---
 
 ### 03. Work — The Apps
+
 **Tags:** Google Analytics API, Live MAU dots, Detail pages
 
 ```
@@ -150,6 +158,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 #### App Details
 
 **Shorty** (`/work/shorty`)
+
 - AI YouTube & Spotify summarization app — turns videos, podcasts, and documents into quick, digestible takeaways
 - 50% month-over-month growth
 - Built with: Next.js, Python microservices, Figma, Selenium + TOR
@@ -165,6 +174,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 - Tags: Data Scraper, DevOps Engineer, Fullstack Engineer
 
 **uNotes** (`/work/unotes`)
+
 - Community-driven note-sharing platform with 30,000+ user-uploaded university docs (past papers, exams, assignments, labs)
 - 5,000+ active monthly users
 - Free and open alternative to Chegg, CourseHero, StuDocu
@@ -179,6 +189,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 - Key features: Instant access, community driven, personal profile, search and filter, no login required, offline support
 
 **Caramel** (`/work/caramel`)
+
 - Open-source alternative to Honey — browser extension that automatically applies the best coupon code at checkout, without selling data or hijacking creators' commissions
 - Source code public on GitHub: github.com/DevinoSolutions/caramel
 - Built with: JavaScript, iOS, macOS
@@ -190,6 +201,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 - Contra detail: https://contra.com/p/v3Ek6YPZ-caramel-open-source-alternative-to-honey-coupon-finder
 
 **UpUp** (`/work/upup`)
+
 - Open-source, free, and secure React file upload component with cloud storage integrations (Google Drive, OneDrive, S3)
 - Versatile NPM component
 - Source code: github.com/DevinoSolutions/upup
@@ -197,6 +209,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 - Contra detail: https://contra.com/p/ZQl3WYFY-g-drive-one-drive-s3-integrations-open-react-file-uploader
 
 **GetItDone** (`/work/getitdone`)
+
 - One dashboard for daily check-ins, task updates, time tracking
 - Skip stand-ups and stop tool-hopping
 - URL: nowgetitdone.com
@@ -206,6 +219,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 ---
 
 ### 04. Services — What I Do
+
 **Tags:** Scroll-triggered reveals
 
 ```
@@ -243,6 +257,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 ---
 
 ### 05. Reviews — Social Proof
+
 **Tags:** Auto-scrolling marquee
 
 ```
@@ -265,6 +280,7 @@ Docker Swarm  /  Tailscale  /  Cloudflared
 ---
 
 ### 06. Open Source — Contributions
+
 **Tags:** GitHub API, Contribution graph
 
 ```
@@ -298,6 +314,7 @@ CI Stack: Prettier / ESLint / knip / ruff / pyright /
 ---
 
 ### 07. Background — Education & Stack
+
 **Tags:** Compact, Tech marquee
 
 ```
@@ -323,11 +340,13 @@ Summa Cum Laude (A+)
 ---
 
 ### 08. The Game — Seamless Scroll Interlude
+
 **Tags:** Three.js/Canvas, Mobile touch, Scroll-triggered
 
 **THE KEY IDEA:** The floating geometric wireframes that have been drifting through the entire page suddenly come alive. They ARE the game. The same circles, triangles, and diamonds that were decorative now become obstacles.
 
 **Game: "Geometric Flow"**
+
 - Your shape (a filled triangle) navigates through a field of wireframe shapes.
 - Tap/click to change direction. Endless runner using the site's own visual language.
 - No jarring transition — the page itself becomes the game.
@@ -349,6 +368,7 @@ Summa Cum Laude (A+)
 ---
 
 ### 09. Blog — Latest Thinking
+
 **Tags:** MDX, 3 latest posts
 
 ```
@@ -382,6 +402,7 @@ My Entire Dev Workflow                       ->
 ---
 
 ### 10. Beyond Code — The Human Side
+
 **Tags:** Compact
 
 ```
@@ -404,6 +425,7 @@ Fitness           Building & Shipping
 ---
 
 ### 11. Contact — The Close
+
 **Tags:** Calendly, Final CTA
 
 ```
@@ -433,6 +455,7 @@ Hosted on a home server with (Heart icon)
 ## Persistent Elements
 
 ### AI Chatbot — Mastra + CopilotKit
+
 **Always present.** Floating green button (Lucide MessageCircle) at bottom-right.
 
 - **Desktop:** Click opens side panel (slide from right).
@@ -445,9 +468,11 @@ Hosted on a home server with (Heart icon)
 - **Icons:** Lucide MessageCircle (float), Bot (header), X (close), Send (submit).
 
 ### Bookmark Button
+
 Small bookmark icon (Lucide Bookmark) in the nav. Triggers browser's "Add to bookmarks" / "Add to Home Screen" on mobile.
 
 ### Sticky Nav
+
 See Navbar section above. Uses scroll-spy with Intersection Observer for active section highlighting.
 
 ---
@@ -455,7 +480,9 @@ See Navbar section above. Uses scroll-spy with Intersection Observer for active 
 ## Additional Pages
 
 ### /work/[slug] — Project Detail Pages
+
 Each app (Shorty, Caramel, uNotes, UpUp, GetItDone) gets a dedicated page with:
+
 - Hero screenshot/video
 - Full description (from Contra portfolio content)
 - Tech stack breakdown
@@ -465,6 +492,7 @@ Each app (Shorty, Caramel, uNotes, UpUp, GetItDone) gets a dedicated page with:
 - Same geometric design language throughout
 
 ### /blog/[slug] — Blog Posts
+
 - Clean reading experience with MDX via `next-mdx-remote`
 - Table of contents sidebar on desktop
 - Shiki for code syntax highlighting
@@ -473,6 +501,7 @@ Each app (Shorty, Caramel, uNotes, UpUp, GetItDone) gets a dedicated page with:
 - Geometric shapes as subtle page decoration (not distracting during reading)
 
 ### /games — Games Arcade
+
 - Collection page with playable mini-games in canvas
 - "Geometric Flow" (the main game, expanded version)
 - Typing speed test
@@ -485,34 +514,36 @@ Each app (Shorty, Caramel, uNotes, UpUp, GetItDone) gets a dedicated page with:
 
 ## Technical Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Framework | Next.js (App Router, RSC, SSR) | 16.x (latest: 16.1.6) |
-| Language | TypeScript (strict mode) | 5.x |
-| Styling | Tailwind CSS + CSS variables + `next-themes` | 4.x |
-| 3D | Three.js via `@react-three/fiber` + `@react-three/drei` | Latest (lazy loaded) |
-| Animations | Framer Motion (`motion`) | Latest |
-| AI Agent Backend | Mastra (`@mastra/ai-sdk`) | Latest |
-| AI Chat UI | CopilotKit v2 (`@copilotkit/react-core/v2`) | Latest |
-| Blog | MDX via `next-mdx-remote` + Shiki | Latest |
-| Icons (UI) | Lucide React | Latest |
-| Icons (Brands) | Simple Icons | Latest |
-| Fonts | Distinctive display font via `next/font` | TBD |
-| APIs | GitHub REST API + Google Analytics Data API (GA4) | — |
-| Deployment | Docker on home server via Dokploy | — |
-| Domain | amindhou.com | — |
-| CI | Prettier, ESLint, knip, ruff, pyright, CodeRabbit, package size limits | — |
+| Layer            | Technology                                                             | Version               |
+| ---------------- | ---------------------------------------------------------------------- | --------------------- |
+| Framework        | Next.js (App Router, RSC, SSR)                                         | 16.x (latest: 16.1.6) |
+| Language         | TypeScript (strict mode)                                               | 5.x                   |
+| Styling          | Tailwind CSS + CSS variables + `next-themes`                           | 4.x                   |
+| 3D               | Three.js via `@react-three/fiber` + `@react-three/drei`                | Latest (lazy loaded)  |
+| Animations       | Framer Motion (`motion`)                                               | Latest                |
+| AI Agent Backend | Mastra (`@mastra/ai-sdk`)                                              | Latest                |
+| AI Chat UI       | CopilotKit v2 (`@copilotkit/react-core/v2`)                            | Latest                |
+| Blog             | MDX via `next-mdx-remote` + Shiki                                      | Latest                |
+| Icons (UI)       | Lucide React                                                           | Latest                |
+| Icons (Brands)   | Simple Icons                                                           | Latest                |
+| Fonts            | Distinctive display font via `next/font`                               | TBD                   |
+| APIs             | GitHub REST API + Google Analytics Data API (GA4)                      | —                     |
+| Deployment       | Docker on home server via Dokploy                                      | —                     |
+| Domain           | amindhou.com                                                           | —                     |
+| CI               | Prettier, ESLint, knip, ruff, pyright, CodeRabbit, package size limits | —                     |
 
 ---
 
 ## Data Integrations
 
 ### Google Analytics Data API (GA4)
+
 - **Purpose:** Fetch last-30-day active users per app domain (aishorty.com, unotes.net, grabcaramel.com, useupup.com, nowgetitdone.com).
 - **Display:** Green pulsing dot + MAU number on each app card. Note: "Updated dynamically — last 30 days."
 - **Fetch strategy:** Server-side in Next.js (RSC or API route). Cached via ISR (revalidate every 24h).
 
 ### GitHub REST API
+
 - **Contribution graph:** Fetch contribution data for AminDhouib, render as CSS grid/SVG with green squares.
 - **Repo stats:** Stars + forks for Caramel and UpUp repos.
 - **Fetch strategy:** Server-side, cached via ISR.

@@ -2,11 +2,6 @@ node_modules
 .next
 .git
 .gitignore
-.superpowers
-docs
-*.md
-!content/**/*.md
-!content/**/*.mdx
 .env*
 .pnpm-debug.log*
 vitest.config.ts
@@ -15,6 +10,26 @@ coverage
 *.pem
 .vercel
 nixpacks.toml
+
+# docs and repo metadata (not needed in the image)
+docs
+*.md
+!content/**/*.md
+!content/**/*.mdx
 README.md
 AGENTS.md
 CLAUDE.md
+
+# local-only analysis, session, and audit artifacts -- Dokploy builds from a
+# git clone where these are gitignored, but a local docker build would drag
+# ~85MB of context without these lines
+.claude
+.superpowers
+audit
+graphify-out
+src/graphify-out
+.graphify*
+.data
+*.log
+aishorty-monitor.*
+tsconfig.tsbuildinfo
