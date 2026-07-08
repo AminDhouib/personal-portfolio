@@ -1,4 +1,8 @@
-FROM node:22-alpine AS base
+# Exact version + digest: CI resolves Node from .nvmrc (22.23.1) and this base
+# must match it; the digest pins the image content so a re-tagged upstream
+# cannot silently change what prod runs. Dependabot does not bump digests in
+# Dockerfiles -- update version + digest together when bumping .nvmrc.
+FROM node:22.23.1-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS base
 
 # --- Dependencies ---
 FROM base AS deps

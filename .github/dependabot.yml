@@ -1,0 +1,22 @@
+# Dependabot keeps the SHA-pinned GitHub Actions and npm dependencies from
+# rotting: pins never move on their own, so without an updater they stay
+# frozen (and unpatched) forever. PRs still go through the full CI gate sweep.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Updates the pinned SHA and keeps the trailing `# vN` comment that
+    # scripts/check-action-pins.mjs relies on for human readability.
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch

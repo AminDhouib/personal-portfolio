@@ -37,7 +37,8 @@ Full gate sweep — run before every commit; tests BEFORE build, `rm -rf .next` 
 
 ```bash
 pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm typecheck && \
-  node scripts/check-env-drift.mjs && node scripts/check-action-pins.mjs && pnpm exec knip && \
+  node scripts/check-env-drift.mjs && node scripts/check-action-pins.mjs && \
+  node scripts/check-root-files.mjs && pnpm exec knip && \
   pnpm test && pnpm test:coverage && pnpm build
 ```
 

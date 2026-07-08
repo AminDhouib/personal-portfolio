@@ -48,6 +48,9 @@ jobs:
       - name: "Action pin check (uses: must be a commit SHA)"
         run: node scripts/check-action-pins.mjs
 
+      - name: Root-file allowlist check
+        run: node scripts/check-root-files.mjs
+
       - name: Knip (dead files, exports, dependencies)
         run: pnpm exec knip
 
@@ -78,7 +81,7 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "deploy skipped: secrets not configured"
+            echo "::warning title=Deploy skipped::deploy secrets not configured; this push did NOT deploy via CI (Dokploy autoDeploy may still fire independently)"
           fi
 
       - name: Connect to Tailscale

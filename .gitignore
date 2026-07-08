@@ -64,3 +64,6 @@ aishorty-monitor.*
 nul
 .devserver.log
 element_clones/
+
+# pass-1/pass-2 audit record stays a local, untracked artifact (owner decision 2026-07-07)
+/audit/
