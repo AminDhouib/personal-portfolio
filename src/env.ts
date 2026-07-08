@@ -21,9 +21,7 @@ const schema = z.object({
   POSTHOG_HOST: z.preprocess(emptyToUndefined, z.url().optional()),
   RESEND_API_KEY: z.string().optional(),
   OPENROUTER_KEY: z.string().optional(),
-  LEADS_DATA_DIR: z.string().optional(),
-  LEADERBOARD_DATA_DIR: z.string().optional(),
-  PG_LEADERBOARD_DIR: z.string().optional(),
+  DATA_DIR: z.string().optional(),
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.url().optional()),
 });
 

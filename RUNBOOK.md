@@ -106,13 +106,25 @@ change.
 `.data` is the named Docker volume `portfolio-data`, mounted at `/app/.data` in the container —
 it holds **live** leaderboards and contact-form leads. Never edit it in place casually.
 
-**Corruption path**: `readForUpdate()` (`src/lib/leaderboard-store.ts`) is the strict read used
-ahead of any write. If the on-disk file is unreadable, malformed JSON, or the wrong shape, it is
-renamed to `<file>.corrupt-<n>` as a best-effort quarantine and the read throws
-`LeaderboardCorruptError` — the write aborts rather than overwriting real data with a near-empty
-replacement, and the route returns 503. `readAll()` (used by GET requests) is deliberately
-lenient and renders an empty board from the same bad file instead of 500ing the public page, so a
-corruption only blocks writes, not reads.
+**Corruption path**: `readFileForUpdate()` (`src/lib/json-file-store.ts`) is the strict read used
+ahead of any write. If the on-disk file is unreadable, malformed JSON, or the wrong shape for its
+declared `schemaVersion`, it is renamed to `<file>.corrupt-<n>` as a best-effort quarantine and
+the read throws `JsonFileCorruptError` — the write aborts rather than overwriting real data with
+a near-empty replacement, and the route returns 503. `readFile()` (used by GET requests) is
+deliberately lenient and renders an empty board from the same bad file instead of 500ing the
+public page, so a corruption only blocks writes, not reads.
+
+**Schema reset (version mismatch) — automatic.** Every persisted JSON document carries a
+`schemaVersion` (`src/lib/persistence-schemas.ts`); leads.jsonl carries it per line. When the
+write path finds a file whose version does not match the build (including pre-versioning v1
+files, which parse as version `undefined`), it does an **archive-then-reset**: the old file is
+renamed to `<file>.schema-mismatch-<n>` (bytes preserved, mtime intact), a `captureException`
+fires so the event is visible in Sentry, and a fresh empty document takes its place. Old data is
+never migrated in code — that is the owner-approved break+reset policy (pass-2 audit,
+2026-07-07). After deploying a schema bump: confirm the archives exist next to the fresh files,
+run the validator (step 3 below) against the live dir, and delete the archives once you no longer
+want the old data. To manually reset a file, take a volume backup (below) and simply delete the
+file — the next write recreates it at the current version.
 
 **Recovery**:
 
@@ -124,9 +136,10 @@ corruption only blocks writes, not reads.
    ```
    (`pnpm validate:data`, with no args, always points at the live `.data` — to check an arbitrary
    directory, such as a scratch copy or a restored backup, call the script directly as above.) A
-   nonzero exit only means at least one of the three known files was unreadable, malformed, or
-   had zero valid rows — a missing `leads.jsonl` in an environment that never received a lead is
-   expected, not corruption.
+   nonzero exit means a file was unreadable, malformed, carried the wrong `schemaVersion`, or
+   contained invalid rows. Zero rows is valid (a freshly reset file is empty by design); a
+   missing `leads.jsonl` in an environment that never received a lead is expected, not
+   corruption.
 4. Replace the live file with the validated copy and reload the app (see Restart above).
 
 **Backup — today, manual only.** No scheduled backup exists (owner-deferred). To copy the volume

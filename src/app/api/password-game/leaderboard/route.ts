@@ -1,47 +1,51 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
-import { pgLeaderboardEntrySchema, type PgLeaderboardEntry } from "@/lib/persistence-schemas";
+import { createJsonFileStore, JsonFileCorruptError } from "@/lib/json-file-store";
+import {
+  emptyPasswordGameLeaderboardFile,
+  passwordGameLeaderboardFileSchema,
+  PERSISTENCE_SCHEMA_VERSION,
+  type PasswordGameLeaderboardEntry,
+} from "@/lib/persistence-schemas";
+import { sanitizePlayerName } from "@/lib/player-name";
 import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
-import { env } from "@/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Entry = PgLeaderboardEntry;
-
-function isEntry(x: unknown): x is Entry {
-  return pgLeaderboardEntrySchema.safeParse(x).success;
-}
-
-const store = createLeaderboardStore<Entry>({
-  dataDir: env.PG_LEADERBOARD_DIR,
+const store = createJsonFileStore({
   fileName: "password-game-leaderboard.json",
-  maxEntries: 500,
-  returnLimit: 50,
-  nameMax: 16,
-  defaultName: "Anonymous",
-  isEntry,
+  schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+  fileSchema: passwordGameLeaderboardFileSchema,
+  emptyFile: emptyPasswordGameLeaderboardFile,
+  scope: "pg-leaderboard",
 });
+
+const MAX_ENTRIES = 500;
+const RETURN_LIMIT = 50;
+const NAME_MAX = 16;
 
 const pgBodySchema = z.object({
   seed: z.unknown(),
-  time: z.unknown(),
-  rules: z.unknown(),
+  elapsedSeconds: z.unknown(),
+  ruleCount: z.unknown(),
   name: z.unknown(),
 });
 
-const TIME_MAX = 24 * 3600;
+const ELAPSED_SECONDS_MAX = 24 * 3600;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const seedParam = searchParams.get("seed");
-  const all = await store.readAll();
-  const filtered = seedParam !== null ? all.filter((e) => e.seed === Number(seedParam)) : all;
-  filtered.sort((a, b) => a.time - b.time);
+  const file = await store.readFile();
+  const filtered =
+    seedParam !== null
+      ? file.entries.filter((e) => e.seed === Number(seedParam))
+      : [...file.entries];
+  filtered.sort((a, b) => a.elapsedSeconds - b.elapsedSeconds);
   return NextResponse.json(
-    { entries: filtered.slice(0, store.returnLimit) },
+    { entries: filtered.slice(0, RETURN_LIMIT) },
     { headers: { "Cache-Control": "s-maxage=10, stale-while-revalidate=30" } },
   );
 }
@@ -59,40 +63,44 @@ export async function POST(req: Request) {
   }
   const o = parsed.data;
   const seed = typeof o.seed === "number" ? Math.floor(o.seed) : NaN;
-  const time = typeof o.time === "number" ? Math.floor(o.time) : NaN;
-  const rules = typeof o.rules === "number" ? Math.floor(o.rules) : NaN;
+  const elapsedSeconds = typeof o.elapsedSeconds === "number" ? Math.floor(o.elapsedSeconds) : NaN;
+  const ruleCount = typeof o.ruleCount === "number" ? Math.floor(o.ruleCount) : NaN;
 
   if (!Number.isFinite(seed) || seed < 0 || seed > 0xffffffff) {
     return NextResponse.json({ error: "invalid seed" }, { status: 400 });
   }
-  if (!Number.isFinite(time) || time < 1 || time > TIME_MAX) {
-    return NextResponse.json({ error: "invalid time" }, { status: 400 });
+  if (
+    !Number.isFinite(elapsedSeconds) ||
+    elapsedSeconds < 1 ||
+    elapsedSeconds > ELAPSED_SECONDS_MAX
+  ) {
+    return NextResponse.json({ error: "invalid elapsedSeconds" }, { status: 400 });
   }
-  if (!Number.isFinite(rules) || rules < 1 || rules > 100) {
-    return NextResponse.json({ error: "invalid rules" }, { status: 400 });
+  if (!Number.isFinite(ruleCount) || ruleCount < 1 || ruleCount > 100) {
+    return NextResponse.json({ error: "invalid ruleCount" }, { status: 400 });
   }
 
-  const entry: Entry = {
-    name: store.sanitizeName(o.name),
+  const entry: PasswordGameLeaderboardEntry = {
+    name: sanitizePlayerName(o.name, { maxLength: NAME_MAX, fallback: "Anonymous" }),
     seed,
-    time,
-    rules,
+    elapsedSeconds,
+    ruleCount,
     createdAt: new Date().toISOString(),
   };
 
   let rank: number;
   try {
     rank = await store.withWriteLock(async () => {
-      const all = await store.readForUpdate();
-      all.push(entry);
-      all.sort((a, b) => a.time - b.time);
-      const trimmed = all.slice(0, store.maxEntries);
-      await store.writeAll(trimmed);
+      const file = await store.readFileForUpdate();
+      const entries = [...file.entries, entry];
+      entries.sort((a, b) => a.elapsedSeconds - b.elapsedSeconds);
+      const trimmed = entries.slice(0, MAX_ENTRIES);
+      await store.writeFile({ ...file, entries: trimmed });
       return trimmed.indexOf(entry) + 1;
     });
   } catch (err) {
-    captureException("api:leaderboard.write", err);
-    const status = err instanceof LeaderboardCorruptError ? 503 : 500;
+    captureException("api:pg-leaderboard.write", err);
+    const status = err instanceof JsonFileCorruptError ? 503 : 500;
     return NextResponse.json(
       { error: status === 503 ? "leaderboard temporarily unavailable" : "could not save score" },
       { status },

@@ -6,10 +6,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // never cached; must reflect the live process
 
 export async function GET() {
-  // Prod mounts the portfolio-data volume at process.cwd()/.data (LEADS_DATA_DIR /
-  // LEADERBOARD_DATA_DIR / PG_LEADERBOARD_DIR all default there too when unset). A
-  // non-mutating W_OK probe catches a missing or read-only mount -- the silent
-  // failure mode that would otherwise lose leads + leaderboard writes.
+  // Prod mounts the portfolio-data volume at process.cwd()/.data (DATA_DIR
+  // defaults there when unset -- src/lib/data-dir.ts). A non-mutating W_OK
+  // probe catches a missing or read-only mount -- the silent failure mode
+  // that would otherwise lose leads + leaderboard writes.
   const dataDir = path.join(process.cwd(), ".data");
   const dataWritable = await fs.access(dataDir, fsConstants.W_OK).then(
     () => true,

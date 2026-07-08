@@ -44,8 +44,8 @@ export function ResultModal({ open, seed, timeSeconds, rulesCleared, tiers, onCl
         body: JSON.stringify({
           name: name.trim(),
           seed,
-          time: timeSeconds,
-          rules: rulesCleared,
+          elapsedSeconds: timeSeconds,
+          ruleCount: rulesCleared,
         }),
         signal: AbortSignal.timeout(8000),
       });

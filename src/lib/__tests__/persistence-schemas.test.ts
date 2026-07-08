@@ -1,103 +1,122 @@
 import { describe, it, expect } from "vitest";
 import {
-  leaderboardEntrySchema,
-  pgLeaderboardEntrySchema,
+  gameLeaderboardRowSchema,
+  gameLeaderboardFileSchema,
+  emptyGameLeaderboardFile,
+  passwordGameLeaderboardEntrySchema,
+  passwordGameLeaderboardFileSchema,
+  emptyPasswordGameLeaderboardFile,
   leadRecordSchema,
-  type LeadRecord,
+  PERSISTENCE_SCHEMA_VERSION,
 } from "../persistence-schemas";
 
-describe("leaderboardEntrySchema", () => {
-  it("accepts a canonical valid entry, including all optional fields", () => {
-    const entry = {
-      name: "Ada",
-      score: 500,
-      level: 3,
-      seconds: 10,
-      kills: 5,
-      distance: 100,
-      region: "us-east",
-      game: "space-shooter",
-      createdAt: "2026-01-01T00:00:00.000Z",
-    };
-    expect(leaderboardEntrySchema.safeParse(entry)).toMatchObject({ success: true });
+// Pinning tests for the v2 persisted shapes (pass-2 break+reset). These
+// assert BOTH directions: what v2 accepts, and that v1-era shapes are
+// rejected (the store's version/quarantine machinery depends on rejection).
+
+const ISO = "2026-07-08T00:00:00.000Z";
+
+const VALID_ROW = { name: "Pilot", score: 100, level: 3, createdAt: ISO };
+const VALID_PG_ENTRY = {
+  name: "Anonymous",
+  seed: 42,
+  elapsedSeconds: 300,
+  ruleCount: 12,
+  createdAt: ISO,
+};
+const VALID_LEAD = {
+  schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+  id: "6f1e1e7e-9a4b-4c3e-8f2a-1b2c3d4e5f60",
+  name: "Ada",
+  email: "ada@example.com",
+  note: "",
+  source: "chatbot",
+  page: "/",
+  createdAt: ISO,
+};
+
+describe("gameLeaderboardRowSchema", () => {
+  it("accepts a minimal row and a row with all per-game extras", () => {
+    expect(gameLeaderboardRowSchema.safeParse(VALID_ROW).success).toBe(true);
+    expect(
+      gameLeaderboardRowSchema.safeParse({
+        ...VALID_ROW,
+        seconds: 12,
+        kills: 3,
+        distance: 400,
+        region: "Ottawa, Canada",
+      }).success,
+    ).toBe(true);
   });
 
-  it("accepts a minimal valid entry with no optional fields (mirrors the DD1-001 default path)", () => {
-    const entry = { name: "Ada", score: 500, level: 3, createdAt: "t" };
-    expect(leaderboardEntrySchema.safeParse(entry)).toMatchObject({ success: true });
-  });
-
-  it("rejects a missing required field", () => {
-    const entry = { score: 500, level: 3, createdAt: "t" };
-    expect(leaderboardEntrySchema.safeParse(entry).success).toBe(false);
-  });
-
-  it("rejects a wrong-typed required field", () => {
-    const entry = { name: "Ada", score: "500", level: 3, createdAt: "t" };
-    expect(leaderboardEntrySchema.safeParse(entry).success).toBe(false);
-  });
-
-  it("safeParse never throws on garbage input", () => {
-    expect(() => leaderboardEntrySchema.safeParse(null)).not.toThrow();
-    expect(() => leaderboardEntrySchema.safeParse("not an object")).not.toThrow();
-    expect(() => leaderboardEntrySchema.safeParse(42)).not.toThrow();
+  it("rejects a non-ISO createdAt", () => {
+    expect(
+      gameLeaderboardRowSchema.safeParse({ ...VALID_ROW, createdAt: "yesterday" }).success,
+    ).toBe(false);
+    expect(gameLeaderboardRowSchema.safeParse({ ...VALID_ROW, createdAt: "" }).success).toBe(false);
   });
 });
 
-describe("pgLeaderboardEntrySchema", () => {
-  it("accepts a canonical valid entry", () => {
-    const entry = { name: "Ada", seed: 7, time: 120, rules: 10, createdAt: "t" };
-    expect(pgLeaderboardEntrySchema.safeParse(entry)).toMatchObject({ success: true });
+describe("gameLeaderboardFileSchema", () => {
+  it("accepts the empty file and a populated boards record", () => {
+    expect(gameLeaderboardFileSchema.safeParse(emptyGameLeaderboardFile()).success).toBe(true);
+    expect(
+      gameLeaderboardFileSchema.safeParse({
+        schemaVersion: 1,
+        boards: { "space-shooter": [VALID_ROW], hextris: [] },
+      }).success,
+    ).toBe(true);
   });
 
-  it("rejects a missing required field", () => {
-    const entry = { name: "Ada", seed: 7, time: 120 };
-    expect(pgLeaderboardEntrySchema.safeParse(entry).success).toBe(false);
+  it("rejects the v1 on-disk shape (flat array, no envelope)", () => {
+    expect(
+      gameLeaderboardFileSchema.safeParse([{ ...VALID_ROW, game: "space-shooter" }]).success,
+    ).toBe(false);
   });
 
-  it("rejects a wrong-typed required field", () => {
-    const entry = { name: "Ada", seed: "7", time: 120, rules: 10, createdAt: "t" };
-    expect(pgLeaderboardEntrySchema.safeParse(entry).success).toBe(false);
+  it("rejects a wrong schemaVersion", () => {
+    expect(gameLeaderboardFileSchema.safeParse({ schemaVersion: 2, boards: {} }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("passwordGameLeaderboard schemas", () => {
+  it("accepts a valid entry and the empty file", () => {
+    expect(passwordGameLeaderboardEntrySchema.safeParse(VALID_PG_ENTRY).success).toBe(true);
+    expect(
+      passwordGameLeaderboardFileSchema.safeParse(emptyPasswordGameLeaderboardFile()).success,
+    ).toBe(true);
   });
 
-  it("safeParse never throws on garbage input", () => {
-    expect(() => pgLeaderboardEntrySchema.safeParse(undefined)).not.toThrow();
-    expect(() => pgLeaderboardEntrySchema.safeParse([])).not.toThrow();
+  it("rejects v1 field names (time/rules)", () => {
+    const v1 = { name: "A", seed: 1, time: 300, rules: 12, createdAt: ISO };
+    expect(passwordGameLeaderboardEntrySchema.safeParse(v1).success).toBe(false);
+  });
+
+  it("rejects the v1 on-disk shape (flat array)", () => {
+    expect(passwordGameLeaderboardFileSchema.safeParse([VALID_PG_ENTRY]).success).toBe(false);
   });
 });
 
 describe("leadRecordSchema", () => {
-  it("accepts a canonical valid record", () => {
-    // Typed as LeadRecord (not just the schema's own safeParse) so the
-    // fixture itself catches drift between this test and the inferred type.
-    const record: LeadRecord = {
+  it("accepts a fully-stamped v2 line", () => {
+    expect(leadRecordSchema.safeParse(VALID_LEAD).success).toBe(true);
+  });
+
+  it("rejects the v1 line shape (timestamp, no id/page/version)", () => {
+    const v1 = {
       name: "Ada",
       email: "ada@example.com",
-      note: "hire me",
+      note: "",
       source: "chatbot",
-      timestamp: "2026-01-01T00:00:00.000Z",
+      timestamp: ISO,
     };
-    expect(leadRecordSchema.safeParse(record)).toMatchObject({ success: true });
+    expect(leadRecordSchema.safeParse(v1).success).toBe(false);
   });
 
-  it("rejects a missing required field", () => {
-    const record = { name: "Ada", email: "ada@example.com" };
-    expect(leadRecordSchema.safeParse(record).success).toBe(false);
-  });
-
-  it("rejects a wrong-typed required field", () => {
-    const record = {
-      name: "Ada",
-      email: "ada@example.com",
-      note: "hire me",
-      source: "chatbot",
-      timestamp: 12345,
-    };
-    expect(leadRecordSchema.safeParse(record).success).toBe(false);
-  });
-
-  it("safeParse never throws on garbage input", () => {
-    expect(() => leadRecordSchema.safeParse(null)).not.toThrow();
-    expect(() => leadRecordSchema.safeParse(42)).not.toThrow();
+  it("rejects a malformed id and a non-ISO createdAt", () => {
+    expect(leadRecordSchema.safeParse({ ...VALID_LEAD, id: "not-a-uuid" }).success).toBe(false);
+    expect(leadRecordSchema.safeParse({ ...VALID_LEAD, createdAt: "12pm" }).success).toBe(false);
   });
 });

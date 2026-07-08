@@ -2,19 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LeaderboardGame } from "@/lib/leaderboard-games";
+// Type-only import: erased at compile time, so zod and the server-only schema
+// module never reach the client bundle. Single declaration for the persisted
+// row shape (P2-NAME-001) -- since schema v2 the row carries no `game` field
+// (the slug is the storage bucket key, supplied via ?game= instead).
+import type { GameLeaderboardRow } from "@/lib/persistence-schemas";
 
-/** Mirrors the persisted Entry shape returned by GET /api/leaderboard. */
-export interface LeaderboardEntry {
-  name: string;
-  score: number;
-  level: number;
-  seconds?: number;
-  kills?: number;
-  distance?: number;
-  region?: string;
-  game?: string;
-  createdAt: string;
-}
+/** The persisted row shape returned by GET /api/leaderboard. */
+export type LeaderboardEntry = GameLeaderboardRow;
 
 /**
  * Fields a game may submit. `name`/`score`/`level` are the only ones every

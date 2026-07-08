@@ -4,14 +4,9 @@ import { useEffect, useState } from "react";
 import { Trophy, RefreshCw } from "lucide-react";
 import { formatTime } from "@/components/game/password-game/result-card-util";
 import { dailySeed, todayDateString } from "@/components/game/password-game/daily";
-
-interface Entry {
-  name: string;
-  seed: number;
-  time: number;
-  rules: number;
-  createdAt: string;
-}
+// Type-only import: erased at compile time, so the server-only schema module
+// never reaches the client bundle (single declaration, P2-NAME-001 pattern).
+import type { PasswordGameLeaderboardEntry as Entry } from "@/lib/persistence-schemas";
 
 export function LeaderboardClient() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -128,7 +123,7 @@ export function LeaderboardClient() {
                 <tr key={`${e.seed}-${e.createdAt}-${i}`} className="border-t border-(--border)">
                   <td className="py-2 font-mono text-(--muted)">{i + 1}</td>
                   <td className="py-2 font-medium">{e.name}</td>
-                  <td className="py-2 font-mono">{formatTime(e.time)}</td>
+                  <td className="py-2 font-mono">{formatTime(e.elapsedSeconds)}</td>
                   <td className="py-2 font-mono text-xs text-(--muted)">
                     <a
                       href={`/games/password-game?seed=${e.seed}`}
@@ -137,7 +132,7 @@ export function LeaderboardClient() {
                       {e.seed}
                     </a>
                   </td>
-                  <td className="py-2 font-mono">{e.rules}</td>
+                  <td className="py-2 font-mono">{e.ruleCount}</td>
                 </tr>
               ))}
             </tbody>

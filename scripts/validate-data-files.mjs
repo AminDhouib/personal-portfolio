@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 /**
- * Dependency-free JSONL/JSON row validator for the persisted leaderboard +
- * leads files (audit/plans/P1.md section 2d / QUALITY-GATES.md section 6.3).
- * This is the restore drill's assertion tool: point it at a directory (the
- * real .data, or a scratch dir holding a downloaded backup artifact) and it
- * reports per-file valid/invalid row counts, exiting non-zero if a file is
- * unreadable or has zero valid rows.
+ * Dependency-free validator for the persisted data files (schema v2, pass-2
+ * audit). This is the restore drill's assertion tool: point it at a directory
+ * (the real .data, or a scratch dir holding a downloaded backup artifact) and
+ * it reports per-file shape validity, exiting non-zero if a file is
+ * unreadable, malformed, carries the wrong schemaVersion, or contains
+ * invalid rows. ZERO rows is valid -- a freshly reset file is empty by
+ * design (RUNBOOK "Schema reset").
  *
- * No zod import here -- the row shapes are mirrored structurally from
+ * No zod import here -- the shapes are mirrored structurally from
  * src/lib/persistence-schemas.ts (pointer, not an import), exactly as
- * check-env-drift.mjs mirrors src/env.ts instead of importing it. Keeping
- * this script free of app dependencies means it can run standalone against
- * a downloaded artifact without a full pnpm install.
+ * check-env-drift.mjs mirrors src/env.ts. The zod<->mirror drift risk is
+ * covered by src/lib/__tests__/persistence-validator-parity.test.ts, which
+ * feeds the same fixtures through both and asserts identical verdicts.
  *
  * Usage: node scripts/validate-data-files.mjs <directory>
  */
@@ -19,20 +20,41 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-/** Mirrors leadRecordSchema: name/email/note/source/timestamp, all strings. */
+export const SCHEMA_VERSION = 1;
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isIsoDateTime(x) {
+  return typeof x === "string" && ISO_RE.test(x) && !Number.isNaN(Date.parse(x));
+}
+
+function optionalNumber(x) {
+  return x === undefined || typeof x === "number";
+}
+
+function optionalString(x) {
+  return x === undefined || typeof x === "string";
+}
+
+/** Mirrors leadRecordSchema (v2): versioned line with id/page/createdAt. */
 export function isValidLeadRow(row) {
   return (
     !!row &&
     typeof row === "object" &&
+    row.schemaVersion === SCHEMA_VERSION &&
+    typeof row.id === "string" &&
+    UUID_RE.test(row.id) &&
     typeof row.name === "string" &&
     typeof row.email === "string" &&
     typeof row.note === "string" &&
     typeof row.source === "string" &&
-    typeof row.timestamp === "string"
+    typeof row.page === "string" &&
+    isIsoDateTime(row.createdAt)
   );
 }
 
-/** Mirrors leaderboardEntrySchema: name/score/level/createdAt required, rest optional. */
+/** Mirrors gameLeaderboardRowSchema (v2): no game field on the row. */
 export function isValidLeaderboardRow(row) {
   return (
     !!row &&
@@ -40,21 +62,83 @@ export function isValidLeaderboardRow(row) {
     typeof row.name === "string" &&
     typeof row.score === "number" &&
     typeof row.level === "number" &&
-    typeof row.createdAt === "string"
+    optionalNumber(row.seconds) &&
+    optionalNumber(row.kills) &&
+    optionalNumber(row.distance) &&
+    optionalString(row.region) &&
+    isIsoDateTime(row.createdAt)
   );
 }
 
-/** Mirrors pgLeaderboardEntrySchema: name/seed/time/rules/createdAt required. */
+/** Mirrors gameLeaderboardFileSchema (v2): versioned boards envelope. */
+export function validateLeaderboardFile(parsed) {
+  if (
+    !parsed ||
+    typeof parsed === "string" ||
+    Array.isArray(parsed) ||
+    typeof parsed !== "object"
+  ) {
+    return { total: 0, valid: 0, invalidAt: [], parseError: true };
+  }
+  if (parsed.schemaVersion !== SCHEMA_VERSION) {
+    return { total: 0, valid: 0, invalidAt: [], parseError: true, wrongVersion: true };
+  }
+  if (!parsed.boards || typeof parsed.boards !== "object" || Array.isArray(parsed.boards)) {
+    return { total: 0, valid: 0, invalidAt: [], parseError: true };
+  }
+  let total = 0;
+  let valid = 0;
+  const invalidAt = [];
+  for (const [game, rows] of Object.entries(parsed.boards)) {
+    if (!Array.isArray(rows)) {
+      invalidAt.push(`${game}(not an array)`);
+      continue;
+    }
+    rows.forEach((row, i) => {
+      total += 1;
+      if (isValidLeaderboardRow(row)) valid += 1;
+      else invalidAt.push(`${game}[${i}]`);
+    });
+  }
+  return { total, valid, invalidAt, parseError: false };
+}
+
+/** Mirrors passwordGameLeaderboardEntrySchema (v2): elapsedSeconds/ruleCount. */
 export function isValidPgLeaderboardRow(row) {
   return (
     !!row &&
     typeof row === "object" &&
     typeof row.name === "string" &&
     typeof row.seed === "number" &&
-    typeof row.time === "number" &&
-    typeof row.rules === "number" &&
-    typeof row.createdAt === "string"
+    typeof row.elapsedSeconds === "number" &&
+    typeof row.ruleCount === "number" &&
+    isIsoDateTime(row.createdAt)
   );
+}
+
+/** Mirrors passwordGameLeaderboardFileSchema (v2): versioned entries envelope. */
+export function validatePgLeaderboardFile(parsed) {
+  if (
+    !parsed ||
+    typeof parsed === "string" ||
+    Array.isArray(parsed) ||
+    typeof parsed !== "object"
+  ) {
+    return { total: 0, valid: 0, invalidAt: [], parseError: true };
+  }
+  if (parsed.schemaVersion !== SCHEMA_VERSION) {
+    return { total: 0, valid: 0, invalidAt: [], parseError: true, wrongVersion: true };
+  }
+  if (!Array.isArray(parsed.entries)) {
+    return { total: 0, valid: 0, invalidAt: [], parseError: true };
+  }
+  let valid = 0;
+  const invalidAt = [];
+  parsed.entries.forEach((row, i) => {
+    if (isValidPgLeaderboardRow(row)) valid += 1;
+    else invalidAt.push(i + 1);
+  });
+  return { total: parsed.entries.length, valid, invalidAt, parseError: false };
 }
 
 /**
@@ -81,35 +165,34 @@ export function validateJsonl(text, isValidRow) {
   return { total: lines.length, valid, invalidAt };
 }
 
-/**
- * Validates a JSON file holding a top-level array of rows. `invalidAt` holds
- * 1-based array indices (not line numbers -- the file is compact JSON, not
- * one-row-per-line) of rows that failed `isValidRow`. `parseError` is true
- * when the file isn't valid JSON or isn't an array at all.
- */
-export function validateJsonArray(text, isValidRow) {
-  let parsed;
+function parseJson(text) {
   try {
-    parsed = JSON.parse(text);
+    return { parsed: JSON.parse(text) };
   } catch {
-    return { total: 0, valid: 0, invalidAt: [], parseError: true };
+    return { parsed: undefined, failed: true };
   }
-  if (!Array.isArray(parsed)) {
-    return { total: 0, valid: 0, invalidAt: [], parseError: true };
-  }
-  let valid = 0;
-  const invalidAt = [];
-  parsed.forEach((row, i) => {
-    if (isValidRow(row)) valid += 1;
-    else invalidAt.push(i + 1);
-  });
-  return { total: parsed.length, valid, invalidAt, parseError: false };
 }
 
 const FILES = [
-  { name: "leads.jsonl", kind: "jsonl", isValidRow: isValidLeadRow },
-  { name: "leaderboard.json", kind: "array", isValidRow: isValidLeaderboardRow },
-  { name: "password-game-leaderboard.json", kind: "array", isValidRow: isValidPgLeaderboardRow },
+  { name: "leads.jsonl", validate: (text) => validateJsonl(text, isValidLeadRow) },
+  {
+    name: "leaderboard.json",
+    validate: (text) => {
+      const { parsed, failed } = parseJson(text);
+      return failed
+        ? { total: 0, valid: 0, invalidAt: [], parseError: true }
+        : validateLeaderboardFile(parsed);
+    },
+  },
+  {
+    name: "password-game-leaderboard.json",
+    validate: (text) => {
+      const { parsed, failed } = parseJson(text);
+      return failed
+        ? { total: 0, valid: 0, invalidAt: [], parseError: true }
+        : validatePgLeaderboardFile(parsed);
+    },
+  },
 ];
 
 /**
@@ -133,11 +216,7 @@ export function validateDataDir(dir) {
         invalidAt: [],
       };
     }
-    const result =
-      f.kind === "jsonl"
-        ? validateJsonl(text, f.isValidRow)
-        : validateJsonArray(text, f.isValidRow);
-    return { file: f.name, readable: true, ...result };
+    return { file: f.name, readable: true, ...f.validate(text) };
   });
 }
 
@@ -151,16 +230,16 @@ function runCli(dir) {
       continue;
     }
     if (r.parseError) {
-      console.error(`MALFORMED: ${r.file} is not valid JSON / not the expected shape`);
+      const detail = r.wrongVersion
+        ? `carries the wrong schemaVersion (expected ${SCHEMA_VERSION})`
+        : "is not valid JSON / not the expected shape";
+      console.error(`MALFORMED: ${r.file} ${detail}`);
       ok = false;
       continue;
     }
     console.log(`${r.file}: ${r.valid}/${r.total} valid rows`);
     if (r.invalidAt.length > 0) {
       console.error(`  invalid row(s) at: ${r.invalidAt.join(", ")}`);
-    }
-    if (r.valid === 0) {
-      console.error(`ZERO valid rows in ${r.file}`);
       ok = false;
     }
   }

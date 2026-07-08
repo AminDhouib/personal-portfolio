@@ -28,13 +28,20 @@ export function uniqueIp(): string {
  */
 export function makeJsonPostRequest(
   body: unknown,
-  opts: { ip?: string; origin?: string | null; host?: string; url?: string } = {},
+  opts: {
+    ip?: string;
+    origin?: string | null;
+    host?: string;
+    url?: string;
+    referer?: string;
+  } = {},
 ): NextRequest {
   const headers: Record<string, string> = {};
   const origin = opts.origin === undefined ? "https://amindhou.com" : opts.origin;
   if (origin) headers["origin"] = origin;
   headers["x-forwarded-host"] = opts.host ?? "amindhou.com";
   headers["x-forwarded-for"] = opts.ip ?? uniqueIp();
+  if (opts.referer) headers["referer"] = opts.referer;
   return new NextRequest(opts.url ?? "https://amindhou.com/api/leaderboard", {
     method: "POST",
     headers,

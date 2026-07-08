@@ -1,40 +1,38 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createLeaderboardStore, LeaderboardCorruptError } from "@/lib/leaderboard-store";
-import { leaderboardEntrySchema, type LeaderboardEntry } from "@/lib/persistence-schemas";
+import { createJsonFileStore, JsonFileCorruptError } from "@/lib/json-file-store";
+import {
+  emptyGameLeaderboardFile,
+  gameLeaderboardFileSchema,
+  PERSISTENCE_SCHEMA_VERSION,
+  type GameLeaderboardRow,
+} from "@/lib/persistence-schemas";
+import { sanitizePlayerName } from "@/lib/player-name";
 import { LEADERBOARD_GAMES } from "@/lib/leaderboard-games";
 import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
-import { env } from "@/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Entry = LeaderboardEntry;
-
-function isEntry(x: unknown): x is Entry {
-  return leaderboardEntrySchema.safeParse(x).success;
-}
-
-const store = createLeaderboardStore<Entry>({
-  dataDir: env.LEADERBOARD_DATA_DIR,
+const store = createJsonFileStore({
   fileName: "leaderboard.json",
-  maxEntries: 100,
-  returnLimit: 25,
-  nameMax: 12,
-  defaultName: "Pilot",
-  isEntry,
+  schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+  fileSchema: gameLeaderboardFileSchema,
+  emptyFile: emptyGameLeaderboardFile,
+  scope: "leaderboard",
 });
 
+const MAX_ENTRIES_PER_GAME = 100;
+const RETURN_LIMIT = 25;
+const NAME_MAX = 12;
 const SCORE_CAP = 10_000_000;
 
-// RC-1 / DD1-001 fix: a missing/invalid `game` is now REJECTED (400), not
-// silently bucketed into "space-shooter". All three in-repo clients
-// (space-shooter, hextris, tower-stacker) migrated to send a valid `game` in
-// P2 steps 3-5 before this flip landed, so there is no live traffic that
-// relied on the old silent default. A closed enum (not "any non-empty
-// string") is deliberate: a client typo would otherwise create a new silent
-// junk bucket, reopening a narrower version of the same bug this fixes.
+// RC-1 / DD1-001 fix: a missing/invalid `game` is REJECTED (400), not
+// silently bucketed. A closed enum (not "any non-empty string") is
+// deliberate: a client typo would otherwise create a new silent junk bucket.
+// Since schema v2 the slug is the bucket key in the boards record, so a
+// persisted row can no longer disagree with the board it sits in.
 const gameSchema = z.enum(LEADERBOARD_GAMES);
 
 export async function GET(req: Request) {
@@ -42,17 +40,17 @@ export async function GET(req: Request) {
   const game = url.searchParams.get("game");
   // Decision 1 (P2 plan gate): require ?game= for a consistent no-silent-
   // default contract, matching the POST-side reject. Deliberately NOT
-  // enum-validated here: an unknown slug just filters to [] (harmless), so
-  // a future 4th game or a stale client requesting an old slug never 400s
-  // on read -- only a genuinely missing `game` is an error.
+  // enum-validated here: an unknown slug just reads an absent board
+  // (harmless []), so a future 4th game or a stale client requesting an old
+  // slug never 400s on read -- only a genuinely missing `game` is an error.
   if (!game) {
     return NextResponse.json({ error: "missing game" }, { status: 400 });
   }
-  let entries = await store.readAll();
-  entries = entries.filter((e) => (e.game ?? "space-shooter") === game);
-  entries.sort((a, b) => b.score - a.score);
+  const file = await store.readFile();
+  const rows = [...(file.boards[game] ?? [])];
+  rows.sort((a, b) => b.score - a.score);
   return NextResponse.json(
-    { entries: entries.slice(0, store.returnLimit) },
+    { entries: rows.slice(0, RETURN_LIMIT) },
     { headers: { "Cache-Control": "s-maxage=10, stale-while-revalidate=30" } },
   );
 }
@@ -76,8 +74,9 @@ export async function POST(req: Request) {
   if (!parsedGame.success) {
     return NextResponse.json({ error: "invalid game" }, { status: 400 });
   }
-  const entry: Entry = {
-    name: store.sanitizeName(o.name),
+  const game = parsedGame.data;
+  const row: GameLeaderboardRow = {
+    name: sanitizePlayerName(o.name, { maxLength: NAME_MAX, fallback: "Pilot" }),
     score,
     level,
     seconds:
@@ -93,34 +92,30 @@ export async function POST(req: Request) {
         ? Math.floor(o.distance)
         : undefined,
     region:
+      // Control chars written as unicode ESCAPES, never literal bytes: a raw
+      // NUL inside this class makes grep classify the file as binary (pass-1
+      // incident, commit ae32d5c).
       typeof o.region === "string" && o.region.length > 0 && o.region.length <= 60
-        ? o.region.replace(/[\u0000-\u001f]/g, "").slice(0, 60)
+        ? o.region.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").slice(0, 60)
         : undefined,
-    game: parsedGame.data,
     createdAt: new Date().toISOString(),
   };
   let rank: number;
   try {
     rank = await store.withWriteLock(async () => {
-      const all = await store.readForUpdate();
-      all.push(entry);
-      all.sort((a, b) => b.score - a.score);
-      const byGame = new Map<string, Entry[]>();
-      for (const e of all) {
-        const key = e.game ?? "space-shooter";
-        if (!byGame.has(key)) byGame.set(key, []);
-        byGame.get(key)!.push(e);
-      }
-      const trimmed: Entry[] = [];
-      for (const [, list] of byGame) trimmed.push(...list.slice(0, store.maxEntries));
-      trimmed.sort((a, b) => b.score - a.score);
-      await store.writeAll(trimmed);
-      const gameList = byGame.get(entry.game ?? "space-shooter") ?? [];
-      return gameList.indexOf(entry) + 1;
+      const file = await store.readFileForUpdate();
+      const rows = [...(file.boards[game] ?? []), row];
+      rows.sort((a, b) => b.score - a.score);
+      // Rank reflects the full sorted board BEFORE trimming (v1 contract): a
+      // submission that falls off the kept top-N still gets its true rank.
+      const rank = rows.indexOf(row) + 1;
+      file.boards[game] = rows.slice(0, MAX_ENTRIES_PER_GAME);
+      await store.writeFile(file);
+      return rank;
     });
   } catch (err) {
     captureException("api:leaderboard.write", err);
-    const status = err instanceof LeaderboardCorruptError ? 503 : 500;
+    const status = err instanceof JsonFileCorruptError ? 503 : 500;
     return NextResponse.json(
       { error: status === 503 ? "leaderboard temporarily unavailable" : "could not save score" },
       { status },

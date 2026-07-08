@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { Resend } from "resend";
+import { appendLead } from "@/lib/leads-store";
 import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
 import { env } from "@/env";
@@ -19,6 +18,7 @@ const NAME_MAX = 200;
 const EMAIL_MAX = 320;
 const NOTE_MAX = 5000;
 const SOURCE_MAX = 100;
+const PAGE_MAX = 200;
 
 // Validates the body is a JSON object; the individual fields are narrowed below
 // (gate rule 3: API routes must zod-parse their input). Fields stay `unknown` so
@@ -30,9 +30,21 @@ const leadSchema = z.object({
   source: z.unknown().optional(),
 });
 
-function leadsPaths(): { dataDir: string; filePath: string } {
-  const dataDir = env.LEADS_DATA_DIR ?? path.join(process.cwd(), ".data");
-  return { dataDir, filePath: path.join(dataDir, "leads.jsonl") };
+/**
+ * Which page produced the lead (persisted as `page`): the referer's pathname.
+ * The chat widget is mounted site-wide, so without this the owner cannot tell
+ * a homepage lead from an /ai page lead (P2-DATA-006).
+ */
+function leadPage(req: NextRequest): string {
+  const referer = req.headers.get("referer");
+  if (!referer) return "";
+  try {
+    return new URL(referer).pathname.slice(0, PAGE_MAX);
+  } catch {
+    // silent-ok: an unparseable referer header is external junk a client can
+    // send at will; the empty page string is the honest recorded value.
+    return "";
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -53,27 +65,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
   }
 
-  const noteStr = typeof note === "string" ? note : "";
-  const sourceStr = typeof source === "string" ? source : "chatbot";
-  const timestamp = new Date().toISOString();
-  const record = {
+  const input = {
     name: name.slice(0, NAME_MAX),
     email: email.slice(0, EMAIL_MAX),
-    note: noteStr.slice(0, NOTE_MAX),
-    source: sourceStr.slice(0, SOURCE_MAX),
-    timestamp,
+    note: (typeof note === "string" ? note : "").slice(0, NOTE_MAX),
+    source: (typeof source === "string" ? source : "chatbot").slice(0, SOURCE_MAX),
+    page: leadPage(req),
   };
 
-  console.log(JSON.stringify({ type: "LEAD", ...record }));
+  console.log(JSON.stringify({ type: "LEAD", ...input }));
 
   // Persist first: the email provider is best-effort, so a durable record on the
   // mounted volume is what guarantees a lead is never silently lost.
-  let persistOk = false;
+  let persisted: { id: string; createdAt: string } | null = null;
   try {
-    const { dataDir, filePath } = leadsPaths();
-    await fs.mkdir(dataDir, { recursive: true });
-    await fs.appendFile(filePath, JSON.stringify(record) + "\n", "utf-8");
-    persistOk = true;
+    const record = await appendLead(input);
+    persisted = { id: record.id, createdAt: record.createdAt };
   } catch (err) {
     captureException("leads.persist", err);
   }
@@ -85,13 +92,14 @@ export async function POST(req: NextRequest) {
       await resend.emails.send({
         from: "Amin AI <leads@amindhou.com>",
         to: "amin@devino.ca",
-        subject: `New lead from ${record.name}`,
+        subject: `New lead from ${input.name}`,
         text: [
-          `Name: ${record.name}`,
-          `Email: ${record.email}`,
-          `Note: ${record.note || "—"}`,
-          `Source: ${record.source}`,
-          `Time: ${timestamp}`,
+          `Name: ${input.name}`,
+          `Email: ${input.email}`,
+          `Note: ${input.note || "-"}`,
+          `Source: ${input.source}`,
+          `Page: ${input.page || "-"}`,
+          `Time: ${persisted?.createdAt ?? new Date().toISOString()}`,
         ].join("\n"),
       });
       emailOk = true;
@@ -101,9 +109,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Only fail the request if the lead reached neither the disk nor an inbox.
-  if (!persistOk && !emailOk) {
+  if (!persisted && !emailOk) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, timestamp });
+  return NextResponse.json({
+    ok: true,
+    id: persisted?.id ?? null,
+    createdAt: persisted?.createdAt ?? null,
+  });
 }

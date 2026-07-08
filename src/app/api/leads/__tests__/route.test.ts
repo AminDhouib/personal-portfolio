@@ -33,14 +33,20 @@ describe("POST /api/leads", () => {
     else process.env.RESEND_API_KEY = savedResendKey;
   });
 
-  it("persists the lead and sends the email on the happy path", async () => {
+  it("persists the v2 lead line and sends the email on the happy path", async () => {
     process.env.RESEND_API_KEY = "test-resend-key";
     const res = await POST(
-      makeJsonPostRequest({ name: "Ada", email: "ada@example.com", note: "hire me" }),
+      makeJsonPostRequest(
+        { name: "Ada", email: "ada@example.com", note: "hire me" },
+        { referer: "https://amindhou.com/ai?utm=x" },
+      ),
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true });
+    const body = (await res.json()) as { ok: boolean; id: string; createdAt: string };
+    expect(body.ok).toBe(true);
+    expect(typeof body.id).toBe("string");
+    expect(new Date(body.createdAt).toISOString()).toBe(body.createdAt);
 
     const mkdir = vi.mocked(fs.mkdir);
     const appendFile = vi.mocked(fs.appendFile);
@@ -52,13 +58,26 @@ describe("POST /api/leads", () => {
     expect(String(filePath)).toContain("leads.jsonl");
     const record = JSON.parse(String(line).trim());
     expect(record).toMatchObject({
+      schemaVersion: 1,
       name: "Ada",
       email: "ada@example.com",
       note: "hire me",
       source: "chatbot",
+      // Page attribution: the referer's pathname only, no query string.
+      page: "/ai",
     });
-    expect(typeof record.timestamp).toBe("string");
+    expect(record.id).toBe(body.id);
+    expect(record.createdAt).toBe(body.createdAt);
     expect(mockSend).toHaveBeenCalledOnce();
+  });
+
+  it("records an empty page when no referer header is present", async () => {
+    const res = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
+    expect(res.status).toBe(200);
+    const call = vi.mocked(fs.appendFile).mock.calls[0];
+    if (!call) throw new Error("expected fs.appendFile to have been called");
+    const record = JSON.parse(String(call[1]).trim());
+    expect(record.page).toBe("");
   });
 
   it("returns ok:true when the email send fails but the lead is persisted", async () => {
