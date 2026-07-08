@@ -4,18 +4,7 @@ import { morseRule, binaryRule, mathWordsRule, captchaRule } from "../rules/tier
 import { anagramRule, reverseRule } from "../rules/tier3-pack";
 import { MORSE_WORDS, toMorse } from "../../../../data/password-game/morse";
 import { ANAGRAM_WORDS } from "../../../../data/password-game/anagrams";
-import type { GameState, Rule } from "../types";
-
-function makeState(password: string, rule: Rule): GameState {
-  return {
-    password,
-    formatting: [],
-    elapsedSeconds: 0,
-    activeRuleIndex: 0,
-    rules: [rule],
-    seed: 1,
-  };
-}
+import { makeState } from "./helpers";
 
 describe("rule pack — morse rule", () => {
   it("exists and is tier 2", () => {

@@ -1,22 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { paulRule } from "../hazards/paul";
-import type { GameState, Rule } from "../types";
+import { makeState } from "./helpers";
 
 const EGG = "🥚";
 const CHICKEN = "🐔";
 const DEAD = "💀";
-
-function makeState(password: string, rule: Rule): GameState {
-  return {
-    password,
-    formatting: [],
-    elapsedSeconds: 0,
-    activeRuleIndex: 0,
-    rules: [rule],
-    seed: 1,
-  };
-}
 
 describe("Tier 4 — Paul the chicken rule", () => {
   it("exists and is tier 4", () => {

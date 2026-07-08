@@ -1,23 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { TIER_2_RULES } from "../rules/tier2";
-import type { GameState, Rule } from "../types";
 import { ELEMENTS } from "../../../../data/password-game/periodic-table";
 import { FOREIGN_WORDS } from "../../../../data/password-game/foreign-words";
 import { COUNTRY_CAPITALS } from "../../../../data/password-game/capitals";
 import { NAMED_COLORS } from "../../../../data/password-game/colors";
 import { CODE_SNIPPETS } from "../../../../data/password-game/code-snippets";
-
-function makeState(password: string, rule: Rule): GameState {
-  return {
-    password,
-    formatting: [],
-    elapsedSeconds: 0,
-    activeRuleIndex: 0,
-    rules: [rule],
-    seed: 1,
-  };
-}
+import { makeState } from "./helpers";
 
 describe("Tier 2 — NATO phonetic rule", () => {
   const def = TIER_2_RULES.find((r) => r.id === "nato-phonetic")!;

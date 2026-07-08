@@ -1,20 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { fireRule } from "../hazards/fire";
-import type { GameState, Rule } from "../types";
+import { makeState } from "./helpers";
 
 const FIRE = "🔥";
-
-function makeState(password: string, rule: Rule): GameState {
-  return {
-    password,
-    formatting: [],
-    elapsedSeconds: 0,
-    activeRuleIndex: 0,
-    rules: [rule],
-    seed: 1,
-  };
-}
 
 describe("Tier 4 — fire hazard rule", () => {
   it("exists and is tier 4", () => {

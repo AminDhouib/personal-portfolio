@@ -1,18 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { TIER_4_RULES } from "../rules/tier4";
-import type { GameState, Rule } from "../types";
-
-function makeState(password: string, rule: Rule): GameState {
-  return {
-    password,
-    formatting: [],
-    elapsedSeconds: 0,
-    activeRuleIndex: 0,
-    rules: [rule],
-    seed: 1,
-  };
-}
+import { makeState } from "./helpers";
 
 describe("Tier 4 — length bomb rule", () => {
   const def = TIER_4_RULES.find((r) => r.id === "length-bomb")!;

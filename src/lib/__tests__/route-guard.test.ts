@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { guardRequest, guardedJsonRoute } from "../route-guard";
-
-let ipCounter = 0;
-function uniqueIp(): string {
-  ipCounter += 1;
-  return `10.55.${Math.floor(ipCounter / 256) % 256}.${ipCounter % 256}`;
-}
+import { uniqueIp } from "@/test/api-route-helpers";
 
 function makeReq(
   opts: { ip?: string; origin?: string | null; host?: string; body?: unknown } = {},

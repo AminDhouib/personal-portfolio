@@ -1,18 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../prng";
 import { TIER_3_RULES } from "../rules/tier3";
-import type { GameState, Rule } from "../types";
-
-function makeState(password: string, rule: Rule): GameState {
-  return {
-    password,
-    formatting: [],
-    elapsedSeconds: 0,
-    activeRuleIndex: 0,
-    rules: [rule],
-    seed: 1,
-  };
-}
+import type { GameState } from "../types";
+import { makeState } from "./helpers";
 
 describe("Tier 3 — every-nth-uppercase rule", () => {
   const def = TIER_3_RULES.find((r) => r.id === "every-nth-upper")!;

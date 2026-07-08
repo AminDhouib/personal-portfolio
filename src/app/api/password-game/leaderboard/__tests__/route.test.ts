@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { mkdtempSync, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { NextRequest } from "next/server";
+import { makeJsonPostRequest } from "@/test/api-route-helpers";
 
 // Same recipe as src/app/api/leaderboard/__tests__/route.test.ts: the store
 // captures env.PG_LEADERBOARD_DIR at import time, so the temp dir must exist
@@ -35,28 +35,6 @@ interface PostResponse {
   error?: string;
 }
 
-let ipCounter = 0;
-function uniqueIp(): string {
-  ipCounter += 1;
-  return `10.41.${Math.floor(ipCounter / 256) % 256}.${ipCounter % 256}`;
-}
-
-function makeReq(
-  body: unknown,
-  opts: { ip?: string; origin?: string | null; host?: string } = {},
-): NextRequest {
-  const headers: Record<string, string> = {};
-  const origin = opts.origin === undefined ? "https://amindhou.com" : opts.origin;
-  if (origin) headers["origin"] = origin;
-  headers["x-forwarded-host"] = opts.host ?? "amindhou.com";
-  headers["x-forwarded-for"] = opts.ip ?? uniqueIp();
-  return new NextRequest("https://amindhou.com/api/password-game/leaderboard", {
-    method: "POST",
-    headers,
-    body: typeof body === "string" ? body : JSON.stringify(body),
-  });
-}
-
 async function resetDir(): Promise<void> {
   const files = await fs.readdir(DATA_DIR);
   await Promise.all(files.map((f) => fs.rm(path.join(DATA_DIR, f), { force: true })));
@@ -70,7 +48,9 @@ describe("/api/password-game/leaderboard", () => {
     if (!DATA_DIR.startsWith(os.tmpdir())) {
       throw new Error(`expected temp data dir under ${os.tmpdir()}, got ${DATA_DIR}`);
     }
-    const probe = await POST(makeReq({ name: "wiring-probe", seed: 1, time: 1, rules: 1 }));
+    const probe = await POST(
+      makeJsonPostRequest({ name: "wiring-probe", seed: 1, time: 1, rules: 1 }),
+    );
     if (probe.status !== 200) {
       throw new Error(`wiring probe POST failed with status ${probe.status}`);
     }
@@ -138,7 +118,7 @@ describe("/api/password-game/leaderboard", () => {
 
   describe("POST", () => {
     it("persists a valid run and returns ok:true + rank", async () => {
-      const res = await POST(makeReq({ name: "Ada", seed: 7, time: 120, rules: 10 }));
+      const res = await POST(makeJsonPostRequest({ name: "Ada", seed: 7, time: 120, rules: 10 }));
       expect(res.status).toBe(200);
       const body = (await res.json()) as PostResponse;
       expect(body).toMatchObject({ ok: true, rank: 1 });
@@ -150,7 +130,7 @@ describe("/api/password-game/leaderboard", () => {
     });
 
     it("sanitizes the submitted name", async () => {
-      const res = await POST(makeReq({ name: "  Ada  ", seed: 1, time: 10, rules: 1 }));
+      const res = await POST(makeJsonPostRequest({ name: "  Ada  ", seed: 1, time: 10, rules: 1 }));
       expect(res.status).toBe(200);
       const stored = JSON.parse(await fs.readFile(FILE_PATH, "utf-8")) as PgLeaderboardEntryDTO[];
       const entry = stored[0];
@@ -159,33 +139,36 @@ describe("/api/password-game/leaderboard", () => {
     });
 
     it("returns 400 for an invalid seed", async () => {
-      const res = await POST(makeReq({ name: "Ada", seed: -1, time: 10, rules: 1 }));
+      const res = await POST(makeJsonPostRequest({ name: "Ada", seed: -1, time: 10, rules: 1 }));
       expect(res.status).toBe(400);
     });
 
     it("returns 400 for an invalid time", async () => {
-      const res = await POST(makeReq({ name: "Ada", seed: 1, time: 0, rules: 1 }));
+      const res = await POST(makeJsonPostRequest({ name: "Ada", seed: 1, time: 0, rules: 1 }));
       expect(res.status).toBe(400);
     });
 
     it("returns 400 for invalid rules", async () => {
-      const res = await POST(makeReq({ name: "Ada", seed: 1, time: 10, rules: 0 }));
+      const res = await POST(makeJsonPostRequest({ name: "Ada", seed: 1, time: 10, rules: 0 }));
       expect(res.status).toBe(400);
     });
 
     it("returns 400 for malformed JSON", async () => {
-      const res = await POST(makeReq("{not json"));
+      const res = await POST(makeJsonPostRequest("{not json"));
       expect(res.status).toBe(400);
     });
 
     it("returns 400 for a non-object body", async () => {
-      const res = await POST(makeReq("42"));
+      const res = await POST(makeJsonPostRequest("42"));
       expect(res.status).toBe(400);
     });
 
     it("rejects a cross-origin request with 403 before touching disk", async () => {
       const res = await POST(
-        makeReq({ name: "Ada", seed: 1, time: 10, rules: 1 }, { origin: "https://evil.example" }),
+        makeJsonPostRequest(
+          { name: "Ada", seed: 1, time: 10, rules: 1 },
+          { origin: "https://evil.example" },
+        ),
       );
       expect(res.status).toBe(403);
       await expect(fs.stat(FILE_PATH)).rejects.toThrow();
@@ -193,7 +176,13 @@ describe("/api/password-game/leaderboard", () => {
 
     it("returns 413 for a body over the 16 KiB cap", async () => {
       const res = await POST(
-        makeReq({ name: "Ada", seed: 1, time: 10, rules: 1, filler: "x".repeat(20_000) }),
+        makeJsonPostRequest({
+          name: "Ada",
+          seed: 1,
+          time: 10,
+          rules: 1,
+          filler: "x".repeat(20_000),
+        }),
       );
       expect(res.status).toBe(413);
       await expect(fs.stat(FILE_PATH)).rejects.toThrow();
@@ -202,10 +191,14 @@ describe("/api/password-game/leaderboard", () => {
     it("rate limits after 10 requests per minute from one IP with 429 + Retry-After", async () => {
       const ip = "61.61.61.61";
       for (let i = 0; i < 10; i++) {
-        const ok = await POST(makeReq({ name: "Ada", seed: 1, time: i + 1, rules: 1 }, { ip }));
+        const ok = await POST(
+          makeJsonPostRequest({ name: "Ada", seed: 1, time: i + 1, rules: 1 }, { ip }),
+        );
         expect(ok.status).toBe(200);
       }
-      const limited = await POST(makeReq({ name: "Ada", seed: 1, time: 1, rules: 1 }, { ip }));
+      const limited = await POST(
+        makeJsonPostRequest({ name: "Ada", seed: 1, time: 1, rules: 1 }, { ip }),
+      );
       expect(limited.status).toBe(429);
       expect(limited.headers.get("Retry-After")).toBeTruthy();
     });
@@ -216,7 +209,7 @@ describe("/api/password-game/leaderboard", () => {
       const originalBytes = "{ not json";
       await fs.writeFile(FILE_PATH, originalBytes, "utf-8");
 
-      const res = await POST(makeReq({ name: "Ada", seed: 1, time: 10, rules: 1 }));
+      const res = await POST(makeJsonPostRequest({ name: "Ada", seed: 1, time: 10, rules: 1 }));
       expect(res.status).toBe(503);
       const body = (await res.json()) as PostResponse;
       expect(body.error).toBe("leaderboard temporarily unavailable");
@@ -233,13 +226,15 @@ describe("/api/password-game/leaderboard", () => {
 
       // Self-heal: the corrupt file is gone, so the next submit sees ENOENT
       // and starts a fresh board.
-      const followUp = await POST(makeReq({ name: "Bea", seed: 1, time: 20, rules: 1 }));
+      const followUp = await POST(
+        makeJsonPostRequest({ name: "Bea", seed: 1, time: 20, rules: 1 }),
+      );
       expect(followUp.status).toBe(200);
     });
 
     it("returns 500 (never ok:true) when the write itself fails", async () => {
       const renameSpy = vi.spyOn(fs, "rename").mockRejectedValueOnce(new Error("disk full"));
-      const res = await POST(makeReq({ name: "Ada", seed: 1, time: 10, rules: 1 }));
+      const res = await POST(makeJsonPostRequest({ name: "Ada", seed: 1, time: 10, rules: 1 }));
       renameSpy.mockRestore();
 
       expect(res.status).toBe(500);
