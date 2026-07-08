@@ -30,6 +30,8 @@ const ROOT_ALLOWLIST = new Set([
   ".prettierrc.json",
   "AGENTS.md",
   "CLAUDE.md",
+  "compose.override.yml",
+  "compose.yml",
   "DESIGN.md",
   "Dockerfile",
   "README.md",

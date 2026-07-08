@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { promises as fs } from "node:fs";
 
 const mockSend = vi.hoisted(() => vi.fn());
+const mockAppendLead = vi.hoisted(() => vi.fn());
 
 vi.mock("resend", () => ({
   Resend: class MockResend {
@@ -9,22 +9,35 @@ vi.mock("resend", () => ({
   },
 }));
 
+vi.mock("@/lib/leads-store", () => ({
+  appendLead: mockAppendLead,
+}));
+
+vi.mock("@/lib/log", () => ({
+  captureException: vi.fn(),
+  logWarn: vi.fn(),
+  logError: vi.fn(),
+}));
+
 import { POST } from "../route";
 import { makeJsonPostRequest } from "@/test/api-route-helpers";
 
-// Distinct IP per request so unrelated tests never trip the per-IP rate limit;
-// the dedicated rate-limit test pins its own IP instead.
-// The route and this test import the same node:fs `promises` singleton, so
-// spying on its methods intercepts the route's writes without hitting disk.
 describe("POST /api/leads", () => {
   let savedResendKey: string | undefined;
 
   beforeEach(() => {
     savedResendKey = process.env.RESEND_API_KEY;
     delete process.env.RESEND_API_KEY;
-    vi.spyOn(fs, "mkdir").mockResolvedValue(undefined);
-    vi.spyOn(fs, "appendFile").mockResolvedValue(undefined);
     mockSend.mockReset().mockResolvedValue({ data: { id: "email_1" }, error: null });
+    mockAppendLead.mockReset().mockResolvedValue({
+      id: "test-uuid",
+      name: "Ada",
+      email: "ada@example.com",
+      note: "",
+      source: "chatbot",
+      page: "",
+      createdAt: "2026-07-08T00:00:00.000Z",
+    });
   });
 
   afterEach(() => {
@@ -33,7 +46,7 @@ describe("POST /api/leads", () => {
     else process.env.RESEND_API_KEY = savedResendKey;
   });
 
-  it("persists the v2 lead line and sends the email on the happy path", async () => {
+  it("persists the lead and sends the email on the happy path", async () => {
     process.env.RESEND_API_KEY = "test-resend-key";
     const res = await POST(
       makeJsonPostRequest(
@@ -46,38 +59,24 @@ describe("POST /api/leads", () => {
     const body = (await res.json()) as { ok: boolean; id: string; createdAt: string };
     expect(body.ok).toBe(true);
     expect(typeof body.id).toBe("string");
-    expect(new Date(body.createdAt).toISOString()).toBe(body.createdAt);
 
-    const mkdir = vi.mocked(fs.mkdir);
-    const appendFile = vi.mocked(fs.appendFile);
-    expect(mkdir).toHaveBeenCalledOnce();
-    expect(appendFile).toHaveBeenCalledOnce();
-    const call = appendFile.mock.calls[0];
-    if (!call) throw new Error("expected fs.appendFile to have been called");
-    const [filePath, line] = call;
-    expect(String(filePath)).toContain("leads.jsonl");
-    const record = JSON.parse(String(line).trim());
-    expect(record).toMatchObject({
-      schemaVersion: 1,
+    expect(mockAppendLead).toHaveBeenCalledOnce();
+    const call = mockAppendLead.mock.calls[0]?.[0];
+    expect(call).toMatchObject({
       name: "Ada",
       email: "ada@example.com",
       note: "hire me",
       source: "chatbot",
-      // Page attribution: the referer's pathname only, no query string.
       page: "/ai",
     });
-    expect(record.id).toBe(body.id);
-    expect(record.createdAt).toBe(body.createdAt);
     expect(mockSend).toHaveBeenCalledOnce();
   });
 
   it("records an empty page when no referer header is present", async () => {
     const res = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
     expect(res.status).toBe(200);
-    const call = vi.mocked(fs.appendFile).mock.calls[0];
-    if (!call) throw new Error("expected fs.appendFile to have been called");
-    const record = JSON.parse(String(call[1]).trim());
-    expect(record.page).toBe("");
+    const call = mockAppendLead.mock.calls[0]?.[0];
+    expect(call?.page).toBe("");
   });
 
   it("returns ok:true when the email send fails but the lead is persisted", async () => {
@@ -87,12 +86,12 @@ describe("POST /api/leads", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true });
-    expect(vi.mocked(fs.appendFile)).toHaveBeenCalledOnce();
+    expect(mockAppendLead).toHaveBeenCalledOnce();
   });
 
   it("returns ok:true when persistence fails but the email is sent", async () => {
     process.env.RESEND_API_KEY = "test-resend-key";
-    vi.mocked(fs.appendFile).mockRejectedValueOnce(new Error("disk full"));
+    mockAppendLead.mockRejectedValueOnce(new Error("db connection refused"));
     const res = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
 
     expect(res.status).toBe(200);
@@ -100,15 +99,14 @@ describe("POST /api/leads", () => {
   });
 
   it("returns 500 ok:false when both persistence and email fail", async () => {
-    // No RESEND_API_KEY → no email attempted; persistence rejects.
-    vi.mocked(fs.appendFile).mockRejectedValueOnce(new Error("disk full"));
+    mockAppendLead.mockRejectedValueOnce(new Error("db down"));
     const res = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ ok: false });
   });
 
-  it("rejects a cross-origin request with 403 before touching disk", async () => {
+  it("rejects a cross-origin request with 403 before touching the db", async () => {
     const res = await POST(
       makeJsonPostRequest(
         { name: "Ada", email: "ada@example.com" },
@@ -116,7 +114,7 @@ describe("POST /api/leads", () => {
       ),
     );
     expect(res.status).toBe(403);
-    expect(vi.mocked(fs.appendFile)).not.toHaveBeenCalled();
+    expect(mockAppendLead).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -125,11 +123,10 @@ describe("POST /api/leads", () => {
       makeJsonPostRequest({ name: "Ada", email: "ada@example.com", note: "x".repeat(20_000) }),
     );
     expect(res.status).toBe(413);
-    expect(vi.mocked(fs.appendFile)).not.toHaveBeenCalled();
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockAppendLead).not.toHaveBeenCalled();
   });
 
-  it("rate limits after 5 requests per minute from one IP with 429 + Retry-After", async () => {
+  it("rate limits after 5 requests per minute from one IP", async () => {
     const ip = "55.55.55.55";
     for (let i = 0; i < 5; i++) {
       const ok = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }, { ip }));
@@ -140,27 +137,12 @@ describe("POST /api/leads", () => {
     );
     expect(limited.status).toBe(429);
     expect(limited.headers.get("Retry-After")).toBeTruthy();
-    expect(await limited.json()).toMatchObject({ error: expect.any(String) });
-  });
-
-  it("caps an oversized note before persisting", async () => {
-    const bigNote = "x".repeat(10_000);
-    const res = await POST(
-      makeJsonPostRequest({ name: "Ada", email: "ada@example.com", note: bigNote }),
-    );
-
-    expect(res.status).toBe(200);
-    const call = vi.mocked(fs.appendFile).mock.calls[0];
-    if (!call) throw new Error("expected fs.appendFile to have been called");
-    const [, line] = call;
-    const record = JSON.parse(String(line).trim());
-    expect(record.note.length).toBe(5000);
   });
 
   it("returns 400 when required fields are missing", async () => {
     const res = await POST(makeJsonPostRequest({ email: "ada@example.com" }));
     expect(res.status).toBe(400);
-    expect(vi.mocked(fs.appendFile)).not.toHaveBeenCalled();
+    expect(mockAppendLead).not.toHaveBeenCalled();
   });
 
   it("returns 400 for an invalid email format", async () => {

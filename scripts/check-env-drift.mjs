@@ -33,8 +33,12 @@ for (const key of schemaKeys) {
   }
 }
 
+// Keys in .env.example consumed by compose.yml or Docker, not by Next.js --
+// they legitimately exist in the example without a matching env.ts schema entry.
+const COMPOSE_ONLY_KEYS = new Set(["POSTGRES_PASSWORD"]);
+
 for (const key of exampleKeys) {
-  if (!schemaKeys.has(key)) {
+  if (!schemaKeys.has(key) && !COMPOSE_ONLY_KEYS.has(key)) {
     console.error(`DRIFT: ${key} is in .env.example but missing from src/env.ts`);
     ok = false;
   }

@@ -12,6 +12,13 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# --- Dev (hot-reload target for compose.override.yml) ---
+FROM deps AS dev
+COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+EXPOSE 3000
+CMD ["pnpm", "dev", "--hostname", "0.0.0.0"]
+
 # --- Builder ---
 FROM base AS builder
 RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
@@ -23,7 +30,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
-# --- Runner ---
+# --- Runner (production) ---
 FROM base AS runner
 WORKDIR /app
 
@@ -38,9 +45,6 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# a named volume mounted at /app/.data inherits this ownership on first use
-RUN mkdir -p /app/.data && chown nextjs:nodejs /app/.data
 
 USER nextjs
 

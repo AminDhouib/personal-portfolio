@@ -6,13 +6,7 @@ import {
   passwordGameLeaderboardEntrySchema,
   passwordGameLeaderboardFileSchema,
   emptyPasswordGameLeaderboardFile,
-  leadRecordSchema,
-  PERSISTENCE_SCHEMA_VERSION,
 } from "../persistence-schemas";
-
-// Pinning tests for the v2 persisted shapes (pass-2 break+reset). These
-// assert BOTH directions: what v2 accepts, and that v1-era shapes are
-// rejected (the store's version/quarantine machinery depends on rejection).
 
 const ISO = "2026-07-08T00:00:00.000Z";
 
@@ -22,16 +16,6 @@ const VALID_PG_ENTRY = {
   seed: 42,
   elapsedSeconds: 300,
   ruleCount: 12,
-  createdAt: ISO,
-};
-const VALID_LEAD = {
-  schemaVersion: PERSISTENCE_SCHEMA_VERSION,
-  id: "6f1e1e7e-9a4b-4c3e-8f2a-1b2c3d4e5f60",
-  name: "Ada",
-  email: "ada@example.com",
-  note: "",
-  source: "chatbot",
-  page: "/",
   createdAt: ISO,
 };
 
@@ -96,27 +80,5 @@ describe("passwordGameLeaderboard schemas", () => {
 
   it("rejects the v1 on-disk shape (flat array)", () => {
     expect(passwordGameLeaderboardFileSchema.safeParse([VALID_PG_ENTRY]).success).toBe(false);
-  });
-});
-
-describe("leadRecordSchema", () => {
-  it("accepts a fully-stamped v2 line", () => {
-    expect(leadRecordSchema.safeParse(VALID_LEAD).success).toBe(true);
-  });
-
-  it("rejects the v1 line shape (timestamp, no id/page/version)", () => {
-    const v1 = {
-      name: "Ada",
-      email: "ada@example.com",
-      note: "",
-      source: "chatbot",
-      timestamp: ISO,
-    };
-    expect(leadRecordSchema.safeParse(v1).success).toBe(false);
-  });
-
-  it("rejects a malformed id and a non-ISO createdAt", () => {
-    expect(leadRecordSchema.safeParse({ ...VALID_LEAD, id: "not-a-uuid" }).success).toBe(false);
-    expect(leadRecordSchema.safeParse({ ...VALID_LEAD, createdAt: "12pm" }).success).toBe(false);
   });
 });

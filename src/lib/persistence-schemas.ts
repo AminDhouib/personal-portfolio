@@ -70,21 +70,5 @@ export function emptyPasswordGameLeaderboardFile(): PasswordGameLeaderboardFile 
   return { schemaVersion: PERSISTENCE_SCHEMA_VERSION, entries: [] };
 }
 
-/**
- * One line of leads.jsonl. Every line is self-describing (schemaVersion on
- * the line, not the file, because JSONL has no envelope). id makes a record
- * addressable for the future read surface (known debt NF-P1-c) and
- * dedupe-able; page records which URL produced the lead; source stays the
- * capture channel (today always "chatbot").
- */
-export const leadRecordSchema = z.object({
-  schemaVersion: z.literal(PERSISTENCE_SCHEMA_VERSION),
-  id: z.uuid(),
-  name: z.string(),
-  email: z.string(),
-  note: z.string(),
-  source: z.string(),
-  page: z.string(),
-  createdAt: z.iso.datetime(),
-});
-export type LeadRecord = z.infer<typeof leadRecordSchema>;
+// Lead schema removed: leads are now in Postgres; the LeadRecord type lives
+// in src/lib/leads-store.ts next to the query code.

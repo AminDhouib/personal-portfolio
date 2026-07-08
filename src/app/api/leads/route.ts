@@ -13,7 +13,7 @@ export interface LeadPayload {
   source?: string;
 }
 
-// Cap persisted fields so a hostile payload can't bloat the leads file on disk.
+// Cap persisted fields so a hostile payload can't bloat the leads table.
 const NAME_MAX = 200;
 const EMAIL_MAX = 320;
 const NOTE_MAX = 5000;
@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
 
   console.log(JSON.stringify({ type: "LEAD", ...input }));
 
-  // Persist first: the email provider is best-effort, so a durable record on the
-  // mounted volume is what guarantees a lead is never silently lost.
+  // Persist first: the email provider is best-effort, so a durable record in
+  // the database is what guarantees a lead is never silently lost.
   let persisted: { id: string; createdAt: string } | null = null;
   try {
     const record = await appendLead(input);

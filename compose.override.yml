@@ -1,0 +1,13 @@
+# Dev overrides -- auto-loaded by `docker compose up`.
+# Bind-mounts source for hot reload, builds the dev Dockerfile target.
+
+services:
+  app:
+    build:
+      target: dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next

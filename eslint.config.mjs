@@ -30,19 +30,7 @@ const RESTRICTED_SYNTAX = [
 
 // fs is the persistence boundary (RC-2). Only these inventoried files may touch
 // it directly; every other component/route/game must go through a store module.
-const FS_ALLOWLIST = [
-  "src/lib/blog.ts",
-  // The two store modules ARE the persistence boundary (schema v2, pass-2
-  // audit): every route goes through them, so fs left the route layer
-  // entirely (the leads route entry below was removed with it).
-  "src/lib/json-file-store.ts",
-  "src/lib/leads-store.ts",
-  "src/app/apple-icon.tsx",
-  "src/app/icon.tsx",
-  // Non-mutating W_OK probe on the persistence-adjacent .data directory for the
-  // liveness/readiness check (P4) -- reads no application data, writes nothing.
-  "src/app/api/health/route.ts",
-];
+const FS_ALLOWLIST = ["src/lib/blog.ts", "src/app/apple-icon.tsx", "src/app/icon.tsx"];
 
 // src/test/** is shared test infrastructure (vitest setup + fixtures): same
 // exemptions as the suites themselves (setup.ts needs node:fs for the

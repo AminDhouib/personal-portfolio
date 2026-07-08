@@ -24,6 +24,7 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   OPENROUTER_KEY: z.string().optional(),
   DATA_DIR: z.string().optional(),
+  DATABASE_URL: z.string().optional(),
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.url().optional()),
 });
 
@@ -59,6 +60,7 @@ export const env: Env = new Proxy({} as Env, {
 // DATA_DIR is deliberately NOT here: it is a path override with a safe
 // default of <cwd>/.data (the one sanctioned exception — DESIGN.md register).
 export const REQUIRED_ENV_VARS = [
+  "DATABASE_URL",
   "OPENROUTER_KEY",
   "SENTRY_DSN",
   "RESEND_API_KEY",
