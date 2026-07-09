@@ -12,7 +12,7 @@ concurrency:
 jobs:
   lint-and-test:
     name: Lint, Typecheck, Test, Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-devino
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -66,7 +66,7 @@ jobs:
     name: Deploy to Dokploy
     needs: lint-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-devino
     timeout-minutes: 10
     steps:
       - name: Check deploy secrets
@@ -98,7 +98,7 @@ jobs:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
         run: |
-          curl -sf -X POST "$DOKPLOY_URL/api/application.deploy" \
+          curl -sf -X POST "$DOKPLOY_URL/api/compose.deploy" \
             -H "x-api-key: $DOKPLOY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"applicationId":"9ZeLiZVLfBtm0OwzIWBxI"}'
+            -d '{"composeId":"hnV_k4WYHOmodXzsvQeDk"}'
