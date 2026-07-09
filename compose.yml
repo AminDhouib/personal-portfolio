@@ -1,5 +1,9 @@
 # THE infrastructure contract. Local, CI, and prod all use this exact file.
 # `docker compose up` builds and runs the same image everywhere.
+#
+# All env vars are read from `.env` (Docker Compose's default) via ${VAR}
+# substitution. Locally: create a `.env` file. Dokploy: set vars in the UI
+# (it creates `.env` automatically). CI: export vars in the runner.
 
 services:
   db:
@@ -8,7 +12,7 @@ services:
     environment:
       POSTGRES_DB: portfolio
       POSTGRES_USER: portfolio
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -27,10 +31,21 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
-    env_file: .env.local
     environment:
       DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD:?}@db:5432/portfolio
       NODE_ENV: production
+      OPENROUTER_KEY: ${OPENROUTER_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GA4_SERVICE_ACCOUNT_KEY: ${GA4_SERVICE_ACCOUNT_KEY:-}
+      GA4_PROPERTY_SHORTY: ${GA4_PROPERTY_SHORTY:-}
+      GA4_PROPERTY_UNOTES: ${GA4_PROPERTY_UNOTES:-}
+      GA4_PROPERTY_CARAMEL: ${GA4_PROPERTY_CARAMEL:-}
+      GA4_PROPERTY_UPUP: ${GA4_PROPERTY_UPUP:-}
+      GA4_PROPERTY_GETITDONE: ${GA4_PROPERTY_GETITDONE:-}
     depends_on:
       db:
         condition: service_healthy
