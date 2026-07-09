@@ -4,6 +4,10 @@
 # All env vars are read from `.env` (Docker Compose's default) via ${VAR}
 # substitution. Locally: create a `.env` file. Dokploy: set vars in the UI
 # (it creates `.env` automatically). CI: export vars in the runner.
+#
+# No host-port bindings: Dokploy's Traefik routes amindhou.com -> app:3000
+# via the domain config. For local use, add `ports: ["3000:3000"]` to the
+# app service in a local-only override, or access via `docker compose exec`.
 
 services:
   db:
@@ -21,16 +25,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "${DB_PORT:-5432}:5432"
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "${PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD}@db:5432/portfolio
       NODE_ENV: production
