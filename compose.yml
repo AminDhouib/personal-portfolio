@@ -12,7 +12,7 @@ services:
     environment:
       POSTGRES_DB: portfolio
       POSTGRES_USER: portfolio
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -32,7 +32,7 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD:?}@db:5432/portfolio
+      DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD}@db:5432/portfolio
       NODE_ENV: production
       OPENROUTER_KEY: ${OPENROUTER_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
