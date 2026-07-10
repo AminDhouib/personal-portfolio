@@ -15,7 +15,9 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-const ogImage = "https://amindhou.com/opengraph-image.png";
+// Extensionless on purpose: the file-convention route (src/app/opengraph-image.tsx)
+// serves /opengraph-image; the .png-suffixed path 404s.
+const ogImage = "https://amindhou.com/opengraph-image";
 
 export const metadata: Metadata = {
   title: {

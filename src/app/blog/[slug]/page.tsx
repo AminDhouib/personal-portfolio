@@ -80,7 +80,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     publisher: { "@id": "https://amindhou.com/#person" },
     url,
     mainEntityOfPage: url,
-    image: `${SITE_ORIGIN}/blog/${slug}/opengraph-image.png`,
+    // Extensionless on purpose: the file-convention route (opengraph-image.tsx in
+    // this segment) serves /opengraph-image; the .png-suffixed path 404s.
+    image: `${SITE_ORIGIN}/blog/${slug}/opengraph-image`,
     keywords: post.tags,
   };
 
