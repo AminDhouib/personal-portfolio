@@ -22,6 +22,17 @@ import { ossProjects } from "@/data/oss-projects";
 // ISR: revalidate every 24h for live MAU + GitHub data
 export const revalidate = 86400;
 
+const SITE_ORIGIN = "https://amindhou.com";
+
+export const metadata = {
+  alternates: {
+    canonical: SITE_ORIGIN,
+    types: {
+      "application/rss+xml": "/feed.xml",
+    },
+  },
+};
+
 export default async function Home() {
   const [mauData, ossRepoStats, contributions] = await Promise.all([
     fetchAllMAU(),

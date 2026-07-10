@@ -6,6 +6,8 @@ import { GAMES, getGameMeta } from "../games-meta";
 import { GameLoader } from "@/components/game/game-loader";
 import { GameCard } from "@/components/game/game-card";
 
+const SITE_ORIGIN = "https://amindhou.com";
+
 export function generateStaticParams() {
   // password-game has its own top-level route; Next resolves it statically.
   return GAMES.filter((g) => !g.external).map((g) => ({ slug: g.slug }));
@@ -18,6 +20,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: game.title,
     description: game.tagline,
+    alternates: {
+      canonical: `${SITE_ORIGIN}/games/${slug}`,
+      types: {
+        "application/rss+xml": "/feed.xml",
+      },
+    },
   };
 }
 

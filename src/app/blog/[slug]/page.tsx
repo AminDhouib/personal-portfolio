@@ -8,19 +8,50 @@ import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getBlogPost, getAllBlogSlugs, extractToc } from "@/lib/blog";
 import { formatDate, formatRelativeDate } from "@/lib/date-utils";
 import { ShareButton, TableOfContents } from "@/components/blog/toc-share";
+import type { Metadata } from "next";
 import type { Options } from "rehype-pretty-code";
 
 export async function generateStaticParams() {
   return getAllBlogSlugs().map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+const SITE_ORIGIN = "https://amindhou.com";
+
+function toIsoDate(date: string): string | undefined {
+  if (!date) return undefined;
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) return {};
+
+  const url = `${SITE_ORIGIN}/blog/${slug}`;
+
   return {
     title: post.title,
     description: post.excerpt,
+    alternates: {
+      canonical: url,
+      types: {
+        "application/rss+xml": "/feed.xml",
+      },
+    },
+    openGraph: {
+      type: "article",
+      publishedTime: toIsoDate(post.date),
+      url,
+      title: post.title,
+      description: post.excerpt,
+      siteName: "Amin Dhouib",
+      locale: "en_US",
+    },
   };
 }
 
@@ -36,8 +67,31 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   const toc = extractToc(post.content);
 
+  const url = `${SITE_ORIGIN}/blog/${slug}`;
+  const publishedTime = toIsoDate(post.date);
+  const blogPostingLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt,
+    datePublished: publishedTime,
+    dateModified: publishedTime,
+    author: { "@id": "https://amindhou.com/#person" },
+    publisher: { "@id": "https://amindhou.com/#person" },
+    url,
+    mainEntityOfPage: url,
+    image: `${SITE_ORIGIN}/blog/${slug}/opengraph-image.png`,
+    keywords: post.tags,
+  };
+
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(blogPostingLd).replace(/</g, "\\u003c"),
+        }}
+      />
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* Back link */}
         <Link

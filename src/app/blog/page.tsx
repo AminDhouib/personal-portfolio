@@ -3,9 +3,17 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getAllBlogPosts } from "@/lib/blog";
 import { formatRelativeDate, formatDate } from "@/lib/date-utils";
 
+const SITE_ORIGIN = "https://amindhou.com";
+
 export const metadata = {
   title: "Blog",
   description: "Thoughts on engineering, open source, and building products.",
+  alternates: {
+    canonical: `${SITE_ORIGIN}/blog`,
+    types: {
+      "application/rss+xml": "/feed.xml",
+    },
+  },
 };
 
 export default async function BlogPage({

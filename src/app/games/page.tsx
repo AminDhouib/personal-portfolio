@@ -3,9 +3,17 @@ import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { GamesClient } from "./games-client";
 
+const SITE_ORIGIN = "https://amindhou.com";
+
 export const metadata = {
   title: "Games",
   description: "Mini-games built with the geometric design language of amindhou.com.",
+  alternates: {
+    canonical: `${SITE_ORIGIN}/games`,
+    types: {
+      "application/rss+xml": "/feed.xml",
+    },
+  },
 };
 
 export default function GamesPage() {

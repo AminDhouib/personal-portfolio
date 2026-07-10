@@ -2,12 +2,15 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Globe, AppWindow } from "lucide-react";
+import type { Metadata } from "next";
 import { SiIcon } from "@/components/ui/tech-icon";
 import { projects } from "@/data/projects";
 import { fetchMAU } from "@/lib/ga4";
 
 // ISR: revalidate every 24h so live MAU stays fresh
 export const revalidate = 86400;
+
+const SITE_ORIGIN = "https://amindhou.com";
 
 // Map common tech names to Simple Icons slugs (lowercase)
 const TECH_ICON_MAP: Record<string, string> = {
@@ -45,13 +48,23 @@ export function generateStaticParams() {
   return projects.map((p) => ({ slug: p.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
   const project = projects.find((p) => p.slug === slug);
   if (!project) return {};
   return {
     title: project.name,
     description: project.description,
+    alternates: {
+      canonical: `${SITE_ORIGIN}/work/${slug}`,
+      types: {
+        "application/rss+xml": "/feed.xml",
+      },
+    },
   };
 }
 

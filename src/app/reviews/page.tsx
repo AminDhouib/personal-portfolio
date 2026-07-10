@@ -3,9 +3,17 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { ReviewsClient } from "./reviews-client";
 import { BOOKING_URL } from "@/data/nav";
 
+const SITE_ORIGIN = "https://amindhou.com";
+
 export const metadata = {
   title: "Reviews",
   description: "Client reviews and testimonials for Amin Dhouib / Devino.",
+  alternates: {
+    canonical: `${SITE_ORIGIN}/reviews`,
+    types: {
+      "application/rss+xml": "/feed.xml",
+    },
+  },
 };
 
 const trustStats = [
