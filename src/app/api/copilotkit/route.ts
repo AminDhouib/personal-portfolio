@@ -7,13 +7,19 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
 import { guardRequest } from "@/lib/route-guard";
 import { createDeadlineFetch } from "@/lib/upstream-fetch";
+import { safeJsonParseServer } from "@/lib/safe-json-server";
+import {
+  applySystemPrompt,
+  buildAminAiSystemPrompt,
+  type ChatCompletionBody,
+} from "@/lib/amin-ai-prompt";
 import { env } from "@/env";
 
 const runtime = new CopilotRuntime();
 
 // RC-10: caps the whole OpenRouter round trip (connect + TTFB + stream) at a
-// generous total. gpt-4o-mini answers on this chatbot finish in seconds, so
-// 60s is roughly 10-20x headroom and will not cut a legitimate stream; it
+// generous total. Claude Haiku 4.5 answers on this chatbot finish in seconds,
+// so 60s is roughly 10-20x headroom and will not cut a legitimate stream; it
 // exists so a hung/slow upstream fails fast instead of holding the route (and
 // the OpenRouter key) open indefinitely. `maxDuration` is deliberately NOT
 // set anywhere in this route: it is a Vercel-only directive and a no-op on
@@ -21,6 +27,16 @@ const runtime = new CopilotRuntime();
 // pass already removed elsewhere) -- this in-handler deadline is the real
 // enforcement mechanism.
 const COPILOT_DEADLINE_MS = 60_000;
+
+// Chat model, served through OpenRouter. Slug verified against the OpenRouter
+// models API (https://openrouter.ai/api/v1/models).
+const MODEL = "anthropic/claude-haiku-4.5";
+
+// The Amin AI grounding, built once at module load from the typed site data.
+// It is the single source of truth for the assistant's facts and is injected
+// into the LLM request server-side below (the client `instructions` prop does
+// not reach the model on CopilotKit 1.54's AG-UI chat path).
+const AMIN_AI_SYSTEM_PROMPT = buildAminAiSystemPrompt();
 
 export const POST = async (req: NextRequest) => {
   // Guard the open LLM proxy before any work: reject cross-origin callers and
@@ -51,8 +67,29 @@ export const POST = async (req: NextRequest) => {
         "X-Title": "Amin Dhouib Portfolio",
       },
     } as never,
-    model: "openai/gpt-4o-mini",
+    model: MODEL,
   });
+
+  // req.signal is merged in too, so a visitor who closes the chat abandons
+  // the upstream call immediately instead of leaving it running to the deadline.
+  const deadlineFetch = createDeadlineFetch({ timeoutMs: COPILOT_DEADLINE_MS, signal: req.signal });
+
+  // Ground every outbound OpenRouter chat-completions call with Amin AI's
+  // system prompt. CopilotKit 1.54 runs the chat UI on the AG-UI stack, whose
+  // run path never forwards the client `instructions` prop to the model, so
+  // merging the prompt into the request body here is the one place the
+  // grounding provably reaches the LLM. This wraps -- and never replaces -- the
+  // RC-10 deadline fetch, so its abort/deadline semantics are unchanged.
+  const groundedFetch: typeof fetch = (input, init) => {
+    if (init && typeof init.body === "string") {
+      const body = safeJsonParseServer<ChatCompletionBody>(init.body, "copilotkit:upstream-body");
+      if (body) {
+        applySystemPrompt(body, AMIN_AI_SYSTEM_PROMPT);
+        return deadlineFetch(input, { ...init, body: JSON.stringify(body) });
+      }
+    }
+    return deadlineFetch(input, init);
+  };
 
   // @ai-sdk/openai v3 defaults to the Responses API which OpenRouter doesn't support.
   // .chat() explicitly selects the Chat Completions endpoint instead.
@@ -63,11 +100,9 @@ export const POST = async (req: NextRequest) => {
       "HTTP-Referer": "https://amindhou.com",
       "X-Title": "Amin Dhouib Portfolio",
     },
-    // req.signal is merged in too, so a visitor who closes the chat abandons
-    // the upstream call immediately instead of leaving it running to the deadline.
-    fetch: createDeadlineFetch({ timeoutMs: COPILOT_DEADLINE_MS, signal: req.signal }),
+    fetch: groundedFetch,
   });
-  adapter.getLanguageModel = () => openrouter.chat("openai/gpt-4o-mini");
+  adapter.getLanguageModel = () => openrouter.chat(MODEL);
 
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
     runtime,

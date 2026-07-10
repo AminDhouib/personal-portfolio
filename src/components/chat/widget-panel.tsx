@@ -5,51 +5,12 @@ import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
-import { ossProjects, type OssProject } from "@/data/oss-projects";
 import { useLeadCollectorAction } from "@/hooks/use-lead-collector-action";
 
-// Open-source project facts (Caramel, UpUp below) are sourced from the single
-// source of truth in src/data/oss-projects.ts so they can't drift out of sync
-// with the site's Open Source section.
-const ossByKey: Record<string, OssProject> = Object.fromEntries(
-  ossProjects.map((p) => [p.key, p] as const),
-);
-
-const caramelProject = ossByKey.caramel;
-const upupProject = ossByKey.upup;
-if (!caramelProject || !upupProject) {
-  throw new Error("oss-projects.ts is missing the caramel/upup entries");
-}
-
-const INSTRUCTIONS = `You are Amin Dhouib's personal AI assistant on his portfolio site amindhou.com.
-You are friendly, concise, and knowledgeable about Amin's work. Keep responses short — this is a chat widget.
-
-About Amin:
-- CEO & CTO of Devino Solutions. Full-stack engineer & founder in Ottawa, Canada.
-- Education: University of Ottawa, BASc Computer Software Engineering, Summa Cum Laude (A+)
-- Languages: Fluent English & French, working Arabic
-- Favorite stack: Next.js, TypeScript, Python (Django/FastAPI), Prisma, Docker, AWS
-
-Key stats: $1M+ revenue, 50+ clients, 30K+ MAU across apps, 5.0/5.0 rating, 99.99% server uptime.
-
-Apps:
-- Shorty (aishorty.com) — AI YouTube & Spotify summarizer. 2.1K MAU, +50% MoM.
-- uNotes (unotes.net) — Community university notes platform. 5K MAU.
-- Caramel (grabcaramel.com) — ${caramelProject.description} browser ext.
-- UpUp (useupup.com) — ${upupProject.description}.
-- GetItDone (nowgetitdone.com) — Team standups & time tracking.
-
-Services: AI Automation, Full Stack Dev, DevOps/Cloud, Database, Security/DevSecOps.
-Rate: $50-75/hr on Contra. app.trycaly.com/amin/15min for booking.
-
-Contact: amin@devino.ca | contra.com/amin
-
-LEAD COLLECTION: When a visitor expresses interest in hiring Amin or working together,
-first encourage them to book a call at https://app.trycaly.com/amin/15min.
-If they'd prefer to leave their contact details instead, use the collectLead action
-to collect their name and email. Always confirm before submitting.
-
-Keep responses to 2-3 sentences max unless detail is explicitly requested.`;
+// The assistant's grounding is not passed here: on CopilotKit 1.54's AG-UI chat
+// path the `instructions` prop never reaches the model. The system prompt is
+// built from the typed site data in src/lib/amin-ai-prompt.ts and injected
+// server-side in src/app/api/copilotkit/route.ts instead.
 
 const HIGHLIGHT_CLASSES = [
   "amin-ai-hl-purple",
@@ -69,7 +30,7 @@ function ChatActions({ pathname }: { pathname: string }) {
   useCopilotChatSuggestions(
     {
       instructions:
-        "ALWAYS suggest EXACTLY these 3 options (do not deviate or rephrase): 1. 'How can I reach out to Amin?' 2. 'What services does Amin offer?' 3. 'Tell me about Amin's projects'",
+        "ALWAYS suggest EXACTLY these 3 options (do not deviate or rephrase): 1. 'What has Amin built?' 2. 'Is Amin available for hire?' 3. 'How do I book a call with Amin?'",
       maxSuggestions: 3,
     },
     [],
@@ -140,7 +101,6 @@ export function ChatWidgetPanel({
     <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
       <ChatActions pathname={pathname} />
       <CopilotPopup
-        instructions={INSTRUCTIONS}
         labels={{
           title: "Amin AI",
           initial: "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
