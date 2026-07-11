@@ -88,6 +88,10 @@ export async function POST(req: NextRequest) {
   let emailOk = false;
   if (env.RESEND_API_KEY) {
     try {
+      // Sends through self-hosted UseSend, not Resend cloud. resend@6 has no
+      // base-URL constructor option; it reads process.env.RESEND_BASE_URL at
+      // import time, so the redirect lives in env config (both vars are
+      // required at boot — see src/env.ts) rather than here.
       const resend = new Resend(env.RESEND_API_KEY);
       await resend.emails.send({
         from: "Amin AI <leads@amindhou.com>",
