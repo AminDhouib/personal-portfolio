@@ -20,6 +20,7 @@ vi.mock("@/lib/log", () => ({
 }));
 
 import { POST } from "../route";
+import { captureException } from "@/lib/log";
 import { makeJsonPostRequest } from "@/test/api-route-helpers";
 
 describe("POST /api/leads", () => {
@@ -29,6 +30,7 @@ describe("POST /api/leads", () => {
     savedResendKey = process.env.RESEND_API_KEY;
     delete process.env.RESEND_API_KEY;
     mockSend.mockReset().mockResolvedValue({ data: { id: "email_1" }, error: null });
+    vi.mocked(captureException).mockClear();
     mockAppendLead.mockReset().mockResolvedValue({
       id: "test-uuid",
       name: "Ada",
@@ -87,6 +89,26 @@ describe("POST /api/leads", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true });
     expect(mockAppendLead).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces a provider error when send resolves with { error } (not a throw)", async () => {
+    process.env.RESEND_API_KEY = "test-resend-key";
+    // UseSend/Resend do not throw on API errors -- send() RESOLVES with a
+    // non-null error (bad key, wrong base URL). The route must report it, not
+    // record a false success.
+    mockSend.mockResolvedValueOnce({
+      data: null,
+      error: { name: "application_error", message: "Invalid API token" },
+    });
+    const res = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
+
+    expect(res.status).toBe(200); // the lead is still persisted
+    expect(await res.json()).toMatchObject({ ok: true });
+    expect(mockSend).toHaveBeenCalledOnce();
+    expect(captureException).toHaveBeenCalledWith(
+      "leads.email",
+      expect.objectContaining({ message: "Invalid API token" }),
+    );
   });
 
   it("returns ok:true when persistence fails but the email is sent", async () => {

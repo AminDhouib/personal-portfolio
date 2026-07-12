@@ -90,10 +90,10 @@ export async function POST(req: NextRequest) {
     try {
       // Sends through self-hosted UseSend, not Resend cloud. resend@6 has no
       // base-URL constructor option; it reads process.env.RESEND_BASE_URL at
-      // import time, so the redirect lives in env config (both vars are
-      // required at boot — see src/env.ts) rather than here.
+      // import time (must include UseSend's /api/v1 path), so the redirect
+      // lives in env config (both vars are required at boot — see src/env.ts).
       const resend = new Resend(env.RESEND_API_KEY);
-      await resend.emails.send({
+      const { error } = await resend.emails.send({
         from: "Amin AI <leads@amindhou.com>",
         to: "amin@devino.ca",
         subject: `New lead from ${input.name}`,
@@ -106,7 +106,11 @@ export async function POST(req: NextRequest) {
           `Time: ${persisted?.createdAt ?? new Date().toISOString()}`,
         ].join("\n"),
       });
-      emailOk = true;
+      // send() resolves with a non-null `error` (it does NOT throw) on
+      // API-level failures — a bad key, wrong base URL, unverified sender.
+      // Surface it instead of recording a false success.
+      if (error) captureException("leads.email", error);
+      else emailOk = true;
     } catch (err) {
       captureException("leads.email", err);
     }
