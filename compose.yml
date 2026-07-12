@@ -37,6 +37,11 @@ services:
       OPENROUTER_KEY: ${OPENROUTER_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # Non-secret UseSend Resend-compat API base. The resend SDK appends
+      # /emails, so this MUST include /api/v1; defaulted here (not left to an
+      # optional .env line) so a missing value can't silently fall back to the
+      # SDK default (Resend cloud) and drop every lead email.
+      RESEND_BASE_URL: ${RESEND_BASE_URL:-https://usesend.devino.ca/api/v1}
       POSTHOG_KEY: ${POSTHOG_KEY:-}
       POSTHOG_HOST: ${POSTHOG_HOST:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
