@@ -134,6 +134,7 @@ const jsonLd = {
 import { Navbar } from "@/components/navbar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { ChatWidget } from "@/components/chat/widget";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 
 export default function RootLayout({
   children,
@@ -151,6 +152,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        <GoogleAnalytics />
       </head>
       <body className="flex min-h-full flex-col">
         <Providers>

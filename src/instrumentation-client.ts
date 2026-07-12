@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import posthog from "posthog-js";
 
 // A DSN is a public identifier, not a secret — it ships in every browser
 // bundle by design. It is committed as a constant because a bare
@@ -21,6 +22,24 @@ Sentry.init({
   replaysOnErrorSampleRate: 0,
   environment: process.env.NODE_ENV,
 });
+
+// Client-side product analytics. Gated on NEXT_PUBLIC_POSTHOG_KEY so it stays a
+// no-op in local dev and any deploy that has not set the key. The literal static
+// process.env read is required for Next.js to inline it into the client bundle --
+// a dynamic env lookup compiles to undefined here (see src/env.ts). Error
+// capture stays with Sentry (above) and server-side PostHog (src/lib/log.ts);
+// this client is product analytics only.
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+
+if (POSTHOG_KEY) {
+  posthog.init(POSTHOG_KEY, {
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://posthog.devino.ca",
+    capture_pageview: "history_change",
+    capture_pageleave: true,
+    autocapture: true,
+    person_profiles: "identified_only",
+  });
+}
 
 // App Router navigation instrumentation: Next.js calls this on every
 // client-side route transition so Sentry can tie spans to the originating

@@ -5,9 +5,15 @@ import { join } from "node:path";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-// Apple touch icon (iOS home-screen). 180x180 is Apple's recommended size.
-// Same circular crop on transparent canvas as the browser-tab icon, but
-// sized for the home-screen rounded-square mask iOS applies on top.
+// Brand accent green (--color-accent-green in globals.css), matching the halo
+// the site draws around the profile photo (.glow-green).
+const ACCENT_GREEN = "#22c55e";
+const TILE_BG = "#0a0a0a";
+
+// Apple touch icon (iOS home screen). iOS applies its own rounded-square mask,
+// so a full-bleed solid background is correct here (no transparent corners
+// needed). Same brand treatment as the browser-tab icon: the face ringed in
+// accent-green on a dark tile.
 export default async function AppleIcon() {
   const photo = await readFile(join(process.cwd(), "public/profile.jpg"));
   const photoSrc = `data:image/jpeg;base64,${photo.toString("base64")}`;
@@ -20,22 +26,34 @@ export default async function AppleIcon() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "transparent",
+        background: TILE_BG,
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photoSrc}
-        alt=""
-        width={180}
-        height={180}
+      <div
         style={{
-          width: "180px",
-          height: "180px",
-          borderRadius: "9999px",
-          objectFit: "cover",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 148,
+          height: 148,
+          borderRadius: 9999,
+          background: ACCENT_GREEN,
         }}
-      />
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photoSrc}
+          alt=""
+          width={128}
+          height={128}
+          style={{
+            width: "128px",
+            height: "128px",
+            borderRadius: "9999px",
+            objectFit: "cover",
+          }}
+        />
+      </div>
     </div>,
     { ...size },
   );
