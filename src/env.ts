@@ -21,6 +21,18 @@ const schema = z.object({
   GA4_PROPERTY_GETITDONE: z.string().optional(),
   POSTHOG_KEY: z.string().optional(),
   POSTHOG_HOST: z.preprocess(emptyToUndefined, z.url().optional()),
+  // Client-side product analytics (browser bundle). Separate from the
+  // server-side POSTHOG_KEY/POSTHOG_HOST above: the client needs the PUBLIC
+  // project ingestion key and the NEXT_PUBLIC_ prefix so Next.js inlines the
+  // static read (see instrumentation-client.ts). All optional -> analytics is
+  // a no-op when unset, never a boot/build failure, so NOT in REQUIRED_ENV_VARS.
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.preprocess(emptyToUndefined, z.url().optional()),
+  // Google Analytics gtag.js measurement ID (G-XXXXXXXXXX), read server-side
+  // through the env proxy and injected into the gtag script tags. Revives the
+  // previously-dead NEXT_PUBLIC_GA4_ID prod var (see DESIGN.md known debt) by
+  // giving it a real consumer; no-op when unset.
+  NEXT_PUBLIC_GA4_ID: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_BASE_URL: z.preprocess(emptyToUndefined, z.url().optional()),
   OPENROUTER_KEY: z.string().optional(),
