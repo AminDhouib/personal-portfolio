@@ -20,6 +20,18 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Public (client) analytics vars must exist at build time so Next.js inlines
+# them into the browser bundle -- a dynamic env read compiles to `undefined`
+# in client code (see src/instrumentation-client.ts and src/env.ts). Dokploy
+# passes these through compose `build.args`; unset in local/CI builds simply
+# yields empty strings, keeping analytics a no-op there.
+ARG NEXT_PUBLIC_POSTHOG_KEY
+ARG NEXT_PUBLIC_POSTHOG_HOST
+ARG NEXT_PUBLIC_GA4_ID
+ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY \
+    NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST \
+    NEXT_PUBLIC_GA4_ID=$NEXT_PUBLIC_GA4_ID
+
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 

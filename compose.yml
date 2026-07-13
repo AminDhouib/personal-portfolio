@@ -30,6 +30,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Client analytics vars are inlined at build time (see Dockerfile). Dokploy
+      # writes these into .env; compose substitutes them into the build args so
+      # the browser bundle actually carries the PostHog key + GA id.
+      args:
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
+        NEXT_PUBLIC_GA4_ID: ${NEXT_PUBLIC_GA4_ID:-}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD}@db:5432/portfolio

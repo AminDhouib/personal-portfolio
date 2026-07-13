@@ -34,7 +34,7 @@ const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 if (POSTHOG_KEY) {
   posthog.init(POSTHOG_KEY, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://posthog.devino.ca",
-    capture_pageview: "history_change",
+    capture_pageview: true,
     capture_pageleave: true,
     autocapture: true,
     person_profiles: "identified_only",
