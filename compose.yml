@@ -58,6 +58,12 @@ services:
       GA4_PROPERTY_CARAMEL: ${GA4_PROPERTY_CARAMEL:-}
       GA4_PROPERTY_UPUP: ${GA4_PROPERTY_UPUP:-}
       GA4_PROPERTY_GETITDONE: ${GA4_PROPERTY_GETITDONE:-}
+      # Emergency escape hatch for the strict env presence gate (src/env.ts
+      # validateRequiredEnv). Left unset in normal operation; set to the exact
+      # sentinel value in the Dokploy env ONLY to deliberately boot past a
+      # missing required var. Wired here so the override can actually reach the
+      # container -- without this line it would be silently unreachable in prod.
+      DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: ${DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION:-}
     depends_on:
       db:
         condition: service_healthy

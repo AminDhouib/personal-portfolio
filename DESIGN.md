@@ -95,10 +95,15 @@ style suggestions.
 Things that look like bugs or oversights but are deliberate. Each was verified against the
 current tree on 2026-07-07.
 
-- **`src/env.ts` validates format only, never presence** — every key in its zod schema is
-  `.optional()`. This is intentional: each integration degrades gracefully when its variable is
-  absent (`.env.example` documents the exact fallback per key), so the schema's only job is
-  catching a malformed value (e.g. a non-URL `SENTRY_DSN`) at boot instead of at request time.
+- **`src/env.ts` splits format-checking (import time) from presence-checking (boot time).** The
+  zod schema makes every key `.optional()` and validates FORMAT only — a malformed value (e.g. a
+  non-URL `SENTRY_DSN`) throws, an absent one does not — because the module also loads during
+  `next build`, where secrets are legitimately absent (CI, fork PRs). PRESENCE is enforced
+  separately at server boot by `validateRequiredEnv()`, wired into `src/instrumentation.ts`'s
+  `register()` and gated on `NEXT_PHASE` so it never runs during build: a missing
+  `REQUIRED_ENV_VAR` fails the boot loudly (see the matching entry below). The per-integration
+  graceful-degradation paths `.env.example` documents are defense-in-depth for a var revoked at
+  runtime, not the prod contract — the boot gate guarantees prod never starts with one missing.
 - **`env`'s reads go through a `Proxy`**, not the parsed zod output — the parsed result is
   discarded on purpose. A client component reading `env.NEXT_PUBLIC_FOO` will get `undefined` at
   runtime even though the proxy itself is fine: Next.js only inlines client-side env reads for
@@ -106,10 +111,14 @@ current tree on 2026-07-07.
   lookup. Client code needs the literal static read, or a committed constant — see
   `instrumentation-client.ts`'s `SENTRY_DSN` constant for the pattern (a DSN is a public
   identifier, not a secret, so committing it is correct, not an oversight).
-- **`GITHUB_TOKEN` is intentionally absent in production.** Without it, GitHub stats fall back to
-  the unauthenticated REST API and the contribution graph falls back from the authenticated
-  GraphQL calendar to a token-free public mirror (`github-contributions-api.jogruber.de`) — the
-  graph still renders real data either way, so the token was never provisioned in prod.
+- **`src/lib/github.ts` keeps a token-free fallback even though `GITHUB_TOKEN` is now required.**
+  A classic read-only PAT (`read:user` scope) was provisioned in prod on 2026-07-14, so
+  `GITHUB_TOKEN` is a `REQUIRED_ENV_VAR` and the boot gate enforces its presence; prod normally
+  uses the authenticated GraphQL contribution calendar and authenticated repo stats. The
+  unauthenticated fallback (repo stars/forks via unauthenticated REST; the graph via the
+  token-free `github-contributions-api.jogruber.de` mirror) is not dead code — it is
+  defense-in-depth so a token revoked at runtime degrades the page to real mirror data instead of
+  breaking it.
 - **Persisted files carry a `schemaVersion` envelope, and a version mismatch archives-then-resets
   instead of migrating.** Pass-2's break+reset (owner-approved, 0 users): on the first boot after
   a schema bump, the store moves the old file aside to `<name>.schema-mismatch-N` (never deletes,
