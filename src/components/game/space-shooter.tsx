@@ -1000,6 +1000,9 @@ export function SpaceShooterGame() {
       }
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {
         if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) e.preventDefault();
+        // Keydown is a user gesture too — resume a suspended AudioContext so
+        // keyboard-only players are not stuck in silence until a mouse move.
+        ensureAudio();
         tryUnpause();
       }
       // Dash: double-tap A / ArrowLeft or D / ArrowRight

@@ -6,6 +6,16 @@ export class SoundManager {
   private enabled = false;
   private sfxEnabled = true;
   private musicEnabled = true;
+  // Master bus: everything routes through one DynamicsCompressor configured as
+  // a limiter, so simultaneous explosions/music/warp can't sum past 1.0 into
+  // hard clipping. Music additionally passes through duckBus, which explosion
+  // hits momentarily dip (sidechain-style pump).
+  private masterBus: DynamicsCompressorNode | null = null;
+  private sfxBus: GainNode | null = null;
+  private duckBus: GainNode | null = null;
+  // Shared feedback-delay "space echo" send — explosions tap into it for a
+  // cavernous tail without per-shot reverb nodes.
+  private echoSend: GainNode | null = null;
   private lastPlay: Record<SoundType, number> = {
     laser: 0,
     boom: 0,
@@ -16,6 +26,18 @@ export class SoundManager {
     warp: 0,
     purchase: 0,
   };
+  // Per-type minimum ms between plays. Laser fires constantly; chime/boom can
+  // burst many times per frame (multi-coin pickups, cluster kills) and would
+  // stack toward the limiter without a floor.
+  private static THROTTLE_MS: Partial<Record<SoundType, number>> = {
+    laser: 70,
+    chime: 45,
+    boom: 45,
+  };
+  // The track that SHOULD be playing right now, kept even while music or all
+  // sound is toggled off so re-enabling can resume it (previously toggling
+  // music back on stayed silent until the next natural track change).
+  private desiredTrack: "gameplay" | "leaderboard" | null = null;
   // Sustained warp whoosh that loops while warp power-up is active
   private warpLoop: {
     src: AudioBufferSourceNode;
@@ -33,10 +55,12 @@ export class SoundManager {
 
   setEnabled(v: boolean) {
     this.enabled = v;
-    if (v) this.ensure();
-    else {
+    if (v) {
+      this.ensure();
+      this.resumeDesiredTrack();
+    } else {
       this.stopWarpLoop();
-      this.stopMusic(0);
+      this.stopMusicNodes(0);
     }
   }
 
@@ -54,10 +78,66 @@ export class SoundManager {
         window.AudioContext ||
         (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       this.ctx = new Ctor();
+      this.buildBuses(this.ctx);
     } catch {
       // silent-ok: best-effort AudioContext construction; a blocked/unsupported AudioContext must not break the render loop
       this.ctx = null;
     }
+  }
+
+  // One-time bus graph: [sfx] -> sfxBus \
+  //                     [music] -> duckBus -> masterBus(limiter) -> destination
+  //                     [echo tap] -> echoSend -> delay loop -> masterBus
+  private buildBuses(ctx: AudioContext) {
+    const master = ctx.createDynamicsCompressor();
+    master.threshold.value = -8;
+    master.knee.value = 6;
+    master.ratio.value = 14;
+    master.attack.value = 0.002;
+    master.release.value = 0.24;
+    master.connect(ctx.destination);
+    const sfx = ctx.createGain();
+    sfx.connect(master);
+    const duck = ctx.createGain();
+    duck.connect(master);
+    const send = ctx.createGain();
+    send.gain.value = 0.9;
+    const delay = ctx.createDelay(1);
+    delay.delayTime.value = 0.19;
+    const damp = ctx.createBiquadFilter();
+    damp.type = "lowpass";
+    damp.frequency.value = 1100;
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.34;
+    send.connect(delay);
+    delay.connect(damp);
+    damp.connect(feedback);
+    feedback.connect(delay);
+    const echoOut = ctx.createGain();
+    echoOut.gain.value = 0.5;
+    damp.connect(echoOut);
+    echoOut.connect(master);
+    this.masterBus = master;
+    this.sfxBus = sfx;
+    this.duckBus = duck;
+    this.echoSend = send;
+  }
+
+  // Destination for one-shot SFX. Falls back to the raw destination if the
+  // bus graph failed to build (never in practice; keeps the ! away).
+  private sfxOut(): AudioNode {
+    return this.sfxBus ?? this.ctx!.destination;
+  }
+
+  // Sidechain-style pump: dip the music bus for a beat when a big transient
+  // (explosion / crash / boss pulse) lands, so it punches through the mix.
+  private duckMusic(depth = 0.35, holdSec = 0.09) {
+    if (!this.ctx || !this.duckBus) return;
+    const t = this.ctx.currentTime;
+    const g = this.duckBus.gain;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(depth, t, 0.015);
+    g.setTargetAtTime(1, t + holdSec, 0.22);
   }
 
   setSfxEnabled(v: boolean) {
@@ -65,16 +145,25 @@ export class SoundManager {
   }
   setMusicEnabled(v: boolean) {
     this.musicEnabled = v;
-    if (!v) this.stopMusic(0.2);
+    if (!v) this.stopMusicNodes(0.2);
+    else this.resumeDesiredTrack();
+  }
+
+  // Restart whichever track should be playing after music/sound was re-enabled.
+  private resumeDesiredTrack() {
+    if (!this.enabled || !this.musicEnabled) return;
+    if (this.desiredTrack === "gameplay") this.startGameplayMusic();
+    else if (this.desiredTrack === "leaderboard") this.startLeaderboardMusic();
   }
 
   play(type: SoundType) {
     if (!this.enabled || !this.sfxEnabled) return;
     this.ensure();
     if (!this.ctx) return;
-    // throttle laser to avoid clipping when rapid-fire
+    // Per-type throttle so rapid-fire / burst pickups don't stack into the limiter
     const now = performance.now();
-    if (type === "laser" && now - this.lastPlay.laser < 70) return;
+    const throttle = SoundManager.THROTTLE_MS[type] ?? 0;
+    if (throttle > 0 && now - this.lastPlay[type] < throttle) return;
     this.lastPlay[type] = now;
     switch (type) {
       case "laser":
@@ -119,7 +208,7 @@ export class SoundManager {
       gain.gain.setValueAtTime(0, at);
       gain.gain.linearRampToValueAtTime(0.1, at + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.001, at + 0.22);
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.sfxOut());
       osc.start(at);
       osc.stop(at + 0.24);
     });
@@ -139,14 +228,16 @@ export class SoundManager {
     const clickGain = ctx.createGain();
     clickGain.gain.setValueAtTime(0.12, t + 0.18);
     clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    src.connect(filt).connect(clickGain).connect(ctx.destination);
+    src.connect(filt).connect(clickGain).connect(this.sfxOut());
     src.start(t + 0.18);
   }
 
   // Biome-change sting — short drum fill + whoosh so the player hears the
   // transition. Called from runTick when the biome flips.
   biomeTransition() {
-    if (!this.enabled || !this.musicEnabled) return;
+    // Gate on SFX, not music: this is a gameplay cue, and "music off, SFX on"
+    // players must still hear the biome flip.
+    if (!this.enabled || !this.sfxEnabled) return;
     this.ensure();
     if (!this.ctx) return;
     const ctx = this.ctx;
@@ -166,7 +257,7 @@ export class SoundManager {
     const gn = ctx.createGain();
     gn.gain.setValueAtTime(0.18, t);
     gn.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filt).connect(gn).connect(ctx.destination);
+    src.connect(filt).connect(gn).connect(this.sfxOut());
     src.start(t);
     // Snare roll: 4 quick noise bursts accelerating into a final accent
     for (let i = 0; i < 5; i++) {
@@ -184,7 +275,7 @@ export class SoundManager {
       const sg = ctx.createGain();
       sg.gain.setValueAtTime(i === 4 ? 0.35 : 0.14, st);
       sg.gain.exponentialRampToValueAtTime(0.001, st + sd);
-      ss.connect(sf).connect(sg).connect(ctx.destination);
+      ss.connect(sf).connect(sg).connect(this.sfxOut());
       ss.start(st);
     }
   }
@@ -193,11 +284,14 @@ export class SoundManager {
   // Driven from runTick on a ~700ms cadence. Higher-tier bosses get richer
   // stacks: low triangle → + tom → + saw-bass stab → + snare crack.
   bossPulse(tier = 1) {
-    if (!this.enabled || !this.musicEnabled) return;
+    // Gate on SFX, not music: the pulse telegraphs boss attacks, so it must
+    // survive a music-off mix.
+    if (!this.enabled || !this.sfxEnabled) return;
     this.ensure();
     if (!this.ctx) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    this.duckMusic(0.55, 0.06);
     // Layer 1 (all tiers): low triangle thump, pitch scales with tier
     const baseFreq = 44 + tier * 2.5; // 46.5 → 64 Hz across T1-T8
     const o1 = ctx.createOscillator();
@@ -207,7 +301,7 @@ export class SoundManager {
     g1.gain.setValueAtTime(0.0, t);
     g1.gain.linearRampToValueAtTime(0.22, t + 0.02);
     g1.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    o1.connect(g1).connect(ctx.destination);
+    o1.connect(g1).connect(this.sfxOut());
     o1.start(t);
     o1.stop(t + 0.45);
     // Layer 2 (tier 3+): tom hit — descending sine with short envelope
@@ -219,7 +313,7 @@ export class SoundManager {
       o2.frequency.exponentialRampToValueAtTime(80, t + 0.15);
       g2.gain.setValueAtTime(0.24, t);
       g2.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      o2.connect(g2).connect(ctx.destination);
+      o2.connect(g2).connect(this.sfxOut());
       o2.start(t);
       o2.stop(t + 0.2);
     }
@@ -235,7 +329,7 @@ export class SoundManager {
       f3.frequency.exponentialRampToValueAtTime(800, t + 0.08);
       g3.gain.setValueAtTime(0.18, t);
       g3.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-      o3.connect(f3).connect(g3).connect(ctx.destination);
+      o3.connect(f3).connect(g3).connect(this.sfxOut());
       o3.start(t);
       o3.stop(t + 0.28);
     }
@@ -255,25 +349,45 @@ export class SoundManager {
       const gg = ctx.createGain();
       gg.gain.setValueAtTime(0.3, t);
       gg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
-      src.connect(filt).connect(gg).connect(ctx.destination);
+      src.connect(filt).connect(gg).connect(this.sfxOut());
       src.start(t);
     }
   }
 
-  // Soft sine pulse, easy on the ears since it fires constantly.
+  // Laser pulse. Kept quiet (it fires constantly) but layered so it reads as
+  // a weapon, not a beep: detuned sine pair for width + a 15ms highpassed
+  // noise click as the attack transient.
   private playLaser() {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(720, t);
-    osc.frequency.exponentialRampToValueAtTime(420, t + 0.06);
-    gain.gain.setValueAtTime(0.025, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.08);
+    for (const detune of [1, 1.0046]) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(720 * detune, t);
+      osc.frequency.exponentialRampToValueAtTime(420 * detune, t + 0.06);
+      gain.gain.setValueAtTime(0.018, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      osc.connect(gain).connect(this.sfxOut());
+      osc.start(t);
+      osc.stop(t + 0.08);
+    }
+    const clickDur = 0.015;
+    const buf = ctx.createBuffer(1, Math.max(1, ctx.sampleRate * clickDur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() - 0.5) * 2 * Math.exp((-i / data.length) * 6);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "highpass";
+    filt.frequency.value = 2600;
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.05, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + clickDur);
+    src.connect(filt).connect(clickGain).connect(this.sfxOut());
+    src.start(t);
   }
 
   // Meteor explosion — three layers stacked for body + crunch + rumble:
@@ -284,6 +398,7 @@ export class SoundManager {
   private playBoom() {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
+    this.duckMusic(0.4, 0.08);
 
     // Layer 1: sharp noise crack
     const crackDur = 0.15;
@@ -301,7 +416,7 @@ export class SoundManager {
     const crackGain = ctx.createGain();
     crackGain.gain.setValueAtTime(0.1, t);
     crackGain.gain.exponentialRampToValueAtTime(0.001, t + crackDur);
-    crackSrc.connect(crackFilt).connect(crackGain).connect(ctx.destination);
+    crackSrc.connect(crackFilt).connect(crackGain).connect(this.sfxOut());
     crackSrc.start(t);
 
     // Layer 2: deep sub-bass thump (the "thoom" of the meteor)
@@ -312,7 +427,7 @@ export class SoundManager {
     sub.frequency.exponentialRampToValueAtTime(28, t + 0.4);
     subGain.gain.setValueAtTime(0.18, t);
     subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-    sub.connect(subGain).connect(ctx.destination);
+    sub.connect(subGain).connect(this.sfxOut());
     sub.start(t);
     sub.stop(t + 0.5);
 
@@ -334,8 +449,15 @@ export class SoundManager {
     const tailGain = ctx.createGain();
     tailGain.gain.setValueAtTime(0.15, t + 0.05);
     tailGain.gain.exponentialRampToValueAtTime(0.001, t + tailDur);
-    tailSrc.connect(tailFilt).connect(tailGain).connect(ctx.destination);
+    tailSrc.connect(tailFilt).connect(tailGain).connect(this.sfxOut());
     tailSrc.start(t);
+    // Space-echo send: the rumble tail feeds the shared feedback delay so the
+    // explosion decays into a cavernous repeat instead of stopping dry.
+    if (this.echoSend) {
+      const tap = ctx.createGain();
+      tap.gain.value = 0.35;
+      tailGain.connect(tap).connect(this.echoSend);
+    }
   }
 
   private playChime() {
@@ -349,7 +471,7 @@ export class SoundManager {
       osc.frequency.setValueAtTime(f, t);
       gain.gain.setValueAtTime(0.07, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.sfxOut());
       osc.start(t);
       osc.stop(t + 0.4);
     }
@@ -358,6 +480,7 @@ export class SoundManager {
   private playCrash() {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
+    this.duckMusic(0.25, 0.15);
     const buf = ctx.createBuffer(1, ctx.sampleRate * 1.0, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) {
@@ -372,8 +495,14 @@ export class SoundManager {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.22, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 1);
-    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.connect(filt).connect(gain).connect(this.sfxOut());
     src.start(t);
+    // Ship death gets the biggest echo tail of all.
+    if (this.echoSend) {
+      const tap = ctx.createGain();
+      tap.gain.value = 0.5;
+      gain.connect(tap).connect(this.echoSend);
+    }
   }
 
   // Rising sweep — shield activating
@@ -387,7 +516,7 @@ export class SoundManager {
     osc.frequency.exponentialRampToValueAtTime(880, t + 0.35);
     gain.gain.setValueAtTime(0.06, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.sfxOut());
     osc.start(t);
     osc.stop(t + 0.42);
   }
@@ -403,7 +532,7 @@ export class SoundManager {
     osc.frequency.exponentialRampToValueAtTime(180, t + 0.35);
     gain.gain.setValueAtTime(0.05, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.sfxOut());
     osc.start(t);
     osc.stop(t + 0.42);
   }
@@ -428,7 +557,7 @@ export class SoundManager {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.16, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.connect(filt).connect(gain).connect(this.sfxOut());
     src.start(t);
   }
 
@@ -463,7 +592,7 @@ export class SoundManager {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.22, t + 0.12);
-    src.connect(filt).connect(gain).connect(ctx.destination);
+    src.connect(filt).connect(gain).connect(this.sfxOut());
     src.start(t);
     lfo.start(t);
     this.warpLoop = { src, gain, lfo, lfoGain };
@@ -603,6 +732,21 @@ export class SoundManager {
     },
   ];
 
+  // Shared soft-clip curve for the bass drive (built once, reused per note).
+  private static driveCurveCache: Float32Array<ArrayBuffer> | null = null;
+  private static driveCurve(): Float32Array<ArrayBuffer> {
+    if (!SoundManager.driveCurveCache) {
+      const n = 256;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * 2 - 1;
+        curve[i] = Math.tanh(x * 1.8);
+      }
+      SoundManager.driveCurveCache = curve;
+    }
+    return SoundManager.driveCurveCache;
+  }
+
   // Drone pad node — a sustained low hum under the music
   private dronePad: {
     osc1: OscillatorNode;
@@ -612,6 +756,7 @@ export class SoundManager {
   } | null = null;
 
   startGameplayMusic() {
+    this.desiredTrack = "gameplay";
     if (!this.musicEnabled) return;
     this.startMusicLoop("gameplay", {
       bpm: 128,
@@ -624,6 +769,7 @@ export class SoundManager {
   }
 
   startLeaderboardMusic() {
+    this.desiredTrack = "leaderboard";
     if (!this.musicEnabled) return;
     this.startMusicLoop("leaderboard", {
       bpm: 92,
@@ -692,10 +838,10 @@ export class SoundManager {
   }
 
   // Space texture one-shots triggered periodically inside the sequencer.
-  private playScannerPing(dest: AudioNode) {
+  private playScannerPing(dest: AudioNode, at?: number) {
     if (!this.ctx) return;
     const ctx = this.ctx;
-    const t = ctx.currentTime;
+    const t = at ?? ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
@@ -708,10 +854,10 @@ export class SoundManager {
     osc.stop(t + 0.18);
   }
 
-  private playRadioCrackle(dest: AudioNode) {
+  private playRadioCrackle(dest: AudioNode, at?: number) {
     if (!this.ctx) return;
     const ctx = this.ctx;
-    const t = ctx.currentTime;
+    const t = at ?? ctx.currentTime;
     const dur = 0.18;
     const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
     const data = buf.getChannelData(0);
@@ -733,10 +879,10 @@ export class SoundManager {
   // Star whoosh — high-to-mid falling saw glide through a bandpass. The
   // sound of a star flying past the cockpit. Used mid-section to reinforce
   // the "fast travel" sensation without stepping on the musical groove.
-  private playStarWhoosh(dest: AudioNode) {
+  private playStarWhoosh(dest: AudioNode, at?: number) {
     if (!this.ctx) return;
     const ctx = this.ctx;
-    const t = ctx.currentTime;
+    const t = at ?? ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const filt = ctx.createBiquadFilter();
@@ -755,10 +901,10 @@ export class SoundManager {
     osc.stop(t + 0.48);
   }
 
-  private playDeepRumble(dest: AudioNode) {
+  private playDeepRumble(dest: AudioNode, at?: number) {
     if (!this.ctx) return;
     const ctx = this.ctx;
-    const t = ctx.currentTime;
+    const t = at ?? ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
@@ -787,21 +933,24 @@ export class SoundManager {
     this.ensure();
     if (!this.ctx) return;
     if (this.music?.track === track) return;
-    this.stopMusic(0.6);
+    this.stopMusicNodes(0.6);
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0, t);
     masterGain.gain.linearRampToValueAtTime(cfg.masterTarget, t + 0.8);
-    masterGain.connect(ctx.destination);
+    // Music routes through the duck bus so explosions can pump it.
+    masterGain.connect(this.duckBus ?? ctx.destination);
     // Drone pad underneath — a sustained low hum giving "spaceship interior"
     this.startDronePad(masterGain);
     const beatMs = 60000 / cfg.bpm / 2; // 8th notes
     let step = 0;
     let sectionIdx = 0;
-    const fire = () => {
+    // Look-ahead scheduling: notes are placed on an audio-clock cursor up to
+    // LOOKAHEAD_SEC ahead, so timer jitter (GC, React re-renders, spawn
+    // bursts) and hidden-tab setInterval throttling can't stumble the beat.
+    const scheduleStep = (now: number) => {
       if (!this.ctx || !this.music || this.music.track !== track) return;
-      const now = this.ctx.currentTime;
       const sec = cfg.sections[sectionIdx % cfg.sections.length];
       if (!sec) return;
       const sectionStep = step % cfg.stepsPerSection;
@@ -862,7 +1011,7 @@ export class SoundManager {
       // two arp notes per 8th-step, each a short filtered saw pluck.
       if (cfg.arp) {
         const arpLen = sec.arp.length;
-        const playArp = (freq: number, at: number) => {
+        const playArp = (freq: number, at: number, level: number) => {
           if (freq <= 0 || !this.ctx) return;
           const o = this.ctx.createOscillator();
           const g = this.ctx.createGain();
@@ -873,7 +1022,7 @@ export class SoundManager {
           f.Q.value = 3;
           f.frequency.setValueAtTime(freq * 6, at);
           f.frequency.exponentialRampToValueAtTime(Math.max(freq * 2, 500), at + dur * 0.4);
-          g.gain.setValueAtTime(0.13, at);
+          g.gain.setValueAtTime(level, at);
           g.gain.exponentialRampToValueAtTime(0.001, at + dur * 0.5);
           o.connect(f).connect(g).connect(masterGain);
           o.start(at);
@@ -881,8 +1030,14 @@ export class SoundManager {
         };
         const a1 = sec.arp[(step * 2) % arpLen] ?? 0;
         const a2 = sec.arp[(step * 2 + 1) % arpLen] ?? 0;
-        playArp(a1, now);
-        playArp(a2, now + dur * 0.5);
+        // Humanize: accent the downbeat, soften off-beats, swing the second
+        // 16th slightly late, and jump the last off-beat of a bar up an
+        // octave — turns the dead-straight arpeggiator into a groove.
+        const accent = step % 4 === 0 ? 0.16 : 0.12;
+        const swing = dur * 0.06;
+        const octaveJump = step % 8 === 7 ? 2 : 1;
+        playArp(a1, now, accent);
+        playArp(a2 * octaveJump, now + dur * 0.5 + swing, 0.09);
       }
       // Drums — kick every quarter (4-on-the-floor), snare on backbeat, closed hat every 8th
       if (cfg.drums) {
@@ -945,8 +1100,16 @@ export class SoundManager {
       if (step % 2 === 0 && bassF > 0) {
         const bassFilt = this.ctx.createBiquadFilter();
         bassFilt.type = "lowpass";
-        bassFilt.frequency.value = Math.min(bassF * 10, 900);
+        // Filter envelope: open fast with the hit, close into the tail — the
+        // low end "breathes" per note instead of sitting static.
+        bassFilt.frequency.setValueAtTime(Math.max(bassF * 3, 120), now);
+        bassFilt.frequency.exponentialRampToValueAtTime(Math.min(bassF * 11, 950), now + 0.09);
+        bassFilt.frequency.exponentialRampToValueAtTime(Math.max(bassF * 4, 150), now + dur * 1.5);
         bassFilt.Q.value = 2;
+        // Soft tanh drive ahead of the filter for analog-style grit.
+        const drive = this.ctx.createWaveShaper();
+        drive.curve = SoundManager.driveCurve();
+        drive.connect(bassFilt);
         const bassGain = this.ctx.createGain();
         bassGain.gain.setValueAtTime(0.12, now);
         bassGain.gain.linearRampToValueAtTime(0.5, now + 0.08);
@@ -956,7 +1119,7 @@ export class SoundManager {
           const bo = this.ctx.createOscillator();
           bo.type = "sawtooth";
           bo.frequency.value = bassF * d;
-          bo.connect(bassFilt);
+          bo.connect(drive);
           bo.start(now);
           bo.stop(now + dur * 1.8);
         }
@@ -974,31 +1137,55 @@ export class SoundManager {
       // ---- Space texture events (periodic) ----
       // Scanner ping every ~4s (every section start)
       if (step > 0 && step % cfg.stepsPerSection === 0) {
-        this.playScannerPing(masterGain);
+        this.playScannerPing(masterGain, now);
       }
       // Star whoosh mid-section — "flying past stars" reinforcement
       if (step > 0 && step % cfg.stepsPerSection === Math.floor(cfg.stepsPerSection / 2)) {
-        this.playStarWhoosh(masterGain);
+        this.playStarWhoosh(masterGain, now);
       }
       // Radio crackle burst every ~8s
       if (step > 0 && step % (cfg.stepsPerSection * 2) === 8) {
-        this.playRadioCrackle(masterGain);
+        this.playRadioCrackle(masterGain, now);
       }
       // Deep-space rumble every ~16s
       if (step > 0 && step % (cfg.stepsPerSection * 4) === 0) {
-        this.playDeepRumble(masterGain);
+        this.playDeepRumble(masterGain, now);
       }
       step++;
       // Advance section every N steps so the progression evolves
       if (step % cfg.stepsPerSection === 0) sectionIdx++;
     };
-    const interval = setInterval(fire, beatMs);
+    const stepSec = beatMs / 1000;
+    const LOOKAHEAD_SEC = 0.18;
+    let nextStepAt = ctx.currentTime + 0.05;
+    const tick = () => {
+      if (!this.ctx || !this.music || this.music.track !== track) return;
+      const horizon = this.ctx.currentTime + LOOKAHEAD_SEC;
+      // Catch-up guard: after a long throttled gap (hidden tab), jump the
+      // cursor forward instead of machine-gunning every missed step at once.
+      if (nextStepAt < this.ctx.currentTime - stepSec) {
+        nextStepAt = this.ctx.currentTime + 0.02;
+      }
+      while (nextStepAt < horizon) {
+        scheduleStep(nextStepAt);
+        nextStepAt += stepSec;
+      }
+    };
+    const interval = setInterval(tick, 30);
     this.music = { track, masterGain, interval, step: 0 };
-    fire();
+    tick();
   }
 
   // Crossfade the current music out over `fadeSec` seconds (default 0.5).
+  // Also clears the "should be playing" intent — use stopMusicNodes when the
+  // intent must survive (music/sound toggles) so re-enabling resumes.
   stopMusic(fadeSec = 0.5) {
+    this.desiredTrack = null;
+    this.stopMusicNodes(fadeSec);
+  }
+
+  // Tear down the playing nodes without forgetting which track should play.
+  private stopMusicNodes(fadeSec = 0.5) {
     this.stopDronePad();
     if (!this.music || !this.ctx) {
       this.music = null;
@@ -1040,7 +1227,7 @@ export class SoundManager {
       const start = t + i * 0.18;
       gain.gain.setValueAtTime(0.12, start);
       gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.sfxOut());
       osc.start(start);
       osc.stop(start + 0.35);
     });
@@ -1056,6 +1243,10 @@ export class SoundManager {
       }
       this.ctx = null;
     }
+    this.masterBus = null;
+    this.sfxBus = null;
+    this.duckBus = null;
+    this.echoSend = null;
     this.enabled = false;
   }
 }
