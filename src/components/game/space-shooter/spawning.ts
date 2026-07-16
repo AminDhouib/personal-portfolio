@@ -296,6 +296,9 @@ export function fireBullets(g: GameRefs, now: number, sounds: SoundManager) {
   } else {
     make(0, 0);
   }
+  // Muzzle flash at the ship nose: tiny, bullet-colored, very short-lived.
+  // spawnExplosion drops most of these under reduced-motion (duration < 400ms).
+  spawnExplosion(g, g.shipX, g.shipY + 0.05, 1.4, color, 120, 0.12);
   g.lastBullet = now;
   sounds.play("laser");
 }
@@ -341,6 +344,7 @@ export function spawnScorePopup(g: GameRefs, x: number, y: number, z: number, am
 // tips and a cyan cockpit shard. Each gets the ship's death impulse plus a
 // random kick so they fan out instead of moving in formation.
 export function spawnShipDebris(g: GameRefs) {
+  g.shakeTrauma = 1;
   const baseVx = g.deathVelX;
   const baseVy = g.deathVelY;
   const baseVz = g.deathVelZ;

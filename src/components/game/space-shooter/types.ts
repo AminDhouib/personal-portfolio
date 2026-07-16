@@ -409,6 +409,9 @@ export interface GameRefs {
   // Which staged death-sequence burst has fired (0 = none). Stage flags, not
   // wall-clock windows, so a hitched frame can't skip a burst.
   deathFxStage: number;
+  // Screen-shake trauma 0..1: bumped by impacts, decays in runTick, applied
+  // (squared) as a camera offset by CameraRig. Ignored under reduced motion.
+  shakeTrauma: number;
   shipFallSpeed: number;
   cameraTargetX: number;
   cameraTargetY: number;

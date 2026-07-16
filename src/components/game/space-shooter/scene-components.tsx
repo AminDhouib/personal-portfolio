@@ -29,21 +29,44 @@ function applyCameraLerp(
   camera.lookAt(lookX, lookY, 0);
 }
 
-// Deterministic star spread (no Math.random during render)
-function buildStarPoints(): Float32Array {
-  const COUNT = 2400;
-  const pts = new Float32Array(COUNT * 3);
+// Deterministic star spread (no Math.random during render). Parameterized by
+// count and a seed so the starfield can be built as several independent shells.
+function buildStarPoints(count: number, seed: number): Float32Array {
+  const pts = new Float32Array(count * 3);
   const phi = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < COUNT; i++) {
-    const r = 30 + ((i * 31) % 70);
-    const y = 1 - (i / (COUNT - 1)) * 2;
+  for (let i = 0; i < count; i++) {
+    const r = 30 + ((i * 31 + seed * 53) % 70);
+    const y = 1 - (i / (count - 1)) * 2;
     const radius = Math.sqrt(1 - y * y);
-    const theta = phi * i;
+    const theta = phi * i + seed * 1.7;
     pts[i * 3 + 0] = r * radius * Math.cos(theta);
     pts[i * 3 + 1] = r * y;
     pts[i * 3 + 2] = r * radius * Math.sin(theta);
   }
   return pts;
+}
+
+// Module-level cached radial glow texture — one soft white-to-transparent
+// gradient reused by every additive halo sprite. Built lazily so this module
+// never touches `document` at import time (SSR-safe).
+let GLOW_TEXTURE: THREE.CanvasTexture | null = null;
+function glowTexture(): THREE.CanvasTexture {
+  if (GLOW_TEXTURE) return GLOW_TEXTURE;
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext("2d")!;
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.35, "rgba(255,255,255,0.55)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  GLOW_TEXTURE = tex;
+  return tex;
 }
 
 // ---------- 3D components ----------
@@ -72,6 +95,9 @@ export function Ship({
   const tintColor = useMemo(() => new THREE.Color("#60a5fa"), []);
   const wingColor = useMemo(() => new THREE.Color("#60a5fa"), []);
   const engineColor = useMemo(() => new THREE.Color("#22d3ee"), []);
+  const glowTex = useMemo(() => glowTexture(), []);
+  const lastHullHex = useRef("");
+  const lastEngineHex = useRef("");
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -82,7 +108,10 @@ export function Ship({
     // Apply equipped-hull tint to ALL hull parts (fuselage + wings +
     // nacelles). A slightly darker variant goes on the wing box so the
     // silhouette still reads as layered even with a solid cosmetic color.
-    tintColor.set(g.shipHullTint);
+    if (g.shipHullTint !== lastHullHex.current) {
+      lastHullHex.current = g.shipHullTint;
+      tintColor.set(g.shipHullTint);
+    }
     if (fuselageRef.current) {
       (fuselageRef.current.material as THREE.MeshToonMaterial).color.copy(tintColor);
     }
@@ -97,7 +126,10 @@ export function Ship({
       (nacelleRRef.current.material as THREE.MeshToonMaterial).color.copy(tintColor);
     }
     // Engine tint — apply cosmetic engine color to the trail, aura, and core
-    engineColor.set(g.shipEngineTint);
+    if (g.shipEngineTint !== lastEngineHex.current) {
+      lastEngineHex.current = g.shipEngineTint;
+      engineColor.set(g.shipEngineTint);
+    }
     if (engineRef.current) {
       (engineRef.current.material as THREE.MeshBasicMaterial).color.copy(engineColor);
     }
@@ -367,6 +399,16 @@ export function Ship({
         <sphereGeometry args={[0.13, 12, 10]} />
         <meshBasicMaterial color={env.starColor} transparent opacity={0.75} />
       </mesh>
+      <sprite position={[0, 0, 0.55]} scale={0.5}>
+        <spriteMaterial
+          map={glowTex}
+          color={env.starColor}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          transparent
+          opacity={0.6}
+        />
+      </sprite>
       {/* Bright inner core that pulses */}
       <mesh ref={engineCoreRef} position={[0, 0, 0.55]}>
         <sphereGeometry args={[0.07, 8, 6]} />
@@ -375,7 +417,14 @@ export function Ship({
       {/* Long stretched plume — extra long during warp */}
       <mesh ref={engineTrailRef} position={[0, 0, 0.85]} rotation={[Math.PI / 2, 0, 0]}>
         <coneGeometry args={[0.12, 0.7, 8, 1, true]} />
-        <meshBasicMaterial color="#22d3ee" transparent opacity={0.5} side={THREE.DoubleSide} />
+        <meshBasicMaterial
+          color="#22d3ee"
+          transparent
+          opacity={0.5}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
       </mesh>
       {/* Warp aura — only visible when warp power-up is active */}
       <mesh ref={warpAuraRef} visible={false}>
@@ -595,7 +644,13 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
           const h = b.size * 5;
           return (
             <sprite key={b.id} ref={setRef} scale={[w, h, 1]}>
-              <spriteMaterial color={b.color} transparent opacity={0.95} />
+              <spriteMaterial
+                color={b.color}
+                transparent
+                opacity={0.95}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
             </sprite>
           );
         }
@@ -606,7 +661,13 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
                 <meshBasicMaterial color={b.color} toneMapped={false} />
               </mesh>
               <mesh geometry={sphGeo} scale={b.size * 3}>
-                <meshBasicMaterial color={b.color} transparent opacity={0.35} />
+                <meshBasicMaterial
+                  color={b.color}
+                  transparent
+                  opacity={0.35}
+                  blending={THREE.AdditiveBlending}
+                  depthWrite={false}
+                />
               </mesh>
               <mesh geometry={ringGeo} scale={b.size * 4} rotation={[Math.PI / 2, 0, 0]}>
                 <meshBasicMaterial
@@ -614,6 +675,8 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
                   transparent
                   opacity={0.5}
                   side={THREE.DoubleSide}
+                  blending={THREE.AdditiveBlending}
+                  depthWrite={false}
                 />
               </mesh>
             </group>
@@ -625,7 +688,13 @@ export function Bullets({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs
               <meshBasicMaterial color={b.color} toneMapped={false} />
             </mesh>
             <mesh geometry={sphGeo} scale={b.size * 2.4}>
-              <meshBasicMaterial color={b.color} transparent opacity={0.4} />
+              <meshBasicMaterial
+                color={b.color}
+                transparent
+                opacity={0.4}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
             </mesh>
           </group>
         );
@@ -652,6 +721,7 @@ export function PowerUps({
   const octaGeo = useMemo(() => new THREE.OctahedronGeometry(1, 0), []);
   const torusKnotGeo = useMemo(() => new THREE.TorusKnotGeometry(0.6, 0.18, 32, 6), []);
   const coneGeo = useMemo(() => new THREE.ConeGeometry(0.5, 1, 6), []);
+  const glowTex = useMemo(() => glowTexture(), []);
   const refs = useRef<Map<number, THREE.Group>>(new Map());
   useEffect(
     () => () => {
@@ -800,7 +870,16 @@ export function PowerUps({
                 </mesh>
               </>
             )}
-            <pointLight color={def.color} intensity={0.8} distance={3.5} />
+            <sprite scale={1.4}>
+              <spriteMaterial
+                map={glowTex}
+                color={def.color}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                transparent
+                opacity={0.5}
+              />
+            </sprite>
           </group>
         );
       })}
@@ -1277,6 +1356,7 @@ export function BossProjectiles({
 export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>; tick: number }) {
   const list = gameRefs.current?.coins ?? [];
   const geo = useMemo(() => new THREE.SphereGeometry(0.18, 12, 10), []);
+  const glowTex = useMemo(() => glowTexture(), []);
   useEffect(() => () => geo.dispose(), [geo]);
   const refs = useRef<Map<number, THREE.Group>>(new Map());
 
@@ -1305,7 +1385,16 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
           <mesh geometry={geo} scale={1.2}>
             <meshToonMaterial color="#fde047" emissive="#ca8a04" emissiveIntensity={0.6} />
           </mesh>
-          <pointLight color="#fde047" intensity={0.4} distance={1.5} />
+          <sprite scale={0.9}>
+            <spriteMaterial
+              map={glowTex}
+              color="#fde047"
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+              transparent
+              opacity={0.5}
+            />
+          </sprite>
         </group>
       ))}
       <group visible={false}>
@@ -1326,19 +1415,34 @@ export function Explosions({
   tick: number;
 }) {
   const explosions = gameRefs.current?.explosions ?? [];
-  const sphGeo = useMemo(() => new THREE.SphereGeometry(0.5, 12, 10), []);
-  useEffect(() => () => sphGeo.dispose(), [sphGeo]);
+  const ringGeo = useMemo(() => new THREE.RingGeometry(0.45, 0.6, 24), []);
+  const glowTex = useMemo(() => glowTexture(), []);
+  useEffect(() => () => ringGeo.dispose(), [ringGeo]);
 
-  const refs = useRef<Map<number, THREE.Mesh>>(new Map());
+  const groupRefs = useRef<Map<number, THREE.Group>>(new Map());
+  const coreRefs = useRef<Map<number, THREE.Sprite>>(new Map());
+  const ringRefs = useRef<Map<number, THREE.Mesh>>(new Map());
+  const flashRefs = useRef<Map<number, THREE.Sprite>>(new Map());
   useFrame(() => {
     const g = gameRefs.current;
     if (!g) return;
     for (const e of g.explosions) {
-      const m = refs.current.get(e.id);
-      if (m) {
-        m.position.set(e.x, e.y, e.z);
-        m.scale.setScalar(e.scale);
-        (m.material as THREE.MeshBasicMaterial).opacity = e.opacity;
+      const grp = groupRefs.current.get(e.id);
+      if (grp) grp.position.set(e.x, e.y, e.z);
+      const core = coreRefs.current.get(e.id);
+      if (core) {
+        core.scale.setScalar(e.scale * 1.5);
+        (core.material as THREE.SpriteMaterial).opacity = e.opacity;
+      }
+      const ring = ringRefs.current.get(e.id);
+      if (ring) {
+        ring.scale.setScalar(e.scale * 1.6);
+        (ring.material as THREE.MeshBasicMaterial).opacity = e.opacity * e.opacity * 0.7;
+      }
+      const flash = flashRefs.current.get(e.id);
+      if (flash) {
+        flash.scale.setScalar(e.scale * 2);
+        (flash.material as THREE.SpriteMaterial).opacity = Math.max(0, (e.opacity - 0.7) / 0.3);
       }
     }
   });
@@ -1346,16 +1450,62 @@ export function Explosions({
   return (
     <group>
       {explosions.map((e) => (
-        <mesh
+        <group
           key={e.id}
           ref={(el) => {
-            if (el) refs.current.set(e.id, el);
-            else refs.current.delete(e.id);
+            if (el) groupRefs.current.set(e.id, el);
+            else groupRefs.current.delete(e.id);
           }}
-          geometry={sphGeo}
         >
-          <meshBasicMaterial color={e.color} transparent opacity={e.opacity} toneMapped={false} />
-        </mesh>
+          <sprite
+            ref={(el) => {
+              if (el) coreRefs.current.set(e.id, el);
+              else coreRefs.current.delete(e.id);
+            }}
+          >
+            <spriteMaterial
+              map={glowTex}
+              color={e.color}
+              transparent
+              opacity={e.opacity}
+              toneMapped={false}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </sprite>
+          <mesh
+            ref={(el) => {
+              if (el) ringRefs.current.set(e.id, el);
+              else ringRefs.current.delete(e.id);
+            }}
+            geometry={ringGeo}
+          >
+            <meshBasicMaterial
+              color={e.color}
+              transparent
+              opacity={e.opacity * e.opacity * 0.7}
+              side={THREE.DoubleSide}
+              toneMapped={false}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+          <sprite
+            ref={(el) => {
+              if (el) flashRefs.current.set(e.id, el);
+              else flashRefs.current.delete(e.id);
+            }}
+          >
+            <spriteMaterial
+              map={glowTex}
+              color={e.color}
+              transparent
+              opacity={0}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </sprite>
+        </group>
       ))}
       <group visible={false}>
         <mesh>
@@ -1563,23 +1713,57 @@ export function SpeedLines({
 }
 
 function Starfield({ env }: { env: Environment }) {
-  const points = useMemo(() => buildStarPoints(), []);
-  const geo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(points, 3));
-    return g;
-  }, [points]);
-  useEffect(() => () => geo.dispose(), [geo]);
+  const near = useRef<THREE.Points>(null);
+  const mid = useRef<THREE.Points>(null);
+  const far = useRef<THREE.Points>(null);
+  const geos = useMemo(() => {
+    const specs = [
+      { count: 900, seed: 0 },
+      { count: 850, seed: 1 },
+      { count: 800, seed: 2 },
+    ];
+    return specs.map(({ count, seed }) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(buildStarPoints(count, seed), 3));
+      return g;
+    });
+  }, []);
+  useEffect(() => () => geos.forEach((g) => g.dispose()), [geos]);
+  useFrame((_, dt) => {
+    if (near.current) near.current.rotation.z += dt * 0.006;
+    if (mid.current) mid.current.rotation.z -= dt * 0.004;
+    if (far.current) far.current.rotation.z += dt * 0.002;
+  });
   return (
-    <points geometry={geo}>
-      <pointsMaterial
-        color={env.starColor}
-        size={0.18}
-        sizeAttenuation
-        transparent
-        opacity={0.85}
-      />
-    </points>
+    <>
+      <points ref={far} geometry={geos[0]}>
+        <pointsMaterial
+          color={env.starColor}
+          size={0.12}
+          sizeAttenuation
+          transparent
+          opacity={0.5}
+        />
+      </points>
+      <points ref={mid} geometry={geos[1]}>
+        <pointsMaterial
+          color={env.starColor}
+          size={0.18}
+          sizeAttenuation
+          transparent
+          opacity={0.7}
+        />
+      </points>
+      <points ref={near} geometry={geos[2]}>
+        <pointsMaterial
+          color={env.starColor}
+          size={0.26}
+          sizeAttenuation
+          transparent
+          opacity={0.9}
+        />
+      </points>
+    </>
   );
 }
 
@@ -1588,14 +1772,15 @@ function CameraRig({ gameRefs }: { gameRefs: React.RefObject<GameRefs> }) {
   useFrame(() => {
     const g = gameRefs.current;
     if (!g) return;
-    applyCameraLerp(
-      camera,
-      g.cameraTargetX,
-      g.cameraTargetY,
-      g.cameraTargetZ,
-      g.shipX * 0.4,
-      g.shipY * 0.4,
-    );
+    let tx = g.cameraTargetX;
+    let ty = g.cameraTargetY;
+    const t = g.shakeTrauma;
+    if (t > 0 && !g.prefs.reducedMotion) {
+      const s = t * t * 0.25;
+      tx += (Math.random() - 0.5) * 2 * s;
+      ty += (Math.random() - 0.5) * 2 * s;
+    }
+    applyCameraLerp(camera, tx, ty, g.cameraTargetZ, g.shipX * 0.4, g.shipY * 0.4);
   });
   return null;
 }

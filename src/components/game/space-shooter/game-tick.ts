@@ -92,6 +92,9 @@ export function runTick(
   g.now = now;
   const step = Math.min(dt, 0.05);
 
+  // Screen-shake trauma decays every frame; impacts below bump it.
+  if (g.shakeTrauma > 0) g.shakeTrauma = Math.max(0, g.shakeTrauma - step * 2.2);
+
   // Sync world arena dimensions to the visible viewport but cap at the
   // configured maximums so ultrawide canvases don't grant extra play space.
   // On portrait/touch, switch to a taller-but-narrower mobile arena.
@@ -211,7 +214,12 @@ export function runTick(
       d.rz += d.rsz * step;
       if (now - d.spawnedAt > d.ttl) g.debris.splice(i, 1);
     }
-    onUiSync();
+    // Throttle like the live-HUD path: an unthrottled sync here re-rendered
+    // the whole React tree at 60Hz for the entire death sequence.
+    if (now - g.lastUiSync > 100) {
+      g.lastUiSync = now;
+      onUiSync();
+    }
     return;
   }
 
@@ -387,6 +395,7 @@ export function runTick(
         b.phase = "defeated";
         b.phaseStartAt = now;
         g.bossesDefeatedThisRun += 1;
+        g.shakeTrauma = 1;
         // Score bonus + guaranteed power-up drop
         const bonus = 500 * b.tier;
         g.score += bonus;
@@ -760,6 +769,7 @@ export function runTick(
           if (b.hp <= 0) g.bullets.splice(j, 1);
           if (o.hp <= 0) {
             spawnExplosion(g, o.x, o.y, o.z, "#fb923c", 600, 0.35);
+            g.shakeTrauma = Math.min(1, g.shakeTrauma + 0.12 + o.size * 0.08);
             g.obstacles.splice(i, 1);
             const basePoints = 12 + Math.floor(o.size * 8);
             g.combo = Math.min(g.combo + 1, 99);

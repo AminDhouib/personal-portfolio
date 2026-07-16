@@ -819,6 +819,7 @@ export function SpaceShooterGame() {
     g.pausedAt = 0;
     g.dyingAt = 0;
     g.deathFxStage = 0;
+    g.shakeTrauma = 0;
     g.shipFallSpeed = 0;
     g.deathVelX = 0;
     g.deathVelY = 0;

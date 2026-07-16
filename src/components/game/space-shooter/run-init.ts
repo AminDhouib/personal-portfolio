@@ -114,6 +114,7 @@ export function createRefs(): GameRefs {
     pausedAt: 0,
     dyingAt: 0,
     deathFxStage: 0,
+    shakeTrauma: 0,
     shipFallSpeed: 0,
     deathVelX: 0,
     deathVelY: 0,
@@ -134,6 +135,7 @@ export function startRun(g: GameRefs): boolean {
   g.startedAt = now;
   g.pausedAt = 0;
   g.deathFxStage = 0;
+  g.shakeTrauma = 0;
   g.invulnUntil = now + START_INVULN_MS;
   g.lastSpawn = now;
   g.lastPowerUpSpawn = now;
