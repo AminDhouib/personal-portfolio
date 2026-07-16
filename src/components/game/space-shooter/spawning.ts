@@ -160,9 +160,14 @@ export function pickWallGapX(playerX: number, arenaW: number): number {
 // Spawn a wall: a line of asteroids across the full arena width at the same
 // Z with a single gap. Forces the player to move into the gap — breaks the
 // "camp at the edge and let auto-fire clear everything" exploit.
+const WALL_COUNT = 6; // 6 asteroid slots evenly spaced across ARENA_W
+const WALL_ROWS = 3; // 3 stacked rows so the gap is a full-height Y column
+// Pieces a wall adds (one slot per row is the gap). game-tick budgets walls
+// against MAX_OBSTACLES with this.
+export const WALL_PIECES = (WALL_COUNT - 1) * WALL_ROWS;
+
 export function spawnWall(g: GameRefs) {
-  const WALL_COUNT = 6; // 6 asteroid slots evenly spaced across ARENA_W
-  const ROWS = 3; // 3 stacked rows so the gap is a full-height Y column
+  const ROWS = WALL_ROWS;
   const gapX = pickWallGapX(g.shipX, ARENA_W);
   const slotWidth = ARENA_W / WALL_COUNT;
   const baseSpeed = 10 + difficulty(g) * 3;

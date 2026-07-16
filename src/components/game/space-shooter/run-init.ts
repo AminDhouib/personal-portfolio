@@ -111,7 +111,9 @@ export function createRefs(): GameRefs {
     nextId: 1,
     startedAt: 0,
     invulnUntil: 0,
+    pausedAt: 0,
     dyingAt: 0,
+    deathFxStage: 0,
     shipFallSpeed: 0,
     deathVelX: 0,
     deathVelY: 0,
@@ -130,6 +132,8 @@ export function startRun(g: GameRefs): boolean {
   const now = performance.now();
   g.status = "playing";
   g.startedAt = now;
+  g.pausedAt = 0;
+  g.deathFxStage = 0;
   g.invulnUntil = now + START_INVULN_MS;
   g.lastSpawn = now;
   g.lastPowerUpSpawn = now;
@@ -233,6 +237,70 @@ export function startRun(g: GameRefs): boolean {
     // silent-ok: best-effort consumable-inventory persistence via localStorage; a run should still start even if this fails
   }
 
+  sounds.startGameplayMusic();
+  return true;
+}
+
+// Shift every absolute performance.now()-based timestamp on the run state by
+// `delta` ms. Called on resume so a paused (or hidden-tab) span does not age
+// power-ups, spawn/fire timers, boss phases, or the survival clock — all of
+// them are stored as absolute clock values.
+export function shiftRunTimestamps(g: GameRefs, delta: number): void {
+  if (delta <= 0) return;
+  g.startedAt += delta;
+  g.invulnUntil += delta;
+  g.comboLastAt += delta;
+  g.lastBullet += delta;
+  g.lastSpawn += delta;
+  g.lastPowerUpSpawn += delta;
+  g.lastBossPulseAt += delta;
+  g.lastAfterimageAt += delta;
+  if (g.nextWallAt > 0) g.nextWallAt += delta;
+  if (g.normalSpawningPausedUntil > 0) g.normalSpawningPausedUntil += delta;
+  g.dash.lastLeftTapAt += delta;
+  g.dash.lastRightTapAt += delta;
+  g.dash.activeUntil += delta;
+  g.dash.cooldownUntil += delta;
+  g.dash.startedAt += delta;
+  for (const p of g.activePowerUps) p.expiresAt += delta;
+  for (const e of g.explosions) e.startedAt += delta;
+  for (const s of g.scorePopups) s.spawnedAt += delta;
+  for (const d of g.debris) d.spawnedAt += delta;
+  for (const a of g.dashAfterimages) a.createdAt += delta;
+  for (const p of g.bossProjectiles) p.spawnedAt += delta;
+  for (const o of g.obstacles) {
+    if (o.lastShotAt) o.lastShotAt += delta;
+  }
+  const b = g.boss;
+  if (b) {
+    b.phaseStartAt += delta;
+    b.encounterStartAt += delta;
+    b.lastShotAt += delta;
+    for (const s of b.subEntities) s.createdAt += delta;
+    if (b.tractorBeam) b.tractorBeam.startAt += delta;
+    if (b.wallSegments) {
+      for (const w of b.wallSegments) w.createdAt += delta;
+    }
+  }
+}
+
+// Pause a live run. Idempotent — only transitions `playing` -> `paused`.
+export function pauseRun(g: GameRefs): boolean {
+  if (g.status !== "playing") return false;
+  g.status = "paused";
+  g.pausedAt = performance.now();
+  sounds.stopMusic(0.3);
+  return true;
+}
+
+// Resume a paused run, shifting all run timestamps by the paused span so
+// nothing aged while the game stood still. Idempotent — `paused` -> `playing`.
+export function resumeRun(g: GameRefs): boolean {
+  if (g.status !== "paused") return false;
+  const now = performance.now();
+  if (g.pausedAt > 0) shiftRunTimestamps(g, now - g.pausedAt);
+  g.pausedAt = 0;
+  g.status = "playing";
   sounds.startGameplayMusic();
   return true;
 }

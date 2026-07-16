@@ -401,7 +401,14 @@ export interface GameRefs {
   nextId: number;
   startedAt: number;
   invulnUntil: number;
+  // performance.now() when the run was paused (0 while not paused). resumeRun
+  // shifts every absolute timestamp forward by the paused span so power-ups,
+  // spawn timers, and the survival clock do not age while paused.
+  pausedAt: number;
   dyingAt: number;
+  // Which staged death-sequence burst has fired (0 = none). Stage flags, not
+  // wall-clock windows, so a hitched frame can't skip a burst.
+  deathFxStage: number;
   shipFallSpeed: number;
   cameraTargetX: number;
   cameraTargetY: number;

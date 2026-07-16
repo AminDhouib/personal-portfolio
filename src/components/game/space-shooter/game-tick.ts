@@ -34,6 +34,7 @@ import {
   spawnScorePopup,
   spawnShipDebris,
   spawnPowerUp,
+  WALL_PIECES,
 } from "./spawning";
 import {
   runWardenBehavior,
@@ -45,7 +46,13 @@ import {
   runDrifterBehavior,
   runSentinelBehavior,
   spawnBoss,
+  bossScheduleEntry,
 } from "./boss-behaviors";
+
+// Homing boss projectiles re-aim toward the ship at a bounded angular rate so
+// a hard strafe can actually shake them; an unbounded re-aim (the old
+// behavior) was pure pursuit and undodgeable without a shield.
+const HOMING_TURN_RATE = 3; // radians/second
 
 // ---------- constants (duplicated from main file for module isolation) ----------
 const ARENA_W_DESKTOP = 9;
@@ -175,10 +182,14 @@ export function runTick(
       }
     }
 
-    if (elapsed > 0.6 && elapsed < 0.65) {
+    // Stage flags (not wall-clock windows) so a hitched frame can't step over
+    // a burst and skip it entirely.
+    if (elapsed > 0.6 && g.deathFxStage < 1) {
+      g.deathFxStage = 1;
       spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#fbbf24", 350, 0.25);
     }
-    if (elapsed > 1.4 && elapsed < 1.45) {
+    if (elapsed > 1.4 && g.deathFxStage < 2) {
+      g.deathFxStage = 2;
       spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 700, 0.6);
       spawnExplosion(g, g.shipX + 0.4, g.shipY + 0.2, g.shipZ, "#fbbf24", 600, 0.5);
       spawnExplosion(g, g.shipX - 0.3, g.shipY - 0.3, g.shipZ, "#f97316", 650, 0.5);
@@ -327,10 +338,12 @@ export function runTick(
   const distMultiplier = THREE.MathUtils.lerp(1, 6, wi);
   g.distance += step * (10 + difficulty(g) * 4) * distMultiplier;
 
-  // Boss scheduling check — only if no boss active
-  if (!g.boss && g.bossScheduleIdx < g.bossSchedule.length) {
-    const next = g.bossSchedule[g.bossScheduleIdx];
-    if (next && g.distance >= next.distance) {
+  // Boss scheduling check — only if no boss active. bossScheduleEntry keeps
+  // producing recycled encounters after the authored schedule runs out, so
+  // long runs never go boss-less.
+  if (!g.boss) {
+    const next = bossScheduleEntry(g.bossSchedule, g.bossScheduleIdx);
+    if (g.distance >= next.distance) {
       const recycleCount = Math.floor(g.bossScheduleIdx / 8);
       spawnBoss(g, next.bossId, recycleCount);
       g.bossScheduleIdx += 1;
@@ -400,10 +413,42 @@ export function runTick(
       const dy0 = g.shipY - p.position[1];
       const dz0 = g.shipZ - p.position[2];
       const len = Math.hypot(dx0, dy0, dz0) || 1;
-      const sp = Math.hypot(p.velocity[0], p.velocity[1], p.velocity[2]);
-      p.velocity[0] = (dx0 / len) * sp;
-      p.velocity[1] = (dy0 / len) * sp;
-      p.velocity[2] = (dz0 / len) * sp;
+      const sp = Math.hypot(p.velocity[0], p.velocity[1], p.velocity[2]) || 1;
+      // Rotate the current heading toward the ship by at most
+      // HOMING_TURN_RATE * step, preserving speed.
+      const cx = p.velocity[0] / sp;
+      const cy = p.velocity[1] / sp;
+      const cz = p.velocity[2] / sp;
+      const tx = dx0 / len;
+      const ty = dy0 / len;
+      const tz = dz0 / len;
+      const dot = Math.min(1, Math.max(-1, cx * tx + cy * ty + cz * tz));
+      const angle = Math.acos(dot);
+      const maxTurn = HOMING_TURN_RATE * step;
+      let nx = tx;
+      let ny = ty;
+      let nz = tz;
+      if (angle > maxTurn) {
+        const t = maxTurn / angle;
+        nx = cx + (tx - cx) * t;
+        ny = cy + (ty - cy) * t;
+        nz = cz + (tz - cz) * t;
+        const nl = Math.hypot(nx, ny, nz);
+        if (nl > 1e-4) {
+          nx /= nl;
+          ny /= nl;
+          nz /= nl;
+        } else {
+          // Target is directly behind — keep the current heading this frame;
+          // the next frames break the symmetry as geometry changes.
+          nx = cx;
+          ny = cy;
+          nz = cz;
+        }
+      }
+      p.velocity[0] = nx * sp;
+      p.velocity[1] = ny * sp;
+      p.velocity[2] = nz * sp;
     }
     p.position[0] += p.velocity[0] * step;
     p.position[1] += p.velocity[1] * step;
@@ -416,8 +461,10 @@ export function runTick(
     if (now > g.invulnUntil && !shieldedShip && dx * dx + dy * dy + dz * dz < hitDist * hitDist) {
       g.status = "dying";
       g.dyingAt = now;
-      g.deathVelX = (dx / (Math.hypot(dx, dy) || 1)) * 7;
-      g.deathVelY = (dy / (Math.hypot(dx, dy) || 1)) * 7 + 3.5;
+      // dx/dy point from the ship TOWARD the projectile — negate so the
+      // wreck is knocked away from the impact, matching every other death path.
+      g.deathVelX = (-dx / (Math.hypot(dx, dy) || 1)) * 7;
+      g.deathVelY = (-dy / (Math.hypot(dx, dy) || 1)) * 7 + 3.5;
       g.deathVelZ = 2.5;
       g.deathAngVel = (Math.random() - 0.5) * 10;
       spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#ef4444", 500, 0.45);
@@ -457,8 +504,15 @@ export function runTick(
   // to a specific gap position. Only while playing (not during warp) so the
   // wall has time to arrive under normal physics before warp trivializes it.
   if (g.status === "playing" && wi < 0.1 && g.nextWallAt > 0 && now >= g.nextWallAt) {
-    spawnWall(g);
-    g.nextWallAt = nextWallTimeMs(now);
+    if (g.obstacles.length + WALL_PIECES <= MAX_OBSTACLES) {
+      spawnWall(g);
+      g.nextWallAt = nextWallTimeMs(now);
+    } else {
+      // Wall is due but would blow past the obstacle budget. Hold normal
+      // spawning so the field drains, and retry on a later tick — the cap
+      // stays a real ceiling without skipping the wall event.
+      g.normalSpawningPausedUntil = Math.max(g.normalSpawningPausedUntil, now + 300);
+    }
   }
 
   // Spawn power-ups
@@ -582,9 +636,19 @@ export function runTick(
       }
       if (beamOn) {
         const dx = g.shipX - o.x;
+        const dy = g.shipY - o.y;
         const dz = g.shipZ - o.z;
         const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-        if (Math.abs(dx) < 0.6 && Math.abs(dz) < 2.5 && now > g.invulnUntil && !shieldedShip) {
+        // |dy| bound matches the rendered beam: a 6-unit column centered on
+        // the zapper (ZapperBeams boxGeometry). Without it the kill zone was
+        // an invisible full-height wall.
+        if (
+          Math.abs(dx) < 0.6 &&
+          Math.abs(dy) < 3 &&
+          Math.abs(dz) < 2.5 &&
+          now > g.invulnUntil &&
+          !shieldedShip
+        ) {
           if (g.reviveAvailable && !g.reviveUsed) {
             g.reviveAvailable = false;
             g.reviveUsed = true;

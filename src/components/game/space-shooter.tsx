@@ -71,7 +71,13 @@ import { useLeaderboard } from "@/hooks/use-leaderboard";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
 import { buildBossSchedule, BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
-import { pickNextBiomeDistance, createRefs, startRun } from "./space-shooter/run-init";
+import {
+  pickNextBiomeDistance,
+  createRefs,
+  startRun,
+  pauseRun,
+  resumeRun,
+} from "./space-shooter/run-init";
 import { Scene } from "./space-shooter/scene-components";
 
 // ---------- constants ----------
@@ -213,6 +219,10 @@ function createUiStateFromGame(g: GameRefs, now: number): UiState {
   if (g.startedAt > 0) {
     if (g.status === "dying" || g.status === "dead") {
       seconds = ((g.dyingAt || now) - g.startedAt) / 1000;
+    } else if (g.status === "paused" && g.pausedAt > 0) {
+      // Freeze the displayed clock at the pause instant; resumeRun shifts
+      // startedAt so the count picks up where it left off.
+      seconds = (g.pausedAt - g.startedAt) / 1000;
     } else {
       seconds = (now - g.startedAt) / 1000;
     }
@@ -223,7 +233,9 @@ function createUiStateFromGame(g: GameRefs, now: number): UiState {
 
   return {
     status: g.status,
-    score: Math.floor(g.score),
+    // Apply the score-multiplier upgrade live so the HUD matches the final
+    // score computed on death instead of jumping at the last moment.
+    score: Math.floor(g.score * g.scoreMultiplier),
     seconds,
     kills: g.kills,
     distance: Math.floor(g.distance),
@@ -302,13 +314,16 @@ export function SpaceShooterGame() {
   const [highScore, setHighScore] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     const saved = window.localStorage.getItem(HS_KEY);
-    return saved ? parseInt(saved, 10) : 0;
+    const parsed = saved ? parseInt(saved, 10) : 0;
+    // Corrupt/tampered storage must not poison the PB comparison with NaN.
+    return Number.isFinite(parsed) ? parsed : 0;
   });
   const [name, setName] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem(NAME_KEY) ?? "";
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   // fetchOnMount:true preserves the pre-existing mount-time fetch (below,
   // "Initial leaderboard load + region detection"); bucket unchanged from
   // before (space-shooter keeps sending game:"space-shooter", so the
@@ -325,6 +340,13 @@ export function SpaceShooterGame() {
   });
   useEffect(
     () => () => {
+      // Tear down a recorder left running by navigating away mid-run — the
+      // dying-status auto-stop never fires if the component unmounts first.
+      const r = recorderRef.current;
+      if (r) {
+        if (r.state !== "inactive") r.stop();
+        for (const t of r.stream.getTracks()) t.stop();
+      }
       sounds.destroy();
     },
     [],
@@ -377,7 +399,11 @@ export function SpaceShooterGame() {
   }, []);
   const stopRecording = useCallback(() => {
     const r = recorderRef.current;
-    if (r && r.state !== "inactive") r.stop();
+    if (r) {
+      if (r.state !== "inactive") r.stop();
+      // Release the canvas capture stream — the recorder alone doesn't.
+      for (const t of r.stream.getTracks()) t.stop();
+    }
     setIsRecording(false);
   }, []);
   const captureShareImage = useCallback(
@@ -505,15 +531,25 @@ export function SpaceShooterGame() {
 
   const togglePause = useCallback(() => {
     const g = gameRefs.current;
-    if (g.status === "playing") {
-      g.status = "paused";
-      sounds.stopMusic(0.3);
+    if (pauseRun(g)) {
       setUi((u) => ({ ...u, status: "paused" }));
-    } else if (g.status === "paused") {
-      g.status = "playing";
-      sounds.startGameplayMusic();
+    } else if (resumeRun(g)) {
       setUi((u) => ({ ...u, status: "playing" }));
     }
+  }, []);
+
+  // Auto-pause when the tab is hidden: RAF freezes but the wall clock does
+  // not, so without this a backgrounded run silently burned power-ups and
+  // inflated the survival timer. Resume stays manual (player input).
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (pauseRun(gameRefs.current)) {
+        setUi((u) => ({ ...u, status: "paused" }));
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   const toggleFullscreen = useCallback(() => {
@@ -780,7 +816,9 @@ export function SpaceShooterGame() {
     g.lastUiSync = 0;
     g.invulnUntil = 0;
     g.startedAt = 0;
+    g.pausedAt = 0;
     g.dyingAt = 0;
+    g.deathFxStage = 0;
     g.shipFallSpeed = 0;
     g.deathVelX = 0;
     g.deathVelY = 0;
@@ -807,27 +845,37 @@ export function SpaceShooterGame() {
   }, [showInstructions]);
 
   const submit = useCallback(async () => {
-    const trimmed = name.trim().slice(0, 12) || "Pilot";
-    safeLocalSet(NAME_KEY, trimmed);
-    const result = await submitScoreToLeaderboard({
-      name: trimmed,
-      score: ui.score,
-      // keep legacy shape on `level` so the route validates the old field
-      level: 1,
-      seconds: Math.floor(ui.seconds),
-      kills: ui.kills,
-      distance: ui.distance,
-      region,
-    });
-    if (result.ok) {
-      setSubmitted(true);
-      await refreshLeaderboard();
-      // World record overrides personal best celebration
-      if (result.rank === 1 && ui.score > 0) {
-        setCelebration("world");
+    // In-flight guard: the button is disabled via `submitting`, but guard here
+    // too so a queued second click can't double-post the same run.
+    if (submitting || submitted) return;
+    setSubmitting(true);
+    try {
+      const trimmed = name.trim().slice(0, 12) || "Pilot";
+      safeLocalSet(NAME_KEY, trimmed);
+      const result = await submitScoreToLeaderboard({
+        name: trimmed,
+        score: ui.score,
+        // keep legacy shape on `level` so the route validates the old field
+        level: 1,
+        seconds: Math.floor(ui.seconds),
+        kills: ui.kills,
+        distance: ui.distance,
+        region,
+      });
+      if (result.ok) {
+        setSubmitted(true);
+        await refreshLeaderboard();
+        // World record overrides personal best celebration
+        if (result.rank === 1 && ui.score > 0) {
+          setCelebration("world");
+        }
       }
+    } finally {
+      setSubmitting(false);
     }
   }, [
+    submitting,
+    submitted,
     name,
     ui.score,
     ui.seconds,
@@ -874,21 +922,20 @@ export function SpaceShooterGame() {
     };
 
     // Input no longer auto-starts the run — the player must explicitly click
-    // PLAY. We still use this to unpause, though, so mouse/touch wake the
-    // paused game.
+    // PLAY. A paused game resumes only via a deliberate gesture: the pause
+    // overlay (click/tap anywhere on it), the header pause button, or a
+    // movement key. Canvas pointer/touch input must NOT resume — it raced
+    // the overlay's own click handler, re-pausing in the same gesture.
     const tryUnpause = () => {
-      const g = gameRefs.current;
-      if (g.status === "paused") g.status = "playing";
+      resumeRun(gameRefs.current);
     };
 
     const onMove = (e: PointerEvent) => {
       ensureAudio();
-      tryUnpause();
       updateTarget(e.clientX, e.clientY);
     };
     const onDown = (e: PointerEvent) => {
       ensureAudio();
-      tryUnpause();
       updateTarget(e.clientX, e.clientY);
     };
     const onTouch = (e: TouchEvent) => {
@@ -896,7 +943,6 @@ export function SpaceShooterGame() {
       if (!touch) return;
       e.preventDefault();
       ensureAudio();
-      tryUnpause();
       updateTarget(touch.clientX, touch.clientY);
     };
     el.addEventListener("pointermove", onMove);
@@ -966,8 +1012,13 @@ export function SpaceShooterGame() {
       keys.add(k);
     };
     const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
+    // Flush held keys when focus leaves — a keyup lost to Alt-Tab or a tab
+    // switch would otherwise leave the ship strafing forever.
+    const clearKeys = () => keys.clear();
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", clearKeys);
+    document.addEventListener("visibilitychange", clearKeys);
 
     let raf = 0;
     const loop = () => {
@@ -999,8 +1050,11 @@ export function SpaceShooterGame() {
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("touchmove", onTouch);
       el.removeEventListener("touchstart", onTouch);
+      el.removeEventListener("touchstart", onFarTap);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clearKeys);
+      document.removeEventListener("visibilitychange", clearKeys);
       cancelAnimationFrame(raf);
     };
   }, []);
@@ -1556,7 +1610,8 @@ export function SpaceShooterGame() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50 backdrop-blur-[2px]"
+              onClick={togglePause}
+              className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-3 bg-black/50 backdrop-blur-[2px]"
             >
               <div className="text-xs font-bold tracking-[0.3em] text-white/60 uppercase">
                 Paused
@@ -1564,7 +1619,12 @@ export function SpaceShooterGame() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={togglePause}
+                onClick={(e) => {
+                  // The overlay behind this button resumes too — don't let the
+                  // same click reach it and toggle twice.
+                  e.stopPropagation();
+                  togglePause();
+                }}
                 className="rounded-xl border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white backdrop-blur-md"
               >
                 Resume
@@ -1959,11 +2019,11 @@ export function SpaceShooterGame() {
                   onClick={() => {
                     void submit();
                   }}
-                  disabled={submitted}
+                  disabled={submitted || submitting}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  {submitted ? "Submitted" : "Submit"}
+                  {submitted ? "Submitted" : submitting ? "Submitting" : "Submit"}
                 </motion.button>
               </div>
 

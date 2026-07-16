@@ -31,6 +31,36 @@ export function buildBossSchedule(): { distance: number; bossId: BossId }[] {
   ];
 }
 
+// The roster cycled after the authored schedule runs out, in tier order so a
+// long run keeps escalating through the full cast.
+const RECYCLE_ROSTER: BossId[] = [
+  "sentinel",
+  "drifter",
+  "swarm-mother",
+  "mirror",
+  "pulsar",
+  "harvester",
+  "warden",
+  "void-tyrant",
+];
+
+// Endless boss scheduling: authored entries first, then the roster recycles
+// forever at a 3000m cadence. Without this, runs past the last authored
+// distance silently stopped producing bosses.
+export function bossScheduleEntry(
+  schedule: { distance: number; bossId: BossId }[],
+  idx: number,
+): { distance: number; bossId: BossId } {
+  const authored = schedule[idx];
+  if (authored) return authored;
+  const lastDistance = schedule[schedule.length - 1]?.distance ?? 0;
+  const extra = idx - schedule.length; // 0-based index into the recycled tail
+  return {
+    distance: lastDistance + (extra + 1) * 3000,
+    bossId: RECYCLE_ROSTER[extra % RECYCLE_ROSTER.length] ?? "sentinel",
+  };
+}
+
 export const BOSS_TIERS: Record<BossId, number> = {
   sentinel: 1,
   drifter: 2,
@@ -288,7 +318,9 @@ export function runHarvesterBehavior(
     boss.tractorBeam = { active: false, startAt: 0, durationMs: 2000, shipOverlapAccum: 0 };
   }
   const beam = boss.tractorBeam;
-  const CYCLE_MS = 4000 / boss.difficultyMult;
+  // Clamp so the cycle always contains an off phase: past difficultyMult 2 the
+  // raw cycle would shrink below the beam duration and the beam never shut off.
+  const CYCLE_MS = Math.max(beam.durationMs + 1000, 4000 / boss.difficultyMult);
   const cycleAge = (now - boss.phaseStartAt) % CYCLE_MS;
   const deltaMs = step * 1000;
   if (cycleAge < beam.durationMs) {

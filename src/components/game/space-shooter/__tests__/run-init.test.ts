@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRefs, startRun, pickNextBiomeDistance } from "../run-init";
+import { createRefs, startRun, pickNextBiomeDistance, pauseRun, resumeRun } from "../run-init";
+import { spawnBoss } from "../boss-behaviors";
 import { ENVIRONMENTS, START_INVULN_MS } from "../types";
 import type { GameRefs } from "../types";
 
@@ -163,6 +164,69 @@ describe("run-init", () => {
     it("with a fixed random draw, adds exactly 700 + r*900", () => {
       vi.spyOn(Math, "random").mockReturnValue(0.5);
       expect(pickNextBiomeDistance(1000)).toBeCloseTo(1000 + 700 + 0.5 * 900, 10);
+    });
+  });
+
+  describe("pauseRun / resumeRun", () => {
+    it("pausing freezes the run clock: no timestamp ages across the paused span", () => {
+      let clock = 100_000;
+      const spy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+      const g = createRefs();
+      startRun(g);
+      const startedAt0 = g.startedAt;
+      // An active 8s power-up that must NOT expire during a 30s pause.
+      g.activePowerUps.push({ type: "shield", expiresAt: clock + 8000 });
+      const expires0 = clock + 8000;
+
+      clock += 1000; // played 1s
+      expect(pauseRun(g)).toBe(true);
+      expect(g.status).toBe("paused");
+      expect(pauseRun(g)).toBe(false); // idempotent
+
+      clock += 30_000; // paused 30s
+      expect(resumeRun(g)).toBe(true);
+      expect(g.status).toBe("playing");
+      expect(g.pausedAt).toBe(0);
+      expect(resumeRun(g)).toBe(false); // idempotent
+
+      // Everything shifted by exactly the paused span.
+      expect(g.startedAt).toBe(startedAt0 + 30_000);
+      expect(g.activePowerUps[0]!.expiresAt).toBe(expires0 + 30_000);
+      // Survival time still reads 1s of actual play.
+      expect((clock - g.startedAt) / 1000).toBeCloseTo(1, 5);
+      spy.mockRestore();
+    });
+
+    it("shifts boss and projectile clocks too", () => {
+      let clock = 200_000;
+      const spy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+      const g = createRefs();
+      startRun(g);
+      spawnBoss(g, "sentinel", 0);
+      const phase0 = g.boss!.phaseStartAt;
+      g.bossProjectiles.push({
+        id: 1,
+        position: [0, 0, -10],
+        velocity: [0, 0, 5],
+        radius: 0.3,
+        color: "#fff",
+        spawnedAt: clock,
+        ttlMs: 4000,
+        homing: false,
+        shielded: false,
+      });
+      pauseRun(g);
+      clock += 10_000;
+      resumeRun(g);
+      expect(g.boss!.phaseStartAt).toBe(phase0 + 10_000);
+      expect(g.bossProjectiles[0]!.spawnedAt).toBe(200_000 + 10_000);
+      spy.mockRestore();
+    });
+
+    it("pauseRun refuses non-playing states", () => {
+      const g = createRefs(); // armed
+      expect(pauseRun(g)).toBe(false);
+      expect(g.status).toBe("armed");
     });
   });
 });
