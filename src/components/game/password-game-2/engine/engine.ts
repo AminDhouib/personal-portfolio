@@ -1,0 +1,365 @@
+import type { Rng } from "./rng";
+import { mulberry32, subSeed } from "./rng";
+import type {
+  ActId,
+  AllyId,
+  EventContext,
+  EventDef,
+  EventInstance,
+  EventPhase,
+  FinaleState,
+  GameState,
+  Pg2RuleDef,
+  PointerTarget,
+  RuleApi,
+  RunStats,
+} from "./types";
+import { cellsToPassword, deleteRange, findCellIndex, insertText } from "./cells";
+import { pushEffect } from "./effects";
+import { CORE_RULES } from "./rules/index";
+import { buildSchedule } from "./director";
+import { EVENT_DEFS } from "./events/index";
+
+export interface CreateRunOpts {
+  seed: number;
+  daily: boolean;
+  /** Injected wall clock for the current-time rule; defaults to the real clock. */
+  nowHHMM?: () => string;
+}
+
+/** defId -> EventDef, resolved once. Empty until the manifest is seeded (Task 3). */
+const DEF_BY_ID: Map<string, EventDef> = new Map(EVENT_DEFS.map((d) => [d.id, d]));
+const CORE_RULE_IDS: ReadonlySet<string> = new Set(CORE_RULES.map((d) => d.id));
+
+/** Act progression. act3 does NOT advance on time — only requestSubmit opens the finale. */
+const NEXT_ACT: Record<ActId, ActId | null> = {
+  prologue: "act1",
+  act1: "act2",
+  act2: "act3",
+  act3: null,
+  finale: null,
+};
+
+/** Runtime-only fields hung on an instance; never serialized, never part of the contract. */
+type LiveInstance = EventInstance & { rng?: Rng; coupledInjected?: boolean };
+
+/** Per-run injected clock, kept off GameState so the serializable shape stays clean. */
+const clockByRun = new WeakMap<GameState, () => string>();
+
+/** Build a fresh run. The clock is stopped until the first printable keystroke. */
+export function createRun(opts: CreateRunOpts): GameState {
+  const g: GameState = {
+    seed: opts.seed,
+    daily: opts.daily,
+    nextCellId: 1,
+    cells: [],
+    caret: 0,
+    startedAtMs: null,
+    elapsedMs: 0,
+    act: "prologue",
+    actElapsedMs: 0,
+    rules: [],
+    ruleStates: {},
+    events: buildSchedule(opts.seed),
+    finale: null,
+    outcome: "playing",
+    inputLocked: false,
+    stats: emptyStats(),
+    effects: [],
+    version: 0,
+  };
+  clockByRun.set(g, opts.nowHHMM ?? defaultNowHHMM);
+  // The first core rule is always visible; later ones reveal as prior rules pass.
+  const first = nextUnrevealedCoreRuleForAct(g);
+  if (first) revealRule(g, first);
+  return g;
+}
+
+/**
+ * Advance the run by dtMs. Order: clocks; lazy-init due events; tick live events
+ * (injecting coupled rules on onset); revalidate + reveal the next core rule;
+ * advance the act. act3 -> finale is deliberately NOT time-driven.
+ */
+export function tick(g: GameState, dtMs: number): void {
+  if (g.startedAtMs !== null) {
+    g.elapsedMs += dtMs;
+    g.actElapsedMs += dtMs;
+  }
+
+  // Init events that have become due in the current act (data + event-scoped rng).
+  for (const inst of g.events) {
+    if (inst.data === undefined && inst.act === g.act && inst.scheduledAtMs <= g.actElapsedMs) {
+      ensureInited(g, inst);
+    }
+  }
+
+  // Tick every live event. The def owns its phase transitions; the engine owns
+  // phaseElapsedMs (accumulated here, reset to 0 when the def flips phase).
+  for (const inst of g.events) {
+    if (inst.data === undefined || inst.phase === "done") continue;
+    const def = DEF_BY_ID.get(inst.defId);
+    if (!def) continue;
+    const prevPhase = inst.phase;
+    inst.phaseElapsedMs += dtMs;
+    def.onTick(inst, makeCtx(g, inst, dtMs));
+    if (inst.phase !== prevPhase) inst.phaseElapsedMs = 0;
+    const live = inst as LiveInstance;
+    if (def.coupledRule && !live.coupledInjected && inst.phase !== "telegraph") {
+      revealRule(g, def.coupledRule);
+      live.coupledInjected = true;
+    }
+  }
+
+  const password = cellsToPassword(g.cells);
+  const api = makeRuleApi(g, clockOf(g));
+  revalidateAndReveal(g, password, api);
+  advanceActIfComplete(g, password, api);
+}
+
+/**
+ * Route a key. Active events see it first (onset order); an unconsumed key, when
+ * input is not locked, edits the password. A single code point inserts at the
+ * caret and starts the clock; the named keys behave conventionally.
+ */
+export function applyKey(g: GameState, key: string): void {
+  for (const inst of activeEvents(g)) {
+    const def = DEF_BY_ID.get(inst.defId);
+    if (!def?.onKey) continue;
+    if (def.onKey(inst, makeCtx(g, inst, 0), key)) return;
+  }
+  if (g.inputLocked) return;
+
+  if ([...key].length === 1) {
+    startClock(g);
+    const r = insertText(g.cells, g.caret, key, g.nextCellId);
+    g.cells = r.cells;
+    g.caret = r.caret;
+    g.nextCellId = r.nextCellId;
+    bump(g);
+    return;
+  }
+
+  switch (key) {
+    case "Backspace": {
+      if (g.caret <= 0) return;
+      const r = deleteRange(g.cells, g.caret - 1, g.caret);
+      g.cells = r.cells;
+      g.caret = r.caret;
+      bump(g);
+      return;
+    }
+    case "Delete": {
+      if (g.caret >= g.cells.length) return;
+      const r = deleteRange(g.cells, g.caret, g.caret + 1);
+      g.cells = r.cells;
+      g.caret = r.caret;
+      bump(g);
+      return;
+    }
+    case "ArrowLeft":
+      g.caret = Math.max(0, g.caret - 1);
+      return;
+    case "ArrowRight":
+      g.caret = Math.min(g.cells.length, g.caret + 1);
+      return;
+    case "Home":
+      g.caret = 0;
+      return;
+    case "End":
+      g.caret = g.cells.length;
+      return;
+  }
+}
+
+/**
+ * Route a pointer. Active events see it first (onset order). During the finale,
+ * targets go to the finale (Task 10). Otherwise a cell target moves the caret.
+ */
+export function applyPointer(g: GameState, target: PointerTarget): void {
+  for (const inst of activeEvents(g)) {
+    const def = DEF_BY_ID.get(inst.defId);
+    if (!def?.onPointer) continue;
+    if (def.onPointer(inst, makeCtx(g, inst, 0), target)) return;
+  }
+  if (g.act === "finale") return; // finale pointer routing lands in Task 10
+  if (target.kind === "cell" && typeof target.id === "number") {
+    const idx = findCellIndex(g.cells, target.id);
+    if (idx >= 0) g.caret = idx;
+  }
+}
+
+/**
+ * Attempt to submit. Refused (with a toast) unless the run is in act3 with every
+ * revealed rule passing; otherwise it opens the finale.
+ */
+export function requestSubmit(g: GameState): void {
+  if (g.act !== "act3" || !allRulesPass(g)) {
+    pushEffect(g, { kind: "toast", text: "The form is not satisfied.", tone: "danger" });
+    return;
+  }
+  g.act = "finale";
+  g.finale = createFinale(g);
+  bump(g);
+  pushEffect(g, { kind: "title-card", act: "finale" });
+}
+
+/** Injected view over run state used by rule validators; clock is fixed per run. */
+export function makeRuleApi(g: GameState, nowHHMM: () => string): RuleApi {
+  const find = (id: string) => g.events.find((e) => e.defId === id);
+  return {
+    isEventActive(id) {
+      const inst = find(id);
+      return inst !== undefined && inst.data !== undefined && isActivePhase(inst.phase);
+    },
+    isEventDone(id) {
+      const inst = find(id);
+      return inst !== undefined && isResolvedInstance(g, inst);
+    },
+    getEventData<S>(id: string): S | null {
+      const inst = find(id);
+      return inst !== undefined && inst.data !== undefined ? (inst.data as S) : null;
+    },
+    nowHHMM,
+  };
+}
+
+// --- internals ---------------------------------------------------------------
+
+function bump(g: GameState): void {
+  g.version++;
+}
+
+function startClock(g: GameState): void {
+  // startedAtMs is the elapsedMs-space origin; 0 is a valid base. Only null means
+  // "not started", so tick accumulates elapsedMs from the next frame on.
+  if (g.startedAtMs === null) g.startedAtMs = 0;
+}
+
+function isActivePhase(phase: EventPhase): boolean {
+  return phase === "onset" || phase === "peak" || phase === "resolving";
+}
+
+/** Live (initialized, non-done) events currently active, earliest onset first. */
+function activeEvents(g: GameState): EventInstance[] {
+  return g.events
+    .filter((e) => e.data !== undefined && isActivePhase(e.phase))
+    .sort((a, b) => a.scheduledAtMs - b.scheduledAtMs);
+}
+
+function makeCtx(g: GameState, inst: EventInstance, dtMs: number): EventContext {
+  return { state: g, rng: rngOf(g, inst), dtMs, emit: (e) => pushEffect(g, e) };
+}
+
+/** The event-scoped rng, created once from subSeed(seed, defId) and reused. */
+function rngOf(g: GameState, inst: EventInstance): Rng {
+  const live = inst as LiveInstance;
+  if (!live.rng) live.rng = mulberry32(subSeed(g.seed, inst.defId));
+  return live.rng;
+}
+
+function ensureInited(g: GameState, inst: EventInstance): void {
+  const def = DEF_BY_ID.get(inst.defId);
+  if (!def) return;
+  inst.data = def.init(rngOf(g, inst), g);
+}
+
+function isResolvedInstance(g: GameState, inst: EventInstance): boolean {
+  if (inst.phase === "done") return true;
+  if (inst.data === undefined) return false;
+  const def = DEF_BY_ID.get(inst.defId);
+  return def !== undefined && def.isResolved(inst, g);
+}
+
+function nextUnrevealedCoreRuleForAct(g: GameState): Pg2RuleDef | null {
+  const revealed = new Set(g.rules.map((r) => r.id));
+  return CORE_RULES.find((d) => d.act === g.act && !revealed.has(d.id)) ?? null;
+}
+
+function revealRule(g: GameState, def: Pg2RuleDef): void {
+  g.rules.push(def.create(mulberry32(subSeed(g.seed, "rule-" + def.id))));
+  bump(g);
+}
+
+function allRulesPass(g: GameState): boolean {
+  const password = cellsToPassword(g.cells);
+  const api = makeRuleApi(g, clockOf(g));
+  return g.rules.every((r) => r.validate(password, g, api).passed);
+}
+
+/** Reveal the next core rule once every revealed core rule passes. */
+function revalidateAndReveal(g: GameState, password: string, api: RuleApi): void {
+  const corePasses = g.rules.every(
+    (r) => !CORE_RULE_IDS.has(r.id) || r.validate(password, g, api).passed,
+  );
+  if (!corePasses) return;
+  const next = nextUnrevealedCoreRuleForAct(g);
+  if (next) revealRule(g, next);
+}
+
+/**
+ * Advance the act once every core rule assigned to it is revealed and passing and
+ * every non-inhabitant event scheduled for it has resolved. Inhabitants persist
+ * until the finale, so they never gate advancement.
+ */
+function advanceActIfComplete(g: GameState, password: string, api: RuleApi): void {
+  const next = NEXT_ACT[g.act];
+  if (next === null) return;
+
+  const revealed = new Set(g.rules.map((r) => r.id));
+  const allActRulesRevealed = CORE_RULES.filter((d) => d.act === g.act).every((d) =>
+    revealed.has(d.id),
+  );
+  const allActRulesPass = g.rules
+    .filter((r) => CORE_RULE_IDS.has(r.id) && r.act === g.act)
+    .every((r) => r.validate(password, g, api).passed);
+  const eventsResolved = g.events
+    .filter((e) => e.act === g.act && e.family !== "inhabitant")
+    .every((e) => isResolvedInstance(g, e));
+
+  if (allActRulesRevealed && allActRulesPass && eventsResolved) {
+    g.act = next;
+    g.actElapsedMs = 0;
+    pushEffect(g, { kind: "title-card", act: next });
+    pushEffect(g, { kind: "sound", sound: "act-fanfare" });
+    bump(g);
+  }
+}
+
+/** Finale bootstrap. A stub until Task 10 moves it to events/finale.ts. */
+function createFinale(g: GameState): FinaleState {
+  return { phase: "missiles", phaseElapsedMs: 0, allies: aliveAllies(g), attempts: 0, data: {} };
+}
+
+/** Ally ids for inhabitants still alive at finale start (empty until Task 6). */
+function aliveAllies(g: GameState): AllyId[] {
+  const allies: AllyId[] = [];
+  for (const inst of g.events) {
+    if (inst.data === undefined) continue;
+    const def = DEF_BY_ID.get(inst.defId);
+    if (def?.allyId && def.isAlive?.(inst)) allies.push(def.allyId);
+  }
+  return allies;
+}
+
+function clockOf(g: GameState): () => string {
+  return clockByRun.get(g) ?? defaultNowHHMM;
+}
+
+function defaultNowHHMM(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function emptyStats(): RunStats {
+  return {
+    lettersAbducted: 0,
+    lettersRescued: 0,
+    infectionsCured: 0,
+    garbageCleared: 0,
+    missilesIntercepted: 0,
+    aliensDowned: 0,
+    creaturesSaved: 0,
+    biggestCrisis: "",
+    knockbacks: 0,
+  };
+}

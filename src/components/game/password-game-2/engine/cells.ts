@@ -42,7 +42,11 @@ export function insertText(
   return { cells: next, caret: caret + inserted.cells.length, nextCellId: inserted.nextCellId };
 }
 
-/** Remove cells with indices in [from, to); bounds are clamped, caret settles at from. */
+/**
+ * Remove cells with indices in [from, to); bounds are clamped. The caret settles
+ * at the range start, itself capped to the array length so a from past the end
+ * never yields an out-of-range caret.
+ */
 export function deleteRange(
   cells: readonly CharCell[],
   from: number,
@@ -50,9 +54,10 @@ export function deleteRange(
 ): { cells: CharCell[]; caret: number } {
   const start = Math.max(0, from);
   const end = Math.min(cells.length, Math.max(to, start));
-  if (start === end) return { cells: [...cells], caret: start };
+  const caret = Math.min(start, cells.length);
+  if (start === end) return { cells: [...cells], caret };
   const next = [...cells.slice(0, start), ...cells.slice(end)];
-  return { cells: next, caret: start };
+  return { cells: next, caret };
 }
 
 /** Index of the cell with the given id, or -1 if absent. */

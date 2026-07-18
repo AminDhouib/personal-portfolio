@@ -84,6 +84,14 @@ describe("cells", () => {
     expect(r.caret).toBe(4);
   });
 
+  it("deleteRange with a from past the end caps the caret at the array length", () => {
+    const { cells } = makeCells("abcd", 1);
+    const r = deleteRange(cells, 9, 12);
+    expect(cellsToPassword(r.cells)).toBe("abcd");
+    expect(r.cells).toHaveLength(4);
+    expect(r.caret).toBe(4);
+  });
+
   it("deleteRange with an empty range is a no-op", () => {
     const { cells } = makeCells("abcd", 1);
     const r = deleteRange(cells, 2, 2);
