@@ -1,4 +1,5 @@
 import type { Pg2RuleDef } from "../types";
+import { rangeInt } from "../rng";
 import { FREEBIE_MESSAGE } from "./act1";
 import { getDailyChessPuzzle } from "../../../../../data/password-game/chess";
 
@@ -37,19 +38,30 @@ const chessBestMove: Pg2RuleDef = {
   },
 };
 
-/** Rule 15 — a ceiling on length, the security-measure gag. */
-const maxLength40: Pg2RuleDef = {
-  id: "max-length-40",
+/**
+ * Rule 15 — a ceiling on length, the security-measure gag. The cap is seeded in
+ * [60, 75]: high enough that the base roster (captcha + drowssap + the live-feed
+ * answers + the digit block) always fits with room to spare, so the designed
+ * tension is against event pressure (Tetris garbage, abductions) rather than
+ * against the rules themselves. The 40 of v1 was structurally unsolvable once
+ * live feeds injected a long country name and a chess SAN.
+ */
+const maxLength: Pg2RuleDef = {
+  id: "max-length",
   act: "act3",
-  create: () => ({
-    id: "max-length-40",
-    act: "act3",
-    description: "Your password must be at most 40 characters. This is a security measure.",
-    validate: (password) => {
-      const len = [...password].length;
-      return { passed: len <= 40, message: `${len} / 40` };
-    },
-  }),
+  create: (rng) => {
+    const target = rangeInt(rng, 60, 75);
+    return {
+      id: "max-length",
+      act: "act3",
+      description: `Your password must be at most ${target} characters. This is a security measure.`,
+      payload: { target },
+      validate: (password) => {
+        const len = [...password].length;
+        return { passed: len <= target, message: `${len} / ${target}` };
+      },
+    };
+  },
 };
 
 /** Rule 16 — the password must contain "password" spelled backwards. */
@@ -81,7 +93,7 @@ const finalBlessing: Pg2RuleDef = {
 /** Act 3 rules, in reveal order. */
 export const ACT3_RULES: readonly Pg2RuleDef[] = [
   chessBestMove,
-  maxLength40,
+  maxLength,
   backwardsPassword,
   finalBlessing,
 ];

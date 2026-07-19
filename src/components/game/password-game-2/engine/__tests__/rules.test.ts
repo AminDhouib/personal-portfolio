@@ -61,7 +61,7 @@ describe("core rule roster", () => {
       "country-name",
       "current-time",
       "chess-best-move",
-      "max-length-40",
+      "max-length",
       "backwards-password",
       "final-blessing",
     ]);
@@ -83,6 +83,10 @@ describe("core rule roster", () => {
     const roman = make("roman-product");
     expect(roman.description).toBe(
       `The Roman numerals in your password must multiply to ${roman.payload!["target"]}.`,
+    );
+    const max = make("max-length");
+    expect(max.description).toBe(
+      `Your password must be at most ${max.payload!["target"]} characters. This is a security measure.`,
     );
   });
 });
@@ -160,13 +164,27 @@ describe("rule 6 - digit-sum", () => {
   const digitsForSum = (n: number): string =>
     "9".repeat(Math.floor(n / 9)) + (n % 9 > 0 ? String(n % 9) : "");
 
-  it("targets a value in [20, 32] and passes only on an exact sum", () => {
+  it("targets a value in [35, 45] and passes only on an exact sum", () => {
     const rule = make("digit-sum");
     const target = rule.payload!["target"] as number;
-    expect(target).toBeGreaterThanOrEqual(20);
-    expect(target).toBeLessThanOrEqual(32);
+    expect(target).toBeGreaterThanOrEqual(35);
+    expect(target).toBeLessThanOrEqual(45);
     expect(passes(rule, digitsForSum(target))).toBe(true);
     expect(passes(rule, digitsForSum(target - 1))).toBe(false);
+  });
+
+  it("targets a sum always above the worst-case forced digits (time 19:59 + SAN 8 = 32)", () => {
+    // The floor of 35 keeps the target reachable at every clock time and SAN, so
+    // solveDigitSum never throws its "protected digits exceed target" guard.
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(make("digit-sum", seed).payload!["target"] as number).toBeGreaterThan(32);
+    }
+    // With the worst-case protected substrings present, the block still lands.
+    const rule = make("digit-sum");
+    const solved = solveRule(rule, "at 19:59 play Ra8", api("19:59"), ["19:59", "Ra8"]);
+    expect(passes(rule, solved)).toBe(true);
+    expect(solved).toContain("19:59");
+    expect(solved).toContain("Ra8");
   });
 
   it("reports current progress in the message", () => {
@@ -377,21 +395,26 @@ describe("rule 14 - chess-best-move", () => {
   });
 });
 
-describe("rule 15 - max-length-40", () => {
-  it("passes at 40 code points and fails at 41", () => {
-    const rule = make("max-length-40");
-    expect(passes(rule, "a".repeat(40))).toBe(true);
-    expect(passes(rule, "a".repeat(41))).toBe(false);
+describe("rule 15 - max-length", () => {
+  it("seeds a cap in [60, 75] and passes at the cap, fails one over", () => {
+    const rule = make("max-length");
+    const cap = rule.payload!["target"] as number;
+    expect(cap).toBeGreaterThanOrEqual(60);
+    expect(cap).toBeLessThanOrEqual(75);
+    expect(passes(rule, "a".repeat(cap))).toBe(true);
+    expect(passes(rule, "a".repeat(cap + 1))).toBe(false);
   });
-  it("solveRule trims trailing filler to fit", () => {
-    const rule = make("max-length-40");
-    const solved = solveRule(rule, "a".repeat(38) + FILLER.repeat(10), api());
+  it("solveRule trims filler to fit the cap", () => {
+    const rule = make("max-length");
+    const cap = rule.payload!["target"] as number;
+    const solved = solveRule(rule, "a".repeat(cap - 2) + FILLER.repeat(10), api());
     expect(passes(rule, solved)).toBe(true);
-    expect([...solved].length).toBe(40);
+    expect([...solved].length).toBe(cap);
   });
   it("throws rather than corrupt non-filler content it cannot trim", () => {
-    const rule = make("max-length-40");
-    expect(() => solveRule(rule, "a".repeat(50), api())).toThrow();
+    const rule = make("max-length");
+    const cap = rule.payload!["target"] as number;
+    expect(() => solveRule(rule, "a".repeat(cap + 10), api())).toThrow();
   });
 });
 
@@ -421,12 +444,34 @@ describe("rule 17 - final-blessing", () => {
 });
 
 describe("solveAll", () => {
-  it("drives the full offline roster to green in <= 40 code points", () => {
-    const rules = CORE_RULES.map((d) => d.create(mulberry32(subSeed(42, "rule-" + d.id))));
+  const roster = (seed: number) =>
+    CORE_RULES.map((d) => d.create(mulberry32(subSeed(seed, "rule-" + d.id))));
+
+  it("drives the full offline roster to green within the seed's max-length cap", () => {
+    const rules = roster(42);
     const g = { cells: [], rules } as unknown as GameState;
     const a = api("12:00");
     const solved = solveAll(g, a);
+    const cap = rules.find((r) => r.id === "max-length")!.payload!["target"] as number;
     expect(rules.every((r) => r.validate(solved, g, a).passed)).toBe(true);
-    expect([...solved].length).toBeLessThanOrEqual(40);
+    expect([...solved].length).toBeLessThanOrEqual(cap);
+  });
+
+  // The solvability guarantee, locked in CI: no seed may be structurally
+  // unsolvable, even under the worst-case live feed (a long country name, a
+  // digit-bearing SAN, and the clock at its maximum digit sum, 19:59).
+  it("solves every seed 1..20 under worst-case live feeds, within the cap", () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      setTodayWord("FLAME");
+      setDailyChessPuzzle(CHESS_PUZZLES[0]!); // best move "Ra8" -> digit 8
+      setExtendedCapitals([{ country: "Saudi Arabia", capital: "Riyadh" }]);
+      const rules = roster(seed);
+      const g = { cells: [], rules } as unknown as GameState;
+      const a = api("19:59"); // peak HH:MM digit sum (1+9+5+9 = 24)
+      const solved = solveAll(g, a);
+      const cap = rules.find((r) => r.id === "max-length")!.payload!["target"] as number;
+      expect(rules.every((r) => r.validate(solved, g, a).passed)).toBe(true);
+      expect([...solved].length).toBeLessThanOrEqual(cap);
+    }
   });
 });

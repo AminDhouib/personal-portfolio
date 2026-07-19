@@ -1,7 +1,7 @@
 import type { GameState, Pg2Rule, RuleApi } from "../types";
 import { cellsToPassword } from "../cells";
 import { CAPTCHA_PHRASE } from "../rules/prologue";
-import { MONTHS, digitSumOf } from "../rules/act1";
+import { MONTHS } from "../rules/act1";
 import { BACKWARDS_PASSWORD } from "../rules/act3";
 import { fromRoman, parseRomanTokens, toRoman } from "../rules/roman";
 
@@ -13,12 +13,13 @@ import { fromRoman, parseRomanTokens, toRoman } from "../rules/roman";
  * revealed set to green. Both take passwords as plain strings and never touch
  * the DOM — the engine feeds them cellsToPassword(g.cells).
  *
- * Two rules are not pure appends: digit-sum rebuilds its own trailing digit
- * block (preserving the current-time substring, the only other required digit
- * carrier when feeds are offline), and max-length-40 trims filler. If a live
- * chess feed injects a digit-bearing SAN, digit-sum and chess can contradict —
- * an inherent Password-Game tension the solver surfaces by throwing, not by
- * silently corrupting the move.
+ * Two rules are not pure appends: digit-sum rebuilds its own digit block and
+ * max-length trims filler. digit-sum takes a list of PROTECTED substrings — the
+ * live payload strings that must survive verbatim (the current-time HH:MM, a
+ * chess SAN, the wordle answer, the country name). Digits inside them count
+ * toward the target and are never stripped, so digit-sum and a digit-bearing SAN
+ * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 60-75)
+ * guarantee the target is always reachable — a seed is never unsolvable.
  */
 
 /** Trim/pad character. A special char (helps rule 4) that is inert everywhere else. */
@@ -46,7 +47,7 @@ const SOLVE_PRIORITY: Record<string, number> = {
   "include-number": 2,
   "digit-sum": 3,
   "min-length-12": 4,
-  "max-length-40": 5,
+  "max-length": 5,
   "final-blessing": 6,
 };
 
@@ -58,26 +59,59 @@ function digitsSummingTo(n: number): string {
   return nines + (rem > 0 ? String(rem) : "");
 }
 
-function solveDigitSum(rule: Pg2Rule, current: string, api: RuleApi): string {
-  const target = Number(rule.payload?.["target"]);
-  const timeStr = api.nowHHMM();
-  const idx = /\d/.test(timeStr) ? current.indexOf(timeStr) : -1;
-  let base: string;
-  let fixedSum: number;
-  if (idx >= 0) {
-    // Preserve the current-time substring; strip every other (stray/old-block) digit.
-    const before = current.slice(0, idx).replace(/\d/g, "");
-    const after = current.slice(idx + timeStr.length).replace(/\d/g, "");
-    base = before + timeStr + after;
-    fixedSum = digitSumOf(timeStr);
-  } else {
-    base = current.replace(/\d/g, "");
-    fixedSum = 0;
+/** The live payload strings of revealed rules that digit-sum must not destroy. */
+function collectProtected(rules: readonly Pg2Rule[], api: RuleApi): string[] {
+  const out: string[] = [api.nowHHMM()];
+  for (const r of rules) {
+    const p = r.payload;
+    if (!p) continue;
+    if (r.id === "wordle-today" && typeof p["word"] === "string") {
+      out.push((p["word"] as string).toLowerCase()); // appended lowercased
+    } else if (r.id === "country-name" && typeof p["country"] === "string") {
+      out.push((p["country"] as string).toLowerCase()); // appended lowercased
+    } else if (r.id === "chess-best-move" && typeof p["bestMove"] === "string") {
+      out.push(p["bestMove"] as string); // appended verbatim
+    }
   }
-  const needed = target - fixedSum;
+  return out;
+}
+
+/**
+ * Rebuild the digit block so every digit in `current` sums to the target. Digits
+ * inside a protected substring survive and count as fixed; every other digit is
+ * stripped and replaced by a fresh block. Throws if the protected digits already
+ * exceed the target — which the seeded 35-45 range makes impossible, since the
+ * forced live payloads (time <= 24, SAN <= 8) never sum past 32.
+ */
+function solveDigitSum(
+  rule: Pg2Rule,
+  current: string,
+  protectedStrings: readonly string[],
+): string {
+  const target = Number(rule.payload?.["target"]);
+  const keep: boolean[] = Array.from({ length: current.length }, () => false);
+  for (const p of protectedStrings) {
+    if (!p) continue;
+    for (let idx = current.indexOf(p); idx !== -1; idx = current.indexOf(p, idx + 1)) {
+      for (let i = idx; i < idx + p.length; i++) keep[i] = true;
+    }
+  }
+  let base = "";
+  let protectedDigits = 0;
+  for (let i = 0; i < current.length; i++) {
+    const ch = current[i] ?? "";
+    const isDigit = ch >= "0" && ch <= "9";
+    if (keep[i]) {
+      base += ch;
+      if (isDigit) protectedDigits += ch.charCodeAt(0) - 48;
+    } else if (!isDigit) {
+      base += ch; // keep non-protected non-digits; strip non-protected digits
+    }
+  }
+  const needed = target - protectedDigits;
   if (needed < 0) {
     throw new Error(
-      `solveRule(digit-sum): fixed digits already sum to ${fixedSum}, over target ${target}`,
+      `solveRule(digit-sum): protected digits already sum to ${protectedDigits}, over target ${target}`,
     );
   }
   return base + digitsSummingTo(needed);
@@ -121,17 +155,18 @@ function solveFeedWord(
   return current + transform(raw);
 }
 
-function trimTo40(current: string): string {
+function trimToMax(rule: Pg2Rule, current: string): string {
+  const max = Number(rule.payload?.["target"]);
   // Filler is an inert sentinel that belongs to no required substring, so it can
   // be pulled from anywhere. min-length-12 may have padded early (leaving filler
   // at the front), so trim the rightmost filler first but do not stop at a
   // non-filler tail. Whatever is left over is real content the roster needs.
   let s = current;
-  while ([...s].length > 40) {
+  while ([...s].length > max) {
     const idx = s.lastIndexOf(FILLER);
     if (idx === -1) {
       throw new Error(
-        `solveRule(max-length-40): cannot trim to <= 40 without breaking a rule (length ${[...s].length})`,
+        `solveRule(max-length): cannot trim to <= ${max} without breaking a rule (length ${[...s].length})`,
       );
     }
     s = s.slice(0, idx) + s.slice(idx + 1);
@@ -139,8 +174,18 @@ function trimTo40(current: string): string {
   return s;
 }
 
-/** Return a password that satisfies `rule`, starting from `current`. */
-export function solveRule(rule: Pg2Rule, current: string, api: RuleApi): string {
+/**
+ * Return a password that satisfies `rule`, starting from `current`. `protected`
+ * carries sibling rules' live payload strings so digit-sum can preserve and
+ * count digit-bearing substrings (a chess SAN); it is ignored by every other
+ * rule and defaults to empty for standalone use.
+ */
+export function solveRule(
+  rule: Pg2Rule,
+  current: string,
+  api: RuleApi,
+  protectedStrings: readonly string[] = [],
+): string {
   if (rule.validate(current, STUB_STATE, api).passed) return current;
   switch (rule.id) {
     case "min-length-12": {
@@ -157,7 +202,8 @@ export function solveRule(rule: Pg2Rule, current: string, api: RuleApi): string 
     case "captcha-human":
       return current + CAPTCHA_PHRASE;
     case "digit-sum":
-      return solveDigitSum(rule, current, api);
+      // Always protect the live clock; add any sibling SAN/answer/name on top.
+      return solveDigitSum(rule, current, [api.nowHHMM(), ...protectedStrings]);
     case "include-month":
       return current + SHORTEST_MONTH;
     case "wordle-today":
@@ -174,8 +220,8 @@ export function solveRule(rule: Pg2Rule, current: string, api: RuleApi): string 
       return current + api.nowHHMM();
     case "chess-best-move":
       return solveFeedWord(rule, current, "bestMove", (m) => m);
-    case "max-length-40":
-      return trimTo40(current);
+    case "max-length":
+      return trimToMax(rule, current);
     case "backwards-password":
       return current + BACKWARDS_PASSWORD;
     case "final-blessing":
@@ -195,13 +241,14 @@ export function solveAll(g: GameState, api: RuleApi): string {
   const MAX_ITERS = 200;
   let s = cellsToPassword(g.cells);
   for (let iter = 0; iter < MAX_ITERS; iter++) {
+    const protectedStrings = collectProtected(g.rules, api);
     const ordered = [...g.rules].sort(
       (a, b) => (SOLVE_PRIORITY[a.id] ?? 1) - (SOLVE_PRIORITY[b.id] ?? 1),
     );
     let changed = false;
     for (const r of ordered) {
       if (r.validate(s, g, api).passed) continue;
-      const next = solveRule(r, s, api);
+      const next = solveRule(r, s, api, protectedStrings);
       if (next !== s) {
         s = next;
         changed = true;

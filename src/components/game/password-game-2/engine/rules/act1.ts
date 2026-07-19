@@ -14,12 +14,18 @@ export function digitSumOf(password: string): number {
   return sum;
 }
 
-/** Rule 6 — the digits must sum to a seeded target in [20, 32]. */
+/**
+ * Rule 6 — the digits must sum to a seeded target in [35, 45]. The floor of 35
+ * sits above the maximum digit sum any forced live payload can contribute (the
+ * current-time HH:MM peaks at 24 for 19:59; a chess SAN adds at most ~8), so the
+ * target is always reachable by padding at every clock time. See the solver's
+ * protected-substring rebuild — a seed must never be structurally unsolvable.
+ */
 const digitSum: Pg2RuleDef = {
   id: "digit-sum",
   act: "act1",
   create: (rng) => {
-    const target = rangeInt(rng, 20, 32);
+    const target = rangeInt(rng, 35, 45);
     return {
       id: "digit-sum",
       act: "act1",
