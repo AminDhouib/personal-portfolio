@@ -40,7 +40,11 @@ const NEXT_ACT: Record<ActId, ActId | null> = {
   finale: null,
 };
 
-/** Runtime-only fields hung on an instance; never serialized, never part of the contract. */
+/**
+ * Runtime bookkeeping hung on an instance. These are plain enumerable fields (so
+ * not hidden from serialization); the point is they are not part of the designed
+ * serial shape (EventInstance) — engine-internal state, not authored run data.
+ */
 type LiveInstance = EventInstance & { rng?: Rng; coupledInjected?: boolean };
 
 /** Per-run injected clock, kept off GameState so the serializable shape stays clean. */
@@ -87,6 +91,9 @@ export function tick(g: GameState, dtMs: number): void {
   }
 
   // Init events that have become due in the current act (data + event-scoped rng).
+  // Deliberate asymmetry: events only init while their act is current, so an
+  // inhabitant scheduled late in an act can miss its onset window entirely — the
+  // Director must schedule inhabitants early in the act (Task 3 concern).
   for (const inst of g.events) {
     if (inst.data === undefined && inst.act === g.act && inst.scheduledAtMs <= g.actElapsedMs) {
       ensureInited(g, inst);
@@ -94,7 +101,10 @@ export function tick(g: GameState, dtMs: number): void {
   }
 
   // Tick every live event. The def owns its phase transitions; the engine owns
-  // phaseElapsedMs (accumulated here, reset to 0 when the def flips phase).
+  // phaseElapsedMs (accumulated here, reset to 0 when the def flips phase). Events
+  // signal cell edits by replacing g.cells with a new array (see EventDef.onTick):
+  // snapshot the reference so a change can be detected and versioned below.
+  const cellsBefore = g.cells;
   for (const inst of g.events) {
     if (inst.data === undefined || inst.phase === "done") continue;
     const def = DEF_BY_ID.get(inst.defId);
@@ -109,6 +119,10 @@ export function tick(g: GameState, dtMs: number): void {
       live.coupledInjected = true;
     }
   }
+  // An event that replaced the cell run is a render-affecting change: version it.
+  if (g.cells !== cellsBefore) bump(g);
+  // Engine-owned safety net: an event may have removed the cell the caret sat on.
+  g.caret = Math.min(g.caret, g.cells.length);
 
   const password = cellsToPassword(g.cells);
   const api = makeRuleApi(g, clockOf(g));
@@ -198,6 +212,7 @@ export function requestSubmit(g: GameState): void {
     return;
   }
   g.act = "finale";
+  g.actElapsedMs = 0; // consistent with other act transitions
   g.finale = createFinale(g);
   bump(g);
   pushEffect(g, { kind: "title-card", act: "finale" });
@@ -276,6 +291,7 @@ function nextUnrevealedCoreRuleForAct(g: GameState): Pg2RuleDef | null {
 }
 
 function revealRule(g: GameState, def: Pg2RuleDef): void {
+  if (g.rules.some((r) => r.id === def.id)) return; // idempotent: never reveal twice
   g.rules.push(def.create(mulberry32(subSeed(g.seed, "rule-" + def.id))));
   bump(g);
 }

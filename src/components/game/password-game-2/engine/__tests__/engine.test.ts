@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyKey, applyPointer, createRun, makeRuleApi, requestSubmit, tick } from "../engine";
-import { drainEffects } from "../effects";
+import { drainEffects, pushEffect } from "../effects";
 import { cellsToPassword } from "../cells";
 import type { CharCell } from "../types";
 
@@ -174,6 +174,31 @@ describe("engine pointer routing", () => {
     // The parasite is skipped in the value but never corrupts the array or caret.
     expect(g.cells.map((c) => c.ch).join("")).toBe("abYZc");
     expect(cellsToPassword(g.cells)).toBe("abYc");
+  });
+});
+
+describe("engine effects backlog cap", () => {
+  it("caps the queue at 64, dropping the oldest so the survivors are the last 64", () => {
+    const g = boot();
+    for (let i = 0; i < 70; i++) {
+      pushEffect(g, { kind: "toast", text: `t${i}`, tone: "info" });
+    }
+    expect(g.effects.length).toBe(64);
+    const texts = g.effects.map((e) => (e.kind === "toast" ? e.text : ""));
+    expect(texts[0]).toBe("t6"); // t0..t5 were dropped
+    expect(texts[texts.length - 1]).toBe("t69");
+  });
+});
+
+describe("engine caret safety net", () => {
+  it("re-clamps the caret when the cell run shrinks under it during a tick", () => {
+    const g = boot();
+    type(g, "abc"); // caret at 3, three cells
+    // Arrange the state an event would leave behind: a shorter run, stale caret.
+    g.cells = g.cells.slice(0, 1);
+    expect(g.caret).toBe(3);
+    tick(g, 100);
+    expect(g.caret).toBe(1); // clamped to cells.length
   });
 });
 

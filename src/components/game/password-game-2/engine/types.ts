@@ -94,8 +94,13 @@ export interface EventDef<S = unknown> {
   id: string;
   family: EventFamily;
   telegraphMs: number;
+  /** Must return a defined (non-undefined) value: data === undefined marks "not yet initialized". */
   init(rng: Rng, state: GameState): S;
-  /** Mutates inst.data and state (via cells helpers). Advances inst.phase. */
+  /**
+   * Mutates inst.data and advances inst.phase. Cell changes must go through the
+   * cells helpers (setCellStatus) or otherwise replace g.cells with a NEW array;
+   * in-place element mutation will not be detected and will not bump the version.
+   */
   onTick(inst: EventInstance<S>, ctx: EventContext): void;
   /** Keyboard interception BEFORE normal typing. Return true if consumed. */
   onKey?(inst: EventInstance<S>, ctx: EventContext, key: string): boolean;

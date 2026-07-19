@@ -64,3 +64,23 @@ export function deleteRange(
 export function findCellIndex(cells: readonly CharCell[], id: number): number {
   return cells.findIndex((cell) => cell.id === id);
 }
+
+/**
+ * Return a NEW cells array with cell `id`'s status replaced: eventTag is set for a
+ * non-normal status and dropped when the status returns to "normal". An absent id
+ * yields a fresh array with identical contents (a benign no-op). Event defs must
+ * route cell changes through this (or otherwise replace g.cells with a new array)
+ * so tick can detect the change by reference and bump the version.
+ */
+export function setCellStatus(
+  cells: readonly CharCell[],
+  id: number,
+  status: CellStatus,
+  eventTag?: string,
+): CharCell[] {
+  return cells.map((cell) => {
+    if (cell.id !== id) return cell;
+    if (status === "normal") return { id: cell.id, ch: cell.ch, status };
+    return { ...cell, status, eventTag };
+  });
+}

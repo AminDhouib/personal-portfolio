@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { cellsToPassword, insertText, deleteRange, makeCells, findCellIndex } from "../cells";
+import {
+  cellsToPassword,
+  insertText,
+  deleteRange,
+  makeCells,
+  findCellIndex,
+  setCellStatus,
+} from "../cells";
 
 describe("cells", () => {
   it("builds cells from a string with stable ids", () => {
@@ -107,5 +114,34 @@ describe("cells", () => {
   it("findCellIndex returns -1 for an absent id", () => {
     const { cells } = makeCells("abc", 1);
     expect(findCellIndex(cells, 999)).toBe(-1);
+  });
+});
+
+describe("setCellStatus", () => {
+  it("replaces the target cell in a new array, leaving the input untouched", () => {
+    const { cells } = makeCells("abc", 1); // ids 1,2,3
+    const next = setCellStatus(cells, 2, "infected", "gerald");
+    expect(next).not.toBe(cells);
+    expect(next[1]!.status).toBe("infected");
+    expect(next[1]!.eventTag).toBe("gerald");
+    expect(next[0]!.status).toBe("normal"); // other cells untouched
+    // the input array is not mutated
+    expect(cells[1]!.status).toBe("normal");
+    expect(cells[1]!.eventTag).toBeUndefined();
+  });
+
+  it("tolerates an absent id, returning a new array with identical contents", () => {
+    const { cells } = makeCells("abc", 1);
+    const next = setCellStatus(cells, 999, "infected", "gerald");
+    expect(next).not.toBe(cells);
+    expect(next.map((c) => c.status)).toEqual(["normal", "normal", "normal"]);
+  });
+
+  it("drops eventTag when the status returns to normal", () => {
+    const tagged = setCellStatus(makeCells("abc", 1).cells, 2, "infected", "gerald");
+    const cleared = setCellStatus(tagged, 2, "normal");
+    expect(cleared[1]!.status).toBe("normal");
+    expect(cleared[1]!.eventTag).toBeUndefined();
+    expect("eventTag" in cleared[1]!).toBe(false);
   });
 });
