@@ -73,7 +73,12 @@ async function loadChess(): Promise<void> {
   }
 }
 
-/** Minimal shape guard: the fields rule 14 actually reads (id/board/toMove/bestMove/hint). */
+/**
+ * Shape guard for the whole ChessPuzzle contract. Rule 14 reads only
+ * id/board/toMove/bestMove/hint, but the guard asserts `p is ChessPuzzle`, so it
+ * must also verify `accept` — otherwise a future reader of puzzle.accept would
+ * get undefined at runtime while TS believes it is string[].
+ */
 function isChessPuzzle(p: unknown): p is ChessPuzzle {
   if (p === null || typeof p !== "object") return false;
   const c = p as Record<string, unknown>;
@@ -82,6 +87,7 @@ function isChessPuzzle(p: unknown): p is ChessPuzzle {
     Array.isArray(c.board) &&
     (c.toMove === "white" || c.toMove === "black") &&
     typeof c.bestMove === "string" &&
+    Array.isArray(c.accept) &&
     typeof c.hint === "string"
   );
 }
