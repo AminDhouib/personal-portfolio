@@ -15,7 +15,9 @@ export default defineConfig({
     // double-counts those files. Spread configDefaults.exclude rather than
     // replacing it -- setting `exclude` bare drops the node_modules/.git
     // exclusions too (vitest 4 behavior, confirmed against installed 4.1.4).
-    exclude: [...configDefaults.exclude, "**/.next/**"],
+    // .claude/worktrees holds transient agent worktrees (full repo copies);
+    // without the exclude their in-progress test files leak into root runs.
+    exclude: [...configDefaults.exclude, "**/.next/**", "**/.claude/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json-summary", "lcov"],
