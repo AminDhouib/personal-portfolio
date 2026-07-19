@@ -398,7 +398,275 @@
   opacity: 0;
 }
 
+/* ---- Canvas event overlay ---------------------------------------------- */
+
+.pg2-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---- Chrome DOM event layer -------------------------------------------- */
+
+/* The container is click-through; only its controls capture pointer events. */
+.pg2-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+.pg2-chrome button {
+  pointer-events: auto;
+}
+
+/* Cookie-consent hydra: stacked corporate dialogs, bottom-center. */
+.pg2-cookie-stack {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  width: 340px;
+  height: 0;
+  transform: translateX(-50%);
+}
+.pg2-cookie {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 340px;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--pg2-line-strong);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px -18px rgba(15, 23, 42, 0.7);
+  pointer-events: auto;
+}
+.pg2-cookie--urgent {
+  animation: pg2-tremble 0.28s ease-in-out infinite;
+  border-color: var(--pg2-chrome);
+}
+.pg2-cookie__title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pg2-ink);
+}
+.pg2-cookie__body {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--pg2-muted);
+}
+.pg2-cookie__actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+.pg2-cookie__accept {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--pg2-chrome);
+  color: #3b2400;
+  border: 1px solid #b45309;
+}
+.pg2-cookie__decline {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #ffffff;
+  color: var(--pg2-body);
+  border: 1px solid var(--pg2-line-strong);
+}
+.pg2-cookie__reject {
+  display: block;
+  margin: 8px auto 0;
+  font-size: 10px;
+  color: var(--pg2-legal);
+  text-decoration: underline;
+  background: none;
+  border: none;
+}
+
+/* Autocorrect: a settings gear plus an enterprise-SaaS preferences modal. */
+.pg2-gear {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--pg2-chrome);
+  background: #ffffff;
+  border: 1px solid var(--pg2-line-strong);
+  box-shadow: 0 6px 16px -8px rgba(15, 23, 42, 0.5);
+  animation: pg2-gear-spin 6s linear infinite;
+}
+.pg2-settings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 320px;
+  transform: translate(-50%, -50%);
+  padding: 18px 18px 14px;
+  border: 1px solid var(--pg2-line-strong);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 30px 70px -24px rgba(15, 23, 42, 0.75);
+  pointer-events: auto;
+}
+.pg2-settings__crumb {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pg2-legal);
+}
+.pg2-settings__title {
+  margin-top: 3px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--pg2-ink);
+}
+.pg2-settings__list {
+  margin-top: 12px;
+  list-style: none;
+}
+.pg2-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-top: 1px solid var(--pg2-line);
+}
+.pg2-settings__label {
+  font-size: 12.5px;
+  color: var(--pg2-body);
+}
+.pg2-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--pg2-line-strong);
+  transition: background 140ms ease;
+}
+.pg2-switch--on {
+  background: #16a34a;
+}
+.pg2-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 140ms ease;
+}
+.pg2-switch--on .pg2-switch__knob {
+  transform: translateX(18px);
+}
+.pg2-settings__foot {
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--pg2-legal);
+}
+
+/* Loading bar: a full-panel 90s-installer upload that swallows every click. */
+.pg2-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(1.5px);
+  pointer-events: auto;
+}
+.pg2-loading__card {
+  width: min(360px, 78%);
+  padding: 22px 22px 18px;
+  border: 1px solid var(--pg2-line-strong);
+  border-radius: 12px;
+  background: #eef1f6;
+  box-shadow:
+    inset 0 0 0 2px #ffffff,
+    0 24px 60px -24px rgba(0, 0, 0, 0.8);
+}
+.pg2-loading__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pg2-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pg2-loading__track {
+  margin-top: 12px;
+  height: 20px;
+  border: 1px solid var(--pg2-line-strong);
+  border-radius: 3px;
+  background: #ffffff;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+.pg2-loading__fill {
+  height: 100%;
+  background: repeating-linear-gradient(45deg, #2563eb, #2563eb 10px, #3b82f6 10px, #3b82f6 20px);
+  transition: width 180ms linear;
+}
+.pg2-loading__hint {
+  margin-top: 12px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--pg2-muted);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.pg2-loading__hint--show {
+  opacity: 1;
+  animation: pg2-hint-pulse 1.4s ease-in-out infinite;
+}
+
 /* ---- Keyframes --------------------------------------------------------- */
+
+@keyframes pg2-tremble {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-1.5px, 1px);
+  }
+  75% {
+    transform: translate(1.5px, -1px);
+  }
+}
+@keyframes pg2-gear-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pg2-hint-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 
 @keyframes pg2-blink {
   0%,
@@ -490,5 +758,10 @@
   }
   .pg2-panel {
     transform: none !important;
+  }
+  .pg2-cookie--urgent,
+  .pg2-gear,
+  .pg2-loading__hint--show {
+    animation: none;
   }
 }

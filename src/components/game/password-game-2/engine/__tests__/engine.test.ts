@@ -488,3 +488,22 @@ describe("engine effects and rule api", () => {
     expect(api.getEventData("gerald")).toBeNull();
   });
 });
+
+describe("engine forceEvent showcase seam", () => {
+  it("schedules the forced event alone at act1@3000", () => {
+    const g = createRun({ seed: 7, daily: false, nowHHMM: () => HHMM, forceEvent: "galaga" });
+    expect(g.events).toHaveLength(1);
+    const only = g.events[0]!;
+    expect(only.defId).toBe("galaga");
+    expect(only.act).toBe("act1");
+    expect(only.scheduledAtMs).toBe(3000);
+    expect(only.phase).toBe("telegraph");
+    expect(only.data).toBeUndefined();
+  });
+
+  it("falls back to the seeded schedule for an unknown forced id", () => {
+    const forced = createRun({ seed: 7, daily: false, nowHHMM: () => HHMM, forceEvent: "nope" });
+    const normal = createRun({ seed: 7, daily: false, nowHHMM: () => HHMM });
+    expect(forced.events.map((e) => e.defId)).toEqual(normal.events.map((e) => e.defId));
+  });
+});

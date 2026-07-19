@@ -53,6 +53,31 @@ function isDroppable(act: ScriptedAct, slot: SlotSpec): boolean {
   );
 }
 
+/** act-relative onset used by the forceEvent showcase seam. */
+const FORCE_ONSET_MS = 3000;
+
+/**
+ * Showcase/debug override: when a run is created with `forceEvent`, the whole seeded
+ * schedule is replaced by a single instance of that event, onsetting 3000ms into
+ * act1. Powers the `?event=<id>` URL param (a real, shippable feature). An unknown
+ * id yields null so buildSchedule falls back to the normal seeded schedule.
+ */
+function forcedSchedule(defId: string): EventInstance[] | null {
+  const def = EVENT_DEFS.find((d) => d.id === defId);
+  if (!def) return null;
+  return [
+    {
+      defId: def.id,
+      family: def.family,
+      act: "act1",
+      phase: "telegraph",
+      phaseElapsedMs: 0,
+      scheduledAtMs: FORCE_ONSET_MS,
+      data: undefined,
+    },
+  ];
+}
+
 /**
  * Resolve a run's seeded event schedule. Each family draws without replacement from
  * a single per-run pool (so a def used in an early act cannot recur later); each
@@ -60,8 +85,15 @@ function isDroppable(act: ScriptedAct, slot: SlotSpec): boolean {
  * take their exact id; droppable slots are decided by a coin flip on the same
  * stream. A dry pool skips the slot rather than throwing (cannot happen with the
  * current 12-def manifest, but the guard keeps a shrunken manifest safe).
+ *
+ * When `forceEvent` names a known def, the seeded schedule is bypassed entirely for
+ * a single-event showcase (see forcedSchedule).
  */
-export function buildSchedule(seed: number): EventInstance[] {
+export function buildSchedule(seed: number, forceEvent?: string): EventInstance[] {
+  if (forceEvent !== undefined) {
+    const forced = forcedSchedule(forceEvent);
+    if (forced) return forced;
+  }
   const pools: Record<EventFamily, string[]> = {
     inhabitant: idsOfFamily("inhabitant"),
     force: idsOfFamily("force"),

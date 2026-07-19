@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import type { ActId, Effect, GameState } from "../engine/types";
+import type { ActId, Effect, GameState, PointerTarget } from "../engine/types";
 import {
   applyKey,
   applyPointer,
@@ -22,12 +22,18 @@ import {
 import { drainEffects } from "../engine/effects";
 import { cellsToPassword } from "../engine/cells";
 import { dailySeed } from "../engine/rng";
+import { EVENT_DEFS } from "../engine/events/index";
 import { getAudio, isEnabled, setEnabled } from "../sound/audio";
 import { playCue } from "../sound/motifs";
 import { CharStage } from "./char-stage";
+import { CanvasOverlay, type OverlayHandle } from "./canvas-overlay";
+import { ChromeEvents } from "./chrome-events";
 import { RuleList } from "./rule-list";
 import { Hud } from "./hud";
 import "./pg2.css";
+
+/** Valid ?event= ids for the showcase URL param, resolved once from the manifest. */
+const EVENT_IDS: ReadonlySet<string> = new Set(EVENT_DEFS.map((d) => d.id));
 
 type Phase = "start" | "running";
 
@@ -94,6 +100,11 @@ export function GameShell() {
     const n = Number(raw);
     return Number.isInteger(n) && n >= 0 && n <= 0xffffffff ? n >>> 0 : null;
   }, [searchParams]);
+  // ?event=<id> forces a single event to onset early in act1 — a debug/showcase URL.
+  const urlEvent = useMemo(() => {
+    const raw = searchParams.get("event");
+    return raw !== null && EVENT_IDS.has(raw) ? raw : null;
+  }, [searchParams]);
 
   const [phase, setPhase] = useState<Phase>("start");
   // The engine store: one mutable object rendered from state (not read from a ref
@@ -120,6 +131,8 @@ export function GameShell() {
 
   const gameRef = useRef<GameState | null>(null);
   const renderedVersionRef = useRef(-1);
+  const overlayRef = useRef<OverlayHandle | null>(null);
+  const autoStartedRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const flashRef = useRef<HTMLDivElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -278,6 +291,9 @@ export function GameShell() {
       tick(g, dt);
       for (const e of drainEffects(g)) dispatch(e);
 
+      // Repaint the canvas overlay every frame — the whole event-visibility layer.
+      overlayRef.current?.paint(g, ts);
+
       // Screen shake: jitter the panel by the decaying trauma, then decay it.
       const panel = panelRef.current;
       if (panel) {
@@ -332,8 +348,8 @@ export function GameShell() {
     };
   }, [phase, forceRender, playSound, pushToast, enqueueCard, setMood, triggerFlash]);
 
-  const start = useCallback((s: number, isDaily: boolean) => {
-    const g = createRun({ seed: s, daily: isDaily, nowHHMM });
+  const start = useCallback((s: number, isDaily: boolean, forceEvent?: string) => {
+    const g = createRun({ seed: s, daily: isDaily, nowHHMM, forceEvent });
     gameRef.current = g;
     renderedVersionRef.current = g.version;
     setGame(g);
@@ -341,6 +357,17 @@ export function GameShell() {
     setDaily(isDaily);
     setPhase("running");
   }, []);
+
+  // Showcase/debug: ?event=<id> auto-starts a run with that single event forced.
+  // The start is deferred to a timer (not run synchronously in the effect body, to
+  // keep the transition out of a render cascade) and claims a once-guard so Strict
+  // Mode's double-invoke cannot start twice. No cleanup cancel — a cancelled 0ms
+  // timer plus the guard is exactly the mount/cleanup/mount no-op trap.
+  useEffect(() => {
+    if (autoStartedRef.current || urlEvent === null) return;
+    autoStartedRef.current = true;
+    window.setTimeout(() => start(urlSeed ?? 7, false, urlEvent), 0);
+  }, [urlEvent, urlSeed, start]);
 
   const toggleSound = useCallback(() => {
     setSoundOn((prev) => {
@@ -367,6 +394,53 @@ export function GameShell() {
   const focusHiddenInput = useCallback(() => {
     hiddenInputRef.current?.focus({ preventScroll: true });
   }, []);
+
+  // Route a pointer target into the engine (canvas chips/aliens and chrome buttons).
+  const applyTarget = useCallback(
+    (target: PointerTarget) => {
+      const g = gameRef.current;
+      if (!g) return;
+      applyPointer(g, target);
+      forceRender();
+      focusHiddenInput();
+    },
+    [forceRender, focusHiddenInput],
+  );
+
+  // Canvas hit-testing: a capture-phase listener on the panel consults the overlay's
+  // per-frame hit regions BEFORE the DOM cells' own mousedown. A consumed hit routes
+  // the target and suppresses the trailing mousedown so the caret does not also move.
+  useEffect(() => {
+    if (phase !== "running") return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    let consumed = false;
+    const onPointerDown = (e: PointerEvent) => {
+      const overlay = overlayRef.current;
+      const g = gameRef.current;
+      if (!overlay || !g) return;
+      const target = overlay.hitTest(e.clientX, e.clientY);
+      consumed = target !== null;
+      if (!target) return;
+      e.preventDefault();
+      e.stopPropagation();
+      applyPointer(g, target);
+      forceRender();
+      focusHiddenInput();
+    };
+    const onMouseDown = (e: MouseEvent) => {
+      if (!consumed) return;
+      consumed = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    panel.addEventListener("pointerdown", onPointerDown, true);
+    panel.addEventListener("mousedown", onMouseDown, true);
+    return () => {
+      panel.removeEventListener("pointerdown", onPointerDown, true);
+      panel.removeEventListener("mousedown", onMouseDown, true);
+    };
+  }, [phase, forceRender, focusHiddenInput]);
 
   const onCellClick = useCallback(
     (id: number) => {
@@ -444,7 +518,7 @@ export function GameShell() {
 
       <div ref={panelRef} className="pg2-panel relative overflow-hidden">
         {phase === "start" ? (
-          <StartScreen urlSeed={urlSeed} onStart={start} />
+          <StartScreen urlSeed={urlSeed} forceEvent={urlEvent} onStart={start} />
         ) : g ? (
           <RunningView
             g={g}
@@ -460,6 +534,11 @@ export function GameShell() {
             onHiddenInput={onHiddenInput}
             onSubmit={onSubmit}
           />
+        ) : null}
+
+        {g && phase === "running" ? <CanvasOverlay ref={overlayRef} /> : null}
+        {g && phase === "running" && g.outcome === "playing" && g.act !== "finale" ? (
+          <ChromeEvents g={g} onPointer={applyTarget} />
         ) : null}
 
         <div ref={flashRef} className="pg2-flash" aria-hidden="true" />
@@ -501,11 +580,14 @@ export function GameShell() {
 
 function StartScreen({
   urlSeed,
+  forceEvent,
   onStart,
 }: {
   urlSeed: number | null;
-  onStart: (seed: number, daily: boolean) => void;
+  forceEvent: string | null;
+  onStart: (seed: number, daily: boolean, forceEvent?: string) => void;
 }) {
+  const force = forceEvent ?? undefined;
   return (
     <div className="p-6 sm:p-8">
       <div className="flex items-center justify-between">
@@ -554,14 +636,14 @@ function StartScreen({
         <button
           type="button"
           className="pg2-btn pg2-btn--primary px-5 py-2.5 text-[15px]"
-          onClick={() => onStart(dailySeed(), true)}
+          onClick={() => onStart(dailySeed(), true, force)}
         >
           Start today&apos;s daily
         </button>
         <button
           type="button"
           className="pg2-btn pg2-btn--ghost px-5 py-2.5 text-[15px]"
-          onClick={() => onStart(randomSeed(), false)}
+          onClick={() => onStart(randomSeed(), false, force)}
         >
           Random seed
         </button>
@@ -569,7 +651,7 @@ function StartScreen({
           <button
             type="button"
             className="pg2-btn pg2-btn--ghost px-5 py-2.5 text-[15px]"
-            onClick={() => onStart(urlSeed, false)}
+            onClick={() => onStart(urlSeed, false, force)}
           >
             Start seed {urlSeed}
           </button>

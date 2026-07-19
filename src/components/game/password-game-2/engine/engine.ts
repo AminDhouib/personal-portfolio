@@ -24,6 +24,11 @@ export interface CreateRunOpts {
   daily: boolean;
   /** Injected wall clock for the current-time rule; defaults to the real clock. */
   nowHHMM?: () => string;
+  /**
+   * Showcase/debug override: force a single event to onset 3000ms into act1,
+   * replacing the seeded schedule. Powers the `?event=<id>` URL param.
+   */
+  forceEvent?: string;
 }
 
 /** defId -> EventDef, resolved once. Empty until the manifest is seeded (Task 3). */
@@ -63,7 +68,7 @@ export function createRun(opts: CreateRunOpts): GameState {
     actElapsedMs: 0,
     rules: [],
     ruleStates: {},
-    events: buildSchedule(opts.seed),
+    events: buildSchedule(opts.seed, opts.forceEvent),
     finale: null,
     outcome: "playing",
     inputLocked: false,
