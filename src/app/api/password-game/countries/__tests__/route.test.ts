@@ -1,61 +1,29 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
-
-vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn() }));
+import { describe, it, expect } from "vitest";
 
 import { GET } from "../route";
-import { logWarn } from "@/lib/log";
-import { mockFetchJsonResponse } from "@/test/api-route-helpers";
-
-const REST_PAYLOAD = [
-  { name: { common: "Japan" }, capital: ["Tokyo"] },
-  { name: { common: "France" }, capital: ["Paris"] },
-  { name: { common: "Antarctica" }, capital: [] },
-];
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.mocked(logWarn).mockClear();
-});
+import { STATIC_CAPITALS } from "@/data/password-game/capitals-static";
 
 describe("GET /api/password-game/countries", () => {
-  it("returns sorted capitals with the week-long cache on success", async () => {
-    vi.stubGlobal("fetch", mockFetchJsonResponse({ ok: true, body: REST_PAYLOAD }));
+  it("serves the vendored static capital list with the week-long cache", async () => {
     const res = await GET();
     const body = await res.json();
-    expect(body.source).toBe("restcountries");
-    expect(body.count).toBe(2);
-    expect(body.capitals).toEqual([
-      { country: "France", capital: "Paris" },
-      { country: "Japan", capital: "Tokyo" },
-    ]);
+    expect(body.source).toBe("static");
+    expect(body.count).toBe(STATIC_CAPITALS.length);
+    expect(body.count).toBeGreaterThan(200);
+    expect(body.capitals).toEqual(STATIC_CAPITALS);
     expect(res.headers.get("cache-control")).toBe(
       "public, s-maxage=604800, stale-while-revalidate=86400",
     );
   });
 
-  it("does NOT cache an upstream failure for a week (DD3-003): short TTL when unavailable", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("upstream down")));
+  it("returns pairs shaped { country, capital } with non-empty values", async () => {
     const res = await GET();
     const body = await res.json();
-    expect(body.source).toBe("unavailable");
-    expect(body.count).toBe(0);
-    expect(res.headers.get("cache-control")).toBe("public, s-maxage=300");
-  });
-
-  it("treats a non-OK upstream response as unavailable with the short TTL", async () => {
-    vi.stubGlobal("fetch", mockFetchJsonResponse({ ok: false }));
-    const res = await GET();
-    const body = await res.json();
-    expect(body.source).toBe("unavailable");
-    expect(res.headers.get("cache-control")).toBe("public, s-maxage=300");
-    expect(logWarn).toHaveBeenCalledTimes(1);
-  });
-
-  it("logs a warning and treats a malformed (non-array) upstream payload as unavailable", async () => {
-    vi.stubGlobal("fetch", mockFetchJsonResponse({ ok: true, body: { not: "an array" } }));
-    const res = await GET();
-    const body = await res.json();
-    expect(body.source).toBe("unavailable");
-    expect(logWarn).toHaveBeenCalledTimes(1);
+    for (const entry of body.capitals) {
+      expect(typeof entry.country).toBe("string");
+      expect(entry.country.length).toBeGreaterThan(0);
+      expect(typeof entry.capital).toBe("string");
+      expect(entry.capital.length).toBeGreaterThan(0);
+    }
   });
 });
