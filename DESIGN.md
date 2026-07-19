@@ -28,8 +28,9 @@ and the write aborts instead of overwriting real data; a version-mismatched file
 Games are self-contained under `src/components/game/`. Most games are a single top-level
 component file (`hextris.tsx`, `tower-stacker.tsx`, `typing-speed.tsx`); non-component logic is
 progressively being extracted into same-named subdirectories as each game gets touched —
-`password-game/` (rules/, hazards/, `engine.ts`, `prng.ts`) and `super-voltorb-flip/`
-(`engine.ts`, `audio.ts`, `chrome.tsx`) are furthest along; `space-shooter/` holds several
+`password-game-2/` (a full `engine/` with `rules/`, `events/`, and a seeded core, plus `stage/`
+and `sound/` layers) and `super-voltorb-flip/` (`engine.ts`, `audio.ts`, `chrome.tsx`) are
+furthest along; `space-shooter/` holds several
 extracted modules (`spawning.ts`, `boss-behaviors.ts`, `sound-manager.ts`, `run-init.ts`) but
 `space-shooter.tsx` and `hextris.tsx` still carry the bulk of their engine logic inline in the
 component. See Extract-before-edit doctrine below before touching either.
@@ -138,10 +139,11 @@ current tree on 2026-07-07.
   `<MotionConfig reducedMotion="never">`, and game keyframe animations plus the `animate-spin`
   status spinners are deliberately left ungated by either mechanism. Motion is gameplay in a
   game, not decoration — do not "fix" this into obeying the OS preference.
-- **The `/games` grid shows 4 cards, not 6, on purpose.** `games-meta.ts` marks `tower-stacker`
-  `hidden: true` and `password-game` both `hidden: true` and `external: true` (it has its own
-  top-level route outside the shared game-loader). Both routes still work if visited directly —
-  `hidden` takes a game out of rotation without deleting any code.
+- **The `/games` grid shows 5 cards, not 6, on purpose.** `games-meta.ts` marks `tower-stacker`
+  `hidden: true`, taking it out of rotation without deleting any code — the route still works if
+  visited directly. `password-game` (The Password Game 2) is `external: true`: its card is live in
+  the grid, but it links to its own top-level route (`/games/password-game`) outside the shared
+  game-loader rather than to a `[slug]` page.
 - **`maxDuration` is deliberately absent from the LLM route** (`src/app/api/copilotkit/route.ts`).
   It's a Vercel-only directive and a documented no-op on this self-hosted deployment — the
   code's own comment calls it out as the same class of theater `env.ts`'s honesty pass removed
@@ -191,7 +193,7 @@ recorded here so a future pass doesn't re-litigate them from scratch.
 
 Any future gameplay change to `hextris.tsx` or `space-shooter.tsx` starts by extracting the
 touched subsystem into its own tested module first, following the pattern `super-voltorb-flip/`
-and `password-game/` already establish (`engine.ts` as a plain, seedable, unit-testable class;
+and `password-game-2/` already establish (a plain, seedable, unit-testable engine module; the
 component file left as the render/glue layer). Do not add logic to either monolith in place —
 that is exactly the change-cost pattern the audit measured directly (a site-wide reduce-motion
 change touched 32 files; adding a game touches 3 dispatch points by design, but editing an

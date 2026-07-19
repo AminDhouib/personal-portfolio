@@ -55,7 +55,7 @@ Everything in `.env.example` is optional for local dev: each integration (AI cha
 src/
   app/          Next.js App Router routes: pages + API routes (chat, leaderboards, leads)
   components/   React components (blog, chat, games, layout, sections, three, ui)
-  data/         Static app data (e.g. password-game content)
+  data/         Static app data (e.g. Password Game 2 feed data: wordle, chess, capitals)
   lib/          Server-side utilities: GitHub stats, GA4, blog loader, leaderboard store
   test/         Vitest setup
 content/
