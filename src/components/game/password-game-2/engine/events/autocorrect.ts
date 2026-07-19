@@ -86,9 +86,11 @@ const isValueCell = (cell: CharCell): boolean => !VALUE_EXCLUDED.has(cell.status
 /**
  * Perform one correction: find the first pair whose source appears (case-insensitive)
  * in the password value, then splice the matched value-cells out and drop the correction
- * in as fresh, normal cells. Excluded cells interleaved with the match are left in place.
- * The caret shifts by the length delta when the edit lands at or left of it. Returns
- * whether a correction was made.
+ * in as fresh, normal cells. An excluded cell interleaved with the match survives by id
+ * but slides to just past the replacement block (the replacement is inserted at the
+ * match's first cell index, and only the matched value-cells are removed). The caret
+ * shifts by the length delta when the edit lands at or left of it. Returns whether a
+ * correction was made.
  */
 function correctOnce(d: AutocorrectData, ctx: EventContext): boolean {
   const cells = ctx.state.cells;

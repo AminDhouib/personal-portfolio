@@ -2,12 +2,10 @@ import type { Rng } from "./rng";
 import { mulberry32, subSeed } from "./rng";
 import type {
   ActId,
-  AllyId,
   EventContext,
   EventDef,
   EventInstance,
   EventPhase,
-  FinaleState,
   GameState,
   Pg2RuleDef,
   PointerTarget,
@@ -19,6 +17,7 @@ import { pushEffect } from "./effects";
 import { CORE_RULES } from "./rules/index";
 import { buildSchedule } from "./director";
 import { EVENT_DEFS } from "./events/index";
+import { createFinale, finalePointer, tickFinale } from "./events/finale";
 
 export interface CreateRunOpts {
   seed: number;
@@ -90,6 +89,14 @@ export function tick(g: GameState, dtMs: number): void {
     g.actElapsedMs += dtMs;
   }
 
+  // The finale owns its own pipeline. The world is frozen (every event is "done"),
+  // so the normal event/rule machinery below has nothing to do; skip straight to it.
+  // The clock above keeps running — the finale's only punishment.
+  if (g.act === "finale") {
+    tickFinale(g, dtMs);
+    return;
+  }
+
   // Snapshot the cell run before any event work. A due event's init may replace
   // g.cells, so the snapshot must precede the init loop as well as the tick loop —
   // both kinds of cell replacement need to be caught by the version bump below.
@@ -114,6 +121,11 @@ export function tick(g: GameState, dtMs: number): void {
     if (!def) continue;
     const prevPhase = inst.phase;
     inst.phaseElapsedMs += dtMs;
+    // Tally time spent in the peak phase per event, so the finale can name the run's
+    // biggest crisis. Attributed to the phase the instance was IN for this dt.
+    if (prevPhase === "peak") {
+      g.stats.peakMsByEvent[inst.defId] = (g.stats.peakMsByEvent[inst.defId] ?? 0) + dtMs;
+    }
     def.onTick(inst, makeCtx(g, inst, dtMs));
     if (inst.phase !== prevPhase) inst.phaseElapsedMs = 0;
     const live = inst as LiveInstance;
@@ -204,8 +216,8 @@ export function applyKey(g: GameState, key: string): void {
 }
 
 /**
- * Route a pointer. Active events see it first (onset order). During the finale,
- * targets go to the finale (Task 10). Otherwise a cell target moves the caret.
+ * Route a pointer. Active events see it first (onset order). Once the finale is open
+ * its targets go to finalePointer; otherwise a cell target moves the caret.
  */
 export function applyPointer(g: GameState, target: PointerTarget): void {
   // Snapshot BEFORE the routing loop so a mutation by a non-consuming handler is
@@ -227,7 +239,10 @@ export function applyPointer(g: GameState, target: PointerTarget): void {
     }
   }
   settle();
-  if (g.act === "finale") return; // finale pointer routing lands in Task 10
+  if (g.finale !== null) {
+    finalePointer(g, target);
+    return;
+  }
   if (target.kind === "cell" && typeof target.id === "number") {
     const idx = findCellIndex(g.cells, target.id);
     if (idx >= 0) g.caret = idx;
@@ -390,22 +405,6 @@ function advanceActIfComplete(g: GameState, password: string, api: RuleApi): voi
   }
 }
 
-/** Finale bootstrap. A stub until Task 10 moves it to events/finale.ts. */
-function createFinale(g: GameState): FinaleState {
-  return { phase: "missiles", phaseElapsedMs: 0, allies: aliveAllies(g), attempts: 0, data: {} };
-}
-
-/** Ally ids for inhabitants still alive at finale start (empty until Task 6). */
-function aliveAllies(g: GameState): AllyId[] {
-  const allies: AllyId[] = [];
-  for (const inst of g.events) {
-    if (inst.data === undefined) continue;
-    const def = DEF_BY_ID.get(inst.defId);
-    if (def?.allyId && def.isAlive?.(inst)) allies.push(def.allyId);
-  }
-  return allies;
-}
-
 function clockOf(g: GameState): () => string {
   return clockByRun.get(g) ?? defaultNowHHMM;
 }
@@ -424,6 +423,7 @@ function emptyStats(): RunStats {
     missilesIntercepted: 0,
     aliensDowned: 0,
     creaturesSaved: 0,
+    peakMsByEvent: {},
     biggestCrisis: "",
     knockbacks: 0,
   };

@@ -11,6 +11,7 @@ function emptyStats(): RunStats {
     missilesIntercepted: 0,
     aliensDowned: 0,
     creaturesSaved: 0,
+    peakMsByEvent: {},
     biggestCrisis: "",
     knockbacks: 0,
   };

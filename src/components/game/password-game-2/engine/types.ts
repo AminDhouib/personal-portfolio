@@ -134,7 +134,10 @@ export interface RunStats {
   missilesIntercepted: number;
   aliensDowned: number;
   creaturesSaved: number; // filled at finale start
-  biggestCrisis: string; // event id with the longest peak phase
+  /** defId -> accumulated ms spent in the peak phase; the engine tick tallies this. */
+  peakMsByEvent: Record<string, number>;
+  /** Event id with the largest accumulated peak ms; "" until the finale computes it. */
+  biggestCrisis: string;
   knockbacks: number; // finale phase restarts
 }
 

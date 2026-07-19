@@ -10,6 +10,7 @@ import type { GalagaData } from "../events/galaga";
 import type { SnakeData } from "../events/snake";
 import type { CookieBannerData } from "../events/cookie-banner";
 import type { AutocorrectData } from "../events/autocorrect";
+import type { MissilesData } from "../events/finale";
 import type { ActId, Effect, EventInstance, GameState, RuleApi } from "../types";
 
 /**
@@ -381,6 +382,34 @@ function driveRun(seed: number): DriveResult {
 
 const SEED = 7;
 
+/** The current missile-phase working state, straight off the finale data bag. */
+const finaleMissiles = (g: GameState): MissilesData =>
+  (g.finale!.data as { missiles: MissilesData }).missiles;
+
+/**
+ * Fight the finale to victory with pointers only (the zero-hardware path the stage
+ * would drive): intercept every falling missile each frame, click the real EULA
+ * checkbox the moment the phase opens, and catch the runaway button on sight. Fails
+ * loudly via the iteration cap rather than hanging if a phase never clears.
+ */
+const finishFinale = (g: GameState) => {
+  let guard = 0;
+  while (g.outcome !== "victory" && guard++ < 5000) {
+    const phase = g.finale!.phase;
+    if (phase === "missiles") {
+      for (const m of finaleMissiles(g).missiles) {
+        if (m.state === "falling") applyPointer(g, { kind: "missile", id: m.id });
+      }
+    } else if (phase === "eula") {
+      applyPointer(g, { kind: "eula-checkbox" });
+    } else {
+      applyPointer(g, { kind: "submit-button" });
+    }
+    tick(g, TICK_MS);
+    drainEffects(g);
+  }
+};
+
 describe("password-game-2 full-run integration", () => {
   it("walks the full arc prologue -> act1 -> act2 -> act3 -> finale, in order, once each", () => {
     const r = driveRun(SEED);
@@ -643,5 +672,49 @@ describe("password-game-2 full-run integration", () => {
     requestSubmit(g);
     expect(g.act).toBe("finale");
     expect(g.finale).not.toBeNull();
+  });
+
+  it("drives the caretaker run through the finale to victory and populates the receipt", () => {
+    const r = driveRun(SEED);
+    const g = r.g;
+    expect(g.act).toBe("finale");
+    expect(g.finale!.phase).toBe("missiles");
+
+    const alliesAtStart = g.finale!.allies.length;
+    finishFinale(g);
+
+    // The run is won, cleanly (no knockbacks on the tended path).
+    expect(g.outcome).toBe("victory");
+    expect(g.stats.knockbacks).toBe(0);
+
+    // Every creature kept alive joined the finale, and the marquee stats are populated.
+    expect(g.stats.creaturesSaved).toBe(alliesAtStart);
+    expect(g.stats.creaturesSaved).toBe(r.inhabitants.length);
+    expect(g.stats.missilesIntercepted).toBeGreaterThan(0);
+    expect(g.stats.biggestCrisis).not.toBe(""); // some event held a peak long enough
+
+    // The clock ran the whole time and lands in a sane window.
+    expect(g.elapsedMs).toBeGreaterThan(r.elapsedAtFinaleMs);
+    expect(g.elapsedMs).toBeLessThan(30 * 60 * 1_000);
+  });
+
+  it("knocks back once when the missiles are neglected, then the finale is still winnable", () => {
+    const r = driveRun(SEED);
+    const g = r.g;
+    expect(g.finale!.phase).toBe("missiles");
+    // Seed 7 fields no Gerald, so nothing intercepts for the player: ignore the
+    // missiles and four will land, restarting the phase exactly once.
+    let guard = 0;
+    while (g.stats.knockbacks < 1 && guard++ < 3000) {
+      tick(g, TICK_MS);
+      drainEffects(g);
+    }
+    expect(g.stats.knockbacks).toBe(1);
+    expect(g.finale!.attempts).toBe(1);
+    expect(g.finale!.phase).toBe("missiles"); // knocked back to the phase start, never out
+
+    // Fight it properly from the restart and win — knockback is a setback, not a loss.
+    finishFinale(g);
+    expect(g.outcome).toBe("victory");
   });
 });

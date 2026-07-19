@@ -286,6 +286,34 @@ describe("the autocorrect demon", () => {
     expect(h.state.caret).toBe(6); // an equal-length edit left the caret at the end
   });
 
+  it("keeps an excluded cell interleaved with a match, sliding it past the replacement (M1)", () => {
+    const h = boot(autocorrectDef);
+    toPeak(h);
+    // "dra" + [abducted] + "gon": the abducted cell drops out of the value, so the value
+    // reads "dragon" and corrects to "dargon". The excluded cell is not part of the match,
+    // so it survives by id and slides to just past the freshly minted replacement block.
+    h.state.cells = [
+      { id: 1, ch: "d", status: "normal" },
+      { id: 2, ch: "r", status: "normal" },
+      { id: 3, ch: "a", status: "normal" },
+      { id: 99, ch: "Z", status: "abducted", eventTag: "galaga" },
+      { id: 4, ch: "g", status: "normal" },
+      { id: 5, ch: "o", status: "normal" },
+      { id: 6, ch: "n", status: "normal" },
+    ] as CharCell[];
+    h.state.nextCellId = 100;
+    h.state.caret = h.state.cells.length;
+
+    drive(h, 8000);
+
+    expect(valueOf(h)).toBe("dargon"); // the abducted cell never counted toward the value
+    const excluded = h.state.cells.find((c) => c.id === 99);
+    expect(excluded).toBeDefined();
+    expect(excluded!.status).toBe("abducted"); // survived by id, untouched
+    expect(h.state.caret).toBeGreaterThanOrEqual(0);
+    expect(h.state.caret).toBeLessThanOrEqual(h.state.cells.length);
+  });
+
   it("shifts the caret left when the correction shrinks the word", () => {
     const h = boot(autocorrectDef);
     toPeak(h);
