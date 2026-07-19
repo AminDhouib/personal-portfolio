@@ -89,7 +89,10 @@ export function createRun(opts: CreateRunOpts): GameState {
  * advance the act. act3 -> finale is deliberately NOT time-driven.
  */
 export function tick(g: GameState, dtMs: number): void {
-  if (g.startedAtMs !== null) {
+  // The clock freezes at any terminal outcome (today only "victory"): the run time IS
+  // the score, so once the finale is won the receipt's TOTAL TIME must be fixed, not
+  // climb while the rAF loop keeps ticking on the receipt screen.
+  if (g.startedAtMs !== null && g.outcome === "playing") {
     g.elapsedMs += dtMs;
     g.actElapsedMs += dtMs;
   }

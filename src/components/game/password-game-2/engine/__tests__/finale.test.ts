@@ -489,6 +489,34 @@ describe("finale — runaway", () => {
   });
 });
 
+// --- The run clock freezes at victory ----------------------------------------
+
+describe("finale — clock freeze at victory", () => {
+  it("stops advancing elapsedMs/actElapsedMs once the run is won", () => {
+    const g = bootFinale();
+    toRunaway(g);
+    applyPointer(g, { kind: "submit-button" }); // catch the button -> victory
+    drainEffects(g);
+    expect(g.outcome).toBe("victory");
+
+    const frozenElapsed = g.elapsedMs;
+    const frozenAct = g.actElapsedMs;
+    const frozenVersion = g.version;
+
+    for (let i = 0; i < 5; i++) {
+      tick(g, 1000); // the shell's rAF keeps ticking on the receipt screen
+      drainEffects(g);
+    }
+
+    // The receipt's TOTAL TIME reads elapsedMs live; a won run must show a fixed time,
+    // not one that climbs while the player reads the receipt or before they post it.
+    expect(g.elapsedMs).toBe(frozenElapsed);
+    expect(g.actElapsedMs).toBe(frozenAct);
+    // A post-victory tick has no render-affecting work; it must not bump the version.
+    expect(g.version).toBe(frozenVersion);
+  });
+});
+
 // --- Zero-ally full clear ----------------------------------------------------
 
 describe("finale — beatable alone", () => {
