@@ -293,6 +293,16 @@ function missileKnockback(g: GameState, f: FinaleState, fd: FinaleData): void {
 }
 
 function enterEula(g: GameState, f: FinaleState, fd: FinaleData): void {
+  // The phase can end while a landing's 1500ms stun is still live (a landing IS a valid
+  // phase-completing event, and the last intercept can fire mid-lock). The auto-release
+  // lives only in tickMissiles, which stops on the flip, so clear the stun here — mirror
+  // missileKnockback — or it bleeds through the eula and runaway phases.
+  // The phase can end while a landing's 1500ms stun is still live (a landing IS a valid
+  // phase-completing event, and the last intercept can fire mid-lock). The auto-release
+  // lives only in tickMissiles, which stops on the flip, so clear the stun here — mirror
+  // missileKnockback — or it bleeds through the eula and runaway phases.
+  g.inputLocked = false;
+  if (fd.missiles) fd.missiles.lockUntilMs = 0;
   f.phase = "eula";
   f.phaseElapsedMs = 0;
   f.attempts = 0;

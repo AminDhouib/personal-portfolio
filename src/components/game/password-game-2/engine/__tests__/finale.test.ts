@@ -282,6 +282,67 @@ describe("finale — missiles", () => {
     expect(g.finale!.phase).toBe("eula");
     expect(g.stats.knockbacks).toBe(0);
   });
+
+  it("clears to EULA without leaking the landing stun when the phase-completing missile lands", () => {
+    const g = bootFinale();
+    const md = missilesOf(g);
+    // Eleven already intercepted; the twelfth is a beat from landing and COMPLETES the
+    // phase as a landing (the first this attempt, so no knockback). The landing stun is
+    // set the same tick the phase clears — it must not bleed into the EULA phase.
+    md.missiles = [
+      ...Array.from({ length: 11 }, (_v, id) => ({
+        id,
+        x: 0.05 * id,
+        launchedAtMs: 0,
+        state: "intercepted" as const,
+      })),
+      { id: 11, x: 0.9, launchedAtMs: 0, state: "falling" as const }, // lands at 4000
+    ];
+    md.launched = 12;
+    md.landedThisAttempt = 0;
+    g.finale!.phaseElapsedMs = 3990;
+
+    tick(g, 20); // phase time 4010 — the last missile lands and completes the phase
+    drainEffects(g);
+
+    expect(g.finale!.phase).toBe("eula");
+    expect(g.inputLocked).toBe(false); // the landing stun did not survive the transition
+    expect(missilesOf(g).lockUntilMs).toBe(0);
+
+    // Nothing re-locks it once inside the EULA phase — it stays released seconds later.
+    tick(g, 3000);
+    drainEffects(g);
+    expect(g.inputLocked).toBe(false);
+  });
+
+  it("clears a live landing stun when the LAST intercept completes the phase on a click", () => {
+    const g = bootFinale();
+    const md = missilesOf(g);
+    // A prior landing left the stun live; ten are intercepted and one still falls. The
+    // click that intercepts it completes the phase via missilePointer -> enterEula.
+    md.missiles = [
+      { id: 0, x: 0.1, launchedAtMs: 0, state: "landed" as const },
+      ...Array.from({ length: 10 }, (_v, i) => ({
+        id: i + 1,
+        x: 0.05 * i,
+        launchedAtMs: 0,
+        state: "intercepted" as const,
+      })),
+      { id: 11, x: 0.9, launchedAtMs: 2000, state: "falling" as const },
+    ];
+    md.launched = 12;
+    md.landedThisAttempt = 1;
+    md.lockUntilMs = 5000; // a prior landing's stun, still live
+    g.inputLocked = true;
+    g.finale!.phaseElapsedMs = 3000;
+
+    applyPointer(g, { kind: "missile", id: 11 }); // the final intercept ends the phase
+    drainEffects(g);
+
+    expect(g.finale!.phase).toBe("eula");
+    expect(g.inputLocked).toBe(false);
+    expect(missilesOf(g).lockUntilMs).toBe(0);
+  });
 });
 
 // --- Phase 2: The EULA Final Form -------------------------------------------
