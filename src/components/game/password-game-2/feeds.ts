@@ -8,8 +8,9 @@ import { setDailyChessPuzzle, type ChessPuzzle } from "@/data/password-game/ches
  * Each rule reads a module-level injected value at rule-create time and, when that
  * value is unset, degrades to a freebie — it never falls back to a static pool. This
  * module is what actually populates those values in production; the server-side
- * proxy routes (/api/password-game/{wordle,countries,chess-puzzle}) do the upstream
- * fetch and caching, we just pull their JSON here and hand it to the setters.
+ * routes (/api/password-game/{wordle,countries,chess-puzzle}) supply the data —
+ * wordle and chess-puzzle proxy their upstreams, countries serves a vendored
+ * dataset — and we just pull their JSON here and hand it to the setters.
  *
  * ACCEPTED DEGRADATION: rules capture the injected feed state at rule-create time,
  * which is start-screen/page-load time. The shell fires loadLiveFeeds() on mount, so
@@ -50,8 +51,8 @@ async function loadCountries(): Promise<void> {
     });
     if (!res.ok) return;
     const data = (await res.json()) as { capitals?: unknown };
-    // The route returns an empty array on upstream failure; never inject an empty list
-    // (the setter would null it anyway, but this keeps the intent explicit).
+    // Never inject an empty list (the setter would null it anyway, but this keeps
+    // the intent explicit and tolerates any future route that could return one).
     if (Array.isArray(data.capitals) && data.capitals.length > 0) {
       setExtendedCapitals(data.capitals as CountryCapital[]);
     }
