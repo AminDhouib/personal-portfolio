@@ -628,6 +628,16 @@ function RunningView({
   const api = useMemo(() => makeRuleApi(g, nowHHMM), [g]);
   const moodEntries = Object.entries(moods);
 
+  // A 1s re-validation heartbeat for the rule list only. Some rules flip purely
+  // from time (a coupled rule going red, the current-time clock) without bumping
+  // g.version; this counter, folded into RuleList's memo, keeps those flips live
+  // at >=1Hz while leaving the memoized CharStage untouched.
+  const [validationTick, setValidationTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setValidationTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   return (
     <>
       <Hud
@@ -689,7 +699,14 @@ function RunningView({
             <p className="mt-5 mb-2 text-xs font-semibold tracking-wide text-[color:var(--pg2-muted)] uppercase">
               Your password must satisfy
             </p>
-            <RuleList rules={g.rules} password={password} state={g} api={api} version={g.version} />
+            <RuleList
+              rules={g.rules}
+              password={password}
+              state={g}
+              api={api}
+              version={g.version}
+              validationTick={validationTick}
+            />
 
             <div className="mt-6 flex justify-end">
               <button

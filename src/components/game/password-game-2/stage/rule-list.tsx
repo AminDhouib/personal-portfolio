@@ -12,6 +12,13 @@ interface RuleListProps {
    * when engine state moves but skips the pure 250ms HUD heartbeat.
    */
   version: number;
+  /**
+   * A >=1Hz counter (also not read directly). Some rules flip purely from elapsed
+   * time — a coupled rule going red, the current-time clock — without bumping
+   * version; this signal re-validates the rows at least once a second so those
+   * flips stay on screen even with zero other engine activity.
+   */
+  validationTick: number;
 }
 
 interface Evaluated {

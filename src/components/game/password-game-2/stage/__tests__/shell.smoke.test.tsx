@@ -35,7 +35,14 @@ describe("pg2 stage smoke", () => {
           onToggleSound={() => {}}
           onCopySeed={() => {}}
         />
-        <RuleList rules={g.rules} password={password} state={g} api={api} version={g.version} />
+        <RuleList
+          rules={g.rules}
+          password={password}
+          state={g}
+          api={api}
+          version={g.version}
+          validationTick={0}
+        />
       </>,
     );
     expect(getByText("01:05")).toBeTruthy(); // mm:ss timer format
