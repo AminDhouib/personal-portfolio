@@ -7,16 +7,22 @@ export const runtime = "nodejs";
 /**
  * Server-side proxy for Lichess's daily puzzle.
  *
- * Fetches `/api/puzzle/daily`, replays the PGN to the puzzle's starting ply,
+ * Fetches `/api/puzzle/daily`, resolves the puzzle's starting position,
  * converts the FEN into our 8-string Unicode board format, and computes the
  * SAN (algebraic notation) of every accepted first move — the answer the
  * player types into their password. Cached for 12h via Next's fetch cache.
+ *
+ * The position comes from the payload's own `puzzle.fen` when present (the
+ * primary path — it sidesteps PGN-replay fragility entirely); otherwise we
+ * replay the game's PGN. `initialPly` is the INDEX of the last played ply, so
+ * the puzzle position is reached by replaying indices 0..initialPly INCLUSIVE.
  */
 
 interface LichessDaily {
   game?: { pgn?: string };
   puzzle?: {
     id?: string;
+    fen?: string;
     initialPly?: number;
     rating?: number;
     themes?: string[];
@@ -77,6 +83,46 @@ function themeToHint(themes: readonly string[] | undefined): string {
   return `Theme: ${top}.`;
 }
 
+/**
+ * Resolve the puzzle's starting position into a chess.js instance. Prefer the
+ * payload's own `puzzle.fen` — loading it directly avoids the whole PGN-replay
+ * fragility class. Fall back to replaying the PGN when the FEN is absent:
+ * `initialPly` is the INDEX of the last played ply, so the puzzle position is
+ * reached by replaying indices 0..initialPly INCLUSIVE. Returns null when the
+ * payload lacks a usable position or the data is malformed.
+ */
+function loadPuzzlePosition(data: LichessDaily): Chess | null {
+  const fen = data.puzzle?.fen;
+  if (typeof fen === "string" && fen.length > 0) {
+    try {
+      return new Chess(fen);
+    } catch {
+      // silent-ok: a malformed upstream FEN just means no usable position; the
+      // caller logs the miss and serves the unavailable fallback.
+      return null;
+    }
+  }
+
+  const pgn = data.game?.pgn;
+  const initialPly = data.puzzle?.initialPly;
+  if (!pgn || typeof initialPly !== "number") return null;
+
+  const chess = new Chess();
+  chess.loadPgn(pgn);
+  const history = chess.history({ verbose: true });
+  // The last played ply is at index initialPly, so we need at least that many
+  // moves plus one to replay through it.
+  if (history.length <= initialPly) return null;
+
+  const replay = new Chess();
+  for (let i = 0; i <= initialPly; i++) {
+    const move = history[i];
+    if (!move) continue;
+    replay.move({ from: move.from, to: move.to, promotion: move.promotion });
+  }
+  return replay;
+}
+
 async function fetchLichess(): Promise<ChessPuzzleDto | null> {
   try {
     const res = await fetch("https://lichess.org/api/puzzle/daily", {
@@ -89,24 +135,16 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
       return null;
     }
     const data: LichessDaily = await res.json();
-    const pgn = data.game?.pgn;
     const puzzle = data.puzzle;
-    if (!pgn || !puzzle?.initialPly || !puzzle.solution || puzzle.solution.length === 0) {
+    if (!puzzle?.solution || puzzle.solution.length === 0) {
       logWarn("api:chess-puzzle", "upstream payload missing required puzzle fields");
       return null;
     }
 
-    const chess = new Chess();
-    chess.loadPgn(pgn);
-    const history = chess.history({ verbose: true });
-    if (history.length < puzzle.initialPly) return null;
-
-    // Replay only up to initialPly to reach the puzzle's starting position.
-    const replay = new Chess();
-    for (let i = 0; i < puzzle.initialPly; i++) {
-      const move = history[i];
-      if (!move) continue;
-      replay.move({ from: move.from, to: move.to, promotion: move.promotion });
+    const replay = loadPuzzlePosition(data);
+    if (!replay) {
+      logWarn("api:chess-puzzle", "could not resolve the puzzle's starting position");
+      return null;
     }
 
     const fen = replay.fen();
