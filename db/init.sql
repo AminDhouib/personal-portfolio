@@ -30,6 +30,18 @@ CREATE TABLE IF NOT EXISTS pg_leaderboard_entries (
 CREATE INDEX IF NOT EXISTS idx_pg_leaderboard_elapsed
   ON pg_leaderboard_entries (elapsed_seconds ASC);
 
+CREATE TABLE IF NOT EXISTS pg2_leaderboard_entries (
+  id              SERIAL PRIMARY KEY,
+  name            TEXT        NOT NULL,
+  seed            BIGINT      NOT NULL,
+  time_ms         INTEGER     NOT NULL,
+  daily           BOOLEAN     NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pg2_leaderboard_seed_time
+  ON pg2_leaderboard_entries (seed, time_ms ASC);
+
 CREATE TABLE IF NOT EXISTS leads (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   name        TEXT        NOT NULL,
