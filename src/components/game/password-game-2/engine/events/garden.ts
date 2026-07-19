@@ -22,7 +22,6 @@ export interface GardenData {
   nextBearAtMs: number; // away: next telegraph; telegraphed: raid-start time
   raidEndsAtMs: number; // raiding: when the raid completes
   distractions: number; // baskets thrown that sent the bear off
-  basketUsedThisRaid: boolean;
   bloomCarryMs: number; // fractional-time carry toward the next bloom
   honeyCarryMs: number; // fractional-time carry toward the next honey tick
 }
@@ -45,7 +44,6 @@ const NEXT_RAID_MAX_S = 70;
 function scheduleNextRaid(d: GardenData, ctx: EventContext): void {
   d.bearState = "away";
   d.nextBearAtMs = ctx.state.elapsedMs + rangeInt(ctx.rng, NEXT_RAID_MIN_S, NEXT_RAID_MAX_S) * 1000;
-  d.basketUsedThisRaid = false;
 }
 
 /** Grow blooms and honey, carrying fractional time so odd ticks never drift. */
@@ -56,6 +54,7 @@ function grow(d: GardenData, ctx: EventContext): void {
       d.bloomed += 1;
       d.bloomCarryMs -= BLOOM_PERIOD_MS;
     }
+    if (d.bloomed >= MAX_BLOOM) d.bloomCarryMs = 0; // no carry once fully bloomed
   }
   if (d.bloomed >= HONEY_MIN_BLOOM && d.honey < HONEY_MAX) {
     d.honeyCarryMs += ctx.dtMs;
@@ -63,6 +62,7 @@ function grow(d: GardenData, ctx: EventContext): void {
       d.honey = Math.min(HONEY_MAX, d.honey + HONEY_PER_TICK);
       d.honeyCarryMs -= HONEY_PERIOD_MS;
     }
+    if (d.honey >= HONEY_MAX) d.honeyCarryMs = 0; // no carry once the hive is full
   }
 }
 
@@ -74,7 +74,6 @@ function stepBear(d: GardenData, ctx: EventContext): void {
       if (now >= d.nextBearAtMs) {
         d.bearState = "telegraphed";
         d.nextBearAtMs = now + BEAR_TELEGRAPH_MS; // repurposed as raid-start time
-        d.basketUsedThisRaid = false;
         ctx.emit({ kind: "mood", eventId: "garden", text: "A bear approaches the hive" });
         ctx.emit({ kind: "sound", sound: "telegraph-doom" });
       }
@@ -126,7 +125,6 @@ export const gardenDef: EventDef<GardenData> = {
     nextBearAtMs: 0,
     raidEndsAtMs: 0,
     distractions: 0,
-    basketUsedThisRaid: false,
     bloomCarryMs: 0,
     honeyCarryMs: 0,
   }),

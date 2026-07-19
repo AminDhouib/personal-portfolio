@@ -196,7 +196,15 @@ export function applyPointer(g: GameState, target: PointerTarget): void {
   for (const inst of activeEvents(g)) {
     const def = DEF_BY_ID.get(inst.defId);
     if (!def?.onPointer) continue;
-    if (def.onPointer(inst, makeCtx(g, inst, 0), target)) return;
+    const cellsBefore = g.cells;
+    if (def.onPointer(inst, makeCtx(g, inst, 0), target)) {
+      // A pointer that edits the cell run (a parasite eviction) is render-affecting.
+      if (g.cells !== cellsBefore) {
+        bump(g);
+        g.caret = Math.min(g.caret, g.cells.length);
+      }
+      return;
+    }
   }
   if (g.act === "finale") return; // finale pointer routing lands in Task 10
   if (target.kind === "cell" && typeof target.id === "number") {

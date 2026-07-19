@@ -32,8 +32,9 @@ const SHORTEST_MONTH = MONTHS.reduce((a, b) => (b.length < a.length ? b : a));
 
 /**
  * Solve priority: content first, then char-class top-ups, digit-sum, length last.
- * Its keys are exactly the rules the solver knows how to satisfy by typing — the
- * 17 core rules. Coupled inhabitant rules (campfire-burning, gerald-fed,
+ * Its keys are the 17 core rules PLUS the infection's coupled "no-infected" rule,
+ * which is password-solvable by design: typing the antidote cures the outbreak on
+ * the following tick. The other coupled rules (campfire-burning, gerald-fed,
  * garden-honey) are validated off event data, not the password, so they are NOT
  * listed here and solveAll skips them; the harness satisfies them by TENDING.
  */
@@ -48,6 +49,7 @@ const SOLVE_PRIORITY: Record<string, number> = {
   "current-time": 1,
   "chess-best-move": 1,
   "backwards-password": 1,
+  "no-infected": 1,
   "include-uppercase": 2,
   "include-special": 2,
   "include-number": 2,
@@ -192,6 +194,15 @@ export function solveRule(
   api: RuleApi,
   protectedStrings: readonly string[] = [],
 ): string {
+  // Handled before the stub-state validate below: no-infected reads state.cells,
+  // which STUB_STATE lacks, and its "solution" is the antidote, not a validate pass.
+  if (rule.id === "no-infected") {
+    const antidote = rule.payload?.["antidote"];
+    if (typeof antidote !== "string" || antidote === "") {
+      throw new Error("solveRule(no-infected): rule payload is missing its antidote");
+    }
+    return current.includes(antidote) ? current : current + antidote;
+  }
   if (rule.validate(current, STUB_STATE, api).passed) return current;
   switch (rule.id) {
     case "min-length-12": {
@@ -238,10 +249,27 @@ export function solveRule(
 }
 
 /**
+ * Solver-local satisfaction. For most rules this is just the rule's own validate;
+ * the exception is no-infected, whose validate lags the password by a tick (the
+ * cure fires when the engine next ticks over the antidote). The solver treats the
+ * antidote's presence as the solution so it converges in one pass and hands the
+ * antidote-bearing password to the harness; the following tick clears the outbreak.
+ */
+function solverSatisfied(rule: Pg2Rule, s: string, g: GameState, api: RuleApi): boolean {
+  if (rule.validate(s, g, api).passed) return true;
+  if (rule.id === "no-infected") {
+    const antidote = rule.payload?.["antidote"];
+    return typeof antidote === "string" && antidote !== "" && s.includes(antidote);
+  }
+  return false;
+}
+
+/**
  * Drive every revealed rule to passing. Iterates in solve-priority order, applies
  * solveRule to each failing rule, and repeats until all pass. Throws loudly if a
  * pass makes no progress (unsatisfiable set) or the cap is hit — never returns a
- * password that fails a revealed rule.
+ * password that fails a revealed rule (per solverSatisfied, which the harness
+ * reconciles with the real validate one tick later for no-infected).
  */
 export function solveAll(g: GameState, api: RuleApi): string {
   const MAX_ITERS = 200;
@@ -255,16 +283,16 @@ export function solveAll(g: GameState, api: RuleApi): string {
     );
     let changed = false;
     for (const r of ordered) {
-      if (r.validate(s, g, api).passed) continue;
+      if (solverSatisfied(r, s, g, api)) continue;
       const next = solveRule(r, s, api, protectedStrings);
       if (next !== s) {
         s = next;
         changed = true;
       }
     }
-    if (solvable.every((r) => r.validate(s, g, api).passed)) return s;
+    if (solvable.every((r) => solverSatisfied(r, s, g, api))) return s;
     if (!changed) {
-      const failing = solvable.filter((r) => !r.validate(s, g, api).passed).map((r) => r.id);
+      const failing = solvable.filter((r) => !solverSatisfied(r, s, g, api)).map((r) => r.id);
       throw new Error(`solveAll stuck; unsatisfiable revealed rules: ${failing.join(", ")}`);
     }
   }

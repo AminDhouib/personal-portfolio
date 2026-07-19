@@ -26,14 +26,22 @@ const ALLY_BY_ID: Record<string, string> = {
   garden: "garden",
 };
 
-/** Inhabitants now carry a coupled rule injected at onset; stubs never did. */
+/**
+ * Coupled rules injected at onset. The three inhabitants each carry one; the
+ * infection (a force) carries the "no infected characters" rule. Everything else
+ * (still stubs, or forces without a rule) carries none.
+ */
 const COUPLED_RULE_BY_ID: Record<string, string> = {
   gerald: "gerald-fed",
   campfire: "campfire-burning",
   garden: "garden-honey",
+  infection: "no-infected",
 };
 
 const isInhabitant = (def: EventDef): boolean => def.family === "inhabitant";
+
+/** Families still shipped as placeholder stubs (Tasks 8-9 replace these). */
+const isStub = (def: EventDef): boolean => def.family === "invasion" || def.family === "chrome";
 
 const state: GameState = createRun({ seed: 1, daily: false });
 
@@ -63,7 +71,7 @@ const freshInst = (def: EventDef): EventInstance => ({
 });
 
 describe("event manifest", () => {
-  it("holds all twelve stub defs exactly once with the final ids, families, and positive telegraphs", () => {
+  it("holds all twelve event defs exactly once with the final ids, families, and positive telegraphs", () => {
     expect(EVENT_DEFS).toHaveLength(EXPECTED.length);
     expect(new Set(EVENT_DEFS.map((d) => d.id)).size).toBe(EXPECTED.length);
     for (const exp of EXPECTED) {
@@ -75,17 +83,18 @@ describe("event manifest", () => {
     }
   });
 
-  it("wires ally identity and a coupled rule onto inhabitants only", () => {
+  it("wires ally identity onto inhabitants only and coupled rules per the map", () => {
     for (const def of EVENT_DEFS) {
       if (isInhabitant(def)) {
         expect(def.allyId).toBe(ALLY_BY_ID[def.id]);
         expect(typeof def.isAlive).toBe("function");
-        expect(def.coupledRule?.id).toBe(COUPLED_RULE_BY_ID[def.id]);
       } else {
         expect(def.allyId).toBeUndefined();
         expect(def.isAlive).toBeUndefined();
-        expect(def.coupledRule).toBeUndefined();
       }
+      const expectedRule = COUPLED_RULE_BY_ID[def.id];
+      if (expectedRule !== undefined) expect(def.coupledRule?.id).toBe(expectedRule);
+      else expect(def.coupledRule).toBeUndefined();
     }
   });
 
@@ -113,8 +122,8 @@ describe("event manifest", () => {
     }
   });
 
-  it("runs the canonical stub lifecycle for non-inhabitants: telegraph -> onset -> peak -> done", () => {
-    for (const def of EVENT_DEFS.filter((d) => !isInhabitant(d))) {
+  it("runs the canonical stub lifecycle for the remaining stub families: telegraph -> onset -> peak -> done", () => {
+    for (const def of EVENT_DEFS.filter(isStub)) {
       const inst = freshInst(def);
       expect(inst.data).toEqual({});
       expect(def.isResolved(inst, state)).toBe(false);

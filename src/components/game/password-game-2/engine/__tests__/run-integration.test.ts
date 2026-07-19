@@ -24,14 +24,6 @@ import type { ActId, Effect, EventInstance, GameState, RuleApi } from "../types"
 const HHMM = "12:00";
 const TICK_MS = 100;
 
-/**
- * Stub peak length before a placeholder event auto-resolves, mirroring STUB_PEAK_MS
- * in events/index.ts (module-private there). A blocking stub therefore resolves at
- * scheduledAtMs + telegraphMs + STUB_PEAK_MS in act-relative time. Tasks 6-10 that
- * replace stubs with real timings will re-derive this per event.
- */
-const STUB_PEAK_MS = 10_000;
-
 /** telegraphMs by def id, straight off the manifest. */
 const TELEGRAPH_MS = new Map(EVENT_DEFS.map((d) => [d.id, d.telegraphMs]));
 
@@ -64,40 +56,79 @@ const retype = (g: GameState, target: string) => {
   type(g, target);
 };
 
+interface TendOpts {
+  inhabitants?: boolean; // stoke/feed/basket the creatures (default true)
+  forces?: boolean; // evict parasites; the black hole is handled via withHeavyWord (default true)
+}
+
 /**
- * Tend the live inhabitants so they survive to the finale and their coupled rules
- * are satisfied at submit: stoke the campfire on its cooldown, feed Gerald, and
- * toss the picnic basket whenever the bear is not away. Deterministic in run state.
- * The campfire is stoked every frame (rate-limited internally by its 1.5s cooldown)
- * rather than on a slow cadence — see the concern noted on the caretaker test.
+ * Tend the live crises so the run stays winnable: stoke the campfire, feed Gerald,
+ * toss the basket whenever the bear is not away, and evict any parasite mimic. The
+ * black hole is collapsed by typing its heavy word (see withHeavyWord) and the
+ * infection is cured by the solver (the no-infected strategy), so neither appears
+ * here. Deterministic in run state. The campfire is stoked every frame (rate-limited
+ * internally by its 1.5s cooldown) rather than on a slow cadence.
  */
-const tend = (g: GameState) => {
+const tend = (g: GameState, opts: TendOpts = {}) => {
+  const inhabitants = opts.inhabitants !== false;
+  const forces = opts.forces !== false;
   for (const e of g.events) {
     if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
-    if (e.defId === "gerald") applyPointer(g, { kind: "feed-button" });
-    else if (e.defId === "campfire") applyPointer(g, { kind: "stoke-button" });
-    else if (e.defId === "garden") {
+    if (inhabitants && e.defId === "gerald") applyPointer(g, { kind: "feed-button" });
+    else if (inhabitants && e.defId === "campfire") applyPointer(g, { kind: "stoke-button" });
+    else if (inhabitants && e.defId === "garden") {
       const bearState = (e.data as { bearState: string }).bearState;
       if (bearState !== "away") applyPointer(g, { kind: "basket-button" });
+    } else if (forces && e.defId === "parasite") {
+      for (const c of g.cells.filter((cell) => cell.status === "parasite")) {
+        applyPointer(g, { kind: "parasite", id: c.id });
+      }
     }
   }
 };
 
+/** Append the black hole's heavy word to the solve target while it is still pulling. */
+const withHeavyWord = (g: GameState, target: string): string => {
+  const bh = g.events.find(
+    (e) =>
+      e.defId === "black-hole" &&
+      e.data !== undefined &&
+      e.phase !== "telegraph" &&
+      e.phase !== "done",
+  );
+  if (!bh) return target;
+  const d = bh.data as { heavyWord: string; collapsingSinceMs: number | null };
+  if (d.collapsingSinceMs !== null) return target;
+  return target.includes(d.heavyWord) ? target : target + d.heavyWord;
+};
+
 /** Solve the revealed roster (retyping only on change), tend, then advance one frame. */
-const solveAndTick = (g: GameState, api: RuleApi, opts: { tendInhabitants?: boolean } = {}) => {
-  const target = solveAll(g, api);
+const solveAndTick = (
+  g: GameState,
+  api: RuleApi,
+  opts: { tendInhabitants?: boolean; tendForces?: boolean } = {},
+) => {
+  const tendForces = opts.tendForces !== false;
+  const base = solveAll(g, api);
+  const target = tendForces ? withHeavyWord(g, base) : base;
   if (target !== cellsToPassword(g.cells)) retype(g, target);
-  if (opts.tendInhabitants !== false) tend(g);
+  tend(g, { inhabitants: opts.tendInhabitants !== false, forces: tendForces });
   tick(g, TICK_MS);
 };
 
 const nonInhabitant = (e: EventInstance) => e.family !== "inhabitant";
 
-/** The last blocking (non-inhabitant) beat's act-relative resolve time, or 0. */
-const expectedActResolveMs = (g: GameState, act: ActId): number => {
+/**
+ * The last (max) act-relative ONSET among the act's blocking (non-inhabitant)
+ * beats — scheduledAtMs + telegraphMs. An act cannot advance before its final
+ * blocking beat has onset and resolved, so this is a hard lower bound on the act's
+ * duration; forces resolve on the driver's cure/evict/collapse timing rather than a
+ * fixed peak, so the upper bound is a generous window past this (see the test).
+ */
+const lastBlockingOnsetMs = (g: GameState, act: ActId): number => {
   const times = g.events
     .filter((e) => e.act === act && nonInhabitant(e))
-    .map((e) => e.scheduledAtMs + (TELEGRAPH_MS.get(e.defId) ?? 0) + STUB_PEAK_MS);
+    .map((e) => e.scheduledAtMs + (TELEGRAPH_MS.get(e.defId) ?? 0));
   return times.length === 0 ? 0 : Math.max(...times);
 };
 
@@ -269,15 +300,16 @@ describe("password-game-2 full-run integration", () => {
     expect(prologue.actDurationMs).toBeLessThan(5_000);
     expect(r.g.events.some((e) => e.act === "prologue")).toBe(false);
 
-    // act1 and act2 are gated by their last blocking (non-inhabitant) event: the
-    // boundary lands at scheduledAtMs + telegraphMs + STUB_PEAK_MS, derived from the
-    // realized schedule — never before the beat resolves, and not idling after.
+    // act1 and act2 are gated by their last blocking (non-inhabitant) event. act1's
+    // chrome stub resolves a fixed 10s after onset; act2's forces resolve on the
+    // driver's cure/collapse/evict timing. Both land in a generous window after the
+    // last blocking onset — never before it, and not idling minutes after.
     for (const act of ["act1", "act2"] as const) {
       const t = byFrom.get(act)!;
-      const expected = expectedActResolveMs(r.g, act);
-      expect(expected).toBeGreaterThan(0);
-      expect(t.actDurationMs).toBeGreaterThanOrEqual(expected);
-      expect(t.actDurationMs).toBeLessThanOrEqual(expected + 500);
+      const onset = lastBlockingOnsetMs(r.g, act);
+      expect(onset).toBeGreaterThan(0);
+      expect(t.actDurationMs).toBeGreaterThanOrEqual(onset);
+      expect(t.actDurationMs).toBeLessThanOrEqual(onset + 60_000);
 
       // Lifecycle at the boundary: every blocking beat done; inhabitant past telegraph.
       expect(t.outgoingNonInhabAllDone).toBe(true);
@@ -326,8 +358,9 @@ describe("password-game-2 full-run integration", () => {
   });
 
   it("untended, inhabitants TRANSFORM rather than crash: the fire embers and eats, the bear tramples", () => {
-    // No tending this run. The campfire should burn out and scar the password; the
-    // bear should trample the garden. Failure transforms the run — it never deletes it.
+    // Tend the blocking forces so the acts still advance, but leave the creatures to
+    // their fate. The campfire should burn out and scar the password; the bear
+    // should trample the garden. Failure transforms the run — it never deletes it.
     const g = boot(SEED);
     const api = makeRuleApi(g, () => HHMM);
 
@@ -335,7 +368,7 @@ describe("password-game-2 full-run integration", () => {
     let sawEatToast = false;
     let sawTrample = false;
     for (let i = 0; i < 6000 && g.act !== "act3"; i++) {
-      // Solve the roster (to advance acts) but leave the creatures to their fate.
+      // Solve the roster and tend the forces (to advance acts), neglect the creatures.
       solveAndTick(g, api, { tendInhabitants: false });
       // An ember scar is wiped by the next frame's retype, so scan every frame.
       if (g.cells.some((c) => c.status === "ember")) sawEmberCell = true;
@@ -365,5 +398,60 @@ describe("password-game-2 full-run integration", () => {
     expect(g.outcome).toBe("playing");
     expect(g.finale).toBeNull();
     expect(g.caret).toBeLessThanOrEqual(g.cells.length);
+  });
+
+  it("untended, forces TRANSFORM the box without crashing", () => {
+    // Reach act2 while neglecting everything, plant a benign field of special chars
+    // (no lowercase letters, so it can never contain an antidote or a heavy word),
+    // then stop touching it and let the scheduled forces work on those cells. The
+    // two seeds between them exercise all three forces: seed 7 is black-hole +
+    // infection, seed 42 is black-hole + parasite.
+    for (const seed of [7, 42]) {
+      const g = boot(seed);
+      const api = makeRuleApi(g, () => HHMM);
+      for (let i = 0; i < 6000 && g.act !== "act2"; i++) {
+        solveAndTick(g, api, { tendInhabitants: false, tendForces: false });
+      }
+      expect(g.act).toBe("act2");
+
+      const act2Forces = g.events
+        .filter((e) => e.act === "act2" && nonInhabitant(e))
+        .map((e) => e.defId);
+      expect(act2Forces.length).toBeGreaterThan(0);
+
+      retype(g, "@".repeat(24)); // a fixed field the forces cannot cure or collapse
+
+      let sawInfected = false;
+      let sawMutated = false;
+      let sawOrbitingExcluded = false;
+      let sawParasiteMismatch = false;
+      for (let i = 0; i < 2600; i++) {
+        tick(g, TICK_MS);
+        const visible = g.cells.length; // every cell renders
+        const valueLen = [...cellsToPassword(g.cells)].length; // excluded cells drop out
+        if (g.cells.some((c) => c.status === "infected")) sawInfected = true;
+        if (g.cells.some((c) => c.status === "mutated")) sawMutated = true;
+        if (g.cells.some((c) => c.status === "orbiting") && valueLen < visible) {
+          sawOrbitingExcluded = true;
+        }
+        if (g.cells.some((c) => c.status === "parasite") && valueLen < visible) {
+          sawParasiteMismatch = true; // more glyphs on screen than the value counts
+        }
+        drainEffects(g);
+      }
+
+      if (act2Forces.includes("infection")) {
+        expect(sawInfected).toBe(true);
+        expect(sawMutated).toBe(true); // a cell sick past 45s mutated
+      }
+      if (act2Forces.includes("black-hole")) expect(sawOrbitingExcluded).toBe(true);
+      if (act2Forces.includes("parasite")) expect(sawParasiteMismatch).toBe(true);
+
+      // The box survived every untended force: no crash, still in act2, caret in range.
+      expect(g.act).toBe("act2");
+      expect(g.outcome).toBe("playing");
+      expect(g.finale).toBeNull();
+      expect(g.caret).toBeLessThanOrEqual(g.cells.length);
+    }
   });
 });

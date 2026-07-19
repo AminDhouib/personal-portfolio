@@ -499,7 +499,6 @@ describe("the garden and the bear", () => {
       nextBearAtMs: 0,
       raidEndsAtMs: 0,
       distractions: 0,
-      basketUsedThisRaid: false,
       bloomCarryMs: 0,
       honeyCarryMs: 0,
     } satisfies GardenData);
@@ -516,6 +515,33 @@ describe("the garden and the bear", () => {
     expect(gardenDef.isResolved(h.inst, h.state)).toBe(false);
     h.state.act = "finale";
     expect(gardenDef.isResolved(h.inst, h.state)).toBe(true);
+  });
+});
+
+// --- Coupled-rule null-instance freebie --------------------------------------
+
+describe("coupled inhabitant rules pass when their event is absent", () => {
+  // A run whose events were cleared: getEventData returns null, so each coupled
+  // rule must fall through to passed:true rather than reading a missing instance.
+  const freebie = (def: EventDef<unknown>): boolean => {
+    const g = createRun({ seed: 1, daily: false, nowHHMM: () => HHMM });
+    g.events = [];
+    const rule = def.coupledRule!.create(mulberry32(1));
+    return rule.validate(
+      "pw",
+      g,
+      makeRuleApi(g, () => HHMM),
+    ).passed;
+  };
+
+  it("gerald-fed is a freebie with no gerald", () => {
+    expect(freebie(geraldDef as EventDef<unknown>)).toBe(true);
+  });
+  it("campfire-burning is a freebie with no campfire", () => {
+    expect(freebie(campfireDef as EventDef<unknown>)).toBe(true);
+  });
+  it("garden-honey is a freebie with no garden", () => {
+    expect(freebie(gardenDef as EventDef<unknown>)).toBe(true);
   });
 });
 

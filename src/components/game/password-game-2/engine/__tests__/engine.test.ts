@@ -30,9 +30,10 @@ const retype = (g: GameState, target: string) => {
 };
 
 /**
- * Tend the live inhabitants so the coupled rules stay satisfied and the creatures
- * survive to the finale: feed Gerald, stoke the campfire, and toss the basket
- * whenever the bear is not away. Deterministic — a pure function of run state.
+ * Tend the live crises so the run stays winnable: feed Gerald, stoke the campfire,
+ * toss the basket whenever the bear is not away, and evict any parasite mimic. The
+ * black hole is collapsed by typing its heavy word (see withHeavyWord); the
+ * infection is cured by the solver (the no-infected strategy). Deterministic.
  */
 const tend = (g: GameState) => {
   for (const e of g.events) {
@@ -42,8 +43,27 @@ const tend = (g: GameState) => {
     else if (e.defId === "garden") {
       const bearState = (e.data as { bearState: string }).bearState;
       if (bearState !== "away") applyPointer(g, { kind: "basket-button" });
+    } else if (e.defId === "parasite") {
+      for (const c of g.cells.filter((cell) => cell.status === "parasite")) {
+        applyPointer(g, { kind: "parasite", id: c.id });
+      }
     }
   }
+};
+
+/** Append the black hole's heavy word to the solve target while it is pulling. */
+const withHeavyWord = (g: GameState, target: string): string => {
+  const bh = g.events.find(
+    (e) =>
+      e.defId === "black-hole" &&
+      e.data !== undefined &&
+      e.phase !== "telegraph" &&
+      e.phase !== "done",
+  );
+  if (!bh) return target;
+  const d = bh.data as { heavyWord: string; collapsingSinceMs: number | null };
+  if (d.collapsingSinceMs !== null) return target;
+  return target.includes(d.heavyWord) ? target : target + d.heavyWord;
 };
 
 /** Core-rule count among the revealed rules (excludes coupled inhabitant rules). */
@@ -52,7 +72,7 @@ const coreRevealed = (g: GameState) =>
 
 /** Satisfy every currently-revealed rule (only retyping when it changed), tend, tick. */
 const solveAndTick = (g: GameState, api: RuleApi, dtMs = 1000) => {
-  const target = solveAll(g, api);
+  const target = withHeavyWord(g, solveAll(g, api));
   if (target !== cellsToPassword(g.cells)) retype(g, target);
   tend(g);
   tick(g, dtMs);
