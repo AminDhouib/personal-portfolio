@@ -2,11 +2,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { GAMES } from "../games-meta";
 import { GameCard } from "@/components/game/game-card";
-import { PasswordGameLoader } from "@/components/game/password-game/password-game-loader";
+import { PasswordGame2Loader } from "@/components/game/password-game-2";
 
 export const metadata = {
-  title: "Password Game 2",
-  description: "A spiritual successor to Neal Fun's Password Game. Seeded chaos, every run unique.",
+  title: "The Password Game 2",
+  description:
+    "Terms and Conditions Apply. A five-act sign-up form from hell — seeded chaos, every run unique.",
 };
 
 export default function PasswordGamePage() {
@@ -22,14 +23,8 @@ export default function PasswordGamePage() {
           All Games
         </Link>
 
-        <h1 className="mb-2 font-display text-4xl font-black tracking-tight">Password Game 2</h1>
-        <p className="mb-8 text-(--muted)">
-          A spiritual successor with seeded runs and escalating chaos. Every seed is a different
-          game.
-        </p>
-
         <div className="max-w-3xl">
-          <PasswordGameLoader />
+          <PasswordGame2Loader />
         </div>
 
         <section className="mt-16">
