@@ -75,6 +75,8 @@ function timeoutWave(d: GalagaData, ctx: EventContext, inst: EventInstance<Galag
   let cells = ctx.state.cells;
   for (const a of d.aliens) {
     if (a.state === "carrying" && a.carriedCellId !== null) {
+      // A tractor-malfunction rain-back restores the letters but is NOT a rescue: only
+      // a player's key-shot counts toward lettersRescued, so the stat stays untouched here.
       cells = setCellStatus(cells, a.carriedCellId, "normal");
     }
   }

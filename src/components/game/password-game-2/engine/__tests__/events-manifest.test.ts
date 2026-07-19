@@ -29,7 +29,7 @@ const ALLY_BY_ID: Record<string, string> = {
 /**
  * Coupled rules injected at onset. The three inhabitants each carry one; the
  * infection (a force) carries the "no infected characters" rule. Everything else
- * (still stubs, or forces without a rule) carries none.
+ * (chrome events, and forces without a rule) carries none.
  */
 const COUPLED_RULE_BY_ID: Record<string, string> = {
   gerald: "gerald-fed",
@@ -40,9 +40,6 @@ const COUPLED_RULE_BY_ID: Record<string, string> = {
 };
 
 const isInhabitant = (def: EventDef): boolean => def.family === "inhabitant";
-
-/** Families still shipped as placeholder stubs (Task 9 replaces the chrome ones). */
-const isStub = (def: EventDef): boolean => def.family === "chrome";
 
 const state: GameState = createRun({ seed: 1, daily: false });
 
@@ -120,39 +117,6 @@ describe("event manifest", () => {
       for (let i = 0; i < 50; i++) drive(def, inst, 1000);
       expect(inst.phase).toBe("peak"); // never auto-resolves during the run
       expect(def.isResolved(inst, state)).toBe(false); // state.act is not "finale"
-    }
-  });
-
-  it("runs the canonical stub lifecycle for the remaining stub families: telegraph -> onset -> peak -> done", () => {
-    for (const def of EVENT_DEFS.filter(isStub)) {
-      const inst = freshInst(def);
-      expect(inst.data).toEqual({});
-      expect(def.isResolved(inst, state)).toBe(false);
-
-      // Telegraph holds for telegraphMs, then flips to onset.
-      let telegraphTicks = 0;
-      while (inst.phase === "telegraph" && telegraphTicks < 100) {
-        drive(def, inst, 1000);
-        telegraphTicks++;
-      }
-      expect(inst.phase).toBe("onset");
-      expect(telegraphTicks).toBe(Math.ceil(def.telegraphMs / 1000));
-      expect(def.isResolved(inst, state)).toBe(false);
-
-      // Onset is a single tick, then peak.
-      drive(def, inst, 1000);
-      expect(inst.phase).toBe("peak");
-      expect(def.isResolved(inst, state)).toBe(false);
-
-      // Peak auto-resolves to done after 10s.
-      let peakTicks = 0;
-      while (inst.phase === "peak" && peakTicks < 100) {
-        drive(def, inst, 1000);
-        peakTicks++;
-      }
-      expect(inst.phase).toBe("done");
-      expect(peakTicks).toBe(10);
-      expect(def.isResolved(inst, state)).toBe(true);
     }
   });
 });

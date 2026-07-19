@@ -6,6 +6,8 @@ import { CORE_RULES } from "../rules/index";
 import { solveAll } from "./solve";
 import type { GalagaData } from "../events/galaga";
 import type { SnakeData } from "../events/snake";
+import type { CookieBannerData } from "../events/cookie-banner";
+import type { AutocorrectData } from "../events/autocorrect";
 import type { ActId, CharCell, EventInstance, GameState, Pg2Rule, RuleApi } from "../types";
 
 const HHMM = "12:00";
@@ -98,6 +100,32 @@ const tendInvasions = (g: GameState) => {
   }
 };
 
+/**
+ * Resolve the chrome nuisances the way a player would: mash the loading bar's keyboard
+ * seizure, click the cookie banner's real reject-all (declining to surface it first), and
+ * flip the autocorrect demon's real off switch through its settings. Deterministic.
+ */
+const tendChrome = (g: GameState) => {
+  for (const e of g.events) {
+    if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
+    if (e.defId === "loading-bar") {
+      applyKey(g, "x");
+    } else if (e.defId === "cookie-banner") {
+      const d = e.data as CookieBannerData;
+      const real = d.banners.find((b) => b.hasRealReject);
+      if (real) applyPointer(g, { kind: "banner-reject-all", id: real.id });
+      else {
+        const first = d.banners[0];
+        if (first) applyPointer(g, { kind: "banner-decline", id: first.id });
+      }
+    } else if (e.defId === "autocorrect") {
+      const d = e.data as AutocorrectData;
+      if (!d.settingsOpen) applyPointer(g, { kind: "settings-gear" });
+      applyPointer(g, { kind: "settings-toggle", id: d.correctToggleIndex });
+    }
+  }
+};
+
 /** Every non-inhabitant event scheduled for `act` has reached its terminal phase. */
 const nonInhabDone = (g: GameState, act: ActId): boolean =>
   g.events
@@ -125,9 +153,14 @@ const coreRevealed = (g: GameState) =>
 
 /** Satisfy every currently-revealed rule (only retyping when it changed), tend, tick. */
 const solveAndTick = (g: GameState, api: RuleApi, dtMs = 1000) => {
+  tendChrome(g); // dismiss banners/toggles; mash the loading bar before anything else
   tendInvasions(g); // shoot/feed/shatter before the solver re-types over the box
-  const target = withHeavyWord(g, solveAll(g, api));
-  if (target !== cellsToPassword(g.cells)) retype(g, target);
+  // Never solve or retype while the loading bar holds the keyboard: the retype's backspace
+  // loop would be eaten as mash and throw on its cap. The bar releases within 12s.
+  if (!g.inputLocked) {
+    const target = withHeavyWord(g, solveAll(g, api));
+    if (target !== cellsToPassword(g.cells)) retype(g, target);
+  }
   tend(g);
   tick(g, dtMs);
 };

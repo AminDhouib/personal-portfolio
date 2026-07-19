@@ -8,18 +8,20 @@ import { ACT_SCRIPTS } from "../director";
 import { solveAll } from "./solve";
 import type { GalagaData } from "../events/galaga";
 import type { SnakeData } from "../events/snake";
+import type { CookieBannerData } from "../events/cookie-banner";
+import type { AutocorrectData } from "../events/autocorrect";
 import type { ActId, Effect, EventInstance, GameState, RuleApi } from "../types";
 
 /**
  * The headless full-run integration harness: a scripted, deterministic drive of a
  * whole run through the public engine API (applyKey / tick / requestSubmit), the
- * pacing safety net that Tasks 6-10 extend as the stub events become real ones.
+ * pacing safety net now that every event family (through the chrome nuisances) is real.
  *
  * It ticks at the real 100ms cadence and solves the revealed rule set through the
  * append-only test solver as rules reveal, so the only thing gating an act boundary
  * is the act's scheduled events resolving on their authored timeline. Pacing
  * expectations are DERIVED from the realized schedule (g.events, which the Director
- * built from ACT_SCRIPTS) plus each def's telegraphMs and the stub peak below — no
+ * built from ACT_SCRIPTS) plus each def's telegraphMs and the driver's tending — no
  * hardcoded transition timestamps.
  */
 
@@ -111,6 +113,36 @@ const tendInvasions = (g: GameState) => {
   }
 };
 
+/**
+ * Resolve the three chrome nuisances as fast as the player could. The loading bar has
+ * seized the keyboard: mash a key each frame to push its fake upload along (its 12s cap
+ * would resolve it regardless). The cookie banner: click the real reject-all the moment
+ * one of the spawned banners carries it, otherwise decline the first banner to breed the
+ * two that will eventually surface it. The autocorrect demon: open its settings and flip
+ * the real off switch (its seeded slot) at once, killing it before it can mangle a rule.
+ * Deterministic in run state.
+ */
+const tendChrome = (g: GameState) => {
+  for (const e of g.events) {
+    if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
+    if (e.defId === "loading-bar") {
+      applyKey(g, "x"); // mashed and swallowed while inputLocked
+    } else if (e.defId === "cookie-banner") {
+      const d = e.data as CookieBannerData;
+      const real = d.banners.find((b) => b.hasRealReject);
+      if (real) applyPointer(g, { kind: "banner-reject-all", id: real.id });
+      else {
+        const first = d.banners[0];
+        if (first) applyPointer(g, { kind: "banner-decline", id: first.id });
+      }
+    } else if (e.defId === "autocorrect") {
+      const d = e.data as AutocorrectData;
+      if (!d.settingsOpen) applyPointer(g, { kind: "settings-gear" });
+      applyPointer(g, { kind: "settings-toggle", id: d.correctToggleIndex });
+    }
+  }
+};
+
 /** Every non-inhabitant event scheduled for `act` has reached its terminal phase. */
 const nonInhabDone = (g: GameState, act: ActId): boolean =>
   g.events.filter((e) => e.act === act && nonInhabitant(e)).every((e) => e.phase === "done");
@@ -160,13 +192,25 @@ const withHeavyWord = (g: GameState, target: string): string => {
 const solveAndTick = (
   g: GameState,
   api: RuleApi,
-  opts: { tendInhabitants?: boolean; tendForces?: boolean; tendInvasions?: boolean } = {},
+  opts: {
+    tendInhabitants?: boolean;
+    tendForces?: boolean;
+    tendInvasions?: boolean;
+    tendChrome?: boolean;
+  } = {},
 ) => {
   const tendForces = opts.tendForces !== false;
+  if (opts.tendChrome !== false) tendChrome(g); // dismiss banners/toggles; mash the loading bar
   if (opts.tendInvasions !== false) tendInvasions(g); // shoot/feed/shatter before re-typing
-  const base = solveAll(g, api);
-  const target = tendForces ? withHeavyWord(g, base) : base;
-  if (target !== cellsToPassword(g.cells)) retype(g, target);
+  // While the loading bar holds the keyboard, NEVER solve or retype: the retype's
+  // backspace loop would be swallowed as mash and spin until its cap throws. The bar
+  // releases within its 12s deadline; tending and the tick continue meanwhile, and the
+  // solver repairs any autocorrect damage on the next unlocked frame.
+  if (!g.inputLocked) {
+    const base = solveAll(g, api);
+    const target = tendForces ? withHeavyWord(g, base) : base;
+    if (target !== cellsToPassword(g.cells)) retype(g, target);
+  }
   tend(g, { inhabitants: opts.tendInhabitants !== false, forces: tendForces });
   tick(g, TICK_MS);
 };
@@ -393,9 +437,10 @@ describe("password-game-2 full-run integration", () => {
     expect(r.g.events.some((e) => e.act === "prologue")).toBe(false);
 
     // act1 and act2 are gated by their last blocking (non-inhabitant) event. act1's
-    // chrome stub resolves a fixed 10s after onset; act2's forces resolve on the
-    // driver's cure/collapse/evict timing. Both land in a generous window after the
-    // last blocking onset — never before it, and not idling minutes after.
+    // chrome resolves on the driver's tendChrome (a dismiss/toggle, or the loading bar's
+    // brief keyboard seizure); act2's forces resolve on the driver's cure/collapse/evict
+    // timing. Both land in a generous window after the last blocking onset — never before
+    // it, and not idling minutes after.
     for (const act of ["act1", "act2"] as const) {
       const t = byFrom.get(act)!;
       const onset = lastBlockingOnsetMs(r.g, act);

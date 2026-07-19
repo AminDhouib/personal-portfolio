@@ -139,20 +139,26 @@ export function tick(g: GameState, dtMs: number): void {
  * caret and starts the clock; the named keys behave conventionally.
  */
 export function applyKey(g: GameState, key: string): void {
+  // Snapshot BEFORE the routing loop so a mutation by a non-consuming onKey handler is
+  // still caught (mirrors applyPointer). Any handler that changes the cell run — a
+  // galaga shot raining its letter back, a future event editing on a passed-through key
+  // — is render-affecting: bump and re-clamp the caret, whether or not the key was consumed.
+  const cellsBefore = g.cells;
+  const settle = (): void => {
+    if (g.cells !== cellsBefore) {
+      bump(g);
+      g.caret = Math.min(g.caret, g.cells.length);
+    }
+  };
   for (const inst of activeEvents(g)) {
     const def = DEF_BY_ID.get(inst.defId);
     if (!def?.onKey) continue;
-    const cellsBefore = g.cells;
     if (def.onKey(inst, makeCtx(g, inst, 0), key)) {
-      // A key an event consumes can still edit the cell run (a galaga shot rains its
-      // letter back): that is render-affecting, so bump and re-clamp the caret.
-      if (g.cells !== cellsBefore) {
-        bump(g);
-        g.caret = Math.min(g.caret, g.cells.length);
-      }
+      settle();
       return;
     }
   }
+  settle();
   if (g.inputLocked) return;
 
   if ([...key].length === 1) {
