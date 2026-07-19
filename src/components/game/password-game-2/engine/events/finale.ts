@@ -28,7 +28,9 @@ const DEF_BY_ID = new Map(EVENT_DEFS.map((d) => [d.id, d]));
 
 const MISSILE_COUNT = 12;
 const MISSILE_LAUNCH_PERIOD_MS = 3200; // one missile launches every this many ms
-const MISSILE_FALL_MS = 4000; // a falling missile lands after this long
+// Exported: the stage painter animates the fall over this exact window, so the
+// drawn missile and the engine's landing moment stay in sync by construction.
+export const MISSILE_FALL_MS = 4000; // a falling missile lands after this long
 const GERALD_PERIOD_MS = 2500; // Gerald auto-intercepts on this cadence
 const MISSILE_LAND_LOCK_MS = 1500; // a landing stuns input for this long
 const MISSILE_KNOCKBACK_AT = 4; // landings in one attempt that force a knockback

@@ -82,6 +82,9 @@ function CookieBanners({
             to keep this password experience relentlessly personalized.
           </p>
           <div className="pg2-cookie__actions">
+            {/* Intentional dark-pattern joke: "Accept all" and "Decline" BOTH
+                route to banner-decline (which breeds two more banners). Only the
+                rare "Reject all" below actually dismisses. Not a copy-paste bug. */}
             <button
               type="button"
               className="pg2-cookie__accept"

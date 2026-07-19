@@ -24,7 +24,7 @@ import type { ParasiteData } from "../engine/events/parasite";
 import type { GalagaData, Alien } from "../engine/events/galaga";
 import type { SnakeData } from "../engine/events/snake";
 import type { TetrisData } from "../engine/events/tetris";
-import type { MissilesData } from "../engine/events/finale";
+import { MISSILE_FALL_MS, type MissilesData } from "../engine/events/finale";
 
 /** A rectangle in canvas-local CSS pixels. */
 export interface RectLike {
@@ -770,6 +770,8 @@ const paintGalaga: Painter = (ctx, inst, layout, g, tMs, hits) => {
     let y = slot.y;
 
     if (a.state === "diving" && a.diveStartedAtMs !== null) {
+      // 2000 mirrors galaga.ts GRAB_DELAY_MS: the dive must visually reach the
+      // box exactly when the engine grabs the glyph.
       const t = Math.min(1, (g.elapsedMs - a.diveStartedAtMs) / 2000);
       y = slot.y + t * (box.y + box.h * 0.6 - slot.y);
       x = slot.x + Math.sin(t * 6) * 40;
@@ -938,6 +940,8 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
 
   for (const drop of d.drops) {
     if (drop.landed) continue;
+    // 2500 mirrors tetris.ts LAND_DELAY_MS: the block must visually touch down
+    // exactly when the engine wedges the garbage cell in.
     const t = Math.min(1, (g.elapsedMs - drop.startAtMs) / 2500);
     const x = colFor(drop.targetIndex);
     const y = box.y - 24 + t * (box.h * 0.5 + 24);
@@ -970,8 +974,6 @@ const paintChromeTelegraph: Painter = (ctx, inst, layout, g, tMs) => {
 };
 
 // --- finale: missiles ---------------------------------------------------------
-
-const MISSILE_FALL_MS = 4000;
 
 /** Stub instance so the finale painter satisfies the uniform Painter signature. */
 export const FINALE_INST: EventInstance = {
