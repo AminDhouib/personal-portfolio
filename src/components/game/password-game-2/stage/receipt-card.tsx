@@ -98,8 +98,9 @@ export function ReceiptCard({
           daily: e["daily"] === true,
         }));
         if (!cancelled) setBoard(entries.slice(0, 10));
-      } catch (err) {
-        reportError(err);
+      } catch {
+        // Expected-failure path (offline, timeout, board down): swallow, the
+        // board simply stays hidden. Reporting would spam Sentry with noise.
       }
     })();
     return () => {
@@ -108,13 +109,17 @@ export function ReceiptCard({
   }, [daily, seed, refreshKey]);
 
   const submit = async () => {
+    // Send the SAME normalized name we record locally: the server falls back to
+    // "Anonymous" for a blank name, and isMine matches on the recorded value, so
+    // posting a different string would break the own-row highlight.
+    const postedName = name.trim() || "Anonymous";
     setPost({ kind: "sending" });
-    setPosted({ name: name.trim() || "Anonymous", timeMs });
+    setPosted({ name: postedName, timeMs });
     try {
       const res = await fetch("/api/password-game-2/leaderboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), seed, timeMs, daily }),
+        body: JSON.stringify({ name: postedName, seed, timeMs, daily }),
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) {
@@ -124,8 +129,8 @@ export function ReceiptCard({
       const body = (await res.json()) as { rank?: number };
       setPost({ kind: "sent", rank: body.rank ?? 0 });
       setRefreshKey((k) => k + 1); // re-read the board so the player's row appears
-    } catch (err) {
-      reportError(err);
+    } catch {
+      // Same expected-failure path as the board read: quiet fallback, no report.
       setPost({ kind: "unavailable" });
     }
   };
