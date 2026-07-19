@@ -3,9 +3,10 @@ export interface CountryCapital {
   capital: string;
 }
 
-// Injected from /api/password-game/countries when REST Countries responds.
-// The pg2 country-name rule reads this live feed only; when it is unset the
-// rule is a freebie (it does not fall back to any static pool).
+// Injected by pg2's feeds.ts (loadLiveFeeds, called once on shell mount) from
+// /api/password-game/countries when REST Countries responds. The pg2 country-name
+// rule reads this live feed only; when it is unset the rule is a freebie (it does
+// not fall back to any static pool).
 let _extended: readonly CountryCapital[] | null = null;
 
 export function setExtendedCapitals(list: readonly CountryCapital[] | null): void {

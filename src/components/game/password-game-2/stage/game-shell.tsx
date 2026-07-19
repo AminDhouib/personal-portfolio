@@ -20,6 +20,7 @@ import {
   tick,
 } from "../engine/engine";
 import { drainEffects } from "../engine/effects";
+import { loadLiveFeeds } from "../feeds";
 import { cellsToPassword } from "../engine/cells";
 import { dailySeed } from "../engine/rng";
 import { EVENT_DEFS } from "../engine/events/index";
@@ -135,6 +136,7 @@ export function GameShell() {
   const renderedVersionRef = useRef(-1);
   const overlayRef = useRef<OverlayHandle | null>(null);
   const autoStartedRef = useRef(false);
+  const feedsLoadedRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const flashRef = useRef<HTMLDivElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -229,6 +231,17 @@ export function GameShell() {
     const update = () => setNarrow(mq.matches);
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Fetch the three live feeds (wordle, country, chess) once on mount, so the
+  // feed-backed rules capture real data at rule-create time instead of freebie
+  // fallbacks. A ref once-guard survives Strict Mode's mount/unmount/mount so we
+  // never double-fetch (mirrors autoStartedRef). Fire-and-forget: loadLiveFeeds
+  // is best-effort and never throws.
+  useEffect(() => {
+    if (feedsLoadedRef.current) return;
+    feedsLoadedRef.current = true;
+    void loadLiveFeeds();
   }, []);
 
   // Clear any pending toast/mood dismissal timers when the shell unmounts.
