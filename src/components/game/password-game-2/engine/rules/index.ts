@@ -1,31 +1,20 @@
 import type { Pg2RuleDef } from "../types";
-
-/** Prologue: a floor on length. */
-const minLength12: Pg2RuleDef = {
-  id: "min-length-12",
-  act: "prologue",
-  create: () => ({
-    id: "min-length-12",
-    act: "prologue",
-    description: "Your password must be at least 12 characters.",
-    validate: (password) => ({ passed: [...password].length >= 12 }),
-  }),
-};
-
-/** Prologue: at least one digit. */
-const includeNumber: Pg2RuleDef = {
-  id: "include-number",
-  act: "prologue",
-  create: () => ({
-    id: "include-number",
-    act: "prologue",
-    description: "Your password must include a number.",
-    validate: (password) => ({ passed: /\d/.test(password) }),
-  }),
-};
+import { PROLOGUE_RULES } from "./prologue";
+import { ACT1_RULES } from "./act1";
+import { ACT2_RULES } from "./act2";
+import { ACT3_RULES } from "./act3";
 
 /**
- * Authored core-rule roster, in reveal order. Task 4 replaces this seam with the
- * full seventeen rules across five acts; the engine reads only this manifest.
+ * Authored core-rule roster, in reveal order across the five acts. The engine
+ * reads only this manifest: it reveals each rule when every prior rule passes,
+ * and advances an act once that act's rules are all revealed and passing.
+ *
+ * Order is load-bearing — the reveal cascade and the act boundaries follow the
+ * index here, not the `act` field alone. See each act module for the rules.
  */
-export const CORE_RULES: Pg2RuleDef[] = [minLength12, includeNumber];
+export const CORE_RULES: Pg2RuleDef[] = [
+  ...PROLOGUE_RULES,
+  ...ACT1_RULES,
+  ...ACT2_RULES,
+  ...ACT3_RULES,
+];

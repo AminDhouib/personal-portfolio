@@ -2,22 +2,58 @@ import { describe, expect, it } from "vitest";
 import { applyKey, applyPointer, createRun, makeRuleApi, requestSubmit, tick } from "../engine";
 import { drainEffects, pushEffect } from "../effects";
 import { cellsToPassword } from "../cells";
-import type { CharCell } from "../types";
+import { CORE_RULES } from "../rules/index";
+import { solveAll } from "./solve";
+import type { CharCell, GameState, RuleApi } from "../types";
 
-const boot = (seed = 42) => createRun({ seed, daily: false, nowHHMM: () => "12:00" });
+const HHMM = "12:00";
+const boot = (seed = 42) => createRun({ seed, daily: false, nowHHMM: () => HHMM });
 
 /** Type each key of a string in order. */
-const type = (g: ReturnType<typeof boot>, s: string) => {
+const type = (g: GameState, s: string) => {
   for (const k of s) applyKey(g, k);
 };
 
+/** Replace the whole password through the public key API: clear to empty, then type. */
+const retype = (g: GameState, target: string) => {
+  applyKey(g, "End");
+  while (g.cells.length > 0) applyKey(g, "Backspace");
+  type(g, target);
+};
+
+/** Satisfy every currently-revealed rule (only retyping when it changed), then tick once. */
+const solveAndTick = (g: GameState, api: RuleApi, dtMs = 1000) => {
+  const target = solveAll(g, api);
+  if (target !== cellsToPassword(g.cells)) retype(g, target);
+  tick(g, dtMs);
+};
+
 /**
- * Tick in 200ms steps until act3 is reached (or a generous cap). Each act now holds
- * scheduled stub events that must resolve before it advances, so the walk to act3
- * takes act-relative minutes rather than a handful of frames.
+ * Walk the run to act3, solving revealed rules as they appear. Each act now holds
+ * scheduled stub events that must resolve before it advances, so the walk takes
+ * act-relative minutes rather than a handful of frames. Fails loudly on its own
+ * if act3 is never reached, so callers can trust the post-condition.
  */
-const runToAct3 = (g: ReturnType<typeof boot>) => {
-  for (let i = 0; i < 3000 && g.act !== "act3"; i++) tick(g, 200);
+const runToAct3 = (g: GameState) => {
+  const api = makeRuleApi(g, () => HHMM);
+  for (let i = 0; i < 4000 && g.act !== "act3"; i++) solveAndTick(g, api);
+  expect(g.act).toBe("act3");
+};
+
+/** Continue in act3 until every one of the 17 rules is revealed and passing. */
+const driveToAllRulesPassing = (g: GameState) => {
+  const api = makeRuleApi(g, () => HHMM);
+  for (let i = 0; i < 400; i++) {
+    solveAndTick(g, api);
+    const pw = cellsToPassword(g.cells);
+    if (
+      g.rules.length === CORE_RULES.length &&
+      g.rules.every((r) => r.validate(pw, g, api).passed)
+    ) {
+      return;
+    }
+  }
+  throw new Error("never reached an all-rules-passing state in act3");
 };
 
 describe("engine", () => {
@@ -90,11 +126,11 @@ describe("engine", () => {
 
   it("advances through the acts and opens the finale on a satisfying submit", () => {
     const g = boot();
-    type(g, "abcdefghijk1"); // 12 chars incl. a digit -> both prologue rules pass
-    // act1/act2 have no core rules yet, but their scheduled events must resolve
-    // before each advances, so walk to act3 instead of ticking a fixed count.
+    // Each act's core rules must be revealed and passing (and its non-inhabitant
+    // events resolved) before it advances, so solve the roster as it unfolds.
     runToAct3(g);
     expect(g.act).toBe("act3");
+    driveToAllRulesPassing(g);
     requestSubmit(g);
     expect(g.act).toBe("finale");
     expect(g.finale).not.toBeNull();
@@ -110,7 +146,6 @@ describe("engine", () => {
 
   it("act3 does not auto-advance to the finale on time alone", () => {
     const g = boot();
-    type(g, "abcdefghijk1");
     runToAct3(g);
     expect(g.act).toBe("act3");
     // Once in act3, time alone never opens the finale — only a satisfying submit does.
@@ -121,7 +156,6 @@ describe("engine", () => {
 
   it("emits one title-card per act transition", () => {
     const g = boot();
-    type(g, "abcdefghijk1");
     runToAct3(g);
     const cards = g.effects.filter((e) => e.kind === "title-card");
     // prologue->act1, act1->act2, act2->act3

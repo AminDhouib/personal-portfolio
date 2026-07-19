@@ -58,3 +58,12 @@ export function setExtendedCapitals(list: readonly CountryCapital[] | null): voi
 export function getCapitals(): readonly CountryCapital[] {
   return _extended ?? COUNTRY_CAPITALS;
 }
+
+/**
+ * The raw injected extended list, or null when the live feed is unset. Distinct
+ * from getCapitals(), which always falls back to the static pool; callers that
+ * must distinguish "feed present" from "feed offline" read this instead.
+ */
+export function getInjectedCapitals(): readonly CountryCapital[] | null {
+  return _extended;
+}

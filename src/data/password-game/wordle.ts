@@ -119,6 +119,15 @@ export function setTodayWord(word: string | null): void {
   _todayWord = word && /^[A-Z]{5}$/.test(word) ? word : null;
 }
 
+/**
+ * The raw injected answer, or null when the live feed is unset. Distinct from
+ * wordleOfTheDay(), which always resolves to a deterministic fallback; callers
+ * that must distinguish "feed present" from "feed offline" read this instead.
+ */
+export function getInjectedWordleWord(): string | null {
+  return _todayWord;
+}
+
 /** Deterministic fallback — same for everyone on the same UTC date. */
 function fallbackOfTheDay(date: Date): string {
   const y = date.getUTCFullYear();
