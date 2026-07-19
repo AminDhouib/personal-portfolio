@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import { memo, type ReactNode, type RefObject } from "react";
 import type { CellStatus, CharCell } from "../engine/types";
 
 interface CharStageProps {
@@ -43,8 +43,18 @@ function glyphOf(cell: CharCell): string {
  * events can infect, abduct, or orbit individual glyphs. A manual caret span is
  * spliced in at g.caret. data-cell-id lets the Task 12 canvas overlay measure
  * per-cell rects for creature painters and pointer hit-testing.
+ *
+ * Memoized: props (cells/caret refs, stable callbacks) only change when the
+ * engine mutates the run, so the 250ms HUD heartbeat re-render skips the ~75 cell
+ * subtree entirely.
  */
-export function CharStage({ cells, caret, boxRef, onCellClick, onBoxClick }: CharStageProps) {
+export const CharStage = memo(function CharStage({
+  cells,
+  caret,
+  boxRef,
+  onCellClick,
+  onBoxClick,
+}: CharStageProps) {
   const clampedCaret = Math.max(0, Math.min(caret, cells.length));
 
   const caretNode = <span key="caret" className="pg2-caret" aria-hidden="true" />;
@@ -91,4 +101,4 @@ export function CharStage({ cells, caret, boxRef, onCellClick, onBoxClick }: Cha
       )}
     </div>
   );
-}
+});

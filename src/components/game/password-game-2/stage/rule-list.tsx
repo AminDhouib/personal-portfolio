@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { GameState, Pg2Rule, RuleApi, ValidationResult } from "../engine/types";
 
 interface RuleListProps {
@@ -6,6 +6,12 @@ interface RuleListProps {
   password: string;
   state: GameState;
   api: RuleApi;
+  /**
+   * The engine version counter. Not read directly — it is a memo re-render signal:
+   * it bumps on every cells/rules/act change, so the memoized list re-validates
+   * when engine state moves but skips the pure 250ms HUD heartbeat.
+   */
+  version: number;
 }
 
 interface Evaluated {
@@ -316,8 +322,11 @@ function RuleCard({
  * Numbered rule cards. The first failing rule is pinned to the top and
  * highlighted; satisfied rules collapse to compact green rows (click to expand).
  * Badge numbers stay tied to authored position, not display order.
+ *
+ * Memoized on its props (version included) so the 250ms HUD heartbeat does not
+ * re-run 17 validations; engine state changes bump version and re-render it.
  */
-export function RuleList({ rules, password, state, api }: RuleListProps) {
+export const RuleList = memo(function RuleList({ rules, password, state, api }: RuleListProps) {
   const evaluated: Evaluated[] = rules.map((rule, i) => ({
     rule,
     badge: i + 1,
@@ -339,4 +348,4 @@ export function RuleList({ rules, password, state, api }: RuleListProps) {
       })}
     </ol>
   );
-}
+});

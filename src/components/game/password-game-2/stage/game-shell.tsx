@@ -129,6 +129,7 @@ export function GameShell() {
   const soundDebounceRef = useRef<Map<string, number>>(new Map());
   const toastIdRef = useRef(0);
   const moodTimersRef = useRef<Map<string, number>>(new Map());
+  const toastTimersRef = useRef<Set<number>>(new Set());
 
   // Title cards show one at a time for 2.2s, skippable on click. showingCardRef
   // lets enqueue decide immediately without reading state during render;
@@ -160,7 +161,11 @@ export function GameShell() {
   const pushToast = useCallback((text: string, tone: Toast["tone"]) => {
     const id = ++toastIdRef.current;
     setToasts((prev) => [...prev, { id, text, tone }].slice(-4));
-    window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+    const timer = window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      toastTimersRef.current.delete(timer);
+    }, 4000);
+    toastTimersRef.current.add(timer);
   }, []);
 
   const setMood = useCallback((eventId: string, text: string) => {
@@ -204,10 +209,21 @@ export function GameShell() {
   // the loop) and a live viewport-width listener for the mobile banner.
   useEffect(() => {
     reducedRef.current = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const mq = window.matchMedia("(max-width: 767px)");
+    const mq = window.matchMedia?.("(max-width: 767px)");
+    if (!mq) return;
     const update = () => setNarrow(mq.matches);
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Clear any pending toast/mood dismissal timers when the shell unmounts.
+  useEffect(() => {
+    const toastTimers = toastTimersRef.current;
+    const moodTimers = moodTimersRef.current;
+    return () => {
+      for (const id of toastTimers) window.clearTimeout(id);
+      for (const id of moodTimers.values()) window.clearTimeout(id);
+    };
   }, []);
 
   // Auto-advance the visible title card after 2.2s; cleanup clears the timer when
@@ -285,6 +301,14 @@ export function GameShell() {
     }
 
     function onKeyDown(e: KeyboardEvent) {
+      if (e.isComposing) return; // never intercept mid-IME-composition
+      // A keystroke aimed at a focused control (button, link, the sound/submit
+      // buttons, a title card) belongs to that control, not the password. Without
+      // this, Space is preventDefault-ed and typed, breaking Space-activation. The
+      // hidden mobile input is deliberately NOT in this list — it is the game
+      // surface, so desktop typing/Backspace still routes here when it has focus.
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("button, a, select, textarea, [role=button]")) return;
       const g = gameRef.current;
       if (!g) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return; // let copy/paste/shortcuts through
@@ -598,7 +622,10 @@ function RunningView({
   onSubmit: () => void;
 }) {
   const password = cellsToPassword(g.cells);
-  const api = makeRuleApi(g, nowHHMM);
+  // Stable across the 250ms heartbeat (g is the same mutable ref for the whole
+  // run) so the memoized RuleList can skip re-validating when nothing changed;
+  // the api's methods read g live, so a fixed identity stays correct.
+  const api = useMemo(() => makeRuleApi(g, nowHHMM), [g]);
   const moodEntries = Object.entries(moods);
 
   return (
@@ -662,7 +689,7 @@ function RunningView({
             <p className="mt-5 mb-2 text-xs font-semibold tracking-wide text-[color:var(--pg2-muted)] uppercase">
               Your password must satisfy
             </p>
-            <RuleList rules={g.rules} password={password} state={g} api={api} />
+            <RuleList rules={g.rules} password={password} state={g} api={api} version={g.version} />
 
             <div className="mt-6 flex justify-end">
               <button

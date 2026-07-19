@@ -24,6 +24,10 @@ export default function PasswordGamePage() {
         </Link>
 
         <div className="max-w-3xl">
+          {/* Server-rendered heading: the interactive shell is client-only
+              (ssr: false), so without this the page ships no h1 in its SSR HTML.
+              sr-only because the shell renders its own visible wordmark. */}
+          <h1 className="sr-only">The Password Game 2</h1>
           <PasswordGame2Loader />
         </div>
 
