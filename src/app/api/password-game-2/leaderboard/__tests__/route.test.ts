@@ -186,6 +186,12 @@ describe("/api/password-game-2/leaderboard", () => {
       const res = await POST(makeJsonPostRequest(validBody({ seed: 7, timeMs: 90_000 })));
       const body = (await res.json()) as PostResponse;
       expect(body.rank).toBe(2);
+
+      // The rank query is scoped to the same seed (mirrors the trim-scope assertion):
+      // rank counts only strictly-faster runs OF THIS SEED, never a global position.
+      const rankQuery = captured.find((q) => q.sql.toUpperCase().includes("COUNT(*)"));
+      expect(rankQuery?.sql.toUpperCase()).toContain("WHERE SEED = $1");
+      expect(rankQuery?.params?.[0]).toBe(7);
     });
 
     it("rejects negative seed with 400", async () => {

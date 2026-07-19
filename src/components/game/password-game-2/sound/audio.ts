@@ -175,8 +175,7 @@ export function getAudio(): AudioBus | null {
   if (!w) return null;
   try {
     const Ctor =
-      w.AudioContext ||
-      (w as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      w.AudioContext || (w as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     const ctx: AudioContextLike = new Ctor();
     bus = createBus(ctx);
@@ -208,8 +207,7 @@ export function playTone(bus: AudioBus, opts: ToneOptions): void {
   const { ctx } = bus;
   const t = ctx.currentTime;
   const attack = (opts.attackMs ?? 8) / 1000;
-  const release =
-    (opts.releaseMs ?? Math.max(opts.durMs - (opts.attackMs ?? 8), 20)) / 1000;
+  const release = (opts.releaseMs ?? Math.max(opts.durMs - (opts.attackMs ?? 8), 20)) / 1000;
 
   const osc = ctx.createOscillator();
   osc.type = opts.type ?? "sine";

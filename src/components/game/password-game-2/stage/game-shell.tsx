@@ -28,6 +28,8 @@ import { playCue } from "../sound/motifs";
 import { CharStage } from "./char-stage";
 import { CanvasOverlay, type OverlayHandle } from "./canvas-overlay";
 import { ChromeEvents } from "./chrome-events";
+import { FinaleStage } from "./finale-stage";
+import { ReceiptCard } from "./receipt-card";
 import { RuleList } from "./rule-list";
 import { Hud } from "./hud";
 import "./pg2.css";
@@ -391,6 +393,9 @@ export function GameShell() {
     );
   }, [seed, pushToast]);
 
+  const playAgain = useCallback(() => start(randomSeed(), false), [start]);
+  const playDaily = useCallback(() => start(dailySeed(), true), [start]);
+
   const focusHiddenInput = useCallback(() => {
     hiddenInputRef.current?.focus({ preventScroll: true });
   }, []);
@@ -523,6 +528,7 @@ export function GameShell() {
           <RunningView
             g={g}
             seed={seed}
+            daily={daily}
             soundOn={soundOn}
             moods={moods}
             boxRef={boxRef}
@@ -533,6 +539,9 @@ export function GameShell() {
             onBoxClick={onBoxClick}
             onHiddenInput={onHiddenInput}
             onSubmit={onSubmit}
+            onPointer={applyTarget}
+            onPlayAgain={playAgain}
+            onPlayDaily={playDaily}
           />
         ) : null}
 
@@ -679,6 +688,7 @@ function StartScreen({
 function RunningView({
   g,
   seed,
+  daily,
   soundOn,
   moods,
   boxRef,
@@ -689,9 +699,13 @@ function RunningView({
   onBoxClick,
   onHiddenInput,
   onSubmit,
+  onPointer,
+  onPlayAgain,
+  onPlayDaily,
 }: {
   g: GameState;
   seed: number;
+  daily: boolean;
   soundOn: boolean;
   moods: Record<string, string>;
   boxRef: RefObject<HTMLDivElement | null>;
@@ -702,6 +716,9 @@ function RunningView({
   onBoxClick: () => void;
   onHiddenInput: (e: FormEvent<HTMLInputElement>) => void;
   onSubmit: () => void;
+  onPointer: (target: PointerTarget) => void;
+  onPlayAgain: () => void;
+  onPlayDaily: () => void;
 }) {
   const password = cellsToPassword(g.cells);
   // Stable across the 250ms heartbeat (g is the same mutable ref for the whole
@@ -733,9 +750,16 @@ function RunningView({
 
       <div className="p-5 sm:p-6">
         {g.outcome === "victory" ? (
-          <VictoryPanel elapsedMs={g.elapsedMs} />
+          <ReceiptCard
+            g={g}
+            seed={seed}
+            daily={daily}
+            onCopySeed={onCopySeed}
+            onPlayAgain={onPlayAgain}
+            onPlayDaily={onPlayDaily}
+          />
         ) : g.act === "finale" ? (
-          <FinalePlaceholder phase={g.finale?.phase ?? "missiles"} />
+          <FinaleStage g={g} onPointer={onPointer} />
         ) : (
           <>
             {moodEntries.length > 0 ? (
@@ -803,54 +827,5 @@ function RunningView({
         )}
       </div>
     </>
-  );
-}
-
-function FinalePlaceholder({ phase }: { phase: string }) {
-  return (
-    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--pg2-line-strong)] bg-[color:var(--pg2-field)] py-12 text-center">
-      <span className="text-xs font-semibold tracking-[0.35em] text-[color:var(--pg2-muted)] uppercase">
-        Finale
-      </span>
-      <h3 className="mt-2 text-3xl font-black tracking-tight text-[color:var(--pg2-ink)]">
-        THE SUBMISSION
-      </h3>
-      <p className="mt-3 text-sm text-[color:var(--pg2-muted)]">
-        Phase: <span className="font-mono">{phase}</span>
-      </p>
-      <p className="mt-1 text-xs text-[color:var(--pg2-legal)]">
-        The boss stage arrives in a later build.
-      </p>
-    </div>
-  );
-}
-
-function VictoryPanel({ elapsedMs }: { elapsedMs: number }) {
-  const total = Math.floor(elapsedMs / 1000);
-  const mm = String(Math.floor(total / 60)).padStart(2, "0");
-  const ss = String(total % 60).padStart(2, "0");
-  return (
-    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-[color:var(--pg2-line)] bg-[color:var(--pg2-field)] py-12 text-center">
-      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" fill="#16a34a" />
-        <path
-          d="M7 12.5l3.2 3.2L17 9"
-          stroke="#fff"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <h3 className="mt-4 text-2xl font-black tracking-tight text-[color:var(--pg2-ink)]">
-        Account created.
-      </h3>
-      <p className="mt-2 text-sm text-[color:var(--pg2-muted)]">
-        Completed in{" "}
-        <span className="font-mono">
-          {mm}:{ss}
-        </span>
-        .
-      </p>
-    </div>
   );
 }

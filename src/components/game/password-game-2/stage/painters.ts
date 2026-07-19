@@ -984,7 +984,7 @@ export const FINALE_INST: EventInstance = {
   data: undefined,
 };
 
-const paintFinaleMissiles: Painter = (ctx, _inst, layout, g, tMs) => {
+const paintFinaleMissiles: Painter = (ctx, _inst, layout, g, tMs, hits) => {
   const p = layout.panelRect;
   const finale = g.finale;
   if (!finale) return;
@@ -996,6 +996,16 @@ const paintFinaleMissiles: Painter = (ctx, _inst, layout, g, tMs) => {
     if (m.state === "falling") {
       const t = Math.min(1, (finale.phaseElapsedMs - m.launchedAtMs) / MISSILE_FALL_MS);
       const y = t * (p.h - 20);
+      // A generous click target around the warhead so a falling missile is catchable.
+      hits.push({
+        shape: "circle",
+        x,
+        y,
+        w: 0,
+        h: 0,
+        r: 22,
+        target: { kind: "missile", id: m.id },
+      });
       // streak
       ctx.save();
       const grad = ctx.createLinearGradient(x, y - 40, x, y);
