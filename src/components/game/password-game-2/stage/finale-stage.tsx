@@ -151,7 +151,10 @@ function MissilesPhase({
 
   return (
     <div className="pg2-alert" aria-live="polite">
-      <div className={`pg2-alert-vignette${reduced ? "pg2-alert-vignette--still" : ""}`} />
+      {/* The space separating base and modifier lives in the static template text:
+          prettier-plugin-tailwindcss strips leading whitespace INSIDE class strings,
+          so a " base--mod" conditional gets silently fused back into one token. */}
+      <div className={`pg2-alert-vignette ${reduced ? "pg2-alert-vignette--still" : ""}`} />
       <div ref={stunRef} className="pg2-stun" aria-hidden="true" />
 
       <p className="pg2-alert__lede">
@@ -165,7 +168,7 @@ function MissilesPhase({
           {[0, 1, 2, 3].map((i) => (
             <span
               key={i}
-              className={`pg2-impacts__dot${i < landings ? "pg2-impacts__dot--hit" : ""}`}
+              className={`pg2-impacts__dot ${i < landings ? "pg2-impacts__dot--hit" : ""}`}
             />
           ))}
         </span>
@@ -264,7 +267,7 @@ function EulaPhase({
           const isReal = idx === realPara;
           const isDecoy = decoys.includes(idx);
           return (
-            <div key={idx} className={`pg2-eula__para${isReal ? "pg2-eula__para--real" : ""}`}>
+            <div key={idx} className={`pg2-eula__para ${isReal ? "pg2-eula__para--real" : ""}`}>
               <p className="pg2-eula__num">Section {idx + 1}.</p>
               <p className="pg2-eula__body">{EULA_CLAUSES[idx % EULA_CLAUSES.length]}</p>
               {isReal ? (

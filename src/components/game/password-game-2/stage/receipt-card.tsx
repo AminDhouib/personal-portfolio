@@ -241,7 +241,7 @@ export function ReceiptCard({
               {board.map((e, i) => (
                 <li
                   key={`${e.name}-${e.timeMs}-${i}`}
-                  className={`pg2-board__row${isMine(e) ? "pg2-board__row--mine" : ""}`}
+                  className={`pg2-board__row ${isMine(e) ? "pg2-board__row--mine" : ""}`}
                 >
                   <span className="pg2-board__pos">{i + 1}</span>
                   <span className="pg2-board__name">{e.name}</span>
