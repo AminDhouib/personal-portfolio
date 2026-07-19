@@ -6,6 +6,8 @@ import { CORE_RULES } from "../rules/index";
 import { EVENT_DEFS } from "../events/index";
 import { ACT_SCRIPTS } from "../director";
 import { solveAll } from "./solve";
+import type { GalagaData } from "../events/galaga";
+import type { SnakeData } from "../events/snake";
 import type { ActId, Effect, EventInstance, GameState, RuleApi } from "../types";
 
 /**
@@ -62,6 +64,58 @@ interface TendOpts {
 }
 
 /**
+ * Leading formation aliens left to dive (their letters are abducted, then rescued by
+ * the key-shot); the rest are clicked down so a wave clears well inside its 45s cap.
+ * With this budget every wave completes without a timeout on a fully-tended run, so
+ * the final wave is shot down to the last invader and the coupled rule passes.
+ */
+const GALAGA_DIVE_BUDGET = 8;
+
+/**
+ * Fight the invasions BEFORE the solver re-types (a retype backspaces the whole box,
+ * which would delete the abducted cells the intruders are holding). Shoot every letter
+ * Galaga is carrying, click down the formation aliens past the dive budget, feed the
+ * snake its pellet at the end of the box, and shatter every Tetris block. Deterministic
+ * in run state.
+ */
+const tendInvasions = (g: GameState) => {
+  for (const e of g.events) {
+    if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
+    if (e.defId === "galaga") {
+      const d = e.data as GalagaData;
+      for (const a of d.aliens) {
+        if (a.state === "carrying" && a.carriedCellId !== null) {
+          const cell = g.cells.find((c) => c.id === a.carriedCellId);
+          if (cell) applyKey(g, cell.ch);
+        }
+      }
+      for (const a of d.aliens) {
+        if (
+          (a.state === "formation" || a.state === "diving") &&
+          a.formationIndex >= GALAGA_DIVE_BUDGET
+        ) {
+          applyPointer(g, { kind: "alien", id: a.id });
+        }
+      }
+    } else if (e.defId === "snake") {
+      const d = e.data as SnakeData;
+      if (!d.gone) {
+        applyKey(g, "End");
+        applyKey(g, d.pelletChar);
+      }
+    } else if (e.defId === "tetris") {
+      for (const c of g.cells.filter((cell) => cell.status === "garbage")) {
+        applyPointer(g, { kind: "cell", id: c.id });
+      }
+    }
+  }
+};
+
+/** Every non-inhabitant event scheduled for `act` has reached its terminal phase. */
+const nonInhabDone = (g: GameState, act: ActId): boolean =>
+  g.events.filter((e) => e.act === act && nonInhabitant(e)).every((e) => e.phase === "done");
+
+/**
  * Tend the live crises so the run stays winnable: stoke the campfire, feed Gerald,
  * toss the basket whenever the bear is not away, and evict any parasite mimic. The
  * black hole is collapsed by typing its heavy word (see withHeavyWord) and the
@@ -106,9 +160,10 @@ const withHeavyWord = (g: GameState, target: string): string => {
 const solveAndTick = (
   g: GameState,
   api: RuleApi,
-  opts: { tendInhabitants?: boolean; tendForces?: boolean } = {},
+  opts: { tendInhabitants?: boolean; tendForces?: boolean; tendInvasions?: boolean } = {},
 ) => {
   const tendForces = opts.tendForces !== false;
+  if (opts.tendInvasions !== false) tendInvasions(g); // shoot/feed/shatter before re-typing
   const base = solveAll(g, api);
   const target = tendForces ? withHeavyWord(g, base) : base;
   if (target !== cellsToPassword(g.cells)) retype(g, target);
@@ -158,6 +213,14 @@ interface DriveResult {
   /** Coupled inhabitant rules present in the roster, and whether all passed at submit. */
   coupledInhabitantRuleIds: string[];
   coupledInhabitantRulesPassAtSubmit: boolean;
+  /** Every act3 invasion/force/chrome was resolved at finale entry (the submit gate). */
+  act3NonInhabAllDoneAtFinale: boolean;
+  /** Galaga marquee telemetry at the satisfying submit. */
+  lettersAbducted: number;
+  lettersRescued: number;
+  aliensDowned: number;
+  galagaTimedOutWaves: number;
+  galagaFinalWavePassesAtSubmit: boolean;
 }
 
 /**
@@ -206,14 +269,18 @@ function driveRun(seed: number): DriveResult {
   expect(g.act).toBe("act3");
 
   // Phase 2: stay in act3 until the full 17-rule CORE roster is revealed and every
-  // rule passes — including the coupled inhabitant rules, which the caretaker keeps
-  // satisfied by tending. Gate on the CORE count, since g.rules also holds coupled ones.
-  for (let i = 0; i < 600; i++) {
+  // rule passes AND every act3 blocking beat has resolved — the submit gate now needs
+  // both, so the caretaker fights the three Galaga waves (and the other invasions/
+  // forces/chrome) to their end. Gate on the CORE count, since g.rules also holds
+  // coupled ones. The window is generous: act3's blocking beats run past the four-
+  // minute mark, and the marquee's three waves take many dive/shot cycles.
+  for (let i = 0; i < 4000; i++) {
     step();
     const pw = cellsToPassword(g.cells);
     if (
       coreRevealed(g) === CORE_RULES.length &&
-      g.rules.every((r) => r.validate(pw, g, api).passed)
+      g.rules.every((r) => r.validate(pw, g, api).passed) &&
+      nonInhabDone(g, "act3")
     ) {
       break;
     }
@@ -221,6 +288,14 @@ function driveRun(seed: number): DriveResult {
   const pw = cellsToPassword(g.cells);
   expect(coreRevealed(g)).toBe(CORE_RULES.length);
   expect(g.rules.every((r) => r.validate(pw, g, api).passed)).toBe(true);
+  const act3NonInhabAllDoneAtFinale = nonInhabDone(g, "act3");
+
+  // Galaga marquee telemetry at the satisfying submit.
+  const galaga = g.events.find((e) => e.defId === "galaga");
+  const galagaData = galaga?.data as GalagaData | undefined;
+  const galagaRule = g.rules.find((r) => r.id === "galaga-final-wave");
+  const galagaFinalWavePassesAtSubmit =
+    galagaRule !== undefined && galagaRule.validate(pw, g, api).passed;
 
   // Snapshot the coupled inhabitant rules' state at the moment of the satisfying submit.
   const coupledRules = g.rules.filter((r) => COUPLED_INHAB_RULE_IDS.has(r.id));
@@ -251,6 +326,12 @@ function driveRun(seed: number): DriveResult {
     elapsedAtFinaleMs,
     coupledInhabitantRuleIds,
     coupledInhabitantRulesPassAtSubmit,
+    act3NonInhabAllDoneAtFinale,
+    lettersAbducted: g.stats.lettersAbducted,
+    lettersRescued: g.stats.lettersRescued,
+    aliensDowned: g.stats.aliensDowned,
+    galagaTimedOutWaves: galagaData?.timedOutWaves ?? 0,
+    galagaFinalWavePassesAtSubmit,
   };
 }
 
@@ -289,6 +370,17 @@ describe("password-game-2 full-run integration", () => {
     // Their coupled rules were injected and were all satisfied at the satisfying submit.
     expect(r.coupledInhabitantRuleIds).toEqual(["campfire-burning", "garden-honey"]);
     expect(r.coupledInhabitantRulesPassAtSubmit).toBe(true);
+  });
+
+  it("clears the marquee: the submit gate held until every act3 invasion resolved", () => {
+    const r = driveRun(SEED);
+    // The submit gate held: every act3 blocking beat was done before the finale opened.
+    expect(r.act3NonInhabAllDoneAtFinale).toBe(true);
+    expect(r.galagaFinalWavePassesAtSubmit).toBe(true);
+    expect(r.lettersAbducted).toBeGreaterThan(0);
+    expect(r.lettersRescued).toBeGreaterThan(0);
+    expect(r.aliensDowned).toBeGreaterThanOrEqual(12 + 8 + 6);
+    expect(r.galagaTimedOutWaves).toBe(0);
   });
 
   it("advances each act only after its last blocking beat resolves on the authored timeline", () => {
@@ -453,5 +545,58 @@ describe("password-game-2 full-run integration", () => {
       expect(g.finale).toBeNull();
       expect(g.caret).toBeLessThanOrEqual(g.cells.length);
     }
+  });
+
+  it("neglected, a Galaga wave times out and the gate refuses submit until the fight is finished", () => {
+    const g = boot(SEED);
+    const api = makeRuleApi(g, () => HHMM);
+
+    // Reach act3 with full tending.
+    for (let i = 0; i < 6000 && g.act !== "act3"; i++) solveAndTick(g, api);
+    expect(g.act).toBe("act3");
+
+    const galagaData = (): GalagaData | undefined =>
+      g.events.find((e) => e.defId === "galaga")?.data as GalagaData | undefined;
+
+    // Neglect the fleet: tend the creatures to keep the run alive, but never fire and
+    // do not re-solve (a solve would try to top up letters the fleet is abducting). A
+    // wave outlives its 45s cap and times out, its carried letters raining back and its
+    // survivors fleeing rather than dying.
+    let timedOut = false;
+    for (let i = 0; i < 2500 && !timedOut; i++) {
+      tend(g);
+      tick(g, TICK_MS);
+      drainEffects(g);
+      if ((galagaData()?.timedOutWaves ?? 0) > 0) timedOut = true;
+    }
+    expect(timedOut).toBe(true);
+    expect(galagaData()!.timedOutWaves).toBeGreaterThan(0);
+
+    // The coupled rule fails (the final wave was not shot down) and the gate refuses:
+    // neglect cannot skip the marquee any more than speed can.
+    const galagaRule = g.rules.find((r) => r.id === "galaga-final-wave")!;
+    expect(galagaRule.validate(cellsToPassword(g.cells), g, api).passed).toBe(false);
+    drainEffects(g);
+    requestSubmit(g);
+    expect(g.act).toBe("act3");
+    expect(g.finale).toBeNull();
+    expect(g.effects.some((e) => e.kind === "toast" && e.tone === "danger")).toBe(true);
+
+    // Finish the fight: fully tend until every rule passes and every act3 blocking beat
+    // resolves, then the same submit opens the finale — the run is still winnable.
+    for (let i = 0; i < 4000; i++) {
+      solveAndTick(g, api);
+      const pw = cellsToPassword(g.cells);
+      if (
+        coreRevealed(g) === CORE_RULES.length &&
+        g.rules.every((r) => r.validate(pw, g, api).passed) &&
+        nonInhabDone(g, "act3")
+      ) {
+        break;
+      }
+    }
+    requestSubmit(g);
+    expect(g.act).toBe("finale");
+    expect(g.finale).not.toBeNull();
   });
 });

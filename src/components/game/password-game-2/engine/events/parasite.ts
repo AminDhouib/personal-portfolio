@@ -30,6 +30,7 @@ function insertParasite(d: ParasiteData, ctx: EventContext): void {
   const id = ctx.state.nextCellId++;
   const parasite: CharCell = { id, ch: glyph, status: "parasite", eventTag: EVENT_ID };
   ctx.state.cells = [...cells.slice(0, index), parasite, ...cells.slice(index)];
+  if (index <= ctx.state.caret) ctx.state.caret++; // keep the caret over the same char
   d.parasiteIds.push(id);
 }
 
@@ -91,6 +92,7 @@ export const parasiteDef: EventDef<ParasiteData> = {
     );
     if (idx < 0) return false;
     ctx.state.cells = [...ctx.state.cells.slice(0, idx), ...ctx.state.cells.slice(idx + 1)];
+    if (idx < ctx.state.caret) ctx.state.caret--; // a cell left of the caret was removed
     const d = inst.data;
     d.parasiteIds = d.parasiteIds.filter((pid) => pid !== id);
     if (d.parasiteIds.length === 0) inst.phase = "done";

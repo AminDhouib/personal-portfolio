@@ -36,12 +36,13 @@ const COUPLED_RULE_BY_ID: Record<string, string> = {
   campfire: "campfire-burning",
   garden: "garden-honey",
   infection: "no-infected",
+  galaga: "galaga-final-wave",
 };
 
 const isInhabitant = (def: EventDef): boolean => def.family === "inhabitant";
 
-/** Families still shipped as placeholder stubs (Tasks 8-9 replace these). */
-const isStub = (def: EventDef): boolean => def.family === "invasion" || def.family === "chrome";
+/** Families still shipped as placeholder stubs (Task 9 replaces the chrome ones). */
+const isStub = (def: EventDef): boolean => def.family === "chrome";
 
 const state: GameState = createRun({ seed: 1, daily: false });
 

@@ -142,7 +142,16 @@ export function applyKey(g: GameState, key: string): void {
   for (const inst of activeEvents(g)) {
     const def = DEF_BY_ID.get(inst.defId);
     if (!def?.onKey) continue;
-    if (def.onKey(inst, makeCtx(g, inst, 0), key)) return;
+    const cellsBefore = g.cells;
+    if (def.onKey(inst, makeCtx(g, inst, 0), key)) {
+      // A key an event consumes can still edit the cell run (a galaga shot rains its
+      // letter back): that is render-affecting, so bump and re-clamp the caret.
+      if (g.cells !== cellsBefore) {
+        bump(g);
+        g.caret = Math.min(g.caret, g.cells.length);
+      }
+      return;
+    }
   }
   if (g.inputLocked) return;
 
@@ -193,19 +202,25 @@ export function applyKey(g: GameState, key: string): void {
  * targets go to the finale (Task 10). Otherwise a cell target moves the caret.
  */
 export function applyPointer(g: GameState, target: PointerTarget): void {
+  // Snapshot BEFORE the routing loop so a mutation by a non-consuming handler is
+  // still caught. Any handler that changes the cell run (a parasite eviction, a
+  // galaga shot, a tetris shatter) is render-affecting: bump and re-clamp the caret.
+  const cellsBefore = g.cells;
+  const settle = (): void => {
+    if (g.cells !== cellsBefore) {
+      bump(g);
+      g.caret = Math.min(g.caret, g.cells.length);
+    }
+  };
   for (const inst of activeEvents(g)) {
     const def = DEF_BY_ID.get(inst.defId);
     if (!def?.onPointer) continue;
-    const cellsBefore = g.cells;
     if (def.onPointer(inst, makeCtx(g, inst, 0), target)) {
-      // A pointer that edits the cell run (a parasite eviction) is render-affecting.
-      if (g.cells !== cellsBefore) {
-        bump(g);
-        g.caret = Math.min(g.caret, g.cells.length);
-      }
+      settle();
       return;
     }
   }
+  settle();
   if (g.act === "finale") return; // finale pointer routing lands in Task 10
   if (target.kind === "cell" && typeof target.id === "number") {
     const idx = findCellIndex(g.cells, target.id);
@@ -215,11 +230,18 @@ export function applyPointer(g: GameState, target: PointerTarget): void {
 
 /**
  * Attempt to submit. Refused (with a toast) unless the run is in act3 with every
- * revealed rule passing; otherwise it opens the finale.
+ * revealed rule passing AND every act3-scheduled non-inhabitant event resolved —
+ * the second gate protects the marquee: a fast typist can satisfy the rules before
+ * Galaga even onsets, and must not be allowed to skip the invasion. The two refusals
+ * carry distinct toasts so the stage can tell the player which gate held.
  */
 export function requestSubmit(g: GameState): void {
   if (g.act !== "act3" || !allRulesPass(g)) {
     pushEffect(g, { kind: "toast", text: "The form is not satisfied.", tone: "danger" });
+    return;
+  }
+  if (!nonInhabitantEventsResolvedForAct(g, "act3")) {
+    pushEffect(g, { kind: "toast", tone: "danger", text: "The form is not done with you yet." });
     return;
   }
   g.act = "finale";
@@ -296,6 +318,18 @@ function isResolvedInstance(g: GameState, inst: EventInstance): boolean {
   return def !== undefined && def.isResolved(inst, g);
 }
 
+/**
+ * Every non-inhabitant event scheduled for `act` has resolved. Inhabitants persist
+ * to the finale, so they never gate an act boundary or a submit; the blocking beats
+ * (forces, invasions, chrome) do. Shared by act advancement and the submit gate so
+ * the two agree on what "the act's crises are over" means.
+ */
+function nonInhabitantEventsResolvedForAct(g: GameState, act: ActId): boolean {
+  return g.events
+    .filter((e) => e.act === act && e.family !== "inhabitant")
+    .every((e) => isResolvedInstance(g, e));
+}
+
 function nextUnrevealedCoreRuleForAct(g: GameState): Pg2RuleDef | null {
   const revealed = new Set(g.rules.map((r) => r.id));
   return CORE_RULES.find((d) => d.act === g.act && !revealed.has(d.id)) ?? null;
@@ -339,9 +373,7 @@ function advanceActIfComplete(g: GameState, password: string, api: RuleApi): voi
   const allActRulesPass = g.rules
     .filter((r) => CORE_RULE_IDS.has(r.id) && r.act === g.act)
     .every((r) => r.validate(password, g, api).passed);
-  const eventsResolved = g.events
-    .filter((e) => e.act === g.act && e.family !== "inhabitant")
-    .every((e) => isResolvedInstance(g, e));
+  const eventsResolved = nonInhabitantEventsResolvedForAct(g, g.act);
 
   if (allActRulesRevealed && allActRulesPass && eventsResolved) {
     g.act = next;

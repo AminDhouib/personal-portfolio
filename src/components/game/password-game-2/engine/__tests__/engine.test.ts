@@ -4,7 +4,9 @@ import { drainEffects, pushEffect } from "../effects";
 import { cellsToPassword } from "../cells";
 import { CORE_RULES } from "../rules/index";
 import { solveAll } from "./solve";
-import type { ActId, CharCell, GameState, RuleApi } from "../types";
+import type { GalagaData } from "../events/galaga";
+import type { SnakeData } from "../events/snake";
+import type { ActId, CharCell, EventInstance, GameState, Pg2Rule, RuleApi } from "../types";
 
 const HHMM = "12:00";
 const boot = (seed = 42) => createRun({ seed, daily: false, nowHHMM: () => HHMM });
@@ -51,6 +53,57 @@ const tend = (g: GameState) => {
   }
 };
 
+/**
+ * Leading formation aliens left to dive so their letters are abducted then rescued;
+ * the rest are clicked down so a wave clears well inside its 45s cap (no timeout).
+ */
+const GALAGA_DIVE_BUDGET = 8;
+
+/**
+ * Clear the invasions BEFORE the solver re-types (a retype would delete abducted
+ * cells out from under the intruders): shoot every letter Galaga is carrying, click
+ * down the formation aliens beyond the dive budget, feed the snake its pellet at the
+ * end of the box, and shatter every Tetris block.
+ */
+const tendInvasions = (g: GameState) => {
+  for (const e of g.events) {
+    if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
+    if (e.defId === "galaga") {
+      const d = e.data as GalagaData;
+      for (const a of d.aliens) {
+        if (a.state === "carrying" && a.carriedCellId !== null) {
+          const cell = g.cells.find((c) => c.id === a.carriedCellId);
+          if (cell) applyKey(g, cell.ch);
+        }
+      }
+      for (const a of d.aliens) {
+        if (
+          (a.state === "formation" || a.state === "diving") &&
+          a.formationIndex >= GALAGA_DIVE_BUDGET
+        ) {
+          applyPointer(g, { kind: "alien", id: a.id });
+        }
+      }
+    } else if (e.defId === "snake") {
+      const d = e.data as SnakeData;
+      if (!d.gone) {
+        applyKey(g, "End");
+        applyKey(g, d.pelletChar);
+      }
+    } else if (e.defId === "tetris") {
+      for (const c of g.cells.filter((cell) => cell.status === "garbage")) {
+        applyPointer(g, { kind: "cell", id: c.id });
+      }
+    }
+  }
+};
+
+/** Every non-inhabitant event scheduled for `act` has reached its terminal phase. */
+const nonInhabDone = (g: GameState, act: ActId): boolean =>
+  g.events
+    .filter((e) => e.act === act && e.family !== "inhabitant")
+    .every((e) => e.phase === "done");
+
 /** Append the black hole's heavy word to the solve target while it is pulling. */
 const withHeavyWord = (g: GameState, target: string): string => {
   const bh = g.events.find(
@@ -72,6 +125,7 @@ const coreRevealed = (g: GameState) =>
 
 /** Satisfy every currently-revealed rule (only retyping when it changed), tend, tick. */
 const solveAndTick = (g: GameState, api: RuleApi, dtMs = 1000) => {
+  tendInvasions(g); // shoot/feed/shatter before the solver re-types over the box
   const target = withHeavyWord(g, solveAll(g, api));
   if (target !== cellsToPassword(g.cells)) retype(g, target);
   tend(g);
@@ -90,22 +144,27 @@ const runToAct3 = (g: GameState) => {
   expect(g.act).toBe("act3");
 };
 
-/** Continue in act3 until every one of the 17 rules is revealed and passing. */
+/**
+ * Continue in act3 until every one of the 17 rules is revealed and passing AND every
+ * act3 invasion/force/chrome has resolved — the submit gate now requires both, so the
+ * caretaker must fight the fleet (and the other blocking beats) to their end.
+ */
 const driveToAllRulesPassing = (g: GameState) => {
   const api = makeRuleApi(g, () => HHMM);
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < 700; i++) {
     solveAndTick(g, api);
     const pw = cellsToPassword(g.cells);
     // g.rules now also holds coupled inhabitant rules, so gate on the CORE count;
     // the every-check still spans all rules (coupled included) since submit needs them.
     if (
       coreRevealed(g) === CORE_RULES.length &&
-      g.rules.every((r) => r.validate(pw, g, api).passed)
+      g.rules.every((r) => r.validate(pw, g, api).passed) &&
+      nonInhabDone(g, "act3")
     ) {
       return;
     }
   }
-  throw new Error("never reached an all-rules-passing state in act3");
+  throw new Error("never reached an all-rules-passing, invasions-cleared state in act3");
 };
 
 describe("engine", () => {
@@ -204,6 +263,70 @@ describe("engine", () => {
     for (let i = 0; i < 120; i++) tick(g, 1000);
     expect(g.act).toBe("act3");
     expect(g.finale).toBeNull();
+  });
+
+  it("refuses submit with the marquee toast when act3 rules pass but an invasion is unresolved", () => {
+    const g = boot();
+    g.act = "act3";
+    g.rules = []; // every revealed rule trivially passes with no rules to check
+    const galagaData: GalagaData = {
+      wave: 1,
+      aliens: [
+        {
+          id: 1000,
+          formationIndex: 0,
+          state: "carrying",
+          carriedCellId: null,
+          diveStartedAtMs: null,
+        },
+      ],
+      waveStartedAtMs: 0,
+      nextDiveAtMs: 0,
+      timedOutWaves: 0,
+    };
+    const inst: EventInstance<GalagaData> = {
+      defId: "galaga",
+      family: "invasion",
+      act: "act3",
+      phase: "peak",
+      phaseElapsedMs: 0,
+      scheduledAtMs: 20_000,
+      data: galagaData,
+    };
+    g.events = [inst];
+
+    requestSubmit(g);
+    expect(g.act).toBe("act3");
+    expect(g.finale).toBeNull();
+    expect(
+      g.effects.some((e) => e.kind === "toast" && e.text === "The form is not done with you yet."),
+    ).toBe(true);
+
+    // Resolving the invasion opens the finale on the same satisfying submit.
+    inst.phase = "done";
+    drainEffects(g);
+    requestSubmit(g);
+    expect(g.act).toBe("finale");
+    expect(g.finale).not.toBeNull();
+  });
+
+  it("keeps the rules-refusal toast (not the marquee one) when a revealed rule fails in act3", () => {
+    const g = boot();
+    g.act = "act3";
+    const failing: Pg2Rule = {
+      id: "always-fails",
+      act: "act3",
+      description: "never satisfied",
+      validate: () => ({ passed: false }),
+    };
+    g.rules = [failing];
+    g.events = [];
+
+    requestSubmit(g);
+    expect(g.act).toBe("act3");
+    const toasts = g.effects.flatMap((e) => (e.kind === "toast" ? [e.text] : []));
+    expect(toasts).toContain("The form is not satisfied.");
+    expect(toasts).not.toContain("The form is not done with you yet.");
   });
 
   it("emits one title-card per act transition", () => {

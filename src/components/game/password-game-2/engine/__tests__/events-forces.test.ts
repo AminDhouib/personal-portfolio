@@ -116,7 +116,6 @@ describe("the infection", () => {
     toPeak(h); // onset ran on the empty box (nothing to infect) but armed the clock
     plant(h, "ab cd"); // a1 b2 sp3 c4 d5
     h.state.cells = setCellStatus(h.state.cells, 2, "infected", "infection");
-    h.inst.data.infectedIds = [2];
     h.inst.data.infectedSinceMs = { 2: h.state.elapsedMs };
     h.inst.data.nextSpreadAtMs = h.state.elapsedMs + 7000;
 
@@ -137,7 +136,6 @@ describe("the infection", () => {
     toPeak(h);
     plant(h, "1234"); // digits: the value can never contain a lowercase antidote
     h.state.cells = setCellStatus(h.state.cells, 1, "infected", "infection");
-    h.inst.data.infectedIds = [1];
     h.inst.data.infectedSinceMs = { 1: h.state.elapsedMs };
     h.inst.data.nextSpreadAtMs = h.state.elapsedMs + 10_000_000; // suppress spread
 
@@ -164,7 +162,6 @@ describe("the infection", () => {
     plant(h, "xy" + antidote); // x1 y2 then the antidote letters
     h.state.cells = setCellStatus(h.state.cells, 1, "infected", "infection");
     h.state.cells = setCellStatus(h.state.cells, 2, "mutated", "infection");
-    h.inst.data.infectedIds = [1, 2];
     h.inst.data.infectedSinceMs = { 1: 0, 2: 0 };
     h.inst.data.nextSpreadAtMs = h.state.elapsedMs + 10_000_000;
     h.state.stats.infectionsCured = 0;
@@ -190,6 +187,15 @@ describe("the infection", () => {
     // event derives its antidote from that same stream, so card and cure always agree.
     const rule = infectionDef.coupledRule!.create(mulberry32(subSeed(seed, "rule-no-infected")));
     expect(rule.payload!["antidote"]).toBe(h.inst.data.antidote);
+  });
+
+  it("pins antidote agreement across seeds: the event's cure equals the rule's published antidote", () => {
+    for (const seed of [1, 5, 9]) {
+      const state = createRun({ seed, daily: false, nowHHMM: () => HHMM });
+      const eventAntidote = infectionDef.init(mulberry32(seed), state).antidote;
+      const rule = infectionDef.coupledRule!.create(mulberry32(subSeed(seed, "rule-no-infected")));
+      expect(rule.payload!["antidote"]).toBe(eventAntidote);
+    }
   });
 
   it("the coupled rule is a freebie when no infection instance is live", () => {

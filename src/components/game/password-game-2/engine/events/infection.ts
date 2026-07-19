@@ -33,7 +33,6 @@ const ANTIDOTE_LABEL = "rule-" + COUPLED_RULE_ID;
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz".split("");
 
 export interface InfectionData {
-  infectedIds: number[]; // every cell id ever infected by this outbreak
   antidote: string; // four distinct lowercase letters; typing them cures
   nextSpreadAtMs: number; // state.elapsedMs of the next spread pulse
   infectedSinceMs: Record<number, number>; // cell id -> elapsedMs it fell ill
@@ -59,7 +58,6 @@ function onset(d: InfectionData, ctx: EventContext): void {
   if (candidates.length === 0) return;
   const target = pickOne(ctx.rng, candidates);
   ctx.state.cells = setCellStatus(ctx.state.cells, target.id, "infected", EVENT_ID);
-  d.infectedIds.push(target.id);
   d.infectedSinceMs[target.id] = ctx.state.elapsedMs;
 }
 
@@ -79,7 +77,6 @@ function spreadOnce(d: InfectionData, ctx: EventContext): void {
       const n = cells[nIdx];
       if (n && n.status === "normal" && !isSpace(n)) {
         cells = setCellStatus(cells, n.id, "infected", EVENT_ID);
-        d.infectedIds.push(n.id);
         d.infectedSinceMs[n.id] = ctx.state.elapsedMs;
         break; // one victim per source per pulse
       }
@@ -155,7 +152,6 @@ export const infectionDef: EventDef<InfectionData> = {
   telegraphMs: TELEGRAPH_MS,
   coupledRule: noInfectedRule,
   init: (_rng, state) => ({
-    infectedIds: [],
     antidote: pickAntidote(mulberry32(subSeed(state.seed, ANTIDOTE_LABEL))),
     nextSpreadAtMs: 0,
     infectedSinceMs: {},
