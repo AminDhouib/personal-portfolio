@@ -253,6 +253,12 @@ describe("rule 9 - sponsor", () => {
     expect(passes(rule, "no backers here")).toBe(false);
   });
 
+  it("passes when a sponsor appears fully uppercased (the other case direction)", () => {
+    const rule = make("sponsor");
+    const sponsors = rule.payload!["sponsors"] as string[];
+    expect(passes(rule, "SEEN ON " + sponsors[0]!.toUpperCase())).toBe(true);
+  });
+
   it("solveRule plugs the shortest seeded sponsor", () => {
     const rule = make("sponsor");
     expect(passes(rule, solveRule(rule, "abc", api()))).toBe(true);
@@ -322,6 +328,17 @@ describe("Roman token parsing (uppercase-only, maximal runs)", () => {
     expect(parseRomanTokens("cloudz may")).toEqual([]);
     expect(romanProduct("cloudz may")).toBe(0); // no tokens -> product 0, never a target
     expect(romanProduct("XII cloudz")).toBe(12);
+  });
+
+  it("a runaway product overflows to +Infinity, never NaN and never any target", () => {
+    // Many separated M tokens (each 1000) multiply past Number.MAX_VALUE. The result
+    // must be a clean +Infinity so the product rule fails safe, never NaN and never
+    // coincidentally equal to an authored target.
+    const many = Array.from({ length: 120 }, () => "M").join(" ");
+    const product = romanProduct(many);
+    expect(product).toBe(Number.POSITIVE_INFINITY);
+    expect(Number.isNaN(product)).toBe(false);
+    for (const target of ROMAN_PRODUCT_TARGETS) expect(product).not.toBe(target);
   });
 });
 

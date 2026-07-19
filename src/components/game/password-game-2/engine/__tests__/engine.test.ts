@@ -4,7 +4,7 @@ import { drainEffects, pushEffect } from "../effects";
 import { cellsToPassword } from "../cells";
 import { CORE_RULES } from "../rules/index";
 import { solveAll } from "./solve";
-import type { CharCell, GameState, RuleApi } from "../types";
+import type { ActId, CharCell, GameState, RuleApi } from "../types";
 
 const HHMM = "12:00";
 const boot = (seed = 42) => createRun({ seed, daily: false, nowHHMM: () => HHMM });
@@ -14,17 +14,47 @@ const type = (g: GameState, s: string) => {
   for (const k of s) applyKey(g, k);
 };
 
-/** Replace the whole password through the public key API: clear to empty, then type. */
+/**
+ * Replace the whole password through the public key API: clear to empty, then type.
+ * The backspace loop is capped so a future input-locking event that swallows
+ * Backspace surfaces as a thrown error instead of hanging the whole suite.
+ */
 const retype = (g: GameState, target: string) => {
   applyKey(g, "End");
-  while (g.cells.length > 0) applyKey(g, "Backspace");
+  let guard = 0;
+  while (g.cells.length > 0) {
+    if (++guard > 500) throw new Error("retype: backspace loop exceeded 500 iterations");
+    applyKey(g, "Backspace");
+  }
   type(g, target);
 };
 
-/** Satisfy every currently-revealed rule (only retyping when it changed), then tick once. */
+/**
+ * Tend the live inhabitants so the coupled rules stay satisfied and the creatures
+ * survive to the finale: feed Gerald, stoke the campfire, and toss the basket
+ * whenever the bear is not away. Deterministic — a pure function of run state.
+ */
+const tend = (g: GameState) => {
+  for (const e of g.events) {
+    if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
+    if (e.defId === "gerald") applyPointer(g, { kind: "feed-button" });
+    else if (e.defId === "campfire") applyPointer(g, { kind: "stoke-button" });
+    else if (e.defId === "garden") {
+      const bearState = (e.data as { bearState: string }).bearState;
+      if (bearState !== "away") applyPointer(g, { kind: "basket-button" });
+    }
+  }
+};
+
+/** Core-rule count among the revealed rules (excludes coupled inhabitant rules). */
+const coreRevealed = (g: GameState) =>
+  g.rules.filter((r) => CORE_RULES.some((d) => d.id === r.id)).length;
+
+/** Satisfy every currently-revealed rule (only retyping when it changed), tend, tick. */
 const solveAndTick = (g: GameState, api: RuleApi, dtMs = 1000) => {
   const target = solveAll(g, api);
   if (target !== cellsToPassword(g.cells)) retype(g, target);
+  tend(g);
   tick(g, dtMs);
 };
 
@@ -46,8 +76,10 @@ const driveToAllRulesPassing = (g: GameState) => {
   for (let i = 0; i < 400; i++) {
     solveAndTick(g, api);
     const pw = cellsToPassword(g.cells);
+    // g.rules now also holds coupled inhabitant rules, so gate on the CORE count;
+    // the every-check still spans all rules (coupled included) since submit needs them.
     if (
-      g.rules.length === CORE_RULES.length &&
+      coreRevealed(g) === CORE_RULES.length &&
       g.rules.every((r) => r.validate(pw, g, api).passed)
     ) {
       return;
@@ -155,11 +187,17 @@ describe("engine", () => {
   });
 
   it("emits one title-card per act transition", () => {
+    // Tending floods the effect queue (moods, feed sounds), which is capped at 64,
+    // so collect title cards by draining every frame rather than reading residue.
     const g = boot();
-    runToAct3(g);
-    const cards = g.effects.filter((e) => e.kind === "title-card");
-    // prologue->act1, act1->act2, act2->act3
-    expect(cards.length).toBe(3);
+    const api = makeRuleApi(g, () => HHMM);
+    const cards: ActId[] = [];
+    for (let i = 0; i < 4000 && g.act !== "act3"; i++) {
+      solveAndTick(g, api);
+      for (const e of drainEffects(g)) if (e.kind === "title-card") cards.push(e.act);
+    }
+    expect(g.act).toBe("act3");
+    expect(cards).toEqual(["act1", "act2", "act3"]); // prologue->act1, act1->act2, act2->act3
   });
 });
 

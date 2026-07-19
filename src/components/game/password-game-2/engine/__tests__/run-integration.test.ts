@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyKey, createRun, makeRuleApi, requestSubmit, tick } from "../engine";
+import { applyKey, applyPointer, createRun, makeRuleApi, requestSubmit, tick } from "../engine";
 import { drainEffects } from "../effects";
 import { cellsToPassword } from "../cells";
 import { CORE_RULES } from "../rules/index";
@@ -35,6 +35,15 @@ const STUB_PEAK_MS = 10_000;
 /** telegraphMs by def id, straight off the manifest. */
 const TELEGRAPH_MS = new Map(EVENT_DEFS.map((d) => [d.id, d.telegraphMs]));
 
+/** Core-rule ids — the roster the solver drives; coupled inhabitant rules are tended. */
+const CORE_IDS = new Set(CORE_RULES.map((d) => d.id));
+
+/** Coupled inhabitant rules injected at onset; satisfied by tending, not typing. */
+const COUPLED_INHAB_RULE_IDS = new Set(["gerald-fed", "campfire-burning", "garden-honey"]);
+
+/** Count of revealed CORE rules (excludes coupled inhabitant rules). */
+const coreRevealed = (g: GameState) => g.rules.filter((r) => CORE_IDS.has(r.id)).length;
+
 /** Acts that carry scripted events, in the order the run walks through them. */
 const SCRIPTED_ACTS = ["act1", "act2", "act3"] as const;
 
@@ -47,14 +56,38 @@ const type = (g: GameState, s: string) => {
 /** Replace the whole password through the public key API: clear to empty, then type. */
 const retype = (g: GameState, target: string) => {
   applyKey(g, "End");
-  while (g.cells.length > 0) applyKey(g, "Backspace");
+  let guard = 0;
+  while (g.cells.length > 0) {
+    if (++guard > 500) throw new Error("retype: backspace loop exceeded 500 iterations");
+    applyKey(g, "Backspace");
+  }
   type(g, target);
 };
 
-/** Solve every revealed rule (retyping only on change) then advance one 100ms frame. */
-const solveAndTick = (g: GameState, api: RuleApi) => {
+/**
+ * Tend the live inhabitants so they survive to the finale and their coupled rules
+ * are satisfied at submit: stoke the campfire on its cooldown, feed Gerald, and
+ * toss the picnic basket whenever the bear is not away. Deterministic in run state.
+ * The campfire is stoked every frame (rate-limited internally by its 1.5s cooldown)
+ * rather than on a slow cadence — see the concern noted on the caretaker test.
+ */
+const tend = (g: GameState) => {
+  for (const e of g.events) {
+    if (e.data === undefined || e.phase === "telegraph" || e.phase === "done") continue;
+    if (e.defId === "gerald") applyPointer(g, { kind: "feed-button" });
+    else if (e.defId === "campfire") applyPointer(g, { kind: "stoke-button" });
+    else if (e.defId === "garden") {
+      const bearState = (e.data as { bearState: string }).bearState;
+      if (bearState !== "away") applyPointer(g, { kind: "basket-button" });
+    }
+  }
+};
+
+/** Solve the revealed roster (retyping only on change), tend, then advance one frame. */
+const solveAndTick = (g: GameState, api: RuleApi, opts: { tendInhabitants?: boolean } = {}) => {
   const target = solveAll(g, api);
   if (target !== cellsToPassword(g.cells)) retype(g, target);
+  if (opts.tendInhabitants !== false) tend(g);
   tick(g, TICK_MS);
 };
 
@@ -91,6 +124,9 @@ interface DriveResult {
   inhabitants: string[];
   ruleDescriptions: string[];
   elapsedAtFinaleMs: number;
+  /** Coupled inhabitant rules present in the roster, and whether all passed at submit. */
+  coupledInhabitantRuleIds: string[];
+  coupledInhabitantRulesPassAtSubmit: boolean;
 }
 
 /**
@@ -138,20 +174,29 @@ function driveRun(seed: number): DriveResult {
   for (let i = 0; i < 6000 && g.act !== "act3"; i++) step();
   expect(g.act).toBe("act3");
 
-  // Phase 2: stay in act3 until the full 17-rule roster is revealed and passing.
+  // Phase 2: stay in act3 until the full 17-rule CORE roster is revealed and every
+  // rule passes — including the coupled inhabitant rules, which the caretaker keeps
+  // satisfied by tending. Gate on the CORE count, since g.rules also holds coupled ones.
   for (let i = 0; i < 600; i++) {
     step();
     const pw = cellsToPassword(g.cells);
     if (
-      g.rules.length === CORE_RULES.length &&
+      coreRevealed(g) === CORE_RULES.length &&
       g.rules.every((r) => r.validate(pw, g, api).passed)
     ) {
       break;
     }
   }
   const pw = cellsToPassword(g.cells);
-  expect(g.rules.length).toBe(CORE_RULES.length);
+  expect(coreRevealed(g)).toBe(CORE_RULES.length);
   expect(g.rules.every((r) => r.validate(pw, g, api).passed)).toBe(true);
+
+  // Snapshot the coupled inhabitant rules' state at the moment of the satisfying submit.
+  const coupledRules = g.rules.filter((r) => COUPLED_INHAB_RULE_IDS.has(r.id));
+  const coupledInhabitantRuleIds = coupledRules.map((r) => r.id).sort();
+  const coupledInhabitantRulesPassAtSubmit = coupledRules.every(
+    (r) => r.validate(pw, g, api).passed,
+  );
 
   const elapsedAtFinaleMs = g.elapsedMs;
   requestSubmit(g); // the satisfying submit opens the finale
@@ -173,6 +218,8 @@ function driveRun(seed: number): DriveResult {
     inhabitants,
     ruleDescriptions: g.rules.map((r) => r.description),
     elapsedAtFinaleMs,
+    coupledInhabitantRuleIds,
+    coupledInhabitantRulesPassAtSubmit,
   };
 }
 
@@ -200,9 +247,17 @@ describe("password-game-2 full-run integration", () => {
     expect(r.finaleAct).toBe("finale");
     expect(r.finalePhase).toBe("missiles");
 
-    // Allies are exactly the run's scheduled inhabitants (all onset by act3).
+    // Allies are exactly the run's scheduled inhabitants (all onset by act3) — the
+    // caretaker kept every creature alive, so none dropped out of the finale roster.
     expect(r.inhabitants.length).toBeGreaterThan(0);
     expect(r.allies).toEqual(r.inhabitants);
+
+    // Seed 7 schedules the campfire (act1) and the garden (act2); no Gerald this seed.
+    expect(r.inhabitants).toEqual(["campfire", "garden"]);
+
+    // Their coupled rules were injected and were all satisfied at the satisfying submit.
+    expect(r.coupledInhabitantRuleIds).toEqual(["campfire-burning", "garden-honey"]);
+    expect(r.coupledInhabitantRulesPassAtSubmit).toBe(true);
   });
 
   it("advances each act only after its last blocking beat resolves on the authored timeline", () => {
@@ -268,5 +323,47 @@ describe("password-game-2 full-run integration", () => {
     expect(a.inhabitants).toEqual(b.inhabitants);
     expect(a.ruleDescriptions).toEqual(b.ruleDescriptions);
     expect(a.elapsedAtFinaleMs).toBe(b.elapsedAtFinaleMs);
+  });
+
+  it("untended, inhabitants TRANSFORM rather than crash: the fire embers and eats, the bear tramples", () => {
+    // No tending this run. The campfire should burn out and scar the password; the
+    // bear should trample the garden. Failure transforms the run — it never deletes it.
+    const g = boot(SEED);
+    const api = makeRuleApi(g, () => HHMM);
+
+    let sawEmberCell = false;
+    let sawEatToast = false;
+    let sawTrample = false;
+    for (let i = 0; i < 6000 && g.act !== "act3"; i++) {
+      // Solve the roster (to advance acts) but leave the creatures to their fate.
+      solveAndTick(g, api, { tendInhabitants: false });
+      // An ember scar is wiped by the next frame's retype, so scan every frame.
+      if (g.cells.some((c) => c.status === "ember")) sawEmberCell = true;
+      for (const e of drainEffects(g)) {
+        if (e.kind === "toast" && e.text === "The campfire is eating your password.") {
+          sawEatToast = true;
+        }
+        if (e.kind === "mood" && e.text === "The bear trampled the garden") sawTrample = true;
+      }
+    }
+    expect(g.act).toBe("act3");
+
+    // The campfire burned out: not burning, having scarred the password at least once.
+    const campfire = g.events.find((e) => e.defId === "campfire");
+    expect((campfire!.data as { burning: boolean }).burning).toBe(false);
+    expect(sawEmberCell).toBe(true);
+    expect(sawEatToast).toBe(true);
+
+    // Its coupled rule now FAILS — the fire is out, so a submit here would be refused.
+    const burningRule = g.rules.find((r) => r.id === "campfire-burning")!;
+    expect(burningRule.validate(cellsToPassword(g.cells), g, api).passed).toBe(false);
+
+    // The untended bear trampled the garden at least once on its authored timeline.
+    expect(sawTrample).toBe(true);
+
+    // The run is intact and still playable — no crash, no deletion, caret in range.
+    expect(g.outcome).toBe("playing");
+    expect(g.finale).toBeNull();
+    expect(g.caret).toBeLessThanOrEqual(g.cells.length);
   });
 });

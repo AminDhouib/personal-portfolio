@@ -26,6 +26,15 @@ const ALLY_BY_ID: Record<string, string> = {
   garden: "garden",
 };
 
+/** Inhabitants now carry a coupled rule injected at onset; stubs never did. */
+const COUPLED_RULE_BY_ID: Record<string, string> = {
+  gerald: "gerald-fed",
+  campfire: "campfire-burning",
+  garden: "garden-honey",
+};
+
+const isInhabitant = (def: EventDef): boolean => def.family === "inhabitant";
+
 const state: GameState = createRun({ seed: 1, daily: false });
 
 const makeCtx = (dtMs: number): EventContext => ({
@@ -66,21 +75,46 @@ describe("event manifest", () => {
     }
   });
 
-  it("wires ally identity onto inhabitant stubs only", () => {
+  it("wires ally identity and a coupled rule onto inhabitants only", () => {
     for (const def of EVENT_DEFS) {
-      if (def.family === "inhabitant") {
+      if (isInhabitant(def)) {
         expect(def.allyId).toBe(ALLY_BY_ID[def.id]);
-        expect(def.isAlive?.(freshInst(def))).toBe(true);
-        expect(def.coupledRule).toBeUndefined();
+        expect(typeof def.isAlive).toBe("function");
+        expect(def.coupledRule?.id).toBe(COUPLED_RULE_BY_ID[def.id]);
       } else {
         expect(def.allyId).toBeUndefined();
         expect(def.isAlive).toBeUndefined();
+        expect(def.coupledRule).toBeUndefined();
       }
     }
   });
 
-  it("runs the canonical lifecycle: init -> telegraph -> onset -> peak -> done", () => {
-    for (const def of EVENT_DEFS) {
+  it("inhabitants persist: telegraph -> onset -> peak, never done, unresolved until finale", () => {
+    for (const def of EVENT_DEFS.filter(isInhabitant)) {
+      const inst = freshInst(def);
+      expect(inst.data).not.toEqual({}); // real per-creature data, not the stub payload
+      expect(def.isResolved(inst, state)).toBe(false);
+
+      // Telegraph holds for telegraphMs, then flips to onset.
+      let telegraphTicks = 0;
+      while (inst.phase === "telegraph" && telegraphTicks < 100) {
+        drive(def, inst, 1000);
+        telegraphTicks++;
+      }
+      expect(inst.phase).toBe("onset");
+      expect(telegraphTicks).toBe(Math.ceil(def.telegraphMs / 1000));
+
+      // Onset is a single tick, then peak — and it stays there for the whole run.
+      drive(def, inst, 1000);
+      expect(inst.phase).toBe("peak");
+      for (let i = 0; i < 50; i++) drive(def, inst, 1000);
+      expect(inst.phase).toBe("peak"); // never auto-resolves during the run
+      expect(def.isResolved(inst, state)).toBe(false); // state.act is not "finale"
+    }
+  });
+
+  it("runs the canonical stub lifecycle for non-inhabitants: telegraph -> onset -> peak -> done", () => {
+    for (const def of EVENT_DEFS.filter((d) => !isInhabitant(d))) {
       const inst = freshInst(def);
       expect(inst.data).toEqual({});
       expect(def.isResolved(inst, state)).toBe(false);

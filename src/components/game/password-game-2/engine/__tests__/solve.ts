@@ -30,7 +30,13 @@ const STUB_STATE = {} as unknown as GameState;
 
 const SHORTEST_MONTH = MONTHS.reduce((a, b) => (b.length < a.length ? b : a));
 
-/** Solve priority: content first, then char-class top-ups, digit-sum, length last. */
+/**
+ * Solve priority: content first, then char-class top-ups, digit-sum, length last.
+ * Its keys are exactly the rules the solver knows how to satisfy by typing — the
+ * 17 core rules. Coupled inhabitant rules (campfire-burning, gerald-fed,
+ * garden-honey) are validated off event data, not the password, so they are NOT
+ * listed here and solveAll skips them; the harness satisfies them by TENDING.
+ */
 const SOLVE_PRIORITY: Record<string, number> = {
   "captcha-human": 1,
   "include-month": 1,
@@ -239,10 +245,12 @@ export function solveRule(
  */
 export function solveAll(g: GameState, api: RuleApi): string {
   const MAX_ITERS = 200;
+  // Only the password-solvable rules; coupled inhabitant rules are tended, not typed.
+  const solvable = g.rules.filter((r) => r.id in SOLVE_PRIORITY);
   let s = cellsToPassword(g.cells);
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const protectedStrings = collectProtected(g.rules, api);
-    const ordered = [...g.rules].sort(
+    const protectedStrings = collectProtected(solvable, api);
+    const ordered = [...solvable].sort(
       (a, b) => (SOLVE_PRIORITY[a.id] ?? 1) - (SOLVE_PRIORITY[b.id] ?? 1),
     );
     let changed = false;
@@ -254,9 +262,9 @@ export function solveAll(g: GameState, api: RuleApi): string {
         changed = true;
       }
     }
-    if (g.rules.every((r) => r.validate(s, g, api).passed)) return s;
+    if (solvable.every((r) => r.validate(s, g, api).passed)) return s;
     if (!changed) {
-      const failing = g.rules.filter((r) => !r.validate(s, g, api).passed).map((r) => r.id);
+      const failing = solvable.filter((r) => !r.validate(s, g, api).passed).map((r) => r.id);
       throw new Error(`solveAll stuck; unsatisfiable revealed rules: ${failing.join(", ")}`);
     }
   }
