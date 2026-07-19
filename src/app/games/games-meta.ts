@@ -81,15 +81,14 @@ export const GAMES: GameMeta[] = [
   },
   {
     slug: "password-game",
-    title: "Password Game 2",
-    tagline: "Seeded chaos — every run is a new disaster",
+    title: "The Password Game 2",
+    tagline: "The form fights back",
     description:
-      "Sequel to the original Password Game with seeded rules, time pressure, and rule-tier escalation. Every seed is shareable and deterministic.",
+      "A five-act sign-up form from hell. Rules stack, creatures move in, fleets invade, and everything you keep alive fights beside you at the finale. One epic seeded run; race the daily.",
     controls: "Type. Obey the rules. Curse at the rules.",
     accent: "#f472b6",
     accentTailwind: "accent-pink",
     external: true,
-    hidden: true,
   },
 ];
 

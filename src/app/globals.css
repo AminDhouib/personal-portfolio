@@ -857,7 +857,7 @@ button[aria-label="Copy to clipboard"] {
 }
 
 /* Reduced motion: quiet the remaining page-chrome animations. Game animations
-   (hextris-*, ts-*, destruction.css, and framer-motion inside games) are
+   (hextris-*, ts-*, pg2 canvas/DOM effects, and framer-motion inside games) are
    intentionally exempt - motion is part of gameplay, not decoration. See RC-6.
    This block must stay at the END of the file: it wins over the base rules
    above (.pulse-dot, .animate-marquee, html scroll-behavior) purely by cascade
@@ -875,5 +875,3 @@ button[aria-label="Copy to clipboard"] {
     animation: none !important;
   }
 }
-
-@import "../components/game/password-game/destruction.css";

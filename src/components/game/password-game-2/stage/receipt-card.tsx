@@ -99,7 +99,7 @@ export function ReceiptCard({
         }));
         if (!cancelled) setBoard(entries.slice(0, 10));
       } catch {
-        // Expected-failure path (offline, timeout, board down): swallow, the
+        // silent-ok: expected-failure path (offline, timeout, board down) — the
         // board simply stays hidden. Reporting would spam Sentry with noise.
       }
     })();
@@ -130,7 +130,7 @@ export function ReceiptCard({
       setPost({ kind: "sent", rank: body.rank ?? 0 });
       setRefreshKey((k) => k + 1); // re-read the board so the player's row appears
     } catch {
-      // Same expected-failure path as the board read: quiet fallback, no report.
+      // silent-ok: same expected-failure path as the board read — quiet fallback, no report.
       setPost({ kind: "unavailable" });
     }
   };

@@ -7,6 +7,5 @@
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreDependencies": ["tailwindcss", "@tailwindcss/typography"],
-  "ignoreExportsUsedInFile": true,
-  "ignore": ["src/components/game/password-game/**"]
+  "ignoreExportsUsedInFile": true
 }

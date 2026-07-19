@@ -57,7 +57,6 @@ export const passwordGameLeaderboardEntrySchema = z.object({
   ruleCount: z.number(),
   createdAt: z.iso.datetime(),
 });
-export type PasswordGameLeaderboardEntry = z.infer<typeof passwordGameLeaderboardEntrySchema>;
 
 /** On-disk shape of password-game-leaderboard.json. */
 export const passwordGameLeaderboardFileSchema = z.object({
