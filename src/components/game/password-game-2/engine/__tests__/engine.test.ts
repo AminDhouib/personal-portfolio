@@ -11,6 +11,15 @@ const type = (g: ReturnType<typeof boot>, s: string) => {
   for (const k of s) applyKey(g, k);
 };
 
+/**
+ * Tick in 200ms steps until act3 is reached (or a generous cap). Each act now holds
+ * scheduled stub events that must resolve before it advances, so the walk to act3
+ * takes act-relative minutes rather than a handful of frames.
+ */
+const runToAct3 = (g: ReturnType<typeof boot>) => {
+  for (let i = 0; i < 3000 && g.act !== "act3"; i++) tick(g, 200);
+};
+
 describe("engine", () => {
   it("clock starts on first keystroke, not on run creation", () => {
     const g = boot();
@@ -82,20 +91,30 @@ describe("engine", () => {
   it("advances through the acts and opens the finale on a satisfying submit", () => {
     const g = boot();
     type(g, "abcdefghijk1"); // 12 chars incl. a digit -> both prologue rules pass
-    // Empty act1/act2/act3 rosters cascade once the prologue is satisfied.
-    for (let i = 0; i < 6; i++) tick(g, 100);
+    // act1/act2 have no core rules yet, but their scheduled events must resolve
+    // before each advances, so walk to act3 instead of ticking a fixed count.
+    runToAct3(g);
     expect(g.act).toBe("act3");
     requestSubmit(g);
     expect(g.act).toBe("finale");
     expect(g.finale).not.toBeNull();
     expect(g.finale!.phase).toBe("missiles");
-    expect(g.finale!.allies).toEqual([]);
+    // Every scheduled inhabitant has onset by act3 and is (stub-)alive, so it is
+    // granted as a finale ally. Which inhabitants depends on the seed's draw.
+    const inhabitants = [
+      ...new Set(g.events.filter((e) => e.family === "inhabitant").map((e) => e.defId)),
+    ].sort();
+    expect(inhabitants.length).toBeGreaterThan(0);
+    expect([...g.finale!.allies].sort()).toEqual(inhabitants);
   });
 
   it("act3 does not auto-advance to the finale on time alone", () => {
     const g = boot();
     type(g, "abcdefghijk1");
-    for (let i = 0; i < 20; i++) tick(g, 1000);
+    runToAct3(g);
+    expect(g.act).toBe("act3");
+    // Once in act3, time alone never opens the finale — only a satisfying submit does.
+    for (let i = 0; i < 120; i++) tick(g, 1000);
     expect(g.act).toBe("act3");
     expect(g.finale).toBeNull();
   });
@@ -103,7 +122,7 @@ describe("engine", () => {
   it("emits one title-card per act transition", () => {
     const g = boot();
     type(g, "abcdefghijk1");
-    for (let i = 0; i < 6; i++) tick(g, 100);
+    runToAct3(g);
     const cards = g.effects.filter((e) => e.kind === "title-card");
     // prologue->act1, act1->act2, act2->act3
     expect(cards.length).toBe(3);

@@ -90,6 +90,11 @@ export function tick(g: GameState, dtMs: number): void {
     g.actElapsedMs += dtMs;
   }
 
+  // Snapshot the cell run before any event work. A due event's init may replace
+  // g.cells, so the snapshot must precede the init loop as well as the tick loop —
+  // both kinds of cell replacement need to be caught by the version bump below.
+  const cellsBefore = g.cells;
+
   // Init events that have become due in the current act (data + event-scoped rng).
   // Deliberate asymmetry: events only init while their act is current, so an
   // inhabitant scheduled late in an act can miss its onset window entirely — the
@@ -102,9 +107,7 @@ export function tick(g: GameState, dtMs: number): void {
 
   // Tick every live event. The def owns its phase transitions; the engine owns
   // phaseElapsedMs (accumulated here, reset to 0 when the def flips phase). Events
-  // signal cell edits by replacing g.cells with a new array (see EventDef.onTick):
-  // snapshot the reference so a change can be detected and versioned below.
-  const cellsBefore = g.cells;
+  // signal cell edits by replacing g.cells with a new array (see EventDef.onTick).
   for (const inst of g.events) {
     if (inst.data === undefined || inst.phase === "done") continue;
     const def = DEF_BY_ID.get(inst.defId);
