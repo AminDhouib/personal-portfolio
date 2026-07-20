@@ -103,7 +103,7 @@ const gardenHoneyRule: Pg2RuleDef = {
     id: "garden-honey",
     act: "act3",
     description:
-      "The hive must hold at least 40 honey when you submit. Do not ask why the form wants honey.",
+      "Keep the hive at 40+ honey when you submit. Throw the picnic basket when the bear comes — bears remember who feeds them.",
     validate: (_password, _state, api) => {
       const d = api.getEventData<GardenData>("garden");
       if (d === null) return { passed: true };

@@ -158,6 +158,62 @@ function chip(
   return { x, y, w, h };
 }
 
+/**
+ * A shared crisis-meter idiom: a labelled horizontal bar with an optional
+ * pass/fail threshold tick and a right-aligned readout. Full width is `max`, the
+ * fill is `value`, the accent is the caller's family `color`. This painter is
+ * time-free and event-agnostic — a caller that wants a below-threshold bar to
+ * read as a crisis pulses or reddens `color` itself before calling in.
+ */
+export interface MeterSpec {
+  x: number;
+  y: number;
+  w: number; // top-left + width, canvas px
+  value: number;
+  max: number; // current / full-scale
+  threshold?: number; // pass/fail tick, same units as value
+  label: string; // name tag above the bar
+  valueText?: string; // right-aligned readout; default `${Math.round(value)}`
+  color: string; // family accent (painters already resolve these)
+}
+
+const METER_BAR_H = 6;
+
+export function drawCrisisMeter(c: CanvasRenderingContext2D, spec: MeterSpec): void {
+  const { x, y, w, value, max, threshold, label, color } = spec;
+  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const valueText = spec.valueText ?? `${Math.round(value)}`;
+
+  c.save();
+  c.textBaseline = "alphabetic";
+  // Name tag (left) and readout (right) on the line above the bar.
+  c.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+  c.textAlign = "left";
+  c.fillStyle = "rgba(148,163,184,0.9)";
+  c.fillText(label, x, y - 5);
+  c.textAlign = "right";
+  c.fillStyle = color;
+  c.fillText(valueText, x + w, y - 5);
+
+  // Track.
+  roundRect(c, x, y, w, METER_BAR_H, METER_BAR_H / 2);
+  c.fillStyle = "rgba(15,23,42,0.14)";
+  c.fill();
+  // Fill.
+  if (frac > 0) {
+    roundRect(c, x, y, w * frac, METER_BAR_H, METER_BAR_H / 2);
+    c.fillStyle = color;
+    c.fill();
+  }
+  // Pass/fail tick.
+  if (threshold !== undefined && max > 0) {
+    const tx = x + w * Math.max(0, Math.min(1, threshold / max));
+    c.fillStyle = "rgba(226,232,240,0.9)";
+    c.fillRect(tx - 1, y - 2, 2, METER_BAR_H + 4);
+  }
+  c.restore();
+}
+
 // --- gerald -------------------------------------------------------------------
 
 function drawFish(
@@ -371,14 +427,15 @@ const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
 
   // Fuel gauge above the fire.
   const gw = 70;
-  const gx = fx - gw / 2;
-  const gy = box.y + box.h - 70;
-  roundRect(ctx, gx, gy, gw, 6, 3);
-  ctx.fillStyle = "rgba(15,23,42,0.14)";
-  ctx.fill();
-  roundRect(ctx, gx, gy, (gw * Math.max(0, Math.min(100, d.fuel))) / 100, 6, 3);
-  ctx.fillStyle = d.fuel < 25 ? RED : "#f59e0b";
-  ctx.fill();
+  drawCrisisMeter(ctx, {
+    x: fx - gw / 2,
+    y: box.y + box.h - 70,
+    w: gw,
+    value: d.fuel,
+    max: 100,
+    label: "FUEL",
+    color: d.fuel < 25 ? RED : "#f59e0b",
+  });
 
   // Stoke chip, top-right — hops when buttonHops changes.
   const a = anim(inst);
@@ -473,6 +530,11 @@ function drawBear(
   ctx.restore();
 }
 
+// Display-only mirrors of garden.ts MIN_HONEY / RAID_DURATION_MS; the engine owns
+// the real values, the painter only reads them to draw the hive meter and drain.
+const HIVE_THRESHOLD = 40;
+const GARDEN_RAID_MS = 6000;
+
 const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const box = layout.boxRect;
   if (!box) return;
@@ -504,40 +566,74 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
   for (let i = 0; i < n; i++) {
     drawFlower(ctx, box.x + 40 + i * 46, box.y + box.h - 8, tMs / 700 + i);
   }
-  // Honey pot glow when honey is high.
-  if (d.honey >= 40) {
-    withGlow(ctx, AMBER, 10, () => {
-      const hx = box.x + box.w - 44;
-      const hy = box.y + box.h - 20;
-      roundRect(ctx, hx - 12, hy - 14, 24, 20, 4);
-      ctx.fillStyle = "#d97706";
-      ctx.fill();
-      ctx.fillStyle = "#fbbf24";
-      ctx.fillRect(hx - 12, hy - 14, 24, 4 + (d.honey / 100) * 14);
-    });
-  }
+  // Honey meter — always visible; loud (red, pulsing) while the hive sits below
+  // the rule threshold, calm amber above. During a raid the readout ticks toward
+  // zero across the raid window (display-only; the engine snaps at raid end).
+  const raidProgress =
+    d.bearState === "raiding"
+      ? Math.max(0, Math.min(1, (g.elapsedMs - (d.raidEndsAtMs - GARDEN_RAID_MS)) / GARDEN_RAID_MS))
+      : 0;
+  const displayHoney = Math.round(d.honey * (1 - raidProgress));
+  const loud = displayHoney < HIVE_THRESHOLD;
+  const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(tMs / 160));
+  drawCrisisMeter(ctx, {
+    x: box.x + 16,
+    y: box.y + 26,
+    w: 120,
+    value: displayHoney,
+    max: 100,
+    threshold: HIVE_THRESHOLD,
+    label: "HIVE",
+    valueText: String(displayHoney),
+    color: loud ? `rgba(248,113,113,${pulse})` : AMBER,
+  });
 
-  // The bear: a looming shadow when telegraphed, the lumbering silhouette when raiding.
+  // The bear: a looming shadow with a shrinking countdown arc when telegraphed,
+  // the lumbering silhouette when raiding.
   if (d.bearState === "telegraphed") {
-    const pulse = 0.3 + 0.15 * Math.sin(tMs / 300);
-    drawBear(ctx, box.x + box.w * 0.5, box.y + 30, 0.8, pulse);
+    const bx = box.x + box.w * 0.5;
+    const by = box.y + 30;
+    const bearPulse = 0.3 + 0.15 * Math.sin(tMs / 300);
+    drawBear(ctx, bx, by, 0.8, bearPulse);
+    // 8000 mirrors garden.ts BEAR_TELEGRAPH_MS; the arc empties as the raid nears.
+    const remain = Math.max(0, Math.min(1, (d.nextBearAtMs - g.elapsedMs) / 8000));
+    ctx.save();
+    ctx.strokeStyle = RED;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(bx, by, 34, -Math.PI / 2, -Math.PI / 2 + remain * Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   } else if (d.bearState === "raiding") {
     const t = Math.min(1, inst.phaseElapsedMs / 800);
     const bx = box.x - 40 + t * (box.w * 0.4 + 40);
     drawBear(ctx, bx, box.y + box.h * 0.5 + Math.sin(tMs / 200) * 4, 1.1, 1);
   }
 
-  // Basket chip, top-right — throw it to distract the bear.
+  // Basket chip, top-right — lit while the bear is telegraphed or raiding, dimmed
+  // with a "bear away" sub-label otherwise.
   const active = d.bearState !== "away";
+  const label = active ? "THROW BASKET" : "BASKET";
+  const chipW = 22 + label.length * 8.5;
   const c = chip(
     ctx,
-    box.x + box.w - 104,
+    box.x + box.w - chipW - 12,
     box.y + 12,
-    "BASKET",
+    label,
     active ? "#16a34a" : GREEN,
     active,
   );
   pushRect(hits, c.x, c.y, c.w, c.h, { kind: "basket-button" });
+  if (!active) {
+    ctx.save();
+    ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillStyle = "rgba(148,163,184,0.85)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("bear away", c.x + c.w / 2, c.y + c.h + 3);
+    ctx.restore();
+  }
 };
 
 // --- infection ----------------------------------------------------------------

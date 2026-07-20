@@ -438,6 +438,45 @@ describe("the garden and the bear", () => {
     expect(interval).toBeLessThanOrEqual(70_000);
   });
 
+  it("pins the authored cycle: blooms feed the hive, then an undistracted raid drains it", () => {
+    const h = boot(gardenDef);
+    toPeak(h);
+
+    // Blooms open on the 20s cadence; honey starts flowing at the second bloom.
+    drive(h, 20_000);
+    expect(h.inst.data.bloomed).toBe(1);
+    expect(h.inst.data.honey).toBe(0);
+    drive(h, 20_000);
+    expect(h.inst.data.bloomed).toBe(2);
+    expect(h.inst.data.honey).toBe(40);
+
+    // The first raid arms 45s after onset; ride the telegraph into the raid.
+    drive(h, 5_000); // reaches nextBearAtMs -> telegraphed
+    expect(h.inst.data.bearState).toBe("telegraphed");
+    drive(h, 8_000); // telegraph window elapses -> raiding
+    expect(h.inst.data.bearState).toBe("raiding");
+
+    const bloomsBefore = h.inst.data.bloomed;
+    h.effects.length = 0;
+    drive(h, 6_000); // raid completes undistracted -> trample
+    expect(h.inst.data.honey).toBe(0);
+    expect(h.inst.data.bloomed).toBe(Math.max(0, bloomsBefore - 2));
+    expect(moodTexts(h.effects)).toContain("The bear trampled the garden");
+    expect(h.inst.data.bearState).toBe("away");
+    const interval = h.inst.data.nextBearAtMs - h.state.elapsedMs;
+    expect(interval).toBeGreaterThanOrEqual(45_000);
+    expect(interval).toBeLessThanOrEqual(70_000);
+  });
+
+  it("the coupled rule copy states the threshold, the basket action, and foreshadows the bear", () => {
+    const rule = gardenDef.coupledRule!.create(mulberry32(1));
+    expect(rule.description).not.toContain("Do not ask why");
+    expect(rule.description).toMatch(/40/);
+    expect(rule.description).toMatch(/basket/i);
+    expect(rule.description).toMatch(/bear/i);
+    expect(rule.description).toMatch(/remember/i);
+  });
+
   it("the basket sends the bear off during the telegraph", () => {
     const h = boot(gardenDef);
     toPeak(h);
