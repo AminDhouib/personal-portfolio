@@ -56,10 +56,15 @@ function spawnBanner(d: CookieBannerData): void {
  * not yet inited) is not a live actor, so the swarm behaves exactly as before. Fires once
  * per swarm (fireUsedThisSwarm, reset when the swarm's first banner spawns) and only when
  * the swarm is at least IGNITE_MIN_BANNERS deep and the fire is burning with fuel to spare.
- * The burn is the accepted minimum beat: the topmost banner is removed instantly with a
- * mood line and the existing paper sound (the chrome layer renders banners from this data
- * each frame, so a pre-removal CSS burn window would have to fight the render cycle). A
- * fixed fuel cost on already-deterministic data, so no rng enters play.
+ * It burns the topmost banner that does NOT carry the real reject-all: the chain is here to
+ * help, so it never strips the swarm's only fast dismissal. The swarm model marks at most one
+ * banner hasRealReject, so with two-plus banners up a burnable one always exists; the no-op
+ * guard is defensive if that ever changes.
+ *
+ * The burn is the accepted minimum beat: the banner is removed instantly with a mood line and
+ * the existing paper sound (the chrome layer renders banners from this data each frame, so a
+ * pre-removal CSS burn window would have to fight the render cycle). A fixed fuel cost on
+ * already-deterministic data, so no rng enters play.
  */
 function igniteBanner(d: CookieBannerData, ctx: EventContext): void {
   if (d.fireUsedThisSwarm || d.banners.length < IGNITE_MIN_BANNERS) return;
@@ -69,9 +74,10 @@ function igniteBanner(d: CookieBannerData, ctx: EventContext): void {
   }
   const f = fire.data as CampfireData;
   if (!f.burning || f.fuel < IGNITE_MIN_FUEL) return;
+  const burned = [...d.banners].reverse().find((b) => !b.hasRealReject);
+  if (!burned) return; // every banner carries the real reject: leave the swarm untouched
   f.fuel = Math.max(0, f.fuel - IGNITE_FUEL_COST);
   d.fireUsedThisSwarm = true;
-  const burned = d.banners[d.banners.length - 1]!; // the topmost (last-spawned) banner catches
   d.banners = d.banners.filter((b) => b.id !== burned.id);
   ctx.emit({ kind: "sound", sound: "paper-shred" });
   ctx.emit({

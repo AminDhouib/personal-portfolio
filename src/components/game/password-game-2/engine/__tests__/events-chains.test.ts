@@ -638,6 +638,26 @@ describe("chain 5: the campfire burns one banner in a live swarm", () => {
     expect(moods(env.effects)).toEqual([]);
   });
 
+  it("never burns the real reject-all banner, taking the topmost one below it instead", () => {
+    const env = boot();
+    const campfire = addEvent(env, campfireDef, 2);
+    toPeak(env, campfireDef, campfire);
+    campfire.data.fuel = 80;
+    const cookie = addEvent(env, cookieBannerDef, 3);
+    cookie.data.realRejectAt = 2; // the topmost banner (ordinal 2) will carry the real reject
+    toPeak(env, cookieBannerDef, cookie); // spawns ordinal 0
+    pointer(env, cookieBannerDef, cookie, { kind: "banner-decline" }); // spawns ordinals 1, 2
+    expect(cookie.data.banners.map((b) => b.id)).toEqual([0, 1, 2]);
+    expect(cookie.data.banners.find((b) => b.hasRealReject)!.id).toBe(2); // topmost is the carrier
+    env.effects.length = 0;
+
+    driveInst(env, cookieBannerDef, cookie, 0);
+    expect(cookie.data.banners.map((b) => b.id)).toEqual([0, 2]); // the one below (id 1) burned
+    expect(cookie.data.banners.find((b) => b.hasRealReject)!.id).toBe(2); // reject path survived
+    expect(campfire.data.fuel).toBe(65);
+    expect(cookie.data.fireUsedThisSwarm).toBe(true);
+  });
+
   it("does nothing while the fire's fuel is below 50", () => {
     const env = boot();
     const campfire = addEvent(env, campfireDef, 2);
