@@ -110,6 +110,8 @@ function swipeInvaders(ctx: EventContext): boolean {
   for (const defId of INVASION_PRIORITY) {
     const inst = ctx.state.events.find((e) => e.defId === defId);
     if (!inst || inst.phase !== "peak" || inst.data === undefined) continue;
+    // The first in-peak invasion is THE target — no fall-through to a lower one
+    // even if its swipe finds nothing to hit.
     if (defId === "galaga") return galagaBearSwipe(inst as EventInstance<GalagaData>, ctx);
     if (defId === "snake") return snakeBearSwipe(inst as EventInstance<SnakeData>, ctx);
     return tetrisBearSwipe(inst as EventInstance<TetrisData>, ctx);
