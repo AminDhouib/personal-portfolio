@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { applyKey, applyPointer, createRun, makeRuleApi, requestSubmit, tick } from "../engine";
+import {
+  applyKey,
+  applyPointer,
+  applyText,
+  createRun,
+  makeRuleApi,
+  requestSubmit,
+  setRuleState,
+  tick,
+} from "../engine";
 import { drainEffects, pushEffect } from "../effects";
 import { cellsToPassword } from "../cells";
 import { CORE_RULES } from "../rules/index";
@@ -8,6 +17,7 @@ import type { GalagaData } from "../events/galaga";
 import type { SnakeData } from "../events/snake";
 import type { CookieBannerData } from "../events/cookie-banner";
 import type { AutocorrectData } from "../events/autocorrect";
+import type { LoadingBarData } from "../events/loading-bar";
 import type { ActId, CharCell, EventInstance, GameState, Pg2Rule, RuleApi } from "../types";
 
 const HHMM = "12:00";
@@ -414,6 +424,70 @@ describe("engine input locking", () => {
     applyKey(g, "a");
     expect(g.cells.length).toBe(1);
     expect(g.startedAtMs).toBe(0);
+  });
+});
+
+describe("engine applyText widget channel", () => {
+  it("types a whole string as keystrokes, landing at the end regardless of the caret", () => {
+    const g = boot();
+    type(g, "abc");
+    g.caret = 1; // caret parked in the middle
+    applyText(g, "XY");
+    // applyText jumps to End first (same path as pressing End), so widget text lands
+    // at the tail, never spliced wherever the caret happened to be.
+    expect(g.cells.map((c) => c.ch).join("")).toBe("abcXY");
+    expect(g.caret).toBe(5);
+  });
+
+  it("routes each char through applyKey, so an active loading-bar stun swallows it", () => {
+    const g = boot();
+    type(g, "abc");
+    const before = g.cells.length;
+    // Stand up the loading bar mid-seizure exactly as onset leaves it: locked input and
+    // a live peak-phase instance whose onKey eats every key (printable or named) as a mash.
+    g.inputLocked = true;
+    const stun: EventInstance<LoadingBarData> = {
+      defId: "loading-bar",
+      family: "chrome",
+      act: "act1",
+      phase: "peak",
+      phaseElapsedMs: 0,
+      scheduledAtMs: 0,
+      data: { progress: 50, startedAtMs: 0 },
+    };
+    g.events = [stun];
+
+    applyText(g, "Nf3");
+    // The leading End and every char were swallowed as mash: nothing typed, but the
+    // bar was nudged — proof the widget cannot bypass an event by going through applyText.
+    expect(g.cells.length).toBe(before);
+    expect(g.cells.map((c) => c.ch).join("")).toBe("abc");
+    expect(stun.data.progress).toBeGreaterThan(50);
+  });
+
+  it("iterates by code point so a surrogate pair survives as a single cell", () => {
+    const g = boot();
+    // U+1D400 MATHEMATICAL BOLD CAPITAL A is a non-BMP surrogate pair (not an emoji).
+    applyText(g, "a\u{1D400}b");
+    expect(g.cells.map((c) => c.ch)).toEqual(["a", "\u{1D400}", "b"]);
+  });
+});
+
+describe("engine rule-state channel", () => {
+  it("setRuleState stores the value and bumps the version", () => {
+    const g = boot();
+    const before = g.version;
+    setRuleState(g, "chess-solved", "Qxf7#");
+    expect(g.ruleStates["chess-solved"]).toBe("Qxf7#");
+    expect(g.version).toBeGreaterThan(before);
+  });
+
+  it("makeRuleApi.ruleState reads a set value back and returns null for an unset id", () => {
+    const g = boot();
+    setRuleState(g, "captcha-passed", true);
+    const api = makeRuleApi(g, () => HHMM);
+    expect(api.ruleState("captcha-passed")).toBe(true);
+    expect(api.ruleState("never-set")).toBeNull();
   });
 });
 

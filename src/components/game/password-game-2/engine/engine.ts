@@ -224,6 +224,29 @@ export function applyKey(g: GameState, key: string): void {
 }
 
 /**
+ * Type a whole string as if a rule-card widget had typed it into the password: jump
+ * the caret to the end (the same path as pressing "End") then feed each code point
+ * through applyKey. Reusing applyKey is a fairness invariant — a widget's characters
+ * are intercepted by active events (a loading-bar stun, snake feeding, autocorrect)
+ * exactly as real keystrokes are, so a widget cannot bypass the world. Iterates with
+ * for..of so astral code points (surrogate pairs) survive as single characters.
+ */
+export function applyText(g: GameState, text: string): void {
+  applyKey(g, "End");
+  for (const ch of text) applyKey(g, ch);
+}
+
+/**
+ * Publish a rule widget's non-text outcome into run state, keyed by rule id; the rule's
+ * validator reads it back through api.ruleState. Bumps the version so the memoized rule
+ * list re-validates against the new state.
+ */
+export function setRuleState(g: GameState, ruleId: string, value: unknown): void {
+  g.ruleStates[ruleId] = value;
+  bump(g);
+}
+
+/**
  * Route a pointer. Active events see it first (onset order). Once the finale is open
  * its targets go to finalePointer; otherwise a cell target moves the caret.
  */
@@ -295,6 +318,9 @@ export function makeRuleApi(g: GameState, nowHHMM: () => string): RuleApi {
     getEventData<S>(id: string): S | null {
       const inst = find(id);
       return inst !== undefined && inst.data !== undefined ? (inst.data as S) : null;
+    },
+    ruleState(id: string): unknown {
+      return g.ruleStates[id] ?? null;
     },
     nowHHMM,
   };

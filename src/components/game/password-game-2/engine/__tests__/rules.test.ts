@@ -19,6 +19,7 @@ const api = (hhmm = "12:00"): RuleApi => ({
   isEventActive: () => false,
   isEventDone: () => false,
   getEventData: () => null,
+  ruleState: () => null,
   nowHHMM: () => hhmm,
 });
 

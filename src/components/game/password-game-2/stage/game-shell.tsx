@@ -14,9 +14,11 @@ import type { ActId, Effect, GameState, PointerTarget } from "../engine/types";
 import {
   applyKey,
   applyPointer,
+  applyText,
   createRun,
   makeRuleApi,
   requestSubmit,
+  setRuleState,
   tick,
 } from "../engine/engine";
 import { drainEffects } from "../engine/effects";
@@ -471,6 +473,33 @@ export function GameShell() {
     [forceRender, focusHiddenInput],
   );
 
+  // Widget input channel (mirrors applyTarget). A rule-card widget either types its
+  // answer into the password through the shared key path (onWidgetText -> applyText,
+  // so events still intercept) or publishes a non-text outcome to run state
+  // (onRuleState -> setRuleState, read back by validators via api.ruleState). Both
+  // are useCallback-stable so RuleList's props identity survives and its memo holds.
+  const onWidgetText = useCallback(
+    (text: string) => {
+      const g = gameRef.current;
+      if (!g) return;
+      applyText(g, text);
+      forceRender();
+      focusHiddenInput();
+    },
+    [forceRender, focusHiddenInput],
+  );
+
+  const onRuleState = useCallback(
+    (id: string, value: unknown) => {
+      const g = gameRef.current;
+      if (!g) return;
+      setRuleState(g, id, value);
+      forceRender();
+      focusHiddenInput();
+    },
+    [forceRender, focusHiddenInput],
+  );
+
   const onBoxClick = useCallback(() => {
     const g = gameRef.current;
     if (!g) return;
@@ -553,6 +582,8 @@ export function GameShell() {
             onHiddenInput={onHiddenInput}
             onSubmit={onSubmit}
             onPointer={applyTarget}
+            onWidgetText={onWidgetText}
+            onRuleState={onRuleState}
             onPlayAgain={playAgain}
             onPlayDaily={playDaily}
           />
@@ -713,6 +744,8 @@ function RunningView({
   onHiddenInput,
   onSubmit,
   onPointer,
+  onWidgetText,
+  onRuleState,
   onPlayAgain,
   onPlayDaily,
 }: {
@@ -730,6 +763,8 @@ function RunningView({
   onHiddenInput: (e: FormEvent<HTMLInputElement>) => void;
   onSubmit: () => void;
   onPointer: (target: PointerTarget) => void;
+  onWidgetText: (text: string) => void;
+  onRuleState: (id: string, value: unknown) => void;
   onPlayAgain: () => void;
   onPlayDaily: () => void;
 }) {
@@ -823,6 +858,8 @@ function RunningView({
               password={password}
               state={g}
               api={api}
+              onWidgetText={onWidgetText}
+              onRuleState={onRuleState}
               version={g.version}
               validationTick={validationTick}
             />

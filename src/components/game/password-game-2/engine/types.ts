@@ -30,6 +30,11 @@ export interface RuleApi {
   isEventActive(id: string): boolean;
   isEventDone(id: string): boolean;
   getEventData<S>(id: string): S | null;
+  /**
+   * A rule widget's published outcome, keyed by rule id (see engine.setRuleState).
+   * Untyped on purpose: each rule narrows its own value. Unset ids read back null.
+   */
+  ruleState(id: string): unknown;
   /** Wall-clock HH:MM for the current-time rule; injected for tests. */
   nowHHMM(): string;
 }

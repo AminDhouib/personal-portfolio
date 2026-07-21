@@ -40,6 +40,8 @@ describe("pg2 stage smoke", () => {
           password={password}
           state={g}
           api={api}
+          onWidgetText={() => {}}
+          onRuleState={() => {}}
           version={g.version}
           validationTick={0}
         />

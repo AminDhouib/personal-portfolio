@@ -7,6 +7,15 @@ interface RuleListProps {
   state: GameState;
   api: RuleApi;
   /**
+   * Widget input channel. Interactive rule payloads (Tasks 9-12) call these to
+   * either type their answer into the password (onWidgetText, routed through the
+   * same key path as the keyboard) or publish a non-text outcome to run state
+   * (onRuleState, read back by validators via api.ruleState). The shell passes
+   * useCallback-stable handlers so the memo below is not defeated.
+   */
+  onWidgetText(text: string): void;
+  onRuleState(id: string, value: unknown): void;
+  /**
    * The engine version counter. Not read directly — it is a memo re-render signal:
    * it bumps on every cells/rules/act change, so the memoized list re-validates
    * when engine state moves but skips the pure 250ms HUD heartbeat.
@@ -20,6 +29,9 @@ interface RuleListProps {
    */
   validationTick: number;
 }
+
+/** The widget-output handlers, forwarded down to interactive payload renderers. */
+type WidgetChannel = Pick<RuleListProps, "onWidgetText" | "onRuleState">;
 
 interface Evaluated {
   rule: Pg2Rule;
@@ -202,8 +214,12 @@ function CountryFlag({ country }: { country: string | null }) {
   );
 }
 
-/** The chess payload's board is 8 rows of 8 Unicode piece glyphs or '.'. */
-function ChessBoard({ board, hint }: { board: string[]; hint?: string }) {
+/**
+ * The chess payload's board is 8 rows of 8 Unicode piece glyphs or '.'. The widget
+ * channel is threaded in for Task 9 (playable chess), which will let a solved mate
+ * type its move into the password; today the board is a static picture.
+ */
+function ChessBoard({ board, hint }: { board: string[]; hint?: string; widget: WidgetChannel }) {
   return (
     <div className="mt-3">
       <div className="pg2-chess" aria-label="Chess position" role="img">
@@ -248,7 +264,7 @@ function AntidoteChip({ code }: { code: string }) {
   );
 }
 
-function PayloadView({ rule }: { rule: Pg2Rule }) {
+function PayloadView({ rule, widget }: { rule: Pg2Rule; widget: WidgetChannel }) {
   const p = rule.payload;
   if (!p) return null;
 
@@ -258,7 +274,8 @@ function PayloadView({ rule }: { rule: Pg2Rule }) {
   if ("country" in p) return <CountryFlag country={readString(p.country)} />;
 
   const board = readStringArray(p.board);
-  if (board) return <ChessBoard board={board} hint={readString(p.hint) ?? undefined} />;
+  if (board)
+    return <ChessBoard board={board} hint={readString(p.hint) ?? undefined} widget={widget} />;
 
   const antidote = readString(p.antidote);
   if (antidote) return <AntidoteChip code={antidote} />;
@@ -272,10 +289,12 @@ function RuleCard({
   ev,
   variant,
   live,
+  widget,
 }: {
   ev: Evaluated;
   variant: "active" | "pass" | "idle";
   live: string | null;
+  widget: WidgetChannel;
 }) {
   const [expanded, setExpanded] = useState(false);
   const passed = variant === "pass";
@@ -317,7 +336,7 @@ function RuleCard({
                 {live ?? ev.result.message}
               </p>
             ) : null}
-            {open ? <PayloadView rule={ev.rule} /> : null}
+            {open ? <PayloadView rule={ev.rule} widget={widget} /> : null}
           </div>
         </div>
       </button>
@@ -333,7 +352,15 @@ function RuleCard({
  * Memoized on its props (version included) so the 250ms HUD heartbeat does not
  * re-run 17 validations; engine state changes bump version and re-render it.
  */
-export const RuleList = memo(function RuleList({ rules, password, state, api }: RuleListProps) {
+export const RuleList = memo(function RuleList({
+  rules,
+  password,
+  state,
+  api,
+  onWidgetText,
+  onRuleState,
+}: RuleListProps) {
+  const widget: WidgetChannel = { onWidgetText, onRuleState };
   const evaluated: Evaluated[] = rules.map((rule, i) => ({
     rule,
     badge: i + 1,
@@ -351,7 +378,7 @@ export const RuleList = memo(function RuleList({ rules, password, state, api }: 
         const isActive = ev === firstFailing;
         const variant = ev.result.passed ? "pass" : isActive ? "active" : "idle";
         const live = ev.rule.id === "current-time" ? api.nowHHMM() : null;
-        return <RuleCard key={ev.rule.id} ev={ev} variant={variant} live={live} />;
+        return <RuleCard key={ev.rule.id} ev={ev} variant={variant} live={live} widget={widget} />;
       })}
     </ol>
   );
