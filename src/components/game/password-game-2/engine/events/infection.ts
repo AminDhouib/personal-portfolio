@@ -3,15 +3,16 @@ import { cellsToPassword, setCellStatus } from "../cells";
 import { type Rng, mulberry32, pickN, pickOne, subSeed } from "../rng";
 
 /**
- * The infection. A telegraph, then one random character falls ill; every
- * SPREAD_PERIOD_MS each sick cell infects one adjacent NORMAL neighbour, but a
- * space is a quarantine wall — it is never infected and adjacency never crosses
- * it. A cell sick for MUTATE_AFTER_MS mutates (still counts as infected, for the
- * rule and for spread). The cure is an antidote: four fixed lowercase letters
- * that, once present anywhere in the password value, wipe the outbreak clean.
+ * Data corruption. A telegraph, then one random character is corrupted; every
+ * SPREAD_PERIOD_MS each corrupted cell spreads to one adjacent NORMAL neighbour,
+ * but a space is a quarantine boundary — it is never corrupted and adjacency
+ * never crosses it. A cell corrupted for MUTATE_AFTER_MS mutates (still counts as
+ * infected, for the rule and for spread). The fix is an antidote: four fixed
+ * lowercase letters that, once present anywhere in the password value, scrub the
+ * corruption clean.
  *
  * Infected and mutated cells still COUNT in the password value (see cells.ts) —
- * the hazard is the spreading blight and the injected "no infected characters"
+ * the hazard is the spreading corruption and the injected "no infected characters"
  * rule, not a shrinking value.
  */
 
@@ -49,12 +50,12 @@ const isInfected = (cell: CharCell): boolean =>
 
 const isSpace = (cell: CharCell): boolean => cell.ch === " ";
 
-/** Fall one random normal, non-space cell ill; announce the outbreak. */
+/** Corrupt one random normal, non-space cell; announce the corruption. */
 function onset(d: InfectionData, ctx: EventContext): void {
   d.nextSpreadAtMs = ctx.state.elapsedMs + SPREAD_PERIOD_MS;
   const candidates = ctx.state.cells.filter((c) => c.status === "normal" && !isSpace(c));
   ctx.emit({ kind: "sound", sound: "force-onset" });
-  ctx.emit({ kind: "toast", tone: "danger", text: "One of your characters looks unwell." });
+  ctx.emit({ kind: "toast", tone: "danger", text: "Data corruption detected in one record." });
   if (candidates.length === 0) return;
   const target = pickOne(ctx.rng, candidates);
   ctx.state.cells = setCellStatus(ctx.state.cells, target.id, "infected", EVENT_ID);
@@ -62,10 +63,10 @@ function onset(d: InfectionData, ctx: EventContext): void {
 }
 
 /**
- * One spread pulse: every currently-sick cell infects one adjacent normal cell.
- * Sources are snapshotted at the pulse start so a cell infected THIS pulse does
- * not chain within it; a space is never a target and is never crossed. The left
- * neighbour is preferred, so the blight fills outward from each seed.
+ * One spread pulse: every currently-corrupted cell spreads to one adjacent normal
+ * cell. Sources are snapshotted at the pulse start so a cell corrupted THIS pulse
+ * does not chain within it; a space is never a target and is never crossed. The
+ * left neighbour is preferred, so the corruption fills outward from each seed.
  */
 function spreadOnce(d: InfectionData, ctx: EventContext): void {
   let cells = ctx.state.cells;
@@ -93,7 +94,7 @@ function spreadIfDue(d: InfectionData, ctx: EventContext): void {
   }
 }
 
-/** Flip any cell sick for MUTATE_AFTER_MS to "mutated" (it stays infected-for-rules). */
+/** Flip any cell corrupted for MUTATE_AFTER_MS to "mutated" (it stays infected-for-rules). */
 function mutateOverdue(d: InfectionData, ctx: EventContext): void {
   let cells = ctx.state.cells;
   for (const cell of cells) {
@@ -106,7 +107,7 @@ function mutateOverdue(d: InfectionData, ctx: EventContext): void {
   ctx.state.cells = cells;
 }
 
-/** If the antidote is in the password value, wipe every sick cell clean. */
+/** If the antidote is in the password value, scrub every corrupted cell clean. */
 function cureIfAntidote(
   d: InfectionData,
   ctx: EventContext,
@@ -125,7 +126,7 @@ function cureIfAntidote(
   ctx.state.stats.infectionsCured += count;
   d.cured = true;
   inst.phase = "done";
-  ctx.emit({ kind: "toast", tone: "success", text: "Outbreak contained." });
+  ctx.emit({ kind: "toast", tone: "success", text: "Corruption cleared." });
 }
 
 /** Coupled rule: no infected/mutated characters may remain at submit. */

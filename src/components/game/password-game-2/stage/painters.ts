@@ -807,7 +807,7 @@ const paintBlackHole: Painter = (ctx, inst, layout, g, tMs) => {
   ctx.font = "800 13px ui-sans-serif, system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const label = `FEED IT: ${d.heavyWord}`;
+  const label = `COMPACTION — FEED IT: ${d.heavyWord}`;
   const lw = ctx.measureText(label).width + 16;
   roundRect(ctx, cx - lw / 2, cy - 46, lw, 20, 6);
   ctx.fillStyle = "rgba(30,16,51,0.9)";

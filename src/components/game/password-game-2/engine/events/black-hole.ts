@@ -3,13 +3,14 @@ import { cellsToPassword, setCellStatus } from "../cells";
 import { pickOne } from "../rng";
 
 /**
- * The black hole. An anchor forms at a fixed index; every PULL_PERIOD_MS the
- * nearest still-normal cell is dragged into orbit (status "orbiting", excluded
- * from the password value). Typing the seeded "heavy word" anywhere in the value
- * collapses the singularity: after a COLLAPSE_GRACE_MS beat every captured cell
- * flips back to normal IN PLACE (orbiting is a status flip — cells never leave
- * the array, so original order is preserved). Reaching MAX_CAPTURES collapses it
- * on the same grace automatically, so an ignored black hole still resolves.
+ * Scheduled storage compaction. A compaction anchor forms at a fixed index; every
+ * PULL_PERIOD_MS the nearest still-normal cell is pulled into the compaction pass
+ * (status "orbiting", excluded from the password value). Typing the seeded "heavy
+ * word" anywhere in the value completes the pass: after a COLLAPSE_GRACE_MS beat
+ * every staged cell flips back to normal IN PLACE (orbiting is a status flip —
+ * cells never leave the array, so original order is preserved). Reaching
+ * MAX_CAPTURES completes the pass on the same grace automatically, so an ignored
+ * compaction still resolves.
  */
 
 const EVENT_ID = "black-hole";
@@ -48,7 +49,7 @@ function pullNearest(d: BlackHoleData, ctx: EventContext): void {
   ctx.state.stats.lettersAbducted++;
 }
 
-/** Rain every captured cell back into place, resolve, and announce it. */
+/** Restore every staged cell back into place, resolve, and announce it. */
 function collapse(d: BlackHoleData, ctx: EventContext, inst: EventInstance<BlackHoleData>): void {
   let cells = ctx.state.cells;
   let count = 0;
@@ -64,7 +65,7 @@ function collapse(d: BlackHoleData, ctx: EventContext, inst: EventInstance<Black
   ctx.emit({
     kind: "toast",
     tone: "success",
-    text: "The singularity collapses. Letters rain back.",
+    text: "Storage compaction complete. Records restored.",
   });
 }
 

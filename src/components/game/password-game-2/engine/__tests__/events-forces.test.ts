@@ -108,7 +108,8 @@ describe("the infection", () => {
     expect(sick).toHaveLength(1);
     expect(sick[0]!.ch).not.toBe(" "); // spaces are never infected
     expect(soundKeys(h.effects)).toContain("force-onset");
-    expect(toastTexts(h.effects)).toContain("One of your characters looks unwell.");
+    expect(toastTexts(h.effects)).toContain("Data corruption detected in one record.");
+    expect(toastTexts(h.effects).some((t) => /corrupt/i.test(t))).toBe(true);
   });
 
   it("spreads every 7s to an adjacent normal cell but never crosses a space wall", () => {
@@ -173,7 +174,8 @@ describe("the infection", () => {
     expect(h.inst.data.cured).toBe(true);
     expect(h.inst.phase).toBe("done");
     expect(h.state.stats.infectionsCured).toBe(2);
-    expect(toastTexts(h.effects)).toContain("Outbreak contained.");
+    expect(toastTexts(h.effects)).toContain("Corruption cleared.");
+    expect(toastTexts(h.effects).some((t) => /corrupt/i.test(t))).toBe(true);
     expect(infectionDef.isResolved(h.inst, h.state)).toBe(true);
   });
 
@@ -283,7 +285,8 @@ describe("the black hole", () => {
     expect(statusOf(h, 1)).toBe("normal");
     expect(statusOf(h, 2)).toBe("normal");
     expect(h.state.stats.lettersRescued).toBe(2);
-    expect(toastTexts(h.effects)).toContain("The singularity collapses. Letters rain back.");
+    expect(toastTexts(h.effects)).toContain("Storage compaction complete. Records restored.");
+    expect(toastTexts(h.effects).some((t) => /compact/i.test(t))).toBe(true);
 
     // Restoration is in place: a stayed ahead of b, order untouched.
     const idxA = h.state.cells.findIndex((c) => c.id === 1);
