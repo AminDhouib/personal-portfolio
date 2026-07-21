@@ -1,4 +1,4 @@
-import type { EventContext, EventDef, EventInstance } from "../types";
+import type { CellStatus, CharCell, EventContext, EventDef, EventInstance } from "../types";
 import { cellsToPassword, setCellStatus } from "../cells";
 import { pickOne } from "../rng";
 
@@ -26,27 +26,52 @@ export interface BlackHoleData {
   nextPullAtMs: number; // state.elapsedMs of the next pull
   heavyWord: string; // typing this into the value triggers collapse
   collapsingSinceMs: number | null; // elapsedMs the collapse began, or null
+  compactedGarbage: boolean; // chain 4: the compactor has eaten its first junk cell
 }
 
-/** Drag the nearest normal cell into orbit; ties resolve to the lower index. */
-function pullNearest(d: BlackHoleData, ctx: EventContext): void {
-  const cells = ctx.state.cells;
+/** Index of the nearest cell of `status` to the anchor; the lower index wins a tie. */
+function nearestOfStatus(
+  cells: readonly CharCell[],
+  anchorIndex: number,
+  status: CellStatus,
+): number {
   let best = -1;
   let bestDist = Infinity;
   for (let i = 0; i < cells.length; i++) {
-    if (cells[i]!.status !== "normal") continue;
-    const dist = Math.abs(i - d.anchorIndex);
+    if (cells[i]!.status !== status) continue;
+    const dist = Math.abs(i - anchorIndex);
     if (dist < bestDist) {
       // strict < keeps the earlier (lower) index on an equidistant tie
       bestDist = dist;
       best = i;
     }
   }
+  return best;
+}
+
+/**
+ * Drag the nearest cell into orbit; ties resolve to the lower index. Chain 4: the
+ * compactor eats junk first, so a garbage cell in reach is captured ahead of any normal
+ * one — this changes only the SELECTION, never the once-per-PULL_PERIOD_MS cadence or the
+ * capture mechanics. The first junk it compacts earns a one-time mood.
+ */
+function pullNearest(d: BlackHoleData, ctx: EventContext): void {
+  const cells = ctx.state.cells;
+  const garbage = nearestOfStatus(cells, d.anchorIndex, "garbage");
+  const best = garbage >= 0 ? garbage : nearestOfStatus(cells, d.anchorIndex, "normal");
   if (best < 0) return; // nothing left to pull
   const cell = cells[best]!;
   ctx.state.cells = setCellStatus(cells, cell.id, "orbiting", EVENT_ID);
   d.capturedIds.push(cell.id);
   ctx.state.stats.lettersAbducted++;
+  if (cell.status === "garbage" && !d.compactedGarbage) {
+    d.compactedGarbage = true;
+    ctx.emit({
+      kind: "mood",
+      eventId: EVENT_ID,
+      text: "The compactor found the junk. It approves.",
+    });
+  }
 }
 
 /** Restore every staged cell back into place, resolve, and announce it. */
@@ -81,6 +106,7 @@ export const blackHoleDef: EventDef<BlackHoleData> = {
       nextPullAtMs: 0,
       heavyWord: pickOne(rng, HEAVY_WORDS),
       collapsingSinceMs: null,
+      compactedGarbage: false,
     };
   },
   onTick(inst: EventInstance<BlackHoleData>, ctx: EventContext): void {

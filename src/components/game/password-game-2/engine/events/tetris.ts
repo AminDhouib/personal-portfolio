@@ -74,6 +74,29 @@ function garbageRemains(ctx: EventContext): boolean {
   return ctx.state.cells.some((c) => c.status === "garbage" && c.eventTag === EVENT_ID);
 }
 
+/**
+ * Shatter the garbage cell at box index `idx`: splice it out, slide the caret left when
+ * the removal sits ahead of it, and tally the clear. Shared by the click and the bear's
+ * swipe so both stay byte-identical.
+ */
+function shatterAt(idx: number, ctx: EventContext, inst: EventInstance<TetrisData>): void {
+  ctx.state.cells = [...ctx.state.cells.slice(0, idx), ...ctx.state.cells.slice(idx + 1)];
+  if (idx < ctx.state.caret) ctx.state.caret--;
+  ctx.state.stats.garbageCleared++;
+  inst.data.hasShattered = true;
+}
+
+/**
+ * The bear's swipe (chain 3): shatter the leftmost garbage block exactly as a click
+ * would. Returns false when no junk is left to clear.
+ */
+export function bearSwipe(inst: EventInstance<TetrisData>, ctx: EventContext): boolean {
+  const idx = ctx.state.cells.findIndex((c) => c.status === "garbage" && c.eventTag === EVENT_ID);
+  if (idx < 0) return false;
+  shatterAt(idx, ctx, inst);
+  return true;
+}
+
 export const tetrisDef: EventDef<TetrisData> = {
   id: EVENT_ID,
   family: "invasion",
@@ -120,10 +143,7 @@ export const tetrisDef: EventDef<TetrisData> = {
       (c) => c.id === id && c.status === "garbage" && c.eventTag === EVENT_ID,
     );
     if (idx < 0) return false; // a normal cell: not consumed, falls through to caret placement
-    ctx.state.cells = [...ctx.state.cells.slice(0, idx), ...ctx.state.cells.slice(idx + 1)];
-    if (idx < ctx.state.caret) ctx.state.caret--;
-    ctx.state.stats.garbageCleared++;
-    inst.data.hasShattered = true;
+    shatterAt(idx, ctx, inst);
     return true;
   },
   isResolved: (inst) => inst.phase === "done",

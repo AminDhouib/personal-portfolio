@@ -1,5 +1,8 @@
 import type { EventContext, EventDef, EventInstance, Pg2RuleDef } from "../types";
 import { rangeInt } from "../rng";
+import { bearSwipe as galagaBearSwipe, type GalagaData } from "./galaga";
+import { bearSwipe as snakeBearSwipe, type SnakeData } from "./snake";
+import { bearSwipe as tetrisBearSwipe, type TetrisData } from "./tetris";
 
 /**
  * The garden and the bear. Flowers bloom slowly; once at least two are open the
@@ -95,6 +98,25 @@ function stepBear(d: GardenData, ctx: EventContext): void {
   }
 }
 
+/**
+ * Chain 3: a bear sent packing swats an invasion on its way out. It swipes the single
+ * highest-priority invasion in peak (galaga before snake before tetris) via that event's
+ * bearSwipe primitive, using the sanctioned cross-event read idiom. Returns whether a
+ * swipe actually landed, so the caller only moods when the bear did something.
+ */
+const INVASION_PRIORITY = ["galaga", "snake", "tetris"] as const;
+
+function swipeInvaders(ctx: EventContext): boolean {
+  for (const defId of INVASION_PRIORITY) {
+    const inst = ctx.state.events.find((e) => e.defId === defId);
+    if (!inst || inst.phase !== "peak" || inst.data === undefined) continue;
+    if (defId === "galaga") return galagaBearSwipe(inst as EventInstance<GalagaData>, ctx);
+    if (defId === "snake") return snakeBearSwipe(inst as EventInstance<SnakeData>, ctx);
+    return tetrisBearSwipe(inst as EventInstance<TetrisData>, ctx);
+  }
+  return false;
+}
+
 /** Coupled rule: the hive must hold at least MIN_HONEY at submit. */
 const gardenHoneyRule: Pg2RuleDef = {
   id: "garden-honey",
@@ -150,6 +172,13 @@ export const gardenDef: EventDef<GardenData> = {
       ctx.emit({ kind: "sound", sound: "paper-shred" });
       ctx.emit({ kind: "mood", eventId: "garden", text: "The bear takes the basket and leaves" });
       scheduleNextRaid(d, ctx);
+      if (swipeInvaders(ctx)) {
+        ctx.emit({
+          kind: "mood",
+          eventId: "garden",
+          text: "The bear swats the invaders on its way out. It remembers this.",
+        });
+      }
     }
     return true;
   },

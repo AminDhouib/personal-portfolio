@@ -143,6 +143,43 @@ function runWave(d: GalagaData, ctx: EventContext, inst: EventInstance<GalagaDat
   maybeAdvanceWave(d, ctx, inst);
 }
 
+/**
+ * Down one alien: a carried glyph rains back as a rescue (exactly as a key-shot), the
+ * kill is tallied, and a cleared wave rolls straight on. Shared by the key-shot, the
+ * click, and the bear's swipe so all three stay byte-identical.
+ */
+function downAlien(a: Alien, ctx: EventContext, inst: EventInstance<GalagaData>): void {
+  if (a.state === "carrying" && a.carriedCellId !== null) {
+    const cellId = a.carriedCellId;
+    a.carriedCellId = null;
+    ctx.state.cells = setCellStatus(ctx.state.cells, cellId, "normal");
+    ctx.state.stats.lettersRescued++;
+  }
+  a.state = "down";
+  a.diveStartedAtMs = null;
+  ctx.state.stats.aliensDowned++;
+  maybeAdvanceWave(inst.data, ctx, inst);
+}
+
+/** Swipe priority: a carrier first (its glyph rains back), then a diver, then formation. */
+function swipeRank(state: Alien["state"]): number {
+  return state === "carrying" ? 0 : state === "diving" ? 1 : 2;
+}
+
+/**
+ * The bear's swipe (chain 3): down the highest-value live invader — a carrier before a
+ * diver before a formation alien, the lower id breaking a tie. Returns false when the
+ * fleet has nothing left to hit.
+ */
+export function bearSwipe(inst: EventInstance<GalagaData>, ctx: EventContext): boolean {
+  const target = inst.data.aliens
+    .filter((a) => a.state === "carrying" || a.state === "diving" || a.state === "formation")
+    .sort((a, b) => swipeRank(a.state) - swipeRank(b.state) || a.id - b.id)[0];
+  if (!target) return false;
+  downAlien(target, ctx, inst);
+  return true;
+}
+
 /** Coupled rule: the final wave must be shot down to the last invader. */
 const galagaFinalWaveRule: Pg2RuleDef = {
   id: "galaga-final-wave",
@@ -206,13 +243,7 @@ export const galagaDef: EventDef<GalagaData> = {
     for (const a of carrying) {
       const cell = ctx.state.cells.find((c) => c.id === a.carriedCellId);
       if (cell && cell.ch.toLowerCase() === lower) {
-        a.state = "down";
-        const cellId = a.carriedCellId!;
-        a.carriedCellId = null;
-        ctx.state.cells = setCellStatus(ctx.state.cells, cellId, "normal");
-        ctx.state.stats.lettersRescued++;
-        ctx.state.stats.aliensDowned++;
-        maybeAdvanceWave(d, ctx, inst);
+        downAlien(a, ctx, inst);
         return true;
       }
     }
@@ -223,10 +254,7 @@ export const galagaDef: EventDef<GalagaData> = {
     const id = typeof target.id === "number" ? target.id : -1;
     const a = inst.data.aliens.find((x) => x.id === id);
     if (!a || (a.state !== "formation" && a.state !== "diving")) return false;
-    a.state = "down";
-    a.diveStartedAtMs = null;
-    ctx.state.stats.aliensDowned++;
-    maybeAdvanceWave(inst.data, ctx, inst);
+    downAlien(a, ctx, inst);
     return true;
   },
   isResolved: (inst) => inst.phase === "done",

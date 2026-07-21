@@ -7,7 +7,19 @@ import { geraldDef } from "../events/gerald";
 import { gardenDef } from "../events/garden";
 import { campfireDef } from "../events/campfire";
 import { infectionDef } from "../events/infection";
-import type { CharCell, Effect, EventContext, EventDef, EventInstance, GameState } from "../types";
+import { galagaDef, bearSwipe as galagaBearSwipe, type GalagaData } from "../events/galaga";
+import { snakeDef, bearSwipe as snakeBearSwipe } from "../events/snake";
+import { tetrisDef, bearSwipe as tetrisBearSwipe } from "../events/tetris";
+import { blackHoleDef } from "../events/black-hole";
+import type {
+  CharCell,
+  Effect,
+  EventContext,
+  EventDef,
+  EventInstance,
+  GameState,
+  PointerTarget,
+} from "../types";
 
 /**
  * Cross-event chains (Workstream B). Each chain is a deterministic side effect of an
@@ -67,6 +79,16 @@ function driveInst<S>(env: Env, def: EventDef<S>, inst: EventInstance<S>, dtMs: 
   inst.phaseElapsedMs += dtMs;
   def.onTick(inst, ctx(env, dtMs));
   if (inst.phase !== prev) inst.phaseElapsedMs = 0;
+}
+
+/** Route a pointer target to one instance's onPointer at the current clock (no time passes). */
+function pointer<S>(
+  env: Env,
+  def: EventDef<S>,
+  inst: EventInstance<S>,
+  target: PointerTarget,
+): boolean {
+  return def.onPointer!(inst, ctx(env, 0), target);
 }
 
 /** Advance one instance past telegraph and its one-tick onset, landing in peak with no extra time. */
@@ -331,5 +353,250 @@ describe("chain 2: a well-fed campfire quarantines infection", () => {
     // infectedSinceMs bookkeeping is left exactly as its own cure would leave it (in place).
     expect(infection.data.nextSpreadAtMs).toBe(spreadAtBefore);
     expect(infection.data.infectedSinceMs[seeded!.id]).toBeDefined();
+  });
+});
+
+// --- bearSwipe: each invasion's counterattack primitive -----------------------
+
+describe("bearSwipe: the invasion primitive the bear calls", () => {
+  it("galaga downs one live alien and tallies it", () => {
+    const env = boot();
+    const galaga = addEvent(env, galagaDef, 5);
+    toPeak(env, galagaDef, galaga);
+    const isLive = (a: GalagaData["aliens"][number]): boolean =>
+      a.state !== "down" && a.state !== "fled";
+    const liveBefore = galaga.data.aliens.filter(isLive).length;
+    const downedBefore = env.state.stats.aliensDowned;
+
+    expect(galagaBearSwipe(galaga, ctx(env, 0))).toBe(true);
+    expect(galaga.data.aliens.filter(isLive)).toHaveLength(liveBefore - 1);
+    expect(env.state.stats.aliensDowned).toBe(downedBefore + 1);
+  });
+
+  it("galaga frees a carried glyph on the swipe, exactly like a key-shot", () => {
+    const env = boot();
+    const galaga = addEvent(env, galagaDef, 5);
+    toPeak(env, galagaDef, galaga);
+    env.state.cells = [{ id: 1, ch: "x", status: "abducted", eventTag: "galaga" }];
+    galaga.data.aliens[0]!.state = "carrying"; // a carrier outranks the formation
+    galaga.data.aliens[0]!.carriedCellId = 1;
+    const rescuedBefore = env.state.stats.lettersRescued;
+    const downedBefore = env.state.stats.aliensDowned;
+
+    expect(galagaBearSwipe(galaga, ctx(env, 0))).toBe(true);
+    expect(galaga.data.aliens[0]!.state).toBe("down");
+    expect(cellById(env, 1).status).toBe("normal"); // the glyph rained back
+    expect(env.state.stats.lettersRescued).toBe(rescuedBefore + 1);
+    expect(env.state.stats.aliensDowned).toBe(downedBefore + 1);
+  });
+
+  it("galaga swipe is a no-op with the whole fleet already down", () => {
+    const env = boot();
+    const galaga = addEvent(env, galagaDef, 5);
+    toPeak(env, galagaDef, galaga);
+    for (const a of galaga.data.aliens) a.state = "down";
+    const downedBefore = env.state.stats.aliensDowned;
+
+    expect(galagaBearSwipe(galaga, ctx(env, 0))).toBe(false);
+    expect(env.state.stats.aliensDowned).toBe(downedBefore);
+  });
+
+  it("snake swipe shoves the next bite one full interval later", () => {
+    const env = boot();
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    const biteBefore = snake.data.nextBiteAtMs;
+
+    expect(snakeBearSwipe(snake, ctx(env, 0))).toBe(true);
+    expect(snake.data.nextBiteAtMs).toBe(biteBefore + 5000); // one BITE_PERIOD_MS out
+  });
+
+  it("snake swipe is a no-op once the snake has slithered off", () => {
+    const env = boot();
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    snake.data.gone = true;
+    const biteBefore = snake.data.nextBiteAtMs;
+
+    expect(snakeBearSwipe(snake, ctx(env, 0))).toBe(false);
+    expect(snake.data.nextBiteAtMs).toBe(biteBefore);
+  });
+
+  it("tetris swipe shatters the leftmost garbage block, caret and all", () => {
+    const env = boot();
+    const tetris = addEvent(env, tetrisDef, 6);
+    env.state.cells = [
+      cell(1, "a"),
+      { id: 2, ch: "#", status: "garbage", eventTag: "tetris" },
+      cell(3, "b"),
+    ];
+    env.state.caret = 3; // to the right of the garbage
+    const clearedBefore = env.state.stats.garbageCleared;
+
+    expect(tetrisBearSwipe(tetris, ctx(env, 0))).toBe(true);
+    expect(valueOf(env)).toBe("ab"); // the junk was spliced out
+    expect(env.state.cells.some((c) => c.status === "garbage")).toBe(false);
+    expect(env.state.caret).toBe(2); // caret to the right of the removal slid left
+    expect(env.state.stats.garbageCleared).toBe(clearedBefore + 1);
+    expect(tetris.data.hasShattered).toBe(true);
+  });
+
+  it("tetris swipe is a no-op when no garbage remains", () => {
+    const env = boot();
+    const tetris = addEvent(env, tetrisDef, 6);
+    env.state.cells = [cell(1, "a"), cell(2, "b")];
+    env.state.caret = 2;
+    const clearedBefore = env.state.stats.garbageCleared;
+
+    expect(tetrisBearSwipe(tetris, ctx(env, 0))).toBe(false);
+    expect(valueOf(env)).toBe("ab");
+    expect(env.state.caret).toBe(2);
+    expect(env.state.stats.garbageCleared).toBe(clearedBefore);
+  });
+});
+
+// --- Chain 3: the bear swats the invaders on its way out ----------------------
+
+describe("chain 3: a fed bear turns on the invaders", () => {
+  it("a basket toss with the bear present downs a galaga alien and moods /remember/", () => {
+    const env = boot();
+    const garden = addEvent(env, gardenDef, 2);
+    toPeak(env, gardenDef, garden);
+    garden.data.bearState = "telegraphed";
+    const galaga = addEvent(env, galagaDef, 5);
+    toPeak(env, galagaDef, galaga);
+    const downedBefore = env.state.stats.aliensDowned;
+    env.effects.length = 0;
+
+    expect(pointer(env, gardenDef, garden, { kind: "basket-button" })).toBe(true);
+    expect(garden.data.distractions).toBe(1); // the base distraction beat still fires
+    expect(env.state.stats.aliensDowned).toBe(downedBefore + 1); // the bear downed one
+    expect(moods(env.effects).some((m) => m.eventId === "garden" && /remember/i.test(m.text))).toBe(
+      true,
+    );
+  });
+
+  it("prefers galaga over a live snake when several invasions are up", () => {
+    const env = boot();
+    const garden = addEvent(env, gardenDef, 2);
+    toPeak(env, gardenDef, garden);
+    garden.data.bearState = "raiding";
+    const galaga = addEvent(env, galagaDef, 5);
+    toPeak(env, galagaDef, galaga);
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    const snakeBiteBefore = snake.data.nextBiteAtMs;
+    const downedBefore = env.state.stats.aliensDowned;
+
+    expect(pointer(env, gardenDef, garden, { kind: "basket-button" })).toBe(true);
+    expect(env.state.stats.aliensDowned).toBe(downedBefore + 1); // galaga took the hit
+    expect(snake.data.nextBiteAtMs).toBe(snakeBiteBefore); // lower-priority snake untouched
+  });
+
+  it("with no live invasion the toss behaves exactly as today", () => {
+    const env = boot();
+    const garden = addEvent(env, gardenDef, 2);
+    toPeak(env, gardenDef, garden);
+    garden.data.bearState = "telegraphed";
+    env.effects.length = 0;
+
+    expect(pointer(env, gardenDef, garden, { kind: "basket-button" })).toBe(true);
+    expect(garden.data.distractions).toBe(1);
+    expect(garden.data.bearState).toBe("away"); // scheduleNextRaid still ran
+    expect(moods(env.effects)).toEqual([
+      { eventId: "garden", text: "The bear takes the basket and leaves" },
+    ]); // only the base beat, no swipe mood
+  });
+
+  it("does not swipe when the basket is tossed while the bear is away", () => {
+    const env = boot();
+    const garden = addEvent(env, gardenDef, 2);
+    toPeak(env, gardenDef, garden); // bear away by default
+    const galaga = addEvent(env, galagaDef, 5);
+    toPeak(env, galagaDef, galaga);
+    const downedBefore = env.state.stats.aliensDowned;
+    env.effects.length = 0;
+
+    expect(pointer(env, gardenDef, garden, { kind: "basket-button" })).toBe(true);
+    expect(garden.data.distractions).toBe(0); // away path is the existing no-op
+    expect(env.state.stats.aliensDowned).toBe(downedBefore); // no swipe fired
+    expect(moods(env.effects)).toEqual([]);
+  });
+});
+
+// --- Chain 4: the storage compactor eats garbage -----------------------------
+
+describe("chain 4: the compactor eats garbage first", () => {
+  const garbage = (id: number, ch: string): CharCell => ({
+    id,
+    ch,
+    status: "garbage",
+    eventTag: "tetris",
+  });
+
+  it("prefers a garbage cell over a nearer normal one and moods on the first capture", () => {
+    const env = boot();
+    const bh = addEvent(env, blackHoleDef, 5);
+    toPeak(env, blackHoleDef, bh);
+    env.state.cells = [cell(1, "a"), garbage(2, "#"), cell(3, "b"), cell(4, "c")];
+    bh.data.anchorIndex = 3; // nearest normal is idx3 (id4); the junk sits far off at idx1
+    bh.data.nextPullAtMs = env.state.elapsedMs; // a pull is due now
+    env.effects.length = 0;
+
+    driveInst(env, blackHoleDef, bh, 0);
+    expect(cellById(env, 2).status).toBe("orbiting"); // the junk got compacted first
+    expect(cellById(env, 4).status).toBe("normal"); // the nearer normal cell was spared
+    expect(
+      moods(env.effects).some((m) => m.eventId === "black-hole" && /compact/i.test(m.text)),
+    ).toBe(true);
+  });
+
+  it("washes a captured garbage cell back to a normal, value-bearing cell on collapse", () => {
+    const env = boot();
+    const bh = addEvent(env, blackHoleDef, 5);
+    toPeak(env, blackHoleDef, bh);
+    env.state.cells = [cell(1, "a"), garbage(2, "#")];
+    bh.data.anchorIndex = 1;
+    bh.data.nextPullAtMs = env.state.elapsedMs;
+
+    driveInst(env, blackHoleDef, bh, 0); // capture the garbage
+    expect(cellById(env, 2).status).toBe("orbiting");
+
+    bh.data.collapsingSinceMs = env.state.elapsedMs;
+    driveInst(env, blackHoleDef, bh, 2000); // grace elapses -> collapse
+    expect(cellById(env, 2).status).toBe("normal"); // the compactor cleaned it
+    expect(valueOf(env)).toContain("#"); // it now counts in the value
+  });
+
+  it("emits the compaction mood only on the first garbage capture", () => {
+    const env = boot();
+    const bh = addEvent(env, blackHoleDef, 5);
+    toPeak(env, blackHoleDef, bh);
+    env.state.cells = [garbage(1, "#"), garbage(2, "%"), cell(3, "a")];
+    bh.data.anchorIndex = 0;
+    bh.data.nextPullAtMs = env.state.elapsedMs;
+
+    driveInst(env, blackHoleDef, bh, 0); // first garbage capture -> mood
+    expect(moods(env.effects).filter((m) => /compact/i.test(m.text))).toHaveLength(1);
+
+    env.effects.length = 0;
+    bh.data.nextPullAtMs = env.state.elapsedMs;
+    driveInst(env, blackHoleDef, bh, 0); // second garbage capture -> silent
+    expect(moods(env.effects).filter((m) => /compact/i.test(m.text))).toHaveLength(0);
+  });
+
+  it("with no garbage present, capture order is identical to today and stays silent", () => {
+    const env = boot();
+    const bh = addEvent(env, blackHoleDef, 5);
+    toPeak(env, blackHoleDef, bh);
+    env.state.cells = [cell(1, "a"), cell(2, "b"), cell(3, "c"), cell(4, "d"), cell(5, "e")];
+    bh.data.anchorIndex = 2; // nearest normal is idx2 (id3)
+    bh.data.nextPullAtMs = env.state.elapsedMs;
+    env.effects.length = 0;
+
+    driveInst(env, blackHoleDef, bh, 0);
+    expect(cellById(env, 3).status).toBe("orbiting"); // nearest normal, exactly as before
+    expect(bh.data.compactedGarbage).toBe(false);
+    expect(moods(env.effects).filter((m) => /compact/i.test(m.text))).toHaveLength(0);
   });
 });

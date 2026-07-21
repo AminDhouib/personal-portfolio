@@ -59,6 +59,18 @@ function maybeLeave(d: SnakeData, ctx: EventContext, inst: EventInstance<SnakeDa
   ctx.emit({ kind: "toast", tone: "success", text: "The snake slithers off, satisfied." });
 }
 
+/**
+ * The bear's swipe (chain 3): shove the snake's next bite one whole interval later.
+ * nextBiteAtMs is always the FUTURE bite, so this never retro-shifts one that already
+ * landed. A snake that has slithered off has nothing left to delay.
+ */
+export function bearSwipe(inst: EventInstance<SnakeData>, _ctx: EventContext): boolean {
+  const d = inst.data;
+  if (d.gone) return false;
+  d.nextBiteAtMs += BITE_PERIOD_MS;
+  return true;
+}
+
 /** Coupled rule: nothing may still be inside the snake at submit. */
 const snakeFedRule: Pg2RuleDef = {
   id: "snake-fed",
