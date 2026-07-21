@@ -1,5 +1,6 @@
 import type { Pg2RuleDef } from "../types";
-import { pickN, rangeInt } from "../rng";
+import type { Rng } from "../rng";
+import { pickN, pickOne, rangeInt } from "../rng";
 import { getInjectedWordleWord } from "../../../../../data/password-game/wordle";
 
 /** Message shown when a live-feed rule has no feed and auto-passes. */
@@ -121,5 +122,100 @@ const sponsor: Pg2RuleDef = {
   },
 };
 
+/**
+ * The six enterprise data-sharing categories in the fake preference center. The
+ * labels are STATIC copy (not seeded) — only the neighbor wiring, the initial
+ * toggle state, and the passphrase vary per seed. Kept terse so each switch row
+ * fits on the rule card.
+ */
+export const CONSENT_TOGGLES: readonly string[] = [
+  "Analytics cookies",
+  "Personalized ads",
+  "Partner data sharing (1,400 partners)",
+  "Email marketing",
+  "Cross-device tracking",
+  "Selling your soul (optional)",
+];
+
+/**
+ * The passphrase pool for the consent wall. Every word is free of uppercase
+ * Roman-numeral letters (I, V, X, L, C, D, M) and of digits, so the phrase the
+ * widget types into the password is inert to the two rewriting rules: it never
+ * seeds a stray token for roman-product (rule 11 — see roman.ts, which reads any
+ * [IVXLCDM] run) and never shifts digit-sum (rule 6). Mirrors the captcha token's
+ * collision-free alphabet; the constraint is asserted in rules.test.ts.
+ */
+export const CONSENT_PASSPHRASES: readonly string[] = ["OPTOUT", "REFUSE", "NOTHANKS", "BEGONE"];
+
+/** How many backward moves seed the initial toggle vector (the scramble depth). */
+const CONSENT_SCRAMBLE = 4;
+
+/** The seeded consent-wall puzzle carried on the rule payload. */
+export interface ConsentPuzzle {
+  toggles: string[]; // the six category labels (static copy, copied per run)
+  neighbor: number[]; // neighbor[i] !== i; the toggle that flips when i is switched off
+  initial: boolean[]; // seeded starting state; true = "sharing enabled"
+  passphrase: string; // revealed once every toggle is off
+}
+
+/**
+ * Build the seeded consent puzzle. Draw order (fixed for determinism): the six
+ * neighbor slots, then the passphrase, then the scramble.
+ *
+ * The move model: clicking a toggle flips it; switching one OFF FLIPS its seeded
+ * neighbor (the dark pattern — decline one thing and something you already
+ * declined comes back). A hard "set neighbor on" would make the all-off goal a
+ * Garden-of-Eden state with no predecessor and thus unreachable, so the neighbor
+ * effect is a flip in both directions. The initial vector comes from a backward
+ * walk of that same move from all-off, so a forward solution always exists; the
+ * BFS solvability test in rules.test.ts is the enforcing safety net.
+ */
+function buildConsentPuzzle(rng: Rng): ConsentPuzzle {
+  const size = CONSENT_TOGGLES.length;
+  // Each toggle's stubborn neighbor sits 1..5 slots ahead (mod size), so it is
+  // never the toggle itself.
+  const neighbor: number[] = [];
+  for (let i = 0; i < size; i++) neighbor.push((i + 1 + rangeInt(rng, 0, 4)) % size);
+  const passphrase = pickOne(rng, CONSENT_PASSPHRASES);
+  const initial: boolean[] = [];
+  for (let i = 0; i < size; i++) initial.push(false);
+  for (let k = 0; k < CONSENT_SCRAMBLE; k++) {
+    const i = rangeInt(rng, 0, size - 1);
+    const nb = neighbor[i] ?? i;
+    initial[i] = true;
+    initial[nb] = !(initial[nb] ?? false);
+  }
+  return { toggles: [...CONSENT_TOGGLES], neighbor, initial, passphrase };
+}
+
+/**
+ * Rule (act1) — the consent-preference wall. A seeded preference center whose six
+ * data-sharing toggles fight back: switching one off flips a neighbor on. Turning
+ * every toggle off reveals a confirmation passphrase the widget types into the
+ * password; the rule is satisfied once that phrase appears. Everything the widget
+ * shows and does comes from the payload, so a daily or racing seed replays it.
+ */
+const consentPreferences: Pg2RuleDef = {
+  id: "consent-preferences",
+  act: "act1",
+  create: (rng) => {
+    const consent = buildConsentPuzzle(rng);
+    return {
+      id: "consent-preferences",
+      act: "act1",
+      description:
+        "Decline all optional data sharing in your preference center, then include the confirmation phrase.",
+      payload: { consent },
+      validate: (password) => ({ passed: password.includes(consent.passphrase) }),
+    };
+  },
+};
+
 /** Act 1 rules, in reveal order. */
-export const ACT1_RULES: readonly Pg2RuleDef[] = [digitSum, includeMonth, wordleToday, sponsor];
+export const ACT1_RULES: readonly Pg2RuleDef[] = [
+  digitSum,
+  includeMonth,
+  wordleToday,
+  sponsor,
+  consentPreferences,
+];

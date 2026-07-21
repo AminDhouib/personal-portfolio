@@ -1,9 +1,11 @@
 import { memo, useState } from "react";
 import type { GameState, Pg2Rule, RuleApi, ValidationResult } from "../engine/types";
 import type { CaptchaChallenge } from "../engine/rules/prologue";
+import type { ConsentPuzzle } from "../engine/rules/act1";
 import type { WidgetChannel } from "./widgets/types";
 import { ChessBoard } from "./widgets/chess";
 import { CaptchaWidget } from "./widgets/captcha";
+import { ConsentWidget } from "./widgets/consent";
 
 interface RuleListProps {
   rules: readonly Pg2Rule[];
@@ -53,6 +55,16 @@ function readCaptcha(v: unknown): CaptchaChallenge | null {
   const c = v as Partial<CaptchaChallenge>;
   return Array.isArray(c.grids) && typeof c.target === "string" && typeof c.token === "string"
     ? (v as CaptchaChallenge)
+    : null;
+}
+function readConsent(v: unknown): ConsentPuzzle | null {
+  if (!v || typeof v !== "object") return null;
+  const c = v as Partial<ConsentPuzzle>;
+  return Array.isArray(c.toggles) &&
+    Array.isArray(c.neighbor) &&
+    Array.isArray(c.initial) &&
+    typeof c.passphrase === "string"
+    ? (v as ConsentPuzzle)
     : null;
 }
 
@@ -253,6 +265,9 @@ function PayloadView({ rule, widget }: { rule: Pg2Rule; widget: WidgetChannel })
 
   const captcha = readCaptcha(p.captcha);
   if (captcha) return <CaptchaWidget ruleId={rule.id} challenge={captcha} widget={widget} />;
+
+  const consent = readConsent(p.consent);
+  if (consent) return <ConsentWidget ruleId={rule.id} puzzle={consent} widget={widget} />;
 
   const sponsors = readStringArray(p.sponsors);
   if (sponsors) return <SponsorTiles sponsors={sponsors} />;

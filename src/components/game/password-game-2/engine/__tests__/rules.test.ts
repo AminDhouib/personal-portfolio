@@ -4,7 +4,14 @@ import { mulberry32, subSeed } from "../rng";
 import { CORE_RULES } from "../rules/index";
 import { FILLER, solveAll, solveRule } from "./solve";
 import { CAPTCHA_KINDS, type CaptchaChallenge } from "../rules/prologue";
-import { FREEBIE_MESSAGE, MONTHS, SPONSORS } from "../rules/act1";
+import {
+  CONSENT_PASSPHRASES,
+  CONSENT_TOGGLES,
+  FREEBIE_MESSAGE,
+  MONTHS,
+  SPONSORS,
+  type ConsentPuzzle,
+} from "../rules/act1";
 import { ROMAN_PRODUCT_TARGETS } from "../rules/act2";
 import { BACKWARDS_PASSWORD } from "../rules/act3";
 import { fromRoman, parseRomanTokens, romanProduct, toRoman } from "../rules/roman";
@@ -46,7 +53,7 @@ afterAll(() => {
 });
 
 describe("core rule roster", () => {
-  it("lists all 17 authored rules in the fixed reveal order", () => {
+  it("lists all 18 authored rules in the fixed reveal order", () => {
     expect(CORE_RULES.map((d) => d.id)).toEqual([
       "min-length-12",
       "include-number",
@@ -57,6 +64,7 @@ describe("core rule roster", () => {
       "include-month",
       "wordle-today",
       "sponsor",
+      "consent-preferences",
       "roman-numeral",
       "roman-product",
       "country-name",
@@ -71,9 +79,9 @@ describe("core rule roster", () => {
   it("groups the rules into the five acts by position", () => {
     const acts = CORE_RULES.map((d) => d.act);
     expect(acts.slice(0, 5)).toEqual(Array(5).fill("prologue"));
-    expect(acts.slice(5, 9)).toEqual(Array(4).fill("act1"));
-    expect(acts.slice(9, 13)).toEqual(Array(4).fill("act2"));
-    expect(acts.slice(13, 17)).toEqual(Array(4).fill("act3"));
+    expect(acts.slice(5, 10)).toEqual(Array(5).fill("act1"));
+    expect(acts.slice(10, 14)).toEqual(Array(4).fill("act2"));
+    expect(acts.slice(14, 18)).toEqual(Array(4).fill("act3"));
   });
 
   it("interpolates seeded targets into the parameterized descriptions", () => {
@@ -302,6 +310,110 @@ describe("rule 9 - sponsor", () => {
   });
 });
 
+describe("rule (act1) - consent-preferences", () => {
+  const puzzleOf = (rule: Pg2Rule): ConsentPuzzle => rule.payload!["consent"] as ConsentPuzzle;
+
+  it("describes declining data sharing and including the confirmation phrase", () => {
+    const rule = make("consent-preferences");
+    expect(rule.description.toLowerCase()).toContain("decline");
+    expect(rule.description.toLowerCase()).toContain("confirmation phrase");
+  });
+
+  it("carries six labeled toggles, a self-avoiding neighbor map, an initial vector, and a passphrase", () => {
+    const p = puzzleOf(make("consent-preferences"));
+    expect(p.toggles).toEqual(CONSENT_TOGGLES);
+    expect(p.neighbor).toHaveLength(6);
+    for (let i = 0; i < 6; i++) {
+      expect(p.neighbor[i]).not.toBe(i); // neighbor[i] !== i for every toggle
+      expect(p.neighbor[i]).toBeGreaterThanOrEqual(0);
+      expect(p.neighbor[i]).toBeLessThan(6);
+    }
+    expect(p.initial).toHaveLength(6);
+    expect(p.initial.every((b) => typeof b === "boolean")).toBe(true);
+    // The seeded scramble always leaves at least one toggle on — never trivially solved.
+    expect(p.initial.some((b) => b)).toBe(true);
+    expect(CONSENT_PASSPHRASES).toContain(p.passphrase);
+  });
+
+  it("draws passphrases with no Roman-numeral letters or digits, so the typed phrase stays inert", () => {
+    // Each Roman letter (I,V,X,L,C,D,M) would seed a token for roman-product (see
+    // roman.ts); any digit would shift digit-sum. The pool must avoid both, mirroring
+    // the captcha token's collision-free alphabet.
+    for (const word of CONSENT_PASSPHRASES) {
+      expect(word).toMatch(/^[A-Z]+$/);
+      expect(word).not.toMatch(/[IVXLCDM0-9]/);
+    }
+    expect(romanProduct(puzzleOf(make("consent-preferences")).passphrase)).toBe(0);
+  });
+
+  it("is fully deterministic for a fixed seed", () => {
+    expect(puzzleOf(make("consent-preferences", 8))).toEqual(
+      puzzleOf(make("consent-preferences", 8)),
+    );
+  });
+
+  it("passes only when the password includes the passphrase", () => {
+    const rule = make("consent-preferences");
+    const phrase = puzzleOf(rule).passphrase;
+    expect(passes(rule, "nothing declined here")).toBe(false);
+    expect(passes(rule, `so i say ${phrase} to them`)).toBe(true);
+  });
+
+  it("solveRule appends the payload passphrase", () => {
+    const rule = make("consent-preferences");
+    const solved = solveRule(rule, "abc", api());
+    expect(solved).toContain(puzzleOf(rule).passphrase);
+    expect(passes(rule, solved)).toBe(true);
+  });
+
+  // The solvability guarantee, locked in CI: from `initial`, a BFS over the toggle
+  // move graph reaches all-off within 12 moves. The state space is 2^6 = 64, so the
+  // search is exhaustive and cheap. Guards against a generation that could wedge a seed.
+  it("is always solvable: BFS from initial reaches all-off within 12 moves for 50 seeds", () => {
+    const encode = (s: readonly boolean[]): string => s.map((b) => (b ? "1" : "0")).join("");
+    const GOAL = encode(Array<boolean>(6).fill(false));
+    // The widget's forward move: clicking toggle i flips t[i]; if that turned i OFF,
+    // its neighbor flips too.
+    const move = (state: readonly boolean[], i: number, neighbor: readonly number[]): boolean[] => {
+      const next = [...state];
+      const wasOn = next[i] ?? false;
+      next[i] = !wasOn;
+      if (wasOn) {
+        const nb = neighbor[i] ?? i;
+        next[nb] = !(next[nb] ?? false);
+      }
+      return next;
+    };
+    const shortestSolve = (initial: boolean[], neighbor: number[]): number => {
+      if (encode(initial) === GOAL) return 0;
+      const seen = new Set<string>([encode(initial)]);
+      let frontier: boolean[][] = [initial];
+      for (let depth = 1; depth <= 12 && frontier.length > 0; depth++) {
+        const nextFrontier: boolean[][] = [];
+        for (const st of frontier) {
+          for (let i = 0; i < 6; i++) {
+            const ns = move(st, i, neighbor);
+            const k = encode(ns);
+            if (k === GOAL) return depth;
+            if (!seen.has(k)) {
+              seen.add(k);
+              nextFrontier.push(ns);
+            }
+          }
+        }
+        frontier = nextFrontier;
+      }
+      return Number.POSITIVE_INFINITY;
+    };
+    for (let seed = 1; seed <= 50; seed++) {
+      const p = puzzleOf(make("consent-preferences", seed));
+      const depth = shortestSolve(p.initial, p.neighbor);
+      expect(Number.isFinite(depth)).toBe(true);
+      expect(depth).toBeLessThanOrEqual(12);
+    }
+  });
+});
+
 describe("rule 10 - roman-numeral", () => {
   it("wants an uppercase Roman letter", () => {
     const rule = make("roman-numeral");
@@ -444,11 +556,11 @@ describe("rule 14 - chess-best-move", () => {
 });
 
 describe("rule 15 - max-length", () => {
-  it("seeds a cap in [60, 75] and passes at the cap, fails one over", () => {
+  it("seeds a cap in [74, 90] and passes at the cap, fails one over", () => {
     const rule = make("max-length");
     const cap = rule.payload!["target"] as number;
-    expect(cap).toBeGreaterThanOrEqual(60);
-    expect(cap).toBeLessThanOrEqual(75);
+    expect(cap).toBeGreaterThanOrEqual(74);
+    expect(cap).toBeLessThanOrEqual(90);
     expect(passes(rule, "a".repeat(cap))).toBe(true);
     expect(passes(rule, "a".repeat(cap + 1))).toBe(false);
   });

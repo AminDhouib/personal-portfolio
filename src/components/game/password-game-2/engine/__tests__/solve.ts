@@ -17,7 +17,7 @@ import { fromRoman, parseRomanTokens, toRoman } from "../rules/roman";
  * live payload strings that must survive verbatim (the current-time HH:MM, a
  * chess SAN, the wordle answer, the country name). Digits inside them count
  * toward the target and are never stripped, so digit-sum and a digit-bearing SAN
- * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 60-75)
+ * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 74-90)
  * guarantee the target is always reachable — a seed is never unsolvable.
  */
 
@@ -42,6 +42,7 @@ const SOLVE_PRIORITY: Record<string, number> = {
   "include-month": 1,
   "wordle-today": 1,
   sponsor: 1,
+  "consent-preferences": 1,
   "roman-numeral": 1,
   "roman-product": 1,
   "country-name": 1,
@@ -232,6 +233,16 @@ export function solveRule(
       return solveFeedWord(rule, current, "word", (w) => w.toLowerCase());
     case "sponsor":
       return solveSponsor(rule, current);
+    case "consent-preferences": {
+      const consent = rule.payload?.["consent"] as { passphrase?: unknown } | undefined;
+      const phrase = consent?.passphrase;
+      if (typeof phrase !== "string" || phrase === "") {
+        throw new Error("solveRule(consent-preferences): rule payload is missing its passphrase");
+      }
+      // The passphrase carries no Roman letters or digits, so a plain append is
+      // inert to roman-product and digit-sum (see CONSENT_PASSPHRASES).
+      return current + phrase;
+    }
     case "roman-numeral":
       return current + "I";
     case "roman-product":
