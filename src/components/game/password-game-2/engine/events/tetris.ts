@@ -1,4 +1,4 @@
-import type { CharCell, EventContext, EventDef, EventInstance } from "../types";
+import type { CharCell, EventContext, EventDef, EventInstance, Pg2RuleDef } from "../types";
 
 /**
  * Tetris garbage. Ten junk blocks fall on a DROP_PERIOD_MS cadence; each lands
@@ -7,7 +7,7 @@ import type { CharCell, EventContext, EventDef, EventInstance } from "../types";
  * intruder, garbage COUNTS in the password value — it inflates the length and warps
  * the digit sum, which is the whole hazard. Backspace clears it natively; clicking a
  * garbage cell shatters it. The event resolves once all ten have landed and no
- * garbage remains. No coupled rule.
+ * garbage remains. The coupled rule refuses submit while any junk block is left.
  */
 
 const EVENT_ID = "tetris";
@@ -27,6 +27,7 @@ interface Drop {
 export interface TetrisData {
   drops: Drop[];
   spawned: number; // blocks that have landed in the box
+  hasShattered: boolean; // set once the player shatters their first garbage block
 }
 
 /** Schedule all ten blocks at onset: seeded slots and staggered start times. */
@@ -43,6 +44,26 @@ function scheduleDrops(d: TetrisData, ctx: EventContext): void {
   }
 }
 
+/** Coupled rule: no junk block may still be in the box at submit. */
+const tetrisCleanRule: Pg2RuleDef = {
+  id: "tetris-clean",
+  act: "act3",
+  create: () => ({
+    id: "tetris-clean",
+    act: "act3",
+    description: "No junk blocks may remain in your password — click garbage to shatter it.",
+    validate: (_password, state, api) => {
+      const d = api.getEventData<TetrisData>(EVENT_ID);
+      if (d === null) return { passed: true }; // no tetris this run: a freebie
+      const junk = state.cells.some((c) => c.status === "garbage" && c.eventTag === EVENT_ID);
+      return {
+        passed: !junk,
+        message: junk ? "Junk blocks are still wedged in your password" : undefined,
+      };
+    },
+  }),
+};
+
 /** True once every scheduled block has landed. */
 function allLanded(d: TetrisData): boolean {
   return d.drops.length >= DROP_COUNT && d.drops.every((x) => x.landed);
@@ -57,7 +78,8 @@ export const tetrisDef: EventDef<TetrisData> = {
   id: EVENT_ID,
   family: "invasion",
   telegraphMs: TELEGRAPH_MS,
-  init: () => ({ drops: [], spawned: 0 }),
+  coupledRule: tetrisCleanRule,
+  init: () => ({ drops: [], spawned: 0, hasShattered: false }),
   onTick(inst: EventInstance<TetrisData>, ctx: EventContext): void {
     const d = inst.data;
     if (inst.phase === "telegraph") {
@@ -101,6 +123,7 @@ export const tetrisDef: EventDef<TetrisData> = {
     ctx.state.cells = [...ctx.state.cells.slice(0, idx), ...ctx.state.cells.slice(idx + 1)];
     if (idx < ctx.state.caret) ctx.state.caret--;
     ctx.state.stats.garbageCleared++;
+    inst.data.hasShattered = true;
     return true;
   },
   isResolved: (inst) => inst.phase === "done",

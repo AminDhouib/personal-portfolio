@@ -37,6 +37,8 @@ const COUPLED_RULE_BY_ID: Record<string, string> = {
   garden: "garden-honey",
   infection: "no-infected",
   galaga: "galaga-final-wave",
+  snake: "snake-fed",
+  tetris: "tetris-clean",
 };
 
 const isInhabitant = (def: EventDef): boolean => def.family === "inhabitant";

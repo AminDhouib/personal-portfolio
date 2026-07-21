@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRun, makeRuleApi } from "../engine";
+import { createRun, makeRuleApi, tick } from "../engine";
 import { cellsToPassword } from "../cells";
 import { mulberry32 } from "../rng";
 import { CORE_RULES } from "../rules/index";
@@ -444,6 +444,68 @@ describe("the snake", () => {
     expect(h.state.cells.every((c) => c.status === "normal")).toBe(true);
     expect(h.state.stats.lettersRescued).toBe(8);
   });
+
+  describe("the coupled rule", () => {
+    it("is injected into the roster once the snake onsets, not while it telegraphs", () => {
+      const h = boot<SnakeData>(snakeDef);
+      plant(h, "abcdef");
+      expect(h.state.rules.some((r) => r.id === "snake-fed")).toBe(false);
+      tick(h.state, snakeDef.telegraphMs); // telegraph -> onset injects the coupled rule
+      expect(h.inst.phase).not.toBe("telegraph");
+      expect(h.state.rules.some((r) => r.id === "snake-fed")).toBe(true);
+    });
+
+    it("fails while a letter is still swallowed, passes once every one is rained back", () => {
+      const h = boot<SnakeData>(snakeDef);
+      toPeak(h);
+      plant(h, "abcd");
+      // The snake is holding cell id 4 (status abducted, its own tag).
+      h.state.cells = h.state.cells.map((c) =>
+        c.id === 4 ? { ...c, status: "abducted", eventTag: "snake" } : c,
+      );
+      const rule = snakeDef.coupledRule!.create(mulberry32(1));
+      const api = makeRuleApi(h.state, () => HHMM);
+      expect(rule.validate(cellsToPassword(h.state.cells), h.state, api).passed).toBe(false);
+
+      // Rain it back: nothing left inside the snake.
+      h.state.cells = h.state.cells.map((c) =>
+        c.id === 4 ? { ...c, status: "normal", eventTag: undefined } : c,
+      );
+      expect(rule.validate(cellsToPassword(h.state.cells), h.state, api).passed).toBe(true);
+    });
+
+    it("ignores an alien-abducted cell: only the snake's own tag counts", () => {
+      const h = boot<SnakeData>(snakeDef);
+      toPeak(h);
+      plant(h, "abcd");
+      // A galaga abduction shares the "abducted" status but a different tag.
+      h.state.cells = h.state.cells.map((c) =>
+        c.id === 2 ? { ...c, status: "abducted", eventTag: "galaga" } : c,
+      );
+      const rule = snakeDef.coupledRule!.create(mulberry32(1));
+      const api = makeRuleApi(h.state, () => HHMM);
+      expect(rule.validate(cellsToPassword(h.state.cells), h.state, api).passed).toBe(true);
+    });
+
+    it("is a freebie when no snake is scheduled this run", () => {
+      const g = createRun({ seed: 1, daily: false, nowHHMM: () => HHMM });
+      g.events = [];
+      const rule = snakeDef.coupledRule!.create(mulberry32(1));
+      expect(
+        rule.validate(
+          "pw",
+          g,
+          makeRuleApi(g, () => HHMM),
+        ).passed,
+      ).toBe(true);
+    });
+
+    it("states the player action: type its snack at the end of the box", () => {
+      const rule = snakeDef.coupledRule!.create(mulberry32(1));
+      expect(rule.description).toMatch(/type/i);
+      expect(rule.description).toMatch(/end/i);
+    });
+  });
 });
 
 // --- Tetris ------------------------------------------------------------------
@@ -570,5 +632,65 @@ describe("tetris garbage", () => {
     expect(garbageCount(h)).toBe(0);
     expect(h.inst.phase).toBe("done");
     expect(tetrisDef.isResolved(h.inst, h.state)).toBe(true);
+  });
+
+  it("starts with hasShattered false and flips it the first time garbage is clicked", () => {
+    const h = boot<TetrisData>(tetrisDef);
+    plant(h, "ab");
+    toPeak(h);
+    expect(h.inst.data.hasShattered).toBe(false);
+    h.inst.data.drops = [
+      { char: "#", targetIndex: 0, startAtMs: h.state.elapsedMs, landed: false },
+    ];
+    drive(h, 2500); // garbage lands
+    expect(h.inst.data.hasShattered).toBe(false); // still false until the player acts
+    const garbage = h.state.cells.find((c) => c.status === "garbage")!;
+    pointer(h, { kind: "cell", id: garbage.id });
+    expect(h.inst.data.hasShattered).toBe(true);
+  });
+
+  describe("the coupled rule", () => {
+    it("is injected into the roster once the blocks begin to fall, not while telegraphing", () => {
+      const h = boot<TetrisData>(tetrisDef);
+      plant(h, "abc");
+      expect(h.state.rules.some((r) => r.id === "tetris-clean")).toBe(false);
+      tick(h.state, tetrisDef.telegraphMs); // telegraph -> onset injects the coupled rule
+      expect(h.inst.phase).not.toBe("telegraph");
+      expect(h.state.rules.some((r) => r.id === "tetris-clean")).toBe(true);
+    });
+
+    it("fails while a junk block remains, passes once every one is shattered", () => {
+      const h = boot<TetrisData>(tetrisDef);
+      toPeak(h);
+      plant(h, "abcd");
+      h.state.cells = [
+        ...h.state.cells,
+        { id: 99, ch: "#", status: "garbage", eventTag: "tetris" },
+      ];
+      const rule = tetrisDef.coupledRule!.create(mulberry32(1));
+      const api = makeRuleApi(h.state, () => HHMM);
+      expect(rule.validate(cellsToPassword(h.state.cells), h.state, api).passed).toBe(false);
+
+      h.state.cells = h.state.cells.filter((c) => c.status !== "garbage");
+      expect(rule.validate(cellsToPassword(h.state.cells), h.state, api).passed).toBe(true);
+    });
+
+    it("is a freebie when no tetris is scheduled this run", () => {
+      const g = createRun({ seed: 1, daily: false, nowHHMM: () => HHMM });
+      g.events = [];
+      const rule = tetrisDef.coupledRule!.create(mulberry32(1));
+      expect(
+        rule.validate(
+          "pw",
+          g,
+          makeRuleApi(g, () => HHMM),
+        ).passed,
+      ).toBe(true);
+    });
+
+    it("states the player action: click garbage to shatter it", () => {
+      const rule = tetrisDef.coupledRule!.create(mulberry32(1));
+      expect(rule.description).toMatch(/click/i);
+    });
   });
 });

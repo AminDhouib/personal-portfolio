@@ -1,4 +1,4 @@
-import type { EventContext, EventDef, EventInstance } from "../types";
+import type { EventContext, EventDef, EventInstance, Pg2RuleDef } from "../types";
 import { setCellStatus } from "../cells";
 import { pickOne } from "../rng";
 
@@ -8,7 +8,7 @@ import { pickOne } from "../rng";
  * pellet glyph while the caret sits at the very end of the box and it eats the pellet
  * instead of the char (a feed, not an insert). Feed it three times, or let it swallow
  * eight letters, and it leaves satisfied — raining every swallowed letter back in
- * place. There is no coupled rule; the snake is a pure value hazard.
+ * place. The coupled rule refuses submit while any letter is still inside the snake.
  */
 
 const EVENT_ID = "snake";
@@ -59,10 +59,32 @@ function maybeLeave(d: SnakeData, ctx: EventContext, inst: EventInstance<SnakeDa
   ctx.emit({ kind: "toast", tone: "success", text: "The snake slithers off, satisfied." });
 }
 
+/** Coupled rule: nothing may still be inside the snake at submit. */
+const snakeFedRule: Pg2RuleDef = {
+  id: "snake-fed",
+  act: "act3",
+  create: () => ({
+    id: "snake-fed",
+    act: "act3",
+    description:
+      "Nothing may remain inside the snake when you submit — type its snack at the end of the box to feed it.",
+    validate: (_password, state, api) => {
+      const d = api.getEventData<SnakeData>(EVENT_ID);
+      if (d === null) return { passed: true }; // no snake this run: a freebie
+      const swallowed = state.cells.some((c) => c.status === "abducted" && c.eventTag === EVENT_ID);
+      return {
+        passed: !swallowed,
+        message: swallowed ? "The snake is still digesting your letters" : undefined,
+      };
+    },
+  }),
+};
+
 export const snakeDef: EventDef<SnakeData> = {
   id: EVENT_ID,
   family: "invasion",
   telegraphMs: TELEGRAPH_MS,
+  coupledRule: snakeFedRule,
   init: (rng) => ({
     swallowedIds: [],
     sated: 0,

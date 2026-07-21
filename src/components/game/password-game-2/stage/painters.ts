@@ -982,6 +982,22 @@ const paintSnake: Painter = (ctx, inst, layout, g, tMs) => {
   ctx.textBaseline = "middle";
   ctx.fillText(d.pelletChar, box.x + box.w - 30, box.y + box.h - 30);
   ctx.restore();
+
+  // The feed instruction, in the black-hole FEED IT: idiom.
+  ctx.save();
+  ctx.font = "800 13px ui-sans-serif, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const label = `FEED: ${d.pelletChar} — AT THE END`;
+  const lw = ctx.measureText(label).width + 16;
+  const lx = box.x + box.w / 2;
+  const ly = box.y + 14;
+  roundRect(ctx, lx - lw / 2, ly - 10, lw, 20, 6);
+  ctx.fillStyle = "rgba(32,11,11,0.9)";
+  ctx.fill();
+  ctx.fillStyle = RED;
+  ctx.fillText(label, lx, ly);
+  ctx.restore();
 };
 
 // --- tetris -------------------------------------------------------------------
@@ -1045,6 +1061,29 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
     const y = box.y - 24 + t * (box.h * 0.5 + 24);
     drawBlock(ctx, x, box.y + box.h * 0.5, s, "", true); // landing-zone ghost
     drawBlock(ctx, x, y, s, drop.char, false);
+  }
+
+  // A one-time nudge above the first landed block, retired the moment the player
+  // shatters their first garbage.
+  if (!d.hasShattered) {
+    const firstGarbage = g.cells.find((c) => c.status === "garbage");
+    const r = firstGarbage ? layout.cellRects.get(firstGarbage.id) : undefined;
+    if (r) {
+      ctx.save();
+      ctx.font = "800 12px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const label = "CLICK TO SHATTER";
+      const lw = ctx.measureText(label).width + 14;
+      const lx = r.x + r.w / 2;
+      const ly = r.y - 14;
+      roundRect(ctx, lx - lw / 2, ly - 9, lw, 18, 5);
+      ctx.fillStyle = "rgba(32,11,11,0.9)";
+      ctx.fill();
+      ctx.fillStyle = RED;
+      ctx.fillText(label, lx, ly);
+      ctx.restore();
+    }
   }
 };
 
