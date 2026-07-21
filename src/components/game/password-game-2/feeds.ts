@@ -75,10 +75,12 @@ async function loadChess(): Promise<void> {
 }
 
 /**
- * Shape guard for the whole ChessPuzzle contract. Rule 14 reads only
- * id/board/toMove/bestMove/hint, but the guard asserts `p is ChessPuzzle`, so it
- * must also verify `accept` — otherwise a future reader of puzzle.accept would
- * get undefined at runtime while TS believes it is string[].
+ * Shape guard for the whole ChessPuzzle contract. Rule 14 reads id/board/toMove/
+ * bestMove/hint, and the playable widget (Task 9) additionally loads `fen` into
+ * chess.js — so the guard asserts both those and `accept` (a future reader of
+ * puzzle.accept would otherwise get undefined at runtime while TS believes it is
+ * string[]). A cached payload from before fen was served fails here and degrades
+ * the rule to a freebie rather than rendering a board the widget cannot drive.
  */
 function isChessPuzzle(p: unknown): p is ChessPuzzle {
   if (p === null || typeof p !== "object") return false;
@@ -89,6 +91,7 @@ function isChessPuzzle(p: unknown): p is ChessPuzzle {
     (c.toMove === "white" || c.toMove === "black") &&
     typeof c.bestMove === "string" &&
     Array.isArray(c.accept) &&
-    typeof c.hint === "string"
+    typeof c.hint === "string" &&
+    typeof c.fen === "string"
   );
 }

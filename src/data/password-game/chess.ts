@@ -9,6 +9,12 @@
  * `bestMove` is in simplified algebraic notation: the answer the player
  * must include in their password. Multiple equivalent notations are
  * accepted via `accept`.
+ *
+ * `fen` is the full Forsyth-Edwards position, the same one `board` depicts,
+ * that the playable widget loads into chess.js to compute legal moves. It must
+ * agree with `board` glyph-for-glyph (a test asserts this for every puzzle).
+ * These didactic positions are minimal and some leave the side-not-to-move in
+ * check; chess.js@1.4 loads them regardless, which is all the widget needs.
  */
 export interface ChessPuzzle {
   id: string;
@@ -17,6 +23,7 @@ export interface ChessPuzzle {
   bestMove: string;
   accept: readonly string[];
   hint: string;
+  fen: string;
 }
 
 // Board helpers
@@ -53,6 +60,7 @@ const puzzle1: ChessPuzzle = {
   bestMove: "Ra8",
   accept: ["Ra8", "Ra8#", "Ra8+"],
   hint: "White mates in one on the back rank.",
+  fen: "k7/1ppp4/8/8/8/8/R7/K7 w - - 0 1",
 };
 
 // Fool's mate already played — White to capture: Qxh4.
@@ -72,6 +80,7 @@ const puzzle2: ChessPuzzle = {
   bestMove: "Qxh4",
   accept: ["Qxh4"],
   hint: "Take the exposed queen.",
+  fen: "r1bqkb1r/pppppppp/2n4n/8/7q/4P3/PPPP1PPP/RNBQKBNR w - - 0 1",
 };
 
 // Knight fork: Nxe5 forks king and rook.
@@ -91,6 +100,7 @@ const puzzle3: ChessPuzzle = {
   bestMove: "Nxe5",
   accept: ["Nxe5"],
   hint: "Knight forks two pieces — pick the capture.",
+  fen: "k7/7r/8/4p3/3N4/8/P6P/K7 w - - 0 1",
 };
 
 // Rook lift to mate: Rh1#.
@@ -110,6 +120,7 @@ const puzzle4: ChessPuzzle = {
   bestMove: "Rh1",
   accept: ["Rh1", "Rh1#", "Rh1+"],
   hint: "Slide the rook to deliver mate.",
+  fen: "7k/5ppp/8/8/8/8/8/RK6 w - - 0 1",
 };
 
 // Pawn promotion: e8=Q.
@@ -129,6 +140,7 @@ const puzzle5: ChessPuzzle = {
   bestMove: "e8=Q",
   accept: ["e8=Q", "e8Q", "e8=Q+", "e8Q+"],
   hint: "Promote the pawn.",
+  fen: "k7/4P3/8/8/8/8/8/7K w - - 0 1",
 };
 
 // Queen mate in the corner, supported by king: Qh7#.
@@ -148,6 +160,7 @@ const puzzle6: ChessPuzzle = {
   bestMove: "Qh7#",
   accept: ["Qh7", "Qh7#", "Qh7+"],
   hint: "Queen finishes it in the corner — the king defends.",
+  fen: "7k/8/6KQ/8/8/8/8/8 w - - 0 1",
 };
 
 // Smothered mate: Nf7# — Black king is boxed in by its own pieces.
@@ -167,6 +180,7 @@ const puzzle7: ChessPuzzle = {
   bestMove: "Nf7#",
   accept: ["Nf7", "Nf7#", "Nf7+"],
   hint: "The classic smothered mate — the king can't escape its own pieces.",
+  fen: "6rk/6pp/3N4/8/8/8/8/7K w - - 0 1",
 };
 
 // Knight fork in the corner: Nc7+ hits king and rook.
@@ -186,6 +200,7 @@ const puzzle8: ChessPuzzle = {
   bestMove: "Nc7+",
   accept: ["Nc7+", "Nc7"],
   hint: "A knight lands on one square and attacks both the king and the rook.",
+  fen: "k3r3/8/8/1N6/8/8/8/7K w - - 0 1",
 };
 
 // Pin exploit — the queen is pinned to the king on the d-file.
@@ -205,6 +220,7 @@ const puzzle9: ChessPuzzle = {
   bestMove: "Rxd5",
   accept: ["Rxd5", "Rxd5+"],
   hint: "The queen is pinned against the king — just take it.",
+  fen: "3k4/8/8/3q4/8/8/8/3R1K2 w - - 0 1",
 };
 
 // King-and-rook mate on the a-file against h8 — king on g6 seals escape squares.
@@ -224,6 +240,7 @@ const puzzle10: ChessPuzzle = {
   bestMove: "Ra8#",
   accept: ["Ra8", "Ra8#", "Ra8+"],
   hint: "The king on g6 seals the escape squares — the rook delivers.",
+  fen: "7k/8/6K1/8/8/8/8/R7 w - - 0 1",
 };
 
 export const CHESS_PUZZLES: readonly ChessPuzzle[] = [

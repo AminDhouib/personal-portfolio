@@ -10,7 +10,8 @@ export const BACKWARDS_PASSWORD = "drowssap";
  * Rule 14 — the best move in the daily chess puzzle, from the live feed only.
  * When no daily puzzle is injected the rule is a freebie; unlike v1's chessRule
  * it never falls back to the static CHESS_PUZZLES pool. The payload carries the
- * board and move so the stage can render the diagram.
+ * board, the move, and the `fen` the stage loads into the playable widget so the
+ * player can click the move out instead of transcribing the SAN by hand.
  */
 const chessBestMove: Pg2RuleDef = {
   id: "chess-best-move",
@@ -28,6 +29,7 @@ const chessBestMove: Pg2RuleDef = {
             toMove: puzzle.toMove,
             bestMove: puzzle.bestMove,
             hint: puzzle.hint,
+            fen: puzzle.fen,
           }
         : { bestMove: null },
       validate: (password) => {

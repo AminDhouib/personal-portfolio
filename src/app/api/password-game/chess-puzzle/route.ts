@@ -37,6 +37,7 @@ interface ChessPuzzleDto {
   bestMove: string;
   accept: readonly string[];
   hint: string;
+  fen: string;
   rating?: number;
   themes?: readonly string[];
 }
@@ -147,6 +148,8 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
       return null;
     }
 
+    // Captured before the solution move is applied below (line ~161 mutates
+    // `replay`), so this is the puzzle position itself — the one the widget loads.
     const fen = replay.fen();
     const board = fenToBoard(fen);
     const toMove: "white" | "black" = replay.turn() === "w" ? "white" : "black";
@@ -172,6 +175,7 @@ async function fetchLichess(): Promise<ChessPuzzleDto | null> {
       bestMove: san,
       accept,
       hint: themeToHint(puzzle.themes),
+      fen,
       rating: puzzle.rating,
       themes: puzzle.themes,
     };

@@ -286,6 +286,43 @@
 .pg2-chess__sq--dark {
   background: #b7c2d0;
 }
+/* Playable squares (fen present). role=button divs, so only cursor + focus. */
+.pg2-chess__sq--btn {
+  cursor: pointer;
+  position: relative;
+}
+.pg2-chess__sq--btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.pg2-chess__sq--selected {
+  box-shadow: inset 0 0 0 3px #f59e0b;
+}
+/* Legal-target dot, overlaid so it reads on empty squares and captures alike. */
+.pg2-chess__sq--target::after {
+  content: "";
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.72);
+  pointer-events: none;
+}
+.pg2-chess__sq--shake {
+  animation: pg2-chess-shake 0.3s ease-in-out;
+}
+@keyframes pg2-chess-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
 
 /* Country flag placeholder. */
 .pg2-flag {

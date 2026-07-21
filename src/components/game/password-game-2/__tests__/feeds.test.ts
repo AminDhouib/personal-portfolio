@@ -32,6 +32,7 @@ const PUZZLE: ChessPuzzle = {
   bestMove: "Ra8",
   accept: ["Ra8", "Ra8#"],
   hint: "Theme: back rank.",
+  fen: "k7/1ppp4/8/8/8/8/R7/K7 w - - 0 1",
 };
 
 type Payloads = {
@@ -119,6 +120,21 @@ describe("loadLiveFeeds", () => {
       wordle: { word: "FLAME" },
       countries: { capitals: [] },
       chess: { puzzle: { id: "x", board: PUZZLE.board } }, // no toMove/bestMove/hint
+    });
+
+    await loadLiveFeeds();
+
+    expect(getDailyChessPuzzle()).toBeNull();
+  });
+
+  it("does not inject a puzzle missing fen (the playable widget needs it)", async () => {
+    // A payload cached before fen was served: every other field is present, but
+    // the widget cannot load an absent position — degrade the rule to a freebie.
+    const { fen: _fen, ...noFen } = PUZZLE;
+    mockFetch({
+      wordle: { word: "FLAME" },
+      countries: { capitals: [] },
+      chess: { puzzle: noFen },
     });
 
     await loadLiveFeeds();

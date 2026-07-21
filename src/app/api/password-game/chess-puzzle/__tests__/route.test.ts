@@ -31,6 +31,9 @@ describe("GET /api/password-game/chess-puzzle", () => {
     expect(body.puzzle.toMove).toBe("white");
     expect(body.puzzle.bestMove).toBe("e4");
     expect(body.puzzle.accept).toContain("e4");
+    // The served fen is the puzzle position itself (before the solution move), so
+    // it still has white to move — not the post-e4 position.
+    expect(body.puzzle.fen).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     expect(res.headers.get("cache-control")).toBe(
       "public, s-maxage=43200, stale-while-revalidate=86400",
     );
