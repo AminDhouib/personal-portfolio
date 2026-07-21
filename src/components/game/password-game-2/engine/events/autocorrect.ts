@@ -1,6 +1,9 @@
 import type { CharCell, EventContext, EventDef, EventInstance } from "../types";
 import { VALUE_EXCLUDED } from "../cells";
 import { rangeInt } from "../rng";
+import type { GeraldData } from "./gerald";
+import type { GardenData } from "./garden";
+import type { CampfireData } from "./campfire";
 
 /**
  * The autocorrect demon. A telegraph, then every SCAN_PERIOD_MS it scans the password
@@ -86,6 +89,53 @@ export interface AutocorrectData {
 const isValueCell = (cell: CharCell): boolean => !VALUE_EXCLUDED.has(cell.status);
 
 /**
+ * Chain 1: the demon is the ecosystem's antagonist. When it mangles a word that names
+ * an inhabitant, it also strikes that inhabitant. Keyed by CORRECTION_PAIRS source word;
+ * the value is the victim's event defId. Only source words that a live inhabitant answers
+ * to appear here — every other rewrite is inert as before.
+ */
+const SABOTAGE: Record<string, "gerald" | "garden" | "campfire"> = {
+  gerald: "gerald", // "gerald" -> "gerard": Gerald goes hungrier
+  honey: "garden", // "honey" -> "hone": the hive loses honey
+  fire: "campfire", // "fire" -> "fira": the campfire loses fuel
+};
+
+const SABOTAGE_HUNGER = 25; // Gerald's hunger jump when his word is eaten (clamped at 100)
+const SABOTAGE_HONEY = 15; // honey drained from the hive (floored at 0)
+const SABOTAGE_FUEL = 20; // fuel knocked off the campfire (floored at 0)
+
+/** The victim-specific mood line, emitted on the victim's own eventId so it lands on their card. */
+const SABOTAGE_MOOD: Record<"gerald" | "garden" | "campfire", string> = {
+  gerald: "The autocorrect demon ate Gerald's dinner",
+  garden: "The autocorrect demon drained the hive",
+  campfire: "The autocorrect demon damped the fire",
+};
+
+/**
+ * Strike the named inhabitant if it is live. Cross-event read via the shared idiom: an
+ * instance in telegraph or done (or not yet inited) is not a valid victim, so the rewrite
+ * behaves exactly as it did before this chain. The hit is a fixed constant on already-
+ * deterministic data, so no new rng enters play.
+ */
+function sabotage(victim: "gerald" | "garden" | "campfire", ctx: EventContext): void {
+  const inst = ctx.state.events.find((e) => e.defId === victim);
+  if (!inst || inst.phase === "telegraph" || inst.phase === "done" || inst.data === undefined) {
+    return;
+  }
+  if (victim === "gerald") {
+    const d = inst.data as GeraldData;
+    d.hunger = Math.min(100, d.hunger + SABOTAGE_HUNGER);
+  } else if (victim === "garden") {
+    const d = inst.data as GardenData;
+    d.honey = Math.max(0, d.honey - SABOTAGE_HONEY);
+  } else {
+    const d = inst.data as CampfireData;
+    d.fuel = Math.max(0, d.fuel - SABOTAGE_FUEL);
+  }
+  ctx.emit({ kind: "mood", eventId: victim, text: SABOTAGE_MOOD[victim] });
+}
+
+/**
  * Perform one correction: find the first pair whose source appears (case-insensitive)
  * in the password value, then splice the matched value-cells out and drop the correction
  * in as fresh, normal cells. An excluded cell interleaved with the match survives by id
@@ -139,6 +189,8 @@ function correctOnce(d: AutocorrectData, ctx: EventContext): boolean {
     d.lastRewriteAtMs = ctx.state.elapsedMs;
     d.lastRewriteCellIds = replacementCells.map((cell) => cell.id);
     ctx.emit({ kind: "toast", tone: "info", text: "Corrected for you." });
+    const victim = SABOTAGE[source];
+    if (victim) sabotage(victim, ctx);
     return true;
   }
   return false;

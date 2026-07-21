@@ -22,6 +22,7 @@ export interface CampfireData {
   fuelCarryMs: number; // fractional-time carry toward the next fuel point lost
   stokeCount: number; // successful stokes, for the every-4th hop
   mood: CampfireMood; // last emitted mood, for crossing detection
+  quarantineCarryMs: number; // chain 2: fractional-time carry toward the next infection cure
 }
 
 const TELEGRAPH_MS = 6000;
@@ -33,6 +34,8 @@ const HOP_EVERY = 4;
 const EAT_BELOW_FUEL = 25; // eats only while burning under this
 const EAT_PERIOD_MS = 6000;
 const RELIGHT_AT_FUEL = 15;
+const QUARANTINE_MIN_FUEL = 60; // chain 2: a well-fed fire sears infection away
+const QUARANTINE_PERIOD_MS = 5000; // one cure per this many ms of fuel-high burning
 
 const MOOD_TEXT: Record<CampfireMood, string> = {
   crackling: "The campfire - crackling",
@@ -82,6 +85,41 @@ function burn(d: CampfireData, ctx: EventContext): void {
   }
 }
 
+/**
+ * Chain 2: cure the leftmost infected cell, mirroring infection's own antidote cure —
+ * setCellStatus to normal and bump stats.infectionsCured, so the two cure paths are
+ * indistinguishable to the infection event. Scoped strictly to status "infected" cells
+ * tagged by infection: mutated, parasite, ember and garbage cells are never touched.
+ * Infection's own cure leaves its private infectedSinceMs bookkeeping in place (a cured
+ * cell is "normal", so mutateOverdue skips it and a later re-infection overwrites it), so
+ * we mirror that by not reaching into it either.
+ */
+function cureLeftmostInfected(ctx: EventContext): void {
+  const target = ctx.state.cells.find((c) => c.status === "infected" && c.eventTag === "infection");
+  if (target === undefined) return;
+  ctx.state.cells = setCellStatus(ctx.state.cells, target.id, "normal");
+  ctx.state.stats.infectionsCured += 1;
+  ctx.emit({ kind: "mood", eventId: "campfire", text: "The fire seared the corruption away" });
+}
+
+/**
+ * Per-tick quarantine: while the fire is well-fed it cures one infected cell every
+ * QUARANTINE_PERIOD_MS. A perk, not a cost — it never consumes fuel and never touches
+ * infection's spread cadence. Below the threshold the carry resets, mirroring the eat
+ * accumulator, so the fire has to be kept fed to earn the cure.
+ */
+function quarantine(d: CampfireData, ctx: EventContext): void {
+  if (d.fuel < QUARANTINE_MIN_FUEL) {
+    d.quarantineCarryMs = 0;
+    return;
+  }
+  d.quarantineCarryMs += ctx.dtMs;
+  while (d.quarantineCarryMs >= QUARANTINE_PERIOD_MS) {
+    d.quarantineCarryMs -= QUARANTINE_PERIOD_MS;
+    cureLeftmostInfected(ctx);
+  }
+}
+
 /** Coupled rule: the campfire must be burning at submit. */
 const campfireBurningRule: Pg2RuleDef = {
   id: "campfire-burning",
@@ -113,6 +151,7 @@ export const campfireDef: EventDef<CampfireData> = {
     fuelCarryMs: 0,
     stokeCount: 0,
     mood: "crackling",
+    quarantineCarryMs: 0,
   }),
   onTick(inst: EventInstance<CampfireData>, ctx: EventContext): void {
     const d = inst.data;
@@ -126,6 +165,7 @@ export const campfireDef: EventDef<CampfireData> = {
     }
     if (inst.phase === "onset") inst.phase = "peak";
     burn(d, ctx);
+    quarantine(d, ctx);
   },
   onPointer(inst: EventInstance<CampfireData>, ctx: EventContext, target): boolean {
     if (target.kind !== "stoke-button") return false;

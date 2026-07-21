@@ -357,6 +357,7 @@ describe("the campfire", () => {
       fuelCarryMs: 0,
       stokeCount: 0,
       mood: "crackling",
+      quarantineCarryMs: 0,
     } satisfies CampfireData);
     const api = makeRuleApi(g, () => HHMM);
 
