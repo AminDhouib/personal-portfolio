@@ -676,12 +676,14 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
   );
   pushRect(hits, c.x, c.y, c.w, c.h, { kind: "basket-button" });
   if (!active) {
+    // Sub-label sits LEFT of the chip, not below it: the row beneath belongs to
+    // the campfire STOKE slot per the chip-column convention.
     ctx.save();
     ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
     ctx.fillStyle = "rgba(148,163,184,0.85)";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText("bear away", c.x + c.w / 2, c.y + c.h + 3);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText("bear away", c.x - 6, c.y + c.h / 2);
     ctx.restore();
   }
 };
