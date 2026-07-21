@@ -1,6 +1,5 @@
 import type { GameState, Pg2Rule, RuleApi } from "../types";
 import { cellsToPassword } from "../cells";
-import { CAPTCHA_PHRASE } from "../rules/prologue";
 import { MONTHS } from "../rules/act1";
 import { BACKWARDS_PASSWORD } from "../rules/act3";
 import { fromRoman, parseRomanTokens, toRoman } from "../rules/roman";
@@ -216,8 +215,14 @@ export function solveRule(
       return current + "A";
     case "include-special":
       return current + "!";
-    case "captcha-human":
-      return current + CAPTCHA_PHRASE;
+    case "captcha-human": {
+      const captcha = rule.payload?.["captcha"] as { token?: unknown } | undefined;
+      const token = captcha?.token;
+      if (typeof token !== "string" || token === "") {
+        throw new Error("solveRule(captcha-human): rule payload is missing its token");
+      }
+      return current + token;
+    }
     case "digit-sum":
       // Always protect the live clock; add any sibling SAN/answer/name on top.
       return solveDigitSum(rule, current, [api.nowHHMM(), ...protectedStrings]);

@@ -3,7 +3,7 @@ import type { GameState, Pg2Rule, RuleApi } from "../types";
 import { mulberry32, subSeed } from "../rng";
 import { CORE_RULES } from "../rules/index";
 import { FILLER, solveAll, solveRule } from "./solve";
-import { CAPTCHA_PHRASE } from "../rules/prologue";
+import { CAPTCHA_KINDS, type CaptchaChallenge } from "../rules/prologue";
 import { FREEBIE_MESSAGE, MONTHS, SPONSORS } from "../rules/act1";
 import { ROMAN_PRODUCT_TARGETS } from "../rules/act2";
 import { BACKWARDS_PASSWORD } from "../rules/act3";
@@ -149,15 +149,45 @@ describe("rule 4 - include-special", () => {
 });
 
 describe("rule 5 - captcha-human", () => {
-  it("demands the exact phrase, case-sensitive", () => {
+  const challengeOf = (rule: Pg2Rule): CaptchaChallenge =>
+    rule.payload!["captcha"] as CaptchaChallenge;
+
+  it("describes the verification challenge and its confirmation code", () => {
     const rule = make("captcha-human");
-    expect(rule.description).toContain(CAPTCHA_PHRASE);
-    expect(passes(rule, "i am human")).toBe(false); // wrong case
-    expect(passes(rule, "well I am human really")).toBe(true);
+    expect(rule.description).toContain("Prove you are human");
+    expect(rule.description).toContain("confirmation code");
   });
-  it("solveRule inserts the phrase", () => {
+
+  it("carries two nine-tile grids, a target kind, and a well-formed token", () => {
+    const c = challengeOf(make("captcha-human"));
+    expect(c.grids).toHaveLength(2);
+    expect(CAPTCHA_KINDS).toContain(c.target);
+    for (const grid of c.grids) {
+      expect(grid).toHaveLength(9);
+      expect(grid.every((t) => CAPTCHA_KINDS.includes(t.kind))).toBe(true);
+      const targetTiles = grid.filter((t) => t.kind === c.target).length;
+      expect(targetTiles).toBeGreaterThanOrEqual(3);
+      expect(targetTiles).toBeLessThanOrEqual(5);
+    }
+    expect(c.token).toMatch(/^OK-[0-9A-F]{4}$/);
+  });
+
+  it("is fully deterministic for a fixed seed", () => {
+    expect(challengeOf(make("captcha-human", 8))).toEqual(challengeOf(make("captcha-human", 8)));
+  });
+
+  it("passes only when the password includes the token", () => {
     const rule = make("captcha-human");
-    expect(passes(rule, solveRule(rule, "abc", api()))).toBe(true);
+    const token = challengeOf(rule).token;
+    expect(passes(rule, "no code here")).toBe(false);
+    expect(passes(rule, `my code is ${token} ok`)).toBe(true);
+  });
+
+  it("solveRule appends the payload token", () => {
+    const rule = make("captcha-human");
+    const solved = solveRule(rule, "abc", api());
+    expect(solved).toContain(challengeOf(rule).token);
+    expect(passes(rule, solved)).toBe(true);
   });
 });
 
