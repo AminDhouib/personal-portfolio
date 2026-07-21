@@ -271,6 +271,9 @@ function ChessBoard({
     // 1) A click onto a lit target completes the move: type its SAN, reset the board.
     if (selected && targets.has(sq)) {
       try {
+        // Promotions always pick a queen: the widget cannot produce an
+        // underpromotion SAN (e8=N#), so those rare dailies must be typed by
+        // hand — validate is a plain string check either way.
         const move = new Chess(fen).move({
           from: selected as Square,
           to: sq as Square,
@@ -329,6 +332,7 @@ function ChessBoard({
                 role="button"
                 tabIndex={0}
                 aria-label={glyph ? `${square} ${glyph}` : square}
+                aria-pressed={isSelected}
                 data-square={square}
                 data-selected={isSelected ? "true" : undefined}
                 data-target={isTarget ? "true" : undefined}
