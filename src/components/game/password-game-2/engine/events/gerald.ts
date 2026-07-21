@@ -81,7 +81,7 @@ const geraldFedRule: Pg2RuleDef = {
       const sinceFed = state.elapsedMs - d.fedAtMs;
       return {
         passed: sinceFed <= FED_WINDOW_MS,
-        message: `fed ${Math.floor(Math.max(0, sinceFed) / 1000)}s ago / 60s`,
+        message: `fed ${Math.floor(Math.max(0, sinceFed) / 1000)}s ago / ${FED_WINDOW_MS / 1000}s`,
       };
     },
   }),

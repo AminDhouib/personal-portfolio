@@ -180,6 +180,17 @@ export interface MeterSpec {
 
 const METER_BAR_H = 6;
 
+// Inhabitant HUD slot convention — gerald, campfire, and garden never resolve
+// before the finale, so the director co-schedules them into the ONE shared
+// boxRect and their always-on HUD elements would otherwise share coordinates.
+// Crisis meters stack in a top-left column (row 0 garden HIVE at box.y + 26,
+// row 1 gerald GERALD; campfire FUEL keeps its own bottom slot); action chips
+// stack in a top-right column (row 0 gerald FEED at box.y + 12, row 1 garden
+// BASKET, row 2 campfire STOKE). Any new always-on element claims the next free
+// slot — never reuse one.
+const METER_ROW_H = 22; // vertical stride between stacked crisis meters
+const CHIP_ROW_H = 38; // vertical stride between stacked action chips (chip h 30 + gap)
+
 export function drawCrisisMeter(ctx: CanvasRenderingContext2D, spec: MeterSpec): void {
   const { x, y, w, value, max, threshold, label, color } = spec;
   const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
@@ -331,14 +342,15 @@ const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
 
   // Hunger gauge — always visible; loud (red, pulsing) once hunger reaches the
   // murky threshold, calm green below. The bar fills as Gerald starves; the
-  // readout is a short tier word so high-vs-low reads without a legend.
+  // readout is a short tier word so high-vs-low reads without a legend. Meter
+  // row 1 (below garden HIVE) per the inhabitant HUD slot convention.
   const loud = d.hunger >= GERALD_MURKY_AT;
   const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(tMs / 160));
   const tier =
     d.hunger >= GERALD_MURKY_AT ? "STARVING" : d.hunger >= GERALD_HUNGRY_AT ? "HUNGRY" : "FED";
   drawCrisisMeter(ctx, {
     x: box.x + 16,
-    y: box.y + 26,
+    y: box.y + 26 + METER_ROW_H,
     w: 120,
     value: d.hunger,
     max: 100,
@@ -347,7 +359,7 @@ const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
     color: loud ? `rgba(248,113,113,${pulse})` : GREEN,
   });
 
-  // Feed chip, top-right of the box.
+  // Feed chip — chip row 0 (top-right) per the slot convention.
   const c = chip(ctx, box.x + box.w - 92, box.y + 12, "FEED", GREEN, true);
   pushRect(hits, c.x, c.y, c.w, c.h, { kind: "feed-button" });
 };
@@ -450,7 +462,8 @@ const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
     });
   }
 
-  // Fuel gauge above the fire.
+  // Fuel gauge above the fire — its own bottom slot per the slot convention, so
+  // it never collides with the top-left meter column garden and gerald share.
   const gw = 70;
   drawCrisisMeter(ctx, {
     x: fx - gw / 2,
@@ -462,7 +475,8 @@ const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
     color: d.fuel < 25 ? RED : "#f59e0b",
   });
 
-  // Stoke chip, top-right — hops when buttonHops changes.
+  // Stoke chip — chip row 2 (top-right) per the slot convention; hops when
+  // buttonHops changes.
   const a = anim(inst);
   if (a.hops !== d.buttonHops) {
     a.hops = d.buttonHops;
@@ -471,7 +485,14 @@ const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const hopT = a.hopAt ? Math.max(0, 1 - (tMs - a.hopAt) / 360) : 0;
   const hop = Math.sin(hopT * Math.PI) * 8;
   const ready = g.elapsedMs >= d.stokeReadyAtMs;
-  const c = chip(ctx, box.x + box.w - 96, box.y + 12 - hop, "STOKE", "#f59e0b", ready);
+  const c = chip(
+    ctx,
+    box.x + box.w - 96,
+    box.y + 12 + 2 * CHIP_ROW_H - hop,
+    "STOKE",
+    "#f59e0b",
+    ready,
+  );
   pushRect(hits, c.x, c.y, c.w, c.h, { kind: "stoke-button" });
 };
 
@@ -596,6 +617,7 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
   // Honey meter — always visible; loud (red, pulsing) while the hive sits below
   // the rule threshold, calm amber above. During a raid the readout ticks toward
   // zero across the raid window (display-only; the engine snaps at raid end).
+  // Meter row 0 (top-left) per the inhabitant HUD slot convention.
   const raidProgress =
     d.bearState === "raiding"
       ? Math.max(0, Math.min(1, (g.elapsedMs - (d.raidEndsAtMs - GARDEN_RAID_MS)) / GARDEN_RAID_MS))
@@ -638,15 +660,16 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
     drawBear(ctx, bx, box.y + box.h * 0.5 + Math.sin(tMs / 200) * 4, 1.1, 1);
   }
 
-  // Basket chip, top-right — lit while the bear is telegraphed or raiding, dimmed
-  // with a "bear away" sub-label otherwise.
+  // Basket chip — chip row 1 (top-right, below gerald FEED) per the slot
+  // convention; lit while the bear is telegraphed or raiding, dimmed with a
+  // "bear away" sub-label otherwise.
   const active = d.bearState !== "away";
   const label = active ? "THROW BASKET" : "BASKET";
   const chipW = 22 + label.length * 8.5;
   const c = chip(
     ctx,
     box.x + box.w - chipW - 12,
-    box.y + 12,
+    box.y + 12 + CHIP_ROW_H,
     label,
     active ? "#16a34a" : GREEN,
     active,
