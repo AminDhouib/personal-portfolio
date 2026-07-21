@@ -36,8 +36,8 @@ const ALPHABET = "abcdefghijklmnopqrstuvwxyz".split("");
 export interface InfectionData {
   antidote: string; // four distinct lowercase letters; typing them cures
   nextSpreadAtMs: number; // state.elapsedMs of the next spread pulse
-  infectedSinceMs: Record<number, number>; // cell id -> elapsedMs it fell ill
-  cured: boolean; // set once the antidote wiped the outbreak
+  infectedSinceMs: Record<number, number>; // cell id -> elapsedMs it went corrupt
+  cured: boolean; // set once the antidote cleared the corruption
 }
 
 /** Four distinct lowercase letters off `rng`, e.g. "zyxo". */
