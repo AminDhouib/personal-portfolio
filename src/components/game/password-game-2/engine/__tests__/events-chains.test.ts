@@ -11,6 +11,7 @@ import { galagaDef, bearSwipe as galagaBearSwipe, type GalagaData } from "../eve
 import { snakeDef, bearSwipe as snakeBearSwipe } from "../events/snake";
 import { tetrisDef, bearSwipe as tetrisBearSwipe } from "../events/tetris";
 import { blackHoleDef } from "../events/black-hole";
+import { cookieBannerDef } from "../events/cookie-banner";
 import type {
   CharCell,
   Effect,
@@ -598,5 +599,187 @@ describe("chain 4: the compactor eats garbage first", () => {
     expect(cellById(env, 3).status).toBe("orbiting"); // nearest normal, exactly as before
     expect(bh.data.compactedGarbage).toBe(false);
     expect(moods(env.effects).filter((m) => /compact/i.test(m.text))).toHaveLength(0);
+  });
+});
+
+// --- Chain 5: a well-fed campfire ignites a consent banner --------------------
+
+describe("chain 5: the campfire burns one banner in a live swarm", () => {
+  /** A live cookie swarm of three banners: onset spawns one, a decline breeds two more. */
+  function swarmOfThree(env: Env) {
+    const cookie = addEvent(env, cookieBannerDef, 3);
+    toPeak(env, cookieBannerDef, cookie); // banner ordinal 0
+    pointer(env, cookieBannerDef, cookie, { kind: "banner-decline" }); // breeds two more
+    return cookie;
+  }
+
+  it("burns exactly one banner, costs 15 fuel, and moods /burn|ignit/ once per swarm", () => {
+    const env = boot();
+    const campfire = addEvent(env, campfireDef, 2);
+    toPeak(env, campfireDef, campfire);
+    campfire.data.fuel = 80; // burning, well above the ignite floor
+    const cookie = swarmOfThree(env);
+    expect(cookie.data.banners.length).toBe(3);
+    env.effects.length = 0;
+
+    driveInst(env, cookieBannerDef, cookie, 0); // ignite tick, no time passes
+    expect(cookie.data.banners.length).toBe(2); // one banner burned away
+    expect(campfire.data.fuel).toBe(65); // 80 - 15
+    expect(cookie.data.fireUsedThisSwarm).toBe(true);
+    expect(
+      moods(env.effects).some((m) => m.eventId === "cookie-banner" && /burn|ignit/i.test(m.text)),
+    ).toBe(true);
+
+    // Once per swarm: a second tick with the fire still hot changes nothing.
+    env.effects.length = 0;
+    driveInst(env, cookieBannerDef, cookie, 0);
+    expect(cookie.data.banners.length).toBe(2);
+    expect(campfire.data.fuel).toBe(65);
+    expect(moods(env.effects)).toEqual([]);
+  });
+
+  it("does nothing while the fire's fuel is below 50", () => {
+    const env = boot();
+    const campfire = addEvent(env, campfireDef, 2);
+    toPeak(env, campfireDef, campfire);
+    campfire.data.fuel = 40; // burning but under the ignite floor
+    const cookie = swarmOfThree(env);
+    env.effects.length = 0;
+
+    driveInst(env, cookieBannerDef, cookie, 0);
+    expect(cookie.data.banners.length).toBe(3); // no burn
+    expect(campfire.data.fuel).toBe(40);
+    expect(cookie.data.fireUsedThisSwarm).toBe(false);
+    expect(moods(env.effects)).toEqual([]);
+  });
+
+  it("does nothing with only one banner up (a swarm is at least two deep)", () => {
+    const env = boot();
+    const campfire = addEvent(env, campfireDef, 2);
+    toPeak(env, campfireDef, campfire);
+    campfire.data.fuel = 80;
+    const cookie = addEvent(env, cookieBannerDef, 3);
+    toPeak(env, cookieBannerDef, cookie); // just banner ordinal 0
+    expect(cookie.data.banners.length).toBe(1);
+    env.effects.length = 0;
+
+    driveInst(env, cookieBannerDef, cookie, 0);
+    expect(cookie.data.banners.length).toBe(1);
+    expect(campfire.data.fuel).toBe(80);
+    expect(cookie.data.fireUsedThisSwarm).toBe(false);
+    expect(moods(env.effects)).toEqual([]);
+  });
+
+  it("with no campfire present the swarm behaves exactly as today", () => {
+    const env = boot();
+    const cookie = swarmOfThree(env);
+    env.effects.length = 0;
+
+    driveInst(env, cookieBannerDef, cookie, 0);
+    expect(cookie.data.banners.length).toBe(3);
+    expect(cookie.data.fireUsedThisSwarm).toBe(false);
+    expect(moods(env.effects)).toEqual([]);
+  });
+
+  it("does not ignite off a campfire still in telegraph (not yet a live fire)", () => {
+    const env = boot();
+    const campfire = addEvent(env, campfireDef, 2); // left in telegraph, never brought to peak
+    campfire.data.fuel = 80;
+    expect(campfire.phase).toBe("telegraph");
+    const cookie = swarmOfThree(env);
+    env.effects.length = 0;
+
+    driveInst(env, cookieBannerDef, cookie, 0);
+    expect(cookie.data.banners.length).toBe(3); // untouched: the phase guard rejects it
+    expect(campfire.data.fuel).toBe(80);
+    expect(moods(env.effects)).toEqual([]);
+  });
+});
+
+// --- Chain 6: a well-fed Gerald calms the snake ------------------------------
+
+describe("chain 6: a fed fish keeps the snake at bay", () => {
+  /** Plant a row of normal cells so biteLast always has something to swallow. */
+  function plantRow(env: Env, text: string): void {
+    env.state.cells = [...text].map((ch, i) => cell(i + 1, ch));
+  }
+
+  it("schedules the next bite 1.5x further out and moods once when Gerald is fed", () => {
+    const env = boot();
+    const gerald = addEvent(env, geraldDef, 2);
+    toPeak(env, geraldDef, gerald);
+    expect(gerald.data.hunger).toBe(30); // well fed (<= 40)
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    plantRow(env, "abcdef");
+    const firstBite = snake.data.nextBiteAtMs;
+    env.effects.length = 0;
+
+    driveInst(env, snakeDef, snake, firstBite - env.state.elapsedMs); // land on the first bite
+    expect(snake.data.nextBiteAtMs).toBe(firstBite + 7500); // 5000 * 1.5, calm cadence
+    expect(moods(env.effects)).toContainEqual({
+      eventId: "snake",
+      text: "The snake keeps its distance from a fed fish.",
+    });
+  });
+
+  it("leaves the base cadence when Gerald is hungry (> 40)", () => {
+    const env = boot();
+    const gerald = addEvent(env, geraldDef, 2);
+    toPeak(env, geraldDef, gerald);
+    gerald.data.hunger = 41; // just over the calm threshold
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    plantRow(env, "abcdef");
+    const firstBite = snake.data.nextBiteAtMs;
+    env.effects.length = 0;
+
+    driveInst(env, snakeDef, snake, firstBite - env.state.elapsedMs);
+    expect(snake.data.nextBiteAtMs).toBe(firstBite + 5000); // base BITE_PERIOD_MS, no slowdown
+    expect(moods(env.effects)).toEqual([]);
+  });
+
+  it("keeps the base cadence with no Gerald in the run", () => {
+    const env = boot();
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    plantRow(env, "abcdef");
+    const firstBite = snake.data.nextBiteAtMs;
+    env.effects.length = 0;
+
+    driveInst(env, snakeDef, snake, firstBite - env.state.elapsedMs);
+    expect(snake.data.nextBiteAtMs).toBe(firstBite + 5000);
+    expect(moods(env.effects)).toEqual([]);
+  });
+
+  it("moods once per snake instance across successive slowed bites", () => {
+    const env = boot();
+    const gerald = addEvent(env, geraldDef, 2);
+    toPeak(env, geraldDef, gerald); // calm
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    plantRow(env, "abcdefghij");
+    env.effects.length = 0;
+
+    driveInst(env, snakeDef, snake, 20_000); // several calm bites in one long tick
+    const calm = moods(env.effects).filter(
+      (m) => m.eventId === "snake" && /keeps its distance/i.test(m.text),
+    );
+    expect(calm).toHaveLength(1);
+  });
+
+  it("does not slow off a Gerald still in telegraph (not yet a live calmer)", () => {
+    const env = boot();
+    const gerald = addEvent(env, geraldDef, 2); // left in telegraph
+    expect(gerald.phase).toBe("telegraph");
+    const snake = addEvent(env, snakeDef, 4);
+    toPeak(env, snakeDef, snake);
+    plantRow(env, "abcdef");
+    const firstBite = snake.data.nextBiteAtMs;
+    env.effects.length = 0;
+
+    driveInst(env, snakeDef, snake, firstBite - env.state.elapsedMs);
+    expect(snake.data.nextBiteAtMs).toBe(firstBite + 5000); // base cadence, guard rejects it
+    expect(moods(env.effects)).toEqual([]);
   });
 });

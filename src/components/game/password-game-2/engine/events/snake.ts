@@ -1,6 +1,7 @@
 import type { EventContext, EventDef, EventInstance, Pg2RuleDef } from "../types";
 import { setCellStatus } from "../cells";
 import { pickOne } from "../rng";
+import type { GeraldData } from "./gerald";
 
 /**
  * The snake. It slithers in and, every BITE_PERIOD_MS, swallows the LAST still-normal
@@ -17,6 +18,8 @@ const BITE_PERIOD_MS = 5000;
 const SATED_TO_LEAVE = 3;
 const SWALLOWED_TO_LEAVE = 8;
 const PELLETS = ["o", "0", "@"] as const;
+const GERALD_CALM_HUNGER_MAX = 40; // chain 6: a fish at or below this hunger is well fed
+const CALM_BITE_SCALE = 1.5; // chain 6: a fed fish stretches the next bite this much further out
 
 export interface SnakeData {
   swallowedIds: number[]; // cell ids swallowed, in bite order
@@ -24,6 +27,7 @@ export interface SnakeData {
   nextBiteAtMs: number; // state.elapsedMs of the next bite
   pelletChar: string; // the glyph that feeds it
   gone: boolean; // set once it has slithered off
+  calmMooded: boolean; // chain 6: the "keeps its distance" mood has fired for this instance
 }
 
 /** Swallow the last still-normal cell, if any. */
@@ -71,6 +75,33 @@ export function bearSwipe(inst: EventInstance<SnakeData>, _ctx: EventContext): b
   return true;
 }
 
+/**
+ * Chain 6: a well-fed Gerald calms the snake, so the NEXT bite is scheduled CALM_BITE_SCALE
+ * further out. Reads Gerald via the sanctioned cross-event idiom (see autocorrect.ts
+ * sabotage(), garden.ts swipeInvaders()): a fish in telegraph or done (or not yet inited) is
+ * not a live calmer, so the snake keeps its base cadence. A pure read of Gerald's hunger at
+ * schedule time — no rng, and because it only sizes the interval added to the FUTURE bite it
+ * never retro-shifts one already scheduled, so determinism holds. Moods once per instance the
+ * first time the calm actually applies.
+ */
+function biteIntervalMs(d: SnakeData, ctx: EventContext): number {
+  const fish = ctx.state.events.find((e) => e.defId === "gerald");
+  if (!fish || fish.phase === "telegraph" || fish.phase === "done" || fish.data === undefined) {
+    return BITE_PERIOD_MS;
+  }
+  const g = fish.data as GeraldData;
+  if (g.hunger > GERALD_CALM_HUNGER_MAX) return BITE_PERIOD_MS;
+  if (!d.calmMooded) {
+    d.calmMooded = true;
+    ctx.emit({
+      kind: "mood",
+      eventId: EVENT_ID,
+      text: "The snake keeps its distance from a fed fish.",
+    });
+  }
+  return BITE_PERIOD_MS * CALM_BITE_SCALE;
+}
+
 /** Coupled rule: nothing may still be inside the snake at submit. */
 const snakeFedRule: Pg2RuleDef = {
   id: "snake-fed",
@@ -103,6 +134,7 @@ export const snakeDef: EventDef<SnakeData> = {
     nextBiteAtMs: 0,
     pelletChar: pickOne(rng, PELLETS),
     gone: false,
+    calmMooded: false,
   }),
   onTick(inst: EventInstance<SnakeData>, ctx: EventContext): void {
     const d = inst.data;
@@ -118,7 +150,7 @@ export const snakeDef: EventDef<SnakeData> = {
     if (inst.phase === "onset") inst.phase = "peak";
     while (ctx.state.elapsedMs >= d.nextBiteAtMs) {
       biteLast(d, ctx);
-      d.nextBiteAtMs += BITE_PERIOD_MS;
+      d.nextBiteAtMs += biteIntervalMs(d, ctx); // chain 6: a fed Gerald stretches the next bite
     }
     maybeLeave(d, ctx, inst);
   },
