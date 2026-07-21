@@ -257,6 +257,20 @@ describe("the autocorrect demon", () => {
     expect(toastTexts(h.effects)).toContain("Corrected for you.");
   });
 
+  it("records the rewritten cell ids and a timestamp for the flash tell", () => {
+    const h = boot(autocorrectDef);
+    expect(aData(h).lastRewriteAtMs).toBe(0); // init default
+    expect(aData(h).lastRewriteCellIds).toEqual([]); // init default
+    toPeak(h);
+    plant(h, "dragon"); // ids 1..6, fresh ids start at 7
+    drive(h, 8000); // the demon strikes at onset + 8000
+    const d = aData(h);
+    // dragon -> dargon: six freshly minted cells replaced the match; the tell carries them.
+    expect(d.lastRewriteCellIds).toEqual(h.state.cells.map((c) => c.id));
+    expect(d.lastRewriteCellIds.every((id) => id > 6)).toBe(true);
+    expect(d.lastRewriteAtMs).toBe(h.state.elapsedMs);
+  });
+
   it("matches case-insensitively, writing the lowercase correction", () => {
     const h = boot(autocorrectDef);
     toPeak(h);

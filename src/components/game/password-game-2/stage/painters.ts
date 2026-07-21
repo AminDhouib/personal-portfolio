@@ -24,6 +24,7 @@ import type { ParasiteData } from "../engine/events/parasite";
 import type { GalagaData, Alien } from "../engine/events/galaga";
 import type { SnakeData } from "../engine/events/snake";
 import type { TetrisData } from "../engine/events/tetris";
+import type { AutocorrectData } from "../engine/events/autocorrect";
 import { MISSILE_FALL_MS, type MissilesData } from "../engine/events/finale";
 
 /** A rectangle in canvas-local CSS pixels. */
@@ -277,6 +278,10 @@ function bubble(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
   ctx.stroke();
 }
 
+// Display-only mirror of gerald.ts MURKY_AT: the hunger at which the water goes
+// murky and the gauge turns loud. The engine owns the real value.
+const GERALD_MURKY_AT = 85;
+
 const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const box = layout.boxRect;
   if (!box) return;
@@ -321,6 +326,23 @@ const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const swX = box.x + 55 + (0.5 + 0.5 * Math.sin(tMs / 1600)) * Math.max(40, swimW);
   const swY = starved ? waterY + 12 : waterY + box.h * 0.28 + Math.sin(tMs / 700) * 6;
   drawFish(ctx, swX, swY, 1, Math.cos(tMs / 1600) >= 0 ? 1 : -1, starved, d.murky);
+
+  // Hunger gauge — always visible; loud (red, pulsing) once hunger reaches the
+  // murky threshold, calm green below. The bar fills as Gerald starves; the
+  // readout is a short tier word so high-vs-low reads without a legend.
+  const loud = d.hunger >= GERALD_MURKY_AT;
+  const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(tMs / 160));
+  const tier = d.hunger >= GERALD_MURKY_AT ? "STARVING" : d.hunger >= 60 ? "HUNGRY" : "FED";
+  drawCrisisMeter(ctx, {
+    x: box.x + 16,
+    y: box.y + 26,
+    w: 120,
+    value: d.hunger,
+    max: 100,
+    label: "GERALD",
+    valueText: tier,
+    color: loud ? `rgba(248,113,113,${pulse})` : GREEN,
+  });
 
   // Feed chip, top-right of the box.
   const c = chip(ctx, box.x + box.w - 92, box.y + 12, "FEED", GREEN, true);
@@ -782,6 +804,17 @@ const paintParasite: Painter = (ctx, inst, layout, g, tMs, hits) => {
     if (!r) continue;
     pushRect(hits, r.x - 2, r.y - 2, r.w + 4, r.h + 4, { kind: "parasite", id });
     if (!wiggling) continue;
+    // Reveal-window tell: a bright ring pulsing around the mimic, lighter than the
+    // violet glyph glow so an attentive player can catch it against the force accent.
+    const ringPulse = 0.5 + 0.5 * Math.sin(tMs / 110);
+    ctx.save();
+    ctx.lineWidth = 2;
+    withGlow(ctx, "#ddd6fe", 10, () => {
+      roundRect(ctx, r.x - 3, r.y - 3, r.w + 6, r.h + 6, 6);
+      ctx.strokeStyle = `rgba(221,214,254,${0.45 + 0.5 * ringPulse})`;
+      ctx.stroke();
+    });
+    ctx.restore();
     const wob = Math.sin(tMs / 40) * 3;
     ctx.save();
     ctx.font = `600 ${Math.round(r.h * 0.8)}px ui-monospace, monospace`;
@@ -1110,6 +1143,36 @@ const paintChromeTelegraph: Painter = (ctx, inst, layout, g, tMs) => {
   ctx.restore();
 };
 
+// The rewrite flash lingers this long after the demon strikes; mirrors nothing
+// in the engine (a display-only fade), so the painter owns it.
+const AUTOCORRECT_FLASH_MS = 1000;
+
+const paintAutocorrect: Painter = (ctx, inst, layout, g, tMs, hits) => {
+  if (inst.phase === "telegraph") {
+    paintChromeTelegraph(ctx, inst, layout, g, tMs, hits);
+    return;
+  }
+  // Peak: when the demon has just rewritten cells, ring them in amber for ~1s so
+  // the silent splice has a visible tell to go with its toast.
+  const d = inst.data as AutocorrectData;
+  const since = g.elapsedMs - d.lastRewriteAtMs;
+  if (since < 0 || since >= AUTOCORRECT_FLASH_MS) return;
+  const fade = 1 - since / AUTOCORRECT_FLASH_MS; // 1 -> 0 across the window
+  const pulse = 0.5 + 0.5 * Math.sin(tMs / 90);
+  ctx.save();
+  ctx.lineWidth = 2.5;
+  for (const id of d.lastRewriteCellIds) {
+    const r = layout.cellRects.get(id);
+    if (!r) continue;
+    withGlow(ctx, AMBER, 12 * fade, () => {
+      roundRect(ctx, r.x - 2, r.y - 2, r.w + 4, r.h + 4, 5);
+      ctx.strokeStyle = `rgba(251,191,36,${fade * (0.6 + 0.4 * pulse)})`;
+      ctx.stroke();
+    });
+  }
+  ctx.restore();
+};
+
 // --- finale: missiles ---------------------------------------------------------
 
 /** Stub instance so the finale painter satisfies the uniform Painter signature. */
@@ -1199,7 +1262,7 @@ export const PAINTERS: Record<string, Painter> = {
   snake: paintSnake,
   tetris: paintTetris,
   "cookie-banner": paintChromeTelegraph,
-  autocorrect: paintChromeTelegraph,
+  autocorrect: paintAutocorrect,
   "loading-bar": paintChromeTelegraph,
   "finale-missiles": paintFinaleMissiles,
 };

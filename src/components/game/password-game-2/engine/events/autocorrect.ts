@@ -78,6 +78,8 @@ export interface AutocorrectData {
   disabled: boolean; // the demon has been switched off
   settingsOpen: boolean; // the settings modal is showing
   correctToggleIndex: number; // 0..5: the slot holding the real off switch
+  lastRewriteAtMs: number; // state.elapsedMs of the last rewrite, for the painter's flash tell
+  lastRewriteCellIds: number[]; // ids of the cells the last rewrite minted; display-only
 }
 
 /** Value-bearing cells contribute to the password; excluded cells (abducted, etc.) do not. */
@@ -134,6 +136,8 @@ function correctOnce(d: AutocorrectData, ctx: EventContext): boolean {
     ctx.state.caret = Math.max(0, Math.min(oldCaret - removedLeft + insertedLeft, next.length));
 
     d.corrections++;
+    d.lastRewriteAtMs = ctx.state.elapsedMs;
+    d.lastRewriteCellIds = replacementCells.map((cell) => cell.id);
     ctx.emit({ kind: "toast", tone: "info", text: "Corrected for you." });
     return true;
   }
@@ -150,6 +154,8 @@ export const autocorrectDef: EventDef<AutocorrectData> = {
     disabled: false,
     settingsOpen: false,
     correctToggleIndex: rangeInt(rng, 0, 5),
+    lastRewriteAtMs: 0,
+    lastRewriteCellIds: [],
   }),
   onTick(inst: EventInstance<AutocorrectData>, ctx: EventContext): void {
     const d = inst.data;

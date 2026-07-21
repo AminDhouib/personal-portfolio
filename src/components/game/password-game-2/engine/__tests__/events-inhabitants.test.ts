@@ -186,6 +186,23 @@ describe("Gerald", () => {
     expect(rule.validate("pw", g, api).passed).toBe(false);
   });
 
+  it("reports the fed countdown in whole seconds, not milliseconds", () => {
+    const { g, rule } = coupledFixture(geraldDef, {
+      hunger: 40,
+      fedAtMs: 1000,
+      murky: false,
+      hungerCarryMs: 0,
+      mood: "hungry",
+    } satisfies GeraldData);
+    const api = makeRuleApi(g, () => HHMM);
+
+    g.elapsedMs = 1000 + 42_000; // 42s since the last feed
+    const res = rule.validate("pw", g, api);
+    expect(res.passed).toBe(true);
+    expect(res.message).toMatch(/^fed \d+s ago \/ 60s$/);
+    expect(res.message).toBe("fed 42s ago / 60s");
+  });
+
   it("resolves only in the finale", () => {
     const h = boot(geraldDef);
     for (const act of ["act1", "act2", "act3"] as ActId[]) {

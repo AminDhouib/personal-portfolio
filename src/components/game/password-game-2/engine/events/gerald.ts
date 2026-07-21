@@ -79,7 +79,10 @@ const geraldFedRule: Pg2RuleDef = {
       const d = api.getEventData<GeraldData>("gerald");
       if (d === null) return { passed: true };
       const sinceFed = state.elapsedMs - d.fedAtMs;
-      return { passed: sinceFed <= FED_WINDOW_MS, message: `${Math.max(0, sinceFed)}ms` };
+      return {
+        passed: sinceFed <= FED_WINDOW_MS,
+        message: `fed ${Math.floor(Math.max(0, sinceFed) / 1000)}s ago / 60s`,
+      };
     },
   }),
 };
