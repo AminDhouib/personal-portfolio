@@ -644,8 +644,9 @@ describe("tetris garbage", () => {
     ];
     drive(h, 2500); // garbage lands
     expect(h.inst.data.hasShattered).toBe(false); // still false until the player acts
-    const garbage = h.state.cells.find((c) => c.status === "garbage")!;
-    pointer(h, { kind: "cell", id: garbage.id });
+    const garbage = h.state.cells.find((c) => c.status === "garbage");
+    expect(garbage).toBeDefined(); // clean failure if LAND_DELAY_MS outgrows the drive above
+    pointer(h, { kind: "cell", id: garbage!.id });
     expect(h.inst.data.hasShattered).toBe(true);
   });
 

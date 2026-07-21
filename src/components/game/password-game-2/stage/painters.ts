@@ -1066,7 +1066,7 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
   // A one-time nudge above the first landed block, retired the moment the player
   // shatters their first garbage.
   if (!d.hasShattered) {
-    const firstGarbage = g.cells.find((c) => c.status === "garbage");
+    const firstGarbage = g.cells.find((c) => c.status === "garbage" && c.eventTag === "tetris");
     const r = firstGarbage ? layout.cellRects.get(firstGarbage.id) : undefined;
     if (r) {
       ctx.save();
