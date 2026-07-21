@@ -179,39 +179,39 @@ export interface MeterSpec {
 
 const METER_BAR_H = 6;
 
-export function drawCrisisMeter(c: CanvasRenderingContext2D, spec: MeterSpec): void {
+export function drawCrisisMeter(ctx: CanvasRenderingContext2D, spec: MeterSpec): void {
   const { x, y, w, value, max, threshold, label, color } = spec;
   const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   const valueText = spec.valueText ?? `${Math.round(value)}`;
 
-  c.save();
-  c.textBaseline = "alphabetic";
+  ctx.save();
+  ctx.textBaseline = "alphabetic";
   // Name tag (left) and readout (right) on the line above the bar.
-  c.font = "700 10px ui-sans-serif, system-ui, sans-serif";
-  c.textAlign = "left";
-  c.fillStyle = "rgba(148,163,184,0.9)";
-  c.fillText(label, x, y - 5);
-  c.textAlign = "right";
-  c.fillStyle = color;
-  c.fillText(valueText, x + w, y - 5);
+  ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(148,163,184,0.9)";
+  ctx.fillText(label, x, y - 5);
+  ctx.textAlign = "right";
+  ctx.fillStyle = color;
+  ctx.fillText(valueText, x + w, y - 5);
 
   // Track.
-  roundRect(c, x, y, w, METER_BAR_H, METER_BAR_H / 2);
-  c.fillStyle = "rgba(15,23,42,0.14)";
-  c.fill();
+  roundRect(ctx, x, y, w, METER_BAR_H, METER_BAR_H / 2);
+  ctx.fillStyle = "rgba(15,23,42,0.14)";
+  ctx.fill();
   // Fill.
   if (frac > 0) {
-    roundRect(c, x, y, w * frac, METER_BAR_H, METER_BAR_H / 2);
-    c.fillStyle = color;
-    c.fill();
+    roundRect(ctx, x, y, w * frac, METER_BAR_H, METER_BAR_H / 2);
+    ctx.fillStyle = color;
+    ctx.fill();
   }
   // Pass/fail tick.
   if (threshold !== undefined && max > 0) {
     const tx = x + w * Math.max(0, Math.min(1, threshold / max));
-    c.fillStyle = "rgba(226,232,240,0.9)";
-    c.fillRect(tx - 1, y - 2, 2, METER_BAR_H + 4);
+    ctx.fillStyle = "rgba(226,232,240,0.9)";
+    ctx.fillRect(tx - 1, y - 2, 2, METER_BAR_H + 4);
   }
-  c.restore();
+  ctx.restore();
 }
 
 // --- gerald -------------------------------------------------------------------
@@ -530,10 +530,12 @@ function drawBear(
   ctx.restore();
 }
 
-// Display-only mirrors of garden.ts MIN_HONEY / RAID_DURATION_MS; the engine owns
-// the real values, the painter only reads them to draw the hive meter and drain.
+// Display-only mirrors of garden.ts MIN_HONEY / RAID_DURATION_MS /
+// BEAR_TELEGRAPH_MS; the engine owns the real values, the painter only reads
+// them to draw the hive meter, drain, and countdown arc.
 const HIVE_THRESHOLD = 40;
 const GARDEN_RAID_MS = 6000;
+const GARDEN_TELEGRAPH_MS = 8000;
 
 const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const box = layout.boxRect;
@@ -595,8 +597,8 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
     const by = box.y + 30;
     const bearPulse = 0.3 + 0.15 * Math.sin(tMs / 300);
     drawBear(ctx, bx, by, 0.8, bearPulse);
-    // 8000 mirrors garden.ts BEAR_TELEGRAPH_MS; the arc empties as the raid nears.
-    const remain = Math.max(0, Math.min(1, (d.nextBearAtMs - g.elapsedMs) / 8000));
+    // The arc empties as the raid nears.
+    const remain = Math.max(0, Math.min(1, (d.nextBearAtMs - g.elapsedMs) / GARDEN_TELEGRAPH_MS));
     ctx.save();
     ctx.strokeStyle = RED;
     ctx.lineWidth = 3;
