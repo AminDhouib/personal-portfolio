@@ -188,7 +188,7 @@ const runToAct3 = (g: GameState) => {
 };
 
 /**
- * Continue in act3 until every one of the 17 rules is revealed and passing AND every
+ * Continue in act3 until every one of the 18 rules is revealed and passing AND every
  * act3 invasion/force/chrome has resolved — the submit gate now requires both, so the
  * caretaker must fight the fleet (and the other blocking beats) to their end.
  */
