@@ -658,6 +658,28 @@ describe("chain 5: the campfire burns one banner in a live swarm", () => {
     expect(cookie.data.fireUsedThisSwarm).toBe(true);
   });
 
+  it("mints ids from a monotonic counter: a mid-swarm burn then a decline forges no dup id or second reject", () => {
+    const env = boot();
+    const campfire = addEvent(env, campfireDef, 2);
+    toPeak(env, campfireDef, campfire);
+    campfire.data.fuel = 80;
+    const cookie = addEvent(env, cookieBannerDef, 3);
+    cookie.data.realRejectAt = 2; // the topmost of the first three carries the real reject
+    toPeak(env, cookieBannerDef, cookie); // id 0
+    pointer(env, cookieBannerDef, cookie, { kind: "banner-decline" }); // ids 1, 2
+    expect(cookie.data.banners.map((b) => b.id)).toEqual([0, 1, 2]);
+
+    driveInst(env, cookieBannerDef, cookie, 0); // fire burns id 1 (below the reject carrier)
+    expect(cookie.data.banners.map((b) => b.id)).toEqual([0, 2]); // a hole where id 1 was
+
+    pointer(env, cookieBannerDef, cookie, { kind: "banner-decline" }); // the freed ordinal must not return
+    const ids = cookie.data.banners.map((b) => b.id);
+    expect(new Set(ids).size).toBe(ids.length); // every stage id still unique
+    const carriers = cookie.data.banners.filter((b) => b.hasRealReject);
+    expect(carriers).toHaveLength(1); // exactly one real-reject carrier, not two
+    expect(carriers[0]!.id).toBe(2); // still the original carrier
+  });
+
   it("does nothing while the fire's fuel is below 50", () => {
     const env = boot();
     const campfire = addEvent(env, campfireDef, 2);

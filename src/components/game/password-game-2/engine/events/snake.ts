@@ -150,7 +150,9 @@ export const snakeDef: EventDef<SnakeData> = {
     if (inst.phase === "onset") inst.phase = "peak";
     while (ctx.state.elapsedMs >= d.nextBiteAtMs) {
       biteLast(d, ctx);
-      d.nextBiteAtMs += biteIntervalMs(d, ctx); // chain 6: a fed Gerald stretches the next bite
+      // chain 6: a fed Gerald stretches the next bite; biteIntervalMs also emits the calm
+      // mood once on the first slowed schedule (not a pure getter, despite its shape).
+      d.nextBiteAtMs += biteIntervalMs(d, ctx);
     }
     maybeLeave(d, ctx, inst);
   },

@@ -32,21 +32,24 @@ export interface CookieBannerData {
   dismissed: boolean; // true once the real reject-all was clicked
   deadlineAtMs: number; // state.elapsedMs the session expires and the swarm leaves
   fireUsedThisSwarm: boolean; // chain 5: the campfire has already burned a banner this swarm
+  spawnedCount: number; // monotonic banners minted this swarm; the next banner's ordinal/id
 }
 
 /**
- * Spawn the next banner (its ordinal is the current stack size). The real-reject
- * ordinal is clamped into the reachable range [0, MAX_BANNERS - 1]: rangeInt(0, 4)
- * already lands there, so the clamp is defensive — were realRejectAt ever to exceed
- * the cap, the LAST (fifth) banner would carry the real link, guaranteeing that a
- * player who declines to the cap can always reach a real reject. Reachability holds
- * regardless: onset spawns ordinal 0, and two declines fill ordinals 1..4.
+ * Spawn the next banner. Its ordinal is a monotonic counter (spawnedCount), NOT the current
+ * stack size: chain 5 can burn a banner mid-swarm, and a stack-size ordinal would then re-mint
+ * a freed value, forging a duplicate stage id and a second real-reject carrier. The real-reject
+ * ordinal is clamped into [0, MAX_BANNERS - 1]: rangeInt(0, 4) already lands there, so the clamp
+ * is defensive. Reachability holds regardless — spawnedCount steps through every integer in turn,
+ * so the banner whose ordinal equals realRejectAt is always minted, exactly once, and chain 5
+ * never burns it; so exactly one live banner ever carries the real reject.
  */
 function spawnBanner(d: CookieBannerData): void {
-  const ordinal = d.banners.length;
+  const ordinal = d.spawnedCount;
   if (ordinal === 0) d.fireUsedThisSwarm = false; // the swarm's first banner opens a fresh burn budget
   const realOrdinal = Math.min(d.realRejectAt, MAX_BANNERS - 1);
   d.banners.push({ id: ordinal, hasRealReject: ordinal === realOrdinal });
+  d.spawnedCount += 1;
 }
 
 /**
@@ -97,6 +100,7 @@ export const cookieBannerDef: EventDef<CookieBannerData> = {
     dismissed: false,
     deadlineAtMs: 0,
     fireUsedThisSwarm: false,
+    spawnedCount: 0,
   }),
   onTick(inst: EventInstance<CookieBannerData>, ctx: EventContext): void {
     const d = inst.data;
