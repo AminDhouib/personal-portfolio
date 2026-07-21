@@ -278,9 +278,11 @@ function bubble(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
   ctx.stroke();
 }
 
-// Display-only mirror of gerald.ts MURKY_AT: the hunger at which the water goes
-// murky and the gauge turns loud. The engine owns the real value.
+// Display-only mirrors of gerald.ts MURKY_AT / the moodFor "hungry" tier: the
+// hunger levels at which the water goes murky (gauge turns loud) and the tier
+// word flips to HUNGRY. The engine owns the real values.
 const GERALD_MURKY_AT = 85;
+const GERALD_HUNGRY_AT = 60;
 
 const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const box = layout.boxRect;
@@ -332,7 +334,8 @@ const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
   // readout is a short tier word so high-vs-low reads without a legend.
   const loud = d.hunger >= GERALD_MURKY_AT;
   const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(tMs / 160));
-  const tier = d.hunger >= GERALD_MURKY_AT ? "STARVING" : d.hunger >= 60 ? "HUNGRY" : "FED";
+  const tier =
+    d.hunger >= GERALD_MURKY_AT ? "STARVING" : d.hunger >= GERALD_HUNGRY_AT ? "HUNGRY" : "FED";
   drawCrisisMeter(ctx, {
     x: box.x + 16,
     y: box.y + 26,
