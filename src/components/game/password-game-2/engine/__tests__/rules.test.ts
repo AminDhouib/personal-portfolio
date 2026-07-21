@@ -329,7 +329,7 @@ describe("rule 11 - roman-product", () => {
     expect(rule.validate("abc", S, api()).message).toBe(`0 / ${target}`);
   });
 
-  it("solveRule reaches the product from an existing token (the captcha's I)", () => {
+  it("solveRule reaches the product from an existing Roman token in the password", () => {
     const rule = make("roman-product");
     expect(passes(rule, solveRule(rule, "I am human", api()))).toBe(true);
   });
