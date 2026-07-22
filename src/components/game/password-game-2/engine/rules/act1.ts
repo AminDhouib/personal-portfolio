@@ -150,6 +150,34 @@ export const CONSENT_PASSPHRASES: readonly string[] = ["OPTOUT", "REFUSE", "NOTH
 /** How many backward moves seed the initial toggle vector (the scramble depth). */
 const CONSENT_SCRAMBLE = 4;
 
+/**
+ * The consent wall's forward move: flip toggle `i`; if that click turned `i` OFF,
+ * also flip its seeded `neighbor[i]` (the dark pattern — declining one thing revives
+ * something you had already declined). Returns a fresh array; does not mutate `state`.
+ *
+ * Shared on purpose: the ConsentWidget drives this on every player click, and the BFS
+ * solvability test in rules.test.ts explores the same graph to prove every seed can
+ * reach all-off. Those two must never drift — one honest definition guarantees the CI
+ * net checks exactly the move the player makes. The generator's backward walk in
+ * buildConsentPuzzle is deliberately NOT expressed through this function: keeping the
+ * scramble independent means the BFS is an honest check of the generator's output
+ * rather than a tautology over shared code.
+ */
+export function applyConsentMove(
+  state: readonly boolean[],
+  i: number,
+  neighbor: readonly number[],
+): boolean[] {
+  const next = [...state];
+  const wasOn = next[i] ?? false;
+  next[i] = !wasOn;
+  if (wasOn) {
+    const nb = neighbor[i] ?? i;
+    next[nb] = !(next[nb] ?? false);
+  }
+  return next;
+}
+
 /** The seeded consent-wall puzzle carried on the rule payload. */
 export interface ConsentPuzzle {
   toggles: string[]; // the six category labels (static copy, copied per run)

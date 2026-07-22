@@ -147,6 +147,14 @@ describe("consent-preference wall", () => {
     expect(checked(2)).toBe(false);
   });
 
+  it("hides the Reset link once solved (its post-solve no-op styling would mislead)", () => {
+    const { save, sw, container } = renderWidget();
+    expect(container.querySelector('[data-testid="consent-reset"]')).not.toBeNull();
+    fireEvent.click(sw(0)!); // reach all-off
+    fireEvent.click(save());
+    expect(container.querySelector('[data-testid="consent-reset"]')).toBeNull();
+  });
+
   it("activates a switch by keyboard (Enter) and stops the event from toggling the card", () => {
     const { sw, checked } = renderWidget();
     expect(checked(2)).toBe(false);

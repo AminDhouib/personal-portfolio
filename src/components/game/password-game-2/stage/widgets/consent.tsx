@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ConsentPuzzle } from "../../engine/rules/act1";
+import { applyConsentMove, type ConsentPuzzle } from "../../engine/rules/act1";
 import type { WidgetChannel } from "./types";
 
 /**
@@ -16,7 +16,10 @@ import type { WidgetChannel } from "./types";
  * so a click never toggles the card, and the global keydown handler ignores these roles
  * so activating a switch never leaks a keystroke into the password. State is component-
  * local and seeded from payload.initial on first render; a re-mount (card collapse then
- * expand) resets progress to `initial`, which is acceptable — the puzzle is short.
+ * expand) resets progress to `initial`, which is acceptable — the puzzle is short. A
+ * player who deliberately re-solves after a re-mount appends the passphrase a second
+ * time; that is accepted (validate is an `includes` check, so the duplicate only costs
+ * length budget, never correctness).
  */
 export function ConsentWidget({
   ruleId,
@@ -34,17 +37,8 @@ export function ConsentWidget({
 
   function clickToggle(i: number) {
     if (solved) return;
-    setState((prev) => {
-      const next = [...prev];
-      const wasOn = next[i] ?? false;
-      next[i] = !wasOn;
-      if (wasOn) {
-        // Only turning a switch OFF disturbs its neighbor, and it FLIPS it.
-        const nb = puzzle.neighbor[i] ?? i;
-        next[nb] = !(next[nb] ?? false);
-      }
-      return next;
-    });
+    // Shared with the CI solvability net so the two can never drift — see applyConsentMove.
+    setState((prev) => applyConsentMove(prev, i, puzzle.neighbor));
   }
 
   function resetToInitial() {
@@ -118,26 +112,28 @@ export function ConsentWidget({
         >
           Save preferences
         </div>
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Reset to initial"
-          data-testid="consent-reset"
-          onClick={(e) => {
-            e.stopPropagation();
-            resetToInitial();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
+        {solved ? null : (
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Reset to initial"
+            data-testid="consent-reset"
+            onClick={(e) => {
               e.stopPropagation();
               resetToInitial();
-            }
-          }}
-          className="pg2-consent__reset"
-        >
-          Reset to initial
-        </div>
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToInitial();
+              }
+            }}
+            className="pg2-consent__reset"
+          >
+            Reset to initial
+          </div>
+        )}
       </div>
       {solved ? (
         <div className="pg2-consent__done">

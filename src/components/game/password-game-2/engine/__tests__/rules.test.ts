@@ -5,6 +5,7 @@ import { CORE_RULES } from "../rules/index";
 import { FILLER, solveAll, solveRule } from "./solve";
 import { CAPTCHA_KINDS, type CaptchaChallenge } from "../rules/prologue";
 import {
+  applyConsentMove,
   CONSENT_PASSPHRASES,
   CONSENT_TOGGLES,
   FREEBIE_MESSAGE,
@@ -373,18 +374,9 @@ describe("rule (act1) - consent-preferences", () => {
   it("is always solvable: BFS from initial reaches all-off within 12 moves for 50 seeds", () => {
     const encode = (s: readonly boolean[]): string => s.map((b) => (b ? "1" : "0")).join("");
     const GOAL = encode(Array<boolean>(6).fill(false));
-    // The widget's forward move: clicking toggle i flips t[i]; if that turned i OFF,
-    // its neighbor flips too.
-    const move = (state: readonly boolean[], i: number, neighbor: readonly number[]): boolean[] => {
-      const next = [...state];
-      const wasOn = next[i] ?? false;
-      next[i] = !wasOn;
-      if (wasOn) {
-        const nb = neighbor[i] ?? i;
-        next[nb] = !(next[nb] ?? false);
-      }
-      return next;
-    };
+    // Explore the SAME forward move the widget drives (applyConsentMove), so this net
+    // proves solvability of exactly the move the player makes.
+    const move = applyConsentMove;
     const shortestSolve = (initial: boolean[], neighbor: number[]): number => {
       if (encode(initial) === GOAL) return 0;
       const seen = new Set<string>([encode(initial)]);
