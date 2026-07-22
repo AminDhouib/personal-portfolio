@@ -12,7 +12,7 @@ import {
   SPONSORS,
   type ConsentPuzzle,
 } from "../rules/act1";
-import { ROMAN_PRODUCT_TARGETS } from "../rules/act2";
+import { COLOR_PALETTE, ROMAN_PRODUCT_TARGETS, type ColorMatch } from "../rules/act2";
 import { BACKWARDS_PASSWORD } from "../rules/act3";
 import { fromRoman, parseRomanTokens, romanProduct, toRoman } from "../rules/roman";
 import { setTodayWord } from "../../../../../data/password-game/wordle";
@@ -53,7 +53,7 @@ afterAll(() => {
 });
 
 describe("core rule roster", () => {
-  it("lists all 18 authored rules in the fixed reveal order", () => {
+  it("lists all 19 authored rules in the fixed reveal order", () => {
     expect(CORE_RULES.map((d) => d.id)).toEqual([
       "min-length-12",
       "include-number",
@@ -69,6 +69,7 @@ describe("core rule roster", () => {
       "roman-product",
       "country-name",
       "current-time",
+      "color-match",
       "chess-best-move",
       "max-length",
       "backwards-password",
@@ -80,8 +81,8 @@ describe("core rule roster", () => {
     const acts = CORE_RULES.map((d) => d.act);
     expect(acts.slice(0, 5)).toEqual(Array(5).fill("prologue"));
     expect(acts.slice(5, 10)).toEqual(Array(5).fill("act1"));
-    expect(acts.slice(10, 14)).toEqual(Array(4).fill("act2"));
-    expect(acts.slice(14, 18)).toEqual(Array(4).fill("act3"));
+    expect(acts.slice(10, 15)).toEqual(Array(5).fill("act2"));
+    expect(acts.slice(15, 19)).toEqual(Array(4).fill("act3"));
   });
 
   it("interpolates seeded targets into the parameterized descriptions", () => {
@@ -529,6 +530,66 @@ describe("rule 13 - current-time", () => {
   });
 });
 
+describe("rule (act2) - color-match", () => {
+  const colorOf = (rule: Pg2Rule): ColorMatch => rule.payload!["color"] as ColorMatch;
+
+  it("describes naming the swatch color in lowercase", () => {
+    const rule = make("color-match");
+    expect(rule.description.toLowerCase()).toContain("color");
+    expect(rule.description.toLowerCase()).toContain("lowercase");
+  });
+
+  it("carries the true color plus five decoys as six shuffled options from the palette", () => {
+    const c = colorOf(make("color-match"));
+    expect(COLOR_PALETTE.some((p) => p.name === c.name && p.hex === c.hex)).toBe(true);
+    expect(c.options).toHaveLength(6);
+    // Every option is a palette entry, and each is distinct.
+    for (const opt of c.options) {
+      expect(COLOR_PALETTE.some((p) => p.name === opt.name && p.hex === opt.hex)).toBe(true);
+    }
+    expect(new Set(c.options.map((o) => o.name)).size).toBe(6);
+    // The true color appears among the options exactly once.
+    expect(c.options.filter((o) => o.name === c.name)).toHaveLength(1);
+  });
+
+  it("is fully deterministic for a fixed seed", () => {
+    expect(colorOf(make("color-match", 8))).toEqual(colorOf(make("color-match", 8)));
+  });
+
+  it("passes only when the exact lowercase name is present (case-sensitive)", () => {
+    const rule = make("color-match");
+    const name = colorOf(rule).name;
+    expect(passes(rule, "no color here")).toBe(false);
+    expect(passes(rule, `the accent is ${name} today`)).toBe(true);
+    // The description says lowercase: an uppercased name does not satisfy it.
+    expect(passes(rule, `the accent is ${name.toUpperCase()} today`)).toBe(false);
+  });
+
+  it("solveRule appends the payload color name", () => {
+    const rule = make("color-match");
+    const solved = solveRule(rule, "abc", api());
+    expect(solved).toContain(colorOf(rule).name);
+    expect(passes(rule, solved)).toBe(true);
+  });
+
+  it("draws palette names with no digits and no Roman-numeral effect, so the typed name stays inert", () => {
+    // The password stores the name lowercase and roman-product reads UPPERCASE
+    // [IVXLCDM] runs only (see roman.ts), so a lowercase name never seeds a token;
+    // and no name carries a digit, so digit-sum is undisturbed. Mirrors the consent
+    // passphrase and captcha token constraints.
+    for (const { name, hex } of COLOR_PALETTE) {
+      expect(name).toMatch(/^[a-z]+$/);
+      expect(name).not.toMatch(/[0-9]/);
+      expect(romanProduct(name)).toBe(0);
+      expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    // Hexes are pairwise distinct across the twelve swatches.
+    expect(new Set(COLOR_PALETTE.map((c) => c.hex)).size).toBe(COLOR_PALETTE.length);
+    expect(new Set(COLOR_PALETTE.map((c) => c.name)).size).toBe(COLOR_PALETTE.length);
+    expect(romanProduct(colorOf(make("color-match")).name)).toBe(0);
+  });
+});
+
 describe("rule 14 - chess-best-move", () => {
   it("is a freebie when the feed is offline", () => {
     const rule = make("chess-best-move");
@@ -556,11 +617,11 @@ describe("rule 14 - chess-best-move", () => {
 });
 
 describe("rule 15 - max-length", () => {
-  it("seeds a cap in [74, 90] and passes at the cap, fails one over", () => {
+  it("seeds a cap in [81, 97] and passes at the cap, fails one over", () => {
     const rule = make("max-length");
     const cap = rule.payload!["target"] as number;
-    expect(cap).toBeGreaterThanOrEqual(74);
-    expect(cap).toBeLessThanOrEqual(90);
+    expect(cap).toBeGreaterThanOrEqual(81);
+    expect(cap).toBeLessThanOrEqual(97);
     expect(passes(rule, "a".repeat(cap))).toBe(true);
     expect(passes(rule, "a".repeat(cap + 1))).toBe(false);
   });

@@ -42,20 +42,22 @@ const chessBestMove: Pg2RuleDef = {
 
 /**
  * Rule 15 — a ceiling on length, the security-measure gag. The cap is seeded in
- * [74, 90]: high enough that the base roster (captcha + drowssap + the consent
- * passphrase + the live-feed answers + the digit block) always fits with room to
- * spare, so the designed tension is against event pressure (Tetris garbage,
- * abductions) rather than against the rules themselves. The floor was lifted from
- * 60 when the consent-preference rule joined act1: the worst-case required content
- * measured 69 characters, so a 60 floor was no longer structurally solvable for
- * every seed. The 40 of v1 was already unsolvable once live feeds injected a long
+ * [81, 97]: high enough that the base roster (captcha + drowssap + the consent
+ * passphrase + the color name + the live-feed answers + the digit block) always
+ * fits with room to spare, so the designed tension is against event pressure
+ * (Tetris garbage, abductions) rather than against the rules themselves. The floor
+ * has been lifted twice: to 74 when the consent-preference rule joined act1, and to
+ * 81 when the color-match rule joined act2 — the worst-case required content now
+ * measures 76 characters (the prior 69 plus the longest palette name, "magenta"/
+ * "crimson" at 7), so an 81 floor keeps every seed structurally solvable with ~5 of
+ * headroom. The 40 of v1 was already unsolvable once live feeds injected a long
  * country name and a chess SAN.
  */
 const maxLength: Pg2RuleDef = {
   id: "max-length",
   act: "act3",
   create: (rng) => {
-    const target = rangeInt(rng, 74, 90);
+    const target = rangeInt(rng, 81, 97);
     return {
       id: "max-length",
       act: "act3",

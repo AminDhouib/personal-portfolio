@@ -1,5 +1,5 @@
 import type { Pg2RuleDef } from "../types";
-import { pickOne } from "../rng";
+import { pickN, pickOne } from "../rng";
 import { romanProduct } from "./roman";
 import { FREEBIE_MESSAGE } from "./act1";
 import { getInjectedCapitals } from "../../../../../data/password-game/capitals";
@@ -81,10 +81,78 @@ const currentTime: Pg2RuleDef = {
   }),
 };
 
+/** One named swatch in the color-match palette. */
+export interface ColorOption {
+  name: string; // lowercase single word; see the inertness note on COLOR_PALETTE
+  hex: string; // "#rrggbb"
+}
+
+/** The seeded color-match puzzle carried on the rule payload. */
+export interface ColorMatch {
+  name: string; // the true color's name (what the password must contain)
+  hex: string; // the true color's swatch, shown big and unlabeled
+  options: ColorOption[]; // seeded shuffle of the truth + 5 decoys (6 total)
+}
+
+/**
+ * Twelve visually-distinct named colors. Every name is a lowercase single word,
+ * so it is inert to the two rewriting rules by construction: roman-product reads
+ * UPPERCASE [IVXLCDM] runs only (see roman.ts), so a lowercase name never seeds a
+ * token (romanProduct(name) === 0), and no name carries a digit, so digit-sum
+ * (rule 6) is undisturbed. The password stores the name lowercase and validate
+ * matches it verbatim, so the inertness holds for the string actually typed.
+ * Hexes are pairwise distinct; the rules test asserts both invariants.
+ */
+export const COLOR_PALETTE: readonly ColorOption[] = [
+  { name: "crimson", hex: "#dc143c" },
+  { name: "coral", hex: "#ff7f50" },
+  { name: "amber", hex: "#ffbf00" },
+  { name: "gold", hex: "#ffd700" },
+  { name: "olive", hex: "#808000" },
+  { name: "teal", hex: "#008080" },
+  { name: "azure", hex: "#007fff" },
+  { name: "indigo", hex: "#4b0082" },
+  { name: "violet", hex: "#8a2be2" },
+  { name: "magenta", hex: "#ff00ff" },
+  { name: "salmon", hex: "#fa8072" },
+  { name: "cyan", hex: "#00b7c3" },
+];
+
+/**
+ * Rule 15 — name the seasonal accent color. A seeded true color is shown as a big
+ * unlabeled swatch; the widget offers it among five decoys drawn from the other
+ * palette entries, and clicking the swatch whose hue matches types the color's
+ * lowercase name into the password. The payload carries the truth plus a seeded
+ * six-way shuffle of the candidates, so a daily or racing seed replays identically.
+ * Validation is an exact lowercase includes — the description says lowercase.
+ */
+const colorMatch: Pg2RuleDef = {
+  id: "color-match",
+  act: "act2",
+  create: (rng) => {
+    const truth = pickOne(rng, COLOR_PALETTE);
+    const decoys = pickN(
+      rng,
+      COLOR_PALETTE.filter((c) => c.name !== truth.name),
+      5,
+    );
+    const options = pickN(rng, [truth, ...decoys], 6); // seeded shuffle of the six
+    const color: ColorMatch = { name: truth.name, hex: truth.hex, options };
+    return {
+      id: "color-match",
+      act: "act2",
+      description: "Your password must name the color of the seasonal accent swatch (lowercase).",
+      payload: { color },
+      validate: (password) => ({ passed: password.includes(truth.name) }),
+    };
+  },
+};
+
 /** Act 2 rules, in reveal order. */
 export const ACT2_RULES: readonly Pg2RuleDef[] = [
   romanNumeral,
   romanProductRule,
   countryName,
   currentTime,
+  colorMatch,
 ];

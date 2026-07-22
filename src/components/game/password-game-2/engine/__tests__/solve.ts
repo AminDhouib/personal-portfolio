@@ -17,7 +17,7 @@ import { fromRoman, parseRomanTokens, toRoman } from "../rules/roman";
  * live payload strings that must survive verbatim (the current-time HH:MM, a
  * chess SAN, the wordle answer, the country name). Digits inside them count
  * toward the target and are never stripped, so digit-sum and a digit-bearing SAN
- * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 74-90)
+ * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 81-97)
  * guarantee the target is always reachable — a seed is never unsolvable.
  */
 
@@ -47,6 +47,7 @@ const SOLVE_PRIORITY: Record<string, number> = {
   "roman-product": 1,
   "country-name": 1,
   "current-time": 1,
+  "color-match": 1,
   "chess-best-move": 1,
   "backwards-password": 1,
   "no-infected": 1,
@@ -251,6 +252,16 @@ export function solveRule(
       return solveFeedWord(rule, current, "country", (c) => c.toLowerCase());
     case "current-time":
       return current + api.nowHHMM();
+    case "color-match": {
+      const color = rule.payload?.["color"] as { name?: unknown } | undefined;
+      const name = color?.name;
+      if (typeof name !== "string" || name === "") {
+        throw new Error("solveRule(color-match): rule payload is missing its color name");
+      }
+      // The name is a lowercase word with no Roman letters or digits, so a plain
+      // append is inert to roman-product and digit-sum (see COLOR_PALETTE).
+      return current + name;
+    }
     case "chess-best-move":
       return solveFeedWord(rule, current, "bestMove", (m) => m);
     case "max-length":

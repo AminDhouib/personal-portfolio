@@ -2,10 +2,12 @@ import { memo, useState } from "react";
 import type { GameState, Pg2Rule, RuleApi, ValidationResult } from "../engine/types";
 import type { CaptchaChallenge } from "../engine/rules/prologue";
 import type { ConsentPuzzle } from "../engine/rules/act1";
+import type { ColorMatch } from "../engine/rules/act2";
 import type { WidgetChannel } from "./widgets/types";
 import { ChessBoard } from "./widgets/chess";
 import { CaptchaWidget } from "./widgets/captcha";
 import { ConsentWidget } from "./widgets/consent";
+import { ColorSwatch } from "./widgets/color";
 
 interface RuleListProps {
   rules: readonly Pg2Rule[];
@@ -65,6 +67,13 @@ function readConsent(v: unknown): ConsentPuzzle | null {
     Array.isArray(c.initial) &&
     typeof c.passphrase === "string"
     ? (v as ConsentPuzzle)
+    : null;
+}
+function readColor(v: unknown): ColorMatch | null {
+  if (!v || typeof v !== "object") return null;
+  const c = v as Partial<ColorMatch>;
+  return typeof c.name === "string" && typeof c.hex === "string" && Array.isArray(c.options)
+    ? (v as ColorMatch)
     : null;
 }
 
@@ -269,6 +278,9 @@ function PayloadView({ rule, widget }: { rule: Pg2Rule; widget: WidgetChannel })
   const consent = readConsent(p.consent);
   if (consent) return <ConsentWidget ruleId={rule.id} puzzle={consent} widget={widget} />;
 
+  const color = readColor(p.color);
+  if (color) return <ColorSwatch ruleId={rule.id} puzzle={color} widget={widget} />;
+
   const sponsors = readStringArray(p.sponsors);
   if (sponsors) return <SponsorTiles sponsors={sponsors} />;
 
@@ -358,7 +370,7 @@ function RuleCard({
  * Badge numbers stay tied to authored position, not display order.
  *
  * Memoized on its props (version included) so the 250ms HUD heartbeat does not
- * re-run 17 validations; engine state changes bump version and re-render it.
+ * re-run 19 validations; engine state changes bump version and re-render it.
  */
 export const RuleList = memo(function RuleList({
   rules,
