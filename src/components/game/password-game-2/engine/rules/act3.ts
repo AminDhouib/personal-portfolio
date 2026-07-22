@@ -43,14 +43,14 @@ const chessBestMove: Pg2RuleDef = {
 /**
  * Rule 15 — a ceiling on length, the security-measure gag. The cap is seeded in
  * [116, 132]. The floor is set by the worst-case required content: every rule's
- * mandatory substring present at once, measured at 111 characters across a sweep
+ * mandatory substring present at once, measured at 114 characters across a sweep
  * of 3000 seeds under the production feeds and the length-maximizing exogenous
  * inputs (clock 00:00, which forces the largest digit-sum block; the longest daily
  * chess SAN; the longest served country). That worst case is dominated by the
  * country-name rule: /api/password-game/countries serves the full vendored capitals
  * list and the rule picks one per seed, so ~6% of seeds draw a country over 20
  * characters and the longest ("Saint Helena, Ascension and Tristan da Cunha") is 44
- * characters on its own. A 116 floor clears 111 with ~5 of headroom, so the designed
+ * characters on its own. A 116 floor clears 114 with ~2 of headroom, so the designed
  * tension is against event pressure (Tetris garbage, abductions transiently inflating
  * the password) rather than against the rules themselves; the 16-wide window keeps
  * the cap varying across seeds. The floor moved 40 -> 74 -> 81 -> 116 as live feeds
