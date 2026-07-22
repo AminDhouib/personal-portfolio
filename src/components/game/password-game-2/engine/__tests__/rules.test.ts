@@ -13,7 +13,12 @@ import {
   SPONSORS,
   type ConsentPuzzle,
 } from "../rules/act1";
-import { COLOR_PALETTE, ROMAN_PRODUCT_TARGETS, type ColorMatch } from "../rules/act2";
+import {
+  COLOR_CONFUSABLE,
+  COLOR_PALETTE,
+  ROMAN_PRODUCT_TARGETS,
+  type ColorMatch,
+} from "../rules/act2";
 import { BACKWARDS_PASSWORD } from "../rules/act3";
 import { fromRoman, parseRomanTokens, romanProduct, toRoman } from "../rules/roman";
 import { setTodayWord } from "../../../../../data/password-game/wordle";
@@ -546,6 +551,19 @@ describe("rule (act2) - color-match", () => {
 
   it("is fully deterministic for a fixed seed", () => {
     expect(colorOf(make("color-match", 8))).toEqual(colorOf(make("color-match", 8)));
+  });
+
+  it("never deals the true color alongside its perceptual near-twin", () => {
+    // The harm is a truth shown next to the twin it is hard to tell apart (amber/gold,
+    // coral/salmon): the match becomes guesswork. The decoy pool excludes the truth's
+    // twin, so the twin never rides along as a decoy. (Two decoys that happen to be
+    // twins of each other are harmless — neither matches the shown swatch.)
+    for (let seed = 1; seed <= 200; seed++) {
+      const c = colorOf(make("color-match", seed));
+      const twin = COLOR_CONFUSABLE[c.name];
+      if (twin === undefined) continue;
+      expect(c.options.some((o) => o.name === twin)).toBe(false);
+    }
   });
 
   it("passes only when the exact lowercase name is present (case-sensitive)", () => {

@@ -119,6 +119,21 @@ export const COLOR_PALETTE: readonly ColorOption[] = [
 ];
 
 /**
+ * Perceptual near-twins that must never co-occur in one option set: amber/gold and
+ * coral/salmon sit close enough in hue that a swatch beside its twin turns the match
+ * into guesswork. Each still appears as the truth on its own seeds; only the decoy
+ * pool excludes the truth's twin, and that exclusion happens BEFORE the seeded decoy
+ * draw so determinism is preserved per seed. (Seeds that previously dealt a twin pair
+ * reroll to a twin-free set; accepted pre-launch.)
+ */
+export const COLOR_CONFUSABLE: Record<string, string> = {
+  amber: "gold",
+  gold: "amber",
+  coral: "salmon",
+  salmon: "coral",
+};
+
+/**
  * Rule 15 — name the seasonal accent color. A seeded true color is shown as a big
  * unlabeled swatch; the widget offers it among five decoys drawn from the other
  * palette entries, and clicking the swatch whose hue matches types the color's
@@ -130,10 +145,14 @@ const colorMatch: Pg2RuleDef = {
   id: "color-match",
   act: "act2",
   create: (rng) => {
+    // Draw order (truth, then decoys, then shuffle) is part of the seed contract:
+    // reordering these draws rerolls every existing daily/racing seed. The twin
+    // filter below sits between pickOne and pickN without adding or removing a draw.
     const truth = pickOne(rng, COLOR_PALETTE);
+    const twin = COLOR_CONFUSABLE[truth.name];
     const decoys = pickN(
       rng,
-      COLOR_PALETTE.filter((c) => c.name !== truth.name),
+      COLOR_PALETTE.filter((c) => c.name !== truth.name && c.name !== twin),
       5,
     );
     const options = pickN(rng, [truth, ...decoys], 6); // seeded shuffle of the six

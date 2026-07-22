@@ -580,6 +580,8 @@
   box-shadow: inset 0 0 0 3px #16a34a;
 }
 .pg2-color__option--shake {
+  /* Deliberate cross-widget reuse of the chess shake keyframe (not a typo);
+     promote to a neutral pg2-shake only if a third widget ever needs it. */
   animation: pg2-chess-shake 0.3s ease-in-out;
 }
 .pg2-color__done {
