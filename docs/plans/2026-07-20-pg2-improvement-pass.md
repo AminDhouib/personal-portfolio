@@ -396,6 +396,18 @@ neighbor `n[i]` turns ON. Generation: start all-off; K=4 times pick a random `i`
 and REVERSE a move (set `t[i] = on`, and if `t[n[i]]` is on, set it off); the resulting
 vector is `initial`. Goal state: all off.
 
+> **Amendment (2026-07-22):** the set-neighbor-ON move above proved unsolvable and did NOT
+> ship as written. With a hard "set neighbor on," the all-off goal is a Garden-of-Eden state
+> — no move produces it as an output — so a BFS over the move graph found it unreachable
+> (200k/200k sampled scrambles unsolvable). The shipped model makes the neighbor effect a
+> FLIP in both directions: switching `i` off flips (toggles) `n[i]` rather than forcing it on.
+> That restores reversibility, keeps the same dark-pattern beat (decline one thing, something
+> you already declined comes back), and is verified solvable — the CI BFS explores the full
+> 64-state space and reaches all-off within its 12-move bound across 50 seeds (worst observed
+> solve depth 6). The shared forward move lives in `applyConsentMove` (act1.ts), which both the
+> widget and the solvability test drive, so the net proves solvability of exactly the move the
+> player makes. See act1.ts's `applyConsentMove` note for the invariant.
+
 - [ ] **Step 1: Failing rule tests** — payload
       `{ consent: { toggles: string[6], neighbor: number[6], initial: boolean[6], passphrase } }`;
       labels are 6 enterprise data-sharing categories; `neighbor[i] !== i`; passphrase is one of

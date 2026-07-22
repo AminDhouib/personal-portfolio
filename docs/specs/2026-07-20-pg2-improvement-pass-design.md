@@ -150,6 +150,13 @@ not capture keyboard focus in ways that break the global keydown game surface.
    backward from the solved (all-off) state so it is always solvable in a bounded number of
    moves. Reaching all-off enables "Save preferences", which reveals a seeded passphrase the
    widget types into the password. Solved-ness also publishes to ruleStates.
+   > **Amendment (2026-07-22):** "flips one seeded neighbor on" is a hard set-ON as written,
+   > and that model shipped as a two-way FLIP instead. Forcing the neighbor ON makes the all-off
+   > goal a Garden-of-Eden state (no predecessor), so it is unreachable — BFS confirmed it
+   > unsolvable. The shipped neighbor effect toggles in both directions, which keeps the dark
+   > pattern (decline one thing, a previously-declined one returns) while staying reversible and
+   > verifiably solvable (worst solve depth 6). See the plan's Task 11 amendment and act1.ts's
+   > `applyConsentMove`.
 4. **RGB color match** (new act2 rule). A seeded target swatch plus three R/G/B sliders
    (step 17, so 16 positions per channel; the target sits on the same lattice — exact match
    is fair). A live preview swatch sits beside the target. On exact match the widget types

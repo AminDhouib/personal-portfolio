@@ -169,6 +169,44 @@ current tree on 2026-07-07.
   by the app's own real clients (`JSON.stringify` output) cannot be malformed — a parse failure
   past the guard chain is inherently a signal of something abnormal, worth capturing.
 
+The following Password Game 2 entries were verified against the current tree on 2026-07-22.
+
+- **PG2's image CAPTCHA rejects the first correct submission on purpose** (`stage/widgets/captcha.tsx`).
+  A player who selects exactly the right tiles on grid 1 and hits Verify is told "Verification
+  failed. Please try again." and handed a second, fresh grid; only the correct set on grid 2 yields
+  the token. This is the dark-pattern joke — the form doubts your humanity exactly once — not an
+  off-by-one. The state machine structurally guarantees a single forced rejection: a wrong set is
+  also rejected but never advances the stage, so it cannot consume the one scripted rejection, and
+  grid 2 has no rejection branch, so the widget cannot soft-lock.
+- **PG2's consent wall fights back when you switch a toggle off, by design** (`stage/widgets/consent.tsx`,
+  `applyConsentMove` in `engine/rules/act1.ts`). Turning a switch OFF flips its seeded neighbor —
+  declining one thing brings back something you already declined. That is the intended friction, not
+  a state bug; the "Reset to initial" link is the honest escape when a player wedges the panel, and
+  it disappears once solved. Because the widget holds its own progress, re-mounting the card (any HUD
+  remount) resets it to the seed's `initial` — expected, since the passphrase reveal is idempotent.
+  A player who deliberately re-solves after the rule is already green can append the passphrase a
+  second time; the extra copy is accepted (the rule is a substring `includes`, and the length budget
+  has headroom). The neighbor effect is a two-way FLIP rather than the spec's set-ON — see the plan's
+  Task 11 amendment for why (a set-ON goal is a Garden-of-Eden state, unsolvable).
+- **PG2's color-match widget is effectively sighted-only, and its near-twin exclusion is narrow on
+  purpose** (`engine/rules/act2.ts`). Naming a swatch by hue is genre-inherent — the original Password
+  Game's color rule is the same — so the widget is not made non-visually solvable; the offline solver
+  and the payload's color name keep it deterministic for tests and racing. The `COLOR_CONFUSABLE`
+  exclusion only keeps a perceptual near-twin (amber/gold, coral/salmon) out of the decoy pool when
+  it is the TRUTH's twin; two decoys that happen to be twins of each other can still co-occur and are
+  harmless, because the fair-match guarantee is only about distinguishing the truth from its decoys.
+- **PG2's chess widget only ever types queen promotions** (`stage/widgets/chess.tsx`). The board
+  hardcodes `promotion: "q"`, so a daily puzzle whose best move is an underpromotion (e.g. `e8=N#`)
+  cannot be clicked out — those rare dailies must be typed by hand into the password. This is an
+  accepted limitation of the click-to-move affordance, not a move-generation bug; the SAN validate
+  still accepts a hand-typed underpromotion.
+- **Every PG2 widget routes its text through `applyText` -> `applyKey`, the same path as a keystroke**
+  (`engine/engine.ts`). This is the widget fairness invariant: a widget never writes to the password
+  directly, so an active event that intercepts typing — a loading-bar stun swallowing keys, the snake
+  eating a character, autocorrect rewriting — intercepts widget output identically. A widget can never
+  bypass an in-progress event; the CAPTCHA token, consent passphrase, chess SAN, and color hex are all
+  subject to the same event pressure a typed answer would face.
+
 ## Adversarial standoffs (restated from the audit's final report)
 
 These went through two rounds of adversarial review and were not fully resolved either way —
@@ -257,6 +295,17 @@ trigger revisiting it.
   new game bypasses them with a raw `localStorage` call.
 - **Voltorb's tile-fade animation still uses a raw `requestAnimationFrame` loop** (audit ref
   NF-P6-1) rather than the shared engine/effects pattern the rest of that game now follows.
+- **PG2's four rule-card widgets nest interactive controls inside a native `<button>`** (`stage/widgets/`
+  captcha/chess/color/consent). `RuleCard` renders the whole card — description, live message, and the
+  `PayloadView` widget — as one native `<button>` (the click-to-expand affordance), so each widget must
+  render its own controls as `role="button"`/`role="switch"` divs with `tabIndex` and key handlers
+  rather than real nested buttons (nested interactive elements are invalid DOM). This is a shared
+  accessibility smell — a real screen-reader user gets a button-inside-button tree — but it is
+  functionally harmless (every widget control `stopPropagation`s so it does not toggle the card) and
+  cheap only to fix by restructuring `RuleCard` so the expand affordance is not the outer element.
+  Deferred; trigger is any broader `RuleCard` a11y pass. Additionally, the consent widget's "Save
+  preferences" control keeps `tabIndex=0` while disabled and signals its state via `aria-disabled`
+  (rather than dropping out of the tab order) — ARIA-legal, flagged here for awareness.
 - **Some defensive branches are provably dead** (audit ref NF(P7)-b) — error paths guarding
   conditions that current callers can no longer produce, left in place as cheap insurance rather
   than removed.
