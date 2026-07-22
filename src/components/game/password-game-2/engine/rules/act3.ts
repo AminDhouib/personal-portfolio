@@ -42,22 +42,30 @@ const chessBestMove: Pg2RuleDef = {
 
 /**
  * Rule 15 — a ceiling on length, the security-measure gag. The cap is seeded in
- * [81, 97]: high enough that the base roster (captcha + drowssap + the consent
- * passphrase + the color name + the live-feed answers + the digit block) always
- * fits with room to spare, so the designed tension is against event pressure
- * (Tetris garbage, abductions) rather than against the rules themselves. The floor
- * has been lifted twice: to 74 when the consent-preference rule joined act1, and to
- * 81 when the color-match rule joined act2 — the worst-case required content now
- * measures 76 characters (the prior 69 plus the longest palette name, "magenta"/
- * "crimson" at 7), so an 81 floor keeps every seed structurally solvable with ~5 of
- * headroom. The 40 of v1 was already unsolvable once live feeds injected a long
- * country name and a chess SAN.
+ * [116, 132]. The floor is set by the worst-case required content: every rule's
+ * mandatory substring present at once, measured at 111 characters across a sweep
+ * of 3000 seeds under the production feeds and the length-maximizing exogenous
+ * inputs (clock 00:00, which forces the largest digit-sum block; the longest daily
+ * chess SAN; the longest served country). That worst case is dominated by the
+ * country-name rule: /api/password-game/countries serves the full vendored capitals
+ * list and the rule picks one per seed, so ~6% of seeds draw a country over 20
+ * characters and the longest ("Saint Helena, Ascension and Tristan da Cunha") is 44
+ * characters on its own. A 116 floor clears 111 with ~5 of headroom, so the designed
+ * tension is against event pressure (Tetris garbage, abductions transiently inflating
+ * the password) rather than against the rules themselves; the 16-wide window keeps
+ * the cap varying across seeds. The floor moved 40 -> 74 -> 81 -> 116 as live feeds
+ * and the act1/act2 widget rules grew the mandatory content; the earlier 81 was
+ * measured against a single short injected country and silently under-counted the
+ * live feed's long tail. The budget is enforced by rules.test.ts: the rule-15 bounds
+ * test pins [116, 132], and the "solves every seed 1..20 under worst-case live feeds"
+ * solveAll test injects the longest served country under both clock extremes and
+ * asserts the fully-solved password fits the seed's cap.
  */
 const maxLength: Pg2RuleDef = {
   id: "max-length",
   act: "act3",
   create: (rng) => {
-    const target = rangeInt(rng, 81, 97);
+    const target = rangeInt(rng, 116, 132);
     return {
       id: "max-length",
       act: "act3",

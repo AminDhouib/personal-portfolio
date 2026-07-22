@@ -17,8 +17,9 @@ import { fromRoman, parseRomanTokens, toRoman } from "../rules/roman";
  * live payload strings that must survive verbatim (the current-time HH:MM, a
  * chess SAN, the wordle answer, the country name). Digits inside them count
  * toward the target and are never stripped, so digit-sum and a digit-bearing SAN
- * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 81-97)
- * guarantee the target is always reachable — a seed is never unsolvable.
+ * no longer contradict. The seeded ranges (digit-sum 35-45, max-length 116-132)
+ * guarantee the target is always reachable — a seed is never unsolvable, even when
+ * the country feed draws its longest name (see the max-length rule's budget note).
  */
 
 /** Trim/pad character. A special char (helps rule 4) that is inert everywhere else. */

@@ -22,7 +22,11 @@ import {
 import { BACKWARDS_PASSWORD } from "../rules/act3";
 import { fromRoman, parseRomanTokens, romanProduct, toRoman } from "../rules/roman";
 import { setTodayWord } from "../../../../../data/password-game/wordle";
-import { CHESS_PUZZLES, setDailyChessPuzzle } from "../../../../../data/password-game/chess";
+import {
+  CHESS_PUZZLES,
+  setDailyChessPuzzle,
+  type ChessPuzzle,
+} from "../../../../../data/password-game/chess";
 import { setExtendedCapitals } from "../../../../../data/password-game/capitals";
 
 /** Validators ignore GameState; a stub keeps the call sites terse. */
@@ -627,11 +631,11 @@ describe("rule 14 - chess-best-move", () => {
 });
 
 describe("rule 15 - max-length", () => {
-  it("seeds a cap in [81, 97] and passes at the cap, fails one over", () => {
+  it("seeds a cap in [116, 132] and passes at the cap, fails one over", () => {
     const rule = make("max-length");
     const cap = rule.payload!["target"] as number;
-    expect(cap).toBeGreaterThanOrEqual(81);
-    expect(cap).toBeLessThanOrEqual(97);
+    expect(cap).toBeGreaterThanOrEqual(116);
+    expect(cap).toBeLessThanOrEqual(132);
     expect(passes(rule, "a".repeat(cap))).toBe(true);
     expect(passes(rule, "a".repeat(cap + 1))).toBe(false);
   });
@@ -689,20 +693,37 @@ describe("solveAll", () => {
   });
 
   // The solvability guarantee, locked in CI: no seed may be structurally
-  // unsolvable, even under the worst-case live feed (a long country name, a
-  // digit-bearing SAN, and the clock at its maximum digit sum, 19:59).
+  // unsolvable, even under the worst-case live feed. Two exogenous extremes are
+  // exercised per seed because they stress different rules: clock 19:59 is the peak
+  // HH:MM digit sum (guards digit-sum's protected-digit path), while clock 00:00 is
+  // the minimum, forcing the largest digit-sum block (the length worst case). The
+  // injected country is the LONGEST the production feed serves (44 chars) — the real
+  // worst case that a full-list feed can draw, not the short single country the
+  // earlier version injected — and the SAN is a 7-char promotion-with-check.
+  const LONGEST_COUNTRY = "Saint Helena, Ascension and Tristan da Cunha";
+  const LONG_SAN_PUZZLE: ChessPuzzle = {
+    id: "budget-worst",
+    board: CHESS_PUZZLES[0]!.board,
+    toMove: "white",
+    bestMove: "exd8=Q+", // 7 chars, carries the rank digit 8
+    accept: ["exd8=Q+"],
+    hint: "",
+    fen: CHESS_PUZZLES[0]!.fen,
+  };
   it("solves every seed 1..20 under worst-case live feeds, within the cap", () => {
     for (let seed = 1; seed <= 20; seed++) {
       setTodayWord("FLAME");
-      setDailyChessPuzzle(CHESS_PUZZLES[0]!); // best move "Ra8" -> digit 8
-      setExtendedCapitals([{ country: "Saudi Arabia", capital: "Riyadh" }]);
+      setDailyChessPuzzle(LONG_SAN_PUZZLE);
+      setExtendedCapitals([{ country: LONGEST_COUNTRY, capital: "Jamestown" }]);
       const rules = roster(seed);
       const g = { cells: [], rules } as unknown as GameState;
-      const a = api("19:59"); // peak HH:MM digit sum (1+9+5+9 = 24)
-      const solved = solveAll(g, a);
       const cap = rules.find((r) => r.id === "max-length")!.payload!["target"] as number;
-      expect(rules.every((r) => r.validate(solved, g, a).passed)).toBe(true);
-      expect([...solved].length).toBeLessThanOrEqual(cap);
+      for (const clock of ["19:59", "00:00"]) {
+        const a = api(clock);
+        const solved = solveAll(g, a);
+        expect(rules.every((r) => r.validate(solved, g, a).passed)).toBe(true);
+        expect([...solved].length).toBeLessThanOrEqual(cap);
+      }
     }
   });
 });
