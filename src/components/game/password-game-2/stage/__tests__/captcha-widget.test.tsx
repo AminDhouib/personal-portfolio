@@ -127,6 +127,29 @@ describe("rejecting image captcha", () => {
     expect(container.querySelector(".pg2-captcha__token")?.textContent).toBe("OK-BEEF");
   });
 
+  it("drives a toggle and the forced rejection through the keyboard path", () => {
+    const { onWidgetText, onRuleState, verify, stage, tile, container } = renderWidget();
+    const press = (el: HTMLElement, key: string) => fireEvent.keyDown(el, { key });
+    // Space flips a tile's pressed state and flips it back — same as the click toggle.
+    press(tile(0)!, " ");
+    expect(tile(0)?.getAttribute("aria-pressed")).toBe("true");
+    press(tile(0)!, " ");
+    expect(tile(0)?.getAttribute("aria-pressed")).toBe("false");
+    // Select the whole correct grid-1 set by keyboard (Enter and Space both activate).
+    press(tile(0)!, "Enter");
+    press(tile(2)!, " ");
+    press(tile(4)!, "Enter");
+    expect(GRID1_TARGET.every((i) => tile(i)?.getAttribute("aria-pressed") === "true")).toBe(true);
+    // Verify by keyboard: the first correct set is the single forced rejection -> grid 2.
+    press(verify(), "Enter");
+    expect(container.querySelector(".pg2-captcha__msg")?.textContent).toBe(
+      "Verification failed. Please try again.",
+    );
+    expect(stage()).toBe("2"); // advanced to grid 2, exactly as the click path does
+    expect(onWidgetText).not.toHaveBeenCalled(); // no token yet — the rejection was consumed
+    expect(onRuleState).toHaveBeenCalledWith("captcha-human", { stage: 2 });
+  });
+
   it("forces exactly one rejection even after earlier wrong guesses on grid 1", () => {
     const { onWidgetText, verify, stage, select, tile } = renderWidget();
     // A wrong guess first (does not consume the forced rejection).

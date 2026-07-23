@@ -77,6 +77,9 @@ describe("color-match eyedropper", () => {
     // candidate labels are attributes (aria-label), and which one is correct is only
     // knowable by matching hue.
     expect(container.textContent).not.toContain("crimson");
+    // Nor through a title tooltip: no element carries the answer name in a title attr.
+    const titles = Array.from(container.querySelectorAll("[title]"));
+    expect(titles.some((el) => (el.getAttribute("title") ?? "").includes("crimson"))).toBe(false);
   });
 
   it("renders the six candidate swatches, each aria-labelled by its color name", () => {
