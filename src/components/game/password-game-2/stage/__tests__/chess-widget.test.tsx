@@ -82,6 +82,21 @@ const withFen = () => ({
   fen: SCHOLAR_FEN,
 });
 
+/**
+ * A white pawn on e7 with the enemy king boxed on h8: e8 promotions are all legal,
+ * and chess.js reports e8=Q+, e8=R+, e8=B, e8=N for the four pieces. The chooser
+ * must appear on the e8 click and only type once a piece is picked.
+ */
+const PROMOTION_FEN = "7k/4P3/8/8/8/8/8/K7 w - - 0 1";
+const withPromotion = () => ({
+  id: "promo",
+  board: fenToGlyphBoard(PROMOTION_FEN),
+  toMove: "white",
+  bestMove: "e8=N",
+  hint: "Underpromote to knight.",
+  fen: PROMOTION_FEN,
+});
+
 afterEach(() => cleanup());
 
 describe("playable chess board", () => {
@@ -129,6 +144,56 @@ describe("playable chess board", () => {
     // Board reset from the same fen: reselecting the queen lights f7 once more.
     fireEvent.click(sq("h5")!);
     expect(sq("f7")?.dataset.target).toBe("true");
+  });
+
+  it("opens a 4-piece promotion chooser on a promotion target instead of typing", () => {
+    const { container, sq, onWidgetText } = renderBoard(withPromotion());
+    fireEvent.click(sq("e7")!);
+    expect(sq("e8")?.dataset.target).toBe("true");
+    fireEvent.click(sq("e8")!);
+    // Four choices, and nothing typed yet: the move waits on the piece pick.
+    expect(container.querySelectorAll("[data-promote]").length).toBe(4);
+    expect(onWidgetText).not.toHaveBeenCalled();
+  });
+
+  it("types the underpromotion SAN when the knight is chosen", () => {
+    const { container, sq, onWidgetText } = renderBoard(withPromotion());
+    fireEvent.click(sq("e7")!);
+    fireEvent.click(sq("e8")!);
+    fireEvent.click(container.querySelector('[data-promote="n"]')!);
+    expect(onWidgetText).toHaveBeenCalledTimes(1);
+    expect(onWidgetText).toHaveBeenCalledWith("e8=N");
+    // Chooser dismissed and the board deselected after the pick.
+    expect(container.querySelectorAll("[data-promote]").length).toBe(0);
+    expect(sq("e7")?.dataset.selected).toBeUndefined();
+  });
+
+  it("types the queen SAN when the queen is chosen", () => {
+    const { container, sq, onWidgetText } = renderBoard(withPromotion());
+    fireEvent.click(sq("e7")!);
+    fireEvent.click(sq("e8")!);
+    fireEvent.click(container.querySelector('[data-promote="q"]')!);
+    expect(onWidgetText).toHaveBeenCalledTimes(1);
+    expect(onWidgetText).toHaveBeenCalledWith("e8=Q+");
+  });
+
+  it("cancels the chooser without typing when another board square is clicked", () => {
+    const { container, sq, onWidgetText } = renderBoard(withPromotion());
+    fireEvent.click(sq("e7")!);
+    fireEvent.click(sq("e8")!);
+    expect(container.querySelectorAll("[data-promote]").length).toBe(4);
+    fireEvent.click(sq("a1")!); // any board square dismisses the pending chooser
+    expect(container.querySelectorAll("[data-promote]").length).toBe(0);
+    expect(onWidgetText).not.toHaveBeenCalled();
+    expect(sq("e7")?.dataset.selected).toBeUndefined();
+  });
+
+  it("never opens the chooser for a non-promotion move", () => {
+    const { container, sq, onWidgetText } = renderBoard(withFen());
+    fireEvent.click(sq("h5")!);
+    fireEvent.click(sq("f7")!); // Qxf7#, not a promotion — types straight through
+    expect(container.querySelectorAll("[data-promote]").length).toBe(0);
+    expect(onWidgetText).toHaveBeenCalledWith("Qxf7#");
   });
 
   it("falls back to the static diagram when the payload has no fen", () => {

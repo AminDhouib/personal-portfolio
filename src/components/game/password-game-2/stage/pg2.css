@@ -311,6 +311,28 @@
 .pg2-chess__sq--shake {
   animation: pg2-chess-shake 0.3s ease-in-out;
 }
+/* Promotion chooser: four pickable pieces shown when a promotion target is clicked. */
+.pg2-chess__promo {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.pg2-chess__promo-piece {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  border: 1px solid var(--pg2-ink);
+  background: #eef2f7;
+  cursor: pointer;
+}
+.pg2-chess__promo-piece:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
 @keyframes pg2-chess-shake {
   0%,
   100% {

@@ -1,8 +1,22 @@
 import { useState } from "react";
-import { Chess, type Square } from "chess.js";
+import { Chess, type PieceSymbol, type Square } from "chess.js";
 import type { WidgetChannel } from "./types";
 
 const CHESS_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+
+/** Chooser roster, in the order a promotion dialog conventionally offers them. */
+const PROMOTION_ROLES = [
+  { role: "q", label: "queen" },
+  { role: "r", label: "rook" },
+  { role: "b", label: "bishop" },
+  { role: "n", label: "knight" },
+] as const;
+
+/** Unicode glyphs for the chooser, keyed by the promoting side's color. */
+const PROMOTION_GLYPHS: Record<"w" | "b", Record<string, string>> = {
+  w: { q: "♕", r: "♖", b: "♗", n: "♘" },
+  b: { q: "♛", r: "♜", b: "♝", n: "♞" },
+};
 
 /** Algebraic square for a grid cell: row 0 is rank 8, col 0 is file a. */
 function squareAt(row: number, col: number): string {
@@ -38,40 +52,62 @@ export function ChessBoard({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [shake, setShake] = useState<string | null>(null);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(
+    null,
+  );
   const interactive = typeof fen === "string" && fen.length > 0;
 
   // Legal destinations for the current selection, resolved fresh from the fen.
+  // A promotion contributes four verbose moves (q/r/b/n) all sharing one `to`;
+  // the Set collapses them, and `promotionTargets` remembers which squares need
+  // the chooser rather than an immediate move.
   const targets = new Set<string>();
+  const promotionTargets = new Set<string>();
   if (interactive && selected) {
     try {
       for (const m of new Chess(fen).moves({ square: selected as Square, verbose: true })) {
         targets.add(m.to);
+        if (m.isPromotion()) promotionTargets.add(m.to);
       }
     } catch {
       // silent-ok: an unexpected square just yields no targets.
     }
   }
 
+  /** Complete a move to its SAN and reset the board back to the puzzle position. */
+  function typeMove(from: string, to: string, promotion: PieceSymbol) {
+    try {
+      const move = new Chess(fen).move({ from: from as Square, to: to as Square, promotion });
+      if (move) widget.onWidgetText(move.san);
+    } catch {
+      // silent-ok: an illegal move (should not happen — from/to came from moves()) types nothing.
+    }
+    setSelected(null);
+    setShake(null);
+    setPendingPromotion(null);
+  }
+
   function onSquare(row: number, col: number) {
     if (!interactive) return;
     const sq = squareAt(row, col);
-    // 1) A click onto a lit target completes the move: type its SAN, reset the board.
-    if (selected && targets.has(sq)) {
-      try {
-        // Promotions always pick a queen: the widget cannot produce an
-        // underpromotion SAN (e8=N#), so those rare dailies must be typed by
-        // hand — validate is a plain string check either way.
-        const move = new Chess(fen).move({
-          from: selected as Square,
-          to: sq as Square,
-          promotion: "q",
-        });
-        if (move) widget.onWidgetText(move.san);
-      } catch {
-        // silent-ok: an illegal move (should not happen — sq came from moves()) types nothing.
-      }
+    // 0) With a chooser open, any board square is a dismissal: deselect, no shake.
+    if (pendingPromotion) {
+      setPendingPromotion(null);
       setSelected(null);
       setShake(null);
+      return;
+    }
+    // 1) A click onto a lit target either opens the promotion chooser or, for an
+    //    ordinary move, types its SAN and resets the board. The chooser lets a
+    //    player pick under-promotions (e8=N#) that a hardcoded queen could never
+    //    reach; validate is a plain string check against whichever SAN is typed.
+    if (selected && targets.has(sq)) {
+      if (promotionTargets.has(sq)) {
+        setPendingPromotion({ from: selected, to: sq });
+        setShake(null);
+        return;
+      }
+      typeMove(selected, sq, "q");
       return;
     }
     // 2) Selecting one of the side-to-move's own pieces lights its targets.
@@ -89,6 +125,16 @@ export function ChessBoard({
     // 3) An empty square or an opponent piece is a dead click: shake, type nothing.
     setSelected(null);
     setShake(sq);
+  }
+
+  // The chooser offers the side-to-move's pieces; resolve the color from the fen.
+  let promotionColor: "w" | "b" = "w";
+  if (pendingPromotion) {
+    try {
+      promotionColor = new Chess(fen).turn();
+    } catch {
+      // silent-ok: default to white if the fen somehow will not parse.
+    }
   }
 
   return (
@@ -142,6 +188,33 @@ export function ChessBoard({
           }),
         )}
       </div>
+      {pendingPromotion ? (
+        <div className="pg2-chess__promo" role="group" aria-label="Choose promotion piece">
+          {PROMOTION_ROLES.map(({ role, label }) => (
+            <div
+              key={role}
+              role="button"
+              tabIndex={0}
+              aria-label={`promote to ${label}`}
+              data-promote={role}
+              onClick={(e) => {
+                e.stopPropagation();
+                typeMove(pendingPromotion.from, pendingPromotion.to, role);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  typeMove(pendingPromotion.from, pendingPromotion.to, role);
+                }
+              }}
+              className="pg2-chess__promo-piece"
+            >
+              {PROMOTION_GLYPHS[promotionColor][role]}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {hint ? <p className="mt-2 text-xs text-[color:var(--pg2-muted)]">{hint}</p> : null}
     </div>
   );

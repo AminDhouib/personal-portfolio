@@ -195,11 +195,13 @@ The following Password Game 2 entries were verified against the current tree on 
   exclusion only keeps a perceptual near-twin (amber/gold, coral/salmon) out of the decoy pool when
   it is the TRUTH's twin; two decoys that happen to be twins of each other can still co-occur and are
   harmless, because the fair-match guarantee is only about distinguishing the truth from its decoys.
-- **PG2's chess widget only ever types queen promotions** (`stage/widgets/chess.tsx`). The board
-  hardcodes `promotion: "q"`, so a daily puzzle whose best move is an underpromotion (e.g. `e8=N#`)
-  cannot be clicked out — those rare dailies must be typed by hand into the password. This is an
-  accepted limitation of the click-to-move affordance, not a move-generation bug; the SAN validate
-  still accepts a hand-typed underpromotion.
+- **PG2's chess widget opens a 4-piece chooser on a promotion, not an auto-queen**
+  (`stage/widgets/chess.tsx`). Clicking a promotion target sets `pendingPromotion` and renders the
+  queen/rook/bishop/knight glyphs for the side to move; picking one types that SAN (so
+  underpromotion dailies like `e8=N#` are now clickable), and clicking any board square while the
+  chooser is open dismisses it as a plain deselect (no shake, no text). Non-promotion targets still
+  type immediately. The chooser exists because SAN validate is a plain string check — a hardcoded
+  queen could never satisfy an underpromotion best-move rule.
 - **Every PG2 widget routes its text through `applyText` -> `applyKey`, the same path as a keystroke**
   (`engine/engine.ts`). This is the widget fairness invariant: a widget never writes to the password
   directly, so an active event that intercepts typing — a loading-bar stun swallowing keys, the snake
