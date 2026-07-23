@@ -15,16 +15,17 @@ is (boundaries, conventions, the intentional-design register).
 `GET /api/health` (`src/app/api/health/route.ts`) always returns HTTP 200 with:
 
 ```json
-{ "status": "ok", "uptime": 12345, "checks": { "data": "writable" } }
+{ "status": "ok", "uptime": 12345, "checks": { "db": "connected" } }
 ```
 
-`checks.data` is a non-mutating `W_OK` probe on the `.data` directory (the mounted volume in
-prod) — it catches a missing or read-only mount, the silent failure mode that would otherwise
-lose leads and leaderboard writes. **Read the JSON body, not just the HTTP status**: the top-level
-`status` and the HTTP status code both stay `"ok"` / `200` even when `checks.data` reports
-`"unwritable"`. This means an unwritable data mount will **not** fail the container's Docker
-`HEALTHCHECK` and will **not** trigger a Swarm auto-restart — only a fully unresponsive process
-does that. If you suspect a mount problem, curl the endpoint and read `checks.data` yourself:
+`checks.db` is a `SELECT 1` against Postgres (`getPool()`, `src/lib/db.ts`) — it catches an
+unreachable or down `db` service, the silent failure mode that would otherwise lose leads and
+leaderboard writes. **Read the JSON body, not just the HTTP status**: the HTTP status stays `200`
+even when the db is down — the top-level `status` flips to `"degraded"` and `checks.db` to
+`"unreachable"`, but the response code does not. This means a db outage will **not** fail the
+container's Docker `HEALTHCHECK` (which only checks `response.ok`, i.e. the HTTP code) and will
+**not** trigger a Swarm auto-restart — only a fully unresponsive process does that. If you suspect
+a db problem, curl the endpoint and read `checks.db` yourself:
 
 ```bash
 curl -s https://amindhou.com/api/health
@@ -97,73 +98,49 @@ pattern as deploy (`$DOKPLOY_URL/api/application.<action>` with the `x-api-key` 
 `applicationId` above, where `<action>` is `stop`, `start`, or `reload`).
 
 Prefer **reload** (restarts the existing container/image, no rebuild, fast) when the running
-process is wedged but the last-deployed code is fine — e.g. after manually repairing a data file.
+process is wedged but the last-deployed code is fine — e.g. after manually repairing data in the db.
 Prefer **redeploy** (full rebuild from current `main`) any time the fix is a code or commit
 change.
 
-### Data surgery
+### Data
 
-`.data` is the named Docker volume `portfolio-data`, mounted at `/app/.data` in the container —
-it holds **live** leaderboards and contact-form leads. Never edit it in place casually.
+All persisted data lives in **Postgres**, not on disk. Compose defines a `db` service
+(`postgres:17-alpine`) whose data sits on the `db-data` named volume; the schema is created once,
+on the volume's first start, from `db/init.sql` mounted into `/docker-entrypoint-initdb.d/`.
+Tables: `leaderboard_entries`, `pg_leaderboard_entries`, `pg2_leaderboard_entries`, and `leads`.
+Row shapes mirror the zod schemas in `src/lib/persistence-schemas.ts`. There is no `.data`
+directory and no JSON/JSONL file store anymore — the old file-persistence machinery (corruption
+quarantine, schema-mismatch archive-then-reset, `validate:data`) was removed in the Postgres
+migration.
 
-**Corruption path**: `readFileForUpdate()` (`src/lib/json-file-store.ts`) is the strict read used
-ahead of any write. If the on-disk file is unreadable, malformed JSON, or the wrong shape for its
-declared `schemaVersion`, it is renamed to `<file>.corrupt-<n>` as a best-effort quarantine and
-the read throws `JsonFileCorruptError` — the write aborts rather than overwriting real data with
-a near-empty replacement, and the route returns 503. `readFile()` (used by GET requests) is
-deliberately lenient and renders an empty board from the same bad file instead of 500ing the
-public page, so a corruption only blocks writes, not reads.
-
-**Schema reset (version mismatch) — automatic.** Every persisted JSON document carries a
-`schemaVersion` (`src/lib/persistence-schemas.ts`); leads.jsonl carries it per line. When the
-write path finds a file whose version does not match the build (including pre-versioning v1
-files, which parse as version `undefined`), it does an **archive-then-reset**: the old file is
-renamed to `<file>.schema-mismatch-<n>` (bytes preserved, mtime intact), a `captureException`
-fires so the event is visible in Sentry, and a fresh empty document takes its place. Old data is
-never migrated in code — that is the owner-approved break+reset policy (pass-2 audit,
-2026-07-07). After deploying a schema bump: confirm the archives exist next to the fresh files,
-run the validator (step 3 below) against the live dir, and delete the archives once you no longer
-want the old data. To manually reset a file, take a volume backup (below) and simply delete the
-file — the next write recreates it at the current version.
-
-**Recovery**:
-
-1. On the server, find the `<file>.corrupt-<n>` sibling next to the original inside the volume.
-2. Inspect and repair its contents in a scratch copy — never the live file directly.
-3. Validate the repaired copy before it goes anywhere near the volume:
-   ```bash
-   node scripts/validate-data-files.mjs <path-to-scratch-copy-dir>
-   ```
-   (`pnpm validate:data`, with no args, always points at the live `.data` — to check an arbitrary
-   directory, such as a scratch copy or a restored backup, call the script directly as above.) A
-   nonzero exit means a file was unreadable, malformed, carried the wrong `schemaVersion`, or
-   contained invalid rows. Zero rows is valid (a freshly reset file is empty by design); a
-   missing `leads.jsonl` in an environment that never received a lead is expected, not
-   corruption.
-4. Replace the live file with the validated copy and reload the app (see Restart above).
-
-**Backup — today, manual only.** No scheduled backup exists (owner-deferred). To copy the volume
-out:
+**Inspect / repair** — needs docker access to the host (locally your own machine; in prod the
+tailnet + docker CLI on the server):
 
 ```bash
-docker run --rm -v portfolio-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/portfolio-data-$(date +%Y%m%d).tar.gz -C /data .
+docker compose exec db psql -U portfolio -d portfolio
 ```
 
-To restore:
+A failed read or write surfaces as a Postgres error: the route catches it, `captureException`
+reports it to Sentry (`src/lib/log.ts`), and the request returns an error status rather than
+silently losing or corrupting data. There is no in-code migration — `db/init.sql` uses
+`CREATE TABLE IF NOT EXISTS` and only runs on a first-ever start, so a schema change means editing
+that file and applying the delta by hand against the live db.
+
+**Backup — none scheduled (owner-deferred).** Dump the database manually:
 
 ```bash
-docker run --rm -v portfolio-data:/data -v "$PWD":/backup alpine \
-  tar xzf /backup/portfolio-data-<date>.tar.gz -C /data
+docker compose exec db pg_dump -U portfolio portfolio > portfolio-$(date +%Y%m%d).sql
 ```
 
-then reload the app and re-run the validator against `.data` before trusting it. Both commands
-require direct docker access to the host (tailnet + docker CLI on the server) — the builder of
-this doc could not execute them from the dev environment and verified them against standard
-Docker volume-backup practice only.
+Restore into a running db service:
 
-Context: prod's leaderboard is currently near-empty for historical reasons predating the current
-persistence hardening — an empty-looking board by itself is not a symptom of a current bug.
+```bash
+cat portfolio-<date>.sql | docker compose exec -T db psql -U portfolio -d portfolio
+```
+
+These mirror standard Postgres backup practice and are unverified against this deployment; restore
+into a throwaway db and check it before trusting it. A fresh `db-data` volume starts with empty
+tables, so an empty-looking board right after a volume reset is expected, not a symptom of a bug.
 
 ### Monitoring reality
 
@@ -178,9 +155,35 @@ you.
 ## Development environment (maintainer's Windows/OneDrive machine)
 
 The following are pitfalls specific to this machine's setup (Windows 11, OneDrive-synced working
-copy, Next.js 16.2.2 + Turbopack). They are not universal Next.js behavior.
+copy). They are not universal behavior.
 
-### The stale-module-graph trap
+### The dev loop is Docker Compose
+
+`pnpm dev` is `docker compose up --build` (see AGENTS.md): it builds the app image and starts it
+alongside the `db` Postgres service, waiting for the db healthcheck. The container runs the
+**production** build (`NODE_ENV=production`, `next build` then start — no Turbopack, no hot
+reload), so a code change means re-running `docker compose up --build`; because the image is
+rebuilt fresh each time, there is no stale-module-graph replay across restarts the way `next dev`
+had.
+
+- No host port is published by default (see the comment in `compose.yml`). For a browser, add a
+  local-only override — `docker compose up` with an `-f` overlay that adds `ports: ["3000:3000"]`
+  to the app service — or reach it via `docker compose exec`.
+- Run it detached with `docker compose up -d --build` (`pnpm start` is the `-d` form) and follow
+  logs via `docker compose logs -f app`; stop with `docker compose down`. Backgrounding a
+  foreground `docker compose up` inside an agent session still risks the session-churn death that
+  killed backgrounded `next dev` jobs — prefer `-d` (a real daemon) over a session-backgrounded
+  process.
+- Needs a local `.env`: at minimum `POSTGRES_PASSWORD`, plus every REQUIRED var — the boot gate
+  (`src/env.ts` `validateRequiredEnv`) refuses to start without them, in dev too. See
+  `.env.example`.
+
+### The bare `next dev` escape hatch (and its stale-module-graph trap)
+
+Running Next.js outside compose — `pnpm exec next dev` against a local Postgres, with
+`DATABASE_URL` and the required vars set in your environment (`.env.example` documents this) — is
+a sanctioned fast-iteration path but is not wired to an npm script. Its Turbopack pitfalls, which
+do NOT apply to the compose loop above, are:
 
 Turbopack's dev chunk URLs are path-derived and stable across content changes, so browser memory
 and disk cache can replay an entire stale module graph across dev-server restarts. Orphaned
