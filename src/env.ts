@@ -36,7 +36,6 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_BASE_URL: z.preprocess(emptyToUndefined, z.url().optional()),
   OPENROUTER_KEY: z.string().optional(),
-  DATA_DIR: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.url().optional()),
 });
@@ -70,8 +69,6 @@ export const env: Env = new Proxy({} as Env, {
 // Every integration this site depends on. The server refuses to boot when any
 // of these is unset — a missing key must be a loud failure at startup, never
 // a feature that silently goes dark in production (pass-2 audit RC-P2-3).
-// DATA_DIR is deliberately NOT here: it is a path override with a safe
-// default of <cwd>/.data (the one sanctioned exception — DESIGN.md register).
 export const REQUIRED_ENV_VARS = [
   "DATABASE_URL",
   "OPENROUTER_KEY",

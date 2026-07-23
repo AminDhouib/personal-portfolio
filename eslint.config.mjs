@@ -33,8 +33,7 @@ const RESTRICTED_SYNTAX = [
 const FS_ALLOWLIST = ["src/lib/blog.ts", "src/app/apple-icon.tsx", "src/app/icon.tsx"];
 
 // src/test/** is shared test infrastructure (vitest setup + fixtures): same
-// exemptions as the suites themselves (setup.ts needs node:fs for the
-// DATA_DIR boundary guard).
+// exemptions as the suites themselves.
 const TEST_AND_SCRIPT_GLOBS = [
   "**/*.test.ts",
   "**/*.test.tsx",

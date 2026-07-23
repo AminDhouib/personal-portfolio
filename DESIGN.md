@@ -127,11 +127,13 @@ current tree on 2026-07-07.
   JSON is a different case — quarantined to `<name>.corrupt-N` and the write path throws (503).
   The pre-v2 merged hextris/space-shooter history lives on in the archived v1 file; the v2
   `boards` record keys every game separately so the merge cannot recur.
-- **`DATA_DIR` is the one env var that is optional under strict validation** — it is a path
-  override with a safe default of `<cwd>/.data` (prod mounts the `portfolio-data` volume there),
-  not an integration credential. Everything else in `REQUIRED_ENV_VARS` fails the boot loudly
-  when missing. Do not add a second "optional because it has a default" var without updating this
-  entry — the exception is meant to stay singular.
+- **`DATA_DIR` was removed (2026-07-23) with the Postgres migration.** It was once the optional
+  root for on-disk JSON/JSONL persistence (default `<cwd>/.data`, prod mounted the `portfolio-data`
+  volume there). Filesystem persistence is gone — leads and leaderboards now write Postgres via
+  `src/lib/db.ts` — so the variable has no consumer and was deleted from the env schema and
+  `.env.example`. This note exists only so readers of older commits that reference `DATA_DIR`
+  understand where it went; there is no longer any "optional because it has a default" exception
+  in `REQUIRED_ENV_VARS`.
 - **Reduced-motion is inverted between chrome and games, on purpose.** The root layout
   (`src/app/providers.tsx`) wraps the whole app in `<MotionConfig reducedMotion="user">`, honoring
   the OS preference for page chrome. Every game explicitly opts back OUT: `game-loader.tsx` and

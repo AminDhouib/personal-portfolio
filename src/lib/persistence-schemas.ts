@@ -1,6 +1,6 @@
 /**
- * Server-only zod schemas for the three persisted surfaces under DATA_DIR
- * (schema v2, pass-2 audit break+reset: audit/pass2/findings-pass2.json
+ * Server-only zod schemas for the three persisted surfaces, now stored in
+ * Postgres (schema v2, pass-2 audit break+reset: audit/pass2/findings-pass2.json
  * P2-DATA-001/002/005/009/010). Every file/line carries an explicit
  * schemaVersion so a reader can tell "old shape" from "corrupt" instead of
  * guessing. v1 files (unversioned flat arrays) are NOT readable by these
