@@ -14,40 +14,40 @@ Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog,
 
 ## Getting started
 
-Requires Node.js >= 22 (see `.nvmrc` / the `engines` field in `package.json`).
+Requires Node.js >= 22 (see `.nvmrc` / the `engines` field in `package.json`) and Docker — `pnpm
+dev` runs the app in Docker Compose alongside its Postgres database.
 
 ```bash
 corepack enable
 pnpm install
-cp -n .env.example .env.local   # optional, see below — -n skips the copy if .env.local exists
+cp -n .env.example .env   # Compose reads .env; fill in POSTGRES_PASSWORD + the required vars
 pnpm dev
 ```
 
-`pnpm dev` binds the next free port if 3000 is already taken on your machine (Turbopack prints
-`⚠ Port 3000 is in use ..., using available port XXXX instead`) — read the terminal output for
-the actual URL rather than assuming `localhost:3000`. If you instead see `Another next dev server
-is already running`, a previous `next dev` process is still holding a lock; stop that process
-before starting a new one. A `Warning: Custom Cache-Control headers detected for the following
-routes` notice on startup is also expected — this repo sets custom cache headers on purpose; it
-isn't a misconfiguration.
+`pnpm dev` runs `docker compose up --build`: it brings up Postgres (the `db` service) and the app
+together, waits for the database healthcheck, then runs a production build in a container (no
+Turbopack hot reload). No host port is published by default — see RUNBOOK.md for local browser
+access and the bare `next dev` escape hatch for fast iteration.
 
-Everything in `.env.example` is optional for local dev: each integration (AI chat, GitHub stats, GA4, lead emails) degrades gracefully — falling back to public/unauthenticated data or simply going quiet — when its variable is unset. See the comments in `.env.example` for the exact fallback behavior of each one.
+A local `.env` is required, not optional: at minimum `POSTGRES_PASSWORD` plus every variable the
+boot gate marks REQUIRED, since the server (`src/env.ts` `validateRequiredEnv`) refuses to start
+without them — in dev too. See the comments in `.env.example` for what each variable is, how to
+obtain it, and the one emergency bypass.
 
 ## Scripts
 
-| Script               | Description                                                  |
-| -------------------- | ------------------------------------------------------------ |
-| `pnpm dev`           | Start the dev server (Turbopack)                             |
-| `pnpm build`         | Production build                                             |
-| `pnpm start`         | Serve the production build                                   |
-| `pnpm lint`          | ESLint                                                       |
-| `pnpm typecheck`     | Type-check with `tsc --noEmit`                               |
-| `pnpm format`        | Format the codebase with Prettier                            |
-| `pnpm format:check`  | Check formatting without writing changes                     |
-| `pnpm test`          | Run the test suite once                                      |
-| `pnpm test:watch`    | Run tests in watch mode                                      |
-| `pnpm test:coverage` | Run the test suite once with coverage                        |
-| `pnpm validate:data` | Validate the shape of the persisted `.data` JSON/JSONL files |
+| Script               | Description                                         |
+| -------------------- | --------------------------------------------------- |
+| `pnpm dev`           | Build and run the app + Postgres via Docker Compose |
+| `pnpm build`         | Production build (`next build`)                     |
+| `pnpm start`         | Run the app + Postgres via Docker Compose, detached |
+| `pnpm lint`          | ESLint                                              |
+| `pnpm typecheck`     | Type-check with `tsc --noEmit`                      |
+| `pnpm format`        | Format the codebase with Prettier                   |
+| `pnpm format:check`  | Check formatting without writing changes            |
+| `pnpm test`          | Run the test suite once                             |
+| `pnpm test:watch`    | Run tests in watch mode                             |
+| `pnpm test:coverage` | Run the test suite once with coverage               |
 
 ## Project structure
 
@@ -75,7 +75,7 @@ Tests use Vitest with `@testing-library/react` and jsdom.
 
 The site is self-hosted via [Dokploy](https://dokploy.com/) (Docker) on a home server, built from the repo's `Dockerfile` — a multi-stage build (`deps` → `builder` → `runner`) producing a Next.js `standalone` output that runs as a non-root user.
 
-**Persistent data.** Game leaderboards and contact-form leads are written as plain JSON/JSONL files under `/app/.data` inside the container. In production this path is a named Docker volume, `portfolio-data`, mounted onto the Dokploy application — without it, that data is wiped on every redeploy since the container filesystem is otherwise ephemeral.
+**Persistent data.** Game leaderboards, the Password Game 2 leaderboard, and contact-form leads are stored in Postgres, not on disk. Compose defines a `db` service (`postgres:17-alpine`) whose data lives on the `db-data` named volume; the schema is created once, on the volume's first start, from `db/init.sql`. Without that volume the data would be wiped on every redeploy. See RUNBOOK.md's data section for the table list and the schema-change procedure.
 
 **CI/CD.** `.github/workflows/ci.yml` runs on every push and pull request:
 
