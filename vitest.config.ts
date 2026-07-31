@@ -50,12 +50,16 @@ export default defineConfig({
       // functions 33.47 / branches 30.23 -- the suite grew well past the
       // pass-2 floors, which sat ~16 points low. Same formula as before:
       // floor(measured) - margin.
+      // Raised again 2026-07-31 against measured lines 36.52 / statements 35.60
+      // / functions 37.18 / branches 32.40, after the super-voltorb-flip
+      // leak-guard (which renders the real board) and the copilotkit
+      // run-error-tap suite landed. Same formula.
       thresholds: {
         autoUpdate: false,
-        lines: 32,
-        statements: 31,
-        functions: 31,
-        branches: 27,
+        lines: 34,
+        statements: 33,
+        functions: 35,
+        branches: 29,
       },
     },
   },
