@@ -157,7 +157,15 @@ export function runWardenBehavior(g: GameRefs, boss: BossState, now: number, ste
   }
 }
 
-export function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, step: number): void {
+// `deathFlashColor` is the only thing that varied between the two bosses that
+// run this loop -- the harvester flashes purple, the swarm mother magenta.
+export function updateDronesGeneric(
+  g: GameRefs,
+  boss: BossState,
+  now: number,
+  step: number,
+  deathFlashColor: string,
+): void {
   for (let i = boss.subEntities.length - 1; i >= 0; i--) {
     const d = boss.subEntities[i];
     if (!d) continue;
@@ -185,7 +193,7 @@ export function updateDronesGeneric(g: GameRefs, boss: BossState, now: number, s
       g.deathVelY = (-sdy / (Math.hypot(sdx, sdy) || 1)) * 7 + 3.5;
       g.deathVelZ = 2.5;
       g.deathAngVel = (Math.random() - 0.5) * 10;
-      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#a855f7", 500, 0.45);
+      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, deathFlashColor, 500, 0.45);
       spawnShipDebris(g);
       sounds.play("crash");
       sounds.stopMusic(0.4);
@@ -301,7 +309,7 @@ export function runVoidTyrantBehavior(
         ttlMs: 10000,
       });
     }
-    updateDronesGeneric(g, boss, now, step);
+    updateDronesGeneric(g, boss, now, step, "#a855f7");
   }
 }
 
@@ -429,45 +437,7 @@ export function runSwarmMotherBehavior(
     }
     boss.lastShotAt = now;
   }
-  for (let i = boss.subEntities.length - 1; i >= 0; i--) {
-    const d = boss.subEntities[i];
-    if (!d) continue;
-    if (d.type !== "drone") continue;
-    const dir = normalizeVec3([
-      g.shipX - d.position[0],
-      g.shipY - d.position[1],
-      g.shipZ - d.position[2],
-    ]);
-    const lerp = 0.05;
-    d.velocity[0] = d.velocity[0] * (1 - lerp) + dir[0] * 3.5 * lerp;
-    d.velocity[1] = d.velocity[1] * (1 - lerp) + dir[1] * 3.5 * lerp;
-    d.velocity[2] = d.velocity[2] * (1 - lerp) + dir[2] * 3.5 * lerp;
-    d.position[0] += d.velocity[0] * step;
-    d.position[1] += d.velocity[1] * step;
-    d.position[2] += d.velocity[2] * step;
-    const sdx = d.position[0] - g.shipX;
-    const sdy = d.position[1] - g.shipY;
-    const sdz = d.position[2] - g.shipZ;
-    const shieldedShip = isPowerUpActive(g, "shield") || isPowerUpActive(g, "warp");
-    if (now > g.invulnUntil && !shieldedShip && sdx * sdx + sdy * sdy + sdz * sdz < 0.9 * 0.9) {
-      g.status = "dying";
-      g.dyingAt = now;
-      g.deathVelX = (-sdx / (Math.hypot(sdx, sdy) || 1)) * 7;
-      g.deathVelY = (-sdy / (Math.hypot(sdx, sdy) || 1)) * 7 + 3.5;
-      g.deathVelZ = 2.5;
-      g.deathAngVel = (Math.random() - 0.5) * 10;
-      spawnExplosion(g, g.shipX, g.shipY, g.shipZ, "#d946ef", 500, 0.45);
-      spawnShipDebris(g);
-      sounds.play("crash");
-      sounds.stopMusic(0.4);
-      sounds.playLosingJingle();
-      boss.subEntities.splice(i, 1);
-      continue;
-    }
-    if (now - d.createdAt > d.ttlMs || d.position[2] > 10) {
-      boss.subEntities.splice(i, 1);
-    }
-  }
+  updateDronesGeneric(g, boss, now, step, "#d946ef");
 }
 
 export function runDrifterBehavior(g: GameRefs, boss: BossState, now: number): void {
