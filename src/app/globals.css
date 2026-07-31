@@ -482,6 +482,12 @@ html {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--card) !important;
+  /* Theme-aware fallback for text shiki did NOT tokenize -- plaintext blocks,
+     and any stray text outside a token span. @tailwindcss/typography otherwise
+     colours `pre` with its own --tw-prose-pre-code (gray-200), which is fine on
+     the dark card but renders at 1.24:1 on the light one, i.e. invisible.
+     Tokenized text is unaffected: those spans carry their own colour. */
+  color: var(--foreground);
   padding: 1.25rem;
   padding-top: 2rem;
   overflow-x: auto;
