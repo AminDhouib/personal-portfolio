@@ -40,6 +40,9 @@ access — it is not exposed through the Dokploy API surface available to agents
 ### Logs
 
 - **stdout** → Dokploy container logs (panel, or the `application-readLogs` API).
+- **API log reads want the full container NAME**, not the short hex id — `compose-readLogs`
+  with an id like `41c3cff6d697` returns a 500; pass the name
+  (`compose-index-multi-byte-microchip-5usn3s-app-1`-style, from `docker-getContainers`).
 - **Exceptions**: `captureException()` (`src/lib/log.ts`) always reports server-side to
   self-hosted Sentry, and additionally forwards a PostHog `$exception` event when both
   `POSTHOG_KEY` and `POSTHOG_HOST` are configured (silently skipped otherwise — there is no
@@ -152,6 +155,12 @@ described above (drives Swarm auto-restart on a wedged/crashed process only).
 any kind. Nobody is notified if the site goes down — you find out by checking, or a visitor tells
 you.
 
+**Also invisible**: AI-chat run failures. CopilotKit emits them as `RUN_ERROR` events inside the
+SSE stream (and the browser console) and swallows them server-side — the 2026-07 multi-day
+dead-chat outage produced zero Sentry events. A dead chat looks healthy from every existing
+signal; verify it by actually asking it something more than 60 seconds after the page's first
+copilotkit POST. See DESIGN.md's Known debt for the forwarding fix.
+
 ## Development environment (maintainer's Windows/OneDrive machine)
 
 The following are pitfalls specific to this machine's setup (Windows 11, OneDrive-synced working
@@ -240,3 +249,30 @@ last thing in the file. It shares specificity with the base rules it overrides (
 order — is what decides, not the media query. Moving this block earlier in the file would
 silently stop it from winning. To emulate the preference in a browser for testing, use the
 `--force-prefers-reduced-motion` flag rather than OS-level settings.
+
+### Browser automation against this site (QA-agent gotchas, learned 2026-07)
+
+- **Windows occlusion freezes rAF**: automated Chrome opened occluded on this machine stops
+  delivering `requestAnimationFrame`, which reads as a frozen game. Launch with
+  `--disable-features=CalculateNativeWinOcclusion`, use `localhost` (not `127.0.0.1`), and
+  assert `document.visibilityState === "visible"` before calling anything a freeze.
+- **Headless-Chrome frame ceiling is ~31 fps** on this machine (measured on an idle page).
+  Every canvas game reads ~31 fps under automation — that is the compositor cadence, not a
+  game throttle; only 500ms+ gaps or identical consecutive canvas readbacks indicate a stall.
+- **Playwright MCP writes only under the repo root** (`.playwright-mcp/`, gitignored). Keep
+  `.mjs` scratch scripts OUT of it — oxlint lints the directory and a stray script turns the
+  commit gate red on an otherwise clean tree.
+- **PG2**: the password surface is a custom div over a hidden `aria-hidden` input — `fill()`
+  appends and does not drive the game; focus the proxy input directly
+  (`document.querySelector('input[aria-hidden="true"]').focus()`) and use keyboard input.
+  `keyboard.type` silently drops non-ASCII (it ate the accent in "Réunion") — use
+  `keyboard.insertText`. Event controls (FEED / BASKET / STOKE chips, crisis meters) are
+  CANVAS-painted with internal hit-rects (`stage/painters.ts`) — they never exist in the DOM;
+  click the stage canvas at the chip's visual position (top-right column over the password box,
+  38px row stride). The stage canvas also overlays the password box, so a click aimed at the
+  text lands on the canvas.
+- **Tower Stacker is not a React game**: a static build in an iframe
+  (`/tower_stacker/game.html`) — start/drop live inside the frame; the game-over overlay and
+  leaderboard form are parent-page React.
+- **Hextris starts from a canvas click** ("Click to start" — no DOM button), and empty-corner
+  canvas readbacks can look frozen; sample the centre band.

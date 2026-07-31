@@ -11,19 +11,19 @@ See `RUNBOOK.md` for operations and `README.md` for the human quickstart.
 
 Routes call into `lib`; `lib` does not call back into routes or components. Direct filesystem
 access is banned everywhere except a small, explicit allowlist (`FS_ALLOWLIST` in
-`eslint.config.mjs`): `src/lib/blog.ts`, `src/lib/json-file-store.ts`, `src/lib/leads-store.ts`,
-`src/app/apple-icon.tsx`, `src/app/icon.tsx`, and `src/app/api/health/route.ts` (a non-mutating
-write-access probe, not a data read). Everything else that needs persistence goes through a
-store module — `fs`/`node:fs`/`fs/promises` imports are lint errors outside that list.
+`eslint.config.mjs`): `src/lib/blog.ts`, `src/app/apple-icon.tsx`, and `src/app/icon.tsx`. The
+list shrank with the Postgres migration — the filesystem stores it once covered are gone.
+Everything else that needs persistence goes through a store module — `fs`/`node:fs`/
+`fs/promises` imports are lint errors outside that list.
 
-Leaderboard and password-game persistence goes **only** through `createJsonFileStore`
-(`src/lib/json-file-store.ts`), instantiated per file with a zod schema from
-`src/lib/persistence-schemas.ts`: `readFile()` for GET requests (lenient — a corrupt or
-version-mismatched file renders as empty rather than 500ing, and GET never mutates disk),
-`readFileForUpdate()` for the write path (strict — a corrupt file throws `JsonFileCorruptError`
-and the write aborts instead of overwriting real data; a version-mismatched file is archived to
-`.schema-mismatch-N` and replaced with a fresh empty file). Leads append through
-`src/lib/leads-store.ts`. See `RUNBOOK.md`'s Data surgery section for the operational side.
+Leaderboard, password-game, and leads persistence is Postgres (the compose `db` service),
+reached **only** through the shared `pg` pool from `getPool()` (`src/lib/db.ts`). The games
+leaderboard route, Password Game 2's leaderboard route, and `src/lib/leads-store.ts` read and
+write tables created by `db/init.sql` (applied once on the db volume's first start); row shapes
+are pinned by zod in `src/lib/persistence-schemas.ts`. Tests never touch a real database — each
+store's suite does `vi.mock("@/lib/db")` and drives an in-memory fake pool, and persistence
+changes need pinning tests FIRST (see `AGENTS.md`'s hard boundaries). See `RUNBOOK.md`'s Data
+section for the operational side.
 
 Games are self-contained under `src/components/game/`. Most games are a single top-level
 component file (`hextris.tsx`, `tower-stacker.tsx`, `typing-speed.tsx`); non-component logic is
@@ -120,13 +120,14 @@ current tree on 2026-07-07.
   token-free `github-contributions-api.jogruber.de` mirror) is not dead code — it is
   defense-in-depth so a token revoked at runtime degrades the page to real mirror data instead of
   breaking it.
-- **Persisted files carry a `schemaVersion` envelope, and a version mismatch archives-then-resets
-  instead of migrating.** Pass-2's break+reset (owner-approved, 0 users): on the first boot after
-  a schema bump, the store moves the old file aside to `<name>.schema-mismatch-N` (never deletes,
-  never migrates in place), reports the reset to Sentry, and starts a fresh empty file. Corrupt
-  JSON is a different case — quarantined to `<name>.corrupt-N` and the write path throws (503).
-  The pre-v2 merged hextris/space-shooter history lives on in the archived v1 file; the v2
-  `boards` record keys every game separately so the merge cannot recur.
+- **The `schemaVersion` archive-then-reset machinery is historical (pre-Postgres).** Until the
+  2026-07 migration, persisted JSON files carried a version envelope; a mismatch archived the
+  file to `<name>.schema-mismatch-N`, corrupt JSON quarantined to `<name>.corrupt-N`, and the
+  pre-v2 merged hextris/space-shooter history lives on in an archived v1 file. That filesystem
+  store (`json-file-store.ts`) left with the migration — row shapes are now pinned by zod in
+  `persistence-schemas.ts` against Postgres rows. This note stays only so readers of older
+  commits and audit reports can map those references; like the `DATA_DIR` note below, it
+  describes something that no longer exists.
 - **`DATA_DIR` was removed (2026-07-23) with the Postgres migration.** It was once the optional
   root for on-disk JSON/JSONL persistence (default `<cwd>/.data`, prod mounted the `portfolio-data`
   volume there). Filesystem persistence is gone — leads and leaderboards now write Postgres via
@@ -146,6 +147,19 @@ current tree on 2026-07-07.
   visited directly. `password-game` (The Password Game 2) is `external: true`: its card is live in
   the grid, but it links to its own top-level route (`/games/password-game`) outside the shared
   game-loader rather than to a `[slug]` page.
+- **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
+  `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
+  license alongside). Known quirks live inside that bundle and are accepted while the game stays
+  hidden: the tower can drift far enough sideways that no drop can land (the run then bleeds out
+  on lives), and PERFECT is awarded leniently. Fixing either means re-vendoring from patched
+  source, not editing the dist. The parent React overlay owns the leaderboard form; an empty
+  name deliberately falls back to "Stacker".
+- **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
+  chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
+- **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
+  blocks-cleared in the `kills` column and writes a `level` the UI never surfaces; player-name
+  inputs cap at 12 characters (`maxLength` plus a slice in the handler). Only worth revisiting
+  if the raw columns are ever exposed publicly.
 - **`maxDuration` is deliberately absent from the LLM route** (`src/app/api/copilotkit/route.ts`).
   It's a Vercel-only directive and a documented no-op on this self-hosted deployment — the
   code's own comment calls it out as the same class of theater `env.ts`'s honesty pass removed
@@ -179,7 +193,9 @@ The following Password Game 2 entries were verified against the current tree on 
   the token. This is the dark-pattern joke — the form doubts your humanity exactly once — not an
   off-by-one. The state machine structurally guarantees a single forced rejection: a wrong set is
   also rejected but never advances the stage, so it cannot consume the one scripted rejection, and
-  grid 2 has no rejection branch, so the widget cannot soft-lock.
+  grid 2 has no rejection branch, so the widget cannot soft-lock. The tile answers living in
+  `aria-label` ("Storefront" and friends) are required for screen-reader play, not a leak to
+  fix — the widget is a captcha parody, not a security control.
 - **PG2's consent wall fights back when you switch a toggle off, by design** (`stage/widgets/consent.tsx`,
   `applyConsentMove` in `engine/rules/act1.ts`). Turning a switch OFF flips its seeded neighbor —
   declining one thing brings back something you already declined. That is the intended friction, not
@@ -189,7 +205,12 @@ The following Password Game 2 entries were verified against the current tree on 
   A player who deliberately re-solves after the rule is already green can append the passphrase a
   second time; the extra copy is accepted (the rule is a substring `includes`, and the length budget
   has headroom). The neighbor effect is a two-way FLIP rather than the spec's set-ON — see the plan's
-  Task 11 amendment for why (a set-ON goal is a Garden-of-Eden state, unsolvable).
+  Task 11 amendment for why (a set-ON goal is a Garden-of-Eden state, unsolvable). Corollary,
+  QA-misfiled as a blocker once already (2026-07-31): clicking only switch-OFF moves can cycle
+  forever between two states and LOOKS unwinnable — the coupling fires only on switching OFF, so
+  the intended escape is turning a coupled partner ON (an ON click flips just itself) and then
+  OFF, which clears the pair together. The BFS net in `rules.test.ts` proves all-off reachable
+  for every seed it checks; do not re-file this.
 - **PG2's color-match widget is effectively sighted-only, and its near-twin exclusion is narrow on
   purpose** (`engine/rules/act2.ts`). Naming a swatch by hue is genre-inherent — the original Password
   Game's color rule is the same — so the widget is not made non-visually solvable; the offline solver
@@ -210,6 +231,16 @@ The following Password Game 2 entries were verified against the current tree on 
   eating a character, autocorrect rewriting — intercepts widget output identically. A widget can never
   bypass an in-progress event; the CAPTCHA token, consent passphrase, chess SAN, and color hex are all
   subject to the same event pressure a typed answer would face.
+- **PG2's late game is attrition, on purpose.** Act 2+ events remove, rewrite, and inject
+  password characters — autocorrect's seeded substitutions (`engine/events/autocorrect.ts`,
+  e.g. "password" -> "passward" plus a lowercasing pass), the tractor's "letters rain back",
+  stray symbol injection, the invader shooter — so previously satisfied rules re-open, including
+  a captcha re-verification. Rules always evaluate against the mutated text. A scripted solver
+  that only repairs text will lose ground here; that is the design, not a regression.
+- **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
+  the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
+  would leak which move is best. The best-move/accept list shipping to the client is inherent to
+  client-side validation and registered as such, not a leak to fix.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
@@ -263,6 +294,12 @@ existing enums for that category live rather than inventing a parallel one.
 Every deferral below was a deliberate scope decision, not an oversight. Each lists what would
 trigger revisiting it.
 
+- **CopilotKit run failures never reach Sentry** (Medium, found 2026-07-31). The runtime emits
+  chat-run errors as `RUN_ERROR` events inside the SSE stream (plus the browser console) and
+  swallows them server-side — the multi-day dead-chat outage fixed by the per-request
+  `CopilotRuntime` produced zero Sentry events. Closing it means catching/forwarding runtime
+  errors to `captureException` in `src/app/api/copilotkit/route.ts`. Trigger: any further chat
+  incident, or the next time that route is touched.
 - **RC-3 — full engine extraction for `space-shooter.tsx`/`hextris.tsx`** (High severity, large
   effort). Deferred; the extract-before-edit doctrine covers incremental progress. Trigger: any
   gameplay-affecting edit to either file.
