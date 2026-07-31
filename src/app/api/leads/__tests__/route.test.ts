@@ -74,6 +74,42 @@ describe("POST /api/leads", () => {
     expect(mockSend).toHaveBeenCalledOnce();
   });
 
+  it("logs a breadcrumb carrying no PII", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await POST(
+      makeJsonPostRequest(
+        { name: "Ada", email: "ada@example.com", note: "hire me" },
+        { referer: "https://amindhou.com/ai" },
+      ),
+    );
+
+    expect(logSpy).toHaveBeenCalledOnce();
+    const line = logSpy.mock.calls[0]?.[0] as string;
+    expect(JSON.parse(line)).toEqual({
+      type: "LEAD",
+      id: "test-uuid",
+      source: "chatbot",
+      page: "/ai",
+    });
+    // The point of the pin: stdout reaches the container log store, so the
+    // visitor's name, address and message must never appear there.
+    expect(line).not.toContain("Ada");
+    expect(line).not.toContain("ada@example.com");
+    expect(line).not.toContain("hire me");
+  });
+
+  it("logs a null id when persistence fails", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    mockAppendLead.mockRejectedValueOnce(new Error("db down"));
+    process.env.RESEND_API_KEY = "test-resend-key";
+
+    await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
+
+    const line = logSpy.mock.calls[0]?.[0] as string;
+    expect(JSON.parse(line)).toMatchObject({ type: "LEAD", id: null });
+  });
+
   it("records an empty page when no referer header is present", async () => {
     const res = await POST(makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }));
     expect(res.status).toBe(200);

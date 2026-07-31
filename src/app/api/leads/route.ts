@@ -73,8 +73,6 @@ export async function POST(req: NextRequest) {
     page: leadPage(req),
   };
 
-  console.log(JSON.stringify({ type: "LEAD", ...input }));
-
   // Persist first: the email provider is best-effort, so a durable record in
   // the database is what guarantees a lead is never silently lost.
   let persisted: { id: string; createdAt: string } | null = null;
@@ -84,6 +82,20 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     captureException("leads.persist", err);
   }
+
+  // Breadcrumb for the container log, deliberately carrying no PII: stdout ends
+  // up in Dokploy's log store, which is not an appropriate home for a visitor's
+  // name, email or message. Those live in the database row and the notification
+  // email. `id` correlates this line to that row, and is null when the write
+  // failed (captureException above already recorded why).
+  console.log(
+    JSON.stringify({
+      type: "LEAD",
+      id: persisted?.id ?? null,
+      source: input.source,
+      page: input.page,
+    }),
+  );
 
   let emailOk = false;
   if (env.RESEND_API_KEY) {
