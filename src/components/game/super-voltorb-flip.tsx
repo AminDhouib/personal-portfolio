@@ -326,9 +326,26 @@ type CardProps = {
   col?: number;
   flags?: FlagValues;
   warning?: boolean;
+  /**
+   * Spoken form of the tile's value ("1", "Voltorb", ...), announced only once
+   * the tile is revealed. Kept separate from `children` because that is markup
+   * (the Voltorb face is an <img alt="">, which announces nothing) and because
+   * it must never reach the DOM while the tile is face down.
+   */
+  valueLabel?: string;
 };
 
-const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }: CardProps) => {
+const Card = ({
+  children,
+  fake,
+  isFlipped,
+  flipCard,
+  row,
+  col,
+  flags,
+  warning,
+  valueLabel,
+}: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
   const faceTextStyle: React.CSSProperties = { fontSize: "calc(var(--svf-tile) * 0.6)" };
@@ -349,7 +366,9 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }:
       tabIndex={0}
       aria-label={
         row !== undefined && col !== undefined
-          ? `Row ${row + 1}, Col ${col + 1}, ${isFlipped ? "revealed" : "face down"}`
+          ? `Row ${row + 1}, Col ${col + 1}, ${
+              isFlipped ? `revealed${valueLabel ? `, ${valueLabel}` : ""}` : "face down"
+            }`
           : undefined
       }
       onClick={flipCard}
@@ -777,6 +796,7 @@ const Gameboard = ({
                     row={coordinate[0]}
                     col={coordinate[1]}
                     isFlipped={peek || cardsFlipped[i]?.isFlipped}
+                    valueLabel={cell.value === "V" ? "Voltorb" : String(cell.value)}
                     flipCard={() => handleFlip(coordinate[0], coordinate[1])}
                     flags={peek || cell.isFlipped ? undefined : cell.flags}
                     warning={

@@ -55,6 +55,18 @@ describe("SuperVoltorbFlip board", () => {
     }
   });
 
+  it("leaks no tile value through a face-down tile's aria-label", () => {
+    const { container } = render(<SuperVoltorbFlipGame />);
+    const tiles = faceDownTiles(container);
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) {
+      // The label announces the value once revealed, so it is a live leak
+      // vector for exactly the same reason the title attribute was in pg2's
+      // colour widget. A face-down label must stop at "face down".
+      expect(tile.getAttribute("aria-label")).toMatch(/^Row \d+, Col \d+, face down$/);
+    }
+  });
+
   it("leaks no Voltorb sprite through a face-down tile", () => {
     const { container } = render(<SuperVoltorbFlipGame />);
     for (const tile of faceDownTiles(container)) {
