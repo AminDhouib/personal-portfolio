@@ -534,6 +534,33 @@ html {
   margin: 1.75rem 0;
 }
 
+/* Dual-theme syntax highlighting. The blog's rehype-pretty-code config passes a
+   theme RECORD ({ light, dark }), which makes shiki emit a --shiki-light and a
+   --shiki-dark custom property per token instead of a literal color -- so
+   without the two rules below every token would render colorless. Dark is the
+   unscoped base because :root is the dark theme; [data-theme="light"] overrides
+   it, matching how the rest of this file is organised.
+   Scoped to html[data-theme] deliberately: rehype-pretty-code writes its OWN
+   data-theme attribute onto the pre/code elements (holding the shiki theme
+   names, e.g. "github-light github-dark-dimmed"), so an unscoped
+   [data-theme="light"] selector here would be reading the wrong attribute.
+   The `inherit` fallbacks matter: shiki only emits the font-style/weight/
+   decoration properties for tokens that need them, and a bare var() on an
+   undefined property is invalid at computed-value time. */
+.prose [data-rehype-pretty-code-figure] code span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style, inherit);
+  font-weight: var(--shiki-dark-font-weight, inherit);
+  text-decoration: var(--shiki-dark-text-decoration, inherit);
+}
+
+html[data-theme="light"] .prose [data-rehype-pretty-code-figure] code span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style, inherit);
+  font-weight: var(--shiki-light-font-weight, inherit);
+  text-decoration: var(--shiki-light-text-decoration, inherit);
+}
+
 .prose [data-rehype-pretty-code-figure] pre {
   margin: 0;
 }

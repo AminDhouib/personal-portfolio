@@ -55,8 +55,17 @@ export async function generateMetadata({
   };
 }
 
+// Two themes, not one: a single dark theme left code blocks unreadable in light
+// mode (dark tokens on the light `--card` background that `.prose pre` paints).
+// With a theme record, shiki stops emitting a literal per-token `color` and
+// instead emits `--shiki-light` / `--shiki-dark` custom properties keyed by the
+// names below, so globals.css picks the active one off `html[data-theme]`.
+// Renaming a key here means renaming the matching custom property there.
 const prettyCodeOptions: Options = {
-  theme: "github-dark-dimmed",
+  theme: {
+    light: "github-light",
+    dark: "github-dark-dimmed",
+  },
   keepBackground: false,
 };
 
