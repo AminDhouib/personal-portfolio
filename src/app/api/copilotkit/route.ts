@@ -6,6 +6,7 @@ import {
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextRequest } from "next/server";
 import { guardRequest } from "@/lib/route-guard";
+import { tapRunErrors } from "@/lib/copilot-run-error-tap";
 import { createDeadlineFetch } from "@/lib/upstream-fetch";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
 import {
@@ -120,5 +121,9 @@ export const POST = async (req: NextRequest) => {
     endpoint: "/api/copilotkit",
   });
 
-  return handleRequest(req);
+  // A failed chat run still answers 200 and reports itself as a RUN_ERROR frame
+  // inside the SSE body, so nothing here throws and Sentry would never hear
+  // about it. tapRunErrors mirrors the stream and forwards those frames; the
+  // response the client gets is unchanged.
+  return tapRunErrors(await handleRequest(req));
 };

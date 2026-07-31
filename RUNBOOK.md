@@ -155,11 +155,17 @@ described above (drives Swarm auto-restart on a wedged/crashed process only).
 any kind. Nobody is notified if the site goes down — you find out by checking, or a visitor tells
 you.
 
-**Also invisible**: AI-chat run failures. CopilotKit emits them as `RUN_ERROR` events inside the
-SSE stream (and the browser console) and swallows them server-side — the 2026-07 multi-day
-dead-chat outage produced zero Sentry events. A dead chat looks healthy from every existing
-signal; verify it by actually asking it something more than 60 seconds after the page's first
-copilotkit POST. See DESIGN.md's Known debt for the forwarding fix.
+**AI-chat run failures**: these now reach Sentry, as of 2026-07-31. CopilotKit reports them as
+`RUN_ERROR` events inside the SSE stream while still answering HTTP 200, so nothing throws
+server-side and the 2026-07 multi-day dead-chat outage produced zero Sentry events.
+`src/lib/copilot-run-error-tap.ts` mirrors the response body and forwards those frames to
+`captureException`, so they arrive tagged `copilotkit:run-error` under a `CopilotRunError` issue.
+
+Note what this does and does not buy you: a broken chat now raises Sentry events, but there is
+still no alerting (see above), so nobody is paged — you have to look. And a chat that fails
+without emitting a `RUN_ERROR` frame at all would still be silent. When in doubt, verify the way
+the outage was originally caught: actually ask it something more than 60 seconds after the page's
+first copilotkit POST.
 
 ## Development environment (maintainer's Windows/OneDrive machine)
 

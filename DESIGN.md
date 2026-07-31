@@ -294,12 +294,17 @@ existing enums for that category live rather than inventing a parallel one.
 Every deferral below was a deliberate scope decision, not an oversight. Each lists what would
 trigger revisiting it.
 
-- **CopilotKit run failures never reach Sentry** (Medium, found 2026-07-31). The runtime emits
+- **CopilotKit run failures never reach Sentry** — CLOSED 2026-07-31. The runtime emitted
   chat-run errors as `RUN_ERROR` events inside the SSE stream (plus the browser console) and
-  swallows them server-side — the multi-day dead-chat outage fixed by the per-request
-  `CopilotRuntime` produced zero Sentry events. Closing it means catching/forwarding runtime
-  errors to `captureException` in `src/app/api/copilotkit/route.ts`. Trigger: any further chat
-  incident, or the next time that route is touched.
+  swallowed them server-side, so the multi-day dead-chat outage fixed by the per-request
+  `CopilotRuntime` produced zero Sentry events. `src/lib/copilot-run-error-tap.ts` now tees the
+  response body and forwards any `RUN_ERROR` frame to `captureException`, returning the client
+  branch untouched. It reads the stream rather than using a library hook because 1.54.1 has none
+  that works: `CopilotRuntime`'s `onError` is declared but never read on this path (and its own
+  docs call it a paid Cloud feature), the `observability_c` call sites are commented-out TODOs,
+  and `createCopilotEndpointSingleRoute` accepts only `{ runtime, basePath, cors }`. Recheck
+  those three on a major CopilotKit upgrade — a real hook would be less fragile than reading
+  frames off the wire.
 - **RC-3 — full engine extraction for `space-shooter.tsx`/`hextris.tsx`** (High severity, large
   effort). Deferred; the extract-before-edit doctrine covers incremental progress. Trigger: any
   gameplay-affecting edit to either file.
