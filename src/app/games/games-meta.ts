@@ -51,9 +51,9 @@ export const GAMES: GameMeta[] = [
   {
     slug: "tower-stacker",
     title: "Tower Stacker",
-    tagline: "Stack blocks, miss a sliver, lose width",
+    tagline: "Time the drop, keep the tower steady",
     description:
-      "Classic timing stacker. A block slides back and forth — tap to drop it. Overhang gets trimmed; perfect stacks keep your width. How tall can you build?",
+      "Classic crane stacker. A block swings overhead on a rope — tap to drop it onto the tower. Land it clean for a perfect; miss and the stack lurches, and three misses end the run. How tall can you build?",
     controls: "Click or tap anywhere to drop the block.",
     accent: "#f87171",
     accentTailwind: "accent-red",
