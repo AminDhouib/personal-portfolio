@@ -184,7 +184,7 @@ export const projects: readonly Project[] = Object.freeze([
       {
         name: "npm",
         icon: "npm",
-        url: "https://www.npmjs.com/package/@upup-company/upup",
+        url: "https://www.npmjs.com/package/@upupjs/core",
       },
       {
         name: "GitHub",
