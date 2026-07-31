@@ -46,12 +46,16 @@ export default defineConfig({
       // policy is unchanged: raise the floor in a dedicated commit whenever
       // measured coverage rises; never lower it without a stated reason in
       // that commit's message.
+      // Re-based 2026-07-31 against measured lines 34.19 / statements 33.40 /
+      // functions 33.47 / branches 30.23 -- the suite grew well past the
+      // pass-2 floors, which sat ~16 points low. Same formula as before:
+      // floor(measured) - margin.
       thresholds: {
         autoUpdate: false,
-        lines: 18,
-        statements: 17,
-        functions: 16,
-        branches: 12,
+        lines: 32,
+        statements: 31,
+        functions: 31,
+        branches: 27,
       },
     },
   },
