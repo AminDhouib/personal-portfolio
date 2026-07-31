@@ -5,14 +5,29 @@ import { GamesClient } from "./games-client";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
+const DESCRIPTION = "Mini-games built with the geometric design language of amindhou.com.";
+
 export const metadata = {
   title: "Games",
-  description: "Mini-games built with the geometric design language of amindhou.com.",
+  description: DESCRIPTION,
   alternates: {
     canonical: `${SITE_ORIGIN}/games`,
     types: {
       "application/rss+xml": "/feed.xml",
     },
+  },
+  // Without its own openGraph block this page inherited the site-wide card from
+  // the root layout, so every hub shared one title when shared.
+  openGraph: {
+    type: "website",
+    url: `${SITE_ORIGIN}/games`,
+    title: "Games — playable mini-games by Amin Dhouib",
+    description: DESCRIPTION,
+    siteName: "Amin Dhouib",
+    locale: "en_US",
+    // Declaring openGraph here replaces the root layout's block wholesale, so
+    // the site card has to be restated or the page ships with no og:image.
+    images: [{ url: `${SITE_ORIGIN}/opengraph-image`, width: 1200, height: 630, alt: "Games" }],
   },
 };
 

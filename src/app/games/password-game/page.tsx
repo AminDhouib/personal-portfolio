@@ -4,10 +4,35 @@ import { GAMES } from "../games-meta";
 import { GameCard } from "@/components/game/game-card";
 import { PasswordGame2Loader } from "@/components/game/password-game-2";
 
+const SITE_ORIGIN = "https://amindhou.com";
+
+const DESCRIPTION =
+  "Terms and Conditions Apply. A five-act sign-up form from hell — seeded chaos, every run unique.";
+
 export const metadata = {
   title: "The Password Game 2",
-  description:
-    "Terms and Conditions Apply. A five-act sign-up form from hell — seeded chaos, every run unique.",
+  description: DESCRIPTION,
+  alternates: {
+    canonical: `${SITE_ORIGIN}/games/password-game`,
+  },
+  openGraph: {
+    type: "website",
+    url: `${SITE_ORIGIN}/games/password-game`,
+    title: "The Password Game 2 — Terms and Conditions Apply",
+    description: DESCRIPTION,
+    siteName: "Amin Dhouib",
+    locale: "en_US",
+    // Declaring openGraph here replaces the root layout's block wholesale, so
+    // the site card has to be restated or the page ships with no og:image.
+    images: [
+      {
+        url: `${SITE_ORIGIN}/opengraph-image`,
+        width: 1200,
+        height: 630,
+        alt: "The Password Game 2",
+      },
+    ],
+  },
 };
 
 export default function PasswordGamePage() {

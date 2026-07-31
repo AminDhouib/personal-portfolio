@@ -65,6 +65,17 @@ export async function generateMetadata({
         "application/rss+xml": "/feed.xml",
       },
     },
+    // Per-project card: without this every /work/* page shared the root
+    // layout's site-wide openGraph title. The og:image still comes from the
+    // co-located opengraph-image.tsx, same as the blog post pages.
+    openGraph: {
+      type: "website",
+      url: `${SITE_ORIGIN}/work/${slug}`,
+      title: `${project.name} — work by Amin Dhouib`,
+      description: project.description,
+      siteName: "Amin Dhouib",
+      locale: "en_US",
+    },
   };
 }
 

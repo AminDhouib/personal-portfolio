@@ -5,14 +5,27 @@ import { formatRelativeDate, formatDate } from "@/lib/date-utils";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
+const DESCRIPTION = "Thoughts on engineering, open source, and building products.";
+
 export const metadata = {
   title: "Blog",
-  description: "Thoughts on engineering, open source, and building products.",
+  description: DESCRIPTION,
   alternates: {
     canonical: `${SITE_ORIGIN}/blog`,
     types: {
       "application/rss+xml": "/feed.xml",
     },
+  },
+  openGraph: {
+    type: "website",
+    url: `${SITE_ORIGIN}/blog`,
+    title: "Blog — engineering notes by Amin Dhouib",
+    description: DESCRIPTION,
+    siteName: "Amin Dhouib",
+    locale: "en_US",
+    // Declaring openGraph here replaces the root layout's block wholesale, so
+    // the site card has to be restated or the page ships with no og:image.
+    images: [{ url: `${SITE_ORIGIN}/opengraph-image`, width: 1200, height: 630, alt: "Blog" }],
   },
 };
 

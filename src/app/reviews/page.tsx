@@ -5,14 +5,27 @@ import { BOOKING_URL } from "@/data/nav";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
+const DESCRIPTION = "Client reviews and testimonials for Amin Dhouib / Devino.";
+
 export const metadata = {
   title: "Reviews",
-  description: "Client reviews and testimonials for Amin Dhouib / Devino.",
+  description: DESCRIPTION,
   alternates: {
     canonical: `${SITE_ORIGIN}/reviews`,
     types: {
       "application/rss+xml": "/feed.xml",
     },
+  },
+  openGraph: {
+    type: "website",
+    url: `${SITE_ORIGIN}/reviews`,
+    title: "Client Reviews — Amin Dhouib",
+    description: DESCRIPTION,
+    siteName: "Amin Dhouib",
+    locale: "en_US",
+    // Declaring openGraph here replaces the root layout's block wholesale, so
+    // the site card has to be restated or the page ships with no og:image.
+    images: [{ url: `${SITE_ORIGIN}/opengraph-image`, width: 1200, height: 630, alt: "Reviews" }],
   },
 };
 
