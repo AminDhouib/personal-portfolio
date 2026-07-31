@@ -149,7 +149,9 @@ export const reviews: readonly Review[] = Object.freeze([
     profileImage: "/reviews/profiles/trevor.png",
     position: "CTO/Founder",
     company: "Plutos App",
-    companyLink: "https://apps.apple.com/in/app/plutos-data",
+    // No companyLink: the App Store listing is delisted (404 in the IN, US, CA
+    // and GB storefronts). The logo renders unlinked, as it does for the other
+    // reviews without a company URL.
     companyLogo: "/reviews/companies/plutos.png",
     linkedin: "https://www.linkedin.com/in/trevor-arashiro/",
     rating: 5,
