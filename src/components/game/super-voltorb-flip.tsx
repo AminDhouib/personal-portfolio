@@ -368,7 +368,13 @@ const Card = ({ children, fake, isFlipped, flipCard, row, col, flags, warning }:
           style={faceTextStyle}
         >
           <div className="flex h-full w-full items-center justify-center border-2 border-[#8a4236]">
-            {children}
+            {/* Only mount the value once the tile is actually revealed. "Face
+                down" is nothing but a CSS rotateY on the wrapper, so rendering
+                {children} unconditionally put every unflipped tile's value
+                (and the Voltorb sprite's src) in the DOM -- readable straight
+                off textContent, which is the whole board's solution. The peek
+                easter egg still works: it drives this same isFlipped prop. */}
+            {isFlipped ? children : null}
           </div>
         </div>
         <div className="absolute inset-0 grid h-full w-full grid-cols-3 bg-white">
