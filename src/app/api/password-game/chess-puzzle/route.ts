@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Chess } from "chess.js";
 import { captureException, logWarn } from "@/lib/log";
+import type { ChessPuzzle } from "@/data/password-game/chess";
 
 export const runtime = "nodejs";
 
@@ -30,14 +31,12 @@ interface LichessDaily {
   };
 }
 
-interface ChessPuzzleDto {
-  id: string;
-  board: readonly string[];
-  toMove: "white" | "black";
-  bestMove: string;
-  accept: readonly string[];
-  hint: string;
-  fen: string;
+// Extends rather than restates ChessPuzzle: the client validates this payload
+// against that exact contract (`isChessPuzzle` in password-game-2/feeds.ts), so a
+// field added there must fail the build here rather than silently degrade rule 14
+// to a freebie at runtime. `rating`/`themes` are lichess-only extras the static
+// puzzles have no equivalent for.
+interface ChessPuzzleDto extends ChessPuzzle {
   rating?: number;
   themes?: readonly string[];
 }
