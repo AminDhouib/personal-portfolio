@@ -3,12 +3,22 @@
 
 /* ── Design Tokens ────────────────────────────────────────── */
 
+/* Fonts stay `inline`: these are indirections onto the variables next/font
+   generates, and `inline` is exactly the case for a token whose value is
+   another var() -- it substitutes the reference rather than emitting a
+   variable that points at a variable. */
 @theme inline {
-  /* Fonts */
   --font-display: var(--font-outfit);
   --font-body: var(--font-space-grotesk);
+}
 
-  /* Accent palette */
+/* The accent palette is deliberately NOT `inline`. With `inline`, Tailwind
+   compiles `text-accent-green` to a literal `color:#22c55e`, which makes the
+   token unthemeable -- redefining it per theme does nothing. Without it, the
+   token is emitted as a real custom property and utilities reference
+   `var(--color-accent-green)`, so a theme can override it. Dark mode is
+   unaffected: the values below are the ones dark mode already used. */
+@theme {
   --color-accent-green: #22c55e;
   --color-accent-blue: #6366f1;
   --color-accent-purple: #a78bfa;
@@ -40,17 +50,67 @@
   --card: #ffffff;
 }
 
-/* NOTE: the accent palette above is declared in `@theme inline`, and `inline`
-   means Tailwind compiles `text-accent-green` to a literal `color:#22c55e`
-   rather than `color:var(--color-accent-green)`. Redefining those tokens here
-   therefore does NOTHING -- verified against the compiled stylesheet. The
-   light-mode accent contrast failures (green 2.09:1, amber 1.97:1 against
-   --background, both under the 4.5:1 text floor) are consequently NOT fixed;
-   fixing them means either dropping `inline` from @theme, which changes how
-   every accent utility and opacity modifier compiles site-wide, or overriding
-   each generated utility class by hand. Both are design calls, not a token
-   tweak. `--muted` above is unaffected by this: it is consumed through
-   `text-(--muted)`, a real var() reference. */
+/* Light-mode accent palette. The @theme values are display colours chosen
+   against #050505 and are unreadable as text on a light background -- measured
+   against --background: green 2.09:1, amber 1.97:1, cyan 2.23:1, purple 2.50:1,
+   pink 3.24:1, red 3.45:1, blue 4.10:1, all under the 4.5:1 text floor. These
+   are the 800-weight members of the same hues, so the palette still reads as
+   the same colours, just legible: amber 6.50, green 6.54, cyan 6.67, pink 7.23,
+   blue 7.25, red 7.62, purple 8.24 against --background.
+   The 700 weights were tried first and rejected: accent text is often set on a
+   tinted tile of its own colour (`bg-accent-green/10 text-accent-green`, the
+   OSS badge), which eats roughly half a point, and that dropped green to 4.39
+   and amber to 4.38. The 800 set holds above 4.5 on --background, on --card,
+   and on its own tint up to /20.
+   Dark mode is untouched -- it keeps the @theme values above. */
+[data-theme="light"] {
+  --color-accent-green: #166534;
+  --color-accent-blue: #4338ca;
+  --color-accent-purple: #5b21b6;
+  --color-accent-amber: #92400e;
+  --color-accent-cyan: #155e75;
+  --color-accent-pink: #9d174d;
+  --color-accent-red: #991b1b;
+}
+
+/* ...but a SOLID accent fill is the opposite problem: it is a background with
+   black text on top, so darkening it makes that pairing worse, not better.
+   The primary CTA (bg-accent-green + text-black, 8 buttons) measures 9.22:1
+   today and would drop to 4.19:1 on the darker green; the amber game button
+   goes 9.78:1 -> 4.18:1. Both solid fills are therefore pinned back to the
+   brand values, which keeps every button's contrast exactly as it is now.
+   Only the full-opacity utilities are pinned: the /10-/60 tint washes still
+   follow the token, where a deeper tint on white is an improvement. */
+[data-theme="light"] .bg-accent-green {
+  background-color: #22c55e;
+}
+[data-theme="light"] .bg-accent-amber {
+  background-color: #f59e0b;
+}
+
+/* The one dimmed accent text that the darker palette cannot rescue. Fading a
+   vivid colour toward a black page reads as "quieter"; fading an already-dark
+   colour toward a white one just washes it out, and green-800 at 60% measures
+   2.88:1 on --background. The other dimmed accent texts in use (/80, /90) stay
+   above 4.5 and are left alone. Undimmed in light mode only -- raising the
+   opacity in the component would change dark mode too. */
+[data-theme="light"] .text-accent-green\/60 {
+  color: var(--color-accent-green);
+}
+
+/* Same reasoning for the review stars, which are a filled shape rather than
+   text. Two of the three star rows (the reviews carousel card and the reviews
+   page card) print no numeric rating beside them, so the star count carries the
+   value and has to clear the 3:1 non-text floor -- the brand amber is 2.15:1 on
+   --card. The text token would clear it easily at 7.09:1, but renders the stars
+   brown. amber-600 keeps them gold at 3.19:1 on --card.
+   Scoped to the fill+stroke pairing so it only catches solid icons: lucide
+   strokes with currentColor, so pinning `fill` alone would leave a dark outline
+   around a gold star. Amber text elsewhere is unaffected. */
+[data-theme="light"] .fill-accent-amber.text-accent-amber {
+  fill: #d97706;
+  color: #d97706;
+}
 
 /* Light mode: boost hero last-name weight so extralight is legible on white */
 [data-theme="light"] .hero-name-suffix {
