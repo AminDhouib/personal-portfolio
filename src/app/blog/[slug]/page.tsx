@@ -127,8 +127,10 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               {post.readingTime}
             </span>
             {post.tags.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Tag className="h-3.5 w-3.5" />
+              // flex-wrap, like the row above: without it this inner row is
+              // unbreakable and a four-tag post pushes past a 390px viewport.
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag className="h-3.5 w-3.5 shrink-0" />
                 {post.tags.map((tag) => (
                   <Link
                     key={tag}
