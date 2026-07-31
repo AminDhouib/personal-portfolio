@@ -15,8 +15,6 @@ import {
 } from "@/lib/amin-ai-prompt";
 import { env } from "@/env";
 
-const runtime = new CopilotRuntime();
-
 // RC-10: caps the whole OpenRouter round trip (connect + TTFB + stream) at a
 // generous total. Claude Haiku 4.5 answers on this chatbot finish in seconds,
 // so 60s is roughly 10-20x headroom and will not cut a legitimate stream; it
@@ -103,6 +101,18 @@ export const POST = async (req: NextRequest) => {
     fetch: groundedFetch,
   });
   adapter.getLanguageModel = () => openrouter.chat(MODEL);
+
+  // Constructed per request, and deliberately NOT hoisted to module scope.
+  // CopilotKit 1.54 creates the default agent lazily, once per CopilotRuntime
+  // instance, and binds it to the serviceAdapter of whichever request built it
+  // first. That adapter closes over this request's `groundedFetch`, which wraps
+  // a one-shot `createDeadlineFetch` (a 60s AbortSignal.timeout plus this
+  // request's own req.signal). A module-scope runtime therefore pins every
+  // later chat run to the FIRST request's already-expired signal: past 60s from
+  // the first POST after a deploy, every upstream call is born aborted and the
+  // stream fails with RUN_ERROR. Hoisting this line back out as an
+  // "optimization" reintroduces exactly that bug.
+  const runtime = new CopilotRuntime();
 
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
     runtime,

@@ -3,13 +3,17 @@ import { NextRequest } from "next/server";
 
 const mockHandleRequest = vi.hoisted(() => vi.fn());
 const mockCreateOpenAI = vi.hoisted(() => vi.fn((_options: unknown) => ({ chat: vi.fn() })));
+// Constructor mock must be a function expression, not an arrow -- arrows have
+// no [[Construct]] and `new` on one throws (vitest 4 quirk, see RUNBOOK).
+const mockCopilotRuntime = vi.hoisted(() => vi.fn(function MockCopilotRuntime() {}));
+const mockEndpoint = vi.hoisted(() =>
+  vi.fn((_options: unknown) => ({ handleRequest: mockHandleRequest })),
+);
 
 vi.mock("@copilotkit/runtime", () => ({
-  CopilotRuntime: class MockCopilotRuntime {},
+  CopilotRuntime: mockCopilotRuntime,
   OpenAIAdapter: class MockOpenAIAdapter {},
-  copilotRuntimeNextJSAppRouterEndpoint: vi.fn(() => ({
-    handleRequest: mockHandleRequest,
-  })),
+  copilotRuntimeNextJSAppRouterEndpoint: mockEndpoint,
 }));
 
 vi.mock("@ai-sdk/openai", () => ({
@@ -40,6 +44,8 @@ describe("POST /api/copilotkit", () => {
     delete process.env.OPENROUTER_KEY;
     mockHandleRequest.mockReset();
     mockCreateOpenAI.mockClear();
+    mockCopilotRuntime.mockClear();
+    mockEndpoint.mockClear();
   });
 
   afterEach(() => {
@@ -94,6 +100,44 @@ describe("POST /api/copilotkit", () => {
     if (!call) throw new Error("expected createOpenAI to have been called");
     const options = call[0] as { fetch?: unknown };
     expect(typeof options.fetch).toBe("function");
+  });
+
+  // Regression pin for the dead-chat bug: a module-scope `new CopilotRuntime()`
+  // let CopilotKit bind its lazily-created default agent to the FIRST request's
+  // serviceAdapter, whose grounded fetch closes over that request's one-shot
+  // 60s deadline signal. Every run after that signal fired was born aborted
+  // (instant TimeoutError -> SSE RUN_ERROR), so chat only worked for ~60s after
+  // each deploy. The runtime must be constructed per request.
+  it("constructs a fresh CopilotRuntime per request", async () => {
+    process.env.OPENROUTER_KEY = "test-key-abc";
+    mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
+
+    await POST(makeReq({ message: "first" }, { ip: "10.30.0.7" }));
+    await POST(makeReq({ message: "second" }, { ip: "10.30.0.8" }));
+
+    expect(mockCopilotRuntime).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes a distinct runtime instance to the endpoint factory on each request", async () => {
+    process.env.OPENROUTER_KEY = "test-key-abc";
+    mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
+
+    await POST(makeReq({ message: "first" }, { ip: "10.30.0.9" }));
+    await POST(makeReq({ message: "second" }, { ip: "10.30.0.10" }));
+
+    expect(mockEndpoint).toHaveBeenCalledTimes(2);
+    const [first, second] = mockEndpoint.mock.calls as unknown as [
+      [{ runtime: unknown; serviceAdapter: unknown }],
+      [{ runtime: unknown; serviceAdapter: unknown }],
+    ];
+    expect(first[0].runtime).toBeDefined();
+    expect(second[0].runtime).toBeDefined();
+    // The actual invariant: not the same object across requests. A hoisted
+    // module-scope runtime would make these identical and fail here.
+    expect(first[0].runtime).not.toBe(second[0].runtime);
+    // The adapter is already per-request; assert it stays that way, since the
+    // runtime binds to whichever adapter it first sees.
+    expect(first[0].serviceAdapter).not.toBe(second[0].serviceAdapter);
   });
 
   it("returns 403 for a cross-origin request and never reaches the runtime", async () => {
