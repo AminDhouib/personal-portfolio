@@ -27,7 +27,12 @@ export const metadata: Metadata = {
 
 export default function AminAIPage() {
   return (
-    <main className="flex flex-col" style={{ height: "calc(100vh - 64px)" }}>
+    // mt-16 clears the 64px fixed navbar. Every other page does this with
+    // pt-24 on a min-h-screen wrapper; this one sizes itself to the viewport
+    // instead, so it needs the offset as margin or its first row renders
+    // underneath the navbar (which it silently did while the chat's own
+    // padding happened to sit there).
+    <main className="mt-16 flex flex-col" style={{ height: "calc(100vh - 64px)" }}>
       <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 py-6">
         {/* The page was a bare chat shell: no heading and no crawlable copy, so
             search engines had nothing to index beyond the title tag. */}
