@@ -14,6 +14,7 @@ import {
   buildAminAiSystemPrompt,
   type ChatCompletionBody,
 } from "@/lib/amin-ai-prompt";
+import { GAMES } from "@/app/games/games-meta";
 import { env } from "@/env";
 
 // RC-10: caps the whole OpenRouter round trip (connect + TTFB + stream) at a
@@ -35,7 +36,9 @@ const MODEL = "anthropic/claude-haiku-4.5";
 // It is the single source of truth for the assistant's facts and is injected
 // into the LLM request server-side below (the client `instructions` prop does
 // not reach the model on CopilotKit 1.54's AG-UI chat path).
-const AMIN_AI_SYSTEM_PROMPT = buildAminAiSystemPrompt();
+// The games registry lives in the app tree, so this route passes it in rather
+// than having lib import from a route directory.
+const AMIN_AI_SYSTEM_PROMPT = buildAminAiSystemPrompt(GAMES);
 
 export const POST = async (req: NextRequest) => {
   // Guard the open LLM proxy before any work: reject cross-origin callers and

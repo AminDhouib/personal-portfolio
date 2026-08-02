@@ -30,11 +30,23 @@ export type ChatCompletionBody = {
 };
 
 /**
+ * Structural subset of `GameMeta` (src/app/games/games-meta.ts). The games
+ * registry lives in the app tree, and lib must not import from routes, so the
+ * caller (the copilotkit route) passes the list in.
+ */
+export type PromptGameMeta = {
+  slug: string;
+  title: string;
+  tagline: string;
+  hidden?: true;
+};
+
+/**
  * Builds the Amin AI system prompt from the typed data sources. Pure and
  * deterministic (no I/O), so it is cheap to call once at route-module load and
  * straightforward to unit-test.
  */
-export function buildAminAiSystemPrompt(): string {
+export function buildAminAiSystemPrompt(games: readonly PromptGameMeta[]): string {
   const productLines = projects
     .map((p) => `- ${p.name} (${p.url}) - ${p.tagline}. ${p.description}`)
     .join("\n");
@@ -62,6 +74,11 @@ export function buildAminAiSystemPrompt(): string {
 
   const socialLines = socialLinks.map((s) => `${s.name}: ${s.url}`).join(" | ");
 
+  const gameLines = games
+    .filter((g) => !g.hidden)
+    .map((g) => `- ${g.title} (https://amindhou.com/games/${g.slug}) - ${g.tagline}.`)
+    .join("\n");
+
   return [
     "You are Amin AI, the assistant on Amin Dhouib's portfolio site (amindhou.com).",
     "Your visitors are mainly recruiters and hiring managers evaluating Amin for engineering roles, and prospective clients considering hiring him. Help them quickly understand what Amin has built and how to work with him.",
@@ -82,6 +99,9 @@ export function buildAminAiSystemPrompt(): string {
     "",
     "Services Amin offers:",
     serviceLines,
+    "",
+    "Playable mini-games Amin built for the site, all at https://amindhou.com/games:",
+    gameLines,
     "",
     `Rate and booking: $50-75/hr on Contra. If a visitor wants to move forward, the fastest next step is booking a 15-minute call at ${BOOKING_URL}.`,
     "",

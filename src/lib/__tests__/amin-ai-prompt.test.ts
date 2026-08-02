@@ -4,9 +4,10 @@ import { projects } from "@/data/projects";
 import { ossProjects } from "@/data/oss-projects";
 import { services } from "@/data/services";
 import { BOOKING_URL, socialLinks } from "@/data/nav";
+import { GAMES } from "@/app/games/games-meta";
 
 describe("buildAminAiSystemPrompt", () => {
-  const prompt = buildAminAiSystemPrompt();
+  const prompt = buildAminAiSystemPrompt(GAMES);
 
   it("names every product from the projects data source", () => {
     // The five products: Shorty, uNotes, Caramel, UpUp, GetItDone.
@@ -54,6 +55,18 @@ describe("buildAminAiSystemPrompt", () => {
     expect(prompt).toContain("collectLead");
     expect(prompt).toMatch(/recruiters/i);
     expect(prompt).toMatch(/2-3 sentences/);
+  });
+
+  it("lists every visible game with its /games URL and omits hidden ones", () => {
+    for (const game of GAMES) {
+      if (game.hidden) {
+        expect(prompt).not.toContain(game.title);
+      } else {
+        expect(prompt).toContain(game.title);
+        expect(prompt).toContain(`https://amindhou.com/games/${game.slug}`);
+      }
+    }
+    expect(prompt).toContain("https://amindhou.com/games");
   });
 
   it("contains no emoji characters", () => {
