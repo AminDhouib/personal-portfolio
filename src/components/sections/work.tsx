@@ -98,7 +98,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                       </span>
                       <span className="text-sm font-medium">{formatMAU(displayMAU)} MAU</span>
                       {liveMAU ? (
-                        <span className="text-xs font-medium text-accent-green/60">live</span>
+                        <span className="text-xs font-medium text-accent-green/80">live</span>
                       ) : null}
                       {!liveMAU && project.mauGrowth && (
                         <span className="text-xs font-medium text-accent-green">

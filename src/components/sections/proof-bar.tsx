@@ -50,7 +50,7 @@ function Counter({
       </div>
       <div className="mb-2 text-xs tracking-wider text-(--muted) uppercase">{label}</div>
       <div className="mx-auto mb-2 h-0.5 w-10 rounded-full" style={{ backgroundColor: color }} />
-      <div className="mx-auto max-w-45 text-[11px] leading-snug text-(--muted)/70">{subtitle}</div>
+      <div className="mx-auto max-w-45 text-[11px] leading-snug text-(--muted)">{subtitle}</div>
     </div>
   );
 }
@@ -124,7 +124,7 @@ export function ProofBar() {
                     className="mx-auto mb-2 h-0.5 w-10 rounded-full"
                     style={{ backgroundColor: m.color }}
                   />
-                  <div className="mx-auto max-w-45 text-[11px] leading-snug text-(--muted)/70">
+                  <div className="mx-auto max-w-45 text-[11px] leading-snug text-(--muted)">
                     {m.subtitle}
                   </div>
                 </div>
@@ -155,7 +155,7 @@ export function ProofBar() {
             <Server className="h-4 w-4 shrink-0" />
             <span className="text-sm">Did you know this site runs on my home server?</span>
           </div>
-          <p className="text-xs text-(--muted)/60">
+          <p className="text-xs text-(--muted)">
             Docker Swarm &nbsp;/&nbsp; Tailscale &nbsp;/&nbsp; Cloudflared
           </p>
         </motion.div>

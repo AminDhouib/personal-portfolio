@@ -184,7 +184,7 @@ export function OpenSource({ stats, contributions }: Props) {
           <h3 className="mb-4 text-sm font-semibold tracking-wider text-(--muted) uppercase">
             Contribution Graph
             {contributions?.length ? (
-              <span className="ml-2 font-normal text-accent-green/60 normal-case">
+              <span className="ml-2 font-normal text-accent-green/80 normal-case">
                 — live from GitHub
               </span>
             ) : null}

@@ -190,7 +190,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
             <span className="text-sm font-medium text-accent-green">{project.mauGrowth}</span>
           )}
           {isLive && (
-            <span className="ml-auto text-xs font-medium text-accent-green/60">
+            <span className="ml-auto text-xs font-medium text-accent-green/80">
               live · last 30 days
             </span>
           )}

@@ -64,7 +64,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
                   {post.excerpt && (
                     <p className="mb-1.5 line-clamp-1 text-sm text-(--muted)">{post.excerpt}</p>
                   )}
-                  <div className="flex items-center gap-3 text-xs text-(--muted)/60">
+                  <div className="flex items-center gap-3 text-xs text-(--muted)">
                     {post.date && <span>{formatRelativeDate(post.date)}</span>}
                     {post.readingTime && (
                       <span className="flex items-center gap-1">

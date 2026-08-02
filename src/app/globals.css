@@ -90,11 +90,14 @@
 
 /* The one dimmed accent text that the darker palette cannot rescue. Fading a
    vivid colour toward a black page reads as "quieter"; fading an already-dark
-   colour toward a white one just washes it out, and green-800 at 60% measures
-   2.88:1 on --background. The other dimmed accent texts in use (/80, /90) stay
-   above 4.5 and are left alone. Undimmed in light mode only -- raising the
-   opacity in the component would change dark mode too. */
-[data-theme="light"] .text-accent-green\/60 {
+   colour toward a white one just washes it out. The green "live" badges were
+   /60, which failed BOTH themes: brand green at 60% on #050505 is 3.67:1, and
+   green-800 at 60% on #f5f5f5 is 2.88:1. The components now use /80, which
+   fixes dark mode (5.93:1 on --background, 5.73:1 on --card) but still leaves
+   light mode at 4.20:1 -- so light mode undims it here instead (full green-800,
+   6.54:1). Kept as a light-only override because raising the opacity further
+   in the component would brighten dark mode past "quieter". */
+[data-theme="light"] .text-accent-green\/80 {
   color: var(--color-accent-green);
 }
 

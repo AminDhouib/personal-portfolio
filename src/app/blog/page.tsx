@@ -59,7 +59,7 @@ export default async function BlogPage({
             className={`rounded-full border px-3 py-1 text-xs transition-colors ${
               !tag
                 ? "border-accent-blue/40 bg-accent-blue/10 text-accent-blue"
-                : "border-(--border) bg-(--surface) text-(--muted)/70 hover:border-accent-blue/30"
+                : "border-(--border) bg-(--surface) text-(--muted) hover:border-accent-blue/30"
             }`}
           >
             All
@@ -71,7 +71,7 @@ export default async function BlogPage({
               className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                 tag === t
                   ? "border-accent-blue/40 bg-accent-blue/10 text-accent-blue"
-                  : "border-(--border) bg-(--surface) text-(--muted)/70 hover:border-accent-blue/30"
+                  : "border-(--border) bg-(--surface) text-(--muted) hover:border-accent-blue/30"
               }`}
             >
               {t}
@@ -101,12 +101,12 @@ export default async function BlogPage({
                     <p className="mb-2 text-sm text-(--muted)">{post.excerpt}</p>
                     <div className="flex items-center gap-3">
                       {post.date && (
-                        <span className="text-xs text-(--muted)/60" title={formatDate(post.date)}>
+                        <span className="text-xs text-(--muted)" title={formatDate(post.date)}>
                           {formatRelativeDate(post.date)}
                         </span>
                       )}
-                      <span className="text-xs text-(--muted)/60">·</span>
-                      <span className="text-xs text-(--muted)/60">{post.readingTime}</span>
+                      <span className="text-xs text-(--muted)">·</span>
+                      <span className="text-xs text-(--muted)">{post.readingTime}</span>
                     </div>
                   </Link>
                   <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-(--muted) transition-all group-hover:translate-x-1 group-hover:text-accent-blue" />
@@ -120,7 +120,7 @@ export default async function BlogPage({
                         className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
                           tag === t
                             ? "border-accent-blue/40 bg-accent-blue/10 text-accent-blue"
-                            : "border-(--border) bg-(--surface) text-(--muted)/70 hover:border-accent-blue/30 hover:text-(--foreground)"
+                            : "border-(--border) bg-(--surface) text-(--muted) hover:border-accent-blue/30 hover:text-(--foreground)"
                         }`}
                       >
                         {t}

@@ -42,7 +42,7 @@ export function Services() {
                   <p className="mb-1 text-sm text-(--muted)">{service.description}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
                     {service.tools.map((tool) => (
-                      <span key={tool} className="text-xs text-(--muted)/60">
+                      <span key={tool} className="text-xs text-(--muted)">
                         <TechIcon name={tool} />
                       </span>
                     ))}

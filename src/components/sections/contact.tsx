@@ -46,7 +46,7 @@ export function Contact() {
         <footer className="mt-16 pt-8">
           <div className="section-divider mb-8" />
           <p className="text-xs text-(--muted)">&copy; {currentYear} Amin Dhouib / amindhou.com</p>
-          <p className="mt-1 flex items-center justify-center gap-1 text-xs text-(--muted)/60">
+          <p className="mt-1 flex items-center justify-center gap-1 text-xs text-(--muted)">
             Hosted on a home server with <Heart className="h-3 w-3 text-accent-green" />
           </p>
         </footer>
