@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lighthouse": "node scripts/run-lighthouse.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.50",
@@ -53,6 +54,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",

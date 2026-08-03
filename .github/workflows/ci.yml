@@ -62,9 +62,66 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
+  lighthouse:
+    name: Lighthouse (all public pages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Next.js production build
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      # Assemble and boot the standalone bundle the same way the Dockerfile
+      # does. CI has no secrets, so the boot uses the env gate's designed
+      # loud bypass sentinel — Lighthouse audits rendered markup, not the
+      # integrations behind the missing vars (DB-backed API calls 500, which
+      # only dings the warn-level best-practices category).
+      - name: Boot standalone server
+        env:
+          DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: I_UNDERSTAND_THIS_MAY_CRASH_CORRUPT_DATA_OR_EXPOSE_BROKEN_BEHAVIOR
+        run: |
+          SERVER_JS=$(find .next/standalone -name server.js -not -path "*/node_modules/*" | head -1)
+          APP_DIR=$(dirname "$SERVER_JS")
+          mkdir -p "$APP_DIR/.next"
+          [ -d "$APP_DIR/.next/static" ] || cp -r .next/static "$APP_DIR/.next/static"
+          [ -d "$APP_DIR/public" ] || cp -r public "$APP_DIR/public"
+          PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 node "$SERVER_JS" &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/api/health
+
+      - name: Lighthouse audit (URL list derived from sitemap.xml)
+        run: node scripts/run-lighthouse.mjs http://localhost:3000
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci
+          if-no-files-found: ignore
+
   deploy:
     name: Deploy to Dokploy
-    needs: lint-and-test
+    needs: [lint-and-test, lighthouse]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
