@@ -22,7 +22,7 @@
     "lighthouse": "node scripts/run-lighthouse.mjs"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.50",
+    "@ai-sdk/openai": "^4.0.25",
     "@copilotkit/react-core": "^1.54.1",
     "@copilotkit/react-ui": "^1.54.1",
     "@copilotkit/runtime": "^1.54.1",
