@@ -15,6 +15,7 @@ import {
   Layers,
   BookOpen,
   Star,
+  Milestone,
   Gamepad2,
   Sparkles,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   services: Layers,
   blog: BookOpen,
   reviews: Star,
+  experience: Milestone,
   game: Gamepad2,
   ai: Sparkles,
 };
@@ -149,8 +151,11 @@ export function Navbar() {
                     style={{
                       backgroundImage:
                         "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
-                      backgroundSize: "250% 100%",
-                      animation: "amin-games-shimmer 3s linear infinite",
+                      // 200% must match the amin-games-shimmer keyframes (0 -> 200%
+                      // background-position): any other size makes the loop land
+                      // mid-gradient and visibly snap every cycle.
+                      backgroundSize: "200% 100%",
+                      animation: "amin-games-shimmer 6s linear infinite",
                     }}
                   >
                     <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: "#a855f7" }} />
@@ -325,8 +330,8 @@ export function Navbar() {
                             style={{
                               backgroundImage:
                                 "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6,#06b6d4,#ec4899,#a855f7)",
-                              backgroundSize: "250% 100%",
-                              animation: "amin-games-shimmer 3s linear infinite",
+                              backgroundSize: "200% 100%",
+                              animation: "amin-games-shimmer 6s linear infinite",
                             }}
                           >
                             <Sparkles className="h-4 w-4 shrink-0" style={{ color: "#a855f7" }} />

@@ -232,7 +232,7 @@ export function OpenSource({ stats, contributions }: Props) {
             ? createPortal(
                 <div
                   role="tooltip"
-                  className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-full rounded-md border border-(--border) bg-(--surface) px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-(--foreground) shadow-lg"
+                  className="pointer-events-none fixed z-60 -translate-x-1/2 -translate-y-full rounded-md border border-(--border) bg-(--surface) px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-(--foreground) shadow-lg"
                   style={{ left: tooltip.x, top: tooltip.y - 8 }}
                 >
                   {tooltip.text}

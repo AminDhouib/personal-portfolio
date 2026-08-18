@@ -51,13 +51,15 @@ export function Background() {
               <h3 className="font-display text-lg font-bold">Education</h3>
             </div>
             <div className="flex items-start gap-4">
-              <Image
-                src="/logos/companies/uottawa.png"
-                alt="University of Ottawa"
-                width={48}
-                height={48}
-                className="h-12 w-12 shrink-0 rounded-full"
-              />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-(--border) bg-white p-1.5">
+                <Image
+                  src="/logos/companies/uottawa.png"
+                  alt="University of Ottawa"
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-contain"
+                />
+              </div>
               <div>
                 <p className="text-base font-semibold">University of Ottawa</p>
                 <p className="text-sm text-(--muted)">BASc Computer Software Engineering</p>

@@ -11,6 +11,7 @@ export const navItems: readonly NavItem[] = Object.freeze([
   { label: "Services", href: "#services", sectionId: "services" },
   { label: "Blog", href: "#blog", sectionId: "blog" },
   { label: "Reviews", href: "/reviews", sectionId: "reviews" },
+  { label: "Experience", href: "#experience", sectionId: "experience" },
   // Games is a full route now (not an in-page anchor), so this opens
   // /games directly instead of scrolling to the embedded game on the home
   // page. sectionId is kept so the scroll-spy still highlights the embedded
