@@ -264,20 +264,23 @@ const SCOPED_STYLES = `
   80%  { transform: scaleX(-0.4); }
   100% { transform: scaleX(1);    }
 }
-/* Level transition flashes — keyed by .svf-lv-flash-up / -down. */
+/* Level transition flashes — keyed by .svf-lv-flash-up / -down.
+   Rest stops are the banner's #3D7757, not the board's sprite-palette
+   #448563: the banner green is darkened so its white 12px text clears the
+   4.5:1 floor (white on #448563 is only 4.42:1). Board tiles keep #448563. */
 .svf-lv-flash-up   { animation: svf-lv-flash-up   1.1s ease-out 1 both; }
 .svf-lv-flash-down { animation: svf-lv-flash-down 1.1s ease-out 1 both; }
 @keyframes svf-lv-flash-up {
-  0%   { background-color: #448563; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
+  0%   { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
   20%  { background-color: #4ade80; box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.55); transform: scale(1.18); }
   60%  { background-color: #6ee08e; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.20); transform: scale(1.06); }
-  100% { background-color: #448563; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
+  100% { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
 }
 @keyframes svf-lv-flash-down {
-  0%   { background-color: #448563; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
+  0%   { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
   20%  { background-color: #b45353; box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.55); transform: scale(0.94) rotate(-1.5deg); }
   60%  { background-color: #6e4848; box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.20); transform: scale(0.98) rotate(0.5deg); }
-  100% { background-color: #448563; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
+  100% { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
 }
 
 /* Risk-warning tile shake — keyed by .svf-tile-anxious on the wrap.
@@ -1632,7 +1635,7 @@ export function SuperVoltorbFlipGame() {
               />
               {game && (
                 <div
-                  className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#448563] px-3 outline outline-2 outline-gray-600 drop-shadow-default${
+                  className={`drop-shadow-default flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#3D7757] px-3 outline outline-2 outline-gray-600 ${
                     levelDir === "up"
                       ? "svf-lv-flash-up"
                       : levelDir === "down"
@@ -1640,11 +1643,9 @@ export function SuperVoltorbFlipGame() {
                         : ""
                   }`}
                 >
-                  <span className="text-xs font-bold tracking-widest text-white/80 uppercase">
-                    Lv
-                  </span>
+                  <span className="text-xs font-bold tracking-widest text-white uppercase">Lv</span>
                   <span className="text-lg leading-none font-black">{displayLevel}</span>
-                  <span className="text-sm text-white/70">VOLTORB Flip</span>
+                  <span className="text-sm text-white/90">VOLTORB Flip</span>
                 </div>
               )}
             </div>
@@ -1667,7 +1668,7 @@ export function SuperVoltorbFlipGame() {
               <div className="flex w-full flex-col gap-1.5 lg:hidden">
                 <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 text-gray-700 outline outline-2 outline-gray-600">
                   <div
-                    className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#448563] px-2 leading-none text-white${
+                    className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#3D7757] px-2 leading-none text-white ${
                       levelDir === "up"
                         ? "svf-lv-flash-up"
                         : levelDir === "down"
@@ -1675,7 +1676,7 @@ export function SuperVoltorbFlipGame() {
                           : ""
                     }`}
                   >
-                    <span className="text-xs font-bold tracking-widest text-white/80 uppercase">
+                    <span className="text-xs font-bold tracking-widest text-white uppercase">
                       Lv
                     </span>
                     <span className="text-xl font-black">{displayLevel}</span>

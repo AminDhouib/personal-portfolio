@@ -24,7 +24,9 @@ import path from "node:path";
 
 const CANONICAL_ORIGIN = "https://amindhou.com";
 // Public pages not listed in the sitemap but still crawlable/linkable.
-const EXTRA_PATHS = ["/ai"];
+// Empty since /ai entered the sitemap; kept (with the dedupe below) so the
+// next deliberately-unlisted page has an obvious home.
+const EXTRA_PATHS = [];
 
 const base = (process.argv[2] ?? "http://localhost:3000").replace(/\/$/, "");
 
@@ -42,8 +44,10 @@ if (locs.length === 0) {
 }
 
 const urls = [
-  ...locs.map((loc) => loc.replace(CANONICAL_ORIGIN, base)),
-  ...EXTRA_PATHS.map((p) => `${base}${p}`),
+  ...new Set([
+    ...locs.map((loc) => loc.replace(CANONICAL_ORIGIN, base)),
+    ...EXTRA_PATHS.map((p) => `${base}${p}`),
+  ]),
 ];
 
 console.log(`run-lighthouse: auditing ${urls.length} URLs from ${base}`);

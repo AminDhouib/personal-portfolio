@@ -32,12 +32,15 @@ export function GameCard({ game, size = "lg" }: { game: GameMeta; size?: "lg" | 
           />
           {/* Title block */}
           <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-            <h3
+            {/* h2, not h3: on /games these cards sit directly under the page
+                h1 with no intermediate heading, so h3 is a heading-order skip.
+                Every other host renders them under an h2 section heading. */}
+            <h2
               className={`font-display font-black tracking-tight ${titleSize} text-white`}
               style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}
             >
               {game.title}
-            </h3>
+            </h2>
             <p className={`mt-1 ${taglineSize} line-clamp-2 text-white/80`}>{game.tagline}</p>
           </div>
         </div>

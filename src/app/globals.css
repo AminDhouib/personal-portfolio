@@ -115,6 +115,25 @@
   color: #d97706;
 }
 
+/* The dark-mode counterpart: the active-chip pairing (`bg-accent-blue/10
+   text-accent-blue` -- the blog tag filter chips and the hextris control
+   badges) sets brand indigo on a tile tinted with 10% of itself over the
+   near-black page, which measures 4.25:1, under the 4.5:1 text floor.
+   Indigo-400 on the same tile is 6.4:1 and still reads as the brand hue.
+   Light mode keeps the token: its indigo-800 clears 6:1 on the light tile,
+   and indigo-400 there would be exactly the washout described above.
+   Themed through a variable rather than a scoped rule pair so the cascade
+   between the two rules never has to be arbitrated. */
+:root {
+  --chip-on-blue-tint: #818cf8;
+}
+[data-theme="light"] {
+  --chip-on-blue-tint: var(--color-accent-blue);
+}
+.bg-accent-blue\/10.text-accent-blue {
+  color: var(--chip-on-blue-tint);
+}
+
 /* Light mode: boost hero last-name weight so extralight is legible on white */
 [data-theme="light"] .hero-name-suffix {
   font-weight: 300;
