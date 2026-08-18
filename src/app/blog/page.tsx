@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getAllBlogPosts } from "@/lib/blog";
 import { formatRelativeDate, formatDate } from "@/lib/date-utils";
@@ -109,6 +110,23 @@ export default async function BlogPage({
                       <span className="text-xs text-(--muted)">{post.readingTime}</span>
                     </div>
                   </Link>
+                  {post.cover && (
+                    <Link
+                      href={`/blog/${post.slug}`}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="mr-6 hidden shrink-0 overflow-hidden rounded-lg border border-(--border) md:block"
+                    >
+                      <Image
+                        src={post.cover}
+                        alt=""
+                        width={144}
+                        height={81}
+                        sizes="144px"
+                        className="h-[81px] w-[144px] object-cover"
+                      />
+                    </Link>
+                  )}
                   <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-(--muted) transition-all group-hover:translate-x-1 group-hover:text-accent-blue" />
                 </div>
                 {post.tags.length > 0 && (

@@ -1,0 +1,113 @@
+---
+title: "Shipping an AI Assistant That Can't Drift From the Truth"
+excerpt: "The chat widget on this site is grounded in the same typed data that renders the pages. Here's how it's built, the bug that killed it for days, and what I now check before putting an LLM in front of customers."
+date: "2026-07-28"
+tags: ["ai", "llm", "architecture", "nextjs"]
+cover: "/blog/grounding-an-ai-assistant-in-typed-data.jpg"
+---
+
+There's a chat widget on this site. You can ask it what I've built, what I charge for, where I've worked. It answers from a system prompt, like every other chatbot.
+
+The difference is that the prompt is not a string somebody wrote. It's compiled from the same typed modules that render the pages, so the assistant's facts and the site's facts cannot disagree. This post is how that works, and the two failures that taught me what actually breaks when you put an LLM in a product.
+
+## The Problem With Hand-Written Prompts
+
+The chat started with an `INSTRUCTIONS` string literal. Then it needed to exist in two places — the floating widget and a dedicated page. So there were two string literals.
+
+By the time I looked closely, they had drifted apart. One knew about a project the other didn't. Neither matched what the site rendered. This is the default outcome, not bad luck: a prompt is documentation, documentation duplicated by hand is documentation that diverges, and nothing fails when it does. No test breaks. No type error. The model just confidently tells a visitor something that stopped being true four months ago.
+
+## Compile the Prompt From the Data
+
+The fix is structural. The prompt is built by a pure function from the typed data modules the site already imports:
+
+```typescript
+import { projects } from "@/data/projects";
+import { ossProjects } from "@/data/oss-projects";
+import { services } from "@/data/services";
+import { experience } from "@/data/experience";
+import { reviews } from "@/data/reviews";
+
+export function buildAminAiSystemPrompt(games: readonly PromptGameMeta[]): string {
+  const productLines = projects
+    .map((p) => `- ${p.name} (${p.url}) - ${p.tagline}. ${p.description}`)
+    .join("\n");
+  // ...same for OSS repos, services, experience, reviews
+}
+```
+
+Add a project to `projects.ts` and it appears in the portfolio grid and in the assistant's knowledge in the same commit. Remove one and it disappears from both. There is no second place to update and therefore no drift to manage.
+
+The function is pure and deterministic — no I/O — so it's cheap to call once when the route module loads, and straightforward to unit test. That last part matters more than it sounds: because the prompt is a function return value, I can assert on its contents. A test can insist the prompt mentions every non-hidden game. Prompt regressions become test failures instead of customer-facing lies.
+
+One wrinkle worth naming: the games registry lives in the app route tree, and this codebase enforces that `lib` never imports from routes. So the builder takes the game list as a parameter and the route passes it in. The boundary held, and the fix was one function argument.
+
+## The Grounding Didn't Reach the Model
+
+Here is where it got interesting. CopilotKit has an `instructions` prop. I set it. The assistant ignored it.
+
+CopilotKit 1.54 runs the chat UI on the AG-UI stack. On that path, the legacy `instructions` prop is captured into a React context value that the run path never reads. It doesn't warn. It doesn't throw. The prop is accepted and silently goes nowhere.
+
+So the prompt gets injected server-side instead, by wrapping the fetch that talks to the provider:
+
+```typescript
+const groundedFetch: typeof fetch = (input, init) => {
+  if (init && typeof init.body === "string") {
+    const body = safeJsonParseServer<ChatCompletionBody>(init.body, "copilotkit:upstream-body");
+    if (body) {
+      applySystemPrompt(body, AMIN_AI_SYSTEM_PROMPT);
+      return deadlineFetch(input, { ...init, body: JSON.stringify(body) });
+    }
+  }
+  return deadlineFetch(input, init);
+};
+```
+
+Not elegant. But it's the one place the grounding provably lands in the outbound request, and "provably" is the operative word. The lesson generalizes past this library: when a framework offers a configuration knob for something that must be true, verify it reaches the wire. A knob that silently does nothing is worse than no knob, because it buys your confidence without earning it.
+
+## The Bug That Killed the Chat for Days
+
+The chat was dead in production for several days. Every message failed. The cause was one line in the wrong scope.
+
+`CopilotRuntime` was constructed at module scope, which looks like an obvious optimization — why rebuild it per request? Because in 1.54 the runtime creates its default agent lazily, once, and binds it to the service adapter of whichever request happened to build it first. That adapter closes over a one-shot 60-second abort signal belonging to that first request.
+
+Sixty seconds after the first message following a deploy, every subsequent upstream call was born already aborted. The runtime was pinned to a dead signal for the life of the process.
+
+The fix is one line moved inside the handler, with a comment that exists to stop a future reader from "optimizing" it back:
+
+```typescript
+// Constructed per request, and deliberately NOT hoisted to module scope.
+const runtime = new CopilotRuntime();
+```
+
+I now treat module-scope construction of anything holding a request-scoped resource as a defect on sight. An `AbortSignal`, a deadline, a per-request auth context — hoisting any of those out of the handler creates a bug that passes every test, works perfectly in local development, and only surfaces in production after an uptime threshold.
+
+## The Failure Was Invisible to Monitoring
+
+The worse part: during the entire outage, Sentry recorded nothing.
+
+A failed chat run still returns HTTP 200. The error arrives as a `RUN_ERROR` frame inside the streaming response body, which the runtime swallows server-side. From every monitoring vantage point, the endpoint was healthy. It was returning 200s with normal latency, containing an error, to every visitor.
+
+Fixing it meant teeing the response stream and forwarding those frames to `captureException`, with the client's copy of the stream untouched. I went looking for a library hook first and there wasn't one that works on 1.54.1: `onError` is declared but never read on this path, the observability call sites are commented-out TODOs, and the single-route endpoint helper accepts only three unrelated options. So the tap reads frames off the wire, and the reason why is written down next to the code, along with a note to recheck those three on the next major upgrade.
+
+The generalizable rule: **a 200 is not a success signal for a streaming endpoint.** If your product streams, your alerting has to understand the stream's own error protocol, or you will find out about outages from users.
+
+## The Hardening Around It
+
+An LLM proxy is an open door to a metered API key, so the route is guarded before it does any work:
+
+- **Origin and rate limit.** Cross-origin callers get a 403, and each client IP is capped per minute. The guard reads only headers, never the body — the runtime needs to read the body itself downstream.
+- **A real deadline.** Every upstream call carries a 60-second timeout, merged with the inbound request's own abort signal, so a visitor who closes the chat cancels the upstream call immediately instead of leaving it running.
+- **No `maxDuration`.** It's a Vercel-only directive and a documented no-op on this self-hosted deployment. It's deliberately absent, with a comment saying so, because a config line that looks like a timeout but isn't one is worse than no line at all.
+
+That last point is a small thing I've become strict about. Configuration that does nothing on your actual platform is a trap for the next person, who will read it, believe the limit is enforced, and not add the real one.
+
+## What I'd Tell a Client Putting AI in Front of Customers
+
+Four things, all learned the expensive way on my own site rather than someone else's:
+
+1. **Generate the prompt from your source of truth.** If a human maintains the model's facts by hand, they will diverge from the product, and nothing will fail loudly when they do.
+2. **Verify the grounding reaches the model.** Test the payload on the wire, not the config object you set.
+3. **Instrument the stream, not the status code.** Streaming endpoints fail with 200s.
+4. **Keep request-scoped things request-scoped.** The optimization that hoists them out is the outage you'll debug for days.
+
+None of this is about model quality. The model was fine the entire time the chat was dead. Every failure above was ordinary engineering — scope, observability, and a single source of truth — which is generally where AI features break in practice.

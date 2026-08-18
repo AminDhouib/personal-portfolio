@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Clock, Tag } from "lucide-react";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
@@ -148,6 +149,22 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           </div>
           <div className="mt-6 h-px bg-gradient-to-r from-accent-blue/50 via-accent-blue/20 to-transparent" />
         </header>
+
+        {/* Cover image — decorative editorial art, so alt stays empty and the
+            asset never enters the accessibility tree as unlabeled content. */}
+        {post.cover && (
+          <div className="mb-10 max-w-3xl overflow-hidden rounded-xl border border-(--border)">
+            <Image
+              src={post.cover}
+              alt=""
+              width={2048}
+              height={1152}
+              priority
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="h-auto w-full"
+            />
+          </div>
+        )}
 
         {/* Two-column layout: article + ToC */}
         <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-12">

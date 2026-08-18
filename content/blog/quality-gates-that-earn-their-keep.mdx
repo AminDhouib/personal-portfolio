@@ -1,0 +1,122 @@
+---
+title: "The Quality Gates on This Site, and What Each One Actually Prevents"
+excerpt: "Every check that runs before this portfolio deploys — the coverage ratchet, a Lighthouse gate over every public page, pinned action SHAs — and the specific failure each one exists to catch."
+date: "2026-08-14"
+tags: ["ci-cd", "testing", "devops", "quality"]
+cover: "/blog/quality-gates-that-earn-their-keep.jpg"
+---
+
+Most CI pipelines are a pile of checks somebody added after an incident and nobody has questioned since. I wanted this site's pipeline to be the opposite: every gate should name the failure it prevents, and if it can't, it gets deleted.
+
+This is that pipeline. It runs on the repository that serves the page you're reading, so you can check my work.
+
+## The Local Sweep Runs First
+
+CI is the safety net. The gate you actually feel is the one you run before committing:
+
+```bash
+pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm typecheck && \
+  node scripts/check-env-drift.mjs && node scripts/check-action-pins.mjs && \
+  node scripts/check-root-files.mjs && pnpm exec knip && \
+  pnpm test && pnpm test:coverage && pnpm build
+```
+
+Two linters, not one, and the order matters. `oxlint` is the fast correctness pass; ESLint carries the type-aware rules and the custom ones written specifically for this codebase. Running the cheap one first means the expensive one only sees code that already passes the obvious checks.
+
+## The Coverage Ratchet, and the Day the Numbers Dropped
+
+Coverage thresholds have one classic failure mode: someone lowers them to make a red build green, and the number stops meaning anything.
+
+So the rule here is one-directional. Floors in `vitest.config.ts` may only be **raised**, in a dedicated commit, when measured coverage actually rises. They are never lowered without a stated reason in that commit's message.
+
+The floors sit at lines 34, statements 33, functions 35, branches 29. Those look low until you know what the denominator is:
+
+```typescript
+coverage: {
+  provider: "v8",
+  // every source file is in the denominator, tested or not
+  include: ["src/**/*.{ts,tsx}"],
+  ...
+}
+```
+
+Vitest's default is to measure only files the suite happened to touch. Under that default this repo reported 69% while true source coverage was about 23% — an untested file was simply invisible to the metric. Switching `include` to all of `src/` made the number honest, and the reported percentage fell hard in the same commit that increased the number of covered lines.
+
+That is the tell for whether a coverage number means anything: ask what happens to a file nobody wrote a test for. If the answer is "nothing," the metric is measuring test-writing effort, not risk.
+
+## Lighthouse Over Every Public Page, Not Just the Homepage
+
+Auditing the homepage and calling it a day is how a broken blog page ships. The gate here derives its URL list from the running server's own sitemap:
+
+```javascript
+const res = await fetch(`${base}/sitemap.xml`);
+const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+const urls = [...locs.map((loc) => loc.replace(CANONICAL_ORIGIN, base)), ...EXTRA_PATHS];
+```
+
+A new public page enters the audit the moment it enters the sitemap. Nobody has to remember to add it. `EXTRA_PATHS` covers the handful of routes that are public and linkable but deliberately kept out of the sitemap.
+
+The floors are split by how trustworthy the signal is:
+
+```json
+"categories:seo":            ["error", { "minScore": 0.98 }],
+"categories:accessibility":  ["error", { "minScore": 0.93 }],
+"categories:best-practices": ["warn",  { "minScore": 0.9 }],
+"categories:performance":    ["warn",  { "minScore": 0.5 }]
+```
+
+SEO and accessibility are hard failures because they measure the markup, and markup is deterministic. Performance is warn-only because a shared CI runner's timing is too noisy to fail a build on — a hard perf floor there would train everyone to re-run the job until it passed, which is worse than no floor at all.
+
+Those numbers are calibrated, not guessed. Measured across all twenty public pages on a production build: SEO 1.0 everywhere, accessibility bottoming out at 0.95 on the blog index, best practices at 0.96, performance at 0.51 on the homepage. The floors sit just under the measured minimums and ratchet up the same way coverage does.
+
+## Every Action Pinned to a Commit SHA
+
+This one is short, and it's the gate I'd port to any repository first:
+
+```javascript
+const SHA_RE = /^[0-9a-f]{40}$/;
+// ...
+if (!SHA_RE.test(version)) {
+  console.error(`UNPINNED: ${filePath}:${i + 1}: "${ref}" is not pinned to a 40-hex commit SHA`);
+}
+```
+
+`uses: actions/checkout@v4` is a moving target. A tag is a pointer, and whoever controls the upstream repository can move it. If that account is compromised, your CI quietly starts running different code with access to your secrets, and nothing in your diff shows it.
+
+So every external `uses:` in this repo is a 40-character SHA with the version in a trailing comment:
+
+```yaml
+uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+```
+
+Local (`./`) and Docker (`docker://`) references are exempt, because neither is a floating version tag. The check is about forty lines and runs in under a second.
+
+## Two Gates That Only Exist Because Drift Is Invisible
+
+**Env schema drift.** Keys in `src/env.ts` and `.env.example` must match exactly, and every required variable has to be an uncommented line in the example. Without this, the example file rots, and the next person to clone the repo debugs a missing variable instead of reading it in the docs.
+
+**Root-file allowlist.** The repository root only ever contains files on an explicit list. Every legitimate addition comes with a one-line comment saying what it is, in the same commit that introduces the file. This is a small thing that compounds: repository roots accumulate junk precisely because no single stray file is ever worth objecting to.
+
+Both run in CI. The root-file check has a second half that only fires locally, catching untracked strays before a `git add -A` sweeps them into a commit.
+
+## Dead Code Has a Gate Too
+
+`knip` runs on every CI build, not quarterly. Unused exports, unused files, unused dependencies — all build failures.
+
+Running it on a schedule means you get a large cleanup task nobody wants. Running it on every build means the dead code never accumulates in the first place, because the commit that orphans a file is the commit that fails.
+
+## What the Gates Cost
+
+The full sweep takes a few minutes locally. In CI, tests and build run in one job while Lighthouse runs in a second, in parallel, because Lighthouse needs a built and booted standalone server and there's no reason to make the fast job wait for it.
+
+The deploy job depends on both. Nothing reaches production without passing every gate above.
+
+There is one honest gap worth naming: the coverage thresholds are repository-wide, not per-file, so a well-tested module can currently offset an untested one. The ratchet guards the aggregate. That's written down as known debt in the repo rather than quietly hoped-over, which is the only responsible way to carry a limitation you've chosen not to fix yet.
+
+## Why This Matters If You're Hiring Me or Buying From Me
+
+The gates are not the point. The point is what they let you skip.
+
+I don't argue about formatting in code review, because Prettier decided. I don't debate whether a rule should be a warning, because a warning is a rule nobody follows and this repo bans downgrading one. I don't wonder whether a change broke accessibility on some page I didn't open, because twenty pages get audited before deploy.
+
+That's the actual return: reviews spend their time on design and correctness, and the boring class of regression stops reaching production without anyone needing to be vigilant about it. Vigilance doesn't scale. Gates do.

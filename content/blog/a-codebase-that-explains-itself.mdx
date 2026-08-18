@@ -1,0 +1,89 @@
+---
+title: "Writing Down Why: The Register That Stops a Codebase Being Re-Litigated"
+excerpt: "Most handoff pain isn't missing code, it's missing reasons. Four docs, an intentional-design register, and known debt with triggers — the structure I use so the next engineer stops 'fixing' things on purpose."
+date: "2026-06-30"
+tags: ["architecture", "documentation", "engineering", "process"]
+cover: "/blog/a-codebase-that-explains-itself.jpg"
+---
+
+Every codebase I've inherited had the same defect, and it was never the code. It was that nobody wrote down why.
+
+So the new engineer finds something odd, assumes it's a mistake, and fixes it. Two weeks later the bug it was preventing comes back. Nobody connects the two, because the reason was never anywhere except in the head of a person who left.
+
+I've become deliberate about this. Here's the structure I use, on my own repository, where you can go read it.
+
+## Four Documents With Four Jobs
+
+Not one sprawling README. Four files that answer four different questions, so that "where do I write this down" has an obvious answer and the docs don't collapse into one unreadable pile:
+
+- **README** — the human quickstart. Install it, run it, where things live.
+- **AGENTS** — the entry point and the hard boundaries. What you must never do.
+- **DESIGN** — why the code is shaped this way: boundaries, enforced conventions, the intentional-design register, known debt.
+- **RUNBOOK** — operations. Health, logs, deploy, rollback, restart, data surgery.
+
+The split is functional. When production is broken at 2am, nobody wants to scroll past architecture philosophy to find the restart command. When someone is about to refactor a module, they don't need the backup procedure. Separate files means each one stays short enough to actually read.
+
+## The Intentional-Design Register
+
+This is the piece I'd port to every project I work on, and the one clients notice.
+
+It's a list of things that look like bugs or oversights but are deliberate. Each entry states what looks wrong, why it's correct, and — critically — what would break if you "fixed" it.
+
+A few real entries:
+
+**Reduced motion is inverted between page chrome and games, on purpose.** The app honors the OS reduced-motion preference everywhere, and every game explicitly opts back out. That looks like an accessibility bug in a code search. It isn't: motion is gameplay in a game and decoration in a page header. The register says so, and says not to "fix" it into obeying the preference.
+
+**The games grid shows five cards, not six.** One game is flagged hidden, taking it out of rotation without deleting any code. The route still works if you visit it directly. Without the note, the next person either restores it or deletes the "dead" code.
+
+**There is no HTML contact form, and that's not a gap.** Lead capture runs through the chat widget and a booking link. This came up in review, got reframed as deliberate product personality for an AI consultancy, and got written down — so it doesn't come up again every six months.
+
+Each entry carries the date it was last verified against the tree. A register nobody re-checks becomes fiction, and a dated entry tells you exactly how much to trust it.
+
+## Known Debt, Each With a Trigger
+
+Every codebase has deferrals. Most teams track them as a vague sense of unease, or a backlog nobody reads.
+
+I write each one down with three parts: what's deferred, why the deferral was reasonable, and **what event should make you revisit it**.
+
+The trigger is the part that makes the list useful. "Two games have no tests" is a guilt entry — you read it, feel bad, and do nothing. "Two games have no tests; trigger: any gameplay edit to either file" is an instruction. It fires at the exact moment the work becomes worthwhile, and stays quiet the rest of the time.
+
+Some triggers are structural. There are three separate places a new game must be registered, which is real duplication. The scoped fix is consolidating them, and the trigger is the next new game — because consolidating for a hypothetical seventh game is churn, and consolidating when you're actually adding one is nearly free.
+
+Some entries are rejections rather than deferrals, and I write those down too. Building the Docker image in CI, on top of the build CI already runs, was judged low value for the added time. That's recorded as **rejected**, not pending. Otherwise it gets re-proposed every audit cycle, and someone re-does the analysis from scratch.
+
+## Standoffs: Disagreements That Didn't Resolve
+
+There's a section for arguments that went two rounds and didn't fully settle.
+
+One example: whether an earlier refactor of a game engine counted as meaningful progress or mostly relocated code without reducing the monolith. That was genuinely disputed. Rather than pick a winner, the doc records the disagreement plus a working ruling — treat the file as still-inline for planning purposes regardless.
+
+This felt strange to write at first. It's the opposite of the confident architecture doc everyone is trained to produce. But an unresolved question that pretends to be resolved is how you get the same argument annually, with fresh participants, from zero. Writing down "we disagreed, here's both sides, here's what to assume meanwhile" ends the loop.
+
+## Conventions Backed by Gates, Not Good Intentions
+
+A convention nobody enforces is a preference. The DESIGN doc is explicit that every convention listed is backed by something that fails the build.
+
+- Routes call into `lib`; `lib` never calls back. Direct filesystem access is banned outside a short allowlist, and each allowlist entry carries a comment explaining why a store module doesn't apply.
+- One module is the only gateway to environment variables. Reading `process.env` directly is a lint error everywhere else, with four documented exceptions.
+- Every `catch` block must call a real error reporter, or carry a `// silent-ok:` comment explaining why swallowing the error is correct.
+- `JSON.parse` is banned outside two wrappers — one for client code, one for server — because the correct way to report a parse failure differs on each side.
+
+My favorite is the one enforced by the type system rather than a linter. Adding a game means registering its slug in three places. The dispatch switch's default case calls `assertNever(slug)`. Because that parameter's type is `never`, forgetting to wire up a new slug is a **compile error**, not a blank page in production.
+
+That's the ideal: don't document the rule, make the rule impossible to break. Documentation is what you fall back on when the type system can't express the constraint.
+
+## Extract Before You Edit
+
+One doctrine covers the two files that are still monoliths: any change to their gameplay logic starts by extracting the touched subsystem into its own tested module. Don't add logic to either in place.
+
+This exists because the cost was measured, not assumed. A site-wide reduced-motion change touched 32 files. Adding a game touches 3 dispatch points — bounded, by design. Editing an already-inline engine has no such bound, which is the entire problem with a monolith and the reason the rule is "extract first" rather than "someday we'll refactor."
+
+Someday-refactors don't happen. Extract-before-edit means the refactor happens incrementally, paid for by work that was going to happen anyway, only in the parts that actually change.
+
+## Why This Is the Thing I'd Sell You
+
+If you hire me or my team to build something, you eventually get the code. Everyone gives you the code.
+
+What determines whether that handoff is worth anything is whether your next engineer can tell the difference between a bug and a decision. Without that, they spend their first month re-deriving reasons — and re-introducing the bugs those reasons were preventing.
+
+The register, the triggers, the recorded standoffs, and the gates that enforce conventions all serve one goal: the code arrives with its reasoning attached. You are not buying a system that only its author can safely change. That is the difference between an asset and a liability, and it costs almost nothing to build in from the start — and a great deal to reconstruct later.

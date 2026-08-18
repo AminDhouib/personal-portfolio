@@ -79,8 +79,9 @@ style suggestions.
   `game-loader.tsx` switch's default case calls `assertNever(slug, ...)` (`src/lib/assert-never.ts`)
   — because the parameter type is `never`, forgetting to wire up a new slug there is a **compile
   error** (`tsc`/`next build`), not a silent blank page.
-- **Coverage ratchet**: floors in `vitest.config.ts` (lines 18 / statements 17 / functions 16 /
-  branches 12 as of the pass-2 re-base) are measured margins below the current suite over the
+- **Coverage ratchet**: floors in `vitest.config.ts` (lines 34 / statements 33 / functions 35 /
+  branches 29 as of 3abe0b0; re-based to 18/17/16/12 at pass-2, raised twice since) are
+  measured margins below the current suite over the
   HONEST scope — coverage `include` is all of `src/`, so untested files count in the
   denominator. Floors may only be **raised**, in a dedicated commit, when measured coverage
   rises — never lowered except with a stated reason in that commit's message (the pass-2 drop

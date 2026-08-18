@@ -13,6 +13,8 @@ export interface BlogPost {
   tags: string[];
   readingTime: string;
   content: string;
+  /** Public path of the post's cover image (e.g. "/blog/<slug>.jpg"); absent for posts without one. */
+  cover?: string;
 }
 
 export type BlogPostMeta = Omit<BlogPost, "content">;
@@ -43,6 +45,7 @@ export function getBlogPost(slug: string): BlogPost | null {
     tags: (data.tags as string[]) ?? [],
     readingTime: rt.text,
     content,
+    ...(typeof data.cover === "string" && data.cover !== "" ? { cover: data.cover } : {}),
   };
 }
 
