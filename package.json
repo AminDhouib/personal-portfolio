@@ -26,7 +26,7 @@
     "@copilotkit/react-core": "^1.54.1",
     "@copilotkit/react-ui": "^1.54.1",
     "@copilotkit/runtime": "^1.54.1",
-    "@google-analytics/data": "^5.2.1",
+    "@google-analytics/data": "^6.1.0",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
     "@sentry/nextjs": "^10.63.0",
