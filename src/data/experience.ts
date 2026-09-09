@@ -168,9 +168,10 @@ export const experience: ExperienceItem[] = [
     period: "May 2019 – Sep 2019",
     location: "Ottawa, ON · On-site",
     highlights: [
+      "Held a Government of Canada security clearance for the duration of the placement.",
       "Laid the foundations for a Java application allowing DND to create, build, and run automated tests for their SOAP services.",
       "Worked with JUnit to create test cases, an Oracle MySQL database for managing DB data, and Hibernate to interface with the DB.",
     ],
-    skills: ["Java", "JUnit", "Hibernate", "SQL"],
+    skills: ["Java", "JUnit", "Hibernate", "SQL", "Security Clearance"],
   },
 ];
