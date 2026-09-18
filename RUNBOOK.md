@@ -109,6 +109,25 @@ it; it is flagged for deletion.
 Do not consider a change shipped until steps 3 and 4 both pass. A push to `main`, a green CI
 run, and a "Deployment queued" reply are each not that.
 
+**Fallback — deploy from the server when the Dokploy API is unavailable** (exercised
+2026-09-18, when the agent's Dokploy MCP session had expired). Dokploy keeps a git checkout of
+`main` at `/etc/dokploy/compose/compose-index-multi-byte-microchip-5usn3s/code` with its own
+patched `compose.yml` (comments stripped, its network block appended — never overwrite it) and
+the prod `.env` (never print it). Over SSH as root on the server:
+
+```bash
+cd /etc/dokploy/compose/compose-index-multi-byte-microchip-5usn3s/code
+git pull --ff-only origin main
+docker compose -p compose-index-multi-byte-microchip-5usn3s -f compose.yml up -d --build app
+```
+
+The `-p` project name must match the running stack exactly — read it from the app container's
+`com.docker.compose.project` label first — or compose creates a second stack with a fresh,
+empty `db-data` volume. Naming only the `app` service rebuilds and recreates the app container
+and leaves the running `db` untouched. This path leaves **no entry** in Dokploy's deployment
+list, so verify by the health `uptime` reset (step 4), not step 3, and expect the panel to keep
+showing the previous commit until the next `compose.deploy`.
+
 ### Rollback
 
 Verified procedure: `git revert` the bad commit(s), push to `main`, manually deploy the reverted
@@ -124,8 +143,8 @@ above, where `<action>` is `stop` or `start`). Both act on the **whole stack** �
 service goes down with the app — so expect a brief full outage, not a rolling swap. There is no
 compose-level `reload`.
 
-For any code or commit change, the fix is a fresh `compose.deploy` (procedure above); it is the
-only exercised path. `compose.redeploy` and a container-only restart (`docker.restartContainer`
+For any code or commit change, the fix is a fresh `compose.deploy` (procedure above) or, when the
+API is unavailable, the server-side fallback; those two are the exercised paths. `compose.redeploy` and a container-only restart (`docker.restartContainer`
 with the full app container name from `docker.getContainers`, or `docker restart <name>` on the
 server) both exist and would be the lighter choice for a wedged process whose deployed code is
 fine — e.g. after manually repairing data in the db — but neither has been exercised here; treat
@@ -308,3 +327,14 @@ silently stop it from winning. To emulate the preference in a browser for testin
   leaderboard form are parent-page React.
 - **Hextris starts from a canvas click** ("Click to start" — no DOM button), and empty-corner
   canvas readbacks can look frozen; sample the centre band.
+
+### `git push` and the pre-push hook
+
+The pre-push hook (`.husky/pre-push`) runs `tsc`, the env-drift and root-files checks, and knip —
+several minutes on this machine — while git already holds an SSH session open to GitHub. GitHub
+closes that idle session ("Connection to github.com closed by remote host", exit 141) and the
+push fails after the hook has passed. Do not skip the hook; keep the session alive instead:
+
+```bash
+GIT_SSH_COMMAND="ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=30" git push origin main
+```
