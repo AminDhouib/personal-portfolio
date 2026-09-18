@@ -39,7 +39,8 @@ access — it is not exposed through the Dokploy API surface available to agents
 
 ### Logs
 
-- **stdout** → Dokploy container logs (panel, or the `application-readLogs` API).
+- **stdout** → Dokploy container logs (the compose service's Logs tab in the panel, or the
+  `compose-readLogs` API).
 - **API log reads want the full container NAME**, not the short hex id — `compose-readLogs`
   with an id like `41c3cff6d697` returns a 500; pass the name
   (`compose-index-multi-byte-microchip-5usn3s-app-1`-style, from `docker-getContainers`).
@@ -71,21 +72,42 @@ secrets are all set: `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DOKPLOY_URL`, `DO
 any are missing, the job prints `deploy skipped: secrets not configured` and exits **green** —
 CI passing does not mean the site shipped.
 
+**The deploy target is the compose service**, id `hnV_k4WYHOmodXzsvQeDk` ("Portfolio Compose":
+the `app` + `db` stack from `compose.yml`). An older standalone Dokploy _application_,
+`9ZeLiZVLfBtm0OwzIWBxI`, still exists in the panel but is orphaned — no domain attached and a
+trimmed env block, so deploying it builds fine and then crashes on the boot env gate. Never target
+it; it is flagged for deletion.
+
 **Standing procedure — manual deploy:**
 
-1. Trigger it: the Dokploy panel's "Deploy" button, or from a machine on the tailnet:
+1. Trigger it: the compose service's "Deploy" button in the Dokploy panel, or from a machine on
+   the tailnet (this is exactly what CI's `deploy` job runs):
    ```bash
-   curl -sf -X POST "$DOKPLOY_URL/api/application.deploy" \
+   curl -sf -X POST "$DOKPLOY_URL/api/compose.deploy" \
      -H "x-api-key: $DOKPLOY_TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{"applicationId":"9ZeLiZVLfBtm0OwzIWBxI"}'
+     -d '{"composeId":"hnV_k4WYHOmodXzsvQeDk"}'
    ```
-2. Verify: check the deployment list in Dokploy for your commit hash at the top with status
-   `done` (build takes roughly 45s).
-3. Live-probe: `https://amindhou.com` returns 200, `curl -s https://amindhou.com/api/health`
-   reports `"status":"ok"`, and spot-check one API contract (e.g. a leaderboard GET).
+   The reply is "Deployment queued" — queued, not built, not live.
+2. Wait for it to start. The build queue is shared across every project on the server with
+   limited concurrency, so a queued job can sit for 30–45 minutes behind another project's batch
+   (Dependabot PR builds and the like), and it does not appear in the compose's deployment list
+   (the panel's Deployments tab, or `deployment.allByCompose`) until it actually starts. Do not
+   cancel other projects' jobs to jump the line, and do not re-trigger — that only queues a second
+   build behind the first.
+3. Verify the build: once running, the top entry of the deployment list has description
+   `Commit: <hash>` matching `git rev-parse origin/main`; the build itself takes roughly 3
+   minutes and must end with status `done`. The old container keeps serving during the build and
+   the swap is brief.
+4. Live-probe: `curl -s https://amindhou.com/api/health` reports `"status":"ok"` with a low
+   `uptime` — seconds, not hours; a fresh container is proof the boot env gate passed — plus
+   `https://amindhou.com` returns 200 and one API contract spot-checks (e.g. a leaderboard GET).
+   Unattended, polling `/api/health` until `uptime` resets is the cheapest reliable signal.
+   A change with no success-path effect on the homepage does not alter the served markup, so
+   trust the uptime reset and the deployment status, never a diff of the HTML.
 
-Do not consider a change shipped until all three steps pass.
+Do not consider a change shipped until steps 3 and 4 both pass. A push to `main`, a green CI
+run, and a "Deployment queued" reply are each not that.
 
 ### Rollback
 
@@ -96,14 +118,18 @@ rollback as unverified rather than documenting it as procedure.
 
 ### Restart / stop / start
 
-Use the Dokploy panel's Start / Stop / Reload controls on the application, or the same API
-pattern as deploy (`$DOKPLOY_URL/api/application.<action>` with the `x-api-key` header and the
-`applicationId` above, where `<action>` is `stop`, `start`, or `reload`).
+Use the compose service's Stop / Start controls in the Dokploy panel, or the same API pattern as
+deploy (`$DOKPLOY_URL/api/compose.<action>` with the `x-api-key` header and the `composeId`
+above, where `<action>` is `stop` or `start`). Both act on the **whole stack** — the `db`
+service goes down with the app — so expect a brief full outage, not a rolling swap. There is no
+compose-level `reload`.
 
-Prefer **reload** (restarts the existing container/image, no rebuild, fast) when the running
-process is wedged but the last-deployed code is fine — e.g. after manually repairing data in the db.
-Prefer **redeploy** (full rebuild from current `main`) any time the fix is a code or commit
-change.
+For any code or commit change, the fix is a fresh `compose.deploy` (procedure above); it is the
+only exercised path. `compose.redeploy` and a container-only restart (`docker.restartContainer`
+with the full app container name from `docker.getContainers`, or `docker restart <name>` on the
+server) both exist and would be the lighter choice for a wedged process whose deployed code is
+fine — e.g. after manually repairing data in the db — but neither has been exercised here; treat
+them like the panel rollback (unverified) and fall back to `compose.deploy` if in doubt.
 
 ### Data
 
