@@ -72,8 +72,14 @@ style suggestions.
   `gameCrashToReport` (`src/lib/report-game-error.ts`) for RAF-loop catches — it dedupes to
   once-per-game-per-session and returns an `Error` the caller passes to a literal `reportError(...)`
   call (so `no-silent-catch` sees a real reporter at the call site); `safeLocalSet`/`asNumberArray`
-  (`src/lib/safe-storage.ts`) for `localStorage` reads/writes that must never throw or trust an
+  (`src/lib/safe-storage.ts`) for `localStorage` writes/reads that must never throw or trust an
   unchecked cast.
+- **Client storage writes only through `safeLocalSet`**: `no-restricted-syntax` bans any
+  `.setItem(...)` call — whatever the receiver, so aliasing `window.localStorage` into a local
+  doesn't slip past — everywhere except `src/lib/safe-storage.ts` itself (tests and scripts are
+  exempt, like the other restricted-syntax selectors). A bare `setItem` throws in private mode, on
+  quota, or with storage blocked; the helper swallows that and returns `false`. `getItem` reads
+  are not gated (see Known debt).
 - **Adding a game** touches three places: `src/app/games/games-meta.ts` (the `GameSlug` union and
   metadata), the switch in `game-loader.tsx`, and the `BANNERS` record in `banners.tsx`. The
   `game-loader.tsx` switch's default case calls `assertNever(slug, ...)` (`src/lib/assert-never.ts`)
@@ -346,9 +352,16 @@ trigger revisiting it.
 - **r3f (React Three Fiber) crash recovery UX** (audit ref NF-P5-a): a WebGL context loss or
   three.js render error in a 3D game currently has no dedicated recovery path beyond the generic
   error boundary. Undone.
-- **A dedicated `localStorage`-usage lint rule** (audit ref NF-P5-b): `safeLocalSet`/
-  `asNumberArray` are convention, not yet gate-enforced — nothing currently fails the build if a
-  new game bypasses them with a raw `localStorage` call.
+- **A dedicated `localStorage`-usage lint rule** (audit ref NF-P5-b) — CLOSED 2026-09-17 for
+  writes: `no-restricted-syntax` now bans any `.setItem(...)` call outside
+  `src/lib/safe-storage.ts` (see Conventions in force), and the eight raw writers — hextris,
+  space-shooter, the Orbital Dodge profile store, Super Voltorb Flip's progress and mute
+  persistence, PG2's sound toggle — moved onto `safeLocalSet`. Two of them (`use-mute.ts` and the
+  Voltorb progress effect) had no try/catch at all and would have thrown where storage is blocked.
+  Residual: `getItem` reads stay convention — `typing-speed.tsx`'s high-score read and
+  `use-mute.ts`'s initial read run outside any try/catch, so a `SecurityError` on storage access
+  still crashes those renders. Trigger for closing that half: a `safeLocalGet` helper plus a
+  matching `getItem` selector, or the next report of a game blanking in a locked-down browser.
 - **Voltorb's tile-fade animation still uses a raw `requestAnimationFrame` loop** (audit ref
   NF-P6-1) rather than the shared engine/effects pattern the rest of that game now follows.
 - **PG2's four rule-card widgets nest interactive controls inside a native `<button>`** (`stage/widgets/`

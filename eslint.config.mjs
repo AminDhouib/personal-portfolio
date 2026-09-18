@@ -28,6 +28,17 @@ const RESTRICTED_SYNTAX = [
   },
 ];
 
+// Client storage writes go through safeLocalSet (src/lib/safe-storage.ts), the
+// one file allowed to call setItem. Matches any receiver, so aliasing
+// window.localStorage into a local can't slip past. Reads (getItem) are not
+// gated yet (DESIGN.md known debt, NF-P5-b residual).
+const STORAGE_WRITE_SYNTAX = {
+  selector:
+    "CallExpression[callee.property.name='setItem'], CallExpression[callee.property.value='setItem']",
+  message:
+    "Write client storage through `safeLocalSet` (`src/lib/safe-storage.ts`); a bare `setItem` throws in private mode, on quota, or with storage blocked.",
+};
+
 // fs is the persistence boundary (RC-2). Only these inventoried files may touch
 // it directly; every other component/route/game must go through a store module.
 const FS_ALLOWLIST = ["src/lib/blog.ts", "src/app/apple-icon.tsx", "src/app/icon.tsx"];
@@ -78,7 +89,7 @@ export default defineConfig([
           message: "Import `env` from `@/env` instead of reading process.env directly.",
         },
       ],
-      "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX],
+      "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, STORAGE_WRITE_SYNTAX],
       "no-restricted-imports": [
         "error",
         {
@@ -113,6 +124,13 @@ export default defineConfig([
   {
     files: FS_ALLOWLIST,
     rules: { "no-restricted-imports": "off" },
+  },
+
+  // ---- safe-storage.ts is the one sanctioned setItem call site; every other
+  // restricted-syntax selector stays on for it ----
+  {
+    files: ["src/lib/safe-storage.ts"],
+    rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX] },
   },
 
   // ---- env gateway + framework config: allowed to read process.env directly ----

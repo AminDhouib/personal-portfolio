@@ -33,6 +33,7 @@ import {
   stopLevelWin,
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
+import { safeLocalSet } from "@/lib/safe-storage";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { COLORS, type Cell, type FlagValues } from "./super-voltorb-flip/types";
@@ -1539,7 +1540,7 @@ export function SuperVoltorbFlipGame() {
   useEffect(() => {
     if (!game) return;
     if (typeof window === "undefined") return;
-    localStorage.setItem(
+    safeLocalSet(
       "svf:progress",
       JSON.stringify({
         currentLevel: game.currentLevel,

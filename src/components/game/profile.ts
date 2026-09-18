@@ -5,6 +5,7 @@
 // the profile key directly. Schema is versioned so we can migrate additively.
 
 import { safeJsonParse } from "@/lib/safe-json";
+import { safeLocalSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "orbital-dodge-profile";
 const CURRENT_VERSION = 1;
@@ -78,11 +79,7 @@ export function loadProfile(): Profile {
 
 export function saveProfile(p: Profile): void {
   if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
-  } catch {
-    // silent-ok: localStorage write may fail (quota exceeded/blocked); profile persistence is non-critical
-  }
+  safeLocalSet(STORAGE_KEY, JSON.stringify(p));
 }
 
 export function addCoins(n: number): Profile {

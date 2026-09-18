@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { safeLocalSet } from "@/lib/safe-storage";
 
 const KEY = "svf:muted";
 
@@ -11,7 +12,7 @@ export function useMute() {
   const toggle = () => {
     setMuted((prev) => {
       const next = !prev;
-      if (typeof window !== "undefined") localStorage.setItem(KEY, next ? "1" : "0");
+      safeLocalSet(KEY, next ? "1" : "0");
       return next;
     });
   };

@@ -488,11 +488,7 @@ export function SpaceShooterGame() {
       saveProfile(p);
     } catch {
       // silent-ok: best-effort settings persistence via the profile store; fall back to a plain localStorage write
-      try {
-        localStorage.setItem("orbital-dodge-prefs", JSON.stringify(prefs));
-      } catch {
-        // silent-ok: localStorage may be unavailable (private browsing/quota); in-session settings still apply
-      }
+      safeLocalSet("orbital-dodge-prefs", JSON.stringify(prefs));
     }
     gameRefs.current.prefs = { ...prefs };
   }, [prefs]);
@@ -500,11 +496,7 @@ export function SpaceShooterGame() {
   useEffect(() => {
     if (firstBossSeen) return;
     if (ui.boss?.phase === "fighting") {
-      try {
-        window.localStorage.setItem("orbital-dodge-first-boss-seen", "1");
-      } catch {
-        // silent-ok: best-effort localStorage write for the first-boss-seen flag; in-session React state still updates below
-      }
+      safeLocalSet("orbital-dodge-first-boss-seen", "1");
       const id = window.setTimeout(() => setFirstBossSeen(true), 0);
       return () => window.clearTimeout(id);
     }

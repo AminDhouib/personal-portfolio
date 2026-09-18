@@ -27,7 +27,7 @@ import {
 } from "./hextris/types";
 import { rotatePoint, randInt } from "./hextris/logic";
 import { safeJsonParse } from "@/lib/safe-json";
-import { asNumberArray } from "@/lib/safe-storage";
+import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 
@@ -112,11 +112,7 @@ export function HextrisGame() {
   // Sync sound enabled state to the manager + persist
   useEffect(() => {
     soundsRef.current!.setEnabled(soundEnabled);
-    try {
-      localStorage.setItem("hextris_sound", soundEnabled ? "on" : "off");
-    } catch {
-      // silent-ok: best-effort persistence; sound preference just won't survive a reload
-    }
+    safeLocalSet("hextris_sound", soundEnabled ? "on" : "off");
   }, [soundEnabled]);
 
   // Detect device type once on mount
@@ -261,13 +257,7 @@ export function HextrisGame() {
 
   // Persist player name
   useEffect(() => {
-    if (playerName) {
-      try {
-        localStorage.setItem("hextris_name", playerName);
-      } catch {
-        // silent-ok: best-effort persistence; name just won't be remembered next visit
-      }
-    }
+    if (playerName) safeLocalSet("hextris_name", playerName);
   }, [playerName]);
 
   async function submitScore(name: string) {
@@ -1559,11 +1549,7 @@ export function HextrisGame() {
         highscores.push(score);
         highscores.sort((a, b) => b - a);
         highscores = highscores.slice(0, 3);
-        try {
-          localStorage.setItem("hextris_highscores", JSON.stringify(highscores));
-        } catch {
-          // silent-ok: best-effort persistence; high score just won't survive a reload
-        }
+        safeLocalSet("hextris_highscores", JSON.stringify(highscores));
         return true;
       }
       return false;

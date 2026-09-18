@@ -1,3 +1,5 @@
+import { safeLocalSet } from "@/lib/safe-storage";
+
 // Procedural Web Audio core for Password Game 2.
 //
 // Engine-agnostic and dependency-injectable: the synthesis helpers take an
@@ -154,13 +156,7 @@ export function isEnabled(): boolean {
 /** Toggle playback and persist the choice when localStorage is available. */
 export function setEnabled(on: boolean): void {
   enabled = on;
-  const store = readStore();
-  if (!store) return;
-  try {
-    store.setItem(STORAGE_KEY, on ? "1" : "0");
-  } catch {
-    // silent-ok: persistence is best-effort; a blocked write must not break audio.
-  }
+  safeLocalSet(STORAGE_KEY, on ? "1" : "0");
 }
 
 /**
