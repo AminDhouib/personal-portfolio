@@ -101,6 +101,13 @@ style suggestions.
   and ratchet like coverage (raise when measured scores rise, never lower to make CI pass);
   performance and best-practices stay **warn**-only because CI runner timing is too noisy for a
   hard floor. The deploy job requires this gate.
+- **E2E gate** (CI job `e2e`; runs locally only against a booted build, see RUNBOOK.md): Playwright
+  (`e2e/`, `playwright.config.ts`) drives Chrome against the standalone production build.
+  Nothing is mocked. The specs read the server's own sitemap, robots.txt, llms.txt and JSON-LD, and
+  walk the funnel (Book a Call links, conversion events, the chat launcher, phone width). Every
+  request to another origin, the Sentry tunnel, or the AI chat proxy is aborted. The specs that
+  fire conversion events skip themselves unless the base URL is localhost, so the suite can never
+  write to production analytics. The deploy job requires this gate.
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
@@ -257,6 +264,27 @@ The following Password Game 2 entries were verified against the current tree on 
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to
   client-side validation and registered as such, not a leak to fix.
+- **`/llms.txt` is a route handler, not a file in `public/`** (`src/app/llms.txt/route.ts`,
+  `force-static`). The hand-written file went stale (it linked a `/work` page that did not exist
+  and missed newer posts); the route builds it from the same data modules as the pages, so a new
+  project, post or FAQ entry appears there on the next build. Do not put a `public/llms.txt` back:
+  it would shadow nothing and silently drift again.
+- **One FAQ source, three renderings.** `src/data/faq.ts` feeds the visible FAQ section, the
+  home page's `FAQPage` JSON-LD, and llms.txt. The answers are built from the other data modules
+  (projects, services, profile) so they cannot contradict the page. The E2E suite asserts the
+  markup and the visible text match; edit the data, never one rendering.
+- **No `Review`/`AggregateRating` markup on `/reviews`.** It looks like a missed rich result, but
+  Google treats reviews a site publishes about itself as self-serving and ineligible; marking them
+  up risks a manual action for no gain.
+- **Projects are `CreativeWork`, not `SoftwareApplication`.** `SoftwareApplication` rich results
+  require `offers` plus a rating, which these projects do not have, so Search Console reports the
+  markup as invalid. `CreativeWork` carries the same entity link (`creator` to the Person) without
+  the error.
+- **Conversion tracking is one delegated click listener** (`ConversionTracker` in the root layout,
+  `src/lib/analytics.ts`), not an `onClick` on each Book a Call link. The links live in server
+  components, and every new CTA is tracked automatically as long as it points at `BOOKING_URL`, a
+  `mailto:`, or a `socialLinks` URL. The listener never calls `preventDefault`, so tracking can
+  never break a link.
 
 ## Adversarial standoffs (restated from the audit's final report)
 

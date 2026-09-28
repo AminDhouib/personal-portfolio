@@ -19,13 +19,18 @@ const spaceGrotesk = Space_Grotesk({
 // serves /opengraph-image; the .png-suffixed path 404s.
 const ogImage = "https://amindhou.com/opengraph-image";
 
+// Name first, then the role and company people search for alongside it; the
+// description states the entity facts in one declarative sentence.
+const TITLE = "Amin Dhouib — Full-Stack Engineer & Founder of Devino Solutions";
+const DESCRIPTION =
+  "Amin Dhouib is an Ottawa full-stack engineer and the CEO & CTO of Devino Solutions. He builds apps like Shorty, uNotes and Caramel, then self-hosts them.";
+
 export const metadata: Metadata = {
   title: {
-    default: "Amin Dhouib — Engineer, Founder, Builder",
+    default: TITLE,
     template: "%s — Amin Dhouib",
   },
-  description:
-    "Personal portfolio of Amin Dhouib — CEO & CTO of Devino Solutions. I build apps people actually use, then self-host them on my home server.",
+  description: DESCRIPTION,
   metadataBase: new URL("https://amindhou.com"),
   alternates: {
     types: {
@@ -47,8 +52,8 @@ export const metadata: Metadata = {
   authors: [{ name: "Amin Dhouib", url: "https://amindhou.com" }],
   creator: "Amin Dhouib",
   openGraph: {
-    title: "Amin Dhouib — Engineer, Founder, Builder",
-    description: "I build apps people actually use, then self-host them on my home server.",
+    title: TITLE,
+    description: DESCRIPTION,
     url: "https://amindhou.com",
     siteName: "Amin Dhouib",
     locale: "en_US",
@@ -59,8 +64,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Amin Dhouib — Engineer, Founder, Builder",
-    description: "I build apps people actually use, then self-host them on my home server.",
+    title: TITLE,
+    description: DESCRIPTION,
     images: [ogImage],
   },
   robots: {
@@ -82,59 +87,23 @@ export const viewport: Viewport = {
   ],
 };
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Person",
-      "@id": "https://amindhou.com/#person",
-      name: "Amin Dhouib",
-      url: "https://amindhou.com",
-      jobTitle: "CEO & CTO",
-      worksFor: {
-        "@type": "Organization",
-        name: "Devino Solutions",
-        url: "https://devino.ca",
-      },
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: "Ottawa",
-        addressCountry: "CA",
-      },
-      sameAs: [
-        "https://github.com/AminDhouib",
-        "https://linkedin.com/in/amin-dhouib",
-        "https://youtube.com/@amin_dhou",
-        "https://contra.com/amin",
-      ],
-      image: "https://amindhou.com/amin.jpg",
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://amindhou.com/#website",
-      url: "https://amindhou.com",
-      name: "Amin Dhouib",
-      publisher: { "@id": "https://amindhou.com/#person" },
-    },
-    {
-      "@type": "ItemList",
-      "@id": "https://amindhou.com/#projects",
-      name: "Projects by Amin Dhouib",
-      itemListElement: [
-        { "@type": "ListItem", position: 1, url: "https://amindhou.com/work/shorty" },
-        { "@type": "ListItem", position: 2, url: "https://amindhou.com/work/unotes" },
-        { "@type": "ListItem", position: 3, url: "https://amindhou.com/work/caramel" },
-        { "@type": "ListItem", position: 4, url: "https://amindhou.com/work/upup" },
-        { "@type": "ListItem", position: 5, url: "https://amindhou.com/work/getitdone" },
-      ],
-    },
-  ],
-};
-
 import { Navbar } from "@/components/navbar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { ChatWidget } from "@/components/chat/widget";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
+import { ConversionTracker } from "@/components/analytics/conversion-tracker";
+import {
+  companyNode,
+  graph,
+  personNode,
+  serializeJsonLd,
+  websiteNode,
+} from "@/lib/structured-data";
+
+// Site-wide entity graph. Page-level blocks (ProfilePage, FAQPage and the
+// project list on the homepage, BlogPosting, breadcrumbs) reference the
+// Person by @id.
+const jsonLd = graph(personNode(), companyNode(), websiteNode());
 
 export default function RootLayout({
   children,
@@ -150,7 +119,7 @@ export default function RootLayout({
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
         <GoogleAnalytics />
       </head>
@@ -170,6 +139,7 @@ export default function RootLayout({
           </div>
           <SiteFooter />
           <ChatWidget enabled />
+          <ConversionTracker />
         </Providers>
       </body>
     </html>

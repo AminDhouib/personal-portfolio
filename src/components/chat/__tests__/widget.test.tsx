@@ -107,6 +107,18 @@ describe("ChatWidget shell", () => {
     expect(screen.getByTestId("lazy-panel").getAttribute("data-initially-open")).toBe("true");
   });
 
+  it("records a chat_open conversion when the launcher opens the chat", () => {
+    const gtag = vi.fn();
+    Object.assign(window, { gtag });
+    try {
+      render(<ChatWidget enabled />);
+      fireEvent.click(screen.getByRole("button", { name: /open amin ai chat/i }));
+      expect(gtag).toHaveBeenCalledWith("event", "chat_open", { path: "/" });
+    } finally {
+      Reflect.deleteProperty(window, "gtag");
+    }
+  });
+
   it("loads the panel when the navbar event is dispatched", async () => {
     render(<ChatWidget enabled />);
     window.dispatchEvent(new CustomEvent("open-amin-ai-chat"));

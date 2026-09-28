@@ -17,7 +17,9 @@ export default defineConfig({
     // exclusions too (vitest 4 behavior, confirmed against installed 4.1.4).
     // .claude/worktrees holds transient agent worktrees (full repo copies);
     // without the exclude their in-progress test files leak into root runs.
-    exclude: [...configDefaults.exclude, "**/.next/**", "**/.claude/**"],
+    // e2e/ holds the Playwright suites: they need a running server and a real
+    // browser, and run through `pnpm test:e2e`, never vitest.
+    exclude: [...configDefaults.exclude, "**/.next/**", "**/.claude/**", "e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json-summary", "lcov"],

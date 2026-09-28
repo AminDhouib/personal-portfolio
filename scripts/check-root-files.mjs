@@ -39,6 +39,7 @@ const ROOT_ALLOWLIST = new Set([
   "knip.json",
   "next.config.ts",
   "package.json",
+  "playwright.config.ts", // E2E suite config (e2e/, `pnpm test:e2e`)
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "postcss.config.mjs",

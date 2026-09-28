@@ -46,8 +46,9 @@ access — it is not exposed through the Dokploy API surface available to agents
   (`compose-index-multi-byte-microchip-5usn3s-app-1`-style, from `docker-getContainers`).
 - **Exceptions**: `captureException()` (`src/lib/log.ts`) always reports server-side to
   self-hosted Sentry, and additionally forwards a PostHog `$exception` event when both
-  `POSTHOG_KEY` and `POSTHOG_HOST` are configured (silently skipped otherwise — there is no
-  separate pageview/analytics client wired in; PostHog here is exception-forwarding only).
+  `POSTHOG_KEY` and `POSTHOG_HOST` are configured (silently skipped otherwise). The browser-side
+  PostHog client in `src/instrumentation-client.ts` is product analytics only, not error capture
+  (see Analytics events below).
   Client-side game crashes go through a different path: `gameCrashToReport`
   (`src/lib/report-game-error.ts`) wraps the error and callers pass it to the browser's native
   `reportError()` DOM global — not a custom function — which the already-installed Sentry client
@@ -192,8 +193,9 @@ tables, so an empty-looking board right after a volume reset is expected, not a 
 
 ### Monitoring reality
 
-**Exists**: Sentry (errors, both client and server), PostHog (server-side exception forwarding
-only, when configured), Dokploy's deployment-state history, the container `HEALTHCHECK`
+**Exists**: Sentry (errors, both client and server), PostHog (server-side exception forwarding,
+plus browser product analytics when `NEXT_PUBLIC_POSTHOG_KEY` is set), GA4 (when
+`NEXT_PUBLIC_GA4_ID` is set), Dokploy's deployment-state history, the container `HEALTHCHECK`
 described above (drives Swarm auto-restart on a wedged/crashed process only).
 
 **Does not exist**: any uptime pinger or external synthetic monitoring, and no alerting/paging of
@@ -211,6 +213,25 @@ still no alerting (see above), so nobody is paged — you have to look. And a ch
 without emitting a `RUN_ERROR` frame at all would still be silent. When in doubt, verify the way
 the outage was originally caught: actually ask it something more than 60 seconds after the page's
 first copilotkit POST.
+
+### Analytics events
+
+Pageviews and autocapture go to PostHog (project "Amin Personal") and GA4. On top of those, the
+site sends four named conversion events, each to both PostHog (`posthog.capture`) and GA4
+(`gtag("event", ...)`), from `src/lib/analytics.ts`:
+
+| Event             | Fires when                                 | Properties                     |
+| ----------------- | ------------------------------------------ | ------------------------------ |
+| `book_call_click` | any link to `BOOKING_URL` is clicked       | `placement`, `path`            |
+| `email_click`     | any `mailto:` link is clicked              | `placement`, `path`            |
+| `social_click`    | any link to a `socialLinks` URL is clicked | `network`, `placement`, `path` |
+| `chat_open`       | the Amin AI launcher opens the chat panel  | `path`                         |
+
+`placement` is the `id` of the enclosing `<section>` (`hero`, `services`, `contact`, ...), or
+`navbar`, `footer`, or `page`. The first three come from one delegated listener
+(`ConversionTracker` in the root layout), so a new CTA is tracked with no extra code. To count
+bookings as conversions in GA4, mark `book_call_click` as a key event in the GA4 admin UI; that
+is a one-time manual step, not code.
 
 ## Development environment (maintainer's Windows/OneDrive machine)
 
@@ -272,6 +293,25 @@ output traces stray test files into `.next/standalone`, which vitest will double
 is on disk when it runs (see `vitest.config.ts`'s `test.exclude`, which now guards against this —
 still avoid building and testing out of order). Never run `pnpm build` while a dev server is
 running against the same `.next` directory.
+
+### Running the E2E suite locally
+
+`pnpm test:e2e` (Playwright, `e2e/`) needs a running production build; it never starts one. The
+CI `e2e` job is the reference recipe. On this machine:
+
+1. Build with a throwaway GA ID and PostHog off, so the gtag bootstrap renders but no real
+   project key is inlined:
+   `NEXT_PUBLIC_GA4_ID=G-E2ETEST000 NEXT_PUBLIC_POSTHOG_KEY= pnpm build`.
+2. Copy `.next/static` and `public/` next to the standalone `server.js` (as the CI boot step
+   does) and start it detached (`Start-Process` plus a PID file) with `PORT=3001`,
+   `HOSTNAME=localhost` and the env gate's bypass sentinel.
+3. Run `E2E_CHANNEL=msedge E2E_BASE_URL=http://localhost:3001 pnpm test:e2e`. Chrome spawning is
+   unreliable here; Edge is the same engine.
+4. Stop the server by PID, then `rm -rf .next` before the next vitest run (see above).
+
+Pointing `E2E_BASE_URL` at production is safe but partial: the specs that fire conversion events
+skip themselves off localhost, and every third-party, Sentry-tunnel and chat-proxy request is
+aborted either way.
 
 ### vitest 4.1.4 quirks
 

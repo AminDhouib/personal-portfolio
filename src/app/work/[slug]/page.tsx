@@ -4,8 +4,10 @@ import Link from "next/link";
 import { ArrowLeft, Globe, AppWindow } from "lucide-react";
 import type { Metadata } from "next";
 import { SiIcon } from "@/components/ui/tech-icon";
+import { BookCallCta } from "@/components/ui/book-call-cta";
 import { projects } from "@/data/projects";
 import { fetchMAU } from "@/lib/ga4";
+import { breadcrumbNode, graph, projectNode, serializeJsonLd } from "@/lib/structured-data";
 
 // ISR: revalidate every 24h so live MAU stays fresh
 export const revalidate = 86400;
@@ -95,8 +97,21 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
   const displayMAU = liveMAU ?? project.mauFallback;
   const isLive = liveMAU !== null;
 
+  const jsonLd = graph(
+    projectNode(project),
+    breadcrumbNode([
+      { name: "Home", path: "/" },
+      { name: "Work", path: "/work" },
+      { name: project.name, path: `/work/${project.slug}` },
+    ]),
+  );
+
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         {/* Back link */}
         <Link
@@ -306,6 +321,11 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
             </a>
           )}
         </div>
+
+        <BookCallCta
+          title={`Need something like ${project.name} built?`}
+          body="I build web, mobile and AI products for clients through Devino Solutions. A 15-minute call is the quickest way to scope yours."
+        />
       </div>
     </div>
   );

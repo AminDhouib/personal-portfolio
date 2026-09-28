@@ -119,9 +119,73 @@ jobs:
           path: .lighthouseci
           if-no-files-found: ignore
 
+  e2e:
+    name: E2E (Playwright, production build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      # A valid-format but unregistered measurement ID, so the build renders
+      # the real gtag bootstrap and the conversion specs can read dataLayer.
+      # The specs block googletagmanager.com, so nothing is ever sent.
+      NEXT_PUBLIC_GA4_ID: G-E2ETEST000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Next.js production build
+        run: pnpm build
+
+      # Same boot as the lighthouse job: the standalone bundle behind the env
+      # gate's loud bypass sentinel, since CI has no secrets.
+      - name: Boot standalone server
+        env:
+          DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: I_UNDERSTAND_THIS_MAY_CRASH_CORRUPT_DATA_OR_EXPOSE_BROKEN_BEHAVIOR
+        run: |
+          SERVER_JS=$(find .next/standalone -name server.js -not -path "*/node_modules/*" | head -1)
+          APP_DIR=$(dirname "$SERVER_JS")
+          mkdir -p "$APP_DIR/.next"
+          [ -d "$APP_DIR/.next/static" ] || cp -r .next/static "$APP_DIR/.next/static"
+          [ -d "$APP_DIR/public" ] || cp -r public "$APP_DIR/public"
+          PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production node "$SERVER_JS" &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/api/health
+
+      # Drives the Google Chrome that ships on ubuntu-latest (channel "chrome"
+      # in playwright.config.ts), so no browser download step is needed.
+      - name: Playwright E2E
+        run: pnpm test:e2e
+        env:
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+
   deploy:
     name: Deploy to Dokploy
-    needs: [lint-and-test, lighthouse]
+    needs: [lint-and-test, lighthouse, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

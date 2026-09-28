@@ -12,12 +12,22 @@ import {
   Game,
   Blog,
   BeyondCode,
+  Faq,
   Contact,
 } from "@/components/sections";
 import { fetchAllMAU } from "@/lib/ga4";
 import { fetchRepoStats, fetchContributionGraph, type RepoStats } from "@/lib/github";
 import { getAllBlogPosts } from "@/lib/blog";
 import { ossProjects } from "@/data/oss-projects";
+import { faqs } from "@/data/faq";
+import { projects } from "@/data/projects";
+import {
+  faqPageNode,
+  graph,
+  profilePageNode,
+  projectListNode,
+  serializeJsonLd,
+} from "@/lib/structured-data";
 
 // ISR: revalidate every 24h for live MAU + GitHub data
 export const revalidate = 86400;
@@ -43,9 +53,14 @@ export default async function Home() {
     ossProjects.map((p, i) => [p.key, ossRepoStats[i] ?? null]),
   );
   const blogPosts = getAllBlogPosts();
+  const jsonLd = graph(profilePageNode(), projectListNode(projects), faqPageNode(faqs));
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <GeometricBackgroundLoader />
       <BackgroundFX />
       <main className="relative z-10">
@@ -60,6 +75,7 @@ export default async function Home() {
         <Game />
         <Blog posts={blogPosts} />
         <BeyondCode />
+        <Faq faqs={faqs} />
         <Contact />
       </main>
     </>
