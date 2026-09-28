@@ -107,7 +107,11 @@ style suggestions.
   walk the funnel (Book a Call links, conversion events, the chat launcher, phone width). Every
   request to another origin, the Sentry tunnel, or the AI chat proxy is aborted. The specs that
   fire conversion events skip themselves unless the base URL is localhost, so the suite can never
-  write to production analytics. The deploy job requires this gate.
+  write to production analytics. The browser runs with WebGL off (`--disable-3d-apis`). CI runners
+  have no GPU, and under software WebGL the home page's two 3D scenes (the background and the
+  embedded Orbital Dodge) hold it near 15fps with idle callbacks starved, so clicks lagged past the
+  test timeout. No spec covers the 3D scenes; the pages degrade to their non-WebGL layout. The
+  deploy job requires this gate.
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
