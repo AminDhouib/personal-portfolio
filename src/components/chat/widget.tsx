@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const ChatWidgetPanel = dynamic(() => import("./widget-panel").then((mod) => mod.ChatWidgetPanel), {
   ssr: false,
@@ -21,9 +22,10 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
 
   const openChat = useCallback(() => {
     if (shouldHide) return;
+    track("chat_open", { path: pathname });
     setPanelLoaded(true);
     setOpenSignal((signal) => signal + 1);
-  }, [shouldHide]);
+  }, [shouldHide, pathname]);
 
   // The navbar "Amin AI" button dispatches this event. Keep this listener in the
   // tiny shell so CopilotKit stays out of the initial route bundle.

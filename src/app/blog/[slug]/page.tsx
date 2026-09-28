@@ -9,6 +9,7 @@ import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getBlogPost, getAllBlogSlugs, extractToc } from "@/lib/blog";
 import { formatDate, formatRelativeDate } from "@/lib/date-utils";
 import { ShareButton, TableOfContents } from "@/components/blog/toc-share";
+import { BookCallCta } from "@/components/ui/book-call-cta";
 import type { Metadata } from "next";
 import type { Options } from "rehype-pretty-code";
 
@@ -186,6 +187,14 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
           {/* Sticky ToC sidebar */}
           <TableOfContents entries={toc} />
+        </div>
+
+        <div className="max-w-3xl">
+          <BookCallCta
+            showAvatar
+            title="Written by Amin Dhouib"
+            body="Full-stack engineer in Ottawa and CEO & CTO of Devino Solutions. Building something similar? Book a 15-minute call."
+          />
         </div>
 
         {/* Footer */}

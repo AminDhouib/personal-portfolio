@@ -33,6 +33,8 @@ pnpm dev              # docker compose up --build — brings up Postgres (the db
 pnpm start             # docker compose up -d — the same stack, detached
 pnpm test              # vitest run, once
 pnpm test:coverage     # vitest run --coverage (ratcheted floors — see DESIGN.md)
+pnpm test:e2e          # Playwright against a RUNNING production build (E2E_BASE_URL); not
+                       # part of the sweep below — CI runs it, RUNBOOK has the local recipe
 pnpm format            # prettier --write
 ```
 
@@ -56,6 +58,10 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   request guard chain, the upstream fetch wrapper, structured logging, GitHub/GA4 clients.
 - `src/components/game/` — the games, each self-contained; see DESIGN.md before editing one.
 - `content/blog/` — MDX blog posts, loaded via `src/lib/blog.ts`.
+- SEO/AEO surface: `src/lib/structured-data.ts` builds every JSON-LD node from `src/data/`
+  (`profile.ts` is the entity source, `faq.ts` the FAQ), and `src/app/llms.txt/route.ts`
+  generates llms.txt from the same data. `e2e/` holds the Playwright suites that check them, and
+  the funnel, against a real build.
 - Persistence is Postgres (the compose `db` service): `src/lib/db.ts` hands out a shared `pg`
   pool via `getPool()`; the leaderboard routes, Password Game 2's leaderboard, and
   `leads-store.ts` read and write tables created by `db/init.sql` (run once on the db volume's

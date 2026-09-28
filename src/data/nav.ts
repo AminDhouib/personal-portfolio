@@ -46,6 +46,7 @@ export const socialLinks = Object.freeze([
   {
     name: "Instagram",
     icon: "instagram",
-    url: "https://instagram.com/amin-dhou",
+    // Instagram handles cannot contain hyphens: /amin-dhou was a dead page.
+    url: "https://instagram.com/amin.dhou",
   },
 ]);

@@ -9,4 +9,5 @@ export { Experience } from "./experience";
 export { Game } from "./game";
 export { Blog } from "./blog";
 export { BeyondCode } from "./beyond-code";
+export { Faq } from "./faq";
 export { Contact } from "./contact";

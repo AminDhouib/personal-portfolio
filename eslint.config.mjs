@@ -138,6 +138,9 @@ export default defineConfig([
     files: [
       "src/env.ts",
       "next.config.ts",
+      // Playwright runs outside the app and never sees src/env.ts: its target
+      // server and browser channel arrive as E2E_* variables.
+      "playwright.config.ts",
       "src/instrumentation.ts",
       "src/instrumentation-client.ts",
       "src/components/game/space-shooter.tsx",
@@ -172,5 +175,7 @@ export default defineConfig([
     "public/tower_stacker/**",
     "audit/**",
     "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Heart } from "lucide-react";
 import { BOOKING_URL } from "@/data/nav";
 import { SocialLinks } from "@/components/ui/social-links";
+import { SiteLinks } from "@/components/layout/site-links";
 
 export function Contact() {
   const currentYear = new Date().getFullYear();
@@ -17,7 +18,7 @@ export function Contact() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <p className="mb-6 text-sm tracking-widest text-(--muted) uppercase">12 — Contact</p>
+          <p className="mb-6 text-sm tracking-widest text-(--muted) uppercase">13 — Contact</p>
           <h2 className="mb-8 font-display text-6xl leading-[0.9] font-black tracking-tighter sm:text-7xl lg:text-8xl">
             LET&apos;S
             <br />
@@ -45,6 +46,7 @@ export function Contact() {
         {/* Footer */}
         <footer className="mt-16 pt-8">
           <div className="section-divider mb-8" />
+          <SiteLinks className="mb-4" />
           <p className="text-xs text-(--muted)">&copy; {currentYear} Amin Dhouib / amindhou.com</p>
           <p className="mt-1 flex items-center justify-center gap-1 text-xs text-(--muted)">
             Hosted on a home server with <Heart className="h-3 w-3 text-accent-green" />
