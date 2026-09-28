@@ -168,7 +168,12 @@ current tree on 2026-07-07.
   `components/sections/game.tsx` both wrap their game content in a nested
   `<MotionConfig reducedMotion="never">`, and game keyframe animations plus the `animate-spin`
   status spinners are deliberately left ungated by either mechanism. Motion is gameplay in a
-  game, not decoration — do not "fix" this into obeying the OS preference.
+  game, not decoration — do not "fix" this into obeying the OS preference. The home page's WebGL
+  background (`components/three/geometric-background.tsx`) is chrome, not a game. Under the OS
+  preference it freezes rather than unmounts, as the CSS aurora does. It switches to
+  `frameloop="demand"`, and its `useFrame` callbacks skip any frame that is not an `"always"`
+  frame, so it draws one still pose and redraws it only on resize. The embedded Orbital Dodge
+  keeps moving.
 - **The `/games` grid shows 5 cards, not 6, on purpose.** `games-meta.ts` marks `tower-stacker`
   `hidden: true`, taking it out of rotation without deleting any code — the route still works if
   visited directly. `password-game` (The Password Game 2) is `external: true`: its card is live in
