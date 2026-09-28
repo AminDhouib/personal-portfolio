@@ -23,5 +23,10 @@ export default defineConfig({
     baseURL,
     channel,
     trace: "retain-on-failure",
+    // WebGL off, locally and in CI alike. The runners have no GPU, and under
+    // software WebGL the home page's 3D scenes held it near 15fps with idle
+    // callbacks starved, so clicks outlasted the test timeout. No spec covers
+    // the 3D scenes (see the E2E gate in DESIGN.md).
+    launchOptions: { args: ["--disable-3d-apis"] },
   },
 });

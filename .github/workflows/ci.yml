@@ -92,16 +92,21 @@ jobs:
       # loud bypass sentinel — Lighthouse audits rendered markup, not the
       # integrations behind the missing vars (DB-backed API calls 500, which
       # only dings the warn-level best-practices category).
+      # public/ and .next/static are merged in, like the Dockerfile's COPY
+      # layers, never skipped when present: output tracing already puts a
+      # partial public/ in the bundle (the icon routes read
+      # public/profile.jpg), and an existence check left every other public
+      # asset 404ing in CI. The server logs to server.log, shown on failure.
       - name: Boot standalone server
         env:
           DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: I_UNDERSTAND_THIS_MAY_CRASH_CORRUPT_DATA_OR_EXPOSE_BROKEN_BEHAVIOR
         run: |
           SERVER_JS=$(find .next/standalone -name server.js -not -path "*/node_modules/*" | head -1)
           APP_DIR=$(dirname "$SERVER_JS")
-          mkdir -p "$APP_DIR/.next"
-          [ -d "$APP_DIR/.next/static" ] || cp -r .next/static "$APP_DIR/.next/static"
-          [ -d "$APP_DIR/public" ] || cp -r public "$APP_DIR/public"
-          PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 node "$SERVER_JS" &
+          mkdir -p "$APP_DIR/.next/static" "$APP_DIR/public"
+          cp -r .next/static/. "$APP_DIR/.next/static/"
+          cp -r public/. "$APP_DIR/public/"
+          PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 node "$SERVER_JS" > server.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/api/health > /dev/null && break
             sleep 1
@@ -110,6 +115,10 @@ jobs:
 
       - name: Lighthouse audit (URL list derived from sitemap.xml)
         run: node scripts/run-lighthouse.mjs http://localhost:3000
+
+      - name: Server log
+        if: failure()
+        run: cat server.log
 
       - name: Upload Lighthouse reports
         if: always()
@@ -149,17 +158,18 @@ jobs:
         run: pnpm build
 
       # Same boot as the lighthouse job: the standalone bundle behind the env
-      # gate's loud bypass sentinel, since CI has no secrets.
+      # gate's loud bypass sentinel, since CI has no secrets, with public/
+      # and .next/static merged in and the server logging to server.log.
       - name: Boot standalone server
         env:
           DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: I_UNDERSTAND_THIS_MAY_CRASH_CORRUPT_DATA_OR_EXPOSE_BROKEN_BEHAVIOR
         run: |
           SERVER_JS=$(find .next/standalone -name server.js -not -path "*/node_modules/*" | head -1)
           APP_DIR=$(dirname "$SERVER_JS")
-          mkdir -p "$APP_DIR/.next"
-          [ -d "$APP_DIR/.next/static" ] || cp -r .next/static "$APP_DIR/.next/static"
-          [ -d "$APP_DIR/public" ] || cp -r public "$APP_DIR/public"
-          PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production node "$SERVER_JS" &
+          mkdir -p "$APP_DIR/.next/static" "$APP_DIR/public"
+          cp -r .next/static/. "$APP_DIR/.next/static/"
+          cp -r public/. "$APP_DIR/public/"
+          PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production node "$SERVER_JS" > server.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/api/health > /dev/null && break
             sleep 1
@@ -172,6 +182,10 @@ jobs:
         run: pnpm test:e2e
         env:
           E2E_BASE_URL: http://localhost:3000
+
+      - name: Server log
+        if: failure()
+        run: cat server.log
 
       - name: Upload Playwright report
         if: failure()
