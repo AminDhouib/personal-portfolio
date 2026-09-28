@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useEffect, type RefObject } from "react";
+import { useRef, useMemo, useEffect, useSyncExternalStore, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -20,8 +20,9 @@ function WireframeShape({
   const meshRef = useRef<THREE.Mesh>(null);
   const { pointer } = useThree();
 
-  useFrame((_, delta) => {
-    if (!meshRef.current) return;
+  useFrame((state, delta) => {
+    // A demand frame (reduced motion) redraws the resting pose, never a step.
+    if (!meshRef.current || state.frameloop !== "always") return;
     const boost = 1 + Math.min(Math.abs(scrollVelocityRef.current ?? 0) * 4, 10);
     meshRef.current.rotation.x += delta * speed * 0.55 * boost;
     meshRef.current.rotation.y += delta * speed * 0.4 * boost;
@@ -46,7 +47,8 @@ function CameraRig({
   scrollVelocityRef: RefObject<number>;
 }) {
   const { camera } = useThree();
-  useFrame(() => {
+  useFrame((state) => {
+    if (state.frameloop !== "always") return;
     const target = -(scrollY.current ?? 0) * 0.0015;
     camera.position.setY(camera.position.y + (target - camera.position.y) * 0.04);
     scrollVelocityRef.current = (scrollVelocityRef.current ?? 0) * 0.9;
@@ -232,7 +234,26 @@ function Shapes({
   );
 }
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function subscribeToReducedMotion(onChange: () => void) {
+  const query = window.matchMedia(REDUCED_MOTION);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+const prefersReducedMotion = () => window.matchMedia(REDUCED_MOTION).matches;
+
 export function GeometricBackground() {
+  // Page chrome honors the OS reduced-motion setting (DESIGN.md). Instead of
+  // unmounting, the scene switches to on-demand rendering: one still frame of
+  // the shapes, redrawn only on resize, with no spin, parallax or scroll
+  // follow. That matches the CSS aurora, which freezes rather than vanishes.
+  const reduceMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    prefersReducedMotion,
+    () => false,
+  );
   const scrollY = useRef(0);
   const scrollVelocityRef = useRef(0);
 
@@ -254,6 +275,7 @@ export function GeometricBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0">
       <Canvas
+        frameloop={reduceMotion ? "demand" : "always"}
         camera={{ position: [0, 0, 5], fov: 60 }}
         dpr={[1, 1.5]}
         gl={{ alpha: true, antialias: true }}
