@@ -3,6 +3,7 @@ import Image from "next/image";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getAllBlogPosts } from "@/lib/blog";
 import { formatRelativeDate, formatDate } from "@/lib/date-utils";
+import { blogPostListNode, breadcrumbNode, graph, serializeJsonLd } from "@/lib/structured-data";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
@@ -39,9 +40,28 @@ export default async function BlogPage({
   const allPosts = getAllBlogPosts();
   const posts = tag ? allPosts.filter((p) => p.tags.includes(tag)) : allPosts;
   const allTags = [...new Set(allPosts.flatMap((p) => p.tags))].sort();
+  // Describes the canonical /blog, so it lists every post even on a ?tag= view.
+  const jsonLd = graph(
+    {
+      "@type": "CollectionPage",
+      "@id": `${SITE_ORIGIN}/blog#page`,
+      url: `${SITE_ORIGIN}/blog`,
+      name: "Blog by Amin Dhouib",
+      description: DESCRIPTION,
+      mainEntity: blogPostListNode(allPosts),
+    },
+    breadcrumbNode([
+      { name: "Home", path: "/" },
+      { name: "Blog", path: "/blog" },
+    ]),
+  );
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/"

@@ -4,6 +4,7 @@ import { projects } from "@/data/projects";
 import { socialLinks } from "@/data/nav";
 import {
   PERSON_ID,
+  blogPostListNode,
   breadcrumbNode,
   companyNode,
   faqPageNode,
@@ -64,6 +65,28 @@ describe("page-level nodes", () => {
         url: `https://amindhou.com/work/${project.slug}`,
       });
     });
+  });
+
+  it("lists blog posts in the order given, each with its /blog URL", () => {
+    const list = blogPostListNode([
+      { slug: "newer-post", title: "The newer post" },
+      { slug: "older-post", title: "The older post" },
+    ]);
+    expect(list).toMatchObject({ "@type": "ItemList", "@id": "https://amindhou.com/blog#posts" });
+    expect(list.itemListElement).toEqual([
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "The newer post",
+        url: "https://amindhou.com/blog/newer-post",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "The older post",
+        url: "https://amindhou.com/blog/older-post",
+      },
+    ]);
   });
 
   it("credits each project to the Person and links its source when it has one", () => {

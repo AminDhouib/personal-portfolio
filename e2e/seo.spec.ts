@@ -29,6 +29,15 @@ const breadcrumbSchema = z.object({
   "@type": z.literal("BreadcrumbList"),
   itemListElement: z.array(z.object({ name: z.string(), item: z.string() })),
 });
+const itemListSchema = z.object({
+  "@type": z.literal("ItemList"),
+  itemListElement: z.array(z.object({ position: z.number(), name: z.string(), url: z.string() })),
+});
+const collectionPageSchema = z.object({
+  "@type": z.literal("CollectionPage"),
+  url: z.string(),
+  mainEntity: itemListSchema,
+});
 const blogPostingSchema = z.object({
   "@type": z.literal("BlogPosting"),
   image: z.string(),
@@ -167,6 +176,29 @@ test("blog posts carry BlogPosting markup with a working image and a known autho
     expect.soft(image.status(), posting.image).toBe(200);
     expect.soft(image.headers()["content-type"], posting.image).toMatch(/^image\//);
   }
+});
+
+test("/blog carries CollectionPage markup listing every post, in the order a visitor reads them", async ({
+  page,
+  request,
+}) => {
+  const urls = await sitemapUrls(request);
+  const postUrls = urls.filter((url) => pathOf(url).startsWith("/blog/"));
+  const blogUrl = urls.find((url) => pathOf(url) === "/blog");
+  expect(postUrls.length).toBeGreaterThan(0);
+  expect(blogUrl).toBeDefined();
+
+  await page.goto("/blog");
+  const nodes = await jsonLdNodes(page);
+  const [collection] = nodesOf(nodes, collectionPageSchema);
+  expect(collection?.url).toBe(blogUrl);
+  const items = collection!.mainEntity.itemListElement;
+  expect(items.map((item) => item.url).sort()).toEqual([...postUrls].sort());
+  expect(items.map((item) => item.position)).toEqual(items.map((_, i) => i + 1));
+  await expect(page.locator('a[href^="/blog/"] h2')).toHaveText(items.map((item) => item.name));
+
+  const [breadcrumb] = nodesOf(nodes, breadcrumbSchema);
+  expect(breadcrumb?.itemListElement.map((crumb) => crumb.item).at(-1)).toBe(blogUrl);
 });
 
 test("the footer links every hub page from anywhere on the site", async ({ page, request }) => {

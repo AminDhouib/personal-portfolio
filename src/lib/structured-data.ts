@@ -1,6 +1,7 @@
 import { SITE_ORIGIN, profile, profileUrls } from "@/data/profile";
 import type { FaqEntry } from "@/data/faq";
 import type { Project } from "@/data/projects";
+import type { BlogPostMeta } from "@/lib/blog";
 
 // schema.org builders for the JSON-LD blocks. The site-wide graph (Person,
 // Organization, WebSite) ships from the root layout; page-level nodes
@@ -112,6 +113,22 @@ export function projectListNode(projects: readonly Project[]): JsonLdNode {
       position: i + 1,
       name: project.name,
       url: `${SITE_ORIGIN}/work/${project.slug}`,
+    })),
+  };
+}
+
+export function blogPostListNode(
+  posts: readonly Pick<BlogPostMeta, "slug" | "title">[],
+): JsonLdNode {
+  return {
+    "@type": "ItemList",
+    "@id": `${SITE_ORIGIN}/blog#posts`,
+    name: `Blog posts by ${profile.name}`,
+    itemListElement: posts.map((post, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: post.title,
+      url: `${SITE_ORIGIN}/blog/${post.slug}`,
     })),
   };
 }
