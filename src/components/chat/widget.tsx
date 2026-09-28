@@ -42,15 +42,18 @@ export function ChatWidget({ enabled }: { enabled?: boolean }) {
     );
   }
 
+  // Below sm the launcher is an icon-only circle: page content scrolls under
+  // this fixed corner, and on a phone the full pill hid a whole FAQ toggle or
+  // the end of a footer line. The label stays in the accessibility tree.
   return (
     <button
       type="button"
       onClick={openChat}
-      className="fixed right-5 bottom-5 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/80 px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-black/30 backdrop-blur transition hover:border-white/30 hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue"
+      className="fixed right-5 bottom-5 z-50 inline-flex size-12 items-center justify-center gap-2 rounded-full border border-white/15 bg-black/80 text-sm font-semibold text-white shadow-2xl shadow-black/30 backdrop-blur transition hover:border-white/30 hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue sm:size-auto sm:px-4 sm:py-3"
       aria-label="Open Amin AI chat"
     >
       <Sparkles className="h-4 w-4 text-accent-blue" aria-hidden />
-      <span>Amin AI</span>
+      <span className="sr-only sm:not-sr-only">Amin AI</span>
     </button>
   );
 }

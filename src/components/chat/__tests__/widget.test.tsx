@@ -94,6 +94,14 @@ describe("ChatWidget shell", () => {
     expect(screen.queryByTestId("lazy-panel")).toBeNull();
   });
 
+  it("is icon-only on phones, keeping its label for screen readers", () => {
+    render(<ChatWidget enabled />);
+    const launcher = screen.getByRole("button", { name: "Open Amin AI chat" });
+    const label = screen.getByText("Amin AI");
+    expect(launcher).toContainElement(label);
+    expect(label).toHaveClass("sr-only", "sm:not-sr-only");
+  });
+
   it("does not render on game routes", () => {
     mockUsePathname.mockReturnValue("/games/space-shooter");
     const { container } = render(<ChatWidget enabled />);

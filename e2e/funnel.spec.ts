@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   blockThirdParties,
   gtagEvents,
@@ -16,6 +16,43 @@ const LOCAL_ONLY =
   "Fires real conversion events; only run against a local build, never production analytics.";
 
 let blocked: string[] = [];
+
+/**
+ * Scrolls to the very bottom, then lists the text, icons and controls the
+ * fixed chat launcher sits on top of. Text is measured by its line boxes, not
+ * its element, since a centered line's paragraph spans the full width.
+ */
+function contentUnderLauncher(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    window.scrollTo({ top: root.scrollHeight, behavior: "instant" });
+    const launcher = document.querySelector('button[aria-label="Open Amin AI chat"]');
+    if (!launcher) return ["(no launcher)"];
+    const zone = launcher.getBoundingClientRect();
+    const overlaps = (rect: DOMRect) =>
+      rect.width > 1 &&
+      rect.height > 1 &&
+      rect.left < zone.right &&
+      rect.right > zone.left &&
+      rect.top < zone.bottom &&
+      rect.bottom > zone.top;
+
+    const covered: string[] = [];
+    const text = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = text.nextNode(); node; node = text.nextNode()) {
+      const words = node.textContent?.trim();
+      if (!words || launcher.contains(node)) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      if ([...range.getClientRects()].some(overlaps)) covered.push(words);
+    }
+    for (const el of document.body.querySelectorAll("a, button, input, svg, img")) {
+      if (launcher.contains(el)) continue;
+      if (overlaps(el.getBoundingClientRect())) covered.push(`<${el.tagName.toLowerCase()}>`);
+    }
+    return covered;
+  });
+}
 
 test.beforeEach(async ({ context, baseURL }) => {
   blocked = await blockThirdParties(context, baseURL);
@@ -126,6 +163,19 @@ test.describe("at phone width", () => {
         () => document.documentElement.scrollWidth - window.innerWidth,
       );
       expect.soft(overflow, `${path} horizontal overflow (px)`).toBeLessThanOrEqual(0);
+    }
+  });
+
+  test("at the end of a page the chat launcher covers none of its content", async ({
+    page,
+    request,
+  }) => {
+    const firstPost = (await sitemapUrls(request)).map(pathOf).find((p) => p.startsWith("/blog/"));
+    for (const path of ["/", "/work", "/work/caramel", "/reviews", firstPost!]) {
+      await page.goto(path);
+      await expect(page.getByRole("button", { name: "Open Amin AI chat" })).toBeVisible();
+      // Polled: late images can still grow the page after the first scroll.
+      await expect.poll(() => contentUnderLauncher(page), { message: path }).toEqual([]);
     }
   });
 
