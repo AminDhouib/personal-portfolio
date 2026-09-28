@@ -5,6 +5,8 @@ import { MotionConfig } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import type { GameSlug } from "@/app/games/games-meta";
 import { assertNever } from "@/lib/assert-never";
+import { WebGLOnly } from "@/components/three/webgl-only";
+import { NeedsWebGL } from "./space-shooter/needs-webgl";
 
 function GameSkeleton() {
   return (
@@ -40,7 +42,11 @@ function renderGame(slug: GameSlug, towerSeed: string | undefined) {
     case "typing-speed":
       return <TypingSpeedGame />;
     case "space-shooter":
-      return <SpaceShooterGame />;
+      return (
+        <WebGLOnly fallback={<NeedsWebGL />} pending={<GameSkeleton />}>
+          <SpaceShooterGame />
+        </WebGLOnly>
+      );
     case "hextris":
       return <HextrisGame />;
     case "super-voltorb-flip":

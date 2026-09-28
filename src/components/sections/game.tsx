@@ -7,6 +7,8 @@ import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { GameCard } from "@/components/game/game-card";
 import { GAMES_BY_SLUG } from "@/app/games/games-meta";
+import { NeedsWebGL } from "@/components/game/space-shooter/needs-webgl";
+import { WebGLOnly } from "@/components/three/webgl-only";
 
 const SpaceShooterGame = dynamic(
   () => import("@/components/game/space-shooter").then((m) => m.SpaceShooterGame),
@@ -44,7 +46,9 @@ export function Game() {
           {/* This embed is the real playable game, not a teaser; exempt from
               reduced-motion by ruling like the /games/space-shooter route. */}
           <MotionConfig reducedMotion="never">
-            <SpaceShooterGame />
+            <WebGLOnly fallback={<NeedsWebGL />}>
+              <SpaceShooterGame />
+            </WebGLOnly>
           </MotionConfig>
 
           <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">

@@ -110,8 +110,9 @@ style suggestions.
   write to production analytics. The browser runs with WebGL off (`--disable-3d-apis`). CI runners
   have no GPU, and under software WebGL the home page's two 3D scenes (the background and the
   embedded Orbital Dodge) hold it near 15fps with idle callbacks starved, so clicks lagged past the
-  test timeout. No spec covers the 3D scenes; the pages degrade to their non-WebGL layout. The
-  deploy job requires this gate.
+  test timeout. No spec drives the 3D scenes themselves. `e2e/webgl-fallback.spec.ts` pins what a
+  visitor without WebGL gets instead: no uncaught errors, no canvas, the notice in place of the
+  game (see the `WebGLOnly` register entry). The deploy job requires this gate.
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
@@ -174,6 +175,16 @@ current tree on 2026-07-07.
   `frameloop="demand"`, and its `useFrame` callbacks skip any frame that is not an `"always"`
   frame, so it draws one still pose and redraws it only on resize. The embedded Orbital Dodge
   keeps moving.
+- **Every react-three-fiber Canvas mounts behind `WebGLOnly`** (`components/three/webgl-only.tsx`).
+  three.js needs a WebGL2 context. Without one, its renderer throws "Error creating WebGL
+  context." inside R3F's async Canvas setup: an unhandled rejection no error boundary catches,
+  repeated on every render of the Canvas (about 20 per home page load before the gate). The gate
+  asks once per page load, on a throwaway canvas. Where the answer is no, the home background
+  renders nothing, so the CSS `BackgroundFX` layer is the whole backdrop and the three.js chunk is
+  never fetched; Orbital Dodge, on the home page and on `/games/space-shooter`, shows the
+  `NeedsWebGL` notice instead. A software-rendered context still counts as WebGL: the gate asks
+  whether three.js can start, not how fast it will run. A new Canvas outside those two wrappers
+  needs the same gate.
 - **The `/games` grid shows 5 cards, not 6, on purpose.** `games-meta.ts` marks `tower-stacker`
   `hidden: true`, taking it out of rotation without deleting any code — the route still works if
   visited directly. `password-game` (The Password Game 2) is `external: true`: its card is live in
@@ -388,7 +399,8 @@ trigger revisiting it.
   residual risk, not a gap to close reflexively.
 - **r3f (React Three Fiber) crash recovery UX** (audit ref NF-P5-a): a WebGL context loss or
   three.js render error in a 3D game currently has no dedicated recovery path beyond the generic
-  error boundary. Undone.
+  error boundary. Undone. (WebGL missing at page load is handled, see the `WebGLOnly` register
+  entry; losing it mid-session is not.)
 - **A dedicated `localStorage`-usage lint rule** (audit ref NF-P5-b) — CLOSED 2026-09-17 for
   writes: `no-restricted-syntax` now bans any `.setItem(...)` call outside
   `src/lib/safe-storage.ts` (see Conventions in force), and the eight raw writers — hextris,
