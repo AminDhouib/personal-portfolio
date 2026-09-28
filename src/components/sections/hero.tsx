@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { ChevronDown, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { BOOKING_URL } from "@/data/nav";
+import { HeroPhoto } from "./hero-photo";
 
 export function Hero() {
   const currentYear = new Date().getFullYear();
@@ -84,18 +84,7 @@ export function Hero() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
-            <div className="relative">
-              <div className="glow-green avatar-backdrop h-48 w-48 overflow-hidden rounded-full border-2 border-accent-green/30 sm:h-64 sm:w-64 lg:h-80 lg:w-80">
-                <Image
-                  src="/profile.png"
-                  alt="Amin Dhouib"
-                  width={320}
-                  height={320}
-                  className="h-full w-full object-cover"
-                  priority
-                />
-              </div>
-            </div>
+            <HeroPhoto />
           </motion.div>
         </div>
       </div>
