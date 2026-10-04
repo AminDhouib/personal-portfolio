@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion, useInView, useMotionValue, useTransform, animate } from "framer-motion";
 import { Star, Server } from "lucide-react";
-import { useEffect } from "react";
 
 interface CounterProps {
   target: number;
@@ -26,10 +25,17 @@ function Counter({
   inView,
   decimals = 0,
 }: CounterProps) {
-  const count = useMotionValue(0);
+  // Start at the real figure so the server HTML (what crawlers, link previews
+  // and no-JS readers get) never says "$0M+" or "0+ Clients". The client
+  // resets to 0 before first paint, so visitors still see the count-up.
+  const count = useMotionValue(target);
   const display = useTransform(count, (v) =>
     decimals > 0 ? v.toFixed(decimals) : Math.round(v).toString(),
   );
+
+  useLayoutEffect(() => {
+    count.set(0);
+  }, [count]);
 
   useEffect(() => {
     if (inView) {
@@ -55,7 +61,7 @@ function Counter({
   );
 }
 
-export function ProofBar() {
+export function ProofBar({ usersK }: { usersK: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -76,7 +82,7 @@ export function ProofBar() {
       color: "var(--color-accent-blue)",
     },
     {
-      target: 30,
+      target: usersK,
       suffix: "K+",
       label: "Users",
       subtitle: "Across my services",

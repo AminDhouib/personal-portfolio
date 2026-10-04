@@ -16,6 +16,7 @@ import {
   Contact,
 } from "@/components/sections";
 import { fetchAllMAU } from "@/lib/ga4";
+import { combinedMonthlyUsers, usersFloorInThousands } from "@/lib/user-reach";
 import { fetchRepoStats, fetchContributionGraph, type RepoStats } from "@/lib/github";
 import { getAllBlogPosts } from "@/lib/blog";
 import { ossProjects } from "@/data/oss-projects";
@@ -65,7 +66,7 @@ export default async function Home() {
       <BackgroundFX />
       <main className="relative z-10">
         <Hero />
-        <ProofBar />
+        <ProofBar usersK={usersFloorInThousands(combinedMonthlyUsers(mauData))} />
         <Work mauData={mauData} />
         <OpenSource stats={ossStats} contributions={contributions} />
         <Services />
