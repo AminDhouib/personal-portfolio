@@ -5,6 +5,7 @@ import { ossProjects } from "@/data/oss-projects";
 import { services } from "@/data/services";
 import { BOOKING_URL, socialLinks } from "@/data/nav";
 import { GAMES } from "@/app/games/games-meta";
+import { combinedMonthlyUsers, formatUsersFloor } from "../user-reach";
 
 describe("buildAminAiSystemPrompt", () => {
   const prompt = buildAminAiSystemPrompt(GAMES);
@@ -46,7 +47,7 @@ describe("buildAminAiSystemPrompt", () => {
     expect(prompt).toContain("$50-75");
     expect(prompt).toContain("$1M+");
     expect(prompt).toContain("50+ clients");
-    expect(prompt).toContain("30K+");
+    expect(prompt).toContain(`${formatUsersFloor(combinedMonthlyUsers())} monthly active users`);
     expect(prompt).toContain("5.0/5.0");
     expect(prompt).toContain("99.99%");
   });

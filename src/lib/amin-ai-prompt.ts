@@ -23,6 +23,7 @@ import { services } from "@/data/services";
 import { experience } from "@/data/experience";
 import { reviews } from "@/data/reviews";
 import { BOOKING_URL, socialLinks } from "@/data/nav";
+import { combinedMonthlyUsers, formatUsersFloor } from "@/lib/user-reach";
 
 /** Minimal shape of an OpenAI-style chat-completions request body. */
 export type ChatCompletionBody = {
@@ -86,9 +87,9 @@ export function buildAminAiSystemPrompt(games: readonly PromptGameMeta[]): strin
     "About Amin:",
     "- CEO and CTO of Devino Solutions; full-stack engineer and founder based in Ottawa, Canada.",
     "- BASc in Computer Software Engineering, University of Ottawa (Summa Cum Laude, A+).",
-    "- Fluent in English and French, working Arabic.",
+    "- Native French speaker, fluent in English, working Arabic.",
     "- Favorite stack: Next.js, TypeScript, Python (Django/FastAPI), Prisma, Docker, AWS.",
-    `- Track record: $1M+ in revenue, 50+ clients, 30K+ monthly active users across his apps, a 5.0/5.0 rating, and 99.99% server uptime, backed by ${fiveStarReviews} five-star client reviews on ${reviewSources}.`,
+    `- Track record: $1M+ in revenue, 50+ clients, ${formatUsersFloor(combinedMonthlyUsers())} monthly active users across his apps, a 5.0/5.0 rating, and 99.99% server uptime, backed by ${fiveStarReviews} five-star client reviews on ${reviewSources}.`,
     `- Current roles: ${currentRoles}. Past experience includes ${pastCompanies}.`,
     "",
     "Products Amin has built:",
