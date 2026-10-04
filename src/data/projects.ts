@@ -45,7 +45,7 @@ export const projects: readonly Project[] = Object.freeze([
     isOSS: false,
     contraUrl:
       "https://contra.com/p/QsA7PFlq-nextjs-figma-python-seleniumandtor-browser-ext-shorty",
-    mauFallback: 2100,
+    mauFallback: 16000,
     mauGrowth: "+50% MoM",
     gaPropertyDomain: "aishorty.com",
     platforms: [
@@ -95,7 +95,7 @@ export const projects: readonly Project[] = Object.freeze([
     url: "https://unotes.net",
     isOSS: false,
     contraUrl: "https://contra.com/p/bve7Lces-nextjs-typescript-aws-u-notes",
-    mauFallback: 5000,
+    mauFallback: 185000,
     gaPropertyDomain: "unotes.net",
     platforms: [
       {
@@ -119,7 +119,7 @@ export const projects: readonly Project[] = Object.freeze([
     story: [
       "uNotes was born from a conversation with university students who were paying $30/month for CourseHero just to access past exams and lab reports. The content was created by students — it shouldn't be paywalled.",
       "I built a community platform where students can upload and download notes, exams, and assignments for free. The key insight was making it searchable by university, course code, and professor — not just generic file dumps.",
-      "uNotes now has 30,000+ documents from universities across Canada and the US, with 5,000+ monthly active users. It's available on the App Store, Google Play, Microsoft Store, and web.",
+      "uNotes now has 30,000+ documents from universities across Canada and the US, and is available on the App Store, Google Play, Microsoft Store, and web.",
     ],
   },
   {

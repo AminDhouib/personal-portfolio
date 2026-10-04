@@ -1,3 +1,5 @@
+import { combinedMonthlyUsers, formatUsersFloor } from "@/lib/user-reach";
+
 /** A labeled cluster of bullets — used when one role spans distinct tracks. */
 export interface HighlightGroup {
   label: string;
@@ -39,9 +41,9 @@ export const experience: ExperienceItem[] = [
     location: "Ottawa, ON · Remote",
     current: true,
     highlights: [
-      "Successfully generated over $1M in project revenue, working with 100+ satisfied clients and earning an average 5-star rating.",
+      "Successfully generated over $1M in project revenue, working with 50+ satisfied clients and earning an average 5-star rating.",
       "Developed many great B2B relationships and long-term client partnerships.",
-      "Published several apps, including uNotes and Shorty, reaching a cumulative 20K monthly active users.",
+      `Published several apps, including uNotes and Shorty, reaching ${formatUsersFloor(combinedMonthlyUsers())} combined monthly active users.`,
     ],
     skills: ["Leadership", "Full-Stack", "Product", "B2B Sales"],
   },
@@ -98,7 +100,7 @@ export const experience: ExperienceItem[] = [
     short: "MA",
     logo: "/logos/companies/mathanex.png",
     accent: "var(--color-accent-purple)",
-    type: "Full-time",
+    type: "Contract",
     period: "Mar 2023 – Jun 2023",
     location: "Remote",
     highlights: [
