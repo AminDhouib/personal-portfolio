@@ -1,4 +1,5 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { unstable_cache } from "next/cache";
 import { captureException } from "@/lib/log";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
 import { env } from "@/env";
@@ -46,13 +47,19 @@ function getClient(): BetaAnalyticsDataClient | null {
   }
 }
 
-export async function fetchMAU(slug: string): Promise<number | null> {
-  const propertyId = propertyIds[slug];
-  if (!propertyId) return null;
-  const client = getClient();
-  if (!client) return null;
-
-  try {
+// A GA4 activeUsers reading is shared by every page that shows it. The home
+// page's Work cards and /work/<slug> are each ISR-cached on their own 24h
+// clock; when each fetched GA4 itself, the two regenerated at different
+// moments and showed different figures for the same product side by side
+// (192.1K on the home card vs 189.2K on /work/unotes). One data-cache entry
+// per property, revalidated daily like the pages, keeps them on one reading.
+// A failed call throws instead of returning, which unstable_cache does not
+// store, so a GA4 outage is retried on the next render rather than pinned for
+// a day; fetchMAU reports it and returns null.
+const cachedActiveUsers = unstable_cache(
+  async (propertyId: string): Promise<number | null> => {
+    const client = getClient();
+    if (!client) throw new Error("GA4 client unavailable");
     const [response] = await client.runReport(
       {
         property: `properties/${propertyId}`,
@@ -63,6 +70,18 @@ export async function fetchMAU(slug: string): Promise<number | null> {
     );
     const value = response.rows?.[0]?.metricValues?.[0]?.value;
     return value ? parseInt(value, 10) : null;
+  },
+  ["ga4-active-users-30d"],
+  { revalidate: 86400, tags: ["ga4-mau"] },
+);
+
+export async function fetchMAU(slug: string): Promise<number | null> {
+  const propertyId = propertyIds[slug];
+  if (!propertyId) return null;
+  if (!getClient()) return null;
+
+  try {
+    return await cachedActiveUsers(propertyId);
   } catch (err) {
     // Report the exhausted GA4 call so the null we return (MAU "unavailable")
     // is not mistaken for a legitimately empty metric.
