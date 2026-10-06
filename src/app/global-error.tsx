@@ -11,10 +11,10 @@ import { useEffect } from "react";
  */
 export default function GlobalError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     reportError(error);
@@ -92,7 +92,7 @@ export default function GlobalError({
             }}
           >
             <button
-              onClick={() => unstable_retry()}
+              onClick={() => retry()}
               style={{
                 cursor: "pointer",
                 border: "none",

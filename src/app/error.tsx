@@ -8,15 +8,16 @@ import { ArrowLeft, RotateCcw } from "lucide-react";
  * Route-segment error boundary. Wraps every page below the root layout, so the
  * navbar + footer stay rendered around this fallback. Mirrors not-found.tsx.
  *
- * `unstable_retry` (Next 16.2+) re-fetches and re-renders the segment — better
- * than `reset()` for transient failures like a flaky data fetch.
+ * `retry` (stable since Next 16.3, `unstable_retry` before that) re-fetches and
+ * re-renders the segment, which beats `reset()` for transient failures like a
+ * flaky data fetch.
  */
 export default function Error({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     reportError(error);
@@ -63,7 +64,7 @@ export default function Error({
         ) : null}
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
-            onClick={() => unstable_retry()}
+            onClick={() => retry()}
             className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-6 py-3 text-base font-semibold text-black transition-all hover:brightness-110"
           >
             <RotateCcw className="h-4 w-4" />
