@@ -131,13 +131,14 @@ style suggestions.
 
 ## Arcade backend
 
-Leaderboard v2 for the arcade games. Orbital Dodge and Hextris move onto it in T1b-2; the legacy
+Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2); the legacy
 `leaderboard_entries` table and `/api/leaderboard` keep serving Tower Stacker until T6. Code:
 `src/lib/arcade/`, route `src/app/api/arcade/scores/route.ts`.
 
 - **Tables.** `arcade_players` (id, token_hash, handle) and `arcade_scores` with primary key
   `(game, board, player_id)`: exactly one best row per player per board. `score` is BIGINT and
-  `detail` is JSONB (the game's validated numbers). Board keys are `all-time`, `daily:YYYY-MM-DD`
+  `detail` is JSONB (the game's validated numbers); `arcade_migrations` (key, applied_at) holds
+  the one-time-work markers. Board keys are `all-time`, `daily:YYYY-MM-DD`
   and `weekly:YYYY-Www`, all UTC; weeks are ISO-8601, and the week-year can differ from the
   calendar year (2027-01-01 is 2026-W53). The server computes every key from its own clock; a
   client never names one.
@@ -149,6 +150,48 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris move onto it in T
 - **Retention.** Each submit deletes that game's daily boards older than 30 days and weekly boards
   older than 12 weeks, in the same transaction. All-time is never pruned. The comparison is
   `board COLLATE "C"` so it does not depend on the database locale.
+- **Legacy import (T1b-2).** `importLegacyLeaderboard` (`src/lib/arcade/legacy-import.ts`) runs
+  inside `ensureArcadeSchema`'s transaction, once, guarded by a row in `arcade_migrations` (key
+  `legacy-leaderboard-import-v1`; renaming the key would re-run the import). It copies the Orbital
+  Dodge and Hextris rows of `leaderboard_entries` that carry the detail the game's plausibility
+  check needs and pass it (the score must also be an integer within `ARCADE_SCORE_CAP`), as
+  all-time rows with the original timestamp and `detail.legacy = true`. Each handle keeps its
+  best score per game (handles are sanitized to 12 characters and compared case-insensitively;
+  ties keep the earlier row). The report counts `read` rows, `imported` scores (for N players),
+  `superseded` rows (a better or earlier row of the same handle won), `unverifiable` rows (NULL
+  detail columns) and `implausible` rows, so `read = imported + superseded + unverifiable +
+implausible`; `db.ts` writes them as one log line (scope `arcade:legacy-import`). The region
+  is not carried over. The legacy route kept at most 100 rows per game, so the
+  1000-row board cap cannot bind the import. A failure rolls the marker back with everything
+  else, so the next request retries; a database without the legacy table records the marker and
+  imports nothing. The legacy table itself is never modified.
+- **Imported players are unclaimable and merge by name.** Every legacy player has
+  `token_hash = 'legacy'`. Same-name legacy rows become ONE player across both games (the handle
+  compared case-insensitively, the first and best row naming it), and a name that sanitizes to
+  nothing falls back to "Pilot", so all such rows merge into one "Pilot" player. Real arcade
+  handles are not unique, so a returning player who picks an old name appears next to the old
+  row, not in place of it.
+- **The legacy route is frozen for the two moved games.** `LEADERBOARD_GAMES`
+  (`src/lib/leaderboard-games.ts`) is `["tower-stacker"]`, so `POST /api/leaderboard` answers 400
+  for `space-shooter` and `hextris` (a deliberate, pinned change). The legacy GET is unchanged
+  and still serves stored rows. T6 moves Tower Stacker and retires the route, its hook and the
+  table.
+- **Browser identity.** `src/lib/arcade/identity.ts` keeps `{ playerId, token }` in
+  `localStorage` under `arcade:player:v1`. A read never creates one (so first-time visitors stay
+  cacheable); the first submit does, with an in-memory copy that wins over storage for the page
+  load, so a reset still holds when the write is refused (quota, blocked storage). After a
+  successful write the stored value is re-read and adopted, so two tabs on a first visit converge.
+  A 403 `identity` response replaces the identity; `useArcadeBoard` does not retry by itself, the
+  player submits again. A corrupt stored value is reported with a fixed message, never its
+  content.
+- **Board hook behaviour.** `useArcadeBoard<G>` (`src/hooks/use-arcade-board.ts`) fetches on
+  mount (Hextris opts out and reads at game over), on a tab switch and after a submit, and never
+  polls: a 429 or 5xx keeps the last board for a same-period refresh and sets an error. A tab
+  switch clears the rows and the `you` row first, so a failed read shows an empty board, not
+  another period's scores. `submit` is typed to the game's exact detail keys (inferred from
+  `ARCADE_GAMES`), never creates an identity for a read, and does not POST a score above the
+  cap. `you: null` (a player trimmed off a full board) shows the board with no "Your best" row
+  and no error.
 - **Daily-seed convention.** Anything that seeds a daily challenge must seed from `utcDayKey`
   (`src/lib/arcade/boards.ts`), so the seed and the daily board turn over at the same instant.
   Password Game 2 seeds from the local date today: a finding owed to T3, deliberately not changed
@@ -158,9 +201,8 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris move onto it in T
 - **Identity is trust on first use.** The browser mints a UUID and a 32-byte token; the first
   submit for an id stores `sha256(token)`, and any later submit for that id must present the same
   token (constant-time compare). A mismatch is a 403 and rolls the transaction back. The player id
-  and token hash never leave the database. From T1b-2 on, imported legacy players carry the hash
-  `legacy`, which can never equal a real digest, so they cannot be claimed (the import does not
-  exist in T1b-1).
+  and token hash never leave the database. Imported legacy players carry the hash `legacy`,
+  which can never equal a real digest, so they cannot be claimed (see "Legacy import" below).
 - **Plausibility.** Each game registers a strict detail schema in `ARCADE_GAMES` and a check
   function in `src/lib/arcade/games.ts` (dispatched by `validateArcadeSubmission`): ceilings
   derived from the game's own scoring rules, with one accept and one reject pinned per
@@ -288,7 +330,9 @@ current tree on 2026-07-07.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
   blocks-cleared in the `kills` column and writes a `level` the UI never surfaces; player-name
   inputs cap at 12 characters (`maxLength` plus a slice in the handler). Only worth revisiting
-  if the raw columns are ever exposed publicly.
+  if the raw columns are ever exposed publicly. Since T1b-2 this describes only the legacy
+  table's remaining writer (Tower Stacker); Hextris's arcade rows keep blocks-cleared in
+  `detail.kills`, which its plausibility check relies on.
 - **`maxDuration` is deliberately absent from the LLM route** (`src/app/api/copilotkit/route.ts`).
   It's a Vercel-only directive and a documented no-op on this self-hosted deployment — the
   code's own comment calls it out as the same class of theater `env.ts`'s honesty pass removed
@@ -405,6 +449,18 @@ The following Password Game 2 entries were verified against the current tree on 
   and row-lock SQL, and prod may only be read, so the test runs against a throwaway service
   container in CI, behind a guard that refuses any host but localhost/127.0.0.1 and any database
   but `arcade_it`, and it never reads `DATABASE_URL`.
+- **Legacy rows were imported once and frozen; the import is lossy on purpose.** Rows with NULL
+  detail columns or implausible values, and the region, are not carried over; each handle keeps
+  one row per game; same-name rows merge into one player (fallback-name rows into one "Pilot").
+  Imported players cannot be claimed (`token_hash = 'legacy'`), so a returning player starts a
+  fresh arcade identity. Do not "repair" this by loosening the plausibility checks for old rows.
+  Prod's legacy leaderboard was empty when Part 1 deployed (2026-10-06), so the import is
+  expected to move 0 or very few rows there; the machinery matters for fresh environments and
+  for rows that arrive before the T1b-2 deploy.
+- **Orbital Dodge shows no region.** The browser's ipapi.co lookup (a third-party call on every
+  visit to the game) was removed with the field, and the arcade board stores none. Nothing in
+  the CSP or the config referenced ipapi.co. Do not reintroduce a client-side geo lookup without
+  a privacy decision.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
