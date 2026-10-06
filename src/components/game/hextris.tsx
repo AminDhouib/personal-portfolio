@@ -95,6 +95,7 @@ export function HextrisGame() {
     period: boardPeriod,
     setPeriod: setBoardPeriod,
     loading: boardLoading,
+    error: boardError,
     refresh: refreshLeaderboard,
     submit,
   } = useArcadeBoard("hextris", { fetchOnMount: false });
@@ -2664,9 +2665,13 @@ export function HextrisGame() {
                   <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center font-mono text-xs text-white/50">
                     {boardLoading
                       ? "Loading"
-                      : boardPeriod === "daily"
-                        ? "No scores yet today"
-                        : "No scores yet this week"}
+                      : boardError
+                        ? "Could not load the board"
+                        : boardPeriod === "daily"
+                          ? "No scores yet today"
+                          : boardPeriod === "weekly"
+                            ? "No scores yet this week"
+                            : "No scores yet"}
                   </p>
                 ) : (
                   <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
