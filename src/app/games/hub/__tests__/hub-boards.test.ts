@@ -77,7 +77,7 @@ describe("parseArcadeRows", () => {
 
   it("trims, caps and cleans names, and falls back to Anonymous", () => {
     const rows = parseArcadeRows({
-      entries: [entry("  Nova  ", 5), entry("x".repeat(40), 4), entry("ev‮il", 3)],
+      entries: [entry("  Nova  ", 5), entry("x".repeat(40), 4), entry("ev\u202eil", 3)],
     });
     expect(rows?.[0]?.name).toBe("Nova");
     expect(rows?.[1]?.name).toBe("x".repeat(32));
