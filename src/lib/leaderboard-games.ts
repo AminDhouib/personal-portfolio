@@ -6,21 +6,19 @@ import type { GameSlug } from "@/app/games/games-meta";
  * `useLeaderboard` (client, typed argument) so a slug typo becomes a
  * TypeScript error at the call site instead of a new silent bucket.
  *
- * The values are hand-authored here, NOT derived from the games registry:
- * only these 3 games use this endpoint (the password-game leaderboard is a
- * separate endpoint/shape, out of scope per audit/plans/P2.md section 1).
- * They are `satisfies`-checked against the canonical `GameSlug` union so a
- * slug that is not a real game fails to compile. The import is type-only
- * (erased at build) and `games-meta` is itself component-free, so this
- * module stays safe to import from a server route.
+ * Orbital Dodge (`space-shooter`) and Hextris moved to the arcade backend
+ * (`/api/arcade/scores`, T1b-2) and are deliberately no longer accepted here:
+ * their legacy rows were imported once and the table is read-only history for
+ * them. Tower Stacker is the only remaining writer until T6 moves it too, at
+ * which point this file, the route and the hook can go.
  *
- * Adding a 4th leaderboard game means appending to this array; every
- * consumer (route validation, hook typing) picks it up automatically.
+ * The value is hand-authored, NOT derived from the games registry (the
+ * password-game leaderboard is a separate endpoint/shape). It is
+ * `satisfies`-checked against the canonical `GameSlug` union so a slug that is
+ * not a real game fails to compile. The import is type-only (erased at build)
+ * and `games-meta` is itself component-free, so this module stays safe to
+ * import from a server route.
  */
-export const LEADERBOARD_GAMES = [
-  "space-shooter",
-  "hextris",
-  "tower-stacker",
-] as const satisfies readonly GameSlug[];
+export const LEADERBOARD_GAMES = ["tower-stacker"] as const satisfies readonly GameSlug[];
 
 export type LeaderboardGame = (typeof LEADERBOARD_GAMES)[number];

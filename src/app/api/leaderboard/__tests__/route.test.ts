@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { makeJsonPostRequest } from "@/test/api-route-helpers";
+import { LEADERBOARD_GAMES } from "@/lib/leaderboard-games";
 
 type Row = Record<string, unknown>;
 const rows: Record<string, Row[]> = {};
@@ -95,26 +96,43 @@ describe("/api/leaderboard", () => {
     });
 
     it("returns entries sorted by score desc", async () => {
-      rows["space-shooter"] = [
+      rows["tower-stacker"] = [
         { name: "A", score: 10, level: 1, createdAt: "2026-01-01T00:00:00.000Z" },
         { name: "B", score: 30, level: 1, createdAt: "2026-01-01T00:00:00.000Z" },
         { name: "C", score: 20, level: 1, createdAt: "2026-01-01T00:00:00.000Z" },
       ];
-      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=space-shooter"));
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=tower-stacker"));
       const body = (await res.json()) as LeaderboardGetResponse;
       expect(body.entries.map((e) => e.name)).toEqual(["B", "C", "A"]);
     });
 
     it("sets a short public cache header", async () => {
-      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=space-shooter"));
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=tower-stacker"));
       expect(res.headers.get("Cache-Control")).toBe("s-maxage=10, stale-while-revalidate=30");
     });
+  });
+
+  describe("frozen games", () => {
+    // Orbital Dodge and Hextris moved to /api/arcade/scores (T1b-2). Their legacy rows were
+    // imported once, and this endpoint no longer accepts new ones: a deliberate behaviour change.
+    it("pins the legacy games that are left (T6 empties this when Tower Stacker moves)", () => {
+      expect([...LEADERBOARD_GAMES]).toEqual(["tower-stacker"]);
+    });
+
+    it.each(["space-shooter", "hextris"])(
+      "rejects a POST for the moved game %s with 400 and writes nothing",
+      async (game) => {
+        const res = await POST(makeJsonPostRequest({ name: "Ada", score: 500, level: 1, game }));
+        expect(res.status).toBe(400);
+        expect(Object.keys(rows)).toEqual([]);
+      },
+    );
   });
 
   describe("POST", () => {
     it("persists a valid score and returns ok:true + rank", async () => {
       const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: 500, level: 3, game: "space-shooter" }),
+        makeJsonPostRequest({ name: "Ada", score: 500, level: 3, game: "tower-stacker" }),
       );
       expect(res.status).toBe(200);
       const body = (await res.json()) as PostResponse;
@@ -135,14 +153,14 @@ describe("/api/leaderboard", () => {
 
     it("rejects invalid score with 400", async () => {
       const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: -1, level: 1, game: "space-shooter" }),
+        makeJsonPostRequest({ name: "Ada", score: -1, level: 1, game: "tower-stacker" }),
       );
       expect(res.status).toBe(400);
     });
 
     it("rejects invalid level with 400", async () => {
       const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: 10, level: 0, game: "space-shooter" }),
+        makeJsonPostRequest({ name: "Ada", score: 10, level: 0, game: "tower-stacker" }),
       );
       expect(res.status).toBe(400);
     });
@@ -150,7 +168,7 @@ describe("/api/leaderboard", () => {
     it("rejects cross-origin with 403", async () => {
       const res = await POST(
         makeJsonPostRequest(
-          { name: "Ada", score: 10, level: 1, game: "space-shooter" },
+          { name: "Ada", score: 10, level: 1, game: "tower-stacker" },
           { origin: "https://evil.example" },
         ),
       );
@@ -168,7 +186,7 @@ describe("/api/leaderboard", () => {
           name: "Ada",
           score: 10,
           level: 1,
-          game: "space-shooter",
+          game: "tower-stacker",
           filler: "x".repeat(20_000),
         }),
       );
