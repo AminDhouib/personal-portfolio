@@ -4,8 +4,17 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { GAMES, getGameMeta } from "../games-meta";
+import { GAME_CONTENT } from "../content";
 import { GameLoader } from "@/components/game/game-loader";
 import { GameCard } from "@/components/game/game-card";
+import { GameAbout } from "@/components/game/game-about";
+import {
+  breadcrumbNode,
+  faqPageNode,
+  graph,
+  serializeJsonLd,
+  videoGameNode,
+} from "@/lib/structured-data";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
@@ -22,14 +31,14 @@ export async function generateMetadata({
   const { slug } = await params;
   const game = getGameMeta(slug);
   if (!game) return {};
+  const content = GAME_CONTENT[game.slug];
   const canonical = `${SITE_ORIGIN}/games/${slug}`;
-  const title = `${game.title}, a free browser game by Amin Dhouib`;
-  // Declaring openGraph here replaces the root layout's block wholesale, so
-  // the site card has to be restated or the page ships with no og:image.
-  const image = `${SITE_ORIGIN}/opengraph-image`;
+  const socialTitle = `${game.title}, a free browser game by Amin Dhouib`;
+  // No images here: the segment's opengraph-image.tsx outranks config images,
+  // and Twitter inherits it while twitter.images stays unset.
   return {
-    title: game.title,
-    description: game.description,
+    title: content.seoTitle,
+    description: content.seoDescription,
     alternates: {
       canonical,
       types: {
@@ -39,17 +48,15 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       url: canonical,
-      title,
-      description: game.description,
+      title: socialTitle,
+      description: content.seoDescription,
       siteName: "Amin Dhouib",
       locale: "en_US",
-      images: [{ url: image, width: 1200, height: 630, alt: game.title }],
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description: game.description,
-      images: [image],
+      title: socialTitle,
+      description: content.seoDescription,
     },
     // A hidden game still serves, but must not be indexed.
     ...(game.hidden ? { robots: { index: false, follow: true } } : {}),
@@ -61,10 +68,31 @@ export default async function GameDetailPage({ params }: { params: Promise<{ slu
   const game = getGameMeta(slug);
   if (!game || game.external) notFound();
 
+  const content = GAME_CONTENT[game.slug];
+  const path = `/games/${game.slug}`;
   const others = GAMES.filter((g) => g.slug !== game.slug && !g.hidden);
+  const jsonLd = graph(
+    videoGameNode({
+      name: game.title,
+      description: content.seoDescription,
+      path,
+      genre: content.genre,
+      playMode: content.playMode,
+    }),
+    faqPageNode(content.faq, `${SITE_ORIGIN}${path}#faq`),
+    breadcrumbNode([
+      { name: "Home", path: "/" },
+      { name: "Games", path: "/games" },
+      { name: game.title, path },
+    ]),
+  );
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/games"
@@ -95,6 +123,8 @@ export default async function GameDetailPage({ params }: { params: Promise<{ slu
         >
           <GameLoader key={game.slug} slug={game.slug} />
         </Suspense>
+
+        <GameAbout title={game.title} content={content} />
 
         <section className="mt-16">
           <h2 className="mb-4 font-display text-sm font-bold tracking-wider text-(--muted) uppercase">
