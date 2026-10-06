@@ -156,7 +156,8 @@ them like the panel rollback (unverified) and fall back to `compose.deploy` if i
 All persisted data lives in **Postgres**, not on disk. Compose defines a `db` service
 (`postgres:17-alpine`) whose data sits on the `db-data` named volume; the schema is created once,
 on the volume's first start, from `db/init.sql` mounted into `/docker-entrypoint-initdb.d/`.
-Tables: `leaderboard_entries`, `pg_leaderboard_entries`, `pg2_leaderboard_entries`, and `leads`.
+Tables: `leaderboard_entries`, `pg_leaderboard_entries`, `pg2_leaderboard_entries`, `leads`,
+`arcade_players`, and `arcade_scores`.
 Row shapes mirror the zod schemas in `src/lib/persistence-schemas.ts`. There is no `.data`
 directory and no JSON/JSONL file store anymore — the old file-persistence machinery (corruption
 quarantine, schema-mismatch archive-then-reset, `validate:data`) was removed in the Postgres
@@ -174,6 +175,42 @@ reports it to Sentry (`src/lib/log.ts`), and the request returns an error status
 silently losing or corrupting data. There is no in-code migration — `db/init.sql` uses
 `CREATE TABLE IF NOT EXISTS` and only runs on a first-ever start, so a schema change means editing
 that file and applying the delta by hand against the live db.
+
+The exceptions are the Password Game 2 table and the arcade tables: a runtime ensure-step
+(`src/lib/arcade/schema.ts` for the arcade) creates them idempotently at first use, so a
+deploy needs no hand-applied delta. A change to the arcade tables means editing
+`ARCADE_SCHEMA_STATEMENTS` and `db/init.sql` together; `schema.test.ts` fails if they drift.
+
+**Arcade boards: inspect** (read-only; same docker access as above):
+
+```bash
+docker compose exec db psql -U portfolio -d portfolio -c "\dt arcade_*"
+docker compose exec db psql -U portfolio -d portfolio -c "SELECT s.board, p.handle, s.score, s.achieved_at FROM arcade_scores s JOIN arcade_players p ON p.id = s.player_id WHERE s.game = 'hextris' AND s.board = 'all-time' ORDER BY s.score DESC, s.achieved_at ASC LIMIT 25"
+```
+
+**Arcade boards: delete one player's rows (data surgery).** Find the id by handle, take a
+`pg_dump` first, then delete inside a transaction and check the count before committing.
+`arcade_scores.player_id` is `ON DELETE CASCADE`, so deleting the player removes every board row
+they hold:
+
+```sql
+SELECT id, handle, created_at FROM arcade_players WHERE handle = '<handle>';
+BEGIN;
+DELETE FROM arcade_players WHERE id = '<uuid>' RETURNING id, handle;
+-- expect exactly one row; then COMMIT; (or ROLLBACK; if it is the wrong player)
+```
+
+**Arcade store test against a throwaway local Postgres** (CI runs it in the `db-integration`
+job; locally it needs Docker). The URL must be localhost or 127.0.0.1 with database `arcade_it`
+or the test refuses to start. Never use the app's `DATABASE_URL`:
+
+```powershell
+docker run --rm -d --name arcade-it -e POSTGRES_PASSWORD=arcade_it_local -e POSTGRES_DB=arcade_it -p 127.0.0.1:55432:5432 postgres:17-alpine
+$env:ARCADE_IT_DATABASE_URL = "postgresql://postgres:arcade_it_local@localhost:55432/arcade_it"
+pnpm exec vitest run src/lib/arcade/__tests__/store.db.test.ts
+Remove-Item Env:ARCADE_IT_DATABASE_URL
+docker rm -f arcade-it
+```
 
 **Backup — none scheduled (owner-deferred).** Dump the database manually:
 

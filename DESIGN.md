@@ -20,10 +20,11 @@ Leaderboard, password-game, and leads persistence is Postgres (the compose `db` 
 reached **only** through the shared `pg` pool from `getPool()` (`src/lib/db.ts`). The games
 leaderboard route, Password Game 2's leaderboard route, and `src/lib/leads-store.ts` read and
 write tables created by `db/init.sql` (applied once on the db volume's first start); row shapes
-are pinned by zod in `src/lib/persistence-schemas.ts`. Tests never touch a real database — each
-store's suite does `vi.mock("@/lib/db")` and drives an in-memory fake pool, and persistence
-changes need pinning tests FIRST (see `AGENTS.md`'s hard boundaries). See `RUNBOOK.md`'s Data
-section for the operational side.
+are pinned by zod in `src/lib/persistence-schemas.ts`. Unit tests never touch a real database —
+each store's suite does `vi.mock("@/lib/db")` and drives an in-memory fake pool, and persistence
+changes need pinning tests FIRST (see `AGENTS.md`'s hard boundaries). The one exception is the
+CI-only arcade store test against a throwaway service container (see the register). See
+`RUNBOOK.md`'s Data section for the operational side.
 
 Games are self-contained under `src/components/game/`. Most games are a single top-level
 component file (`hextris.tsx`, `tower-stacker.tsx`, `typing-speed.tsx`); non-component logic is
@@ -127,6 +128,46 @@ style suggestions.
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
   the rule. When `FS_ALLOWLIST` genuinely must grow, the health route's own entry is the model: a
   comment explaining exactly what the direct fs access does and why a store module doesn't apply.
+
+## Arcade backend
+
+Leaderboard v2 for the arcade games. Orbital Dodge and Hextris move onto it in T1b-2; the legacy
+`leaderboard_entries` table and `/api/leaderboard` keep serving Tower Stacker until T6. Code:
+`src/lib/arcade/`, route `src/app/api/arcade/scores/route.ts`.
+
+- **Tables.** `arcade_players` (id, token_hash, handle) and `arcade_scores` with primary key
+  `(game, board, player_id)`: exactly one best row per player per board. `score` is BIGINT and
+  `detail` is JSONB (the game's validated numbers). Board keys are `all-time`, `daily:YYYY-MM-DD`
+  and `weekly:YYYY-Www`, all UTC; weeks are ISO-8601, and the week-year can differ from the
+  calendar year (2027-01-01 is 2026-W53). The server computes every key from its own clock; a
+  client never names one.
+- **Ensure-step convention.** `db/init.sql` runs only on a fresh volume and prod's already exists,
+  so the tables are created at first use by `ensureArcadeSchema` (`src/lib/arcade/schema.ts`)
+  inside one transaction under a Postgres advisory lock, memoized by `getArcadePool()`. A new
+  arcade table goes into `ARCADE_SCHEMA_STATEMENTS` and `db/init.sql`; the pin test
+  (`schema.test.ts`) enforces the mirror, statement by statement and in order.
+- **Retention.** Each submit deletes that game's daily boards older than 30 days and weekly boards
+  older than 12 weeks, in the same transaction. All-time is never pruned. The comparison is
+  `board COLLATE "C"` so it does not depend on the database locale.
+- **Daily-seed convention.** Anything that seeds a daily challenge must seed from `utcDayKey`
+  (`src/lib/arcade/boards.ts`), so the seed and the daily board turn over at the same instant.
+  Password Game 2 seeds from the local date today: a finding owed to T3, deliberately not changed
+  here.
+- **Higher is better only.** The upsert replaces a row only on a strictly higher score. A
+  lower-is-better game (a timed run) needs a new direction column and a store change, not a flag.
+- **Identity is trust on first use.** The browser mints a UUID and a 32-byte token; the first
+  submit for an id stores `sha256(token)`, and any later submit for that id must present the same
+  token (constant-time compare). A mismatch is a 403 and rolls the transaction back. The player id
+  and token hash never leave the database. Imported legacy players carry the hash `legacy`, which
+  can never equal a real digest, so they cannot be claimed.
+- **Plausibility.** Each game registers a strict detail schema in `ARCADE_GAMES` and a check
+  function in `src/lib/arcade/games.ts` (dispatched by `validateArcadeSubmission`): ceilings
+  derived from the game's own scoring rules, with one accept and one reject pinned per
+  inequality. A malformed detail is a 400; an implausible score
+  is a 422 with a stable reason. Adding a game to the arcade = a validator + tests + a hook swap.
+- **Driver types.** node-postgres returns BIGINT and `count(*)` as strings and TIMESTAMPTZ as a
+  `Date`. SQL casts ranks with `::int`, and the pins in `persistence-schemas.ts` coerce score and
+  timestamp (and are strict, so an unexpected column fails instead of reaching the client).
 
 ## Intentional-design register
 
@@ -330,6 +371,20 @@ The following Password Game 2 entries were verified against the current tree on 
   components, and every new CTA is tracked automatically as long as it points at `BOOKING_URL`, a
   `mailto:`, or a `socialLinks` URL. The listener never calls `preventDefault`, so tracking can
   never break a link.
+- **Arcade scores are trusted up to plausibility ceilings; this is not anti-cheat.** The games run
+  entirely in the browser, so every submitted value is client supplied. The registry rejects
+  fabricated short runs and absurd claims; it cannot catch moderate inflation on a long run, and
+  it is not meant to. Do not "fix" it by adding client signatures or telemetry: nothing in the
+  browser is secret from the player.
+- **Arcade player ids are client-generated (trust on first use).** There are no accounts. The
+  token protects an id from being taken over after its first submit; it does not stop one person
+  minting many ids. A cleared browser starts a new player. Both are accepted for a portfolio
+  leaderboard.
+- **One CI-only test talks to a real Postgres.** `store.db.test.ts` is the sole exception to "tests
+  never touch a real database". A mocked pool cannot prove the upsert, `rank()`, `COLLATE "C"`
+  and row-lock SQL, and prod may only be read, so the test runs against a throwaway service
+  container in CI, behind a guard that refuses any host but localhost/127.0.0.1 and any database
+  but `arcade_it`, and it never reads `DATABASE_URL`.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
