@@ -146,10 +146,10 @@ export function projectNode(project: Project): JsonLdNode {
   };
 }
 
-export function faqPageNode(faqs: readonly FaqEntry[]): JsonLdNode {
+export function faqPageNode(faqs: readonly FaqEntry[], id = `${SITE_ORIGIN}/#faq`): JsonLdNode {
   return {
     "@type": "FAQPage",
-    "@id": `${SITE_ORIGIN}/#faq`,
+    "@id": id,
     mainEntity: faqs.map((faq) => ({
       "@type": "Question",
       name: faq.question,
@@ -167,6 +167,53 @@ export function breadcrumbNode(crumbs: readonly { name: string; path: string }[]
       position: i + 1,
       name: crumb.name,
       item: `${SITE_ORIGIN}${crumb.path === "/" ? "" : crumb.path}`,
+    })),
+  };
+}
+
+/**
+ * A playable game page. Free, in the browser, made by the Person; the image is
+ * the page's file-based Open Graph card. No ratings: none exist to cite.
+ */
+export function videoGameNode(game: {
+  name: string;
+  description: string;
+  /** Site-relative page path, e.g. "/games/hextris". */
+  path: string;
+  genre: readonly string[];
+  playMode: "SinglePlayer" | "MultiPlayer" | "CoOp";
+}): JsonLdNode {
+  const url = `${SITE_ORIGIN}${game.path}`;
+  return {
+    "@type": "VideoGame",
+    "@id": `${url}#game`,
+    name: game.name,
+    description: game.description,
+    url,
+    image: `${url}/opengraph-image`,
+    genre: [...game.genre],
+    playMode: `https://schema.org/${game.playMode}`,
+    gamePlatform: "Web browser",
+    applicationCategory: "GameApplication",
+    operatingSystem: "Any",
+    inLanguage: "en",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+    author: { "@id": PERSON_ID },
+    publisher: { "@id": PERSON_ID },
+  };
+}
+
+export function gameListNode(games: readonly { title: string; slug: string }[]): JsonLdNode {
+  return {
+    "@type": "ItemList",
+    "@id": `${SITE_ORIGIN}/games#games`,
+    name: `Browser games by ${profile.name}`,
+    itemListElement: games.map((game, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: game.title,
+      url: `${SITE_ORIGIN}/games/${game.slug}`,
     })),
   };
 }
