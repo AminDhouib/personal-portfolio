@@ -158,13 +158,28 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris move onto it in T
 - **Identity is trust on first use.** The browser mints a UUID and a 32-byte token; the first
   submit for an id stores `sha256(token)`, and any later submit for that id must present the same
   token (constant-time compare). A mismatch is a 403 and rolls the transaction back. The player id
-  and token hash never leave the database. Imported legacy players carry the hash `legacy`, which
-  can never equal a real digest, so they cannot be claimed.
+  and token hash never leave the database. From T1b-2 on, imported legacy players carry the hash
+  `legacy`, which can never equal a real digest, so they cannot be claimed (the import does not
+  exist in T1b-1).
 - **Plausibility.** Each game registers a strict detail schema in `ARCADE_GAMES` and a check
   function in `src/lib/arcade/games.ts` (dispatched by `validateArcadeSubmission`): ceilings
   derived from the game's own scoring rules, with one accept and one reject pinned per
-  inequality. A malformed detail is a 400; an implausible score
-  is a 422 with a stable reason. Adding a game to the arcade = a validator + tests + a hook swap.
+  inequality. A malformed detail is a 400; an implausible score is a 422 with a stable reason.
+  Adding a game to the arcade = a validator + tests + a hook swap.
+- **Board cap: 1000 rows.** Each submit that wrote a row on a board (the upsert's `improved`)
+  trims that board back to its top `BOARD_ROW_CAP` (1000) rows by `(score DESC, achieved_at ASC)`,
+  in the same transaction, so a flood of fresh player ids cannot grow the tables without bound.
+  The trim's `ORDER BY` matches `idx_arcade_scores_rank` exactly and adds no tiebreak column, so
+  the planner can walk the index. The submit response keeps the rank computed before the trim: a
+  submit that lands below a full board still reports e.g. rank 1001 and `improved: true`, and the
+  player's row is gone. From then on a read that passes that player's id gets `you: null` for that
+  board. This is intended: a score outside the top 1000 is not on the board. The player row stays
+  (see Known debt).
+- **Reads are rate limited, not guarded.** `GET /api/arcade/scores` is limited to 120 reads per
+  60 s per client IP (key `arcade-read:<ip>`; a 429 with `Retry-After`, the same shape as the
+  POST's). It has no origin or content-type guard on purpose: the public response is
+  CDN-cacheable and holds nothing secret, so any origin may read it. This deviates from the T1b
+  plan's note that the GET is unguarded; the limit exists because each read is up to two queries.
 - **Driver types.** node-postgres returns BIGINT and `count(*)` as strings and TIMESTAMPTZ as a
   `Date`. SQL casts ranks with `::int`, and the pins in `persistence-schemas.ts` coerce score and
   timestamp (and are strict, so an unexpected column fails instead of reaching the client).
@@ -451,6 +466,12 @@ trigger revisiting it.
   and `createCopilotEndpointSingleRoute` accepts only `{ runtime, basePath, cors }`. Recheck
   those three on a major CopilotKit upgrade — a real hook would be less fragile than reading
   frames off the wire.
+- **`arcade_players` rows are never pruned.** Trimming a board to its 1000-row cap, or retention
+  deleting an expired daily or weekly board, removes `arcade_scores` rows but leaves the
+  player row behind, so the table grows without a bound of its own: growth is limited only by the
+  POST rate limit (10 submits per minute per client IP). Each row is small. Trigger: the table
+  reaching a size that matters, or a privacy request; the fix is a periodic delete of players
+  with no score rows left (and, for an abandoned player, the data-surgery recipe in `RUNBOOK.md`).
 - **RC-3 — full engine extraction for `space-shooter.tsx`/`hextris.tsx`** (High severity, large
   effort). Deferred; the extract-before-edit doctrine covers incremental progress. Trigger: any
   gameplay-affecting edit to either file.
