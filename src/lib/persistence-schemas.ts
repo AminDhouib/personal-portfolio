@@ -69,5 +69,42 @@ export function emptyPasswordGameLeaderboardFile(): PasswordGameLeaderboardFile 
   return { schemaVersion: PERSISTENCE_SCHEMA_VERSION, entries: [] };
 }
 
+/**
+ * node-postgres returns BIGINT as a string and TIMESTAMPTZ as a Date. These two
+ * coercions are the only place the arcade store reconciles driver types with the JSON
+ * the client reads: pgInteger accepts an integer number or a decimal string of at most
+ * 15 digits (so it can never lose precision), and pgTimestamp turns a Date into an ISO
+ * string.
+ */
+const pgInteger = z.union([
+  z.number().int(),
+  z
+    .string()
+    .regex(/^-?\d{1,15}$/)
+    .transform(Number),
+]);
+const pgTimestamp = z.union([z.date().transform((d) => d.toISOString()), z.iso.datetime()]);
+
+/** One ranked row of an arcade board as the store reads it. Strict: an unexpected column fails. */
+export const arcadeBoardRowSchema = z.strictObject({
+  rank: pgInteger,
+  handle: z.string(),
+  score: pgInteger,
+  detail: z.record(z.string(), z.union([z.number(), z.boolean()])),
+  achievedAt: pgTimestamp,
+  isYou: z.boolean(),
+});
+export type ArcadeBoardRow = z.infer<typeof arcadeBoardRowSchema>;
+
+/** The caller's own rank and score on a board (the "Your best" line). */
+export const arcadeYouRowSchema = z.strictObject({ rank: pgInteger, score: pgInteger });
+export type ArcadeYouRow = z.infer<typeof arcadeYouRowSchema>;
+
+/** A player's stored best on one board, read back after a submit. */
+export const arcadeBestRowSchema = z.strictObject({ score: pgInteger, rank: pgInteger });
+
+/** The stored token hash used for the trust-on-first-use identity check. */
+export const arcadeTokenRowSchema = z.strictObject({ token_hash: z.string().min(1) });
+
 // Lead schema removed: leads are now in Postgres; the LeadRecord type lives
 // in src/lib/leads-store.ts next to the query code.
