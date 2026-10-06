@@ -365,3 +365,20 @@ describe("cloneGame", () => {
     expect(game.cells[0]?.[0]?.isFlipped).toBe(false);
   });
 });
+
+describe("VoltorbFlip.restore", () => {
+  it("sets the displayed level and total, starts a fresh playing round, and survives cloneGame", () => {
+    const game = new VoltorbFlip();
+    game.restore(7, 3714);
+
+    expect(game.currentLevel).toBe(7);
+    expect(game.totalScore).toBe(3714);
+    expect(game.currentScore).toBe(0);
+    expect(game.gameStatus).toBe("playing");
+    expect(game.cells.flat().every((c) => !c.isFlipped)).toBe(true);
+
+    const clone = cloneGame(game);
+    expect(clone.currentLevel).toBe(7);
+    expect(clone.totalScore).toBe(3714);
+  });
+});
