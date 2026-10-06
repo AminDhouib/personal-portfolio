@@ -261,6 +261,10 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
   failed and populated (fixed-height tile bodies and chips, a reserved caption), because the
   server HTML is the placeholder state. `e2e/games-hub.spec.ts` compares every state with the
   JS-disabled render within 2px at 390 and 1440 wide.
+- **No Suspense around the islands.** `page.tsx` renders `GamesClient` directly. The boundary
+  that used to wrap it (from when it read `useSearchParams`) let React stream the hub as a
+  hidden segment that only an inline script reveals, so with JavaScript off the page showed no
+  games. The JS-disabled baseline in the height test fails if that comes back.
 - **Props from the server.** Genre and play-mode chips come from `hubTags()` (server side,
   `GAME_CONTENT`) and reach the client as plain props, so the About copy never enters the
   client bundle. `GAME_CONTENT` carries no `server-only` import, so nothing at the module level

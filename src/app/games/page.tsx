@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { GamesClient } from "./games-client";
 import { hubTags } from "./hub/hub-tags";
@@ -77,9 +76,10 @@ export default function GamesPage() {
           daily leaderboards reset at midnight UTC, so there is always a fresh run to chase.
         </p>
 
-        <Suspense fallback={null}>
-          <GamesClient tags={hubTags()} />
-        </Suspense>
+        {/* No Suspense boundary. One was added when GamesClient read useSearchParams (it no
+            longer does), and it let React stream the whole hub as a hidden segment that only
+            an inline script reveals, so without JavaScript the page showed no games. */}
+        <GamesClient tags={hubTags()} />
       </div>
     </div>
   );
