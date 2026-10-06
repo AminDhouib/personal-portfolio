@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { GAMES, GAMES_BY_SLUG } from "../games-meta";
@@ -41,7 +42,7 @@ export const metadata = {
     title: SOCIAL_TITLE,
     description: CONTENT.seoDescription,
   },
-};
+} satisfies Metadata;
 
 const jsonLd = graph(
   videoGameNode({

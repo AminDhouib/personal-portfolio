@@ -263,39 +263,45 @@ test("every public game page server-renders its About copy, game JSON-LD and its
   await blockThirdParties(context, baseURL);
   const page = await context.newPage();
 
-  for (const game of publicGames) {
-    const path = `/games/${game.slug}`;
-    await page.goto(path, { waitUntil: "domcontentloaded" });
+  try {
+    for (const game of publicGames) {
+      const path = `/games/${game.slug}`;
+      await page.goto(path, { waitUntil: "domcontentloaded" });
 
-    const about = await page.locator("[data-game-about]").innerText();
-    const words = about.split(/\s+/).filter(Boolean).length;
-    expect.soft(words, `${path} About words`).toBeGreaterThanOrEqual(MIN_ABOUT_WORDS);
+      const aboutBlock = page.locator("[data-game-about]");
+      await expect.soft(aboutBlock, `${path} About block`).toHaveCount(1);
+      if ((await aboutBlock.count()) === 1) {
+        const words = (await aboutBlock.innerText()).split(/\s+/).filter(Boolean).length;
+        expect.soft(words, `${path} About words`).toBeGreaterThanOrEqual(MIN_ABOUT_WORDS);
+      }
 
-    const nodes = await jsonLdNodes(page);
-    const [videoGame] = nodesOf(nodes, videoGameSchema);
-    expect.soft(videoGame?.name, `${path} VideoGame name`).toBe(game.title);
-    expect.soft(videoGame && pathOf(videoGame.url), `${path} VideoGame url`).toBe(path);
-    expect.soft(nodesOf(nodes, faqPageSchema), `${path} FAQPage`).toHaveLength(1);
-    const [crumbs] = nodesOf(nodes, breadcrumbSchema);
-    expect
-      .soft(
-        crumbs?.itemListElement.map((c) => c.name),
-        `${path} breadcrumb`,
-      )
-      .toEqual(["Home", "Games", game.title]);
+      const nodes = await jsonLdNodes(page);
+      const [videoGame] = nodesOf(nodes, videoGameSchema);
+      expect.soft(videoGame?.name, `${path} VideoGame name`).toBe(game.title);
+      expect.soft(videoGame && pathOf(videoGame.url), `${path} VideoGame url`).toBe(path);
+      expect.soft(nodesOf(nodes, faqPageSchema), `${path} FAQPage`).toHaveLength(1);
+      const [crumbs] = nodesOf(nodes, breadcrumbSchema);
+      expect
+        .soft(
+          crumbs?.itemListElement.map((c) => c.name),
+          `${path} breadcrumb`,
+        )
+        .toEqual(["Home", "Games", game.title]);
 
-    // Next appends a ?<hash> to file-based image URLs, so match the path by substring.
-    const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
-    const twitterImage = await page.locator('meta[name="twitter:image"]').getAttribute("content");
-    expect.soft(ogImage, `${path} og:image`).toContain(`${path}/opengraph-image`);
-    expect.soft(twitterImage, `${path} twitter:image`).toContain(`${path}/opengraph-image`);
-    if (ogImage) {
-      const image = await request.get(pathOf(ogImage));
-      expect.soft(image.status(), ogImage).toBe(200);
-      expect.soft(image.headers()["content-type"], ogImage).toContain("image/png");
+      // Next appends a ?<hash> to file-based image URLs, so match the path by substring.
+      const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
+      const twitterImage = await page.locator('meta[name="twitter:image"]').getAttribute("content");
+      expect.soft(ogImage, `${path} og:image`).toContain(`${path}/opengraph-image`);
+      expect.soft(twitterImage, `${path} twitter:image`).toContain(`${path}/opengraph-image`);
+      if (ogImage) {
+        const image = await request.get(pathOf(ogImage));
+        expect.soft(image.status(), ogImage).toBe(200);
+        expect.soft(image.headers()["content-type"], ogImage).toContain("image/png");
+      }
     }
+  } finally {
+    await context.close();
   }
-  await context.close();
 });
 
 test("/games is a CollectionPage whose ItemList names every public game in order", async ({
@@ -312,6 +318,9 @@ test("the sitemap and llms.txt cover every public game and no hidden one; hidden
   page,
   request,
 }) => {
+  // Guard the derived lists: a wrong `hidden` flag must not pass silently.
+  expect(publicGames.length).toBeGreaterThan(1);
+  expect(GAMES.find((g) => g.slug === "tower-stacker")?.hidden).toBe(true);
   const sitemapPaths = (await sitemapUrls(request)).map(pathOf);
   const llms = await (await request.get("/llms.txt")).text();
 
