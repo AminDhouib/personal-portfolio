@@ -34,8 +34,9 @@ export async function generateMetadata({
   const content = GAME_CONTENT[game.slug];
   const canonical = `${SITE_ORIGIN}/games/${slug}`;
   const socialTitle = `${game.title}, a free browser game by Amin Dhouib`;
-  // No images here: the segment's opengraph-image.tsx outranks config images,
-  // and Twitter inherits it while twitter.images stays unset.
+  // No images key at all: Next applies the segment's opengraph-image.tsx only
+  // while openGraph and twitter leave the key unset (even `images: undefined`
+  // blocks it), and Twitter then inherits the Open Graph image.
   return {
     title: content.seoTitle,
     description: content.seoDescription,

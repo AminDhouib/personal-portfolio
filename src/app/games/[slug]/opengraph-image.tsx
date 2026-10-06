@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import { GAMES, getGameMeta } from "../games-meta";
 import { OG_SIZE, renderGameOgImage } from "../og-image";
 
-// File-based metadata outranks the page's openGraph.images, and Twitter
-// inherits the Open Graph image when the page sets no twitter.images.
-// Re-exported through Next's metadata route loader, so each slug is
-// prerendered at build time instead of drawn per request.
+// Next applies this file-based image only while the page's metadata leaves
+// openGraph.images and twitter.images unset (it checks for the key itself,
+// so even `images: undefined` blocks it); Twitter then inherits the Open
+// Graph image. Re-exported through Next's metadata route loader, so each
+// slug is prerendered at build time instead of drawn per request.
 export function generateStaticParams() {
   return GAMES.filter((g) => !g.external).map((g) => ({ slug: g.slug }));
 }
