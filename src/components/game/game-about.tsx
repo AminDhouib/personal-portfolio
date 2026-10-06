@@ -22,15 +22,15 @@ export function GameAbout({ title, content }: { title: string; content: GameCont
 
       <h3 className={H3}>How to play</h3>
       <ol className={`mt-3 list-decimal space-y-1.5 pl-5 ${BODY}`}>
-        {content.howToPlay.map((step) => (
-          <li key={step}>{step}</li>
+        {content.howToPlay.map((step, i) => (
+          <li key={`${i}:${step}`}>{step}</li>
         ))}
       </ol>
 
       <h3 className={H3}>Controls</h3>
       <dl className="mt-3 grid grid-cols-[minmax(0,auto)_1fr] gap-x-6 gap-y-2 text-sm">
-        {content.controls.map((control) => (
-          <Fragment key={`${control.input}:${control.action}`}>
+        {content.controls.map((control, i) => (
+          <Fragment key={`${i}:${control.input}:${control.action}`}>
             <dt className="font-semibold">{control.input}</dt>
             <dd className={BODY}>{control.action}</dd>
           </Fragment>
@@ -39,15 +39,15 @@ export function GameAbout({ title, content }: { title: string; content: GameCont
 
       <h3 className={H3}>Tips and strategy</h3>
       <ul className={`mt-3 list-disc space-y-1.5 pl-5 ${BODY}`}>
-        {content.strategy.map((tip) => (
-          <li key={tip}>{tip}</li>
+        {content.strategy.map((tip, i) => (
+          <li key={`${i}:${tip}`}>{tip}</li>
         ))}
       </ul>
 
       <h3 className={H3}>Quick facts</h3>
       <dl className="mt-3 grid grid-cols-[minmax(0,auto)_1fr] gap-x-6 gap-y-2 text-sm">
-        {content.facts.map((fact) => (
-          <Fragment key={fact.label}>
+        {content.facts.map((fact, i) => (
+          <Fragment key={`${i}:${fact.label}`}>
             <dt className="font-semibold">{fact.label}</dt>
             <dd className={BODY}>{fact.value}</dd>
           </Fragment>
@@ -56,8 +56,8 @@ export function GameAbout({ title, content }: { title: string; content: GameCont
 
       <h3 className={H3}>FAQ</h3>
       <div className="mt-3 space-y-5">
-        {content.faq.map((entry) => (
-          <div key={entry.question}>
+        {content.faq.map((entry, i) => (
+          <div key={`${i}:${entry.question}`}>
             <h4 className="font-semibold">{entry.question}</h4>
             <p className={`mt-1 ${BODY}`}>{entry.answer}</p>
           </div>
@@ -66,8 +66,8 @@ export function GameAbout({ title, content }: { title: string; content: GameCont
 
       <h3 className={H3}>Credits</h3>
       <ul className="mt-3 space-y-1.5 text-sm text-(--muted)">
-        {content.credits.map((credit) => (
-          <li key={credit.label}>
+        {content.credits.map((credit, i) => (
+          <li key={`${i}:${credit.label}`}>
             <span className="font-semibold text-(--foreground)/85">{credit.label}:</span>{" "}
             {credit.href ? (
               <a

@@ -41,8 +41,8 @@ describe("game page metadata", () => {
       // A config image would be overridden anyway; setting twitter.images would
       // stop Twitter inheriting the generated card.
       const meta = await metaFor(game.slug);
-      expect(meta.openGraph?.images).toBeUndefined();
-      expect(meta.twitter?.images).toBeUndefined();
+      expect(Object.hasOwn(meta.openGraph!, "images")).toBe(false);
+      expect(Object.hasOwn(meta.twitter!, "images")).toBe(false);
     });
   }
 
@@ -60,8 +60,8 @@ describe("game page metadata", () => {
     expect(meta.description).toBe(content.seoDescription);
     expect(meta.alternates?.canonical).toBe("https://amindhou.com/games/password-game");
     expect(meta.openGraph?.url).toBe(meta.alternates?.canonical);
-    expect(meta.openGraph?.images).toBeUndefined();
-    expect(meta.twitter?.images).toBeUndefined();
+    expect(Object.hasOwn(meta.openGraph!, "images")).toBe(false);
+    expect(Object.hasOwn(meta.twitter!, "images")).toBe(false);
     expect(meta.twitter?.card).toBe("summary_large_image");
   });
 });

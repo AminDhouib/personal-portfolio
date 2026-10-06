@@ -19,8 +19,9 @@ const GAME = GAMES_BY_SLUG["password-game"];
 const CONTENT = GAME_CONTENT["password-game"];
 const SOCIAL_TITLE = "The Password Game 2 — Terms and Conditions Apply";
 
-// No images: this segment's opengraph-image.tsx outranks config images, and
-// Twitter inherits it while twitter.images stays unset.
+// No images key at all: Next applies this segment's opengraph-image.tsx only
+// while openGraph and twitter leave the key unset (even `images: undefined`
+// blocks it), and Twitter then inherits the Open Graph image.
 export const metadata = {
   title: CONTENT.seoTitle,
   description: CONTENT.seoDescription,
