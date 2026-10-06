@@ -157,7 +157,7 @@ test.describe("at phone width", () => {
 
   test("landing pages never scroll sideways", async ({ page, request }) => {
     const firstPost = (await sitemapUrls(request)).map(pathOf).find((p) => p.startsWith("/blog/"));
-    for (const path of ["/", "/work", "/work/caramel", "/reviews", firstPost!]) {
+    for (const path of ["/", "/games", "/work", "/work/caramel", "/reviews", firstPost!]) {
       await page.goto(path);
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
