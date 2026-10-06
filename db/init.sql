@@ -75,3 +75,8 @@ CREATE TABLE IF NOT EXISTS arcade_scores (
 
 CREATE INDEX IF NOT EXISTS idx_arcade_scores_rank
   ON arcade_scores (game, board, score DESC, achieved_at ASC);
+
+CREATE TABLE IF NOT EXISTS arcade_migrations (
+  key        TEXT        PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
