@@ -33,8 +33,9 @@ export const GAMES: GameMeta[] = [
     title: "Orbital Dodge",
     tagline: "Thread the asteroid belt in 3D",
     description:
-      "3D ship shooter. Move with mouse, touch, or WASD. Auto-fire breaks asteroids; dodge the rest, grab coins, unlock ships and upgrades in the shop between runs.",
-    controls: "Mouse / touch / WASD to move. Bullets fire automatically.",
+      "3D ship shooter. Steer with mouse, touch, WASD or the arrow keys, and double-tap to dash. Auto-fire breaks asteroids; dodge the rest, grab coins, and unlock ships and upgrades in the shop after your first run.",
+    controls:
+      "Mouse / touch / WASD / arrows to move. Double-tap to dash. Bullets fire automatically.",
     accent: "#22d3ee",
     accentTailwind: "accent-blue",
   },
@@ -43,8 +44,8 @@ export const GAMES: GameMeta[] = [
     title: "Hextris",
     tagline: "Rotate the hex, match three, don't let it overflow",
     description:
-      "Rotate the central hexagon to catch falling colored blocks. Match three of the same color on one face to clear them. Stack too high on any side and it's game over.",
-    controls: "Click either side of the hex to rotate. Match 3 to clear.",
+      "Rotate the central hexagon to catch falling colored blocks. Match three or more connected blocks of one color to clear them, chain clears into combos, and keep every side under the limit as it tightens.",
+    controls: "Arrow keys or A/D to rotate, or tap the left or right half. Match 3 to clear.",
     accent: "#a78bfa",
     accentTailwind: "purple-400",
   },
@@ -53,7 +54,7 @@ export const GAMES: GameMeta[] = [
     title: "Tower Stacker",
     tagline: "Time the drop, keep the tower steady",
     description:
-      "Classic crane stacker. A block swings overhead on a rope — tap to drop it onto the tower. Land it clean for a perfect; miss and the stack lurches, and three misses end the run. How tall can you build?",
+      "Classic crane stacker. A block swings overhead on a rope — tap to drop it onto the tower. Land it clean for a perfect; a miss costs one of your three lives. How tall can you build?",
     controls: "Click or tap anywhere to drop the block.",
     accent: "#f87171",
     accentTailwind: "accent-red",
@@ -74,8 +75,8 @@ export const GAMES: GameMeta[] = [
     title: "Super Voltorb Flip",
     tagline: "Flip tiles, deduce, don't pop the bomb",
     description:
-      "A faithful recreation of the HGSS Pokémon GameCorner classic. Flip tiles to collect multipliers, use row/column clue panels to deduce where Voltorbs hide, and climb 8 difficulty levels.",
-    controls: "Click tiles to flip. Toggle memo mode to mark possibilities.",
+      "A fan recreation of the HGSS Pokémon Game Corner classic. Flip tiles to collect multipliers, use the row and column clues to deduce where Voltorbs hide, and climb 9 levels.",
+    controls: "Click or tap tiles to flip. Use the memo buttons to mark what a tile could be.",
     accent: "#fbbf24",
     accentTailwind: "accent-amber",
   },
@@ -84,7 +85,7 @@ export const GAMES: GameMeta[] = [
     title: "The Password Game 2",
     tagline: "The form fights back",
     description:
-      "A five-act sign-up form from hell. Rules stack, creatures move in, fleets invade, and everything you keep alive fights beside you at the finale. One epic seeded run; race the daily.",
+      "A five-act sign-up form from hell. Rules stack, creatures move in, fleets invade, and everything you keep alive fights beside you at the finale. Every run is seeded; race the daily.",
     controls: "Type. Obey the rules. Curse at the rules.",
     accent: "#f472b6",
     accentTailwind: "accent-pink",
