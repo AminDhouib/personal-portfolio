@@ -74,6 +74,9 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   idempotently at first use and mirrored in `db/init.sql`; see DESIGN.md's "Arcade backend".
   Orbital Dodge and Hextris read and write it through `src/hooks/use-arcade-board.ts`; Tower
   Stacker keeps the legacy `/api/leaderboard` route until T6.
+- `/games` hub: `src/app/games/hub/` holds the client islands (Today strip over the public daily
+  reads, read-only "On this device" stats) behind the static `src/app/games/page.tsx`; the
+  featured card is chosen by `featured` on `GameMeta`. See DESIGN.md's "Games hub".
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries

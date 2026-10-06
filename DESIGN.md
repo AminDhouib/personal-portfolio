@@ -237,6 +237,37 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2)
   `Date`. SQL casts ranks with `::int`, and the pins in `persistence-schemas.ts` coerce score and
   timestamp (and are strict, so an unexpected column fails instead of reaching the client).
 
+## Games hub
+
+`/games` is a static, server-rendered page (metadata and JSON-LD unchanged) whose body is a
+stack of client islands under `src/app/games/hub/`, in this order: the featured card, the Today
+strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 featured title, h2
+"Today" with h3 tile titles, h2 "On this device", h2 "More games" with h3 card titles
+(`games-client.test.tsx` and `e2e/games-hub.spec.ts` pin the outline).
+
+- **Featured.** The `featured?: true` flag on `GameMeta` (set on `space-shooter` only; pinned by
+  `games-meta.test.ts`) picks the featured game through `partitionGames`, never array position.
+  `GAMES` order is the registry order and is unchanged.
+- **Today strip.** `TODAY_SOURCES` names three tiles: Password Game 2 (its daily board),
+  Orbital Dodge and Hextris (the arcade daily boards). `useHubBoards` starts the three reads once
+  the strip is within 200px of the viewport (immediately if `IntersectionObserver` is missing),
+  never polls, and aborts on unmount. `fetchHubBoard` has its own 5 s timeout, never reports, and
+  turns every failure into the "Board unavailable right now" tile.
+- **On this device.** `hub-stats.ts` reads exactly five keys (`space-shooter-hs`,
+  `orbital-dodge-profile`, `hextris_highscores`, `svf:progress`, `typing-high-score`) through
+  guarded parsers, and never writes. `hub-stats.test.ts` pins the key list and the setItem
+  absence.
+- **Stable height.** Each island renders the same height before data, while loading, empty,
+  failed and populated (fixed-height tile bodies and chips, a reserved caption), because the
+  server HTML is the placeholder state. `e2e/games-hub.spec.ts` compares every state with the
+  JS-disabled render within 2px at 390 and 1440 wide.
+- **Props from the server.** Genre and play-mode chips come from `hubTags()` (server side,
+  `GAME_CONTENT`) and reach the client as plain props, so the About copy never enters the
+  client bundle. `GAME_CONTENT` carries no `server-only` import, so nothing at the module level
+  stops a client file importing it; `src/app/games/__tests__/content-server-boundary.test.ts`
+  is the guard. It scans every source file under `src/`, and fails if a `"use client"` module
+  imports `GAME_CONTENT` (or anything under `games/content`).
+
 ## Intentional-design register
 
 Things that look like bugs or oversights but are deliberate. Each was verified against the
@@ -467,6 +498,30 @@ The following Password Game 2 entries were verified against the current tree on 
   visit to the game) was removed with the field, and the arcade board stores none. Nothing in
   the CSP or the config referenced ipapi.co. Do not reintroduce a client-side geo lookup without
   a privacy decision.
+- **The featured game is a static flag, not a computed ranking.** `featured?: true` on one
+  `GameMeta` row decides the hub's lead card. Picking by plays or score would need a read on
+  every page view for a page that is otherwise static. Change the flag by editing
+  `games-meta.ts` (and its test), not by adding logic.
+- **The Today strip reads public, cacheable endpoints, deferred, and never with a player id.**
+  The arcade read and the Password Game 2 read both answer anonymous requests with
+  `s-maxage=10, stale-while-revalidate=30`. The hub never passes `player=` (that response is
+  `private, no-store`, per visitor, and would tie the hub to a browser identity), so a hub tile
+  never shows "you". The reads wait until the strip is near the viewport so a visitor who never
+  scrolls to it costs nothing.
+- **"On this device" is display-only, forgeable and never sent.** The numbers come from
+  localStorage, which the visitor can edit; they are clamped, parsed defensively and shown with
+  the label "Best on this device" (Voltorb Flip: "Saved progress", never "best level"). Nothing
+  is written, uploaded, compared with a board or used to gate anything. It does not read
+  Password Game 2 storage, `walletCoins` or `arcade:player:v1`.
+- **The Password Game 2 tile is labelled by UTC day, and the seed is still local until T3.** The
+  board's `daily=1` filter is the database's UTC day, while the game seeds its daily from the
+  visitor's local date, so for a few hours each day the two disagree. The tile says "(UTC)" and
+  "Fastest daily runs posted today" rather than promising it is the board of the visitor's own
+  puzzle. The seed alignment is T3.
+- **Read cost of the hub.** One visit that reaches the strip issues about two arcade reads and
+  one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
+  who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an
+  error; the Password Game 2 read has no rate limit. Both are cacheable for 10 s at the edge.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
