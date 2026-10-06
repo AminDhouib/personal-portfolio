@@ -76,7 +76,10 @@ export function GameCard({
               </ul>
             )}
             {cta !== undefined && (
-              <span className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-6 text-sm font-semibold text-black">
+              <span
+                aria-hidden="true"
+                className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-6 text-sm font-semibold text-black"
+              >
                 {cta}
               </span>
             )}

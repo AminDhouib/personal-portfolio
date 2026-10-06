@@ -10,6 +10,9 @@ import type { TodaySource } from "./today-sources";
  * retry. Reads are aborted on unmount. `boards` has no entry for a slug until its read
  * settles, so a missing entry means "loading". State is only set from the read's
  * continuation, never synchronously in the effect.
+ *
+ * `sources` is an effect dependency, so it must be referentially stable (a module
+ * constant). A fresh array each render would abort and restart every read.
  */
 export function useHubBoards(sources: readonly TodaySource[]): {
   ref: RefObject<HTMLElement | null>;

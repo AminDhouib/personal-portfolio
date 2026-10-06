@@ -42,7 +42,7 @@ export function DeviceStats() {
       </h2>
       {/* Four chips in every state, each a fixed 144px tall, so a first visit, a returning
           player and the server render all occupy the same space. */}
-      <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <ul role="list" className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {statChips(stats).map((item) => (
           <li key={item.slug} className="min-w-0">
             <Link
@@ -56,7 +56,7 @@ export function DeviceStats() {
                 <div className="text-xs text-(--muted)">{item.label}</div>
               </div>
               <div>
-                <div className="font-display text-xl leading-7 font-black tabular-nums">
+                <div className="truncate font-display text-xl leading-7 font-black tabular-nums">
                   {item.value === null ? (
                     <>
                       <span aria-hidden="true">{DASH}</span>
