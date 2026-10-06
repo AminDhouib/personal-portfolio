@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 import { blockThirdParties } from "./helpers";
 import { GAMES, GAMES_BY_SLUG } from "../src/app/games/games-meta";
 import { TODAY_SOURCES } from "../src/app/games/hub/today-sources";
@@ -420,5 +420,172 @@ test.describe("On this device", () => {
       HUB_KEYS,
     );
     expect(stored).toEqual(HUB_KEYS.map(() => null));
+  });
+});
+
+interface Heights {
+  today: number;
+  device: number;
+}
+
+interface Scenario {
+  /** false renders the server HTML only: the height every state must match. */
+  js: boolean;
+  variant?: Variant;
+  seed?: Record<string, string>;
+  /** Hold the reads so the tiles stay in their loading state while measured. */
+  held?: boolean;
+  longNames?: boolean;
+}
+
+async function heightOf(page: Page, testId: string): Promise<number> {
+  return page.getByTestId(testId).evaluate((node) => node.getBoundingClientRect().height);
+}
+
+/** Loads /games in a fresh context under one scenario and measures the two island sections. */
+async function measureHub(
+  browser: Browser,
+  baseURL: string | undefined,
+  viewport: { width: number; height: number },
+  scenario: Scenario,
+): Promise<Heights> {
+  const context = await browser.newContext({
+    baseURL,
+    viewport,
+    javaScriptEnabled: scenario.js,
+    ...(scenario.seed ? { storageState: seededState(baseURL, scenario.seed) } : {}),
+  });
+  let release: () => void = () => undefined;
+  try {
+    await blockThirdParties(context, baseURL);
+    const page = await context.newPage();
+    if (scenario.js) {
+      const hold = scenario.held
+        ? new Promise<void>((resolve) => {
+            release = resolve;
+          })
+        : undefined;
+      await mockBoards(page, scenario.variant ?? "populated", {
+        hold,
+        longNames: scenario.longNames,
+      });
+    }
+    await page.goto("/games");
+    if (scenario.js) {
+      await expect(page.getByTestId("hub-device")).not.toHaveAttribute("data-state", "pending");
+      if (scenario.held) {
+        await expect(page.getByTestId("hub-today")).toHaveAttribute("data-state", "loading");
+      } else {
+        await settle(page);
+      }
+    }
+    await page.evaluate(() => document.fonts.ready);
+    return {
+      today: await heightOf(page, "hub-today"),
+      device: await heightOf(page, "hub-device"),
+    };
+  } finally {
+    release();
+    await context.close();
+  }
+}
+
+test.describe("layout stability", () => {
+  const viewports = [
+    { name: "phone", width: 390, height: 844 },
+    { name: "desktop", width: 1440, height: 900 },
+  ];
+
+  for (const { name, width, height } of viewports) {
+    test(`every state is the height of the server render at ${name} width`, async ({
+      browser,
+      baseURL,
+    }) => {
+      test.slow();
+      const viewport = { width, height };
+      const baseline = await measureHub(browser, baseURL, viewport, { js: false });
+      expect(baseline.today).toBeGreaterThan(100);
+      expect(baseline.device).toBeGreaterThan(100);
+      const scenarios: Record<string, Scenario> = {
+        "populated and seeded": { js: true, variant: "populated", seed: SEEDED },
+        "reads in flight": { js: true, held: true },
+        "empty boards": { js: true, variant: "empty" },
+        "failed boards": { js: true, variant: "error" },
+        "long names": { js: true, variant: "populated", seed: SEEDED, longNames: true },
+      };
+      for (const [label, scenario] of Object.entries(scenarios)) {
+        const heights = await measureHub(browser, baseURL, viewport, scenario);
+        expect
+          .soft(Math.abs(heights.today - baseline.today), `Today, ${label}`)
+          .toBeLessThanOrEqual(2);
+        expect
+          .soft(Math.abs(heights.device - baseline.device), `On this device, ${label}`)
+          .toBeLessThanOrEqual(2);
+      }
+    });
+  }
+});
+
+async function leftEdges(page: Page, selector: string): Promise<number[]> {
+  return page
+    .locator(selector)
+    .evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().left)));
+}
+
+test.describe("at phone width", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test.describe("with seeded bests and the longest names", () => {
+    test.use({ storageState: seeded(SEEDED) });
+
+    test("never scrolls sideways", async ({ page }) => {
+      await mockBoards(page, "populated", { longNames: true });
+      await page.goto("/games");
+      await settle(page);
+      await expect(page.getByTestId("hub-device")).toHaveAttribute("data-state", "populated");
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+      const clipped = await page
+        .locator('[data-testid="today-tile"], [data-testid="stat-chip"]')
+        .evaluateAll((nodes) =>
+          nodes
+            .filter((node) => node.scrollWidth > node.clientWidth)
+            .map((node) => node.textContent),
+        );
+      expect(clipped).toEqual([]);
+    });
+  });
+
+  test("stacks the tiles in one column and the chips in two", async ({ page }) => {
+    await mockBoards(page, "populated");
+    await page.goto("/games");
+    await settle(page);
+    expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(1);
+    expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(2);
+  });
+
+  test("keeps every hub link at least 44px tall", async ({ page }) => {
+    await mockBoards(page, "populated");
+    await page.goto("/games");
+    await settle(page);
+    const heights = await page
+      .locator('[data-testid="today-tile"] a, [data-testid="stat-chip"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+    expect(heights).toHaveLength(TODAY_SOURCES.length + 4);
+    for (const value of heights) expect(value).toBeGreaterThanOrEqual(44);
+  });
+});
+
+test.describe("at desktop width", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("lays the tiles out in three columns and the chips in four", async ({ page }) => {
+    await mockBoards(page, "populated");
+    await page.goto("/games");
+    await settle(page);
+    expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(3);
+    expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(4);
   });
 });
