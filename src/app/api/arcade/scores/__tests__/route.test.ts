@@ -94,7 +94,17 @@ function createEmulator() {
       }
       return { rows: [] };
     }
-    if (sql.startsWith("DELETE FROM arcade_scores")) {
+    if (sql.startsWith("DELETE FROM arcade_scores s USING")) {
+      // The cap trim: keep the first [cap] rows of the board by (score DESC, achieved_at ASC).
+      const [game, board, cap] = params as [string, string, number];
+      const ordered = scores
+        .filter((s) => s.game === game && s.board === board)
+        .sort((a, b) => b.score - a.score || a.achievedAt.getTime() - b.achievedAt.getTime());
+      const cut = new Set(ordered.slice(cap));
+      scores = scores.filter((s) => !cut.has(s));
+      return undefined;
+    }
+    if (sql.startsWith("DELETE FROM arcade_scores WHERE")) {
       const [game, daily, weekly] = params as [string, string, string];
       scores = scores.filter(
         (s) =>
@@ -134,7 +144,8 @@ function createEmulator() {
         }));
       return { rows };
     }
-    if (sql.includes("WHERE r.player_id")) {
+    if (sql.startsWith("SELECT (1")) {
+      // READ_YOU: the caller's rank by the count formula, then their score.
       const [game, board, playerId] = params as [string, string, string];
       const mine = scores.find(
         (s) => s.game === game && s.board === board && s.playerId === playerId,
@@ -148,6 +159,21 @@ function createEmulator() {
     fake,
     scores: () => scores,
     players: () => players,
+    /** Insert `count` ready-made players with one row each on a board, scoring from `base` up. */
+    seed: (game: string, board: string, count: number, base: number) => {
+      for (let i = 0; i < count; i += 1) {
+        const id = `seed-${board}-${i}`;
+        players.set(id, { tokenHash: "seed", handle: `S${i}` });
+        scores.push({
+          game,
+          board,
+          playerId: id,
+          score: base + i,
+          detail: {},
+          achievedAt: new Date("2026-10-01T00:00:00.000Z"),
+        });
+      }
+    },
     failOn: (pattern: RegExp | null) => {
       failOn = pattern;
     },
@@ -427,6 +453,47 @@ describe("POST /api/arcade/scores", () => {
     expect(json).toEqual({ error: "could not save score" });
     expect(await reported()).toHaveBeenCalledWith("api:arcade-scores.write", expect.any(Error));
     expect(emu.scores()).toHaveLength(0);
+  });
+});
+
+describe("board row cap", () => {
+  const CAP = 1000;
+
+  it("a submit that lands below a full board is cut: it reports its pre-trim rank, then reads as unranked", async () => {
+    emu.seed("space-shooter", "all-time", CAP, 5000);
+    const { res, json } = await submit({ score: 100 });
+    expect(res.status).toBe(200);
+    expect(json.boards?.map((b) => [b.board, b.rank, b.improved])).toEqual([
+      ["all-time", CAP + 1, true],
+      ["weekly:2026-W41", 1, true],
+      ["daily:2026-10-06", 1, true],
+    ]);
+    expect(emu.scores().filter((s) => s.board === "all-time")).toHaveLength(CAP);
+
+    const mine = await read(`game=space-shooter&board=all-time&player=${P1}`);
+    expect(mine.json.you).toBeNull();
+    const weekly = await read(`game=space-shooter&board=weekly&player=${P1}`);
+    expect(weekly.json.you).toEqual({ rank: 1, score: 100 });
+  });
+
+  it("a submit above a full board stays and the previous lowest row is the one cut", async () => {
+    emu.seed("space-shooter", "all-time", CAP, 5000);
+    const { json } = await submit({ score: 9000 });
+    expect(json.boards?.[0]).toMatchObject({ board: "all-time", improved: true });
+    const rows = emu.scores().filter((s) => s.board === "all-time");
+    expect(rows).toHaveLength(CAP);
+    expect(rows.some((s) => s.playerId === P1)).toBe(true);
+    expect(rows.some((s) => s.score === 5000)).toBe(false);
+    const mine = await read(`game=space-shooter&board=all-time&player=${P1}`);
+    expect(mine.json.you?.score).toBe(9000);
+  });
+
+  it("does not trim a board whose upsert did not write a row", async () => {
+    await submit({ score: 4200 });
+    emu.seed("space-shooter", "all-time", CAP, 5000);
+    const { json } = await submit({ score: 100 });
+    expect(json.boards?.[0]).toMatchObject({ board: "all-time", improved: false });
+    expect(emu.scores().filter((s) => s.board === "all-time")).toHaveLength(CAP + 1);
   });
 });
 

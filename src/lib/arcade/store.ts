@@ -14,6 +14,15 @@ import { withTransaction, type TxPool } from "./tx";
 
 const BOARD_LIMIT = 25;
 
+/**
+ * Each board keeps at most this many rows: a submit that wrote a row trims its board back
+ * to the top BOARD_ROW_CAP by (score DESC, achieved_at ASC). This bounds table growth, since
+ * every fresh player id adds a score row on three boards. A player cut from a board stops
+ * being listed there, and a later read that passes their id gets `you: null` for it; the
+ * submit response that caused the cut still reports the rank they had just before it.
+ */
+export const BOARD_ROW_CAP = 1000;
+
 interface SubmitInput {
   game: ArcadeGameSlug;
   playerId: string;
@@ -78,12 +87,24 @@ const PRUNE_OLD_BOARDS = `DELETE FROM arcade_scores
       OR (board LIKE 'weekly:%' AND board COLLATE "C" < $3))`;
 
 // Rank = 1 + the number of rows ahead: a higher score, or an equal score reached earlier.
-const BEST_AND_RANK = `SELECT s.score,
-    (1 + (SELECT count(*) FROM arcade_scores o
+// This is exactly what rank() OVER (ORDER BY score DESC, achieved_at ASC) yields, but it
+// counts through idx_arcade_scores_rank instead of windowing the whole board.
+const RANK_OF_S = `(1 + (SELECT count(*) FROM arcade_scores o
            WHERE o.game = s.game AND o.board = s.board
-             AND (o.score > s.score OR (o.score = s.score AND o.achieved_at < s.achieved_at))))::int AS rank
+             AND (o.score > s.score OR (o.score = s.score AND o.achieved_at < s.achieved_at))))::int AS rank`;
+
+const BEST_AND_RANK = `SELECT s.score,
+    ${RANK_OF_S}
   FROM arcade_scores s
   WHERE s.game = $1 AND s.board = $2 AND s.player_id = $3`;
+
+// Deletes every row past the cap on one board. The ORDER BY matches idx_arcade_scores_rank
+// exactly (no tiebreak column) so the planner can walk the index; the subquery runs once per
+// statement, so exactly the rows beyond the first BOARD_ROW_CAP are removed even among ties.
+const TRIM_BOARD = `DELETE FROM arcade_scores s
+  USING (SELECT player_id FROM arcade_scores WHERE game = $1 AND board = $2
+         ORDER BY score DESC, achieved_at ASC OFFSET $3) cut
+  WHERE s.game = $1 AND s.board = $2 AND s.player_id = cut.player_id`;
 
 /**
  * Record one validated score for one player on the all-time, weekly and daily boards in a
@@ -137,6 +158,11 @@ export async function submitScore(
           best: best.score,
           improved: improved[index] === true,
         });
+        // Only a board whose upsert wrote a row can have grown. The rank above was read
+        // first, so this submit still reports the rank it earned even if it is cut here.
+        if (improved[index] === true) {
+          await client.query(TRIM_BOARD, [input.game, board, BOARD_ROW_CAP]);
+        }
       }
       return { ok: true, boards };
     });
@@ -160,9 +186,9 @@ const READ_BOARD = `SELECT r.rank::int AS rank, p.handle, r.score, r.detail,
   ORDER BY r.rank ASC, p.id ASC
   LIMIT $4`;
 
-const READ_YOU = `SELECT r.rank::int AS rank, r.score
-  FROM (${RANKED_ROWS}) r
-  WHERE r.player_id = $3`;
+const READ_YOU = `SELECT ${RANK_OF_S}, s.score
+  FROM arcade_scores s
+  WHERE s.game = $1 AND s.board = $2 AND s.player_id = $3`;
 
 /** The top of one board, plus the caller's own rank when `playerId` is given. */
 export async function readBoard(

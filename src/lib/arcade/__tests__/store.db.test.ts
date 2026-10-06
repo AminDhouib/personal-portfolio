@@ -6,7 +6,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { assertArcadeItUrl } from "@/test/arcade-it-guard";
 import { ensureArcadeSchema } from "../schema";
-import { readBoard, submitScore } from "../store";
+import { BOARD_ROW_CAP, readBoard, submitScore } from "../store";
 
 // This file is the ONE sanctioned place a test talks to a real database (AGENTS.md hard
 // boundary). It runs only when ARCADE_IT_DATABASE_URL is set (the CI db-integration job,
@@ -55,6 +55,36 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
       `SELECT player_id, score, detail FROM arcade_scores WHERE board = 'all-time' ORDER BY player_id`,
     );
     return rows as { player_id: string; score: string; detail: Record<string, number> }[];
+  }
+
+  async function boardCount(game: string, board: string): Promise<number> {
+    const { rows } = await pool.query(
+      "SELECT count(*)::int AS n FROM arcade_scores WHERE game = $1::text AND board = $2::text",
+      [game, board],
+    );
+    return (rows[0] as { n: number }).n;
+  }
+
+  /**
+   * Fill one board with `count` ready-made players (random uuids from gen_random_uuid, tagged
+   * through token_hash so they can be found again), scoring baseScore + 1 .. baseScore + count,
+   * all achieved an hour before NOW. Set-based, so a full 1000-row board is two statements.
+   */
+  async function seedBoard(game: string, board: string, count: number, baseScore: number) {
+    const tag = `seed:${game}:${board}`;
+    await pool.query(
+      `INSERT INTO arcade_players (id, token_hash, handle)
+       SELECT gen_random_uuid(), $1::text, 'S' || n::text FROM generate_series(1, $2::int) AS n`,
+      [tag, count],
+    );
+    await pool.query(
+      `INSERT INTO arcade_scores (game, board, player_id, score, detail, achieved_at)
+       SELECT $1::text, $2::text, p.id::uuid, $3::bigint + row_number() OVER (ORDER BY p.id),
+              '{}'::jsonb, $4::timestamptz
+         FROM arcade_players p
+        WHERE p.token_hash = $5::text`,
+      [game, board, baseScore, new Date(NOW.getTime() - 3_600_000), tag],
+    );
   }
 
   beforeAll(async () => {
@@ -180,11 +210,127 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     expect(you).toEqual({ rank: 2, score: 4200 });
   });
 
+  it("the caller's rank is the rank on their own board row, for every player, with ties", async () => {
+    const later = new Date(NOW.getTime() + 60_000);
+    // Two rows with the same score and the same achieved_at, and one with the same score
+    // reached later, plus a clear leader.
+    await put({ player: pid("1"), token: tok("A"), handle: "P1", score: 4200 });
+    await put({ player: pid("5"), token: tok("E"), handle: "P5", score: 4200 });
+    await put({ player: pid("2"), token: tok("B"), handle: "P2", score: 4200, at: later });
+    await put({ player: pid("3"), token: tok("C"), handle: "P3", score: 5000 });
+
+    const expected: Record<string, number> = { P3: 1, P1: 2, P5: 2, P2: 4 };
+    for (const [digit, handle] of [
+      ["1", "P1"],
+      ["5", "P5"],
+      ["2", "P2"],
+      ["3", "P3"],
+    ] as const) {
+      const { entries, you } = await readBoard(pool, {
+        game: "space-shooter",
+        board: "all-time",
+        playerId: pid(digit),
+      });
+      const mine = entries.find((e) => e.isYou);
+      expect(mine?.handle).toBe(handle);
+      expect(you?.rank).toBe(mine?.rank);
+      expect(you?.rank).toBe(expected[handle]);
+    }
+  });
+
   it("the submit outcome reports the same rank as the board read", async () => {
     await put({ player: pid("1"), token: tok("A"), score: 5000 });
     const second = await put({ player: pid("2"), token: tok("B"), handle: "Bob", score: 3000 });
     expect(second).toMatchObject({ ok: true });
-    if (second.ok) expect(second.boards.map((b) => b.rank)).toEqual([2, 2, 2]);
+    if (!second.ok) return;
+    expect(second.boards.map((b) => b.rank)).toEqual([2, 2, 2]);
+    for (const result of second.boards) {
+      const { entries, you } = await readBoard(pool, {
+        game: "space-shooter",
+        board: result.board,
+        playerId: pid("2"),
+      });
+      expect(you?.rank).toBe(result.rank);
+      expect(entries.find((e) => e.isYou)?.rank).toBe(result.rank);
+    }
+  });
+
+  describe("board row cap", () => {
+    it("a score below a full board is cut: the count stays at the cap and the submitter's row is gone", async () => {
+      await seedBoard("space-shooter", "all-time", BOARD_ROW_CAP, 1000);
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP);
+
+      const outcome = await put({ score: 500 });
+
+      expect(outcome).toMatchObject({ ok: true });
+      if (!outcome.ok) return;
+      // The response keeps the rank computed before the trim.
+      expect(outcome.boards.map((b) => [b.board, b.rank, b.improved])).toEqual([
+        ["all-time", BOARD_ROW_CAP + 1, true],
+        ["weekly:2026-W41", 1, true],
+        ["daily:2026-10-06", 1, true],
+      ]);
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP);
+      expect(await allTimeRows()).toHaveLength(BOARD_ROW_CAP);
+      const mine = await pool.query(
+        "SELECT 1 FROM arcade_scores WHERE board = 'all-time' AND player_id = $1::uuid",
+        [pid("1")],
+      );
+      expect(mine.rows).toHaveLength(0);
+
+      // A trimmed player reads as unranked on that board, and still ranked where they were kept.
+      const read = (board: string) =>
+        readBoard(pool, { game: "space-shooter", board, playerId: pid("1") });
+      expect((await read("all-time")).you).toBeNull();
+      expect((await read("weekly:2026-W41")).you).toEqual({ rank: 1, score: 500 });
+      expect(await boardCount("space-shooter", "weekly:2026-W41")).toBe(1);
+      expect(await boardCount("space-shooter", "daily:2026-10-06")).toBe(1);
+    }, 30_000);
+
+    it("a score above a full board stays and the previous lowest row is the one cut", async () => {
+      await seedBoard("space-shooter", "all-time", BOARD_ROW_CAP, 1000);
+
+      const outcome = await put({ score: 5000 });
+
+      expect(outcome).toMatchObject({ ok: true });
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP);
+      const rows = await allTimeRows();
+      expect(rows.map((r) => r.score)).not.toContain("1001");
+      expect(rows.map((r) => r.score)).toContain("1002");
+      expect(rows.map((r) => r.player_id)).toContain(pid("1"));
+      const { you } = await readBoard(pool, {
+        game: "space-shooter",
+        board: "all-time",
+        playerId: pid("1"),
+      });
+      expect(you).toEqual({ rank: 1, score: 5000 });
+    }, 30_000);
+
+    it("leaves other boards and other games untouched, even when they are over the cap", async () => {
+      await seedBoard("hextris", "all-time", BOARD_ROW_CAP + 1, 1000);
+      await seedBoard("space-shooter", "daily:2026-10-05", BOARD_ROW_CAP + 1, 1000);
+      await seedBoard("space-shooter", "weekly:2026-W40", BOARD_ROW_CAP + 1, 1000);
+      await seedBoard("space-shooter", "all-time", BOARD_ROW_CAP, 1000);
+
+      await put({ score: 500 });
+
+      expect(await boardCount("hextris", "all-time")).toBe(BOARD_ROW_CAP + 1);
+      expect(await boardCount("space-shooter", "daily:2026-10-05")).toBe(BOARD_ROW_CAP + 1);
+      expect(await boardCount("space-shooter", "weekly:2026-W40")).toBe(BOARD_ROW_CAP + 1);
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP);
+    }, 30_000);
+
+    it("does not trim a board the submit did not improve", async () => {
+      await put({ score: 4200 });
+      await seedBoard("space-shooter", "all-time", BOARD_ROW_CAP, 5000);
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP + 1);
+
+      const outcome = await put({ score: 100 });
+
+      expect(outcome).toMatchObject({ ok: true });
+      if (outcome.ok) expect(outcome.boards.map((b) => b.improved)).toEqual([false, false, false]);
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP + 1);
+    }, 30_000);
   });
 
   it("prunes this game's daily boards older than 30 days and weekly boards older than 12 weeks", async () => {
