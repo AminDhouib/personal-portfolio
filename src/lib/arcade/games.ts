@@ -86,14 +86,11 @@ function checkHextris(score: number, detail: HextrisDetail): Verdict {
   return { ok: true };
 }
 
-/** Slug to strict detail schema and plausibility check. */
+/** Slug to strict detail schema; `validateArcadeSubmission` dispatches to the game's check. */
 export const ARCADE_GAMES = {
-  "space-shooter": { detailSchema: spaceShooterDetailSchema, check: checkSpaceShooter },
-  hextris: { detailSchema: hextrisDetailSchema, check: checkHextris },
-} satisfies Record<
-  ArcadeGameSlug,
-  { detailSchema: z.ZodType; check: (score: number, detail: never) => Verdict }
->;
+  "space-shooter": { detailSchema: spaceShooterDetailSchema },
+  hextris: { detailSchema: hextrisDetailSchema },
+} satisfies Record<ArcadeGameSlug, { detailSchema: z.ZodType }>;
 
 export type ArcadeSubmissionVerdict =
   | { ok: true; detail: Record<string, number> }

@@ -24,7 +24,8 @@ export async function withTransaction<T>(
     try {
       await client.query("ROLLBACK");
     } catch {
-      // silent-ok: the original error is rethrown below; a failed ROLLBACK means the connection is broken, so it is destroyed on release instead of reported twice
+      // silent-ok: the original error is rethrown below; a failed ROLLBACK means the
+      // connection is broken, so it is destroyed on release instead of reported twice.
       destroy = true;
     }
     throw err;
