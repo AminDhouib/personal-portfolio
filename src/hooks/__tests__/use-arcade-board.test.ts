@@ -8,6 +8,7 @@ vi.mock("@/lib/arcade/identity", () => ({
   resetIdentity: identity.reset,
 }));
 
+import { ARCADE_SCORE_CAP } from "@/lib/arcade/games";
 import { useArcadeBoard } from "../use-arcade-board";
 
 const ID = { playerId: "11111111-1111-4111-8111-111111111111", token: "A".repeat(43) };
@@ -300,6 +301,68 @@ describe("useArcadeBoard", () => {
       expect(reportErrorMock).toHaveBeenCalledTimes(1);
     });
 
+    it("clears the rows and the you row the moment the period changes, before the new board lands", async () => {
+      fetchMock.mockResolvedValueOnce(
+        okResponse(board([serverEntry({ handle: "Today" })], { rank: 1, score: 10 })),
+      );
+      const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(1));
+      expect(result.current.you).toEqual({ rank: 1, score: 10 });
+
+      let resolveWeek: (r: Response) => void = () => {};
+      fetchMock.mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveWeek = resolve;
+          }),
+      );
+      act(() => {
+        result.current.setPeriod("weekly");
+      });
+      expect(result.current.entries).toEqual([]);
+      expect(result.current.you).toBeNull();
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        resolveWeek(okResponse(board([serverEntry({ handle: "Week" })], { rank: 2, score: 8 })));
+      });
+      await waitFor(() => expect(result.current.entries.map((e) => e.name)).toEqual(["Week"]));
+      expect(result.current.you).toEqual({ rank: 2, score: 8 });
+    });
+
+    it("leaves an empty board and an error, not the old period's rows, when the read after a switch fails", async () => {
+      fetchMock.mockResolvedValueOnce(
+        okResponse(board([serverEntry({ handle: "Today" })], { rank: 1, score: 10 })),
+      );
+      const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "too many requests" }), { status: 429 }),
+      );
+      act(() => {
+        result.current.setPeriod("weekly");
+      });
+      await waitFor(() => expect(result.current.error).toContain("429"));
+      expect(result.current.entries).toEqual([]);
+      expect(result.current.you).toBeNull();
+    });
+
+    it("keeps the last board when a same-period refresh fails", async () => {
+      fetchMock.mockResolvedValueOnce(
+        okResponse(board([serverEntry({ handle: "Kept" })], { rank: 1, score: 10 })),
+      );
+      const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+      await act(async () => {
+        await result.current.refresh();
+      });
+      expect(result.current.entries.map((e) => e.name)).toEqual(["Kept"]);
+      expect(result.current.you).toEqual({ rank: 1, score: 10 });
+    });
+
     it("ignores a slow response for a period the player has already left", async () => {
       let resolveFirst: (r: Response) => void = () => {};
       fetchMock.mockImplementationOnce(
@@ -390,15 +453,17 @@ describe("useArcadeBoard", () => {
     it("sends only the keys of the game: hextris drops distance, space-shooter drops level", async () => {
       const hextris = await mounted("hextris");
       fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      // Not a fresh literal on purpose: the type forbids the extra key, the runtime must too.
+      const hextrisPayload = {
+        name: "Ada",
+        score: 9,
+        seconds: 5,
+        kills: 6,
+        level: 2.9,
+        distance: 99,
+      };
       await act(async () => {
-        await hextris.result.current.submit({
-          name: "Ada",
-          score: 9,
-          seconds: 5,
-          kills: 6,
-          level: 2.9,
-          distance: 99,
-        });
+        await hextris.result.current.submit(hextrisPayload);
       });
       const hx = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
       expect(hx.detail).toEqual({ seconds: 5, kills: 6, level: 2 });
@@ -406,15 +471,16 @@ describe("useArcadeBoard", () => {
       fetchMock.mockClear();
       const shooter = await mounted("space-shooter");
       fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      const shooterPayload = {
+        name: "Ada",
+        score: 9,
+        seconds: 5,
+        kills: 6,
+        distance: 7,
+        level: 4,
+      };
       await act(async () => {
-        await shooter.result.current.submit({
-          name: "Ada",
-          score: 9,
-          seconds: 5,
-          kills: 6,
-          distance: 7,
-          level: 4,
-        });
+        await shooter.result.current.submit(shooterPayload);
       });
       const ss = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
       expect(ss.detail).toEqual({ seconds: 5, kills: 6, distance: 7 });
@@ -520,6 +586,86 @@ describe("useArcadeBoard", () => {
       });
       expect(submitResult).toEqual({ ok: false });
       expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("clips an over-long handle to 200 characters before sending", async () => {
+      const { result } = await mounted();
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({
+          name: "x".repeat(500),
+          score: 5,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+        });
+      });
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect(body.handle).toBe("x".repeat(200));
+    });
+
+    it("does not POST a score above the cap: it returns a rejection and sets an error", async () => {
+      const { result } = await mounted();
+      let submitResult: unknown;
+      await act(async () => {
+        submitResult = await result.current.submit({
+          name: "Ada",
+          score: ARCADE_SCORE_CAP + 1,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+        });
+      });
+      expect(submitResult).toEqual({ ok: false, rejected: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1); // the mount GET only
+      expect(result.current.error).toBeTruthy();
+    });
+
+    it("compares the cap after flooring, so a score exactly at the cap is still POSTed", async () => {
+      const { result } = await mounted();
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({
+          name: "Ada",
+          score: ARCADE_SCORE_CAP + 0.9,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+        });
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect(body.score).toBe(ARCADE_SCORE_CAP);
+    });
+
+    it("returns { ok:false } instead of rejecting when the identity cannot be created", async () => {
+      const { result } = await mounted();
+      identity.get.mockImplementation(() => {
+        throw new Error("crypto unavailable");
+      });
+      let submitResult: unknown;
+      await act(async () => {
+        submitResult = await result.current.submit({
+          name: "Ada",
+          score: 5,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+        });
+      });
+      expect(submitResult).toEqual({ ok: false });
+      expect(fetchMock).toHaveBeenCalledTimes(1); // no POST without an identity
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+      expect(result.current.error).toBeTruthy();
+    });
+
+    it("requires every detail key of the game at compile time", async () => {
+      const { result } = await mounted("hextris");
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        // @ts-expect-error hextris requires level, which is missing here
+        await result.current.submit({ name: "Ada", score: 5, seconds: 1, kills: 1 });
+      });
     });
   });
 });
