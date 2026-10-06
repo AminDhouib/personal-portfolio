@@ -1,50 +1,71 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { GAMES } from "../games-meta";
+import { GAMES, GAMES_BY_SLUG } from "../games-meta";
+import { GAME_CONTENT } from "../content";
 import { GameCard } from "@/components/game/game-card";
+import { GameAbout } from "@/components/game/game-about";
 import { PasswordGame2Loader } from "@/components/game/password-game-2";
+import {
+  breadcrumbNode,
+  faqPageNode,
+  graph,
+  serializeJsonLd,
+  videoGameNode,
+} from "@/lib/structured-data";
 
 const SITE_ORIGIN = "https://amindhou.com";
+const PATH = "/games/password-game";
+const GAME = GAMES_BY_SLUG["password-game"];
+const CONTENT = GAME_CONTENT["password-game"];
+const SOCIAL_TITLE = "The Password Game 2 — Terms and Conditions Apply";
 
-const DESCRIPTION =
-  "Terms and Conditions Apply. A five-act sign-up form from hell — seeded chaos, every run unique.";
-
+// No images: this segment's opengraph-image.tsx outranks config images, and
+// Twitter inherits it while twitter.images stays unset.
 export const metadata = {
-  title: "The Password Game 2",
-  description: DESCRIPTION,
+  title: CONTENT.seoTitle,
+  description: CONTENT.seoDescription,
   alternates: {
-    canonical: `${SITE_ORIGIN}/games/password-game`,
+    canonical: `${SITE_ORIGIN}${PATH}`,
   },
   openGraph: {
     type: "website",
-    url: `${SITE_ORIGIN}/games/password-game`,
-    title: "The Password Game 2 — Terms and Conditions Apply",
-    description: DESCRIPTION,
+    url: `${SITE_ORIGIN}${PATH}`,
+    title: SOCIAL_TITLE,
+    description: CONTENT.seoDescription,
     siteName: "Amin Dhouib",
     locale: "en_US",
-    // Declaring openGraph here replaces the root layout's block wholesale, so
-    // the site card has to be restated or the page ships with no og:image.
-    images: [
-      {
-        url: `${SITE_ORIGIN}/opengraph-image`,
-        width: 1200,
-        height: 630,
-        alt: "The Password Game 2",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "The Password Game 2 — Terms and Conditions Apply",
-    description: DESCRIPTION,
-    images: [`${SITE_ORIGIN}/opengraph-image`],
+    title: SOCIAL_TITLE,
+    description: CONTENT.seoDescription,
   },
 };
+
+const jsonLd = graph(
+  videoGameNode({
+    name: GAME.title,
+    description: CONTENT.seoDescription,
+    path: PATH,
+    genre: CONTENT.genre,
+    playMode: CONTENT.playMode,
+  }),
+  faqPageNode(CONTENT.faq, `${SITE_ORIGIN}${PATH}#faq`),
+  breadcrumbNode([
+    { name: "Home", path: "/" },
+    { name: "Games", path: "/games" },
+    { name: GAME.title, path: PATH },
+  ]),
+);
 
 export default function PasswordGamePage() {
   const others = GAMES.filter((g) => g.slug !== "password-game" && !g.hidden);
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/games"
@@ -58,9 +79,11 @@ export default function PasswordGamePage() {
           {/* Server-rendered heading: the interactive shell is client-only
               (ssr: false), so without this the page ships no h1 in its SSR HTML.
               sr-only because the shell renders its own visible wordmark. */}
-          <h1 className="sr-only">The Password Game 2</h1>
+          <h1 className="sr-only">{GAME.title}</h1>
           <PasswordGame2Loader />
         </div>
+
+        <GameAbout title={GAME.title} content={CONTENT} />
 
         <section className="mt-16">
           <h2 className="mb-4 font-display text-sm font-bold tracking-wider text-(--muted) uppercase">
