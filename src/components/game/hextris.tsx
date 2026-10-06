@@ -2290,11 +2290,13 @@ export function HextrisGame() {
   return (
     <div
       ref={containerRef}
+      // The immersive layer must sit above the site navbar (z-70) and its
+      // mobile menu, or the navbar covers the Exit fullscreen button.
       className={`overflow-hidden border border-white/10 bg-[#050505] ${
         isFullscreen
           ? "relative h-screen w-screen rounded-none"
           : mobileImmersive
-            ? "hextris-immersive fixed inset-0 z-50 h-[100dvh] w-screen rounded-none"
+            ? "hextris-immersive fixed inset-0 z-80 h-[100dvh] w-screen rounded-none"
             : "relative w-full rounded-xl"
       }`}
     >
