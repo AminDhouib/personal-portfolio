@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { accuracyPercent, isNewBest, wpm } from "../metrics";
+import { accuracyPercent, isNewBest, liveWpm, wpm } from "../metrics";
 
 describe("typing-speed metrics", () => {
+  it("liveWpm stays 0 for the first second, then matches wpm", () => {
+    expect(liveWpm(2, 80)).toBe(0);
+    expect(liveWpm(10, 999)).toBe(0);
+    expect(liveWpm(250, 60000)).toBe(wpm(250, 60000));
+  });
+
   it("wpm is (chars / 5) per minute", () => {
     expect(wpm(250, 60000)).toBe(50);
   });

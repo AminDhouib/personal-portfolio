@@ -978,7 +978,8 @@ export function SpaceShooterGame() {
       if (!touch) return;
       // Only steering touches are claimed; a tap on a button must keep its
       // synthesized click (PLAY, SHOP, TROPHIES, FLY AGAIN).
-      if (shouldCaptureTouch(e.target, gameRefs.current.status)) e.preventDefault();
+      const phase = e.type === "touchmove" ? "move" : "start";
+      if (shouldCaptureTouch(e.target, gameRefs.current.status, phase)) e.preventDefault();
       ensureAudio();
       updateTarget(touch.clientX, touch.clientY);
     };
@@ -1035,12 +1036,20 @@ export function SpaceShooterGame() {
         spawnBoss(g, bossIds[nextIdx] ?? "sentinel", 0);
         return;
       }
+      // Keys typed into a text field (the AI chat, the pilot name box) belong
+      // to that field: they neither steer, resume nor get swallowed.
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest("input, textarea, select") !== null)
+      ) {
+        return;
+      }
       // While a run is live and on screen, claim the steering keys and Space
       // so the page does not scroll under the player.
       const runLive = gameRefs.current.status === "playing" || gameRefs.current.status === "paused";
       // Space still activates a focused control (e.g. the Pause button).
-      const onControl =
-        e.target instanceof Element && e.target.closest("button, a, input") !== null;
+      const onControl = target instanceof Element && target.closest("button, a") !== null;
       if (
         runLive &&
         inViewRef.current &&

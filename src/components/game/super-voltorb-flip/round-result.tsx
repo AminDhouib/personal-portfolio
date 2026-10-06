@@ -24,10 +24,13 @@ export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }:
   }, []);
 
   const title = kind === "lose" ? "Voltorb! Round lost." : `Round cleared! +${coins} coins`;
+  // A win always moves up a level unless the player is already at the top.
   const levelLine =
-    fromLevel === toLevel
-      ? `Staying on Level ${toLevel}`
-      : `Level ${fromLevel} to Level ${toLevel}`;
+    fromLevel !== toLevel
+      ? `Level ${fromLevel} to Level ${toLevel}`
+      : kind === "win"
+        ? `Top level: Level ${toLevel}`
+        : `Staying on Level ${toLevel}`;
 
   return (
     <div className="rounded-5 absolute inset-x-2 bottom-2 z-30 flex items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1.5 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600">

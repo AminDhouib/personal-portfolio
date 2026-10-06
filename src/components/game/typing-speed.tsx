@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 import { safeLocalSet } from "@/lib/safe-storage";
-import { accuracyPercent, isNewBest, wpm } from "./typing-speed/metrics";
+import { accuracyPercent, isNewBest, liveWpm, wpm } from "./typing-speed/metrics";
 
 const SENTENCES = [
   "The quick brown fox jumps over the lazy dog near the riverbank.",
@@ -221,7 +221,7 @@ export function TypingSpeedGame() {
   const totalTyped = typed.length;
   const currentWPM =
     state === "playing"
-      ? wpm(totalTyped, elapsed)
+      ? liveWpm(totalTyped, elapsed)
       : state === "done"
         ? wpm(target.length, elapsed)
         : 0;
