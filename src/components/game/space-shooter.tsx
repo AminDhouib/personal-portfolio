@@ -65,7 +65,8 @@ import {
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
-import { useLeaderboard } from "@/hooks/use-leaderboard";
+import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
+import { useArcadeBoard } from "@/hooks/use-arcade-board";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
 import { buildBossSchedule, BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
@@ -114,27 +115,9 @@ function SettingsToggle({
 }
 
 // ---------- leaderboard helpers ----------
-// fetchLeaderboard/submitScore moved to useLeaderboard("space-shooter")
-// (RC-8, CT-006); the hook injects `game`, while the submit call site below
-// still passes level:1 itself (legacy shape so the route validates the old field).
-
-// Detect the player's country/region for the leaderboard. Free, no API key
-// required. Falls back to "" silently if blocked.
-async function detectRegion(): Promise<string> {
-  try {
-    const r = await fetch("https://ipapi.co/json/", {
-      cache: "force-cache",
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!r.ok) return "";
-    const j = await r.json();
-    if (typeof j?.country_name === "string" && j.country_name) return j.country_name;
-    if (typeof j?.country_code === "string") return j.country_code;
-  } catch {
-    // silent-ok: region/geo lookup is best-effort; the leaderboard just omits the region on failure
-  }
-  return "";
-}
+// The board is read and written through useArcadeBoard("space-shooter") (leaderboard v2):
+// the hook owns the player identity, the period tabs and the submit payload. There is no
+// country lookup any more; the v2 board does not store one.
 
 // ---------- main component ----------
 
@@ -307,7 +290,6 @@ export function SpaceShooterGame() {
   const [ui, setUi] = useState<UiState>(createInitialUiState);
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
   const [crashed, setCrashed] = useState(false);
-  const [region, setRegion] = useState<string>("");
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
   const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
   const [highScore, setHighScore] = useState<number>(() => {
@@ -323,15 +305,19 @@ export function SpaceShooterGame() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // fetchOnMount:true preserves the pre-existing mount-time fetch (below,
-  // "Initial leaderboard load + region detection"); bucket unchanged from
-  // before (space-shooter keeps sending game:"space-shooter", so the
-  // merged-legacy board is preserved per the ruling).
+  // The server refused the run as implausible (422): not retryable, so the button says so.
+  const [rejected, setRejected] = useState(false);
+  // Leaderboard v2. The default fetchOnMount loads the all-time board once on mount; the
+  // legacy rows were imported into it, so the board survives the move.
   const {
     entries: leaderboard,
+    you: leaderboardYou,
+    period: boardPeriod,
+    setPeriod: setBoardPeriod,
+    loading: boardLoading,
     refresh: refreshLeaderboard,
     submit: submitScoreToLeaderboard,
-  } = useLeaderboard("space-shooter");
+  } = useArcadeBoard("space-shooter");
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
     // Sound is ON by default — but localStorage "0" persists explicit mute.
     if (typeof window === "undefined") return true;
@@ -790,6 +776,7 @@ export function SpaceShooterGame() {
         distance: Math.floor(g.distance),
       }));
       setSubmitted(false);
+      setRejected(false);
       setCelebration(isPersonalBest ? "personal" : null);
       void refreshLeaderboard();
       refreshProfile();
@@ -864,6 +851,7 @@ export function SpaceShooterGame() {
     g.cameraTargetZ = 5;
     setUi(createInitialUiState());
     setSubmitted(false);
+    setRejected(false);
     setCelebration(null);
     setShowInstructions(true);
   }, []);
@@ -882,20 +870,18 @@ export function SpaceShooterGame() {
   const submit = useCallback(async () => {
     // In-flight guard: the button is disabled via `submitting`, but guard here
     // too so a queued second click can't double-post the same run.
-    if (submitting || submitted) return;
+    if (submitting || submitted || rejected) return;
     setSubmitting(true);
     try {
       const trimmed = name.trim().slice(0, 12) || "Pilot";
       safeLocalSet(NAME_KEY, trimmed);
+      // The hook floors every number and sends only this game's detail keys.
       const result = await submitScoreToLeaderboard({
         name: trimmed,
         score: ui.score,
-        // keep legacy shape on `level` so the route validates the old field
-        level: 1,
-        seconds: Math.floor(ui.seconds),
+        seconds: ui.seconds,
         kills: ui.kills,
         distance: ui.distance,
-        region,
       });
       if (result.ok) {
         setSubmitted(true);
@@ -904,6 +890,8 @@ export function SpaceShooterGame() {
         if (result.rank === 1 && ui.score > 0) {
           setCelebration("world");
         }
+      } else if (result.rejected) {
+        setRejected(true);
       }
     } finally {
       setSubmitting(false);
@@ -911,21 +899,15 @@ export function SpaceShooterGame() {
   }, [
     submitting,
     submitted,
+    rejected,
     name,
     ui.score,
     ui.seconds,
     ui.kills,
     ui.distance,
-    region,
     submitScoreToLeaderboard,
     refreshLeaderboard,
   ]);
-
-  // Initial leaderboard load + region detection (useLeaderboard's
-  // fetchOnMount:true default handles the leaderboard fetch)
-  useEffect(() => {
-    void detectRegion().then(setRegion);
-  }, []);
 
   // Sound toggle persistence
   const toggleSound = useCallback(() => {
@@ -2088,39 +2070,67 @@ export function SpaceShooterGame() {
                   onClick={() => {
                     void submit();
                   }}
-                  disabled={submitted || submitting}
+                  disabled={submitted || submitting || rejected}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  {submitted ? "Submitted" : submitting ? "Submitting" : "Submit"}
+                  {submitted
+                    ? "Submitted"
+                    : rejected
+                      ? "Not accepted"
+                      : submitting
+                        ? "Submitting"
+                        : "Submit"}
                 </motion.button>
               </div>
 
-              {leaderboard.length > 0 && (
+              {(leaderboard.length > 0 || boardPeriod !== "all-time") && (
                 <div className="w-full max-w-md rounded-lg border border-white/15 bg-white/5 p-3 text-sm">
                   <div className="mb-2 text-xs font-bold tracking-widest text-white/60 uppercase">
                     Top pilots
                   </div>
-                  <ol className="space-y-1">
-                    {leaderboard.slice(0, 8).map((e, i) => (
-                      <li
-                        key={`${e.name}-${e.createdAt}-${i}`}
-                        className="flex items-center gap-2 text-white/85"
-                      >
-                        <span className="w-5 text-white/40 tabular-nums">{i + 1}.</span>
-                        <span className="flex-1 truncate">
-                          {e.name}
-                          {e.region && (
-                            <span className="ml-1.5 text-xs text-white/40">{e.region}</span>
+                  <ArcadeBoardTabs
+                    label="Leaderboard period"
+                    period={boardPeriod}
+                    onChange={setBoardPeriod}
+                    className="mb-2"
+                    activeClassName="border-accent-blue/60 bg-accent-blue/20 text-accent-blue"
+                    inactiveClassName="border-white/15 bg-white/5 text-white/60 hover:text-white"
+                  />
+                  {leaderboard.length === 0 ? (
+                    <p className="py-2 text-center text-xs text-white/50">
+                      {boardLoading
+                        ? "Loading"
+                        : boardPeriod === "daily"
+                          ? "No scores yet today"
+                          : "No scores yet this week"}
+                    </p>
+                  ) : (
+                    <ol className="space-y-1">
+                      {leaderboard.slice(0, 8).map((e) => (
+                        <li
+                          key={`${e.rank}-${e.name}-${e.createdAt}`}
+                          className={
+                            e.isYou
+                              ? "flex items-center gap-2 font-semibold text-accent-blue"
+                              : "flex items-center gap-2 text-white/85"
+                          }
+                        >
+                          <span className="w-6 text-white/40 tabular-nums">{e.rank}.</span>
+                          <span className="flex-1 truncate">{e.name}</span>
+                          {typeof e.seconds === "number" && (
+                            <span className="text-xs text-white/45 tabular-nums">{e.seconds}s</span>
                           )}
-                        </span>
-                        {typeof e.seconds === "number" && (
-                          <span className="text-xs text-white/45 tabular-nums">{e.seconds}s</span>
-                        )}
-                        <span className="font-mono tabular-nums">{e.score}</span>
-                      </li>
-                    ))}
-                  </ol>
+                          <span className="font-mono tabular-nums">{e.score}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
+                    <div className="mt-2 text-xs text-white/60">
+                      Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
+                    </div>
+                  )}
                 </div>
               )}
 
