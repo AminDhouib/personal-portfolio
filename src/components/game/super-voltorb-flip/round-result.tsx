@@ -12,9 +12,10 @@ export type RoundResultProps = {
 };
 
 /**
- * End-of-round banner for Super Voltorb Flip. Absolutely positioned inside the
- * board frame (which is `relative`), so it never shifts layout. Styled like the
- * game's other light chrome (white card, grey outline, green action button).
+ * End-of-round banner for Super Voltorb Flip. It fills the result slot under
+ * the board, the same 60px as the slot's idle line, so it neither covers tiles
+ * nor shifts layout. Styled like the game's other light chrome (white card,
+ * grey outline, green action button).
  */
 export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }: RoundResultProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -33,7 +34,7 @@ export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }:
         : `Staying on Level ${toLevel}`;
 
   return (
-    <div className="rounded-5 absolute inset-x-2 bottom-2 z-30 flex items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1.5 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600">
+    <div className="rounded-5 flex min-h-[60px] items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1.5 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600">
       <div className="min-w-0 flex-1 leading-tight" role="status">
         <p
           className={`text-sm font-bold sm:text-base ${kind === "lose" ? "text-[#b3261e]" : "text-[#2f6b4b]"}`}
