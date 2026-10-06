@@ -92,7 +92,8 @@ style suggestions.
   page's metadata leaves `openGraph.images` and `twitter.images` unset. It checks
   `hasOwnProperty('images')`, so even `images: undefined` blocks the file image; never set either
   key on a game page's metadata. Next also appends a `?<hash>` to the file image URL, so tests
-  match its path, not the full URL.
+  match its path, not the full URL. The `/games` hub is the deliberate exception: it sets
+  `openGraph.images` explicitly to restate the site card.
 - **Coverage ratchet**: floors in `vitest.config.ts` (lines 34 / statements 33 / functions 35 /
   branches 29 as of 3abe0b0; re-based to 18/17/16/12 at pass-2, raised twice since) are
   measured margins below the current suite over the
