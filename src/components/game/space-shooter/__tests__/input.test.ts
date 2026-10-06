@@ -40,6 +40,14 @@ describe("shouldCaptureTouch", () => {
       expect(shouldCaptureTouch(div, s)).toBe(false);
     }
   });
+
+  it("keeps steering a drag that began on a control, but only while playing", () => {
+    const button = document.createElement("button");
+    expect(shouldCaptureTouch(button, "playing", "move")).toBe(true);
+    for (const s of STATUSES.filter((x) => x !== "playing")) {
+      expect(shouldCaptureTouch(button, s, "move")).toBe(false);
+    }
+  });
 });
 
 describe("keyboardStep", () => {
