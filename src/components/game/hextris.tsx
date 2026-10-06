@@ -26,6 +26,7 @@ import {
   AV_CONST,
 } from "./hextris/types";
 import { rotatePoint, randInt } from "./hextris/logic";
+import { isRecordableRun } from "./hextris/session";
 import { safeJsonParse } from "@/lib/safe-json";
 import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
@@ -99,7 +100,6 @@ export function HextrisGame() {
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "submitted" | "failed">(
     "idle",
   );
-  const submittedOnceRef = useRef(false);
 
   // Sound manager — created once per component lifetime
   const soundsRef = useRef<HextrisSounds | null>(null);
@@ -182,9 +182,12 @@ export function HextrisGame() {
   useEffect(() => {
     if (!mobileImmersive && !isFullscreen) return;
     const prev = document.body.style.overflow;
+    const prevRoot = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prevRoot;
     };
   }, [mobileImmersive, isFullscreen]);
 
@@ -274,24 +277,19 @@ export function HextrisGame() {
     if (result.ok && typeof result.rank === "number") {
       setRank(result.rank);
       setSubmitState("submitted");
-      submittedOnceRef.current = true;
       await refreshLeaderboard();
     } else {
       setSubmitState("failed");
     }
   }
 
-  // On game-over: fetch leaderboard + auto-submit once (if name saved)
+  // On game-over: fetch the leaderboard. Scores are only posted when the player
+  // presses Submit (or Enter in the name box), never automatically.
   useEffect(() => {
     if (uiState === "gameover") {
       void refreshLeaderboard();
-      if (playerName.trim() && !submittedOnceRef.current) {
-        void submitScore(playerName);
-      }
     }
     if (uiState === "playing") {
-      // Reset the submit guard when a new game starts
-      submittedOnceRef.current = false;
       setRank(null);
       setSubmitState("idle");
     }
@@ -1546,10 +1544,12 @@ export function HextrisGame() {
 
     function checkGameOver(): boolean {
       if (isInfringing()) {
-        highscores.push(score);
-        highscores.sort((a, b) => b - a);
-        highscores = highscores.slice(0, 3);
-        safeLocalSet("hextris_highscores", JSON.stringify(highscores));
+        if (isRecordableRun(score)) {
+          highscores.push(score);
+          highscores.sort((a, b) => b - a);
+          highscores = highscores.slice(0, 3);
+          safeLocalSet("hextris_highscores", JSON.stringify(highscores));
+        }
         return true;
       }
       return false;
@@ -1960,7 +1960,7 @@ export function HextrisGame() {
               color: "#f59e0b",
             });
             lastCleanSweepMs = performance.now();
-            sounds.gameOver();
+            sounds.boundaryShrink();
             haptic([40, 20, 40]);
           }
         } else if (lastSyncedShrinkWarn !== null) {
@@ -2257,6 +2257,12 @@ export function HextrisGame() {
 
     // Window blur = auto-pause
     function handleBlur() {
+      // The keyup for a held rush key is lost with focus; reset so the
+      // speed-up cannot stay stuck after the player returns.
+      if (settings.speedUpKeyHeld) {
+        settings.speedUpKeyHeld = false;
+      }
+      rush = 1;
       if (gameState === 1) togglePause();
     }
     window.addEventListener("blur", handleBlur);
@@ -2284,12 +2290,12 @@ export function HextrisGame() {
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden border border-white/10 bg-[#050505] ${
+      className={`overflow-hidden border border-white/10 bg-[#050505] ${
         isFullscreen
-          ? "h-screen w-screen rounded-none"
+          ? "relative h-screen w-screen rounded-none"
           : mobileImmersive
             ? "hextris-immersive fixed inset-0 z-50 h-[100dvh] w-screen rounded-none"
-            : "w-full rounded-xl"
+            : "relative w-full rounded-xl"
       }`}
     >
       <canvas ref={canvasRef} className="block w-full" style={{ touchAction: "none" }} />
@@ -2586,6 +2592,17 @@ export function HextrisGame() {
                 type="text"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  if (
+                    submitState !== "submitting" &&
+                    submitState !== "submitted" &&
+                    playerName.trim()
+                  ) {
+                    void submitScore(playerName);
+                  }
+                }}
                 placeholder="Your name"
                 maxLength={12}
                 className="flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-sm text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none"
