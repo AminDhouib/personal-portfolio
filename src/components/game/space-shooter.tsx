@@ -62,6 +62,7 @@ import {
   POWERUP_DEFS,
   tryDash,
 } from "./space-shooter/types";
+import { isWorldRecord } from "./space-shooter/celebration";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
@@ -307,17 +308,20 @@ export function SpaceShooterGame() {
   const [submitting, setSubmitting] = useState(false);
   // The server refused the run as implausible (422): not retryable, so the button says so.
   const [rejected, setRejected] = useState(false);
-  // Leaderboard v2. The default fetchOnMount loads the all-time board once on mount; the
-  // legacy rows were imported into it, so the board survives the move.
+  // Leaderboard v2. fetchOnMount:false because the board only renders on the death overlay,
+  // and the death handler refreshes it; the home-page embed mounts this same component, so a
+  // mount fetch would cost every home view a GET for a board nobody sees. The legacy rows
+  // were imported into the all-time board, so it survives the move.
   const {
     entries: leaderboard,
     you: leaderboardYou,
     period: boardPeriod,
     setPeriod: setBoardPeriod,
     loading: boardLoading,
+    error: boardError,
     refresh: refreshLeaderboard,
     submit: submitScoreToLeaderboard,
-  } = useArcadeBoard("space-shooter");
+  } = useArcadeBoard("space-shooter", { fetchOnMount: false });
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
     // Sound is ON by default — but localStorage "0" persists explicit mute.
     if (typeof window === "undefined") return true;
@@ -886,8 +890,9 @@ export function SpaceShooterGame() {
       if (result.ok) {
         setSubmitted(true);
         await refreshLeaderboard();
-        // World record overrides personal best celebration
-        if (result.rank === 1 && ui.score > 0) {
+        // World record overrides personal best celebration. result.rank is the rank of the
+        // player's best, not of this run, so it must come with an improved all-time board.
+        if (isWorldRecord(result.boards, ui.score)) {
           setCelebration("world");
         }
       } else if (result.rejected) {
@@ -2101,9 +2106,13 @@ export function SpaceShooterGame() {
                     <p className="py-2 text-center text-xs text-white/50">
                       {boardLoading
                         ? "Loading"
-                        : boardPeriod === "daily"
-                          ? "No scores yet today"
-                          : "No scores yet this week"}
+                        : boardError
+                          ? "Could not load the board"
+                          : boardPeriod === "daily"
+                            ? "No scores yet today"
+                            : boardPeriod === "weekly"
+                              ? "No scores yet this week"
+                              : "No scores yet"}
                     </p>
                   ) : (
                     <ol className="space-y-1">

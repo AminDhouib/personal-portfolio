@@ -87,8 +87,8 @@ function compareIso(a: string, b: string): number {
  * into the arcade tables. Runs inside ensureArcadeSchema's transaction, after the DDL:
  * the marker row is inserted first, so a failure anywhere rolls the marker back with
  * everything else and the next start retries. Rows that cannot be verified (NULL detail
- * columns) or fail the game's plausibility check are skipped and counted; a handle's non-best rows are counted as superseded, so that
- * read = imported + superseded + skipped. Players are
+ * columns) or fail the game's plausibility check are skipped and counted; a handle's non-best
+ * rows are counted as superseded, so that read = imported + superseded + skipped. Players are
  * grouped by lower-cased sanitized handle across both games; each gets the unclaimable
  * 'legacy' token hash. Only the all-time board is written, with the original timestamp.
  */

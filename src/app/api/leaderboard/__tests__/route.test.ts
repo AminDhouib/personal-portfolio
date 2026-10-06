@@ -124,7 +124,23 @@ describe("/api/leaderboard", () => {
       async (game) => {
         const res = await POST(makeJsonPostRequest({ name: "Ada", score: 500, level: 1, game }));
         expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: "invalid game" });
         expect(Object.keys(rows)).toEqual([]);
+      },
+    );
+
+    // The freeze is POST only: the rows already stored stay readable.
+    it.each(["space-shooter", "hextris"])(
+      "still serves the stored rows of the moved game %s on GET",
+      async (game) => {
+        rows[game] = [
+          { name: "Old", score: 10, level: 1, createdAt: "2026-01-01T00:00:00.000Z" },
+          { name: "Best", score: 30, level: 1, createdAt: "2026-01-01T00:00:00.000Z" },
+        ];
+        const res = await GET(new Request(`https://amindhou.com/api/leaderboard?game=${game}`));
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as LeaderboardGetResponse;
+        expect(body.entries.map((e) => e.name)).toEqual(["Best", "Old"]);
       },
     );
   });
