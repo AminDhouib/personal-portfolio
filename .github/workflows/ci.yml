@@ -197,9 +197,51 @@ jobs:
             test-results
           if-no-files-found: ignore
 
+  # The one place a test talks to a real database: a throwaway Postgres service container
+  # that lives and dies with this job. store.db.test.ts refuses any host but localhost or
+  # 127.0.0.1 and any database but arcade_it, and never reads DATABASE_URL (AGENTS.md hard
+  # boundary, DESIGN.md register). The password below is a throwaway for that container.
+  db-integration:
+    name: Postgres integration (arcade store)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: arcade_it
+          POSTGRES_PASSWORD: arcade_it_ci_throwaway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d arcade_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Arcade store against the service container
+        run: pnpm exec vitest run src/lib/arcade/__tests__/store.db.test.ts
+        env:
+          ARCADE_IT_DATABASE_URL: postgresql://postgres:arcade_it_ci_throwaway@localhost:5432/arcade_it
+
   deploy:
     name: Deploy to Dokploy
-    needs: [lint-and-test, lighthouse, e2e]
+    needs: [lint-and-test, lighthouse, e2e, db-integration]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
