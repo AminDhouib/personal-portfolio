@@ -30,7 +30,8 @@ import { isRecordableRun } from "./hextris/session";
 import { safeJsonParse } from "@/lib/safe-json";
 import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
-import { useLeaderboard } from "@/hooks/use-leaderboard";
+import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
+import { useArcadeBoard } from "@/hooks/use-arcade-board";
 
 // ═══════════════════════════════════════════════════════════════
 // COMPONENT
@@ -85,21 +86,23 @@ export function HextrisGame() {
       return "";
     }
   });
-  // hextris starts a fresh board under its own game slug (RC-1 / DD1-001):
-  // previously this had no `game` field and silently shared the
-  // space-shooter bucket. fetchOnMount:false preserves the pre-existing
-  // timing (hextris only read the board on game-over, never on mount).
+  // Leaderboard v2. fetchOnMount:false preserves the pre-existing timing (hextris only reads
+  // the board on game-over, never on mount). The legacy rows were imported into the all-time
+  // board, so it survives the move.
   const {
     entries: leaderboard,
+    you: leaderboardYou,
+    period: boardPeriod,
+    setPeriod: setBoardPeriod,
+    loading: boardLoading,
     refresh: refreshLeaderboard,
     submit,
-  } = useLeaderboard("hextris", {
-    fetchOnMount: false,
-  });
+  } = useArcadeBoard("hextris", { fetchOnMount: false });
   const [rank, setRank] = useState<number | null>(null);
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "submitted" | "failed">(
-    "idle",
-  );
+  // "rejected" is a 422 (implausible run): shown as "Score not accepted", never retried.
+  const [submitState, setSubmitState] = useState<
+    "idle" | "submitting" | "submitted" | "failed" | "rejected"
+  >("idle");
 
   // Sound manager — created once per component lifetime
   const soundsRef = useRef<HextrisSounds | null>(null);
@@ -264,7 +267,7 @@ export function HextrisGame() {
   }, [playerName]);
 
   async function submitScore(name: string) {
-    if (submitState === "submitting") return;
+    if (submitState === "submitting" || submitState === "rejected") return;
     const trimmedName = name.trim().slice(0, 12) || "Player";
     setSubmitState("submitting");
     const result = await submit({
@@ -278,6 +281,8 @@ export function HextrisGame() {
       setRank(result.rank);
       setSubmitState("submitted");
       await refreshLeaderboard();
+    } else if (result.rejected) {
+      setSubmitState("rejected");
     } else {
       setSubmitState("failed");
     }
@@ -2600,6 +2605,7 @@ export function HextrisGame() {
                   if (
                     submitState !== "submitting" &&
                     submitState !== "submitted" &&
+                    submitState !== "rejected" &&
                     playerName.trim()
                   ) {
                     void submitScore(playerName);
@@ -2615,7 +2621,10 @@ export function HextrisGame() {
                   void submitScore(playerName);
                 }}
                 disabled={
-                  submitState === "submitting" || submitState === "submitted" || !playerName.trim()
+                  submitState === "submitting" ||
+                  submitState === "submitted" ||
+                  submitState === "rejected" ||
+                  !playerName.trim()
                 }
                 className="rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -2625,51 +2634,85 @@ export function HextrisGame() {
                     ? "Saved"
                     : submitState === "failed"
                       ? "Retry"
-                      : "Submit"}
+                      : submitState === "rejected"
+                        ? "Rejected"
+                        : "Submit"}
               </button>
             </div>
 
+            {submitState === "rejected" && (
+              <p role="status" className="mt-2 font-mono text-xs text-accent-amber">
+                Score not accepted
+              </p>
+            )}
+
             {/* Top 8 leaderboard */}
-            {leaderboard.length > 0 && (
+            {(leaderboard.length > 0 || boardPeriod !== "all-time") && (
               <div className="mt-4">
                 <div className="mb-2 px-1 font-mono text-[10px] tracking-widest text-white/50 uppercase">
                   Top Runs
                 </div>
-                <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
-                  {leaderboard.slice(0, 8).map((e, i) => {
-                    const isYou =
-                      rank !== null &&
-                      i + 1 === rank &&
-                      e.score === uiScore &&
-                      e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase();
-                    return (
-                      <div
-                        key={`${e.createdAt}-${i}`}
-                        className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
-                          isYou ? "bg-accent-pink/10" : ""
-                        }`}
-                      >
-                        <span
-                          className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
-                        >
-                          {i + 1}
-                        </span>
-                        <span
-                          className={`flex-1 truncate ${
-                            isYou ? "font-bold text-accent-pink" : "text-white/90"
+                <ArcadeBoardTabs
+                  label="Leaderboard period"
+                  period={boardPeriod}
+                  onChange={setBoardPeriod}
+                  className="mb-2"
+                  activeClassName="border-accent-pink/60 bg-accent-pink/20 text-accent-pink"
+                  inactiveClassName="border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
+                />
+                {leaderboard.length === 0 ? (
+                  <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center font-mono text-xs text-white/50">
+                    {boardLoading
+                      ? "Loading"
+                      : boardPeriod === "daily"
+                        ? "No scores yet today"
+                        : "No scores yet this week"}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
+                    {leaderboard.slice(0, 8).map((e) => {
+                      // The server marks the viewer's own row. The old name-and-rank match is
+                      // only the fallback for a response that omits the flag.
+                      const isYou =
+                        e.isYou ??
+                        (rank !== null &&
+                          e.rank === rank &&
+                          e.score === uiScore &&
+                          e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase());
+                      return (
+                        <div
+                          key={`${e.rank}-${e.name}-${e.createdAt}`}
+                          className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
+                            isYou ? "bg-accent-pink/10" : ""
                           }`}
                         >
-                          {e.name}
-                        </span>
-                        <span
-                          className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
-                        >
-                          {e.score}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <span
+                            className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
+                          >
+                            {e.rank}
+                          </span>
+                          <span
+                            className={`flex-1 truncate ${
+                              isYou ? "font-bold text-accent-pink" : "text-white/90"
+                            }`}
+                          >
+                            {e.name}
+                          </span>
+                          <span
+                            className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
+                          >
+                            {e.score}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
+                  <div className="mt-2 px-1 font-mono text-[10px] text-white/50">
+                    Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
+                  </div>
+                )}
               </div>
             )}
 
