@@ -65,7 +65,7 @@ describe("TodayStrip", () => {
     expect(html).toContain('data-state="loading"');
     expect(html).toContain("Resets at 00:00 UTC");
     expect(html).not.toContain("Resets in");
-    expect(html.split("—").length - 1).toBe(9);
+    expect(html.split("\u2014").length - 1).toBe(9);
     for (const source of TODAY_SOURCES) {
       expect(html).toContain(`href="/games/${source.slug}"`);
     }

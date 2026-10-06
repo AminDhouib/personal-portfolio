@@ -7,7 +7,7 @@ import { useResetCountdown } from "./reset-countdown";
 import { TODAY_SOURCES, type TodaySource } from "./today-sources";
 import { useHubBoards } from "./use-hub-boards";
 
-const DASH = "—";
+const DASH = "\u2014";
 const PLACEHOLDER_RANKS = [1, 2, 3] as const;
 
 type TileState = "idle" | "ready" | "empty" | "error";
