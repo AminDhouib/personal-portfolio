@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { GameBanner } from "./banners";
+import { GameBanner } from "./registry";
 import type { GameMeta } from "@/app/games/games-meta";
 
 export function GameCard({

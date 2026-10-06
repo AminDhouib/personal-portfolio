@@ -10,7 +10,7 @@ vi.mock("framer-motion", () => ({
   },
 }));
 
-vi.mock("../banners", () => ({
+vi.mock("../registry", () => ({
   GameBanner: () => <div data-testid="game-banner" />,
 }));
 
