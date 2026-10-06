@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { GamesClient } from "./games-client";
+import { GAMES } from "./games-meta";
+import { breadcrumbNode, gameListNode, graph, serializeJsonLd } from "@/lib/structured-data";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
@@ -39,8 +41,26 @@ export const metadata = {
 };
 
 export default function GamesPage() {
+  const jsonLd = graph(
+    {
+      "@type": "CollectionPage",
+      "@id": `${SITE_ORIGIN}/games#page`,
+      url: `${SITE_ORIGIN}/games`,
+      name: "Free browser games by Amin Dhouib",
+      description: DESCRIPTION,
+      mainEntity: gameListNode(GAMES.filter((g) => !g.hidden)),
+    },
+    breadcrumbNode([
+      { name: "Home", path: "/" },
+      { name: "Games", path: "/games" },
+    ]),
+  );
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
