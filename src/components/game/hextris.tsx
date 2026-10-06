@@ -95,7 +95,7 @@ export function HextrisGame() {
     period: boardPeriod,
     setPeriod: setBoardPeriod,
     loading: boardLoading,
-    error: boardError,
+    readError: boardError,
     refresh: refreshLeaderboard,
     submit,
   } = useArcadeBoard("hextris", { fetchOnMount: false });
@@ -2648,78 +2648,76 @@ export function HextrisGame() {
             )}
 
             {/* Top 8 leaderboard */}
-            {(leaderboard.length > 0 || boardPeriod !== "all-time") && (
-              <div className="mt-4">
-                <div className="mb-2 px-1 font-mono text-[10px] tracking-widest text-white/50 uppercase">
-                  Top Runs
-                </div>
-                <ArcadeBoardTabs
-                  label="Leaderboard period"
-                  period={boardPeriod}
-                  onChange={setBoardPeriod}
-                  className="mb-2"
-                  activeClassName="border-accent-pink/60 bg-accent-pink/20 text-accent-pink"
-                  inactiveClassName="border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
-                />
-                {leaderboard.length === 0 ? (
-                  <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center font-mono text-xs text-white/50">
-                    {boardLoading
-                      ? "Loading"
-                      : boardError
-                        ? "Could not load the board"
-                        : boardPeriod === "daily"
-                          ? "No scores yet today"
-                          : boardPeriod === "weekly"
-                            ? "No scores yet this week"
-                            : "No scores yet"}
-                  </p>
-                ) : (
-                  <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
-                    {leaderboard.slice(0, 8).map((e) => {
-                      // The server marks the viewer's own row. The old name-and-rank match is
-                      // only the fallback for a response that omits the flag.
-                      const isYou =
-                        e.isYou ??
-                        (rank !== null &&
-                          e.rank === rank &&
-                          e.score === uiScore &&
-                          e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase());
-                      return (
-                        <div
-                          key={`${e.rank}-${e.name}-${e.createdAt}`}
-                          className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
-                            isYou ? "bg-accent-pink/10" : ""
+            <div className="mt-4">
+              <div className="mb-2 px-1 font-mono text-[10px] tracking-widest text-white/50 uppercase">
+                Top Runs
+              </div>
+              <ArcadeBoardTabs
+                label="Leaderboard period"
+                period={boardPeriod}
+                onChange={setBoardPeriod}
+                className="mb-2"
+                activeClassName="border-pink-400/60 bg-pink-500/20 text-pink-300"
+                inactiveClassName="border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
+              />
+              {leaderboard.length === 0 ? (
+                <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center font-mono text-xs text-white/50">
+                  {boardLoading
+                    ? "Loading"
+                    : boardError
+                      ? "Could not load the board"
+                      : boardPeriod === "daily"
+                        ? "No scores yet today"
+                        : boardPeriod === "weekly"
+                          ? "No scores yet this week"
+                          : "No scores yet"}
+                </p>
+              ) : (
+                <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
+                  {leaderboard.slice(0, 8).map((e) => {
+                    // The server marks the viewer's own row. The old name-and-rank match is
+                    // only the fallback for a response that omits the flag.
+                    const isYou =
+                      e.isYou ??
+                      (rank !== null &&
+                        e.rank === rank &&
+                        e.score === uiScore &&
+                        e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase());
+                    return (
+                      <div
+                        key={`${e.rank}-${e.name}-${e.createdAt}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
+                          isYou ? "bg-accent-pink/10" : ""
+                        }`}
+                      >
+                        <span
+                          className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
+                        >
+                          {e.rank}
+                        </span>
+                        <span
+                          className={`flex-1 truncate ${
+                            isYou ? "font-bold text-accent-pink" : "text-white/90"
                           }`}
                         >
-                          <span
-                            className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
-                          >
-                            {e.rank}
-                          </span>
-                          <span
-                            className={`flex-1 truncate ${
-                              isYou ? "font-bold text-accent-pink" : "text-white/90"
-                            }`}
-                          >
-                            {e.name}
-                          </span>
-                          <span
-                            className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
-                          >
-                            {e.score}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
-                  <div className="mt-2 px-1 font-mono text-[10px] text-white/50">
-                    Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
-                  </div>
-                )}
-              </div>
-            )}
+                          {e.name}
+                        </span>
+                        <span
+                          className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
+                        >
+                          {e.score}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
+                <div className="mt-2 px-1 font-mono text-[10px] text-white/50">
+                  Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
+                </div>
+              )}
+            </div>
 
             <button
               type="button"

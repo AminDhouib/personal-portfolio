@@ -162,7 +162,7 @@ describe("useArcadeBoard", () => {
           isYou: false,
         },
       ]);
-      expect(result.current.error).toBeNull();
+      expect(result.current.readError).toBeNull();
     });
 
     it("tolerates a null or missing detail, and an absent isYou stays absent", async () => {
@@ -231,7 +231,7 @@ describe("useArcadeBoard", () => {
       const { result } = renderHook(() => useArcadeBoard("space-shooter"));
 
       await waitFor(() => expect(result.current.loading).toBe(false));
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.readError).toBeTruthy();
       expect(result.current.entries).toEqual([]);
     });
 
@@ -251,7 +251,7 @@ describe("useArcadeBoard", () => {
         await act(async () => {
           await result.current.refresh();
         });
-        expect(result.current.error).toContain("429");
+        expect(result.current.readError).toContain("429");
         expect(result.current.entries.map((e) => e.name)).toEqual(["Kept"]);
 
         await act(async () => {
@@ -288,7 +288,7 @@ describe("useArcadeBoard", () => {
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.you).toBeNull();
-      expect(result.current.error).toBeNull();
+      expect(result.current.readError).toBeNull();
       expect(result.current.entries.map((e) => e.name)).toEqual(["Top"]);
     });
 
@@ -297,7 +297,7 @@ describe("useArcadeBoard", () => {
       const { result } = renderHook(() => useArcadeBoard("space-shooter"));
 
       await waitFor(() => expect(result.current.loading).toBe(false));
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.readError).toBeTruthy();
       expect(reportErrorMock).toHaveBeenCalledTimes(1);
     });
 
@@ -343,7 +343,7 @@ describe("useArcadeBoard", () => {
       act(() => {
         result.current.setPeriod("weekly");
       });
-      await waitFor(() => expect(result.current.error).toContain("429"));
+      await waitFor(() => expect(result.current.readError).toContain("429"));
       expect(result.current.entries).toEqual([]);
       expect(result.current.you).toBeNull();
     });
@@ -361,6 +361,117 @@ describe("useArcadeBoard", () => {
       });
       expect(result.current.entries.map((e) => e.name)).toEqual(["Kept"]);
       expect(result.current.you).toEqual({ rank: 1, score: 10 });
+    });
+
+    // The games render the board panel and its tabs unconditionally and branch only the body
+    // on these values, so the all-time states below must each be distinguishable.
+    it("switching back to all-time empties the rows and reports loading until the read lands", async () => {
+      fetchMock.mockResolvedValueOnce(okResponse(board([serverEntry({ handle: "Allie" })])));
+      const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+      fetchMock.mockResolvedValueOnce(okResponse(board([])));
+      act(() => {
+        result.current.setPeriod("weekly");
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let resolveAll: (r: Response) => void = () => {};
+      fetchMock.mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveAll = resolve;
+          }),
+      );
+      act(() => {
+        result.current.setPeriod("all-time");
+      });
+      expect(result.current.period).toBe("all-time");
+      expect(result.current.entries).toEqual([]);
+      expect(result.current.loading).toBe(true);
+      expect(result.current.readError).toBeNull();
+
+      await act(async () => {
+        resolveAll(okResponse(board([])));
+      });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      // An empty all-time board: no rows, not loading, no error ("No scores yet").
+      expect(result.current.entries).toEqual([]);
+      expect(result.current.readError).toBeNull();
+    });
+
+    describe("readError", () => {
+      const SUBMIT = { name: "Ada", score: 5, seconds: 1, kills: 1, distance: 1 };
+
+      it("is null on a fresh hook and set by a failed read", async () => {
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+        const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+        await waitFor(() => expect(result.current.readError).toContain("500"));
+        expect(result.current).not.toHaveProperty("error");
+      });
+
+      it("is cleared by a later successful read", async () => {
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+        const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+        await waitFor(() => expect(result.current.readError).toBeTruthy());
+
+        fetchMock.mockResolvedValueOnce(okResponse(board([serverEntry()])));
+        await act(async () => {
+          await result.current.refresh();
+        });
+        expect(result.current.readError).toBeNull();
+        expect(result.current.entries).toHaveLength(1);
+      });
+
+      it("is cleared the moment the period changes, before the new board lands", async () => {
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+        const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+        await waitFor(() => expect(result.current.readError).toBeTruthy());
+
+        fetchMock.mockImplementationOnce(() => new Promise<Response>(() => {}));
+        act(() => {
+          result.current.setPeriod("weekly");
+        });
+        expect(result.current.readError).toBeNull();
+        expect(result.current.loading).toBe(true);
+      });
+
+      it("is not set by a failed submit on an empty, successfully read board", async () => {
+        fetchMock.mockResolvedValueOnce(okResponse(board([])));
+        const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+        let outcome: unknown;
+        await act(async () => {
+          outcome = await result.current.submit(SUBMIT);
+        });
+        expect(outcome).toEqual({ ok: false });
+        expect(result.current.readError).toBeNull();
+      });
+
+      it("is not set by a submit that throws, and is not cleared by a successful submit", async () => {
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 503 }));
+        const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+        await waitFor(() => expect(result.current.readError).toContain("503"));
+
+        fetchMock.mockRejectedValueOnce(new Error("timeout"));
+        await act(async () => {
+          await result.current.submit(SUBMIT);
+        });
+        expect(result.current.readError).toContain("503");
+
+        fetchMock.mockResolvedValueOnce(
+          okResponse({
+            ok: true,
+            boards: [{ period: "all-time", board: "all-time", rank: 1, best: 5, improved: true }],
+          }),
+        );
+        await act(async () => {
+          await result.current.submit(SUBMIT);
+        });
+        expect(result.current.readError).toContain("503");
+      });
     });
 
     it("ignores a slow response for a period the player has already left", async () => {
@@ -500,7 +611,7 @@ describe("useArcadeBoard", () => {
         });
       });
       expect(submitResult).toEqual({ ok: false, rejected: true });
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.readError).toBeNull(); // a submit failure is the caller's, not a read error
     });
 
     it("a 403 identity error resets the identity once and does not retry on its own", async () => {
@@ -538,7 +649,7 @@ describe("useArcadeBoard", () => {
       expect(identity.reset).not.toHaveBeenCalled();
     });
 
-    it("returns { ok:false } and sets error on a non-ok submit response with no body", async () => {
+    it("returns { ok:false } on a non-ok submit response with no body", async () => {
       const { result } = await mounted();
       fetchMock.mockResolvedValueOnce(new Response(null, { status: 400 }));
       let submitResult: unknown;
@@ -552,7 +663,7 @@ describe("useArcadeBoard", () => {
         });
       });
       expect(submitResult).toEqual({ ok: false });
-      expect(result.current.error).toContain("400");
+      expect(result.current.readError).toBeNull(); // a submit failure is the caller's, not a read error
     });
 
     it("returns { ok:false } when a 200 body does not say ok:true", async () => {
@@ -604,7 +715,7 @@ describe("useArcadeBoard", () => {
       expect(body.handle).toBe("x".repeat(200));
     });
 
-    it("does not POST a score above the cap: it returns a rejection and sets an error", async () => {
+    it("does not POST a score above the cap: it returns a rejection", async () => {
       const { result } = await mounted();
       let submitResult: unknown;
       await act(async () => {
@@ -618,7 +729,7 @@ describe("useArcadeBoard", () => {
       });
       expect(submitResult).toEqual({ ok: false, rejected: true });
       expect(fetchMock).toHaveBeenCalledTimes(1); // the mount GET only
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.readError).toBeNull(); // a submit failure is the caller's, not a read error
     });
 
     it("compares the cap after flooring, so a score exactly at the cap is still POSTed", async () => {
@@ -656,7 +767,7 @@ describe("useArcadeBoard", () => {
       expect(submitResult).toEqual({ ok: false });
       expect(fetchMock).toHaveBeenCalledTimes(1); // no POST without an identity
       expect(reportErrorMock).toHaveBeenCalledTimes(1);
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.readError).toBeNull(); // a submit failure is the caller's, not a read error
     });
 
     it("requires every detail key of the game at compile time", async () => {

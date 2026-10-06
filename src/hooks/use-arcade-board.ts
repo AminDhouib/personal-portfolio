@@ -180,7 +180,10 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
   const [you, setYou] = useState<ArcadeYou | null>(null);
   const [period, setPeriodState] = useState<BoardPeriod>(initialPeriod);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Set and cleared by reads only (refresh and period switches). A failed submit is reported
+  // through submit()'s return value and the caller's own submit state, never through here, so
+  // an empty board after a failed submit does not claim the board could not load.
+  const [readError, setReadError] = useState<string | null>(null);
   const gameRef = useRef<ArcadeGameSlug>(game);
   gameRef.current = game;
   // Written synchronously by setPeriod so the refresh it triggers reads the new period.
@@ -202,7 +205,7 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
       });
       if (id !== requestId.current) return [];
       if (!res.ok) {
-        setError(`failed to load leaderboard (status ${res.status})`);
+        setReadError(`failed to load leaderboard (status ${res.status})`);
         return [];
       }
       const data = await readJsonBody(res);
@@ -216,11 +219,11 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
       }
       setEntries(parsed);
       setYou(toYou(data.you));
-      setError(null);
+      setReadError(null);
       return parsed;
     } catch (err) {
       reportError(err);
-      if (id === requestId.current) setError("failed to load leaderboard");
+      if (id === requestId.current) setReadError("failed to load leaderboard");
       return [];
     } finally {
       if (id === requestId.current) setLoading(false);
@@ -240,6 +243,7 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
       // failed read shows an empty board, not another period's scores under this tab.
       setEntries([]);
       setYou(null);
+      setReadError(null);
       void refresh();
     },
     [refresh],
@@ -252,7 +256,6 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
         const score = Math.max(0, Math.floor(payload.score));
         if (score > SCORE_CAP) {
           // The server would answer 400; this is the same "not accepted" outcome as a 422.
-          setError("score not accepted");
           return { ok: false, rejected: true };
         }
         // Inside the try: creating the identity touches crypto and storage, which can throw.
@@ -272,33 +275,27 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
         });
         const data = await readJsonBody(res);
         if (res.status === 422) {
-          setError("score not accepted");
           return { ok: false, rejected: true };
         }
         if (res.status === 403 && data.error === "identity") {
           resetIdentity();
-          setError("identity was reset, please submit again");
           return { ok: false, identityReset: true };
         }
         if (!res.ok) {
-          setError(`failed to submit score (status ${res.status})`);
           return { ok: false };
         }
         if (data.ok !== true) {
-          setError("failed to submit score");
           return { ok: false };
         }
         const boards = toBoards(data.boards);
-        setError(null);
         return { ok: true, rank: boards.find((b) => b.period === "all-time")?.rank, boards };
       } catch (err) {
         reportError(err);
-        setError("failed to submit score");
         return { ok: false };
       }
     },
     [],
   );
 
-  return { entries, you, period, setPeriod, loading, error, refresh, submit };
+  return { entries, you, period, setPeriod, loading, readError, refresh, submit };
 }
