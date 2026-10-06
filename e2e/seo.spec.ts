@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { blockThirdParties, jsonLdNodes, nodesOf, pathOf, sitemapUrls } from "./helpers";
+import { GAMES } from "../src/app/games/games-meta";
 
 // What a crawler or an answer engine sees: the sitemap, robots.txt, llms.txt,
 // canonicals and JSON-LD, read off the running production build.
@@ -43,6 +44,16 @@ const blogPostingSchema = z.object({
   image: z.string(),
   author: z.object({ "@id": z.string() }),
 });
+const videoGameSchema = z.object({
+  "@type": z.literal("VideoGame"),
+  name: z.string(),
+  url: z.string(),
+  author: z.object({ "@id": z.string() }),
+});
+
+const publicGames = GAMES.filter((g) => !g.hidden);
+const hiddenGames = GAMES.filter((g) => g.hidden);
+const MIN_ABOUT_WORDS = 350;
 
 const withoutTrailingSlash = (url: string) => url.replace(/\/$/, "");
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -238,5 +249,82 @@ test("the footer links every hub page from anywhere on the site", async ({ page,
 test("unknown routes answer with a real 404", async ({ request }) => {
   for (const path of ["/this-page-does-not-exist", "/work/not-a-project", "/blog/not-a-post"]) {
     expect.soft((await request.get(path)).status(), path).toBe(404);
+  }
+});
+
+test("every public game page server-renders its About copy, game JSON-LD and its own share image", async ({
+  browser,
+  baseURL,
+  request,
+}) => {
+  test.setTimeout(120_000);
+  // JavaScript off: what a crawler reads before hydration. The games are client-only.
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  await blockThirdParties(context, baseURL);
+  const page = await context.newPage();
+
+  for (const game of publicGames) {
+    const path = `/games/${game.slug}`;
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+
+    const about = await page.locator("[data-game-about]").innerText();
+    const words = about.split(/\s+/).filter(Boolean).length;
+    expect.soft(words, `${path} About words`).toBeGreaterThanOrEqual(MIN_ABOUT_WORDS);
+
+    const nodes = await jsonLdNodes(page);
+    const [videoGame] = nodesOf(nodes, videoGameSchema);
+    expect.soft(videoGame?.name, `${path} VideoGame name`).toBe(game.title);
+    expect.soft(videoGame && pathOf(videoGame.url), `${path} VideoGame url`).toBe(path);
+    expect.soft(nodesOf(nodes, faqPageSchema), `${path} FAQPage`).toHaveLength(1);
+    const [crumbs] = nodesOf(nodes, breadcrumbSchema);
+    expect
+      .soft(
+        crumbs?.itemListElement.map((c) => c.name),
+        `${path} breadcrumb`,
+      )
+      .toEqual(["Home", "Games", game.title]);
+
+    // Next appends a ?<hash> to file-based image URLs, so match the path by substring.
+    const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
+    const twitterImage = await page.locator('meta[name="twitter:image"]').getAttribute("content");
+    expect.soft(ogImage, `${path} og:image`).toContain(`${path}/opengraph-image`);
+    expect.soft(twitterImage, `${path} twitter:image`).toContain(`${path}/opengraph-image`);
+    if (ogImage) {
+      const image = await request.get(pathOf(ogImage));
+      expect.soft(image.status(), ogImage).toBe(200);
+      expect.soft(image.headers()["content-type"], ogImage).toContain("image/png");
+    }
+  }
+  await context.close();
+});
+
+test("/games is a CollectionPage whose ItemList names every public game in order", async ({
+  page,
+}) => {
+  await page.goto("/games", { waitUntil: "domcontentloaded" });
+  const [collection] = nodesOf(await jsonLdNodes(page), collectionPageSchema);
+  expect(collection?.mainEntity.itemListElement.map((item) => pathOf(item.url))).toEqual(
+    publicGames.map((g) => `/games/${g.slug}`),
+  );
+});
+
+test("the sitemap and llms.txt cover every public game and no hidden one; hidden games are noindex", async ({
+  page,
+  request,
+}) => {
+  const sitemapPaths = (await sitemapUrls(request)).map(pathOf);
+  const llms = await (await request.get("/llms.txt")).text();
+
+  for (const game of publicGames) {
+    expect.soft(sitemapPaths, `${game.slug} in sitemap`).toContain(`/games/${game.slug}`);
+    expect.soft(llms, `${game.slug} in llms.txt`).toContain(`/games/${game.slug})`);
+  }
+  for (const game of hiddenGames) {
+    expect.soft(sitemapPaths, `${game.slug} not in sitemap`).not.toContain(`/games/${game.slug}`);
+    expect.soft(llms, `${game.slug} not in llms.txt`).not.toContain(`/games/${game.slug})`);
+    await page.goto(`/games/${game.slug}`, { waitUntil: "domcontentloaded" });
+    await expect
+      .soft(page.locator('meta[name="robots"]'), `${game.slug} noindex`)
+      .toHaveAttribute("content", /noindex/);
   }
 });
