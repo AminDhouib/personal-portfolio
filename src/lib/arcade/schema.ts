@@ -1,3 +1,4 @@
+import { importLegacyLeaderboard, type LegacyImportReport } from "./legacy-import";
 import { withTransaction, type TxPool } from "./tx";
 
 /**
@@ -36,14 +37,24 @@ export const ARCADE_SCHEMA_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_arcade_scores_rank
     ON arcade_scores (game, board, score DESC, achieved_at ASC)`,
+  `CREATE TABLE IF NOT EXISTS arcade_migrations (
+    key        TEXT        PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
 ];
 
-/** Create the arcade tables if they do not exist. Safe to run any number of times, concurrently. */
-export async function ensureArcadeSchema(pool: TxPool): Promise<void> {
-  await withTransaction(pool, async (client) => {
+/**
+ * Create the arcade tables if they do not exist, then run the one-time legacy import
+ * (a no-op once its marker row exists). Safe to run any number of times, concurrently:
+ * the advisory lock serializes starters, and the import shares the DDL's transaction, so
+ * a failed import rolls the marker back and the next start retries.
+ */
+export async function ensureArcadeSchema(pool: TxPool): Promise<LegacyImportReport> {
+  return withTransaction(pool, async (client) => {
     await client.query("SELECT pg_advisory_xact_lock($1)", [ARCADE_SCHEMA_LOCK_ID]);
     for (const statement of ARCADE_SCHEMA_STATEMENTS) {
       await client.query(statement);
     }
+    return importLegacyLeaderboard(client);
   });
 }

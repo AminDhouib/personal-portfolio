@@ -49,17 +49,21 @@ describe("ARCADE_SCHEMA_STATEMENTS", () => {
     expect(joined).toContain("REFERENCES arcade_players (id) ON DELETE CASCADE");
     expect(joined).toContain("score BIGINT NOT NULL");
     expect(joined).toContain("ON arcade_scores (game, board, score DESC, achieved_at ASC)");
+    expect(joined).toContain(
+      "arcade_migrations ( key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now() )",
+    );
   });
 });
 
 describe("ensureArcadeSchema", () => {
-  it("takes the advisory lock, runs every statement, all in one transaction", async () => {
+  it("takes the advisory lock, runs every statement, then the legacy-import marker, all in one transaction", async () => {
     const fake = createFakePool();
     await ensureArcadeSchema(fake.pool);
     expect(fake.sqls()).toEqual([
       "BEGIN",
       "SELECT pg_advisory_xact_lock($1)",
       ...ARCADE_SCHEMA_STATEMENTS.map(collapse),
+      expect.stringMatching(/^INSERT INTO arcade_migrations/),
       "COMMIT",
     ]);
     expect(fake.queries[1]?.params).toEqual([ARCADE_SCHEMA_LOCK_ID]);
@@ -77,6 +81,63 @@ describe("ensureArcadeSchema", () => {
       return undefined;
     });
     await expect(ensureArcadeSchema(fake.pool)).rejects.toThrow("index failed");
+    expect(fake.sqls().at(-1)).toBe("ROLLBACK");
+    expect(fake.sqls()).not.toContain("COMMIT");
+    expect(fake.stats.released).toBe(1);
+  });
+});
+
+describe("ensureArcadeSchema: legacy import step", () => {
+  function importFake(over: { present?: boolean; failOn?: RegExp } = {}) {
+    return createFakePool((sql) => {
+      if (over.failOn?.test(sql)) throw new Error("legacy read failed");
+      if (sql.startsWith("INSERT INTO arcade_migrations")) {
+        return { rows: [{ key: "legacy-leaderboard-import-v1" }] };
+      }
+      if (sql.startsWith("SELECT to_regclass")) {
+        return { rows: [{ present: over.present ?? true }] };
+      }
+      if (sql.startsWith("SELECT id, game")) return { rows: [] };
+      return undefined;
+    });
+  }
+
+  const head = (sql: string) => sql.split(" ").slice(0, 3).join(" ");
+
+  it("reports already-applied when the marker insert returns no row", async () => {
+    const fake = createFakePool();
+    await expect(ensureArcadeSchema(fake.pool)).resolves.toEqual({ status: "already-applied" });
+  });
+
+  it("runs the import after the DDL and before COMMIT, on the same client and transaction", async () => {
+    const fake = importFake();
+    await expect(ensureArcadeSchema(fake.pool)).resolves.toEqual({
+      status: "imported",
+      read: 0,
+      skippedUnverifiable: 0,
+      skippedImplausible: 0,
+      players: 0,
+      scores: 0,
+    });
+    const afterDdl = fake.sqls().slice(2 + ARCADE_SCHEMA_STATEMENTS.length);
+    expect(afterDdl.map(head)).toEqual([
+      "INSERT INTO arcade_migrations",
+      "SELECT to_regclass('leaderboard_entries') IS",
+      "SELECT id, game,",
+      "COMMIT",
+    ]);
+    expect(fake.stats.connects).toBe(1);
+  });
+
+  it("reports no-legacy-table and still commits the marker when the table is missing", async () => {
+    const fake = importFake({ present: false });
+    await expect(ensureArcadeSchema(fake.pool)).resolves.toEqual({ status: "no-legacy-table" });
+    expect(fake.sqls().at(-1)).toBe("COMMIT");
+  });
+
+  it("rolls the whole ensure back, marker included, when the import fails", async () => {
+    const fake = importFake({ failOn: /^SELECT id, game/ });
+    await expect(ensureArcadeSchema(fake.pool)).rejects.toThrow("legacy read failed");
     expect(fake.sqls().at(-1)).toBe("ROLLBACK");
     expect(fake.sqls()).not.toContain("COMMIT");
     expect(fake.stats.released).toBe(1);

@@ -4,8 +4,9 @@ import { makeJsonPostRequest, uniqueIp } from "@/test/api-route-helpers";
 import { createFakePool } from "@/test/fake-pg";
 
 // Same shape as the legacy route test: the pool is the only thing replaced. Here it is an
-// in-memory emulation of the five arcade statements, so the real store and the real
-// getArcadePool run end to end through the real route.
+// in-memory emulation of the arcade statements (the store's, plus the legacy import the
+// ensure-step runs), so the real store and the real getArcadePool run end to end through the
+// real route.
 const state = vi.hoisted(() => ({ pool: undefined as unknown }));
 vi.mock("@/lib/db", () => ({ getPool: () => state.pool }));
 vi.mock("@/lib/log", () => ({
@@ -27,7 +28,15 @@ interface StoredScore {
 function createEmulator() {
   let players = new Map<string, { tokenHash: string; handle: string }>();
   let scores: StoredScore[] = [];
-  let snapshot: { players: typeof players; scores: StoredScore[] } | null = null;
+  // The legacy-import marker rows, and what the legacy leaderboard_entries table holds
+  // (null = the table does not exist). Both default to "nothing to import".
+  let migrations = new Set<string>();
+  let legacy: Record<string, unknown>[] | null = [];
+  let snapshot: {
+    players: typeof players;
+    scores: StoredScore[];
+    migrations: typeof migrations;
+  } | null = null;
   let failOn: RegExp | null = null;
 
   function rankOf(mine: StoredScore): number {
@@ -44,14 +53,48 @@ function createEmulator() {
   const fake = createFakePool((sql, params) => {
     if (failOn?.test(sql)) throw new Error("db down");
     if (sql === "BEGIN") {
-      snapshot = { players: new Map(players), scores: scores.map((s) => ({ ...s })) };
+      snapshot = {
+        players: new Map(players),
+        scores: scores.map((s) => ({ ...s })),
+        migrations: new Set(migrations),
+      };
       return undefined;
     }
     if (sql === "ROLLBACK") {
       if (snapshot) {
         players = snapshot.players;
         scores = snapshot.scores;
+        migrations = snapshot.migrations;
       }
+      return undefined;
+    }
+    if (sql.startsWith("INSERT INTO arcade_migrations")) {
+      // ON CONFLICT DO NOTHING RETURNING key: a row only the first time a key is recorded.
+      const key = params[0] as string;
+      if (migrations.has(key)) return { rows: [] };
+      migrations.add(key);
+      return { rows: [{ key }] };
+    }
+    if (sql.startsWith("SELECT to_regclass")) return { rows: [{ present: legacy !== null }] };
+    if (sql.startsWith("SELECT id, game")) return { rows: legacy ?? [] };
+    if (sql.startsWith("INSERT INTO arcade_scores") && sql.includes("'all-time'")) {
+      // The import's score insert: the board is a literal, so params are
+      // [game, playerId, score, detailJson, createdAtIso].
+      const [game, playerId, score, detailJson, createdAt] = params as [
+        string,
+        string,
+        number,
+        string,
+        string,
+      ];
+      scores.push({
+        game,
+        board: "all-time",
+        playerId,
+        score,
+        detail: JSON.parse(detailJson) as Record<string, number>,
+        achievedAt: new Date(createdAt),
+      });
       return undefined;
     }
     if (sql.startsWith("SELECT pg_advisory_xact_lock(hashtextextended(")) {
@@ -180,6 +223,15 @@ function createEmulator() {
     },
     failOn: (pattern: RegExp | null) => {
       failOn = pattern;
+    },
+    migrations: () => migrations,
+    /** What the legacy leaderboard_entries table holds when the one-time import reads it. */
+    seedLegacy: (rows: Record<string, unknown>[]) => {
+      legacy = rows;
+    },
+    /** A database that never had the legacy table. */
+    dropLegacyTable: () => {
+      legacy = null;
     },
   };
 }
@@ -656,5 +708,101 @@ describe("GET /api/arcade/scores", () => {
     const { res } = await read("game=space-shooter&board=all-time");
     expect(res.status).toBe(500);
     expect(await reported()).toHaveBeenCalledWith("api:arcade-scores.read", expect.any(Error));
+  });
+});
+
+describe("legacy import through the ensure-step", () => {
+  const MARKER = "legacy-leaderboard-import-v1";
+  const LEGACY_ROWS = [
+    {
+      id: 1,
+      game: "space-shooter",
+      name: "Bob",
+      score: 5000,
+      level: 1,
+      seconds: 60,
+      kills: 40,
+      distance: 1500,
+      created_at: new Date("2026-03-02T11:00:00.000Z"),
+    },
+    {
+      id: 2,
+      game: "hextris",
+      name: "Ada",
+      score: 20000,
+      level: 17,
+      seconds: 120,
+      kills: 300,
+      distance: null,
+      created_at: new Date("2026-03-05T10:00:00.000Z"),
+    },
+  ];
+
+  it("imports the legacy rows on the first request and serves them on the all-time board only", async () => {
+    emu.seedLegacy(LEGACY_ROWS);
+    const shooter = await read("game=space-shooter&board=all-time");
+    expect(shooter.res.status).toBe(200);
+    expect(shooter.json.entries).toEqual([
+      {
+        rank: 1,
+        handle: "Bob",
+        score: 5000,
+        detail: { ...SS_DETAIL, legacy: true },
+        achievedAt: "2026-03-02T11:00:00.000Z",
+        isYou: false,
+      },
+    ]);
+    const hextris = await read("game=hextris&board=all-time");
+    expect(hextris.json.entries.map((e) => [e.handle, e.score, e.rank])).toEqual([
+      ["Ada", 20000, 1],
+    ]);
+    expect((await read("game=space-shooter&board=daily")).json.entries).toEqual([]);
+    expect((await read("game=space-shooter&board=weekly")).json.entries).toEqual([]);
+    expect([...emu.migrations()]).toEqual([MARKER]);
+    expect([...emu.players().values()].map((p) => p.tokenHash)).toEqual(["legacy", "legacy"]);
+  });
+
+  it("imports once: a later process start finds the marker and adds nothing", async () => {
+    emu.seedLegacy(LEGACY_ROWS);
+    await read("game=space-shooter&board=all-time");
+    expect(emu.scores()).toHaveLength(2);
+    vi.resetModules();
+    ({ GET, POST } = await import("../route"));
+    await read("game=space-shooter&board=all-time");
+    expect(emu.scores()).toHaveLength(2);
+    expect(emu.players().size).toBe(2);
+  });
+
+  it("a live score ranks against the imported rows", async () => {
+    emu.seedLegacy(LEGACY_ROWS);
+    const { json } = await submit({ score: 4200 });
+    expect(json.boards?.map((b) => [b.board, b.rank])).toEqual([
+      ["all-time", 2],
+      ["weekly:2026-W41", 1],
+      ["daily:2026-10-06", 1],
+    ]);
+  });
+
+  it("records the marker and imports nothing when the legacy table does not exist", async () => {
+    emu.dropLegacyTable();
+    const { res, json } = await read("game=space-shooter&board=all-time");
+    expect(res.status).toBe(200);
+    expect(json.entries).toEqual([]);
+    expect([...emu.migrations()]).toEqual([MARKER]);
+    expect(emu.scores()).toHaveLength(0);
+  });
+
+  it("a failed import answers 500, leaves no marker, and the next request retries it", async () => {
+    emu.seedLegacy(LEGACY_ROWS);
+    emu.failOn(/^SELECT id, game/);
+    expect((await read("game=space-shooter&board=all-time")).res.status).toBe(500);
+    expect(emu.migrations().size).toBe(0);
+    expect(emu.scores()).toHaveLength(0);
+
+    emu.failOn(null);
+    const retry = await read("game=space-shooter&board=all-time");
+    expect(retry.res.status).toBe(200);
+    expect(retry.json.entries).toHaveLength(1);
+    expect([...emu.migrations()]).toEqual([MARKER]);
   });
 });
