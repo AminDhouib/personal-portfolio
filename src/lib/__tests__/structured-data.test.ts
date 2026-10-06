@@ -8,12 +8,14 @@ import {
   breadcrumbNode,
   companyNode,
   faqPageNode,
+  gameListNode,
   graph,
   personNode,
   profilePageNode,
   projectListNode,
   projectNode,
   serializeJsonLd,
+  videoGameNode,
 } from "../structured-data";
 
 describe("serializeJsonLd", () => {
@@ -132,5 +134,65 @@ describe("faqs", () => {
   it("names every product in the 'what has he built' answer", () => {
     const built = faqs.find((f) => f.question === "What has Amin Dhouib built?");
     for (const project of projects) expect(built?.answer).toContain(project.name);
+  });
+});
+
+describe("videoGameNode", () => {
+  const node = videoGameNode({
+    name: "Hextris",
+    description: "Rotate the hexagon.",
+    path: "/games/hextris",
+    genre: ["Puzzle", "Arcade"],
+    playMode: "SinglePlayer",
+  });
+
+  it("describes a free browser game made by the Person", () => {
+    expect(node["@type"]).toBe("VideoGame");
+    expect(node["@id"]).toBe("https://amindhou.com/games/hextris#game");
+    expect(node.url).toBe("https://amindhou.com/games/hextris");
+    expect(node.author).toEqual({ "@id": PERSON_ID });
+    expect(node.gamePlatform).toBe("Web browser");
+    expect(node.isAccessibleForFree).toBe(true);
+    expect(node.offers).toEqual({ "@type": "Offer", price: 0, priceCurrency: "USD" });
+  });
+
+  it("points its image at the page's generated share card and its play mode at schema.org", () => {
+    expect(node.image).toBe("https://amindhou.com/games/hextris/opengraph-image");
+    expect(node.playMode).toBe("https://schema.org/SinglePlayer");
+    expect(node.genre).toEqual(["Puzzle", "Arcade"]);
+  });
+});
+
+describe("gameListNode", () => {
+  it("lists the games in order with absolute URLs", () => {
+    const node = gameListNode([
+      { title: "Hextris", slug: "hextris" },
+      { title: "Typing Speed", slug: "typing-speed" },
+    ]);
+    expect(node["@type"]).toBe("ItemList");
+    expect(node.itemListElement).toEqual([
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Hextris",
+        url: "https://amindhou.com/games/hextris",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Typing Speed",
+        url: "https://amindhou.com/games/typing-speed",
+      },
+    ]);
+  });
+});
+
+describe("faqPageNode ids", () => {
+  it("keeps the site FAQ id by default and takes a page-specific one", () => {
+    const qa = [{ question: "Q?", answer: "A." }];
+    expect(faqPageNode(qa)["@id"]).toBe("https://amindhou.com/#faq");
+    expect(faqPageNode(qa, "https://amindhou.com/games/hextris#faq")["@id"]).toBe(
+      "https://amindhou.com/games/hextris#faq",
+    );
   });
 });
