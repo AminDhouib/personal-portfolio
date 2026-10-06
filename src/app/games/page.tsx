@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { GamesClient } from "./games-client";
+import { hubTags } from "./hub/hub-tags";
 import { GAMES } from "./games-meta";
 import { breadcrumbNode, gameListNode, graph, serializeJsonLd } from "@/lib/structured-data";
 
@@ -61,7 +62,7 @@ export default function GamesPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+      <div data-testid="games-hub" className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
           className="mb-8 inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
@@ -71,12 +72,13 @@ export default function GamesPage() {
         </Link>
 
         <h1 className="mb-2 font-display text-4xl font-black tracking-tight">Games</h1>
-        <p className="mb-12 text-(--muted)">
-          Free browser games built for this site. No downloads, no sign-up: pick one and play.
+        <p className="mb-8 text-(--muted)">
+          Free browser games built for this site. No downloads, no sign-up: pick one and play. The
+          daily leaderboards reset at midnight UTC, so there is always a fresh run to chase.
         </p>
 
         <Suspense fallback={null}>
-          <GamesClient />
+          <GamesClient tags={hubTags()} />
         </Suspense>
       </div>
     </div>
