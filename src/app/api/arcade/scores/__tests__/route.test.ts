@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { makeJsonPostRequest, uniqueIp } from "@/test/api-route-helpers";
 import { createFakePool } from "@/test/fake-pg";
 
@@ -248,6 +248,13 @@ async function read(query: string, ip?: string) {
   return { res, json: (await res.json()) as ReadBody };
 }
 
+// A cold first import of the route (next/server, zod, the whole store graph) can exceed the
+// default 10 s hook timeout on a loaded machine. Importing it once here warms the transform
+// cache with a generous budget; the per-test reset below still gives every test fresh state.
+beforeAll(async () => {
+  await import("../route");
+}, 60_000);
+
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -345,7 +352,7 @@ describe("POST /api/arcade/scores", () => {
     expect(emu.players().get(P1)?.handle).toBe("Averyveryver");
   });
 
-  it.each([["   "], ["‮"]])("falls back to Pilot for the handle %j", async (handle) => {
+  it.each([["   "], ["\u202e"]])("falls back to Pilot for the handle %j", async (handle) => {
     await submit({ handle });
     expect(emu.players().get(P1)?.handle).toBe("Pilot");
   });
