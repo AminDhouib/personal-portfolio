@@ -6,6 +6,10 @@ import {
   passwordGameLeaderboardEntrySchema,
   passwordGameLeaderboardFileSchema,
   emptyPasswordGameLeaderboardFile,
+  arcadeBoardRowSchema,
+  arcadeBestRowSchema,
+  arcadeTokenRowSchema,
+  arcadeYouRowSchema,
 } from "../persistence-schemas";
 
 const ISO = "2026-07-08T00:00:00.000Z";
@@ -80,5 +84,78 @@ describe("passwordGameLeaderboard schemas", () => {
 
   it("rejects the v1 on-disk shape (flat array)", () => {
     expect(passwordGameLeaderboardFileSchema.safeParse([VALID_PG_ENTRY]).success).toBe(false);
+  });
+});
+
+describe("arcade row pins", () => {
+  const BOARD_ROW = {
+    rank: 1,
+    handle: "Ada",
+    score: 4200,
+    detail: { seconds: 60, kills: 40, distance: 1500 },
+    achievedAt: ISO,
+    isYou: false,
+  };
+
+  it("board row: accepts numbers and ISO strings as-is", () => {
+    expect(arcadeBoardRowSchema.parse(BOARD_ROW)).toEqual(BOARD_ROW);
+  });
+
+  it("board row: coerces driver types (BIGINT string score, Date achievedAt)", () => {
+    const parsed = arcadeBoardRowSchema.parse({
+      ...BOARD_ROW,
+      rank: "3",
+      score: "9007199254740",
+      achievedAt: new Date(ISO),
+    });
+    expect(parsed.rank).toBe(3);
+    expect(parsed.score).toBe(9_007_199_254_740);
+    expect(parsed.achievedAt).toBe(ISO);
+  });
+
+  it("board row: detail may carry the legacy marker", () => {
+    const parsed = arcadeBoardRowSchema.parse({
+      ...BOARD_ROW,
+      detail: { seconds: 1, legacy: true },
+    });
+    expect(parsed.detail).toEqual({ seconds: 1, legacy: true });
+  });
+
+  it("board row: rejects null, empty and unsafe numeric strings and floats", () => {
+    expect(arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, score: null }).success).toBe(false);
+    expect(arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, score: "" }).success).toBe(false);
+    expect(arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, score: "12abc" }).success).toBe(false);
+    expect(
+      arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, score: "1234567890123456" }).success,
+    ).toBe(false);
+    expect(arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, score: 1.5 }).success).toBe(false);
+    expect(arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, achievedAt: "yesterday" }).success).toBe(
+      false,
+    );
+    expect(
+      arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, achievedAt: new Date("nope") }).success,
+    ).toBe(false);
+  });
+
+  it("board row: is strict, so a leaked column (player_id) fails instead of reaching the client", () => {
+    expect(
+      arcadeBoardRowSchema.safeParse({
+        ...BOARD_ROW,
+        player_id: "11111111-1111-4111-8111-111111111111",
+      }).success,
+    ).toBe(false);
+    expect(arcadeBoardRowSchema.safeParse({ ...BOARD_ROW, isYou: undefined }).success).toBe(false);
+  });
+
+  it("you and best rows coerce the same way", () => {
+    expect(arcadeYouRowSchema.parse({ rank: "2", score: "500" })).toEqual({ rank: 2, score: 500 });
+    expect(arcadeBestRowSchema.parse({ score: "500", rank: 2 })).toEqual({ score: 500, rank: 2 });
+    expect(arcadeYouRowSchema.safeParse({ rank: 2, score: 500, extra: 1 }).success).toBe(false);
+  });
+
+  it("token row requires a non-empty token_hash string and nothing else", () => {
+    expect(arcadeTokenRowSchema.parse({ token_hash: "abc" })).toEqual({ token_hash: "abc" });
+    expect(arcadeTokenRowSchema.safeParse({ token_hash: "" }).success).toBe(false);
+    expect(arcadeTokenRowSchema.safeParse({}).success).toBe(false);
   });
 });
