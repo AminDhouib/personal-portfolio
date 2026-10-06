@@ -277,6 +277,15 @@ export class VoltorbFlip {
     this._board = new Board(this._level, this._size);
   }
 
+  // Resume a saved session: `level` is the displayed 1-based level (what the
+  // currentLevel getter returns), and the board is rebuilt for it. Rules
+  // (payouts, level up/down) are untouched.
+  public restore(level: number, totalScore: number): void {
+    this._currentLevel = Math.max(0, Math.min(8, Math.round(level) - 1));
+    this._totalScore = Math.max(0, totalScore);
+    this.restartGame();
+  }
+
   // Dev-only shortcut: force a win for the current level. Bumps score by the
   // remaining coins-to-win and advances to the next level, mirroring what
   // flipCell does when the last valuable tile is hit.

@@ -34,6 +34,8 @@ import {
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { loadProgress } from "./super-voltorb-flip/progress";
+import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { COLORS, type Cell, type FlagValues } from "./super-voltorb-flip/types";
@@ -377,7 +379,11 @@ const Card = ({
       }
       onClick={flipCard}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") flipCard?.();
+        if (e.key === "Enter" || e.key === " ") {
+          // Space would otherwise scroll the page before the flip lands.
+          e.preventDefault();
+          flipCard?.();
+        }
       }}
     >
       {rowColor && <div className="svf-conn-e" style={{ backgroundColor: rowColor }} />}
@@ -554,18 +560,52 @@ const Gameboard = ({
   const [warningTile, setWarningTile] = useState<{ row: number; col: number } | null>(null);
   const warningTileRef = useRef<{ row: number; col: number } | null>(null);
 
-  async function waitForUserInteraction() {
+  // Round-end banner (win or lose). The flow waits on it: the banner button,
+  // a pointerdown on the board, or Enter/Space/any printable key continues.
+  const [roundResult, setRoundResult] = useState<Omit<RoundResultProps, "onContinue"> | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  // Level shown while the round was live; the engine moves currentLevel the
+  // instant the round ends, so the "from" side has to be remembered.
+  const roundStartLevelRef = useRef(game.currentLevel);
+  // Aborts the pending wait (and removes all its listeners) on resolve or unmount.
+  const pendingWaitRef = useRef<AbortController | null>(null);
+  const continueRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (game.gameStatus === "playing" || game.gameStatus === "memo") {
+      roundStartLevelRef.current = game.currentLevel;
+    }
+  }, [game.gameStatus, game.currentLevel]);
+
+  useEffect(() => {
+    return () => pendingWaitRef.current?.abort();
+  }, []);
+
+  function waitForUserInteraction() {
+    pendingWaitRef.current?.abort();
+    const controller = new AbortController();
+    pendingWaitRef.current = controller;
+    const { signal } = controller;
     return new Promise<void>((resolve) => {
-      const handleClick = () => {
+      const done = () => {
+        if (signal.aborted) return;
+        controller.abort();
+        pendingWaitRef.current = null;
+        continueRef.current = null;
         resolve();
-        document.removeEventListener("click", handleClick);
       };
-      const handleKeyPress = () => {
-        resolve();
-        document.removeEventListener("keypress", handleKeyPress);
-      };
-      document.addEventListener("click", handleClick);
-      document.addEventListener("keypress", handleKeyPress);
+      continueRef.current = done;
+      frameRef.current?.addEventListener("pointerdown", done, { signal });
+      document.addEventListener(
+        "keydown",
+        (e) => {
+          if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+          if (e.key === "Enter" || e.key === " " || e.key.length === 1) done();
+        },
+        { signal },
+      );
+      // An unmount aborts the controller without resolving: the flow just
+      // stops instead of animating a dead component.
     });
   }
 
@@ -757,6 +797,16 @@ const Gameboard = ({
         if (runPostFanfare) {
           await runPostFanfare();
         }
+        if (waitForClick) {
+          setRoundResult({
+            kind: "win",
+            fromLevel: roundStartLevelRef.current,
+            toLevel: game.currentLevel,
+            coins: game.currentScore,
+          });
+          await waitForUserInteraction();
+          setRoundResult(null);
+        }
         // 4 + 5. Cards flip down with the SLOT01 flash fired at the
         //         same frame as the first column — keeps SE/visual in
         //         lockstep instead of leading by the 100ms head delay.
@@ -768,7 +818,13 @@ const Gameboard = ({
       // the first card folding back down.
       void flipCardsUp().then(async () => {
         if (waitForClick) {
+          setRoundResult({
+            kind: "lose",
+            fromLevel: roundStartLevelRef.current,
+            toLevel: game.currentLevel,
+          });
           await waitForUserInteraction();
+          setRoundResult(null);
         }
         flipCardsDown(100, () => onFlipDownStart?.("down"));
       });
@@ -780,6 +836,7 @@ const Gameboard = ({
 
   return (
     <div
+      ref={frameRef}
       className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)] outline outline-2 outline-gray-600`}
       style={{ "--svf-n": N } as React.CSSProperties}
     >
@@ -868,6 +925,7 @@ const Gameboard = ({
           </div>
         </div>
       </div>
+      {roundResult && <RoundResult {...roundResult} onContinue={() => continueRef.current?.()} />}
     </div>
   );
 };
@@ -1536,9 +1594,21 @@ export function SuperVoltorbFlipGame() {
     // to re-tick 0 → earned while the round's old score lingers.
   }, [game, muted]);
 
+  // Restore the saved level + total once on mount. The persist effect below
+  // waits for `hydrated`, which flips in the same batch as the restored game,
+  // so the first render's Lv1/0 defaults can never overwrite a save.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const saved = loadProgress();
+    if (saved) updateGame((g) => g.restore(saved.currentLevel, saved.totalScore));
+    setHydrated(true);
+    // Mount-only by design; updateGame is recreated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Persist level + total score to localStorage on change.
   useEffect(() => {
-    if (!game) return;
+    if (!game || !hydrated) return;
     if (typeof window === "undefined") return;
     safeLocalSet(
       "svf:progress",
@@ -1547,7 +1617,7 @@ export function SuperVoltorbFlipGame() {
         totalScore: game.totalScore,
       }),
     );
-  }, [game, game?.currentLevel, game?.totalScore]);
+  }, [game, game?.currentLevel, game?.totalScore, hydrated]);
 
   // Reset memo mode + drive music/game-over audio on status transitions.
   // restartGame sets status back to "playing" after cards flip down.
