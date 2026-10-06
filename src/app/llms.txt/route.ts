@@ -1,5 +1,6 @@
 import { getAllBlogPosts } from "@/lib/blog";
 import { GAMES } from "@/app/games/games-meta";
+import { GAME_CONTENT } from "@/app/games/content";
 import { BOOKING_URL, socialLinks } from "@/data/nav";
 import { faqs } from "@/data/faq";
 import { SITE_ORIGIN, profile } from "@/data/profile";
@@ -65,11 +66,18 @@ export function GET(): Response {
     "",
     `- ${link("Client reviews and testimonials", "/reviews")}`,
     "",
+    "## Games",
+    "",
+    `Free browser games built for this site, playable on desktop and phone with no download or sign-up.`,
+    "",
+    `- ${link("Games index", "/games")}`,
+    ...games.map(
+      (g) => `- ${link(g.title, `/games/${g.slug}`)}: ${GAME_CONTENT[g.slug].seoDescription}`,
+    ),
+    "",
     "## Optional",
     "",
     `- ${link("Amin AI", "/ai")}: a chat assistant grounded in the same facts as this file`,
-    `- ${link("Games index", "/games")}`,
-    ...games.map((g) => `- ${link(g.title, `/games/${g.slug}`)}: ${g.tagline}`),
     `- ${link("Sitemap", "/sitemap.xml")}`,
     "",
   ];
