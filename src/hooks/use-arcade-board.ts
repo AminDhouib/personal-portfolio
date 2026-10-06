@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-// Type-only imports are erased, so the server-side arcade modules never reach the client bundle.
+// Type-only imports are erased, so the server-side arcade modules (and zod) never reach the
+// client bundle.
+import type { z } from "zod";
 import type { BoardPeriod } from "@/lib/arcade/boards";
-import type { ArcadeGameSlug } from "@/lib/arcade/games";
+import type { ARCADE_GAMES, ArcadeGameSlug } from "@/lib/arcade/games";
 import { getIdentity, peekIdentity, resetIdentity } from "@/lib/arcade/identity";
 
 /** One leaderboard row as the games render it. */
@@ -33,15 +35,18 @@ export interface ArcadeBoardResult {
   improved: boolean;
 }
 
-/** Fields a game may submit; only the keys of the game in question are sent. */
-export interface ArcadeSubmitPayload {
+/** The detail keys one game submits, inferred from the server's strict detail schema. */
+type ArcadeDetail<G extends ArcadeGameSlug> = z.infer<(typeof ARCADE_GAMES)[G]["detailSchema"]>;
+
+/**
+ * What a game submits: the name, the score and exactly the game's detail keys. The server
+ * rejects a body with a missing or extra detail key (400), so the type makes that a compile
+ * error instead.
+ */
+export type ArcadeSubmitPayload<G extends ArcadeGameSlug = ArcadeGameSlug> = {
   name: string;
   score: number;
-  seconds?: number;
-  kills?: number;
-  distance?: number;
-  level?: number;
-}
+} & ArcadeDetail<G>;
 
 export interface ArcadeSubmitResult {
   ok: boolean;
@@ -61,13 +66,19 @@ export interface UseArcadeBoardOptions {
   fetchOnMount?: boolean;
 }
 
-type DetailKey = "seconds" | "kills" | "distance" | "level";
-
-// The server's detail schema is strict per game, so only that game's keys may be sent.
-const DETAIL_KEYS: Record<ArcadeGameSlug, readonly DetailKey[]> = {
+// The server's detail schema is strict per game, so only that game's keys may be sent. The
+// mapped type ties each list to the schema's own keys, so a renamed key fails typecheck.
+const DETAIL_KEYS: { [G in ArcadeGameSlug]: readonly (keyof ArcadeDetail<G> & string)[] } = {
   "space-shooter": ["seconds", "kills", "distance"],
   hextris: ["seconds", "kills", "level"],
 };
+
+// Mirrors ARCADE_SCORE_CAP in src/lib/arcade/games.ts. That module imports zod and the
+// validators, which a client component must not pull in for one number; the hook test pins
+// the two together (a score at the cap is sent, one above it is not).
+const SCORE_CAP = 10_000_000;
+// The server's body schema takes a handle up to 200 characters and sanitizes it to 12.
+const HANDLE_MAX_SENT = 200;
 
 const PERIODS: readonly BoardPeriod[] = ["daily", "weekly", "all-time"];
 const REQUEST_TIMEOUT_MS = 8000;
@@ -133,7 +144,10 @@ function toBoards(x: unknown): ArcadeBoardResult[] {
   return boards;
 }
 
-function pickDetail(game: ArcadeGameSlug, payload: ArcadeSubmitPayload): Record<string, number> {
+function pickDetail(
+  game: ArcadeGameSlug,
+  payload: Readonly<Record<string, unknown>>,
+): Record<string, number> {
   const detail: Record<string, number> = {};
   for (const key of DETAIL_KEYS[game]) {
     const value = finite(payload[key]);
@@ -157,14 +171,17 @@ async function readJsonBody(res: Response): Promise<Record<string, unknown>> {
  * submits scores with the browser's trust-on-first-use identity. Each game keeps its own
  * submit-UX state; this hook owns only fetch, parse, period and the request payload.
  */
-export function useArcadeBoard(game: ArcadeGameSlug, options: UseArcadeBoardOptions = {}) {
+export function useArcadeBoard<G extends ArcadeGameSlug>(
+  game: G,
+  options: UseArcadeBoardOptions = {},
+) {
   const { period: initialPeriod = "all-time", fetchOnMount = true } = options;
   const [entries, setEntries] = useState<ArcadeBoardEntry[]>([]);
   const [you, setYou] = useState<ArcadeYou | null>(null);
   const [period, setPeriodState] = useState<BoardPeriod>(initialPeriod);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const gameRef = useRef(game);
+  const gameRef = useRef<ArcadeGameSlug>(game);
   gameRef.current = game;
   // Written synchronously by setPeriod so the refresh it triggers reads the new period.
   const periodRef = useRef(initialPeriod);
@@ -219,55 +236,69 @@ export function useArcadeBoard(game: ArcadeGameSlug, options: UseArcadeBoardOpti
       if (next === periodRef.current) return;
       periodRef.current = next;
       setPeriodState(next);
+      // The rows and the you row belong to the period just left. Drop them now so a slow or
+      // failed read shows an empty board, not another period's scores under this tab.
+      setEntries([]);
+      setYou(null);
       void refresh();
     },
     [refresh],
   );
 
-  const submit = useCallback(async (payload: ArcadeSubmitPayload): Promise<ArcadeSubmitResult> => {
-    const identity = getIdentity();
-    const slug = gameRef.current;
-    try {
-      const res = await fetch("/api/arcade/scores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          game: slug,
-          playerId: identity.playerId,
-          token: identity.token,
-          handle: payload.name,
-          score: Math.max(0, Math.floor(payload.score)),
-          detail: pickDetail(slug, payload),
-        }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      const data = await readJsonBody(res);
-      if (res.status === 422) {
-        setError("score not accepted");
-        return { ok: false, rejected: true };
-      }
-      if (res.status === 403 && data.error === "identity") {
-        resetIdentity();
-        setError("identity was reset, please submit again");
-        return { ok: false, identityReset: true };
-      }
-      if (!res.ok) {
-        setError(`failed to submit score (status ${res.status})`);
-        return { ok: false };
-      }
-      if (data.ok !== true) {
+  const submit = useCallback(
+    async (payload: ArcadeSubmitPayload<G>): Promise<ArcadeSubmitResult> => {
+      try {
+        const slug = gameRef.current;
+        const score = Math.max(0, Math.floor(payload.score));
+        if (score > SCORE_CAP) {
+          // The server would answer 400; this is the same "not accepted" outcome as a 422.
+          setError("score not accepted");
+          return { ok: false, rejected: true };
+        }
+        // Inside the try: creating the identity touches crypto and storage, which can throw.
+        const identity = getIdentity();
+        const res = await fetch("/api/arcade/scores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            game: slug,
+            playerId: identity.playerId,
+            token: identity.token,
+            handle: payload.name.slice(0, HANDLE_MAX_SENT),
+            score,
+            detail: pickDetail(slug, payload),
+          }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+        const data = await readJsonBody(res);
+        if (res.status === 422) {
+          setError("score not accepted");
+          return { ok: false, rejected: true };
+        }
+        if (res.status === 403 && data.error === "identity") {
+          resetIdentity();
+          setError("identity was reset, please submit again");
+          return { ok: false, identityReset: true };
+        }
+        if (!res.ok) {
+          setError(`failed to submit score (status ${res.status})`);
+          return { ok: false };
+        }
+        if (data.ok !== true) {
+          setError("failed to submit score");
+          return { ok: false };
+        }
+        const boards = toBoards(data.boards);
+        setError(null);
+        return { ok: true, rank: boards.find((b) => b.period === "all-time")?.rank, boards };
+      } catch (err) {
+        reportError(err);
         setError("failed to submit score");
         return { ok: false };
       }
-      const boards = toBoards(data.boards);
-      setError(null);
-      return { ok: true, rank: boards.find((b) => b.period === "all-time")?.rank, boards };
-    } catch (err) {
-      reportError(err);
-      setError("failed to submit score");
-      return { ok: false };
-    }
-  }, []);
+    },
+    [],
+  );
 
   return { entries, you, period, setPeriod, loading, error, refresh, submit };
 }

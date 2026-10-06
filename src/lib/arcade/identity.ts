@@ -66,20 +66,38 @@ function readStored(): ArcadeIdentity | null {
     return null;
   }
   if (raw === null) return null;
-  const parsed = safeJsonParse<unknown>(raw, "arcade-identity");
+  // A JSON SyntaxError message can quote a slice of the input, and the input holds the token,
+  // so the default report (console.error plus reportError with the raw error) is replaced by
+  // one fixed message that carries no content.
+  const parsed = safeJsonParse<unknown>(raw, "arcade-identity", null, () => {
+    if (typeof reportError === "function") {
+      reportError(new Error("arcade identity: stored value is not valid JSON, ignored"));
+    }
+  });
   return isIdentity(parsed) ? { playerId: parsed.playerId, token: parsed.token } : null;
 }
 
 function create(): ArcadeIdentity {
-  const identity: ArcadeIdentity = { playerId: newPlayerId(), token: newToken() };
+  const minted: ArcadeIdentity = { playerId: newPlayerId(), token: newToken() };
+  let identity = minted;
+  if (safeLocalSet(KEY, JSON.stringify(minted))) {
+    // Two tabs on a first visit can each mint one and the last write wins; adopt what is
+    // actually stored so both tabs end up with the same identity. Only after a successful
+    // write: after a failed one the stored value is an older identity we are replacing.
+    identity = readStored() ?? minted;
+  }
+  // Always kept: when the write failed (quota, blocked storage) this is the only copy.
   memory = identity;
-  safeLocalSet(KEY, JSON.stringify(identity));
   return identity;
 }
 
-/** The identity if one exists, without creating or writing anything (safe on first paint). */
+/**
+ * The identity if one exists, without creating or writing anything (safe on first paint).
+ * Memory wins over storage: it is the newest identity this page load created, which matters
+ * when a reset could not be stored and storage still holds the refused one.
+ */
 export function peekIdentity(): ArcadeIdentity | null {
-  return readStored() ?? memory;
+  return memory ?? readStored();
 }
 
 /** The identity, created and stored on first use. Call it only when submitting a score. */
