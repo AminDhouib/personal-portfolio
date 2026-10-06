@@ -5,7 +5,8 @@ import { GamesClient } from "./games-client";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
-const DESCRIPTION = "Mini-games built with the geometric design language of amindhou.com.";
+const DESCRIPTION =
+  "Free browser games built for this site. No downloads, no sign-up: pick one and play.";
 
 export const metadata = {
   title: "Games",
@@ -29,6 +30,12 @@ export const metadata = {
     // the site card has to be restated or the page ships with no og:image.
     images: [{ url: `${SITE_ORIGIN}/opengraph-image`, width: 1200, height: 630, alt: "Games" }],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Games — playable mini-games by Amin Dhouib",
+    description: DESCRIPTION,
+    images: [`${SITE_ORIGIN}/opengraph-image`],
+  },
 };
 
 export default function GamesPage() {
@@ -45,7 +52,7 @@ export default function GamesPage() {
 
         <h1 className="mb-2 font-display text-4xl font-black tracking-tight">Games</h1>
         <p className="mb-12 text-(--muted)">
-          Mini-games using the same wireframe shapes from this site. Click / tap to play.
+          Free browser games built for this site. No downloads, no sign-up: pick one and play.
         </p>
 
         <Suspense fallback={null}>

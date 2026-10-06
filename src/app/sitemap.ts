@@ -14,7 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const projectSlugs = projects.map((p) => p.slug);
   const posts = getAllBlogPosts();
-  const gameSlugs = GAMES.filter((g) => !g.hidden && !g.external).map((g) => g.slug);
+  const gameSlugs = GAMES.filter((g) => !g.hidden).map((g) => g.slug);
   // Posts are sorted newest-first, so the blog index changed when its newest post did.
   const newestPostDate = posts.map((p) => postDate(p.date)).find((d) => d !== undefined);
 
