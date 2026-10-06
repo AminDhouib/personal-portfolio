@@ -10,6 +10,7 @@ import {
   arcadeBestRowSchema,
   arcadeTokenRowSchema,
   arcadeYouRowSchema,
+  legacyLeaderboardRowSchema,
 } from "../persistence-schemas";
 
 const ISO = "2026-07-08T00:00:00.000Z";
@@ -157,5 +158,55 @@ describe("arcade row pins", () => {
     expect(arcadeTokenRowSchema.parse({ token_hash: "abc" })).toEqual({ token_hash: "abc" });
     expect(arcadeTokenRowSchema.safeParse({ token_hash: "" }).success).toBe(false);
     expect(arcadeTokenRowSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("legacy leaderboard row pin", () => {
+  const LEGACY_ROW = {
+    id: 7,
+    game: "hextris",
+    name: "Ada",
+    score: 20000,
+    level: 17,
+    seconds: 120,
+    kills: 300,
+    distance: null,
+    created_at: new Date(ISO),
+  };
+
+  it("accepts a driver row and turns the Date into an ISO string", () => {
+    expect(legacyLeaderboardRowSchema.parse(LEGACY_ROW)).toEqual({
+      ...LEGACY_ROW,
+      created_at: ISO,
+    });
+  });
+
+  it("keeps NULL detail columns null (old rows and games that never sent them)", () => {
+    const parsed = legacyLeaderboardRowSchema.parse({
+      ...LEGACY_ROW,
+      seconds: null,
+      kills: null,
+      distance: null,
+    });
+    expect([parsed.seconds, parsed.kills, parsed.distance]).toEqual([null, null, null]);
+  });
+
+  it("accepts only the two arcade games", () => {
+    expect(
+      legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, game: "space-shooter" }).success,
+    ).toBe(true);
+    expect(
+      legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, game: "tower-stacker" }).success,
+    ).toBe(false);
+  });
+
+  it("is strict and rejects fractional or missing numbers", () => {
+    expect(legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, region: "Canada" }).success).toBe(
+      false,
+    );
+    expect(legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, score: 1.5 }).success).toBe(false);
+    expect(legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, level: null }).success).toBe(
+      false,
+    );
   });
 });
