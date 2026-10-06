@@ -3,7 +3,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "next-themes";
 import {
   Rocket,
   Trophy,
@@ -59,7 +58,6 @@ import {
   ARENA_H,
   POWERUP_DURATION_MS,
   ENVIRONMENTS,
-  INVERTED_ARMED_ENV,
   envForTime,
   POWERUP_DEFS,
   tryDash,
@@ -79,6 +77,7 @@ import {
   resumeRun,
 } from "./space-shooter/run-init";
 import { Scene } from "./space-shooter/scene-components";
+import { keyboardStep, shouldCaptureTouch } from "./space-shooter/input";
 
 // ---------- constants ----------
 
@@ -376,7 +375,7 @@ export function SpaceShooterGame() {
   const chunksRef = useRef<Blob[]>([]);
   const startRecording = useCallback(() => {
     try {
-      const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+      const canvas = containerRef.current?.querySelector("canvas") ?? null;
       if (!canvas) return;
       const stream = canvas.captureStream(30);
       let mimeType = "video/webm;codecs=vp9";
@@ -408,7 +407,9 @@ export function SpaceShooterGame() {
   }, []);
   const captureShareImage = useCallback(
     async (stats: { score: number; distance: number; kills: number }): Promise<Blob | null> => {
-      const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
+      // The game's own canvas: on the home page the first canvas in the
+      // document is the background scene.
+      const canvas = containerRef.current?.querySelector("canvas") ?? null;
       if (!canvas) return null;
       const w = 1200,
         h = 630;
@@ -431,7 +432,7 @@ export function SpaceShooterGame() {
       ctx.fillText(`Kills: ${stats.kills}`, w / 2, 400);
       ctx.font = "20px system-ui";
       ctx.fillStyle = "#64748b";
-      ctx.fillText("amindhouib.ca/games", w / 2, 580);
+      ctx.fillText("amindhou.com/games/space-shooter", w / 2, 580);
       return new Promise((resolve) => outCanvas.toBlob((b) => resolve(b), "image/png"));
     },
     [],
@@ -544,6 +545,37 @@ export function SpaceShooterGame() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
+  // Same pause path for a window that lost focus and for an embed scrolled
+  // mostly off-screen (the home page), so a run never plays itself unwatched.
+  // Never auto-resumes.
+  const inViewRef = useRef(true);
+  useEffect(() => {
+    const el = containerRef.current;
+    const pauseIfRunning = () => {
+      if (pauseRun(gameRefs.current)) {
+        setUi((u) => ({ ...u, status: "paused" }));
+      }
+    };
+    let io: IntersectionObserver | null = null;
+    if (el && typeof IntersectionObserver !== "undefined") {
+      io = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[entries.length - 1];
+          if (!entry) return;
+          inViewRef.current = entry.isIntersecting && entry.intersectionRatio >= 0.35;
+          if (!inViewRef.current) pauseIfRunning();
+        },
+        { threshold: [0, 0.35, 1] },
+      );
+      io.observe(el);
+    }
+    window.addEventListener("blur", pauseIfRunning);
+    return () => {
+      io?.disconnect();
+      window.removeEventListener("blur", pauseIfRunning);
+    };
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -564,12 +596,9 @@ export function SpaceShooterGame() {
     if (typeof window === "undefined") return false;
     return navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches;
   }, []);
-  const { resolvedTheme } = useTheme();
-  const invertedArmed = resolvedTheme === "light" && ui.status === "armed";
-  // Mirror to gameRefs so runTick can pick the right color target each frame.
-  useEffect(() => {
-    gameRefs.current.invertedArmed = invertedArmed;
-  }, [invertedArmed]);
+  // The scene is space: it renders the dark biome palette whatever the site
+  // theme is (gameRefs.invertedArmed stays false, so runTick never lerps to the
+  // light-grey Deep Space env).
 
   // sync sound manager with React state
   useEffect(() => {
@@ -599,6 +628,19 @@ export function SpaceShooterGame() {
       return () => window.clearTimeout(id);
     }
   }, [ui.status, shopOpen, settingsOpen, achievementsOpen]);
+  // Escape closes whichever full-panel overlay is open.
+  const panelOpen = shopOpen || achievementsOpen || settingsOpen;
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setShopOpen(false);
+      setAchievementsOpen(false);
+      setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [panelOpen]);
   // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
   const [devFps, setDevFps] = useState(60);
   useEffect(() => {
@@ -934,7 +976,9 @@ export function SpaceShooterGame() {
     const onTouch = (e: TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
-      e.preventDefault();
+      // Only steering touches are claimed; a tap on a button must keep its
+      // synthesized click (PLAY, SHOP, TROPHIES, FLY AGAIN).
+      if (shouldCaptureTouch(e.target, gameRefs.current.status)) e.preventDefault();
       ensureAudio();
       updateTarget(touch.clientX, touch.clientY);
     };
@@ -991,8 +1035,22 @@ export function SpaceShooterGame() {
         spawnBoss(g, bossIds[nextIdx] ?? "sentinel", 0);
         return;
       }
+      // While a run is live and on screen, claim the steering keys and Space
+      // so the page does not scroll under the player.
+      const runLive = gameRefs.current.status === "playing" || gameRefs.current.status === "paused";
+      // Space still activates a focused control (e.g. the Pause button).
+      const onControl =
+        e.target instanceof Element && e.target.closest("button, a, input") !== null;
+      if (
+        runLive &&
+        inViewRef.current &&
+        ["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"]
+          .concat(onControl ? [] : [" "])
+          .includes(k)
+      ) {
+        e.preventDefault();
+      }
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {
-        if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) e.preventDefault();
         // Keydown is a user gesture too — resume a suspended AudioContext so
         // keyboard-only players are not stuck in silence until a mouse move.
         ensureAudio();
@@ -1017,11 +1075,14 @@ export function SpaceShooterGame() {
     document.addEventListener("visibilitychange", clearKeys);
 
     let raf = 0;
-    const loop = () => {
+    let lastFrameAt = performance.now();
+    const loop = (frameAt: number) => {
       try {
         const g = gameRefs.current;
+        const dtSeconds = (frameAt - lastFrameAt) / 1000;
+        lastFrameAt = frameAt;
         if (g.status === "playing") {
-          const speed = 0.14;
+          const speed = keyboardStep(dtSeconds);
           let dx = 0;
           let dy = 0;
           if (keys.has("arrowleft") || keys.has("a")) dx -= speed;
@@ -1073,7 +1134,7 @@ export function SpaceShooterGame() {
             : "aspect-3/4 w-full sm:aspect-auto sm:h-115"
         }`}
         style={{
-          background: invertedArmed ? INVERTED_ARMED_ENV.bg : env.bg,
+          background: env.bg,
           cursor: ui.status === "playing" ? "none" : "default",
           // Cap so 16:1 monitors letterbox at ~21:9, AND cap mobile portrait
           // height so the canvas doesn't dominate the viewport on tall phones.
@@ -1547,47 +1608,49 @@ export function SpaceShooterGame() {
             </div>
 
             {/* Top-right: best + controls (pause / mute / fullscreen) */}
-            <div className="absolute top-3 right-3 flex items-center gap-2">
-              {highScore > 0 && (
-                <div className="pointer-events-none flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-accent-amber tabular-nums backdrop-blur-sm">
-                  <Trophy className="h-3 w-3" />
-                  {highScore}
-                </div>
-              )}
-              <button
-                onClick={togglePause}
-                aria-label={ui.status === "paused" ? "Resume" : "Pause"}
-                className="rounded-lg border border-white/10 bg-black/50 p-1.5 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
-              >
-                {ui.status === "paused" ? (
-                  <Play className="h-3.5 w-3.5" />
-                ) : (
-                  <Pause className="h-3.5 w-3.5" />
+            {!shopOpen && (
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                {highScore > 0 && (
+                  <div className="pointer-events-none flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-accent-amber tabular-nums backdrop-blur-sm">
+                    <Trophy className="h-3 w-3" />
+                    {highScore}
+                  </div>
                 )}
-              </button>
-              <button
-                onClick={toggleSound}
-                aria-label={soundEnabled ? "Mute" : "Unmute"}
-                className="rounded-lg border border-white/10 bg-black/50 p-1.5 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
-              >
-                {soundEnabled ? (
-                  <Volume2 className="h-3.5 w-3.5" />
-                ) : (
-                  <VolumeX className="h-3.5 w-3.5" />
-                )}
-              </button>
-              <button
-                onClick={toggleFullscreen}
-                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                className="rounded-lg border border-white/10 bg-black/50 p-1.5 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="h-3.5 w-3.5" />
-                ) : (
-                  <Maximize2 className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
+                <button
+                  onClick={togglePause}
+                  aria-label={ui.status === "paused" ? "Resume" : "Pause"}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
+                >
+                  {ui.status === "paused" ? (
+                    <Play className="h-3.5 w-3.5" />
+                  ) : (
+                    <Pause className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  onClick={toggleSound}
+                  aria-label={soundEnabled ? "Mute" : "Unmute"}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
+                >
+                  {soundEnabled ? (
+                    <Volume2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <VolumeX className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Biome label — bottom center */}
             <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 font-mono text-[10px] tracking-widest text-white/40 uppercase">
@@ -1671,11 +1734,12 @@ export function SpaceShooterGame() {
           </div>
         )}
 
-        {/* Record toggle (armed only) */}
-        {ui.status === "armed" && (
+        {/* Record toggle (armed only). Top-left so it never sits over the
+            bottom-anchored hint line. */}
+        {ui.status === "armed" && !panelOpen && (
           <button
             onClick={() => (isRecording ? stopRecording() : startRecording())}
-            className="absolute bottom-3 left-3 z-30 flex items-center gap-2 rounded-md border border-white/20 bg-black/50 px-3 py-1.5 text-xs text-white hover:bg-black/70"
+            className="absolute top-3 left-3 z-30 flex min-h-11 items-center gap-2 rounded-md border border-white/20 bg-black/50 px-3 text-xs text-white hover:bg-black/70"
             type="button"
           >
             <span
@@ -1685,10 +1749,10 @@ export function SpaceShooterGame() {
           </button>
         )}
         {/* Settings gear (idle or dead only) */}
-        {(ui.status === "armed" || ui.status === "dead") && (
+        {(ui.status === "armed" || ui.status === "dead") && !panelOpen && (
           <button
             onClick={() => setSettingsOpen(true)}
-            className="absolute top-3 right-3 z-30 rounded border border-white/20 bg-black/40 p-2 text-white transition hover:bg-black/60"
+            className="absolute top-3 right-3 z-30 flex h-11 w-11 items-center justify-center rounded border border-white/20 bg-black/40 text-white transition hover:bg-black/60"
             aria-label="Settings"
             type="button"
           >
@@ -1848,7 +1912,7 @@ export function SpaceShooterGame() {
                 <CoinsIcon className="h-3.5 w-3.5" />
                 {profile.walletCoins}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex w-full flex-wrap items-center justify-center gap-2 px-3 sm:gap-3">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -1856,7 +1920,7 @@ export function SpaceShooterGame() {
                     const g = gameRefs.current;
                     if (g.status === "armed") startRun(g);
                   }}
-                  className="rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-7 py-3 text-base font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/30"
+                  className="min-h-11 rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-5 py-3 text-base font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/30 sm:px-7"
                 >
                   Play
                 </motion.button>
@@ -1864,7 +1928,7 @@ export function SpaceShooterGame() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShopOpen(true)}
-                  className="flex items-center gap-2 rounded-xl border border-accent-amber/50 bg-accent-amber/20 px-5 py-3 text-sm font-bold tracking-wider text-accent-amber uppercase"
+                  className="flex min-h-11 items-center gap-2 rounded-xl border border-accent-amber/50 bg-accent-amber/20 px-4 py-3 text-sm font-bold tracking-wider text-accent-amber uppercase sm:px-5"
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Shop
@@ -1873,7 +1937,7 @@ export function SpaceShooterGame() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setAchievementsOpen(true)}
-                  className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold tracking-wider text-white/80 uppercase"
+                  className="flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold tracking-wider text-white/80 uppercase sm:px-5"
                 >
                   <Trophy className="h-4 w-4" />
                   Trophies
@@ -2056,7 +2120,7 @@ export function SpaceShooterGame() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={launch}
-                  className="inline-flex items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
                 >
                   <RotateCcw className="h-4 w-4" />
                   Fly again
@@ -2066,7 +2130,7 @@ export function SpaceShooterGame() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShopOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-accent-amber/50 bg-accent-amber/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-amber uppercase sm:px-5 sm:py-2.5 sm:text-sm"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-amber/50 bg-accent-amber/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-amber uppercase sm:px-5 sm:py-2.5 sm:text-sm"
                   >
                     <ShoppingCart className="h-4 w-4" />
                     Shop
@@ -2084,7 +2148,7 @@ export function SpaceShooterGame() {
                       a.click();
                       setTimeout(() => URL.revokeObjectURL(url), 1000);
                     }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-blue-400/50 bg-blue-500/20 px-4 py-2 text-xs font-bold tracking-wider text-blue-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-blue-400/50 bg-blue-500/20 px-4 py-2 text-xs font-bold tracking-wider text-blue-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
                   >
                     Download Replay
                   </motion.button>
@@ -2131,7 +2195,7 @@ export function SpaceShooterGame() {
                       setTimeout(() => URL.revokeObjectURL(url), 1000);
                     })();
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-xs font-bold tracking-wider text-emerald-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-xs font-bold tracking-wider text-emerald-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
                 >
                   <Share2 className="h-4 w-4" />
                   Share
@@ -2154,7 +2218,7 @@ export function SpaceShooterGame() {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reload
