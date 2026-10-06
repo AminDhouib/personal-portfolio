@@ -23,7 +23,7 @@
     "lighthouse": "node scripts/run-lighthouse.mjs"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.50",
+    "@ai-sdk/openai": "^3.0.124",
     "@copilotkit/react-core": "^1.54.1",
     "@copilotkit/react-ui": "^1.54.1",
     "@copilotkit/runtime": "^1.54.1",
@@ -67,7 +67,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "4.1.4",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "eslint-plugin-oxlint": "^1.72.0",
@@ -81,7 +81,7 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "typescript-eslint": "^8.63.0",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.11"
   },
   "lint-staged": {
     "*.{ts,tsx,mts}": [
