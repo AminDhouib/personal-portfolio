@@ -11,6 +11,7 @@
  * compile time, no zod in the bundle); the schema VALUES are server-only.
  */
 import { z } from "zod";
+import { ARCADE_GAME_SLUGS } from "@/lib/arcade/games";
 
 export const PERSISTENCE_SCHEMA_VERSION = 1;
 
@@ -105,6 +106,26 @@ export const arcadeBestRowSchema = z.strictObject({ score: pgInteger, rank: pgIn
 
 /** The stored token hash used for the trust-on-first-use identity check. */
 export const arcadeTokenRowSchema = z.strictObject({ token_hash: z.string().min(1) });
+
+/**
+ * A row of the legacy leaderboard_entries table as the one-time arcade import reads it
+ * (src/lib/arcade/legacy-import.ts). INTEGER columns arrive as numbers; seconds, kills and
+ * distance are nullable because old rows (and games that never sent them) hold NULLs.
+ * Only the two arcade games can appear: the import query filters on them, and any other
+ * value is a bug that must abort the import rather than be skipped.
+ */
+export const legacyLeaderboardRowSchema = z.strictObject({
+  id: pgInteger,
+  game: z.enum(ARCADE_GAME_SLUGS),
+  name: z.string(),
+  score: pgInteger,
+  level: pgInteger,
+  seconds: pgInteger.nullable(),
+  kills: pgInteger.nullable(),
+  distance: pgInteger.nullable(),
+  created_at: pgTimestamp,
+});
+export type LegacyLeaderboardRow = z.infer<typeof legacyLeaderboardRowSchema>;
 
 // Lead schema removed: leads are now in Postgres; the LeadRecord type lives
 // in src/lib/leads-store.ts next to the query code.
