@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { fetchHubBoard, type HubBoardResult } from "../hub-boards";
@@ -92,6 +93,46 @@ describe("useHubBoards", () => {
     });
     await screen.findAllByText("ok");
     expect(fetchMock).toHaveBeenCalledTimes(TODAY_SOURCES.length);
+  });
+
+  it("under StrictMode leaves one live request set and ignores the aborted first one", async () => {
+    const pending: Array<{
+      signal: AbortSignal | undefined;
+      resolve: (result: HubBoardResult) => void;
+    }> = [];
+    fetchMock.mockImplementation(
+      (_source, signal) =>
+        new Promise<HubBoardResult>((resolve) => {
+          pending.push({ signal, resolve });
+        }),
+    );
+    render(
+      <StrictMode>
+        <Probe sources={TODAY_SOURCES} />
+      </StrictMode>,
+    );
+    const count = TODAY_SOURCES.length;
+    // The double-invoked effect started two request sets; the first is aborted, the second live.
+    expect(pending).toHaveLength(count * 2);
+    const first = pending.slice(0, count);
+    const second = pending.slice(count);
+    for (const request of first) expect(request.signal?.aborted).toBe(true);
+    for (const request of second) expect(request.signal?.aborted).toBe(false);
+
+    // The aborted set settling late must not set state.
+    await act(async () => {
+      for (const request of first) request.resolve({ status: "error" });
+    });
+    for (const source of TODAY_SOURCES) {
+      expect(screen.getByTestId(source.slug)).toHaveTextContent("idle");
+    }
+
+    await act(async () => {
+      for (const request of second) request.resolve({ status: "ok", rows: [] });
+    });
+    for (const source of TODAY_SOURCES) {
+      expect(screen.getByTestId(source.slug)).toHaveTextContent("ok");
+    }
   });
 
   it("records an error result", async () => {
