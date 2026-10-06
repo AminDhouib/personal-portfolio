@@ -1,3 +1,21 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# Security pins for transitive dependencies whose parents hold them below the fixed version.
+# Each one stays inside the major its parent expects. Drop an entry once the parent ships
+# the fix itself (pnpm audit without the entry stays clean).
+overrides:
+  # GHSA-866g-f22w-33x8 (low). @ai-sdk/google-vertex 3.0.x (via @copilotkit/runtime) pins
+  # 3.0.23. 3.0.30 is the newest fixed 3.0.x without undici ^5, whose 5.x line has
+  # advisories that are only fixed in 6.x.
+  "@ai-sdk/provider-utils@>=3.0.0 <3.0.28": "3.0.30"
+  # GHSA-866g-f22w-33x8 (low). @ai-sdk/mcp (via @copilotkit/runtime) pins 4.0.22; 4.0.57 is
+  # the version @ai-sdk/openai already uses.
+  "@ai-sdk/provider-utils@>=4.0.0 <4.0.33": "4.0.57"
+  # GHSA-x7hr-w5r2-h6wg (moderate, DOM clobbering). refractor 3 (via @copilotkit/react-ui's
+  # react-syntax-highlighter) pins ~1.27.0.
+  "prismjs@<1.30.0": "^1.30.0"
+  # GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx (moderate). Dev only:
+  # express 4 under @lhci/cli pins ~6.14.0.
+  "qs@>=6.11.1 <6.16.0": "^6.16.0"
