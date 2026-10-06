@@ -157,7 +157,7 @@ All persisted data lives in **Postgres**, not on disk. Compose defines a `db` se
 (`postgres:17-alpine`) whose data sits on the `db-data` named volume; the schema is created once,
 on the volume's first start, from `db/init.sql` mounted into `/docker-entrypoint-initdb.d/`.
 Tables: `leaderboard_entries`, `pg_leaderboard_entries`, `pg2_leaderboard_entries`, `leads`,
-`arcade_players`, and `arcade_scores`.
+`arcade_players`, `arcade_scores`, and `arcade_migrations`.
 Row shapes mirror the zod schemas in `src/lib/persistence-schemas.ts`. There is no `.data`
 directory and no JSON/JSONL file store anymore — the old file-persistence machinery (corruption
 quarantine, schema-mismatch archive-then-reset, `validate:data`) was removed in the Postgres
@@ -207,6 +207,39 @@ outside the top 1000 has no row there (the API answers `you: null` for them on t
 `arcade_players` rows are not pruned (see DESIGN.md Known debt). `GET /api/arcade/scores` is
 rate limited to 120 reads per 60 s per client IP; a client over it gets a 429 with `Retry-After`,
 and the in-memory counter resets when the app restarts. POST stays at 10 per 60 s.
+
+**Legacy leaderboard import (T1b-2): inspect and re-run.** The first arcade request after the
+T1b-2 deploy copies the plausible Orbital Dodge and Hextris rows of `leaderboard_entries` into
+the arcade tables, once, and logs one line at warn level with scope `arcade:legacy-import`:
+"imported N scores for M players (read R: S superseded, U unverifiable, I implausible)" (see
+Logs above for how to read it). A database without the legacy table logs "no leaderboard_entries
+table" instead, and every later start logs nothing. The marker is a row in `arcade_migrations`
+(key `legacy-leaderboard-import-v1`); imported players have `token_hash = 'legacy'` and their
+score rows carry `detail.legacy = true`. `leaderboard_entries` is left untouched: it is the
+source and the backup, and since `POST /api/leaderboard` now answers 400 for these two games
+(only Tower Stacker still writes there), their rows in it are frozen history. Prod's legacy
+leaderboard was empty when Part 1 deployed (2026-10-06), so expect the line to report 0 or very
+few scores there; that is a correct run, not a failure.
+Inspect (read-only):
+
+```bash
+docker compose exec db psql -U portfolio -d portfolio -c "SELECT * FROM arcade_migrations"
+docker compose exec db psql -U portfolio -d portfolio -c "SELECT s.game, count(*) FROM arcade_scores s JOIN arcade_players p ON p.id = s.player_id WHERE p.token_hash = 'legacy' GROUP BY s.game"
+```
+
+To re-run it (take a `pg_dump` first), delete the legacy players (their score rows cascade) and
+the marker in one transaction. Rows submitted live since belong to real players and are kept:
+
+```sql
+BEGIN;
+DELETE FROM arcade_players WHERE token_hash = 'legacy' RETURNING id, handle;
+DELETE FROM arcade_migrations WHERE key = 'legacy-leaderboard-import-v1' RETURNING key;
+-- expect the legacy players and exactly one marker row; then COMMIT; (or ROLLBACK;)
+```
+
+The ensure-step is memoized per process, so the import runs again on the next app start, not on
+the next request: restart the app (see Restart above) and read the log line. A failed import
+rolls its marker back with everything else and retries on the next request by itself.
 
 **Arcade store test against a throwaway local Postgres** (CI runs it in the `db-integration`
 job; locally it needs Docker). The URL must be localhost or 127.0.0.1 with database `arcade_it`

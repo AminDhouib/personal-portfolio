@@ -72,6 +72,8 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 - Arcade leaderboard v2: `src/lib/arcade/` (UTC board keys, per-game plausibility registry,
   store, ensure-step) behind `src/app/api/arcade/scores/route.ts`. Its tables are created
   idempotently at first use and mirrored in `db/init.sql`; see DESIGN.md's "Arcade backend".
+  Orbital Dodge and Hextris read and write it through `src/hooks/use-arcade-board.ts`; Tower
+  Stacker keeps the legacy `/api/leaderboard` route until T6.
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries
