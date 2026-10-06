@@ -39,17 +39,20 @@ function TileBody({
   return (
     <div data-tile-body="" aria-busy={state === "idle"} className="mt-3 h-18">
       {state === "idle" && (
-        <ol aria-hidden="true">
-          {PLACEHOLDER_RANKS.map((rank) => (
-            <li key={rank} className="flex h-6 items-center gap-2 text-sm text-(--muted)">
-              <span className="w-4 shrink-0 tabular-nums">{rank}</span>
-              <span>{DASH}</span>
-            </li>
-          ))}
-        </ol>
+        <>
+          <p className="sr-only">Loading</p>
+          <ol role="list" aria-hidden="true">
+            {PLACEHOLDER_RANKS.map((rank) => (
+              <li key={rank} className="flex h-6 items-center gap-2 text-sm text-(--muted)">
+                <span className="w-4 shrink-0 tabular-nums">{rank}</span>
+                <span>{DASH}</span>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
       {state === "ready" && result?.status === "ok" && (
-        <ol>
+        <ol role="list">
           {result.rows.map((row) => (
             <li key={row.rank} className="flex h-6 items-center gap-2 text-sm">
               <span className="w-4 shrink-0 text-(--muted) tabular-nums">{row.rank}</span>
@@ -130,7 +133,7 @@ export function TodayStrip() {
         Today
       </h2>
       <p className="mt-1 text-sm text-(--muted)">The top three on each daily board.</p>
-      <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+      <ul role="list" className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
         {tiles.map((tile) => (
           <li key={tile.source.slug} className="min-w-0">
             <TodayTile source={tile.source} state={tile.state} result={tile.result} />
