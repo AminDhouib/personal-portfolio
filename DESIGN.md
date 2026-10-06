@@ -187,9 +187,23 @@ current tree on 2026-07-07.
   needs the same gate.
 - **The `/games` grid shows 5 cards, not 6, on purpose.** `games-meta.ts` marks `tower-stacker`
   `hidden: true`, taking it out of rotation without deleting any code — the route still works if
-  visited directly. `password-game` (The Password Game 2) is `external: true`: its card is live in
+  visited directly, but its page is `noindex` and it is left out of the sitemap and every "other
+  games" list. `password-game` (The Password Game 2) is `external: true`: its card is live in
   the grid, but it links to its own top-level route (`/games/password-game`) outside the shared
-  game-loader rather than to a `[slug]` page.
+  game-loader rather than to a `[slug]` page; it is still in the sitemap. The first public game
+  renders as a featured card spanning both columns, so an odd count never leaves a lone card in
+  the last row.
+- **Orbital Dodge pauses itself and never resumes itself.** A live run pauses when the window
+  loses focus, when the tab is hidden, or when less than 35% of the game is on screen (the home
+  page embed scrolled away), so a run never plays out unwatched; the player always resumes. The
+  scene is always the dark space palette: the light-theme "inverted armed" menu backdrop was
+  removed because it read as muddy grey, and the `invertedArmed` flag in `game-tick.ts`,
+  `scene-components.tsx` and `types.ts` is now always false (dormant code; delete it the next time
+  that subsystem is touched).
+- **Super Voltorb Flip waits for the player at the end of every round.** After the reveal (and,
+  on a win, the payout) a result banner names the outcome and the level change and offers
+  Continue / Next round; a tap on the board or any key also continues. HGSS waits for a press
+  after a clear as well, so the earlier auto-advance on a win is gone on purpose.
 - **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
   `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
   license alongside). Known quirks live inside that bundle and are accepted while the game stays
