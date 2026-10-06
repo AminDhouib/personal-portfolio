@@ -56,22 +56,18 @@ function isLeaderboardEntry(x: unknown): x is LeaderboardEntry {
 export interface UseLeaderboardOptions {
   /**
    * Fetch the board once on mount (and whenever `game` changes). Default
-   * true, matching space-shooter's pre-existing mount-time fetch. hextris
-   * only reads the board on game-over (not on mount) and tower-stacker never
-   * reads it at all (POST-only) -- both pass `false` here and drive `refresh`
-   * themselves, so migrating them to this hook does not add a network call
-   * that did not exist before.
+   * true. tower-stacker never reads the board (POST-only) and passes `false`.
+   * Orbital Dodge and hextris moved to useArcadeBoard (T1b-2).
    */
   fetchOnMount?: boolean;
 }
 
 /**
  * Owns the read path (`entries`/`loading`/`error`/`refresh`) and provides an
- * imperative `submit` for one leaderboard game. Each game keeps its own
- * submit-UX state machine (hextris's 4-state machine, space-shooter's
- * celebration/personal-best, tower-stacker's submitting/submitted bools) --
- * this hook centralizes only the fetch/timeout/parse/error mechanics that
- * were hand-duplicated across the three call sites (RC-8, CT-006).
+ * imperative `submit` for one legacy leaderboard game. Only tower-stacker
+ * still uses it; Orbital Dodge and hextris moved to useArcadeBoard (T1b-2).
+ * The fetch/timeout/parse/error mechanics were centralized here for RC-8,
+ * CT-006.
  */
 export function useLeaderboard(game: LeaderboardGame, options: UseLeaderboardOptions = {}) {
   const { fetchOnMount = true } = options;

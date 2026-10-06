@@ -19,11 +19,11 @@ describe("useLeaderboard", () => {
 
   it("GETs with the game injected into the query string on mount, and passes an AbortSignal", async () => {
     fetchMock.mockResolvedValueOnce(okResponse({ entries: [] }));
-    renderHook(() => useLeaderboard("hextris"));
+    renderHook(() => useLeaderboard("tower-stacker"));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/leaderboard?game=hextris");
+    expect(url).toBe("/api/leaderboard?game=tower-stacker");
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
@@ -55,7 +55,7 @@ describe("useLeaderboard", () => {
   it("parses ok entries into state and clears loading/error", async () => {
     const seed = [{ name: "Ada", score: 10, level: 1, createdAt: "t" }];
     fetchMock.mockResolvedValueOnce(okResponse({ entries: seed }));
-    const { result } = renderHook(() => useLeaderboard("space-shooter"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.entries).toEqual(seed);
@@ -64,7 +64,7 @@ describe("useLeaderboard", () => {
 
   it("guards a malformed { entries } shape down to an empty array instead of throwing", async () => {
     fetchMock.mockResolvedValueOnce(okResponse({ entries: "not-an-array" }));
-    const { result } = renderHook(() => useLeaderboard("space-shooter"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.entries).toEqual([]);
@@ -79,7 +79,7 @@ describe("useLeaderboard", () => {
         ],
       }),
     );
-    const { result } = renderHook(() => useLeaderboard("space-shooter"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.entries).toHaveLength(1);
@@ -88,7 +88,7 @@ describe("useLeaderboard", () => {
 
   it("surfaces a non-ok GET response as an error without throwing", async () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
-    const { result } = renderHook(() => useLeaderboard("space-shooter"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeTruthy();
@@ -97,7 +97,7 @@ describe("useLeaderboard", () => {
 
   it("reports and surfaces a GET rejection (e.g. timeout) as an error", async () => {
     fetchMock.mockRejectedValueOnce(new Error("timeout"));
-    const { result } = renderHook(() => useLeaderboard("space-shooter"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBeTruthy();
@@ -128,7 +128,7 @@ describe("useLeaderboard", () => {
 
   it("returns { ok:false } and sets error on a non-ok submit response", async () => {
     fetchMock.mockResolvedValueOnce(okResponse({ entries: [] }));
-    const { result } = renderHook(() => useLeaderboard("hextris"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 400 }));
@@ -143,7 +143,7 @@ describe("useLeaderboard", () => {
 
   it("reports and returns { ok:false } when submit rejects (e.g. timeout)", async () => {
     fetchMock.mockResolvedValueOnce(okResponse({ entries: [] }));
-    const { result } = renderHook(() => useLeaderboard("hextris"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     fetchMock.mockRejectedValueOnce(new Error("timeout"));
@@ -158,7 +158,7 @@ describe("useLeaderboard", () => {
 
   it("refresh() re-fetches on demand and returns the parsed entries", async () => {
     fetchMock.mockResolvedValueOnce(okResponse({ entries: [] }));
-    const { result } = renderHook(() => useLeaderboard("hextris"));
+    const { result } = renderHook(() => useLeaderboard("tower-stacker"));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     const fresh = [{ name: "Bea", score: 99, level: 1, createdAt: "t" }];
