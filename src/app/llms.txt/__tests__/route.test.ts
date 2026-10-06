@@ -3,6 +3,8 @@ import { getAllBlogPosts } from "@/lib/blog";
 import { faqs } from "@/data/faq";
 import { projects } from "@/data/projects";
 import { BOOKING_URL } from "@/data/nav";
+import { GAMES } from "@/app/games/games-meta";
+import { GAME_CONTENT } from "@/app/games/content";
 import { GET } from "../route";
 
 // Runs against the real checked-in content (content/blog, src/data): the
@@ -44,5 +46,23 @@ describe("GET /llms.txt", () => {
   it("never renders an unfilled value", async () => {
     const body = await GET().text();
     expect(body).not.toMatch(/undefined|\[object Object\]/);
+  });
+
+  it("has a Games section describing every public game", async () => {
+    const body = await GET().text();
+    const section = body.split("## Games\n")[1]?.split("\n## ")[0] ?? "";
+    expect(section).toContain("(https://amindhou.com/games)");
+    for (const game of GAMES.filter((g) => !g.hidden)) {
+      expect(section).toContain(
+        `[${game.title}](https://amindhou.com/games/${game.slug}): ${GAME_CONTENT[game.slug].seoDescription}`,
+      );
+    }
+  });
+
+  it("never lists a hidden game", async () => {
+    const body = await GET().text();
+    for (const game of GAMES.filter((g) => g.hidden)) {
+      expect(body).not.toContain(`/games/${game.slug})`);
+    }
   });
 });
