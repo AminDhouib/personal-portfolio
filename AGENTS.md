@@ -69,14 +69,20 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   `leads-store.ts` read and write tables created by `db/init.sql` (run once on the db volume's
   first start). Row shapes are pinned by zod in `persistence-schemas.ts` — see RUNBOOK.md's Data
   section.
+- Arcade leaderboard v2: `src/lib/arcade/` (UTC board keys, per-game plausibility registry,
+  store, ensure-step) behind `src/app/api/arcade/scores/route.ts`. Its tables are created
+  idempotently at first use and mirrored in `db/init.sql`; see DESIGN.md's "Arcade backend".
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries
 
 - **Never point code or tests at the live database.** Leaderboards and leads live in Postgres
-  (prod's `db-data` volume); never run destructive SQL against it casually. Tests never touch a
-  real database — each store's test does `vi.mock("@/lib/db")` so `getPool()` returns an
-  in-memory fake.
+  (prod's `db-data` volume); never run destructive SQL against it casually. Unit tests never touch
+  a real database — each store's test does `vi.mock("@/lib/db")` so `getPool()` returns an
+  in-memory fake. The single exception is `src/lib/arcade/__tests__/store.db.test.ts`, which runs
+  only in CI's `db-integration` job (or against a throwaway local container, see RUNBOOK.md)
+  against a service-container Postgres. It refuses any host but `localhost`/`127.0.0.1` and any
+  database but `arcade_it`, never reads `DATABASE_URL`, and must never be pointed at prod.
 - **Never weaken, disable, or except a gate.** No file-level eslint-disables, no downgrading a
   rule to `"warn"`, no widening `FS_ALLOWLIST` without a justifying comment. Conventions and the
   disable-comment convention are in DESIGN.md.
