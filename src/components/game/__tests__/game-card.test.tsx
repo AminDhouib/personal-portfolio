@@ -88,4 +88,12 @@ describe("GameCard", () => {
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
+
+  it("hides the call to action from assistive tech so the link name is the title", () => {
+    render(<GameCard game={baseGame} cta="Play now" />);
+    expect(screen.getByText("Play now")).toHaveAttribute("aria-hidden", "true");
+    const link = screen.getByRole("link", { name: /Hextris/ });
+    expect(link).toHaveAccessibleName(expect.stringContaining("Hextris"));
+    expect(link).not.toHaveAccessibleName(expect.stringContaining("Play now"));
+  });
 });

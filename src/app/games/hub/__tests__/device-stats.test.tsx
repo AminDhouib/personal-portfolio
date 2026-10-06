@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { ACHIEVEMENT_TOTAL } from "../hub-stats";
 import { DeviceStats } from "../device-stats";
@@ -89,6 +90,45 @@ describe("DeviceStats", () => {
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     expect(report).not.toHaveBeenCalled();
     expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("re-renders the chips when another tab changes storage", () => {
+    seed(SEEDED);
+    render(<DeviceStats />);
+    expect(chips()[3]).toHaveTextContent("87");
+    act(() => {
+      localStorage.setItem("typing-high-score", "123");
+      window.dispatchEvent(new StorageEvent("storage", { key: "typing-high-score" }));
+    });
+    expect(chips()[3]).toHaveTextContent("123");
+    expect(chips()[3]).not.toHaveTextContent("87");
+  });
+
+  it("hydrates the server placeholder without a mismatch, then shows the seeded chips", async () => {
+    const html = renderToString(<DeviceStats />);
+    expect(html).toContain('data-state="pending"');
+    expect(html).not.toContain("48,210");
+    seed(SEEDED);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    await act(async () => {
+      root = hydrateRoot(container, <DeviceStats />);
+    });
+    const hydrationErrors = consoleError.mock.calls.filter((call) =>
+      call.some((arg) => /hydrat|did not match|mismatch/i.test(String(arg))),
+    );
+    expect(hydrationErrors).toEqual([]);
+    expect(container.querySelector('[data-testid="hub-device"]')).toHaveAttribute(
+      "data-state",
+      "populated",
+    );
+    expect(container).toHaveTextContent("48,210");
+    expect(container).toHaveTextContent("9,100");
+    act(() => root?.unmount());
+    container.remove();
   });
 
   it("only reads: no write, remove or clear", () => {

@@ -105,7 +105,7 @@ describe("TodayStrip", () => {
     expect(hextris).toHaveTextContent("9,100");
   });
 
-  it("asks for the three public daily boards, with a signal and never a player id", async () => {
+  it("asks for the three public daily boards, from three URLs and never sends a player id", async () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     render(<TodayStrip />);
     await settled();
