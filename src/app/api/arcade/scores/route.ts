@@ -6,6 +6,7 @@ import { ARCADE_GAME_SLUGS, ARCADE_SCORE_CAP, validateArcadeSubmission } from "@
 import { readBoard, submitScore } from "@/lib/arcade/store";
 import { captureException } from "@/lib/log";
 import { sanitizePlayerName } from "@/lib/player-name";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { guardedJsonRoute } from "@/lib/route-guard";
 
 export const runtime = "nodejs";
@@ -32,6 +33,19 @@ const submitBodySchema = z.strictObject({
 });
 
 export async function GET(req: Request) {
+  // Rate limit only: reads stay open to any origin (the public response is CDN-cacheable and
+  // carries no secret), but each read can cost two indexed queries, so one client is capped.
+  const rate = checkRateLimit(`arcade-read:${getClientIp(req)}`, {
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "too many requests" },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
+  }
+
   const params = new URL(req.url).searchParams;
   const parsed = readQuerySchema.safeParse({
     game: params.get("game") ?? undefined,
