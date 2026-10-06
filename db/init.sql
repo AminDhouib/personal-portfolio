@@ -51,3 +51,27 @@ CREATE TABLE IF NOT EXISTS leads (
   page        TEXT        NOT NULL DEFAULT '',
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Arcade leaderboard v2 (src/lib/arcade). The app ALSO creates these at first use
+-- (src/lib/arcade/schema.ts), because this file only runs on a fresh volume and prod's
+-- volume already exists. schema.test.ts fails if the two copies drift.
+CREATE TABLE IF NOT EXISTS arcade_players (
+  id           UUID        PRIMARY KEY,
+  token_hash   TEXT        NOT NULL,
+  handle       TEXT        NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS arcade_scores (
+  game        TEXT        NOT NULL,
+  board       TEXT        NOT NULL,
+  player_id   UUID        NOT NULL REFERENCES arcade_players (id) ON DELETE CASCADE,
+  score       BIGINT      NOT NULL,
+  detail      JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  achieved_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (game, board, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arcade_scores_rank
+  ON arcade_scores (game, board, score DESC, achieved_at ASC);
