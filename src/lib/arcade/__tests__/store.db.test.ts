@@ -112,19 +112,28 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
   });
 
   beforeEach(async () => {
-    await pool.query("TRUNCATE arcade_scores, arcade_players CASCADE");
+    // arcade_migrations and the legacy table are cleared too, so each test controls whether
+    // the one-time import has run and what it can see. arcade_it is a throwaway database.
+    await pool.query(
+      "TRUNCATE arcade_scores, arcade_players, arcade_migrations, leaderboard_entries CASCADE",
+    );
   });
 
   it("the ensure-step creates the tables from nothing, even when three run concurrently", async () => {
-    // The arcade_it database is this suite's alone (the guard guarantees it), and only the two
+    // The arcade_it database is this suite's alone (the guard guarantees it), and only the three
     // arcade tables are dropped. The tables are recreated here, so test order does not matter.
-    await pool.query("DROP TABLE IF EXISTS arcade_scores, arcade_players CASCADE");
+    // The legacy table is left in place (empty, from the beforeEach), so the first ensure to win
+    // the advisory lock records the marker and imports nothing.
+    await pool.query(
+      "DROP TABLE IF EXISTS arcade_scores, arcade_players, arcade_migrations CASCADE",
+    );
     const gone = await pool.query(
       `SELECT to_regclass('arcade_players') IS NULL AS players,
               to_regclass('arcade_scores') IS NULL AS scores,
+              to_regclass('arcade_migrations') IS NULL AS migrations,
               to_regclass('idx_arcade_scores_rank') IS NULL AS idx`,
     );
-    expect(gone.rows[0]).toEqual({ players: true, scores: true, idx: true });
+    expect(gone.rows[0]).toEqual({ players: true, scores: true, migrations: true, idx: true });
 
     const results = await Promise.allSettled([
       ensureArcadeSchema(pool),
@@ -135,9 +144,10 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     const { rows } = await pool.query(
       `SELECT to_regclass('arcade_players') IS NOT NULL AS players,
               to_regclass('arcade_scores') IS NOT NULL AS scores,
+              to_regclass('arcade_migrations') IS NOT NULL AS migrations,
               to_regclass('idx_arcade_scores_rank') IS NOT NULL AS idx`,
     );
-    expect(rows[0]).toEqual({ players: true, scores: true, idx: true });
+    expect(rows[0]).toEqual({ players: true, scores: true, migrations: true, idx: true });
   });
 
   it("a new player is claimed with the sha256 of the token and the handle it was given", async () => {
@@ -465,5 +475,205 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     await pool.query("DELETE FROM arcade_players WHERE id = $1::uuid", [pid("1")]);
     const { rows } = await pool.query("SELECT count(*)::int AS n FROM arcade_scores");
     expect(rows[0]?.n).toBe(0);
+  });
+
+  describe("legacy import", () => {
+    interface LegacySeed {
+      game: string;
+      name: string;
+      score: number;
+      level?: number;
+      seconds?: number | null;
+      kills?: number | null;
+      distance?: number | null;
+      at: string;
+    }
+
+    const SS = { seconds: 60, kills: 40, distance: 1500 };
+    const SEED: LegacySeed[] = [
+      { game: "space-shooter", name: "Ada", score: 3000, ...SS, at: "2026-03-01T10:00:00.000Z" },
+      { game: "space-shooter", name: "ada", score: 4200, ...SS, at: "2026-03-02T10:00:00.000Z" },
+      { game: "space-shooter", name: "Bob", score: 5000, ...SS, at: "2026-03-02T11:00:00.000Z" },
+      {
+        game: "hextris",
+        name: "ADA",
+        score: 20000,
+        seconds: 120,
+        kills: 300,
+        level: 17,
+        at: "2026-03-05T10:00:00.000Z",
+      },
+      { game: "tower-stacker", name: "Tower", score: 99999, at: "2026-03-06T10:00:00.000Z" },
+      {
+        game: "space-shooter",
+        name: "Cheat",
+        score: 1_000_000,
+        seconds: 10,
+        kills: 0,
+        distance: 0,
+        at: "2026-03-07T10:00:00.000Z",
+      },
+      {
+        game: "hextris",
+        name: "Dee",
+        score: 500,
+        seconds: 30,
+        kills: null,
+        level: 2,
+        at: "2026-03-08T10:00:00.000Z",
+      },
+    ];
+
+    async function seedLegacy(rows: LegacySeed[]) {
+      for (const r of rows) {
+        await pool.query(
+          `INSERT INTO leaderboard_entries (game, name, score, level, seconds, kills, distance, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            r.game,
+            r.name,
+            r.score,
+            r.level ?? 1,
+            r.seconds ?? null,
+            r.kills ?? null,
+            r.distance ?? null,
+            r.at,
+          ],
+        );
+      }
+    }
+
+    it("imports the plausible rows of the two arcade games as unclaimable players, all-time only", async () => {
+      await seedLegacy(SEED);
+      await expect(ensureArcadeSchema(pool)).resolves.toEqual({
+        status: "imported",
+        read: 6,
+        skippedUnverifiable: 1,
+        skippedImplausible: 1,
+        players: 2,
+        scores: 3,
+      });
+
+      const players = await pool.query(
+        "SELECT handle, token_hash, created_at FROM arcade_players ORDER BY created_at",
+      );
+      expect(players.rows).toEqual([
+        { handle: "ADA", token_hash: "legacy", created_at: new Date("2026-03-02T10:00:00.000Z") },
+        { handle: "Bob", token_hash: "legacy", created_at: new Date("2026-03-02T11:00:00.000Z") },
+      ]);
+
+      const scores = await pool.query(
+        `SELECT p.handle, s.game, s.board, s.score, s.detail, s.achieved_at
+           FROM arcade_scores s JOIN arcade_players p ON p.id = s.player_id
+          ORDER BY s.game, s.score DESC`,
+      );
+      expect(scores.rows).toEqual([
+        {
+          handle: "ADA",
+          game: "hextris",
+          board: "all-time",
+          score: "20000",
+          detail: { seconds: 120, kills: 300, level: 17, legacy: true },
+          achieved_at: new Date("2026-03-05T10:00:00.000Z"),
+        },
+        {
+          handle: "Bob",
+          game: "space-shooter",
+          board: "all-time",
+          score: "5000",
+          detail: { ...SS, legacy: true },
+          achieved_at: new Date("2026-03-02T11:00:00.000Z"),
+        },
+        {
+          handle: "ADA",
+          game: "space-shooter",
+          board: "all-time",
+          score: "4200",
+          detail: { ...SS, legacy: true },
+          achieved_at: new Date("2026-03-02T10:00:00.000Z"),
+        },
+      ]);
+    });
+
+    it("the imported rows read back through the store: ranked, flagged legacy, absent from daily", async () => {
+      await seedLegacy(SEED);
+      await ensureArcadeSchema(pool);
+      const allTime = await readBoard(pool, {
+        game: "space-shooter",
+        board: "all-time",
+        playerId: null,
+      });
+      expect(allTime.entries.map((e) => [e.handle, e.rank, e.score, e.detail.legacy])).toEqual([
+        ["Bob", 1, 5000, true],
+        ["ADA", 2, 4200, true],
+      ]);
+      const daily = await readBoard(pool, {
+        game: "space-shooter",
+        board: "daily:2026-10-06",
+        playerId: null,
+      });
+      expect(daily.entries).toEqual([]);
+    });
+
+    it("runs once: a later start neither re-imports nor sees rows added since", async () => {
+      await seedLegacy(SEED);
+      await ensureArcadeSchema(pool);
+      await seedLegacy([
+        {
+          game: "hextris",
+          name: "Late",
+          score: 10,
+          seconds: 5,
+          kills: 5,
+          level: 1,
+          at: "2026-04-01T10:00:00.000Z",
+        },
+      ]);
+      await expect(ensureArcadeSchema(pool)).resolves.toEqual({ status: "already-applied" });
+      const { rows } = await pool.query("SELECT count(*)::int AS n FROM arcade_players");
+      expect(rows[0]?.n).toBe(2);
+      const late = await pool.query("SELECT 1 FROM arcade_players WHERE handle = 'Late'");
+      expect(late.rows).toHaveLength(0);
+    });
+
+    it("three concurrent starts import exactly once (advisory lock plus marker)", async () => {
+      await seedLegacy(SEED);
+      const reports = await Promise.all([
+        ensureArcadeSchema(pool),
+        ensureArcadeSchema(pool),
+        ensureArcadeSchema(pool),
+      ]);
+      expect(reports.filter((r) => r.status === "imported")).toHaveLength(1);
+      expect(reports.filter((r) => r.status === "already-applied")).toHaveLength(2);
+      const { rows } = await pool.query("SELECT count(*)::int AS n FROM arcade_players");
+      expect(rows[0]?.n).toBe(2);
+    });
+
+    it("an imported player cannot be claimed with any token", async () => {
+      await seedLegacy(SEED);
+      await ensureArcadeSchema(pool);
+      const found = await pool.query("SELECT id FROM arcade_players WHERE handle = 'Bob'");
+      const id = found.rows[0]?.id as string;
+      const before = await pool.query("SELECT * FROM arcade_scores ORDER BY game, score");
+      await expect(put({ player: id, token: tok("Z"), score: 9000 })).resolves.toEqual({
+        ok: false,
+        error: "identity",
+      });
+      expect((await pool.query("SELECT * FROM arcade_scores ORDER BY game, score")).rows).toEqual(
+        before.rows,
+      );
+    });
+
+    it("records the marker and imports nothing when the legacy table does not exist", async () => {
+      await pool.query("DROP TABLE leaderboard_entries");
+      try {
+        await expect(ensureArcadeSchema(pool)).resolves.toEqual({ status: "no-legacy-table" });
+        const { rows } = await pool.query("SELECT key FROM arcade_migrations");
+        expect(rows).toEqual([{ key: "legacy-leaderboard-import-v1" }]);
+      } finally {
+        // Recreate the legacy table (init.sql is idempotent) so later tests and reruns have it.
+        await pool.query(readFileSync(path.resolve(process.cwd(), "db/init.sql"), "utf8"));
+      }
+    });
   });
 });
