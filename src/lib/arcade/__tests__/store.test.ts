@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { createFakePool } from "@/test/fake-pg";
-import { readBoard, submitScore } from "../store";
+import { BOARD_ROW_CAP, readBoard, submitScore } from "../store";
 
 const NOW = new Date("2026-10-06T12:00:00.000Z");
 const PLAYER = "11111111-1111-4111-8111-111111111111";
@@ -66,8 +66,11 @@ describe("submitScore: statement sequence and parameters", () => {
       "INSERT INTO arcade_scores",
       "DELETE FROM arcade_scores",
       "SELECT s.score, (1",
+      "DELETE FROM arcade_scores",
       "SELECT s.score, (1",
+      "DELETE FROM arcade_scores",
       "SELECT s.score, (1",
+      "DELETE FROM arcade_scores",
       "COMMIT",
     ]);
     expect(fake.stats).toEqual({ connects: 1, released: 1, destroyed: 0 });
@@ -111,7 +114,7 @@ describe("submitScore: statement sequence and parameters", () => {
   it("prunes old daily and weekly boards of this game only, with locale-independent comparison", async () => {
     const fake = scripted();
     await submitScore(fake.pool, INPUT, NOW);
-    const prune = fake.queries.find((q) => q.sql.startsWith("DELETE FROM arcade_scores"));
+    const prune = fake.queries.find((q) => q.sql.startsWith("DELETE FROM arcade_scores WHERE"));
     expect(prune?.params).toEqual(["space-shooter", "daily:2026-09-06", "weekly:2026-W29"]);
     expect(prune?.sql).toContain("game = $1");
     expect(prune?.sql).toContain(`board COLLATE "C" < $2`);
@@ -139,6 +142,72 @@ describe("submitScore: statement sequence and parameters", () => {
     await submitScore(fake.pool, { ...INPUT, handle: "Bobby'; DROP TABLE arcade_scores;--" }, NOW);
     expect(fake.sqls().join(" ")).not.toContain("Bobby");
     expect(fake.sqls().join(" ")).not.toContain("DROP TABLE");
+  });
+});
+
+describe("submitScore: board row cap", () => {
+  const trims = (fake: ReturnType<typeof scripted>) =>
+    fake.queries.filter((q) => q.sql.startsWith("DELETE FROM arcade_scores s USING"));
+
+  it("caps a board at 1000 rows", () => {
+    expect(BOARD_ROW_CAP).toBe(1000);
+  });
+
+  it("trims every board whose upsert wrote a row, once each, to the cap", async () => {
+    const fake = scripted();
+    await submitScore(fake.pool, INPUT, NOW);
+    expect(trims(fake).map((q) => q.params)).toEqual([
+      ["space-shooter", "all-time", 1000],
+      ["space-shooter", "weekly:2026-W41", 1000],
+      ["space-shooter", "daily:2026-10-06", 1000],
+    ]);
+  });
+
+  it("does not trim a board whose upsert did not write a row", async () => {
+    const fake = scripted({ improved: [true, false, true] });
+    await submitScore(fake.pool, INPUT, NOW);
+    expect(trims(fake).map((q) => q.params)).toEqual([
+      ["space-shooter", "all-time", 1000],
+      ["space-shooter", "daily:2026-10-06", 1000],
+    ]);
+  });
+
+  it("does not trim at all when no board improved", async () => {
+    const fake = scripted({ improved: [false, false, false] });
+    await submitScore(fake.pool, INPUT, NOW);
+    expect(trims(fake)).toHaveLength(0);
+  });
+
+  it("trims a board right after its rank is read, so the response keeps the pre-trim rank", async () => {
+    const fake = scripted({
+      best: [
+        { score: "4200", rank: 1001 },
+        { score: "4200", rank: 1 },
+        { score: "4200", rank: 1 },
+      ],
+    });
+    const outcome = await submitScore(fake.pool, INPUT, NOW);
+    const sqls = fake.sqls();
+    const firstRead = sqls.findIndex((sql) => sql.startsWith("SELECT s.score"));
+    const firstTrim = sqls.findIndex((sql) => sql.startsWith("DELETE FROM arcade_scores s USING"));
+    expect(firstRead).toBeGreaterThan(-1);
+    expect(firstTrim).toBe(firstRead + 1);
+    expect(outcome.ok && outcome.boards.map((b) => b.rank)).toEqual([1001, 1, 1]);
+  });
+
+  it("orders exactly like the rank index, with no tiebreak column that would force a sort", async () => {
+    const fake = scripted();
+    await submitScore(fake.pool, INPUT, NOW);
+    const sql = trims(fake)[0]?.sql ?? "";
+    expect(sql).toContain("ORDER BY score DESC, achieved_at ASC OFFSET $3");
+    expect(sql).toContain("WHERE game = $1 AND board = $2");
+    expect(sql).toContain("s.game = $1 AND s.board = $2 AND s.player_id = cut.player_id");
+  });
+
+  it("rolls back the whole submit if the trim fails", async () => {
+    const fake = scripted({ failOn: /^DELETE FROM arcade_scores s USING/ });
+    await expect(submitScore(fake.pool, INPUT, NOW)).rejects.toThrow("db down");
+    expect(fake.sqls().at(-1)).toBe("ROLLBACK");
   });
 });
 
@@ -231,7 +300,7 @@ describe("readBoard", () => {
   function boardFake(rows: Record<string, unknown>[], you?: Record<string, unknown>) {
     return createFakePool((sql) => {
       if (sql.includes("p.handle")) return { rows };
-      if (sql.includes("WHERE r.player_id")) return { rows: you ? [you] : [] };
+      if (sql.includes("s.player_id = $3")) return { rows: you ? [you] : [] };
       return undefined;
     });
   }
@@ -298,6 +367,18 @@ describe("readBoard", () => {
     expect(sql).toContain("rank() OVER (ORDER BY score DESC, achieved_at ASC)");
     expect(sql).toContain("ORDER BY r.rank ASC, p.id ASC");
     expect(sql).not.toMatch(/AS (id|"playerId"|player_id)\b/);
+  });
+
+  it("reads the caller's rank by the indexed count formula, not by windowing the whole board", async () => {
+    const fake = boardFake([], { rank: 1, score: "1" });
+    await readBoard(fake.pool, { game: "hextris", board: "all-time", playerId: PLAYER });
+    const sql = fake.queries[1]?.sql ?? "";
+    expect(sql).toContain(
+      "o.score > s.score OR (o.score = s.score AND o.achieved_at < s.achieved_at)",
+    );
+    expect(sql).toContain("::int AS rank");
+    expect(sql).toContain("s.game = $1 AND s.board = $2 AND s.player_id = $3");
+    expect(sql).not.toContain("OVER");
   });
 
   it("rejects a row with an unexpected column instead of passing it to the client", async () => {
