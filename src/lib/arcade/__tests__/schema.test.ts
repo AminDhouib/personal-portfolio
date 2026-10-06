@@ -30,7 +30,7 @@ describe("ARCADE_SCHEMA_STATEMENTS", () => {
     }
   });
 
-  it("has no semicolons, so each one is a single statement for the extended query protocol", () => {
+  it("has no semicolons, because the init.sql mirror test splits on them and each statement runs as its own query", () => {
     for (const statement of ARCADE_SCHEMA_STATEMENTS) expect(statement).not.toContain(";");
   });
 
