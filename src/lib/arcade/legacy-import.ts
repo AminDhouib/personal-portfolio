@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { legacyLeaderboardRowSchema, type LegacyLeaderboardRow } from "@/lib/persistence-schemas";
 import { sanitizePlayerName } from "@/lib/player-name";
-import { ARCADE_GAME_SLUGS, validateArcadeSubmission, type ArcadeGameSlug } from "./games";
+import {
+  ARCADE_GAME_SLUGS,
+  ARCADE_SCORE_CAP,
+  validateArcadeSubmission,
+  type ArcadeGameSlug,
+} from "./games";
 
 // Renaming this key would re-run the import: it is the "already done" marker row.
 const MIGRATION_KEY = "legacy-leaderboard-import-v1";
@@ -17,6 +22,8 @@ export type LegacyImportReport =
   | {
       status: "imported";
       read: number;
+      /** Valid rows dropped because the same handle has a better (or earlier equal) row. */
+      superseded: number;
       skippedUnverifiable: number;
       skippedImplausible: number;
       players: number;
@@ -80,7 +87,8 @@ function compareIso(a: string, b: string): number {
  * into the arcade tables. Runs inside ensureArcadeSchema's transaction, after the DDL:
  * the marker row is inserted first, so a failure anywhere rolls the marker back with
  * everything else and the next start retries. Rows that cannot be verified (NULL detail
- * columns) or fail the game's plausibility check are skipped and counted. Players are
+ * columns) or fail the game's plausibility check are skipped and counted; a handle's non-best rows are counted as superseded, so that
+ * read = imported + superseded + skipped. Players are
  * grouped by lower-cased sanitized handle across both games; each gets the unclaimable
  * 'legacy' token hash. Only the all-time board is written, with the original timestamp.
  */
@@ -97,6 +105,8 @@ export async function importLegacyLeaderboard(
   const result = await client.query(READ_LEGACY, [[...ARCADE_GAME_SLUGS]]);
   let skippedUnverifiable = 0;
   let skippedImplausible = 0;
+  let superseded = 0;
+  // The legacy route kept at most 100 rows per game, so the 1000-row board cap cannot be reached.
   const best = new Map<string, Candidate>();
   for (const raw of result.rows) {
     const row = legacyLeaderboardRowSchema.parse(raw);
@@ -105,8 +115,11 @@ export async function importLegacyLeaderboard(
       skippedUnverifiable += 1;
       continue;
     }
+    // The common range the live route's body schema enforces; the per-game check does not.
+    const scoreInRange =
+      Number.isInteger(row.score) && row.score >= 0 && row.score <= ARCADE_SCORE_CAP;
     const verdict = validateArcadeSubmission(row.game, row.score, detail);
-    if (!verdict.ok) {
+    if (!scoreInRange || !verdict.ok) {
       skippedImplausible += 1;
       continue;
     }
@@ -124,7 +137,12 @@ export async function importLegacyLeaderboard(
     const key = `${row.game}|${handle.toLowerCase()}`;
     const current = best.get(key);
     // Rows arrive oldest first: only a strictly higher score replaces, so ties keep the earlier row.
-    if (current === undefined || candidate.score > current.score) best.set(key, candidate);
+    if (current === undefined) {
+      best.set(key, candidate);
+    } else {
+      superseded += 1;
+      if (candidate.score > current.score) best.set(key, candidate);
+    }
   }
 
   // Best row first: the first row seen for a handle names the player and supplies the
@@ -167,6 +185,7 @@ export async function importLegacyLeaderboard(
   return {
     status: "imported",
     read: result.rows.length,
+    superseded,
     skippedUnverifiable,
     skippedImplausible,
     players: players.size,

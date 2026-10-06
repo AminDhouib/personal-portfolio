@@ -83,7 +83,7 @@ describe("getArcadePool: legacy import log line", () => {
     expect(log.logWarn).toHaveBeenCalledTimes(1);
     expect(log.logWarn).toHaveBeenCalledWith(
       "arcade:legacy-import",
-      "imported 0 scores for 0 players (read 0, skipped 0 unverifiable and 0 implausible)",
+      "imported 0 scores for 0 players (read 0: 0 superseded, 0 unverifiable, 0 implausible)",
     );
   });
 

@@ -114,6 +114,7 @@ describe("ensureArcadeSchema: legacy import step", () => {
     await expect(ensureArcadeSchema(fake.pool)).resolves.toEqual({
       status: "imported",
       read: 0,
+      superseded: 0,
       skippedUnverifiable: 0,
       skippedImplausible: 0,
       players: 0,

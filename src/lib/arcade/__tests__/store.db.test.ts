@@ -548,6 +548,7 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
       await expect(ensureArcadeSchema(pool)).resolves.toEqual({
         status: "imported",
         read: 6,
+        superseded: 1,
         skippedUnverifiable: 1,
         skippedImplausible: 1,
         players: 2,
@@ -665,7 +666,7 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     });
 
     it("records the marker and imports nothing when the legacy table does not exist", async () => {
-      await pool.query("DROP TABLE leaderboard_entries");
+      await pool.query("DROP TABLE IF EXISTS leaderboard_entries");
       try {
         await expect(ensureArcadeSchema(pool)).resolves.toEqual({ status: "no-legacy-table" });
         const { rows } = await pool.query("SELECT key FROM arcade_migrations");
