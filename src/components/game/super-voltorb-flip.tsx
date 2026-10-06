@@ -937,7 +937,7 @@ const Gameboard = ({
         {roundResult ? (
           <RoundResult {...roundResult} onContinue={() => continueRef.current?.()} />
         ) : (
-          <p className="rounded-5 flex min-h-[60px] items-center border-2 border-gray-300 bg-white px-3 text-sm text-gray-600 outline outline-2 outline-gray-600 sm:text-base">
+          <p className="rounded-5 flex min-h-[72px] items-center border-2 border-gray-300 bg-white px-3 text-sm text-gray-600 outline outline-2 outline-gray-600 sm:min-h-[60px] sm:text-base">
             Flip the cards and collect coins!
           </p>
         )}
