@@ -57,6 +57,8 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 - `src/lib/` — server-side utilities: the Postgres pool (`db.ts`) and persistence stores, the
   request guard chain, the upstream fetch wrapper, structured logging, GitHub/GA4 clients.
 - `src/components/game/` — the games, each self-contained; see DESIGN.md before editing one.
+- `src/app/games/content/` — each game's server-rendered About copy and SEO fields
+  (`GAME_CONTENT`); `src/components/game/registry.tsx` is its client twin (`GAME_CLIENT`).
 - `content/blog/` — MDX blog posts, loaded via `src/lib/blog.ts`.
 - SEO/AEO surface: `src/lib/structured-data.ts` builds every JSON-LD node from `src/data/`
   (`profile.ts` is the entity source, `faq.ts` the FAQ), and `src/app/llms.txt/route.ts`

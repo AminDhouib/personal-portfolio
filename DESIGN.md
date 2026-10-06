@@ -80,11 +80,19 @@ style suggestions.
   exempt, like the other restricted-syntax selectors). A bare `setItem` throws in private mode, on
   quota, or with storage blocked; the helper swallows that and returns `false`. `getItem` reads
   are not gated (see Known debt).
-- **Adding a game** touches three places: `src/app/games/games-meta.ts` (the `GameSlug` union and
-  metadata), the switch in `game-loader.tsx`, and the `BANNERS` record in `banners.tsx`. The
-  `game-loader.tsx` switch's default case calls `assertNever(slug, ...)` (`src/lib/assert-never.ts`)
-  — because the parameter type is `never`, forgetting to wire up a new slug there is a **compile
-  error** (`tsc`/`next build`), not a silent blank page.
+- **Adding a game** touches three typed places: `src/app/games/games-meta.ts` (the `GameSlug`
+  union and the `GAMES` row), `GAME_CONTENT` in `src/app/games/content/` (server-rendered About
+  copy, search title and description, FAQ, credits) and `GAME_CLIENT` in
+  `src/components/game/registry.tsx` (banner and lazy renderer). The last two are
+  `Record<GameSlug, ...>`, so a missing entry is a **compile error**; `registry.test.tsx` and
+  `game-content.test.ts` fail if `GAMES` drifts from them. The content test also enforces a
+  350-600 word About budget and search-result lengths, and `e2e/seo.spec.ts` gates every public
+  game page on server-rendered copy, VideoGame/FAQPage/breadcrumb JSON-LD and its own share image.
+  **Share image rule:** Next applies a segment's file-based `opengraph-image.tsx` only while the
+  page's metadata leaves `openGraph.images` and `twitter.images` unset. It checks
+  `hasOwnProperty('images')`, so even `images: undefined` blocks the file image; never set either
+  key on a game page's metadata. Next also appends a `?<hash>` to the file image URL, so tests
+  match its path, not the full URL.
 - **Coverage ratchet**: floors in `vitest.config.ts` (lines 34 / statements 33 / functions 35 /
   branches 29 as of 3abe0b0; re-based to 18/17/16/12 at pass-2, raised twice since) are
   measured margins below the current suite over the
@@ -355,8 +363,10 @@ already-inline engine has no such bound).
 ## Change guide
 
 **Copy or content change** (blog post, page text, game description/tagline): edit the relevant
-MDX file under `content/blog/` or the metadata in `games-meta.ts` / page component directly. No
-gate beyond the standard sweep applies specifically to content changes.
+MDX file under `content/blog/` or the metadata in `games-meta.ts` / page component directly. A
+game's About copy lives in `src/app/games/content/<slug>.ts`; any gameplay change that makes a
+sentence there untrue updates it in the same change. No gate beyond the standard sweep applies
+specifically to content changes.
 
 **Gameplay change** (a game's rules, scoring, or engine behavior): follow the extract-before-edit
 doctrine above first if the target game doesn't already have an extracted engine module. Add or
@@ -391,10 +401,6 @@ trigger revisiting it.
 - **RC-6 — a user-facing motion/settings toggle** (Medium). The current fix is OS-preference-only
   (chrome honors `prefers-reduced-motion`, games opt out). A user-facing in-app toggle, and a
   shared settings provider to host it, remain undone.
-- **RC-7 — single game registry consolidation** (Medium). Today there are three independently
-  maintained game-dispatch points (`games-meta.ts`, the `game-loader.tsx` switch, `banners.tsx`'s
-  `BANNERS` record); `assertNever` makes the switch fail-closed but doesn't unify them. Trigger:
-  the next new game (#7) — speculative consolidation before then isn't worth the churn.
 - **RC-12 — a CI step that builds the Dockerfile itself** — rejected outright, not deferred. CI
   already runs `next build`; building the Docker image too was judged low value for the added
   CI time.
