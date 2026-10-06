@@ -158,6 +158,28 @@ export class HextrisSounds {
     });
   }
 
+  // Short descending two-note warning for the boundary shrink; a hazard, not
+  // a loss, so it must not sound like gameOver().
+  boundaryShrink() {
+    if (!this.enabled) return;
+    this.ensureCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    [740, 520].forEach((f, i) => {
+      const osc = this.ctx!.createOscillator();
+      const env = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = f;
+      const start = now + i * 0.11;
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(0.2, start + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+      osc.connect(env).connect(this.sfxGain!);
+      osc.start(start);
+      osc.stop(start + 0.2);
+    });
+  }
+
   // ─── MUSIC ──────────────────────────────────────────────
 
   startMenuMusic() {
