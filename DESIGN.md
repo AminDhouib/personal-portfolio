@@ -203,7 +203,9 @@ current tree on 2026-07-07.
 - **Super Voltorb Flip waits for the player at the end of every round.** After the reveal (and,
   on a win, the payout) a result banner names the outcome and the level change and offers
   Continue / Next round; a tap on the board or any key also continues. HGSS waits for a press
-  after a clear as well, so the earlier auto-advance on a win is gone on purpose.
+  after a clear as well, so the earlier auto-advance on a win is gone on purpose. The banner
+  lives in a slot under the board, never over it (the revealed board is worth reading), and the
+  slot shows a one-line hint between rounds so it keeps its height and the page never jumps.
 - **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
   `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
   license alongside). Known quirks live inside that bundle and are accepted while the game stays

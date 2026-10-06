@@ -835,97 +835,113 @@ const Gameboard = ({
   const N = game.cells.length;
 
   return (
-    <div
-      ref={frameRef}
-      className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)] outline outline-2 outline-gray-600`}
-      style={{ "--svf-n": N } as React.CSSProperties}
-    >
-      <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
-        <div className="flex flex-col gap-[var(--svf-gap)]">
-          <div className="flex gap-[var(--svf-gap)]">
-            <div
-              className="relative grid gap-[var(--svf-gap)]"
-              style={{
-                gridTemplateColumns: `repeat(${N}, var(--svf-tile))`,
-              }}
-            >
-              {game.cells.flat().map((cell, i) => {
-                const coordinate = indexToCoordinate(i, N);
-                return (
-                  <Card
-                    key={i}
-                    row={coordinate[0]}
-                    col={coordinate[1]}
-                    isFlipped={peek || cardsFlipped[i]?.isFlipped}
-                    valueLabel={cell.value === "V" ? "Voltorb" : String(cell.value)}
-                    flipCard={() => handleFlip(coordinate[0], coordinate[1])}
-                    flags={peek || cell.isFlipped ? undefined : cell.flags}
-                    warning={
-                      warningTile?.row === coordinate[0] && warningTile?.col === coordinate[1]
-                    }
-                  >
-                    {cell.value === "V" ? (
-                      // tile/voltorb.png is upstream's srcTile0 (22×22 with
-                      // salmon + voltorb body baked in, matching the
-                      // voltorb-tile region embedded in each explode_*.png
-                      // frame). Using it here makes the post-explosion
-                      // static voltorb pixel-identical in size and style
-                      // to the voltorb shown during the destruction frames,
-                      // eliminating the snap on overlay unmount.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src="/games/super-voltorb-flip/sprites/upstream/tile/voltorb.png"
-                        alt=""
-                        className="picture-outline voltorb"
-                        style={{
-                          imageRendering: "pixelated",
-                          width: "calc(var(--svf-tile) * 0.95)",
-                          height: "calc(var(--svf-tile) * 0.95)",
-                          maxWidth: "none",
-                          maxHeight: "none",
-                          display: "block",
-                        }}
-                      />
-                    ) : (
-                      cell.value
-                    )}
-                  </Card>
-                );
-              })}
-
-              {game.colValues.map((col, index) => (
-                <RowColCard coins={col.coins} voltorbs={col.voltorbs} key={index} index={index} />
-              ))}
-
-              {theme &&
-                effects.map((e) => {
-                  const Comp = e.kind === "bomb" ? theme.BombFlip : theme.CoinReveal;
+    // The board plus the result slot under it; a tap anywhere here continues
+    // a finished round.
+    <div ref={frameRef} className="flex flex-col gap-2">
+      <div
+        className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)] outline outline-2 outline-gray-600`}
+        style={{ "--svf-n": N } as React.CSSProperties}
+      >
+        <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
+          <div className="flex flex-col gap-[var(--svf-gap)]">
+            <div className="flex gap-[var(--svf-gap)]">
+              <div
+                className="relative grid gap-[var(--svf-gap)]"
+                style={{
+                  gridTemplateColumns: `repeat(${N}, var(--svf-tile))`,
+                }}
+              >
+                {game.cells.flat().map((cell, i) => {
+                  const coordinate = indexToCoordinate(i, N);
                   return (
-                    <div
-                      key={e.id}
-                      className="pointer-events-none absolute"
-                      style={{
-                        left: `calc(${e.col} * (var(--svf-tile) + var(--svf-gap)))`,
-                        top: `calc(${e.row} * (var(--svf-tile) + var(--svf-gap)))`,
-                        width: "var(--svf-tile)",
-                        height: "var(--svf-tile)",
-                        zIndex: 20,
-                      }}
+                    <Card
+                      key={i}
+                      row={coordinate[0]}
+                      col={coordinate[1]}
+                      isFlipped={peek || cardsFlipped[i]?.isFlipped}
+                      valueLabel={cell.value === "V" ? "Voltorb" : String(cell.value)}
+                      flipCard={() => handleFlip(coordinate[0], coordinate[1])}
+                      flags={peek || cell.isFlipped ? undefined : cell.flags}
+                      warning={
+                        warningTile?.row === coordinate[0] && warningTile?.col === coordinate[1]
+                      }
                     >
-                      <Comp row={e.row} col={e.col} onDone={e.onDone} />
-                    </div>
+                      {cell.value === "V" ? (
+                        // tile/voltorb.png is upstream's srcTile0 (22×22 with
+                        // salmon + voltorb body baked in, matching the
+                        // voltorb-tile region embedded in each explode_*.png
+                        // frame). Using it here makes the post-explosion
+                        // static voltorb pixel-identical in size and style
+                        // to the voltorb shown during the destruction frames,
+                        // eliminating the snap on overlay unmount.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src="/games/super-voltorb-flip/sprites/upstream/tile/voltorb.png"
+                          alt=""
+                          className="picture-outline voltorb"
+                          style={{
+                            imageRendering: "pixelated",
+                            width: "calc(var(--svf-tile) * 0.95)",
+                            height: "calc(var(--svf-tile) * 0.95)",
+                            maxWidth: "none",
+                            maxHeight: "none",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        cell.value
+                      )}
+                    </Card>
                   );
                 })}
-            </div>
-            <div className="flex flex-col gap-[var(--svf-gap)]">
-              {game.rowValues.map((row, index) => (
-                <RowColCard coins={row.coins} voltorbs={row.voltorbs} key={index} index={index} />
-              ))}
+
+                {game.colValues.map((col, index) => (
+                  <RowColCard coins={col.coins} voltorbs={col.voltorbs} key={index} index={index} />
+                ))}
+
+                {theme &&
+                  effects.map((e) => {
+                    const Comp = e.kind === "bomb" ? theme.BombFlip : theme.CoinReveal;
+                    return (
+                      <div
+                        key={e.id}
+                        className="pointer-events-none absolute"
+                        style={{
+                          left: `calc(${e.col} * (var(--svf-tile) + var(--svf-gap)))`,
+                          top: `calc(${e.row} * (var(--svf-tile) + var(--svf-gap)))`,
+                          width: "var(--svf-tile)",
+                          height: "var(--svf-tile)",
+                          zIndex: 20,
+                        }}
+                      >
+                        <Comp row={e.row} col={e.col} onDone={e.onDone} />
+                      </div>
+                    );
+                  })}
+              </div>
+              <div className="flex flex-col gap-[var(--svf-gap)]">
+                {game.rowValues.map((row, index) => (
+                  <RowColCard coins={row.coins} voltorbs={row.voltorbs} key={index} index={index} />
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
-      {roundResult && <RoundResult {...roundResult} onContinue={() => continueRef.current?.()} />}
+      {/* The round result sits under the board, never over it: at the end of
+          a round every tile is face up and the whole board is worth reading.
+          The idle line holds the slot's height so the page does not jump when
+          the banner appears, and w-0 min-w-full keeps the slot to the board's
+          width instead of letting long text widen the column. */}
+      <div className="w-0 min-w-full">
+        {roundResult ? (
+          <RoundResult {...roundResult} onContinue={() => continueRef.current?.()} />
+        ) : (
+          <p className="rounded-5 flex min-h-[60px] items-center border-2 border-gray-300 bg-white px-3 text-sm text-gray-600 outline outline-2 outline-gray-600 sm:text-base">
+            Flip the cards and collect coins!
+          </p>
+        )}
+      </div>
     </div>
   );
 };

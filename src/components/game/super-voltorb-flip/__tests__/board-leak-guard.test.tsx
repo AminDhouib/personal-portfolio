@@ -75,4 +75,14 @@ describe("SuperVoltorbFlip board", () => {
       expect(tile.querySelector("img.voltorb")).toBeNull();
     }
   });
+
+  it("keeps the round result slot under the board, outside its frame", () => {
+    const { container, getByText } = render(<SuperVoltorbFlipGame />);
+    // The idle line and the end-of-round banner share one slot; a banner
+    // inside the frame covered the bottom row and its clue cards.
+    const slot = getByText("Flip the cards and collect coins!").parentElement!;
+    const frame = container.querySelector(".svf-board-frame")!;
+    expect(frame.contains(slot)).toBe(false);
+    expect(frame.nextElementSibling).toBe(slot);
+  });
 });
