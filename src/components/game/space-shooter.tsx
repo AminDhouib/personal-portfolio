@@ -318,7 +318,7 @@ export function SpaceShooterGame() {
     period: boardPeriod,
     setPeriod: setBoardPeriod,
     loading: boardLoading,
-    error: boardError,
+    readError: boardError,
     refresh: refreshLeaderboard,
     submit: submitScoreToLeaderboard,
   } = useArcadeBoard("space-shooter", { fetchOnMount: false });
@@ -2089,59 +2089,57 @@ export function SpaceShooterGame() {
                 </motion.button>
               </div>
 
-              {(leaderboard.length > 0 || boardPeriod !== "all-time") && (
-                <div className="w-full max-w-md rounded-lg border border-white/15 bg-white/5 p-3 text-sm">
-                  <div className="mb-2 text-xs font-bold tracking-widest text-white/60 uppercase">
-                    Top pilots
-                  </div>
-                  <ArcadeBoardTabs
-                    label="Leaderboard period"
-                    period={boardPeriod}
-                    onChange={setBoardPeriod}
-                    className="mb-2"
-                    activeClassName="border-accent-blue/60 bg-accent-blue/20 text-accent-blue"
-                    inactiveClassName="border-white/15 bg-white/5 text-white/60 hover:text-white"
-                  />
-                  {leaderboard.length === 0 ? (
-                    <p className="py-2 text-center text-xs text-white/50">
-                      {boardLoading
-                        ? "Loading"
-                        : boardError
-                          ? "Could not load the board"
-                          : boardPeriod === "daily"
-                            ? "No scores yet today"
-                            : boardPeriod === "weekly"
-                              ? "No scores yet this week"
-                              : "No scores yet"}
-                    </p>
-                  ) : (
-                    <ol className="space-y-1">
-                      {leaderboard.slice(0, 8).map((e) => (
-                        <li
-                          key={`${e.rank}-${e.name}-${e.createdAt}`}
-                          className={
-                            e.isYou
-                              ? "flex items-center gap-2 font-semibold text-accent-blue"
-                              : "flex items-center gap-2 text-white/85"
-                          }
-                        >
-                          <span className="w-6 text-white/40 tabular-nums">{e.rank}.</span>
-                          <span className="flex-1 truncate">{e.name}</span>
-                          {typeof e.seconds === "number" && (
-                            <span className="text-xs text-white/45 tabular-nums">{e.seconds}s</span>
-                          )}
-                          <span className="font-mono tabular-nums">{e.score}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                  {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
-                    <div className="mt-2 text-xs text-white/60">
-                      Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
-                    </div>
-                  )}
+              <div className="w-full max-w-md rounded-lg border border-white/15 bg-white/5 p-3 text-sm">
+                <div className="mb-2 text-xs font-bold tracking-widest text-white/60 uppercase">
+                  Top pilots
                 </div>
-              )}
+                <ArcadeBoardTabs
+                  label="Leaderboard period"
+                  period={boardPeriod}
+                  onChange={setBoardPeriod}
+                  className="mb-2"
+                  activeClassName="border-indigo-400/60 bg-indigo-500/20 text-indigo-300"
+                  inactiveClassName="border-white/15 bg-white/5 text-white/60 hover:text-white"
+                />
+                {leaderboard.length === 0 ? (
+                  <p className="py-2 text-center text-xs text-white/50">
+                    {boardLoading
+                      ? "Loading"
+                      : boardError
+                        ? "Could not load the board"
+                        : boardPeriod === "daily"
+                          ? "No scores yet today"
+                          : boardPeriod === "weekly"
+                            ? "No scores yet this week"
+                            : "No scores yet"}
+                  </p>
+                ) : (
+                  <ol className="space-y-1">
+                    {leaderboard.slice(0, 8).map((e) => (
+                      <li
+                        key={`${e.rank}-${e.name}-${e.createdAt}`}
+                        className={
+                          e.isYou
+                            ? "flex items-center gap-2 font-semibold text-indigo-300"
+                            : "flex items-center gap-2 text-white/85"
+                        }
+                      >
+                        <span className="w-6 text-white/40 tabular-nums">{e.rank}.</span>
+                        <span className="flex-1 truncate">{e.name}</span>
+                        {typeof e.seconds === "number" && (
+                          <span className="text-xs text-white/45 tabular-nums">{e.seconds}s</span>
+                        )}
+                        <span className="font-mono tabular-nums">{e.score}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
+                  <div className="mt-2 text-xs text-white/60">
+                    Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center justify-center gap-2 px-2 sm:gap-3">
                 <motion.button

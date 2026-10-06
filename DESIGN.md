@@ -159,12 +159,12 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2)
   best score per game (handles are sanitized to 12 characters and compared case-insensitively;
   ties keep the earlier row). The report counts `read` rows, `imported` scores (for N players),
   `superseded` rows (a better or earlier row of the same handle won), `unverifiable` rows (NULL
-  detail columns) and `implausible` rows, so `read = imported + superseded + unverifiable +
-implausible`; `db.ts` writes them as one log line (scope `arcade:legacy-import`). The region
-  is not carried over. The legacy route kept at most 100 rows per game, so the
-  1000-row board cap cannot bind the import. A failure rolls the marker back with everything
-  else, so the next request retries; a database without the legacy table records the marker and
-  imports nothing. The legacy table itself is never modified.
+  detail columns) and `implausible` rows, so
+  `read = imported + superseded + unverifiable + implausible`; `db.ts` writes them as one log
+  line (scope `arcade:legacy-import`). The region is not carried over. The legacy route kept at
+  most 100 rows per game, so the 1000-row board cap cannot bind the import. A failure rolls the
+  marker back with everything else, so the next request retries; a database without the legacy
+  table records the marker and imports nothing. The legacy table itself is never modified.
 - **Imported players are unclaimable and merge by name.** Every legacy player has
   `token_hash = 'legacy'`. Same-name legacy rows become ONE player across both games (the handle
   compared case-insensitively, the first and best row naming it), and a name that sanitizes to
@@ -185,13 +185,19 @@ implausible`; `db.ts` writes them as one log line (scope `arcade:legacy-import`)
   player submits again. A corrupt stored value is reported with a fixed message, never its
   content.
 - **Board hook behaviour.** `useArcadeBoard<G>` (`src/hooks/use-arcade-board.ts`) fetches on
-  mount (Hextris opts out and reads at game over), on a tab switch and after a submit, and never
-  polls: a 429 or 5xx keeps the last board for a same-period refresh and sets an error. A tab
-  switch clears the rows and the `you` row first, so a failed read shows an empty board, not
-  another period's scores. `submit` is typed to the game's exact detail keys (inferred from
-  `ARCADE_GAMES`), never creates an identity for a read, and does not POST a score above the
-  cap. `you: null` (a player trimmed off a full board) shows the board with no "Your best" row
-  and no error.
+  mount by default (Orbital Dodge and Hextris both pass `fetchOnMount: false` and read at game
+  over, so the home-page embed costs no GET), on a tab switch and after a submit, and never polls:
+  a 429 or 5xx keeps the last board for a same-period refresh and sets `readError`. A tab
+  switch clears the rows, the `you` row and `readError` first, so a failed read shows an empty
+  board, not another period's scores. `readError` is set only by reads; a failed submit is
+  reported through `submit`'s result (`ok`, `rejected`, `identityReset`) and each game's own
+  submit state, never the hook's state, so a failed submit cannot make the board claim it could not
+  load. Both games render the board panel (heading, period tabs, body) unconditionally on the
+  game-over card; only the body branches (loading, read error, empty for the period, rows), so
+  the focused tab never unmounts when a tab switch empties the rows. `submit` is typed to the
+  game's exact detail keys (inferred from `ARCADE_GAMES`), never creates an identity for a read,
+  and does not POST a score above the cap. `you: null` (a player trimmed off a full board) shows
+  the board with no "Your best" row and no error.
 - **Daily-seed convention.** Anything that seeds a daily challenge must seed from `utcDayKey`
   (`src/lib/arcade/boards.ts`), so the seed and the daily board turn over at the same instant.
   Password Game 2 seeds from the local date today: a finding owed to T3, deliberately not changed
@@ -202,7 +208,7 @@ implausible`; `db.ts` writes them as one log line (scope `arcade:legacy-import`)
   submit for an id stores `sha256(token)`, and any later submit for that id must present the same
   token (constant-time compare). A mismatch is a 403 and rolls the transaction back. The player id
   and token hash never leave the database. Imported legacy players carry the hash `legacy`,
-  which can never equal a real digest, so they cannot be claimed (see "Legacy import" below).
+  which can never equal a real digest, so they cannot be claimed (see "Legacy import" above).
 - **Plausibility.** Each game registers a strict detail schema in `ARCADE_GAMES` and a check
   function in `src/lib/arcade/games.ts` (dispatched by `validateArcadeSubmission`): ceilings
   derived from the game's own scoring rules, with one accept and one reject pinned per
