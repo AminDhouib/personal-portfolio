@@ -200,12 +200,23 @@ DELETE FROM arcade_players WHERE id = '<uuid>' RETURNING id, handle;
 -- expect exactly one row; then COMMIT; (or ROLLBACK; if it is the wrong player)
 ```
 
+**Arcade boards: size cap and read limit.** Every board holds at most 1000 rows: a submit that
+wrote a row trims its board back to the top 1000 by score (ties by earliest). So a board
+that looks capped at exactly 1000 rows is working as designed, and a player whose score fell
+outside the top 1000 has no row there (the API answers `you: null` for them on that board).
+`arcade_players` rows are not pruned (see DESIGN.md Known debt). `GET /api/arcade/scores` is
+rate limited to 120 reads per 60 s per client IP; a client over it gets a 429 with `Retry-After`,
+and the in-memory counter resets when the app restarts. POST stays at 10 per 60 s.
+
 **Arcade store test against a throwaway local Postgres** (CI runs it in the `db-integration`
 job; locally it needs Docker). The URL must be localhost or 127.0.0.1 with database `arcade_it`
-or the test refuses to start. Never use the app's `DATABASE_URL`:
+or the test refuses to start. Never use the app's `DATABASE_URL`. The wait loop matters: the
+image starts a temporary server to run its init step and then restarts, and only the final server
+listens on TCP, so `pg_isready -h 127.0.0.1` succeeds only once Postgres is really up:
 
 ```powershell
 docker run --rm -d --name arcade-it -e POSTGRES_PASSWORD=arcade_it_local -e POSTGRES_DB=arcade_it -p 127.0.0.1:55432:5432 postgres:17-alpine
+for ($i = 0; $i -lt 30; $i++) { docker exec arcade-it pg_isready -h 127.0.0.1 -U postgres -d arcade_it *> $null; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 1 }
 $env:ARCADE_IT_DATABASE_URL = "postgresql://postgres:arcade_it_local@localhost:55432/arcade_it"
 pnpm exec vitest run src/lib/arcade/__tests__/store.db.test.ts
 Remove-Item Env:ARCADE_IT_DATABASE_URL
