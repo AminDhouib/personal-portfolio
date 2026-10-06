@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { accuracyPercent, isNewBest, wpm } from "./typing-speed/metrics";
 
 const SENTENCES = [
   "The quick brown fox jumps over the lazy dog near the riverbank.",
@@ -44,16 +45,6 @@ const FIRST_SENTENCE = firstOf(SENTENCES);
 
 type GameState = "idle" | "playing" | "done";
 
-function calcWPM(typedChars: number, elapsedMs: number): number {
-  if (elapsedMs === 0) return 0;
-  return Math.round((typedChars / 5) * (60000 / elapsedMs));
-}
-
-function calcAccuracy(correct: number, total: number): number {
-  if (total === 0) return 100;
-  return Math.round((correct / total) * 100);
-}
-
 function pickSentence(exclude?: string): string {
   let s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)] ?? FIRST_SENTENCE;
   let tries = 0;
@@ -83,6 +74,9 @@ export function TypingSpeedGame() {
   const [streak, setStreak] = useState(0);
   const [maxStreak, setMaxStreak] = useState(0);
   const [errors, setErrors] = useState(0);
+  const [correctKeys, setCorrectKeys] = useState(0);
+  const [totalKeys, setTotalKeys] = useState(0);
+  const [newBest, setNewBest] = useState(false);
   const [shake, setShake] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
 
@@ -114,21 +108,24 @@ export function TypingSpeedGame() {
     };
   }, []);
 
+  // Arms the round: the clock does not run until the first keystroke that
+  // changes the text (see handleInput), so reading time is not penalised.
   const startGame = useCallback(() => {
     setState("playing");
     setTyped("");
     setStreak(0);
     setMaxStreak(0);
     setErrors(0);
+    setCorrectKeys(0);
+    setTotalKeys(0);
+    setNewBest(false);
     setBursts([]);
-    const now = Date.now();
-    startTimeRef.current = now;
+    startTimeRef.current = 0;
     setElapsed(0);
     if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setElapsed(Date.now() - now);
-    }, 80);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    timerRef.current = null;
+    // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
+    inputRef.current?.focus();
   }, []);
 
   const resetGame = useCallback(() => {
@@ -138,7 +135,11 @@ export function TypingSpeedGame() {
     setElapsed(0);
     setStreak(0);
     setErrors(0);
+    setCorrectKeys(0);
+    setTotalKeys(0);
+    setNewBest(false);
     setBursts([]);
+    startTimeRef.current = 0;
     setTarget((prev) => pickSentence(prev));
   }, []);
 
@@ -169,10 +170,21 @@ export function TypingSpeedGame() {
       const prevLen = typed.length;
       const newLen = val.length;
 
+      if (newLen !== prevLen && startTimeRef.current === 0) {
+        const now = Date.now();
+        startTimeRef.current = now;
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setElapsed(Date.now() - now);
+        }, 80);
+      }
+
       if (newLen > prevLen) {
         const newChar = val[newLen - 1];
         const expected = target[newLen - 1];
+        setTotalKeys((t) => t + 1);
         if (newChar === expected) {
+          setCorrectKeys((c) => c + 1);
           setStreak((s) => {
             const next = s + 1;
             setMaxStreak((m) => Math.max(m, next));
@@ -195,29 +207,44 @@ export function TypingSpeedGame() {
         const finalElapsed = Date.now() - startTimeRef.current;
         setElapsed(finalElapsed);
         setState("done");
-        const wpm = calcWPM(target.length, finalElapsed);
-        if (wpm > highScore) {
-          setHighScore(wpm);
-          safeLocalSet("typing-high-score", String(wpm));
+        const score = wpm(target.length, finalElapsed);
+        setNewBest(isNewBest(score, highScore > 0 ? highScore : null));
+        if (score > highScore) {
+          setHighScore(score);
+          safeLocalSet("typing-high-score", String(score));
         }
       }
     },
     [state, target, typed.length, highScore, spawnBurst],
   );
 
-  const correctChars = useMemo(
-    () => typed.split("").filter((c, i) => c === target[i]).length,
-    [typed, target],
-  );
   const totalTyped = typed.length;
   const currentWPM =
     state === "playing"
-      ? calcWPM(totalTyped, elapsed)
+      ? wpm(totalTyped, elapsed)
       : state === "done"
-        ? calcWPM(target.length, elapsed)
+        ? wpm(target.length, elapsed)
         : 0;
-  const accuracy = calcAccuracy(correctChars, totalTyped);
+  const accuracy = accuracyPercent(correctKeys, totalKeys);
   const progress = (totalTyped / target.length) * 100;
+
+  // Enter starts from the idle screen; Escape restarts the current sentence.
+  useEffect(() => {
+    if (state === "done") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && state === "idle") {
+        const el = e.target instanceof Element ? e.target : null;
+        if (el?.closest("button, a, input, textarea, select")) return;
+        e.preventDefault();
+        startGame();
+      } else if (e.key === "Escape" && state === "playing") {
+        e.preventDefault();
+        startGame();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [state, startGame]);
 
   const renderChar = (char: string, i: number) => {
     const isTyped = i < typed.length;
@@ -464,7 +491,7 @@ export function TypingSpeedGame() {
             <div className="relative mt-2 text-sm text-(--muted)">
               {accuracy}% accuracy · {(elapsed / 1000).toFixed(1)}s · best streak {maxStreak} ·{" "}
               {errors} error{errors === 1 ? "" : "s"}
-              {currentWPM >= highScore && currentWPM > 0 && (
+              {newBest && (
                 <motion.span
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -493,7 +520,7 @@ export function TypingSpeedGame() {
       {state === "playing" && (
         <button
           onClick={resetGame}
-          className="inline-flex items-center gap-1.5 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+          className="inline-flex min-h-11 items-center gap-1.5 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <RotateCcw className="h-3 w-3" />
           Skip
