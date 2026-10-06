@@ -5,9 +5,19 @@ import { motion } from "framer-motion";
 import { GameBanner } from "./banners";
 import type { GameMeta } from "@/app/games/games-meta";
 
-export function GameCard({ game, size = "lg" }: { game: GameMeta; size?: "lg" | "sm" }) {
+export function GameCard({
+  game,
+  size = "lg",
+  featured = false,
+}: {
+  game: GameMeta;
+  size?: "lg" | "sm";
+  featured?: boolean;
+}) {
   const href = `/games/${game.slug}`;
-  const aspect = size === "lg" ? "aspect-[5/3]" : "aspect-[4/3]";
+  // The title sits in its own band below the art, so the card is taller than
+  // the old full-bleed 5:3 to leave the art room.
+  const aspect = featured ? "aspect-[4/3] sm:aspect-[21/9]" : "aspect-[4/3]";
   const titleSize = size === "lg" ? "text-xl sm:text-2xl" : "text-base sm:text-lg";
   const taglineSize = size === "lg" ? "text-sm" : "text-xs";
   return (
@@ -19,10 +29,22 @@ export function GameCard({ game, size = "lg" }: { game: GameMeta; size?: "lg" | 
         href={href}
         className="group relative block overflow-hidden rounded-2xl border border-(--border) shadow-lg shadow-black/30 transition-colors hover:border-white/20"
       >
-        <div className={`relative ${aspect} w-full`}>
-          <GameBanner slug={game.slug} />
-          {/* Dark overlay for legibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+        <div className={`relative flex ${aspect} w-full flex-col`}>
+          {/* The banner art keeps its own region above the title band, so the
+              title never sits on top of it. */}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <GameBanner slug={game.slug} />
+          </div>
+          {/* Title band: a dark scrim under the text. */}
+          <div className="relative shrink-0 bg-gradient-to-t from-black/90 to-black/70 p-4 sm:p-5">
+            {/* h2, not h3: on /games these cards sit directly under the page
+                h1 with no intermediate heading, so h3 is a heading-order skip.
+                Every other host renders them under an h2 section heading. */}
+            <h2 className={`font-display font-black tracking-tight ${titleSize} text-white`}>
+              {game.title}
+            </h2>
+            <p className={`mt-1 ${taglineSize} line-clamp-2 text-white/80`}>{game.tagline}</p>
+          </div>
           {/* Accent glow ring on hover — rounded to match the card's
               rounded-2xl so the inset outline follows the corners instead
               of drawing a hard rectangle that bleeds past them. */}
@@ -30,19 +52,6 @@ export function GameCard({ game, size = "lg" }: { game: GameMeta; size?: "lg" | 
             className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity group-hover:opacity-100"
             style={{ boxShadow: `inset 0 0 0 2px ${game.accent}` }}
           />
-          {/* Title block */}
-          <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-            {/* h2, not h3: on /games these cards sit directly under the page
-                h1 with no intermediate heading, so h3 is a heading-order skip.
-                Every other host renders them under an h2 section heading. */}
-            <h2
-              className={`font-display font-black tracking-tight ${titleSize} text-white`}
-              style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}
-            >
-              {game.title}
-            </h2>
-            <p className={`mt-1 ${taglineSize} line-clamp-2 text-white/80`}>{game.tagline}</p>
-          </div>
         </div>
       </Link>
     </motion.div>

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getAllBlogPosts } from "@/lib/blog";
 import { projects } from "@/data/projects";
+import { GAMES } from "@/app/games/games-meta";
 import sitemap from "../sitemap";
 
 describe("sitemap", () => {
@@ -29,5 +30,14 @@ describe("sitemap", () => {
     const [newest] = getAllBlogPosts();
     const index = entries.find((e) => e.url === "https://amindhou.com/blog");
     expect(index?.lastModified).toEqual(new Date(newest!.date));
+  });
+
+  it("lists the Password Game page and every public game, and no hidden game", () => {
+    expect(urls).toContain("https://amindhou.com/games/password-game");
+    for (const game of GAMES) {
+      const url = `https://amindhou.com/games/${game.slug}`;
+      if (game.hidden) expect(urls).not.toContain(url);
+      else expect(urls).toContain(url);
+    }
   });
 });

@@ -80,6 +80,26 @@ test("every sitemap URL serves an indexable page that declares itself canonical"
   }
 });
 
+test("/games and every game page share og:url with the canonical and carry a twitter card", async ({
+  page,
+  request,
+}) => {
+  const urls = (await sitemapUrls(request)).filter((url) => pathOf(url).startsWith("/games"));
+  expect(urls.length).toBeGreaterThan(1);
+
+  for (const url of urls) {
+    await page.goto(pathOf(url), { waitUntil: "domcontentloaded" });
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
+    expect.soft(canonical, `${url} canonical`).toBeTruthy();
+    await expect
+      .soft(page.locator('meta[property="og:url"]'), `${url} og:url`)
+      .toHaveAttribute("content", canonical ?? "");
+    await expect
+      .soft(page.locator('meta[name="twitter:card"]'), `${url} twitter:card`)
+      .toHaveCount(1);
+  }
+});
+
 test("every same-site link in llms.txt resolves", async ({ request }) => {
   const res = await request.get("/llms.txt");
   expect(res.status()).toBe(200);

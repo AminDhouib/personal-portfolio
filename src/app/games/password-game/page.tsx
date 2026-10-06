@@ -33,10 +33,16 @@ export const metadata = {
       },
     ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "The Password Game 2 — Terms and Conditions Apply",
+    description: DESCRIPTION,
+    images: [`${SITE_ORIGIN}/opengraph-image`],
+  },
 };
 
 export default function PasswordGamePage() {
-  const others = GAMES.filter((g) => g.slug !== "password-game");
+  const others = GAMES.filter((g) => g.slug !== "password-game" && !g.hidden);
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
