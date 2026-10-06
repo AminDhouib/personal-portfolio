@@ -2,7 +2,6 @@
 
 import { motion, useMotionValue, animate } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import type { GameSlug } from "@/app/games/games-meta";
 
 // ---------- shared ----------
 
@@ -41,7 +40,7 @@ function StarField({ density = 40, color = "white" }: { density?: number; color?
 // solid flat-shaded polyhedra asteroids (not wireframe), diagonal warp
 // streaks, cyan ship with engine trail, vignette + bloom feel.
 
-function SpaceShooterBanner() {
+export function SpaceShooterBanner() {
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0a0a1a" }}>
       {/* Biome nebula glow — drifts slowly downward for parallax */}
@@ -239,7 +238,7 @@ function SpaceShooterBanner() {
 // fall from outside, land in stack order (inner → middle → outer), and when
 // three of the same color are on a face they flash and clear. Loops.
 
-function HextrisBanner() {
+export function HextrisBanner() {
   // Exact palette from src/components/game/hextris.tsx
   const PINK = "#ec4899";
   const AMBER = "#f59e0b";
@@ -534,7 +533,7 @@ function HextrisBanner() {
 // Actual game: #05070d bg, #ef4444 red accent, corner tick marks, scanline
 // aesthetic, monospace HUD, blocks trim on miss.
 
-function TowerStackerBanner() {
+export function TowerStackerBanner() {
   const blocks = [
     { c: "#ef4444", w: 100 },
     { c: "#ef4444", w: 95 },
@@ -604,7 +603,7 @@ function TowerStackerBanner() {
 // Actual game: confetti colors #22c55e/#60a5fa/#f59e0b/#a78bfa/#ec4899,
 // character-level pop, streak counter, WPM display.
 
-function TypingSpeedBanner() {
+export function TypingSpeedBanner() {
   const text = "THE QUICK FOX";
   const correctColors = ["#22c55e", "#60a5fa", "#f59e0b", "#a78bfa", "#ec4899"];
   return (
@@ -1072,7 +1071,7 @@ function VoltorbBannerTileBack() {
   );
 }
 
-function SuperVoltorbFlipBanner() {
+export function SuperVoltorbFlipBanner() {
   const TILE = 28;
   const GAP = 12;
   const OUTLINE = 3;
@@ -1140,7 +1139,7 @@ function SuperVoltorbFlipBanner() {
 // Actual game: chaos system with overlays, fracture cracks, destruction glyphs,
 // pink/purple chaos aesthetic, seed display.
 
-function PasswordGameBanner() {
+export function PasswordGameBanner() {
   return (
     <div className="absolute inset-0 flex flex-col justify-center overflow-hidden bg-gradient-to-br from-[#0a0a0f] via-[#1a0e1e] to-[#0a0a0f] p-4 sm:p-5">
       {/* Fracture cracks (SVG lines like the actual game's FractureWeb) */}
@@ -1241,20 +1240,4 @@ function PasswordGameBanner() {
       ))}
     </div>
   );
-}
-
-// ---------- registry ----------
-
-const BANNERS: Record<GameSlug, () => React.ReactNode> = {
-  "space-shooter": SpaceShooterBanner,
-  hextris: HextrisBanner,
-  "tower-stacker": TowerStackerBanner,
-  "typing-speed": TypingSpeedBanner,
-  "super-voltorb-flip": SuperVoltorbFlipBanner,
-  "password-game": PasswordGameBanner,
-};
-
-export function GameBanner({ slug }: { slug: GameSlug }) {
-  const Banner = BANNERS[slug];
-  return <Banner />;
 }
