@@ -27,11 +27,39 @@ describe("assertArcadeItUrl", () => {
       "postgresql://u:s3cret@localhost:5432/arcade_it?host=evil",
     ],
     ["a fragment", "postgresql://u:s3cret@localhost:5432/arcade_it#frag"],
+    // WHATWG new URL trims these, pg-connection-string does not: a leading space makes pg
+    // resolve the host to "base" and a trailing one makes the database "arcade_it ".
+    ["a leading space", " postgresql://u:s3cret@localhost:5432/arcade_it"],
+    ["a trailing space", "postgresql://u:s3cret@localhost:5432/arcade_it "],
+    ["a trailing newline", "postgresql://u:s3cret@localhost:5432/arcade_it\n"],
+    ["an embedded tab", "postgresql://u:s3cret@local\thost:5432/arcade_it"],
+    ["a DEL character", "postgresql://u:s3cret@localhost:5432/arcade_it\u007f"],
+    ["a leading non-breaking space", "\u00a0postgresql://u:s3cret@localhost:5432/arcade_it"],
+    // pg honors hostaddr like host, and decodes percent-escapes in the host that the WHATWG
+    // parser leaves untouched for a non-special scheme (so the guard sees a different host).
+    ["a hostaddr override", "postgresql://u:s3cret@localhost:5432/arcade_it?hostaddr=1.2.3.4"],
+    ["a percent-encoded host", "postgresql://u:s3cret@%6cocalhost:5432/arcade_it"],
+    [
+      "a percent-encoded trailing dot on the host",
+      "postgresql://u:s3cret@localhost%2e:5432/arcade_it",
+    ],
     ["a non-postgres protocol", "http://localhost/arcade_it"],
     ["an unparseable string", "not a url"],
     ["an empty string", ""],
   ])("refuses %s", (_name, url) => {
     expect(() => assertArcadeItUrl(url)).toThrow(/ARCADE_IT_DATABASE_URL refused/);
+  });
+
+  it("never puts the connection string or password in the whitespace refusal either", () => {
+    let message = "";
+    try {
+      assertArcadeItUrl(" postgresql://u:s3cret@localhost:5432/arcade_it");
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toMatch(/ARCADE_IT_DATABASE_URL refused/);
+    expect(message).not.toContain("s3cret");
+    expect(message).not.toContain("localhost:5432");
   });
 
   it("never puts the connection string or password in the error", () => {

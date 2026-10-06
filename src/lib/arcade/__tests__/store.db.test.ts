@@ -23,6 +23,17 @@ const tok = (c: string) => c.repeat(43);
 const sha = (token: string) => createHash("sha256").update(token).digest("hex");
 const DETAIL = { seconds: 60, kills: 40, distance: 1500 };
 
+// Always runs, and is deliberately outside the skipIf below: if the CI job loses its
+// database URL, the suite would otherwise skip and the job would still go green. GitHub
+// Actions sets GITHUB_JOB to the job id, which is `db-integration` in .github/workflows/ci.yml.
+describe("arcade real-Postgres suite wiring", () => {
+  it("has its database URL whenever it runs in the CI db-integration job", () => {
+    if (process.env.GITHUB_JOB === "db-integration") {
+      expect(process.env.ARCADE_IT_DATABASE_URL).toBeTruthy();
+    }
+  });
+});
+
 describe.skipIf(!url)("arcade store against a real Postgres", () => {
   let pool: Pool;
 
@@ -104,12 +115,23 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     await pool.query("TRUNCATE arcade_scores, arcade_players CASCADE");
   });
 
-  it("the ensure-step is idempotent, including three concurrent runs", async () => {
-    await Promise.all([
+  it("the ensure-step creates the tables from nothing, even when three run concurrently", async () => {
+    // The arcade_it database is this suite's alone (the guard guarantees it), and only the two
+    // arcade tables are dropped. The tables are recreated here, so test order does not matter.
+    await pool.query("DROP TABLE IF EXISTS arcade_scores, arcade_players CASCADE");
+    const gone = await pool.query(
+      `SELECT to_regclass('arcade_players') IS NULL AS players,
+              to_regclass('arcade_scores') IS NULL AS scores,
+              to_regclass('idx_arcade_scores_rank') IS NULL AS idx`,
+    );
+    expect(gone.rows[0]).toEqual({ players: true, scores: true, idx: true });
+
+    const results = await Promise.allSettled([
       ensureArcadeSchema(pool),
       ensureArcadeSchema(pool),
       ensureArcadeSchema(pool),
     ]);
+    expect(results.map((r) => r.status)).toEqual(["fulfilled", "fulfilled", "fulfilled"]);
     const { rows } = await pool.query(
       `SELECT to_regclass('arcade_players') IS NOT NULL AS players,
               to_regclass('arcade_scores') IS NOT NULL AS scores,
@@ -118,10 +140,34 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     expect(rows[0]).toEqual({ players: true, scores: true, idx: true });
   });
 
-  it("a new player is claimed with the sha256 of the token and a sanitized handle", async () => {
+  it("a new player is claimed with the sha256 of the token and the handle it was given", async () => {
+    // Sanitizing the handle is the route's job; the store keeps what it is handed.
     await expect(put({ handle: "Ada" })).resolves.toMatchObject({ ok: true });
     const { rows } = await pool.query("SELECT id, token_hash, handle FROM arcade_players");
     expect(rows).toEqual([{ id: pid("1"), token_hash: sha(tok("A")), handle: "Ada" }]);
+  });
+
+  it("every accepted submit refreshes the handle and last_seen_at, even when no score improves", async () => {
+    const later = new Date(NOW.getTime() + 3_600_000);
+    await put({ handle: "Ada", score: 4200 });
+    const first = await pool.query(
+      "SELECT handle, created_at, last_seen_at FROM arcade_players WHERE id = $1::uuid",
+      [pid("1")],
+    );
+    expect(first.rows[0]?.handle).toBe("Ada");
+    expect(first.rows[0]?.last_seen_at.getTime()).toBe(NOW.getTime());
+
+    const outcome = await put({ handle: "Ada2", score: 100, at: later });
+    expect(outcome).toMatchObject({ ok: true });
+    if (outcome.ok) expect(outcome.boards.map((b) => b.improved)).toEqual([false, false, false]);
+
+    const second = await pool.query(
+      "SELECT handle, created_at, last_seen_at FROM arcade_players WHERE id = $1::uuid",
+      [pid("1")],
+    );
+    expect(second.rows[0]?.handle).toBe("Ada2");
+    expect(second.rows[0]?.last_seen_at.getTime()).toBe(later.getTime());
+    expect(second.rows[0]?.created_at.getTime()).toBe(first.rows[0]?.created_at.getTime());
   });
 
   it("writes the all-time, weekly and daily boards for the server clock", async () => {
@@ -156,6 +202,7 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     expect(worse).toMatchObject({ ok: true });
     if (worse.ok) expect(worse.boards.map((b) => b.improved)).toEqual([false, false, false]);
     const better = await put({ score: 4300 });
+    expect(better).toMatchObject({ ok: true });
     if (better.ok)
       expect(better.boards.map((b) => [b.best, b.improved])).toEqual([
         [4300, true],
@@ -344,12 +391,12 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
     ];
     await pool.query(
       `INSERT INTO arcade_scores (game, board, player_id, score, detail, achieved_at)
-       SELECT 'space-shooter', b, $1, 1, '{}'::jsonb, now() FROM unnest($2::text[]) AS b`,
+       SELECT 'space-shooter', b, $1::uuid, 1, '{}'::jsonb, now() FROM unnest($2::text[]) AS b`,
       [pid("1"), oldBoards],
     );
     await pool.query(
       `INSERT INTO arcade_scores (game, board, player_id, score, detail, achieved_at)
-       VALUES ('hextris', 'daily:2020-01-01', $1, 1, '{}'::jsonb, now())`,
+       VALUES ('hextris', 'daily:2020-01-01', $1::uuid, 1, '{}'::jsonb, now())`,
       [pid("1")],
     );
 
@@ -402,7 +449,7 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
 
   it("deleting a player cascades to their scores (the RUNBOOK data-surgery recipe)", async () => {
     await put();
-    await pool.query("DELETE FROM arcade_players WHERE id = $1", [pid("1")]);
+    await pool.query("DELETE FROM arcade_players WHERE id = $1::uuid", [pid("1")]);
     const { rows } = await pool.query("SELECT count(*)::int AS n FROM arcade_scores");
     expect(rows[0]?.n).toBe(0);
   });
