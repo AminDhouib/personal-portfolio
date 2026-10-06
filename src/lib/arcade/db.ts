@@ -28,7 +28,7 @@ function reportLegacyImport(report: LegacyImportReport): void {
     case "imported":
       logWarn(
         "arcade:legacy-import",
-        `imported ${report.scores} scores for ${report.players} players (read ${report.read}, skipped ${report.skippedUnverifiable} unverifiable and ${report.skippedImplausible} implausible)`,
+        `imported ${report.scores} scores for ${report.players} players (read ${report.read}: ${report.superseded} superseded, ${report.skippedUnverifiable} unverifiable, ${report.skippedImplausible} implausible)`,
       );
       return;
   }

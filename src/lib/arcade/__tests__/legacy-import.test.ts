@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createFakePool } from "@/test/fake-pg";
+import { ARCADE_SCORE_CAP } from "../games";
 import { importLegacyLeaderboard } from "../legacy-import";
 
 // Pinned as a literal on purpose: renaming the marker would re-run the import.
@@ -135,6 +136,7 @@ describe("importLegacyLeaderboard: marker and table guard", () => {
     await expect(importLegacyLeaderboard(fake.client, ids())).resolves.toEqual({
       status: "imported",
       read: 0,
+      superseded: 0,
       skippedUnverifiable: 0,
       skippedImplausible: 0,
       players: 0,
@@ -166,6 +168,7 @@ describe("importLegacyLeaderboard: what is imported", () => {
     expect(report).toEqual({
       status: "imported",
       read: 10,
+      superseded: 2,
       skippedUnverifiable: 2,
       skippedImplausible: 2,
       players: 3,
@@ -224,7 +227,7 @@ describe("importLegacyLeaderboard: what is imported", () => {
 
   it("sanitizes handles like the live route: bidi controls stripped, blank becomes Pilot, 12 characters", async () => {
     const fake = scripted([
-      legacyRow({ id: 1, name: "‮Evil", score: 3000 }),
+      legacyRow({ id: 1, name: "\u202eEvil", score: 3000 }),
       legacyRow({ id: 2, name: "   ", score: 2000, created_at: at("2026-03-02T10:00:00.000Z") }),
       legacyRow({
         id: 3,
@@ -238,6 +241,42 @@ describe("importLegacyLeaderboard: what is imported", () => {
       .filter((q) => q.sql.startsWith("INSERT INTO arcade_players"))
       .map((q) => q.params[2]);
     expect(handles).toEqual(["Evil", "Pilot", "Averyveryver"]);
+  });
+
+  it("skips a row whose score is outside 0..ARCADE_SCORE_CAP, counted as implausible", async () => {
+    // A long, busy run whose detail makes the ceiling check pass for any score in range, so
+    // only the range guard can reject these.
+    const long = { seconds: 80_000, kills: 90_000, distance: 900_000 };
+    const fake = scripted([
+      legacyRow({ id: 1, name: "Neg", score: -5 }),
+      legacyRow({ id: 2, name: "Big", score: ARCADE_SCORE_CAP + 1, ...long }),
+      legacyRow({ id: 3, name: "Edge", score: ARCADE_SCORE_CAP, ...long }),
+      legacyRow({ id: 4, name: "Zero", score: 0 }),
+    ]);
+    const report = await importLegacyLeaderboard(fake.client, ids());
+    expect(report).toEqual({
+      status: "imported",
+      read: 4,
+      superseded: 0,
+      skippedUnverifiable: 0,
+      skippedImplausible: 2,
+      players: 2,
+      scores: 2,
+    });
+    const handles = fake.queries
+      .filter((q) => q.sql.startsWith("INSERT INTO arcade_players"))
+      .map((q) => q.params[2]);
+    expect(handles).toEqual(["Edge", "Zero"]);
+  });
+
+  it("reconciles: read = imported + superseded + unverifiable + implausible", async () => {
+    const fake = scripted(ROWS);
+    const report = await importLegacyLeaderboard(fake.client, ids());
+    if (report.status !== "imported") throw new Error("expected an import");
+    expect(report.superseded).toBe(2);
+    expect(report.read).toBe(
+      report.scores + report.superseded + report.skippedUnverifiable + report.skippedImplausible,
+    );
   });
 
   it("uses a random UUID per player by default", async () => {

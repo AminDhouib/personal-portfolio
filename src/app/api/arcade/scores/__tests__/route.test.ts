@@ -20,7 +20,7 @@ interface StoredScore {
   board: string;
   playerId: string;
   score: number;
-  detail: Record<string, number>;
+  detail: Record<string, number | boolean>;
   achievedAt: Date;
 }
 
@@ -269,7 +269,7 @@ interface ReadBody {
     rank: number;
     handle: string;
     score: number;
-    detail: Record<string, number>;
+    detail: Record<string, number | boolean>;
     achievedAt: string;
     isYou: boolean;
   }[];
