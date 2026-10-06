@@ -168,13 +168,18 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris move onto it in T
   Adding a game to the arcade = a validator + tests + a hook swap.
 - **Board cap: 1000 rows.** Each submit that wrote a row on a board (the upsert's `improved`)
   trims that board back to its top `BOARD_ROW_CAP` (1000) rows by `(score DESC, achieved_at ASC)`,
-  in the same transaction, so a flood of fresh player ids cannot grow the tables without bound.
-  The trim's `ORDER BY` matches `idx_arcade_scores_rank` exactly and adds no tiebreak column, so
+  in the same transaction, so a flood of fresh player ids cannot grow `arcade_scores` without
+  bound (`arcade_players` is not bounded; see Known debt). The trim's `ORDER BY` matches `idx_arcade_scores_rank` exactly and adds no tiebreak column, so
   the planner can walk the index. The submit response keeps the rank computed before the trim: a
   submit that lands below a full board still reports e.g. rank 1001 and `improved: true`, and the
   player's row is gone. From then on a read that passes that player's id gets `you: null` for that
   board. This is intended: a score outside the top 1000 is not on the board. The player row stays
   (see Known debt).
+- **Submits for a game are serialized.** The first statement of every submit transaction is a
+  per-game `pg_advisory_xact_lock`, taken before the player row lock, so all writers for a game
+  take their locks in one order. Without it, concurrent submits on a full board could deadlock
+  (40P01, a 500), overshoot the cap until the next trim, or trim a row another submit had just
+  improved. The lock is released at COMMIT or ROLLBACK.
 - **Reads are rate limited, not guarded.** `GET /api/arcade/scores` is limited to 120 reads per
   60 s per client IP (key `arcade-read:<ip>`; a 429 with `Retry-After`, the same shape as the
   POST's). It has no origin or content-type guard on purpose: the public response is
