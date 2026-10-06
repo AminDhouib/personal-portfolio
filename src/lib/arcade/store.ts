@@ -61,6 +61,10 @@ function sameHash(stored: string, candidate: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// First statement of every submit: one lock order per game, so concurrent submits cannot
+// deadlock on the player and score rows or race each other's board trim.
+const LOCK_GAME = `SELECT pg_advisory_xact_lock(hashtextextended('arcade:' || $1, 0))`;
+
 const INSERT_PLAYER = `INSERT INTO arcade_players (id, token_hash, handle)
   VALUES ($1, $2, $3)
   ON CONFLICT (id) DO NOTHING`;
@@ -121,6 +125,7 @@ export async function submitScore(
   const tokenHash = hashToken(input.token);
   try {
     return await withTransaction(pool, async (client): Promise<SubmitOutcome> => {
+      await client.query(LOCK_GAME, [input.game]);
       await client.query(INSERT_PLAYER, [input.playerId, tokenHash, input.handle]);
       const locked = await client.query(LOCK_PLAYER, [input.playerId]);
       const stored = arcadeTokenRowSchema.parse(locked.rows[0]);

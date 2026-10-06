@@ -58,6 +58,7 @@ describe("submitScore: statement sequence and parameters", () => {
     await submitScore(fake.pool, INPUT, NOW);
     expect(fake.sqls().map(label)).toEqual([
       "BEGIN",
+      "SELECT pg_advisory_xact_lock(hashtextextended('arcade:' ||",
       "INSERT INTO arcade_players",
       "SELECT token_hash FROM",
       "UPDATE arcade_players SET",
@@ -79,7 +80,7 @@ describe("submitScore: statement sequence and parameters", () => {
   it("stores only the sha256 of the token, never the token", async () => {
     const fake = scripted();
     await submitScore(fake.pool, INPUT, NOW);
-    expect(fake.queries[1]?.params).toEqual([PLAYER, TOKEN_HASH, "Ada"]);
+    expect(fake.queries[2]?.params).toEqual([PLAYER, TOKEN_HASH, "Ada"]);
     for (const query of fake.queries) expect(query.params).not.toContain(TOKEN);
     expect(fake.sqls().join(" ")).not.toContain(TOKEN);
   });
@@ -271,7 +272,18 @@ describe("submitScore: identity (trust on first use)", () => {
   it("locks the player row (FOR UPDATE) before the identity check so one player's submits serialize", async () => {
     const fake = scripted();
     await submitScore(fake.pool, INPUT, NOW);
-    expect(fake.sqls()[2]).toBe("SELECT token_hash FROM arcade_players WHERE id = $1 FOR UPDATE");
+    expect(fake.sqls()[3]).toBe("SELECT token_hash FROM arcade_players WHERE id = $1 FOR UPDATE");
+  });
+
+  it("takes a per-game advisory lock first, once, so every writer for a game locks in one order", async () => {
+    const fake = scripted();
+    await submitScore(fake.pool, INPUT, NOW);
+    const lockSql = "SELECT pg_advisory_xact_lock(hashtextextended('arcade:' || $1, 0))";
+    expect(fake.sqls()[0]).toBe("BEGIN");
+    expect(fake.sqls()[1]).toBe(lockSql);
+    expect(fake.queries[1]?.params).toEqual(["space-shooter"]);
+    expect(fake.sqls().filter((sql) => sql === lockSql)).toHaveLength(1);
+    expect(fake.sqls().findIndex((sql) => sql.startsWith("INSERT INTO arcade_players"))).toBe(2);
   });
 });
 

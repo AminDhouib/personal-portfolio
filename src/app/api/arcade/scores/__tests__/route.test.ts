@@ -54,6 +54,10 @@ function createEmulator() {
       }
       return undefined;
     }
+    if (sql.startsWith("SELECT pg_advisory_xact_lock(hashtextextended(")) {
+      // The per-game submit lock: the emulator is single-threaded, so there is nothing to wait on.
+      return { rows: [{ pg_advisory_xact_lock: "" }] };
+    }
     if (sql.startsWith("INSERT INTO arcade_players")) {
       const [id, tokenHash, handle] = params as [string, string, string];
       if (!players.has(id)) players.set(id, { tokenHash, handle });
@@ -361,7 +365,7 @@ describe("POST /api/arcade/scores", () => {
     await submit();
     await submit({ score: 4300 });
     const sqls = emu.fake.sqls();
-    const locks = sqls.filter((sql) => sql.startsWith("SELECT pg_advisory_xact_lock"));
+    const locks = sqls.filter((sql) => sql === "SELECT pg_advisory_xact_lock($1)");
     expect(locks).toHaveLength(1);
     const lockAt = sqls.indexOf("SELECT pg_advisory_xact_lock($1)");
     const firstPlayerInsert = sqls.findIndex((sql) => sql.startsWith("INSERT INTO arcade_players"));

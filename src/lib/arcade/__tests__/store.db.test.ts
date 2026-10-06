@@ -378,6 +378,19 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
       if (outcome.ok) expect(outcome.boards.map((b) => b.improved)).toEqual([false, false, false]);
       expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP + 1);
     }, 30_000);
+
+    it("concurrent submits by different players on a full board all succeed and leave exactly the cap", async () => {
+      await seedBoard("space-shooter", "all-time", BOARD_ROW_CAP, 1000);
+
+      const results = await Promise.all([
+        put({ player: pid("1"), token: tok("A"), score: 500 }),
+        put({ player: pid("2"), token: tok("B"), score: 600 }),
+        put({ player: pid("3"), token: tok("C"), score: 700 }),
+      ]);
+
+      expect(results.every((r) => r.ok)).toBe(true);
+      expect(await boardCount("space-shooter", "all-time")).toBe(BOARD_ROW_CAP);
+    }, 30_000);
   });
 
   it("prunes this game's daily boards older than 30 days and weekly boards older than 12 weeks", async () => {
