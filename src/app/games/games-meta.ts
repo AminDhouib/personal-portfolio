@@ -26,6 +26,10 @@ export interface GameMeta {
   // works if visited directly. Use to take a game out of rotation
   // without deleting any code.
   hidden?: true;
+  // The one game the /games hub leads with. Exactly one public game carries
+  // it (games-meta.test.ts pins that); the hub reads the flag, so the order of
+  // GAMES never has to double as "which game is featured".
+  featured?: true;
 }
 
 export const GAMES: GameMeta[] = [
@@ -39,6 +43,7 @@ export const GAMES: GameMeta[] = [
       "Mouse / touch / WASD / arrows to move. Double-tap to dash. Bullets fire automatically.",
     accent: "#22d3ee",
     accentTailwind: "accent-blue",
+    featured: true,
   },
   {
     slug: "hextris",
