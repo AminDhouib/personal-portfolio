@@ -241,8 +241,10 @@ async function submit(over: Record<string, unknown> = {}) {
   return { res, json: (await res.json()) as SubmitBody };
 }
 
-async function read(query: string) {
-  const res = await GET(new Request(`${URL_SCORES}?${query}`));
+async function read(query: string, ip?: string) {
+  const res = await GET(
+    new Request(`${URL_SCORES}?${query}`, ip ? { headers: { "x-forwarded-for": ip } } : undefined),
+  );
   return { res, json: (await res.json()) as ReadBody };
 }
 
@@ -588,6 +590,54 @@ describe("GET /api/arcade/scores", () => {
     expect(daily.json.entries).toEqual([]);
     const allTime = await read("game=space-shooter&board=all-time");
     expect(allTime.json.entries).toHaveLength(1);
+  });
+
+  describe("read rate limit", () => {
+    const QUERY = "game=space-shooter&board=all-time";
+
+    it("answers the 121st read from one client within a minute with 429 and Retry-After", async () => {
+      const ip = uniqueIp();
+      for (let i = 0; i < 120; i += 1) {
+        expect((await read(QUERY, ip)).res.status).toBe(200);
+      }
+      const { res, json } = await read(QUERY, ip);
+      expect(res.status).toBe(429);
+      expect(json).toEqual({ error: "too many requests" });
+      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThanOrEqual(1);
+    });
+
+    it("does not limit a different client, and does not touch the database once limited", async () => {
+      const ip = uniqueIp();
+      for (let i = 0; i < 120; i += 1) await read(QUERY, ip);
+      const before = emu.fake.queries.length;
+      expect((await read(QUERY, ip)).res.status).toBe(429);
+      expect(emu.fake.queries).toHaveLength(before);
+      expect((await read(QUERY, uniqueIp())).res.status).toBe(200);
+    });
+
+    it("lets the client read again once the window has passed", async () => {
+      const ip = uniqueIp();
+      for (let i = 0; i < 121; i += 1) await read(QUERY, ip);
+      vi.setSystemTime(new Date(NOW.getTime() + 61_000));
+      expect((await read(QUERY, ip)).res.status).toBe(200);
+    });
+
+    it("counts reads and submits in separate buckets", async () => {
+      const ip = uniqueIp();
+      for (let i = 0; i < 120; i += 1) await read(QUERY, ip);
+      expect((await post(body(), { ip })).status).toBe(200);
+      for (let i = 0; i < 10; i += 1) await post(body(), { ip });
+      expect((await read(QUERY, ip)).res.status).toBe(429);
+    });
+
+    it("does not require an origin: a plain cross-site read is still served", async () => {
+      const res = await GET(
+        new Request(`${URL_SCORES}?${QUERY}`, {
+          headers: { origin: "https://evil.example", "x-forwarded-for": uniqueIp() },
+        }),
+      );
+      expect(res.status).toBe(200);
+    });
   });
 
   it("answers a database failure with 500 and reports it", async () => {
