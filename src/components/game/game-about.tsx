@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import type { GameContent } from "@/app/games/content/types";
 
 // Server-rendered: the game itself is client-only (ssr: false), so this block
@@ -63,6 +64,26 @@ export function GameAbout({ title, content }: { title: string; content: GameCont
           </div>
         ))}
       </div>
+
+      {content.links && content.links.length > 0 ? (
+        <>
+          <h3 className={H3}>More</h3>
+          <ul className="mt-3 space-y-1.5">
+            {content.links.map((link) => (
+              <li key={link.href} className={BODY}>
+                <Link
+                  href={link.href}
+                  className="font-semibold underline underline-offset-2 hover:text-(--foreground)"
+                >
+                  {link.label}
+                </Link>
+                {": "}
+                <span>{link.description}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       <h3 className={H3}>Credits</h3>
       <ul className="mt-3 space-y-1.5 text-sm text-(--muted)">

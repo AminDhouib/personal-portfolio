@@ -27,6 +27,13 @@ export interface GameCredit {
   href?: string;
 }
 
+export interface GameLink {
+  label: string;
+  /** Site-relative path. */
+  href: string;
+  description: string;
+}
+
 export interface GameContent {
   /** The <title>, before the layout template appends " — Amin Dhouib". Leads with the search term. */
   seoTitle: string;
@@ -43,4 +50,6 @@ export interface GameContent {
   facts: GameFact[];
   faq: GameFaq[];
   credits: GameCredit[];
+  /** Related pages on this site, listed in the About block. */
+  links?: GameLink[];
 }

@@ -16,6 +16,7 @@ import {
   projectNode,
   serializeJsonLd,
   videoGameNode,
+  webApplicationNode,
 } from "../structured-data";
 
 describe("serializeJsonLd", () => {
@@ -160,6 +161,32 @@ describe("videoGameNode", () => {
     expect(node.image).toBe("https://amindhou.com/games/hextris/opengraph-image");
     expect(node.playMode).toBe("https://schema.org/SinglePlayer");
     expect(node.genre).toEqual(["Puzzle", "Arcade"]);
+  });
+});
+
+describe("webApplicationNode", () => {
+  it("describes a free in-browser tool by the Person", () => {
+    const node = webApplicationNode({
+      name: "Voltorb Flip Solver",
+      description: "d",
+      path: "/games/super-voltorb-flip/solver",
+    });
+    expect(node).toEqual({
+      "@type": "WebApplication",
+      "@id": "https://amindhou.com/games/super-voltorb-flip/solver#app",
+      name: "Voltorb Flip Solver",
+      description: "d",
+      url: "https://amindhou.com/games/super-voltorb-flip/solver",
+      image: "https://amindhou.com/games/super-voltorb-flip/solver/opengraph-image",
+      applicationCategory: "UtilitiesApplication",
+      browserRequirements: "Requires JavaScript",
+      operatingSystem: "Any",
+      inLanguage: "en",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+      author: { "@id": "https://amindhou.com/#person" },
+      publisher: { "@id": "https://amindhou.com/#person" },
+    });
   });
 });
 

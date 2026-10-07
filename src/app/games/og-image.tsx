@@ -11,7 +11,9 @@ export function gameOgAlt(slug: GameSlug): string {
   return `${game.title}: ${game.tagline}. A free browser game by Amin Dhouib.`;
 }
 
-export function renderGameOgImage(slug: GameSlug): ImageResponse {
+export type GameOgOverride = { kicker?: string; title?: string; tagline?: string };
+
+export function renderGameOgImage(slug: GameSlug, override?: GameOgOverride): ImageResponse {
   const game = GAMES_BY_SLUG[slug];
   return new ImageResponse(
     <div
@@ -37,7 +39,7 @@ export function renderGameOgImage(slug: GameSlug): ImageResponse {
           fontWeight: 700,
         }}
       >
-        FREE BROWSER GAME
+        {override?.kicker ?? "FREE BROWSER GAME"}
       </div>
       <div
         style={{
@@ -49,7 +51,7 @@ export function renderGameOgImage(slug: GameSlug): ImageResponse {
           lineHeight: 0.95,
         }}
       >
-        {game.title}
+        {override?.title ?? game.title}
       </div>
       <div
         style={{
@@ -62,7 +64,7 @@ export function renderGameOgImage(slug: GameSlug): ImageResponse {
         }}
       />
       <div style={{ display: "flex", marginTop: "28px", fontSize: 36, color: "#bbbbbb" }}>
-        {game.tagline}
+        {override?.tagline ?? game.tagline}
       </div>
       <div
         style={{
