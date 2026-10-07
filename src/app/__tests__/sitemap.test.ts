@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { getAllBlogPosts } from "@/lib/blog";
 import { projects } from "@/data/projects";
 import { GAMES } from "@/app/games/games-meta";
+import { SOLVER_PATH } from "@/app/games/super-voltorb-flip/solver/solver-content";
 import sitemap from "../sitemap";
 
 describe("sitemap", () => {
@@ -39,5 +40,9 @@ describe("sitemap", () => {
       if (game.hidden) expect(urls).not.toContain(url);
       else expect(urls).toContain(url);
     }
+  });
+
+  it("lists the Voltorb Flip solver page", () => {
+    expect(urls).toContain(`https://amindhou.com${SOLVER_PATH}`);
   });
 });

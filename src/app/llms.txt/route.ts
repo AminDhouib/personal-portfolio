@@ -1,6 +1,10 @@
 import { getAllBlogPosts } from "@/lib/blog";
 import { GAMES } from "@/app/games/games-meta";
 import { GAME_CONTENT } from "@/app/games/content";
+import {
+  SOLVER_DESCRIPTION,
+  SOLVER_PATH,
+} from "@/app/games/super-voltorb-flip/solver/solver-content";
 import { BOOKING_URL, socialLinks } from "@/data/nav";
 import { faqs } from "@/data/faq";
 import { SITE_ORIGIN, profile } from "@/data/profile";
@@ -71,9 +75,12 @@ export function GET(): Response {
     `Free browser games built for this site, playable on desktop and phone with no download or sign-up.`,
     "",
     `- ${link("Games index", "/games")}`,
-    ...games.map(
-      (g) => `- ${link(g.title, `/games/${g.slug}`)}: ${GAME_CONTENT[g.slug].seoDescription}`,
-    ),
+    ...games.flatMap((g) => [
+      `- ${link(g.title, `/games/${g.slug}`)}: ${GAME_CONTENT[g.slug].seoDescription}`,
+      ...(g.slug === "super-voltorb-flip"
+        ? [`- ${link("Voltorb Flip solver", SOLVER_PATH)}: ${SOLVER_DESCRIPTION}`]
+        : []),
+    ]),
     "",
     "## Optional",
     "",

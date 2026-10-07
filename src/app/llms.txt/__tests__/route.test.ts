@@ -5,6 +5,10 @@ import { projects } from "@/data/projects";
 import { BOOKING_URL } from "@/data/nav";
 import { GAMES } from "@/app/games/games-meta";
 import { GAME_CONTENT } from "@/app/games/content";
+import {
+  SOLVER_DESCRIPTION,
+  SOLVER_PATH,
+} from "@/app/games/super-voltorb-flip/solver/solver-content";
 import { GET } from "../route";
 
 // Runs against the real checked-in content (content/blog, src/data): the
@@ -57,6 +61,15 @@ describe("GET /llms.txt", () => {
         `[${game.title}](https://amindhou.com/games/${game.slug}): ${GAME_CONTENT[game.slug].seoDescription}`,
       );
     }
+  });
+
+  it("lists the Voltorb Flip solver right after the game", async () => {
+    const body = await GET().text();
+    const solver = `- [Voltorb Flip solver](https://amindhou.com${SOLVER_PATH}): ${SOLVER_DESCRIPTION}`;
+    const lines = body.split("\n");
+    const at = lines.indexOf(solver);
+    expect(at).toBeGreaterThan(0);
+    expect(lines[at - 1]).toContain("(https://amindhou.com/games/super-voltorb-flip)");
   });
 
   it("never lists a hidden game", async () => {

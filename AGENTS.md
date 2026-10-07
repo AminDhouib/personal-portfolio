@@ -77,6 +77,9 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 - `/games` hub: `src/app/games/hub/` holds the client islands (Today strip over the public daily
   reads, read-only "On this device" stats) behind the static `src/app/games/page.tsx`; the
   featured card is chosen by `featured` on `GameMeta`. See DESIGN.md's "Games hub".
+- Voltorb Flip solver: `src/app/games/super-voltorb-flip/solver/` (static server-rendered page plus
+  the client island `solver-client.tsx`) over the pure solver in
+  `src/components/game/super-voltorb-flip/solver.ts`. See DESIGN.md's "Voltorb Flip solver".
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries

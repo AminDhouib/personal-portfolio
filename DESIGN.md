@@ -272,6 +272,20 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
   is the guard. It scans every source file under `src/`, and fails if a `"use client"` module
   imports `GAME_CONTENT` (or anything under `games/content`).
 
+## Voltorb Flip solver
+
+`/games/super-voltorb-flip/solver` is a static page (copy and FAQ in `solver-content.ts`) with one
+client island. The solver (`components/game/super-voltorb-flip/solver.ts`) enumerates every board
+that fits the ten clues and the flipped tiles, so the odds are exact, not sampled.
+
+- **Weighting.** Each fitting board is weighted by its HGSS deal probability through
+  `ACCEPT_RATE` (the share of deals each board config accepts). Clues no recipe produces fall back
+  to uniform weighting, and the page says so. `MAX_LAYOUTS` caps the enumeration; past it the page
+  asks for a flipped tile instead of guessing.
+- **Odds labels.** `formatOdds` never shows 0% or 100% unless the odds are exact.
+- **Regenerate on change.** `ACCEPT_RATE` is seeded, 400k samples per board. If `hgss.ts` ever
+  changes, regenerate it (the recipe is the comment above it in `solver-prior.ts`).
+
 ## Intentional-design register
 
 Things that look like bugs or oversights but are deliberate. Each was verified against the
