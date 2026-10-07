@@ -19,6 +19,8 @@ let globalMuted = false;
 let master: Master | null = null;
 let music: HTMLAudioElement | null = null;
 let musicSrc: string | null = null;
+// Loops being faded out; they have left the `music` slot but still sound.
+const fading = new Set<HTMLAudioElement>();
 
 function getMaster(): Master | null {
   if (master) return master;
@@ -37,27 +39,58 @@ function getMaster(): Master | null {
   }
 }
 
-// An AudioContext created before a user gesture starts suspended; every cue is
+// An AudioContext created before a user gesture starts suspended (iOS Safari
+// also reports "interrupted" after a call or a tab switch); every cue is
 // triggered by (or soon after) a gesture, so wake it each time.
 function wake(m: Master): void {
-  if (m.ctx.state !== "suspended") return;
+  if (m.ctx.state !== "suspended" && m.ctx.state !== "interrupted") return;
   // silent-ok: resume() rejects while the browser still blocks audio; the next gesture retries.
   m.ctx.resume?.().catch(() => undefined);
 }
+
+interface LiveCue {
+  timer: number;
+  handle: CueHandle | null;
+}
+
+// One-shot cues still sounding, so stopAllCues() can silence them on unmount.
+const liveCues = new Set<LiveCue>();
 
 function playCue(name: CueName): Promise<void> {
   const cue = CUES[name];
   return new Promise((resolve) => {
     if (globalMuted || typeof window === "undefined") return resolve();
     const m = getMaster();
+    let handle: CueHandle | null = null;
     if (m) {
       wake(m);
-      scheduleCue(m.ctx, m.out, cue, m.ctx.currentTime);
+      handle = scheduleCue(m.ctx, m.out, cue, m.ctx.currentTime);
     }
     // Resolve at the cue's end even without audio, so gameplay that awaits a
     // cue (the risk fanfare gating the board) keeps the same pacing.
-    window.setTimeout(resolve, cue.ms);
+    const live: LiveCue = {
+      handle,
+      timer: window.setTimeout(() => {
+        liveCues.delete(live);
+        resolve();
+      }, cue.ms),
+    };
+    liveCues.add(live);
   });
+}
+
+/**
+ * Silence every one-shot cue still sounding and drop its end timer. A cancelled
+ * cue's promise never resolves: its only awaiter is the component being torn
+ * down, and resolving it would release a lock on a board nobody sees.
+ */
+export function stopAllCues(): void {
+  if (typeof window === "undefined") return;
+  for (const live of liveCues) {
+    window.clearTimeout(live.timer);
+    live.handle?.stop();
+  }
+  liveCues.clear();
 }
 
 // One-shot effects. Each returns a promise that resolves when the cue ends;
@@ -175,6 +208,8 @@ export function fadeOutMusic(ms = 400): void {
   const m = music;
   music = null;
   musicSrc = null;
+  // The slot is already free, but a mute during the fade must still reach it.
+  fading.add(m);
   const startVol = m.volume;
   const startTime = performance.now();
   const tick = () => {
@@ -182,7 +217,10 @@ export function fadeOutMusic(ms = 400): void {
     const t = Math.min(1, elapsed / ms);
     m.volume = Math.max(0, startVol * (1 - t));
     if (t < 1) requestAnimationFrame(tick);
-    else m.pause();
+    else {
+      m.pause();
+      fading.delete(m);
+    }
   };
   requestAnimationFrame(tick);
 }
@@ -191,5 +229,6 @@ export function fadeOutMusic(ms = 400): void {
 export function setMusicMuted(muted: boolean): void {
   globalMuted = muted;
   if (music) music.muted = muted;
+  for (const m of fading) m.muted = muted;
   if (master) setMasterMuted(master, muted);
 }

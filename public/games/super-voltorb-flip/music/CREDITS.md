@@ -19,12 +19,12 @@ ships with this site.
 
 All tracks above are CC0 (public domain). No attribution is legally required, but is appreciated per the authors' wishes.
 
-- **TinyWorlds** — Happy tune generated using Autotracker and edited with Audacity.
-- **SubspaceAudio (Juhani Junkala)** — Part of the "5 Action Chiptunes" pack released as CC0 for game developers.
-- **celestialghost8** — Famitracker/VRC6 chiptune composition.
-- **Pro Sensory (Alex McCulloch)** — "Just include my name Alex McCulloch. Attribution appreciated but not required."
-- **Zane Little Music** — A cute chiptune loop for adventure games.
-- **skrjablin** — Commodore SID chip chiptune made with Goat Tracker. Loopable. Dual-licensed CC-BY 3.0 and CC0; used here under CC0.
+- **TinyWorlds** - Happy tune generated using Autotracker and edited with Audacity.
+- **SubspaceAudio (Juhani Junkala)** - Part of the "5 Action Chiptunes" pack released as CC0 for game developers.
+- **celestialghost8** - Famitracker/VRC6 chiptune composition.
+- **Pro Sensory (Alex McCulloch)** - "Just include my name Alex McCulloch. Attribution appreciated but not required."
+- **Zane Little Music** - A cute chiptune loop for adventure games.
+- **skrjablin** - Commodore SID chip chiptune made with Goat Tracker. Loopable. Dual-licensed CC-BY 3.0 and CC0; used here under CC0.
 
 ## Sound effects and fanfares
 

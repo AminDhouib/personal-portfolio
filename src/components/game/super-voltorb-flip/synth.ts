@@ -15,10 +15,12 @@ export interface ParamLike {
   setValueAtTime(value: number, startTime: number): unknown;
   linearRampToValueAtTime(value: number, endTime: number): unknown;
   exponentialRampToValueAtTime(value: number, endTime: number): unknown;
+  cancelScheduledValues(startTime: number): unknown;
 }
 
 export interface NodeLike {
   connect(destination: NodeLike): unknown;
+  disconnect(): void;
 }
 
 export interface GainLike extends NodeLike {
@@ -28,6 +30,7 @@ export interface GainLike extends NodeLike {
 interface SourceLike extends NodeLike {
   start(when: number): void;
   stop(when: number): void;
+  onended: ((ev: Event) => void) | null;
 }
 
 interface OscillatorLike extends SourceLike {
@@ -96,8 +99,19 @@ export function createMaster(ctx: CtxLike, muted: boolean): Master {
   return { ctx, out };
 }
 
+// Gain changes that must not click ramp over this long (seconds).
+const DECLICK = 0.01;
+
+/** Ramp `gain` from wherever it is to `target`, so a hard step cannot pop. */
+function rampTo(ctx: CtxLike, gain: ParamLike, target: number): void {
+  const now = ctx.currentTime;
+  gain.cancelScheduledValues(now);
+  gain.setValueAtTime(gain.value, now);
+  gain.linearRampToValueAtTime(target, now + DECLICK);
+}
+
 export function setMasterMuted(master: Master, muted: boolean): void {
-  master.out.gain.value = muted ? 0 : 1;
+  rampTo(master.ctx, master.out.gain, muted ? 0 : 1);
 }
 
 const FLOOR = 0.0001;
@@ -107,7 +121,8 @@ const FLOOR = 0.0001;
  * Returns a handle whose stop() silences whatever has not finished.
  */
 export function scheduleCue(ctx: CtxLike, dest: NodeLike, cue: Cue, startAt: number): CueHandle {
-  const sources: SourceLike[] = [];
+  // Each voice: its source and the gain that shapes it, so stop() can fade it.
+  const voices: { src: SourceLike; gain: GainLike }[] = [];
 
   for (const n of cue.notes) {
     const t = startAt + n.at / 1000;
@@ -126,9 +141,13 @@ export function scheduleCue(ctx: CtxLike, dest: NodeLike, cue: Cue, startAt: num
 
     osc.connect(gain);
     gain.connect(dest);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
     osc.start(t);
     osc.stop(t + dur + 0.02);
-    sources.push(osc);
+    voices.push({ src: osc, gain });
   }
 
   for (const hit of cue.noise) {
@@ -149,21 +168,30 @@ export function scheduleCue(ctx: CtxLike, dest: NodeLike, cue: Cue, startAt: num
     filter.frequency.setValueAtTime(hit.lowpassHz, t);
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(hit.gain, t);
+    gain.gain.setValueAtTime(FLOOR, t);
+    gain.gain.linearRampToValueAtTime(hit.gain, t + Math.min(0.004, dur / 4));
     gain.gain.exponentialRampToValueAtTime(FLOOR, t + dur);
 
     src.connect(filter);
     filter.connect(gain);
     gain.connect(dest);
+    src.onended = () => {
+      src.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
     src.start(t);
     src.stop(t + dur);
-    sources.push(src);
+    voices.push({ src, gain });
   }
 
   return {
     stop() {
       const now = ctx.currentTime;
-      for (const s of sources) s.stop(now);
+      for (const v of voices) {
+        rampTo(ctx, v.gain.gain, 0);
+        v.src.stop(now + DECLICK + 0.002);
+      }
     },
   };
 }

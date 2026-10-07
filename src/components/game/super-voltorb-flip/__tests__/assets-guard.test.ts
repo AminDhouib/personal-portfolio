@@ -8,7 +8,14 @@ import { describe, it, expect } from "vitest";
 
 const ROOT = process.cwd();
 const GAME_DIR = join(ROOT, "public", "games", "super-voltorb-flip");
+const PUBLIC = join(ROOT, "public");
 const SRC = join(ROOT, "src");
+const AUDIO_EXT = /\.(mp3|ogg|wav|m4a|flac)$/i;
+
+// The only audio under public/ besides this game's music folder: Tower Stacker's
+// vendored upstream bundle ships its own sound files (see DESIGN.md, "Tower
+// Stacker's game is a vendored minified bundle"). Nothing else may.
+const OTHER_AUDIO_ALLOWED = ["tower_stacker"];
 
 // Directories under the game's public folder that T2c-2 deletes. Remove this
 // list in that PR (the guard there asserts the directory is gone instead).
@@ -59,6 +66,10 @@ const sourceText = sourceFiles()
   .map((f) => readFileSync(f, "utf8"))
   .join("\n");
 
+// The same source with block and whole-line comments removed, so a comment that
+// merely mentions a file cannot satisfy the "referenced" check.
+const sourceCode = sourceText.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 describe("Super Voltorb Flip assets", () => {
   it("ships no ripped audio folders", () => {
     expect(existsSync(join(GAME_DIR, "audio"))).toBe(false);
@@ -71,19 +82,30 @@ describe("Super Voltorb Flip assets", () => {
     }
   });
 
-  it("references every shipped file from source", () => {
+  it("ships no audio file anywhere else under public/ (other than the vendored Tower Stacker)", () => {
+    const strays = walk(PUBLIC)
+      .map((f) => f.replaceAll("\\", "/"))
+      .filter((f) => AUDIO_EXT.test(f))
+      .filter((f) => !f.includes("/public/games/super-voltorb-flip/music/"))
+      .filter((f) => !OTHER_AUDIO_ALLOWED.some((d) => f.includes(`/public/${d}/`)));
+    expect(strays).toEqual([]);
+  });
+
+  it("references every shipped file from code, not just a comment", () => {
     for (const file of shippedFiles().filter(isAsset)) {
       if (isKeptUnwired(file)) continue;
       const name = basename(file);
-      expect(sourceText, `${name} is shipped but no source file names it`).toContain(name);
+      expect(sourceCode, `${name} is shipped but no code loads a path ending /${name}`).toContain(
+        `/${name}`,
+      );
     }
   });
 
-  it("credits every music track in CREDITS.md", () => {
+  it("credits every music track in a CREDITS.md table row", () => {
     const credits = readFileSync(join(GAME_DIR, "music", "CREDITS.md"), "utf8");
     for (const file of shippedFiles().filter(isAsset)) {
       const name = basename(file);
-      expect(credits, `${name} is not credited`).toContain(name);
+      expect(credits, `${name} has no credits table row`).toContain(`| \`${name}\` |`);
     }
   });
 

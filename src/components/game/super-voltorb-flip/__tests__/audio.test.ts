@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CUES, LEVEL_WIN_MS, RISK_WARNING_MS } from "../sound-cues";
-import { makeFakeCtx, type FakeCtx } from "./fake-ctx";
+import { makeFakeCtx, type FakeCtx, type FakeSource } from "./fake-ctx";
 
 class FakeAudio {
   static all: FakeAudio[] = [];
@@ -23,6 +23,10 @@ class FakeAudio {
 }
 
 let ctx: FakeCtx;
+
+function lastStop(s: FakeSource): number {
+  return s.stopped[s.stopped.length - 1]!;
+}
 
 function installContext(c: FakeCtx | undefined) {
   if (!c) {
@@ -102,11 +106,12 @@ describe("sfx", () => {
   it("silences a cue already in flight when muted, via the master gain", async () => {
     const { sfx, setMusicMuted } = await load();
     void sfx.payoutFinal();
+    const calls = ctx.gains[0]!.gain.calls;
     expect(ctx.gains[0]!.gain.value).toBe(1);
     setMusicMuted(true);
-    expect(ctx.gains[0]!.gain.value).toBe(0);
+    expect(calls[calls.length - 1]).toMatchObject({ m: "lin", v: 0 });
     setMusicMuted(false);
-    expect(ctx.gains[0]!.gain.value).toBe(1);
+    expect(calls[calls.length - 1]).toMatchObject({ m: "lin", v: 1 });
   });
 
   it("resumes a suspended context on the first cue", async () => {
@@ -114,6 +119,54 @@ describe("sfx", () => {
     const { sfx } = await load();
     void sfx.flip();
     expect(ctx.resumed).toBe(1);
+  });
+
+  it("resumes an interrupted context too (iOS Safari)", async () => {
+    ctx.state = "interrupted";
+    const { sfx } = await load();
+    void sfx.flip();
+    expect(ctx.resumed).toBe(1);
+  });
+
+  it("does not resume a running context", async () => {
+    const { sfx } = await load();
+    void sfx.flip();
+    expect(ctx.resumed).toBe(0);
+  });
+});
+
+describe("stopAllCues", () => {
+  it("halts every live one-shot cue and drops its end timer", async () => {
+    const { sfx, stopAllCues } = await load();
+    let done = false;
+    void sfx.riskWarning().then(() => {
+      done = true;
+    });
+    void sfx.flip();
+    ctx.currentTime = 0.4;
+    stopAllCues();
+    for (const o of ctx.oscillators) expect(lastStop(o)).toBeCloseTo(0.412, 6);
+    // The end timers are gone: nothing resolves, however long we wait.
+    await vi.advanceTimersByTimeAsync(RISK_WARNING_MS * 2);
+    expect(done).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("leaves nothing to stop once the cues have ended on their own", async () => {
+    const { sfx, stopAllCues } = await load();
+    void sfx.flip();
+    await vi.advanceTimersByTimeAsync(CUES.flip.ms + 1);
+    const stops = ctx.oscillators.map((o) => o.stopped.length);
+    stopAllCues();
+    expect(ctx.oscillators.map((o) => o.stopped.length)).toEqual(stops);
+  });
+
+  it("is safe with no AudioContext", async () => {
+    installContext(undefined);
+    const { sfx, stopAllCues } = await load();
+    void sfx.riskWarning();
+    expect(() => stopAllCues()).not.toThrow();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -138,7 +191,7 @@ describe("level-clear fanfare", () => {
     stopLevelWin();
     await vi.advanceTimersByTimeAsync(LEVEL_WIN_MS * 2);
     expect(onEnded).not.toHaveBeenCalled();
-    expect(ctx.oscillators[0]!.stopped[ctx.oscillators[0]!.stopped.length - 1]).toBe(0.5);
+    expect(lastStop(ctx.oscillators[0]!)).toBeCloseTo(0.512, 6);
   });
 
   it("still calls onEnded on time when there is no AudioContext", async () => {
@@ -171,7 +224,7 @@ describe("game-over jingle", () => {
     expect(count).toBe(CUES.gameOver.notes.length);
     ctx.currentTime = 1;
     stopGameOver();
-    expect(ctx.oscillators[0]!.stopped[ctx.oscillators[0]!.stopped.length - 1]).toBe(1);
+    expect(lastStop(ctx.oscillators[0]!)).toBeCloseTo(1.012, 6);
   });
 });
 
@@ -221,6 +274,21 @@ describe("background music", () => {
     expect(FakeAudio.all[0]!.paused).toBe(true);
     playMusic(1);
     expect(FakeAudio.all).toHaveLength(2);
+  });
+
+  it("a mute during fadeOutMusic reaches the element that is still fading", async () => {
+    const { playMusic, fadeOutMusic, setMusicMuted } = await load();
+    playMusic(1);
+    fadeOutMusic(1000);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(FakeAudio.all[0]!.paused).toBe(false);
+    setMusicMuted(true);
+    expect(FakeAudio.all[0]!.muted).toBe(true);
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(FakeAudio.all[0]!.paused).toBe(true);
+    // Done fading: a later unmute no longer touches it.
+    setMusicMuted(false);
+    expect(FakeAudio.all[0]!.muted).toBe(true);
   });
 
   it("fadeOutMusic pauses the old element and frees the slot", async () => {
