@@ -1,0 +1,93 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { describe, it, expect } from "vitest";
+
+// Regression guard for Super Voltorb Flip's assets: nothing ripped, nothing
+// unreferenced, nothing unattributed. Walks the real tree, so it fails the day
+// someone drops a file in public/games/super-voltorb-flip or loads a removed path.
+
+const ROOT = process.cwd();
+const GAME_DIR = join(ROOT, "public", "games", "super-voltorb-flip");
+const SRC = join(ROOT, "src");
+
+// Directories under the game's public folder that T2c-2 deletes. Remove this
+// list in that PR (the guard there asserts the directory is gone instead).
+const NOT_YET_REMOVED = ["sprites"];
+
+// CC0 tracks for the abandoned skin variants. Kept on purpose (owner ruling:
+// the existing CC0 music stays); nothing plays them, so the "referenced from
+// source" check skips exactly these. The credits check still covers them.
+const KEPT_UNWIRED_MUSIC = [
+  "music/theme-classic.mp3",
+  "music/theme-meadow.mp3",
+  "music/theme-twilight.mp3",
+];
+
+function walk(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walk(full));
+    else out.push(full);
+  }
+  return out;
+}
+
+function shippedFiles(): string[] {
+  return walk(GAME_DIR).filter(
+    (f) => !NOT_YET_REMOVED.some((d) => f.startsWith(join(GAME_DIR, d))),
+  );
+}
+
+function isAsset(file: string): boolean {
+  const name = basename(file);
+  return name !== ".gitkeep" && name !== "CREDITS.md";
+}
+
+function isKeptUnwired(file: string): boolean {
+  const path = file.replaceAll("\\", "/");
+  return KEPT_UNWIRED_MUSIC.some((k) => path.endsWith(`/${k}`));
+}
+
+function sourceFiles(): string[] {
+  return walk(SRC).filter(
+    (f) => /\.tsx?$/.test(f) && !f.includes("__tests__") && !/\.test\.tsx?$/.test(f),
+  );
+}
+
+const sourceText = sourceFiles()
+  .map((f) => readFileSync(f, "utf8"))
+  .join("\n");
+
+describe("Super Voltorb Flip assets", () => {
+  it("ships no ripped audio folders", () => {
+    expect(existsSync(join(GAME_DIR, "audio"))).toBe(false);
+    expect(existsSync(join(GAME_DIR, "sfx"))).toBe(false);
+  });
+
+  it("ships only music tracks and the credits file", () => {
+    for (const file of shippedFiles().filter(isAsset)) {
+      expect(file.replaceAll("\\", "/")).toMatch(/\/music\/[^/]+\.mp3$/);
+    }
+  });
+
+  it("references every shipped file from source", () => {
+    for (const file of shippedFiles().filter(isAsset)) {
+      if (isKeptUnwired(file)) continue;
+      const name = basename(file);
+      expect(sourceText, `${name} is shipped but no source file names it`).toContain(name);
+    }
+  });
+
+  it("credits every music track in CREDITS.md", () => {
+    const credits = readFileSync(join(GAME_DIR, "music", "CREDITS.md"), "utf8");
+    for (const file of shippedFiles().filter(isAsset)) {
+      const name = basename(file);
+      expect(credits, `${name} is not credited`).toContain(name);
+    }
+  });
+
+  it("loads no removed audio path from source", () => {
+    expect(sourceText).not.toMatch(/super-voltorb-flip\/(audio|sfx)\//);
+  });
+});
