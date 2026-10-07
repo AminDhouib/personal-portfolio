@@ -1,128 +1,180 @@
-let music: HTMLAudioElement | null = null;
-let gameOverAudio: HTMLAudioElement | null = null;
-let levelWinAudio: HTMLAudioElement | null = null;
+import { CUES, type CueName } from "./sound-cues";
+import { musicTrackForLevel } from "./music";
+import {
+  createMaster,
+  scheduleCue,
+  setMasterMuted,
+  type CtxLike,
+  type CueHandle,
+  type Master,
+} from "./synth";
+
+// Super Voltorb Flip's audio facade. Sound effects and fanfares are synthesized
+// from the tables in sound-cues.ts; the background loop is one of three CC0
+// tracks picked by level band (music.ts). Every function here is safe to call
+// during SSR and when the browser has no AudioContext: cues then still "play"
+// for their nominal length, so the round flow's timing does not depend on audio.
+
 let globalMuted = false;
+let master: Master | null = null;
+let music: HTMLAudioElement | null = null;
+let musicSrc: string | null = null;
 
-// Authentic HG/SS Voltorb-Flip sound effects, rendered directly from the
-// game's own gs_sound_data.sdat (pret/pokeheartgold). The SE constants used
-// by src/voltorb_flip/voltorb_flip.c are mapped 1:1 here:
-//   SEQ_SE_GS_PANERU_MEKURU    → tile-flip
-//   SEQ_SE_GS_COIN_PAYOUT_ONE  → coin-payout-one
-//   SEQ_SE_GS_COIN_PAYOUT_LAST → coin-payout-last
-//   SEQ_SE_GS_COIN_HAZURE      → voltorb-pop
-//   SEQ_SE_GS_OKOZUKAI         → level-clear
-//   SEQ_SE_DP_SELECT           → memo-select
-const SFX_PATH = "/games/super-voltorb-flip/sfx";
+function getMaster(): Master | null {
+  if (master) return master;
+  if (typeof window === "undefined") return null;
+  try {
+    const Ctor =
+      window.AudioContext ||
+      (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return null;
+    const ctx: CtxLike = new Ctor();
+    master = createMaster(ctx, globalMuted);
+    return master;
+  } catch {
+    // silent-ok: a blocked or unsupported AudioContext must not throw into the game loop.
+    return null;
+  }
+}
 
-// Pool of preloaded Audio elements per file so rapid repeat clicks don't
-// step on each other (each call clones from the template).
-const sfxCache = new Map<string, HTMLAudioElement>();
-function playSample(file: string, volume = 0.6): Promise<void> {
-  // Resolves when the clone fires `ended` (or errors / safety-timeouts)
-  // so gameplay code can `await sfx.foo()` when timing matters. Existing
-  // fire-and-forget callers just ignore the returned promise.
+// An AudioContext created before a user gesture starts suspended; every cue is
+// triggered by (or soon after) a gesture, so wake it each time.
+function wake(m: Master): void {
+  if (m.ctx.state !== "suspended") return;
+  // silent-ok: resume() rejects while the browser still blocks audio; the next gesture retries.
+  m.ctx.resume?.().catch(() => undefined);
+}
+
+function playCue(name: CueName): Promise<void> {
+  const cue = CUES[name];
   return new Promise((resolve) => {
     if (globalMuted || typeof window === "undefined") return resolve();
-    let template = sfxCache.get(file);
-    if (!template) {
-      template = new Audio(`${SFX_PATH}/${file}`);
-      template.preload = "auto";
-      sfxCache.set(file, template);
+    const m = getMaster();
+    if (m) {
+      wake(m);
+      scheduleCue(m.ctx, m.out, cue, m.ctx.currentTime);
     }
-    // cloneNode lets the SFX overlap with itself on rapid input.
-    const node = template.cloneNode(true) as HTMLAudioElement;
-    node.volume = volume;
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      resolve();
-    };
-    node.addEventListener("ended", finish, { once: true });
-    node.addEventListener("error", finish, { once: true });
-    node.play().catch(finish);
-    // Safety net in case neither event fires.
-    window.setTimeout(finish, 8000);
+    // Resolve at the cue's end even without audio, so gameplay that awaits a
+    // cue (the risk fanfare gating the board) keeps the same pacing.
+    window.setTimeout(resolve, cue.ms);
   });
 }
 
-// Sample-accurate names following the in-game C source (PlaySE call sites in
-// pret/pokeheartgold/src/voltorb_flip/voltorb_flip.c). See docs/voltorb-flip-audio-audit.md
-// for the full mapping.
+// One-shot effects. Each returns a promise that resolves when the cue ends;
+// existing fire-and-forget callers ignore it, riskWarning's caller awaits it.
 export const sfx = {
-  /** Tile flip animation start — every tile, even voltorbs. */
-  flip: () => playSample("tile-flip.mp3", 0.55),
-
-  /** Voltorb hit. In HG/SS the flip SE plays first, then this overlaps shortly after. */
-  voltorbPop: () => playSample("voltorb-pop.mp3", 0.65),
-
-  /** Played per ~4 ticks while the "you earned X coins" counter scrolls up. */
-  payoutTickEarn: () => playSample("level-clear.mp3", 0.55),
-
-  /** Played per ~4 ticks while the earned coins drain into the player's wallet. */
-  payoutTickBank: () => playSample("coin-payout-one.mp3", 0.55),
-
-  /** Final closing chime of the payout chain. */
-  payoutFinal: () => playSample("coin-payout-last.mp3", 0.6),
-
-  /** Memo open / close — same SE for both transitions in HG/SS. */
-  memoSlide: () => playSample("card-flip.mp3", 0.55),
-
-  /** Memo flag toggled on a tile (DP_BOX01). */
-  memoToggle: () => playSample("memo-toggle.mp3", 0.55),
-
-  /** Cursor moved between memo buttons or board cells (DP_SELECT). */
-  cursorMove: () => playSample("memo-select.mp3", 0.55),
-
-  /** Tap on an already-flipped tile / disallowed action (DP_BOX03). */
-  invalidTap: () => playSample("invalid-tap.mp3", 0.5),
-
-  /** Final-decision tone — quit confirmations etc. (DP_DECIDE). */
-  decide: () => playSample("decide.mp3", 0.55),
-
-  /** Memo "Back" / "Clear" button (DP_BUTTON3). */
-  backButton: () => playSample("back-button.mp3", 0.55),
-
-  /** Round-start: level went up. (GS_SLOT01) */
-  levelUp: () => playSample("level-up.mp3", 0.6),
-
-  /** Round-start: level went down. (GS_SLOT03) */
-  levelDown: () => playSample("level-down.mp3", 0.6),
-
-  /** "Is this what you're expecting?!" risk warning (ME_CARDGAME1). */
-  riskWarning: () => playSample("warning-fanfare.mp3", 0.55),
-
-  // ── Legacy/back-compat aliases (used by existing call sites until the
-  // gameplay code is migrated to the explicit names above).
-  click: () => playSample("tile-flip.mp3", 0.55),
-  coin: () => {
-    // HG/SS does NOT play a per-flip coin SE — coin chimes only fire during
-    // the post-round payout banner. Until the win flow is rewired, keep
-    // this as a no-op so x2/x3 reveals stop double-bleeping.
-  },
-  win: () => playSample("level-clear.mp3", 0.6),
-  lose: () => playSample("voltorb-pop.mp3", 0.65),
+  /** Tile flip start, every tile including Voltorbs. */
+  flip: () => playCue("flip"),
+  /** Voltorb hit; fires shortly after `flip`. */
+  voltorbPop: () => playCue("voltorbPop"),
+  /** Earn counter tick, every 4th rollup step. */
+  payoutTickEarn: () => playCue("payoutTickEarn"),
+  /** Wallet drain tick, every 4th drain step. */
+  payoutTickBank: () => playCue("payoutTickBank"),
+  /** Closing chime of the payout chain. */
+  payoutFinal: () => playCue("payoutFinal"),
+  /** Memo drawer open and close. */
+  memoSlide: () => playCue("memoSlide"),
+  /** Memo flag toggled on a tile. */
+  memoToggle: () => playCue("memoToggle"),
+  /** Cursor moved between memo buttons or board cells. */
+  cursorMove: () => playCue("cursorMove"),
+  /** Tap on a revealed tile or a disallowed action. */
+  invalidTap: () => playCue("invalidTap"),
+  /** Confirmation tone. */
+  decide: () => playCue("decide"),
+  /** Memo Back / Clear. */
+  backButton: () => playCue("backButton"),
+  /** Round start: the level went up. */
+  levelUp: () => playCue("levelUp"),
+  /** Round start: the level went down. */
+  levelDown: () => playCue("levelDown"),
+  /** High-risk flip warning; resolves when the fanfare ends. */
+  riskWarning: () => playCue("riskWarning"),
 };
 
-export function playMusic() {
-  if (music) return;
-  music = new Audio("/games/super-voltorb-flip/audio/music_loop.mp3");
+// ---- Fanfares: a cue plus an end-of-cue timer, cancellable as one. ----------
+
+interface FanfareSlot {
+  timer: number | null;
+  handle: CueHandle | null;
+}
+
+const levelWinSlot: FanfareSlot = { timer: null, handle: null };
+const gameOverSlot: FanfareSlot = { timer: null, handle: null };
+
+function stopFanfare(slot: FanfareSlot): void {
+  if (typeof window === "undefined") return;
+  if (slot.timer !== null) window.clearTimeout(slot.timer);
+  slot.timer = null;
+  slot.handle?.stop();
+  slot.handle = null;
+}
+
+function startFanfare(slot: FanfareSlot, name: CueName, onEnded?: () => void): void {
+  stopFanfare(slot);
+  if (typeof window === "undefined") return;
+  const cue = CUES[name];
+  if (!globalMuted) {
+    const m = getMaster();
+    if (m) {
+      wake(m);
+      slot.handle = scheduleCue(m.ctx, m.out, cue, m.ctx.currentTime);
+    }
+  }
+  slot.timer = window.setTimeout(() => {
+    slot.timer = null;
+    slot.handle = null;
+    onEnded?.();
+  }, cue.ms);
+}
+
+/** Round-lost jingle. */
+export function playGameOver(): void {
+  startFanfare(gameOverSlot, "gameOver");
+}
+
+export function stopGameOver(): void {
+  stopFanfare(gameOverSlot);
+}
+
+/** Round-cleared fanfare. `onEnded` fires once at its end unless stopLevelWin() cancels it. */
+export function playLevelWin(onEnded?: () => void): void {
+  startFanfare(levelWinSlot, "levelClear", onEnded);
+}
+
+export function stopLevelWin(): void {
+  stopFanfare(levelWinSlot);
+}
+
+// ---- Background music --------------------------------------------------------
+
+/** Start (or keep) the loop for `level`'s band; a different band swaps the element. */
+export function playMusic(level: number): void {
+  if (typeof window === "undefined") return;
+  const track = musicTrackForLevel(level);
+  if (music && musicSrc === track.src) return;
+  music?.pause();
+  music = new Audio(track.src);
+  musicSrc = track.src;
   music.loop = true;
-  music.volume = 0.3;
+  music.volume = track.volume;
   music.muted = globalMuted;
   // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
   music.play().catch(() => undefined);
 }
 
-export function stopMusic() {
+export function stopMusic(): void {
   music?.pause();
   music = null;
+  musicSrc = null;
 }
 
-export function fadeOutMusic(ms = 400) {
+export function fadeOutMusic(ms = 400): void {
   if (!music) return;
   const m = music;
   music = null;
+  musicSrc = null;
   const startVol = m.volume;
   const startTime = performance.now();
   const tick = () => {
@@ -135,45 +187,9 @@ export function fadeOutMusic(ms = 400) {
   requestAnimationFrame(tick);
 }
 
-export function playGameOver() {
-  if (typeof window === "undefined") return;
-  gameOverAudio?.pause();
-  gameOverAudio = new Audio("/games/super-voltorb-flip/audio/game_over.mp3");
-  gameOverAudio.volume = 0.5;
-  gameOverAudio.muted = globalMuted;
-  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
-  gameOverAudio.play().catch(() => undefined);
-}
-
-export function stopGameOver() {
-  gameOverAudio?.pause();
-  gameOverAudio = null;
-}
-
-export function playLevelWin(onEnded?: () => void): HTMLAudioElement | null {
-  if (typeof window === "undefined") return null;
-  levelWinAudio?.pause();
-  levelWinAudio = new Audio("/games/super-voltorb-flip/audio/music_level_win.mp3");
-  levelWinAudio.volume = 0.5;
-  levelWinAudio.muted = globalMuted;
-  if (onEnded) levelWinAudio.addEventListener("ended", onEnded, { once: true });
-  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
-  levelWinAudio.play().catch(() => undefined);
-  return levelWinAudio;
-}
-
-export function stopLevelWin() {
-  levelWinAudio?.pause();
-  levelWinAudio = null;
-}
-
-// (Note: HG/SS JP swaps to BGM scene 64 during the coin-payout chain
-// (voltorb_flip.c:1047). The NA Voltorb Flip doesn't use a separate
-// payout track — the gameplay loop continues — so we omit it here.)
-
-export function setMusicMuted(muted: boolean) {
+/** Mutes the music element and zeroes the master gain, silencing fanfares in flight. */
+export function setMusicMuted(muted: boolean): void {
   globalMuted = muted;
   if (music) music.muted = muted;
-  if (gameOverAudio) gameOverAudio.muted = muted;
-  if (levelWinAudio) levelWinAudio.muted = muted;
+  if (master) setMasterMuted(master, muted);
 }

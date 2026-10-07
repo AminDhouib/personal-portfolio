@@ -1696,7 +1696,7 @@ export function SuperVoltorbFlipGame() {
       stopLevelWin();
       if (!muted) {
         musicStartedRef.current = true;
-        playMusic();
+        playMusic(game.currentLevel);
       }
     }
     prevGameStatusRef.current = cur;
@@ -1706,10 +1706,18 @@ export function SuperVoltorbFlipGame() {
     };
   }, [game, game?.gameStatus, muted, clearMemoFlags]);
 
+  // The level the next loop should be picked for. A ref, not an effect
+  // dependency: a level change mid-round (the win moves it at once) must not
+  // restart the music over the clear fanfare.
+  const levelRef = useRef(1);
+  useEffect(() => {
+    levelRef.current = game?.currentLevel ?? 1;
+  }, [game?.currentLevel]);
+
   function handleFirstInteraction() {
     if (!musicStartedRef.current && !muted) {
       musicStartedRef.current = true;
-      playMusic();
+      playMusic(levelRef.current);
     }
   }
 
@@ -1718,10 +1726,10 @@ export function SuperVoltorbFlipGame() {
   // swallows the rejection and handleFirstInteraction starts it on the
   // first click. We still mark musicStartedRef so we don't double-start.
   useEffect(() => {
-    if (muted) return;
+    if (muted || !hydrated) return;
     musicStartedRef.current = true;
-    playMusic();
-  }, [muted]);
+    playMusic(levelRef.current);
+  }, [muted, hydrated]);
 
   return (
     <>
