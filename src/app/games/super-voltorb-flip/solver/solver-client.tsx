@@ -47,9 +47,15 @@ function statusText(result: ReturnType<typeof solve> | null): string {
       return "Too many boards fit. Flip a tile in the game and enter it here.";
     case "solved": {
       const count = result.layouts === 1 ? "1 board fits" : `${result.layouts} boards fit`;
-      return result.weighting === "uniform"
-        ? `${count} these clues. They do not match any HeartGold and SoulSilver board recipe for this level, so each counts equally.`
-        : `${count} these clues.`;
+      const note =
+        result.weighting === "uniform"
+          ? " They do not match any HeartGold and SoulSilver board recipe for this level, so each counts equally."
+          : "";
+      const best =
+        result.best === null
+          ? ""
+          : ` Best next tile: row ${Math.floor(result.best / 5) + 1}, column ${(result.best % 5) + 1}.`;
+      return `${count} these clues.${note}${best}`;
     }
   }
 }
@@ -83,12 +89,15 @@ export function SolverClient() {
   const setClue = (kind: Kind, index: number, field: keyof ClueBox, raw: string) => {
     const value = raw.replace(/\D/g, "").slice(0, field === "coins" ? 2 : 1);
     (kind === "Row" ? setRows : setCols)((prev) =>
-      prev.map((box, i) => (i === index ? { ...box, [field]: value } : box)),
+      prev[index]?.[field] === value
+        ? prev
+        : prev.map((box, i) => (i === index ? { ...box, [field]: value } : box)),
     );
     if (field === "voltorbs" && value !== "" && Number(value) <= 5) {
       // Typing a Voltorb count finishes that clue: move on to the next one.
       const order = kind === "Row" ? index : 5 + index;
       const next = order + 1;
+      if (next >= 10) return;
       const key = `${next < 5 ? "Row" : "Column"} ${(next % 5) + 1} coins`;
       fields.current.get(key)?.focus();
     }
@@ -167,7 +176,7 @@ export function SolverClient() {
     }
 
     const odds = solved?.tiles[i];
-    if (!odds) {
+    if (!solved || !odds) {
       return (
         <button
           key={i}
@@ -180,7 +189,7 @@ export function SolverClient() {
     }
 
     const multiplier = odds.two + odds.three;
-    const isBest = solved?.best === i;
+    const isBest = solved.best === i;
     const onlyOneOrVoltorb = multiplier === 0;
     const caption = isBest
       ? "Flip next"
@@ -191,7 +200,7 @@ export function SolverClient() {
         : odds.voltorb === 0
           ? "Safe"
           : "";
-    const name = `${where}: ${formatOdds(odds.voltorb)} Voltorb, ${formatOdds(multiplier)} two or three. Face down. ${action}`;
+    const name = `${where}: ${formatOdds(odds.voltorb)} Voltorb, ${formatOdds(multiplier)} two or three.${caption ? ` ${caption}.` : ""} Face down. ${action}`;
     return (
       <button
         key={i}
@@ -201,7 +210,7 @@ export function SolverClient() {
         className={`flex min-h-11 min-w-11 flex-col items-center justify-center rounded-md border-2 px-0.5 ${
           onlyOneOrVoltorb
             ? "border-(--border) bg-(--card) text-(--muted)"
-            : "border-transparent text-black"
+            : "border-black/20 text-black"
         } ${isBest ? "outline-3 outline-offset-2 outline-(--foreground)" : ""}`}
         style={onlyOneOrVoltorb ? undefined : { backgroundColor: riskColor(odds.voltorb) }}
       >
