@@ -1,4 +1,15 @@
 import type { Cell, CellValue, RowColValues, GameStatus } from "./types";
+import {
+  EMPTY_ROUND,
+  HISTORY_SIZE,
+  MAX_LEVEL,
+  PAYOUT_CAP,
+  generateLayout,
+  maxPayout,
+  nextLevel,
+  pickBoardId,
+  type RoundSummary,
+} from "./hgss";
 import { safeJsonParse } from "@/lib/safe-json";
 
 // ---------------------------------------------------------------------------
@@ -111,7 +122,9 @@ export class Board {
   private _colValues: RowColValues[];
   private _size: number;
 
-  constructor(level: Level, size: number = 5) {
+  // `level` is either a formula Level (shuffled deal) or a ready row-major
+  // layout (the HGSS deal).
+  constructor(level: Level | CellValue[], size: number = 5) {
     this._size = size;
     this._rowValues = Array(size)
       .fill(0)
@@ -120,8 +133,17 @@ export class Board {
       .fill(0)
       .map(() => ({ coins: 0, voltorbs: 0 }));
     this._maxLevelScore = 0;
-    this._board = this.createBoard(level);
+    if (Array.isArray(level)) {
+      this._board = this.fillBoard(level);
+      this._maxLevelScore = maxPayout(level);
+    } else {
+      this._board = this.createBoard(level);
+    }
     this._flippedCells = 0;
+  }
+
+  static fromLayout(values: CellValue[]): Board {
+    return new Board(values, 5);
   }
 
   public flagCell(row: number, col: number, flag: CellValue): void {
@@ -151,9 +173,7 @@ export class Board {
   }
 
   private createBoard(level: Level) {
-    const size = this._size;
-    const total = size * size;
-    const board: Cell[][] = [...Array(size)].map(() => Array.from({ length: size }));
+    const total = this._size * this._size;
     // Level is already size-aware — counts fit the board by construction.
     const { x2: scaledX2, x3: scaledX3, voltorbs: scaledV } = level.levelData;
 
@@ -164,6 +184,18 @@ export class Board {
     ];
     const remainingFillArray: 1[] = Array(total - levelValuesArray.length).fill(1);
     const shuffledValuesArray: CellValue[] = shuffle([...levelValuesArray, ...remainingFillArray]);
+    const board = this.fillBoard(shuffledValuesArray);
+    // Win threshold = product of every non-1 tile. Ignoring the authored
+    // level.coins value (which is 5x5-only) keeps every board winnable even
+    // after the area-scaling above rounds counts down.
+    this._maxLevelScore = Math.pow(2, scaledX2) * Math.pow(3, scaledX3);
+    return board;
+  }
+
+  // Lays the values out row-major and accumulates the row/column sums.
+  private fillBoard(shuffledValuesArray: CellValue[]) {
+    const size = this._size;
+    const board: Cell[][] = [...Array(size)].map(() => Array.from({ length: size }));
 
     let index = 0;
     for (let row = 0; row < size; row++) {
@@ -192,10 +224,6 @@ export class Board {
         index++;
       }
     }
-    // Win threshold = product of every non-1 tile. Ignoring the authored
-    // level.coins value (which is 5x5-only) keeps every board winnable even
-    // after the area-scaling above rounds counts down.
-    this._maxLevelScore = Math.pow(2, scaledX2) * Math.pow(3, scaledX3);
     return board;
   }
 
@@ -221,8 +249,11 @@ export class Board {
 }
 
 // ---------------------------------------------------------------------------
-// src/game/VoltorbFlip.ts (1:1).
+// src/game/VoltorbFlip.ts, now dealing and scoring by the HGSS rules (hgss.ts).
 // ---------------------------------------------------------------------------
+
+const emptyHistory = (): RoundSummary[] =>
+  Array.from({ length: HISTORY_SIZE }, () => ({ ...EMPTY_ROUND }));
 
 export class VoltorbFlip {
   private _board: Board;
@@ -232,6 +263,9 @@ export class VoltorbFlip {
   private _level: Level;
   private _gameStatus: GameStatus;
   private _size: number;
+  // Last HISTORY_SIZE rounds, oldest first (HGSS boardHistory).
+  private _history: RoundSummary[];
+  private _boardId: number;
 
   constructor(size: number = 5) {
     this._size = size;
@@ -240,7 +274,10 @@ export class VoltorbFlip {
     this._currentScore = 0;
     this._totalScore = 0;
     this._gameStatus = "playing";
-    this._board = new Board(this._level, this._size);
+    this._history = emptyHistory();
+    this._boardId = 0;
+    // The rng is not stored on the instance: cloneGame uses structuredClone, which cannot clone functions.
+    this._board = this.dealBoard(Math.random);
   }
 
   public toggleMemo() {
@@ -252,50 +289,77 @@ export class VoltorbFlip {
   }
 
   public flipCell(row: number, col: number): void {
+    // The round is over once it is won, lost or quit; HGSS takes no more flips.
+    if (this._gameStatus === "win" || this._gameStatus === "lose" || this._gameStatus === "quit") {
+      return;
+    }
     const cellValue = this._board.flipCell(row, col);
 
     if (cellValue === "V") {
-      if (this._board.flippedCells < this._currentLevel) {
-        this._currentLevel = this._board.flippedCells;
-      }
       this._gameStatus = "lose";
+      this.endRound("lost");
       return;
     }
-    this._currentScore = this._currentScore === 0 ? cellValue : this._currentScore * cellValue;
+    this._currentScore =
+      this._currentScore === 0 ? cellValue : Math.min(PAYOUT_CAP, this._currentScore * cellValue);
 
     if (this._currentScore === this._board.maxLevelScore) {
-      this._currentLevel = Math.min(this._currentLevel + 1, 8);
       this._totalScore += this._currentScore;
       this._gameStatus = "win";
+      this.endRound("won");
     }
   }
 
-  public restartGame(): void {
+  // Quit (QuitRound_Run): bank the round's coins and end it. Only a live round can quit.
+  public quit(): void {
+    if (this._gameStatus !== "playing" && this._gameStatus !== "memo") return;
+    this._totalScore += this._currentScore;
+    this._gameStatus = "quit";
+    this.endRound("quit");
+  }
+
+  // PushBoardHistory + CalcNextLevel, run the moment a round ends.
+  private endRound(outcome: "won" | "lost" | "quit"): void {
+    this._history = [
+      ...this._history,
+      { outcome, cardsFlipped: this._board.flippedCells, boardId: this._boardId },
+    ].slice(-HISTORY_SIZE);
+    this._currentLevel = nextLevel(this._history) - 1;
+  }
+
+  // SelectBoardId + GenerateBoard. Only 5x5 deals from the HGSS table; ?size=N
+  // boards (dev and layout testing) keep the old formula deal.
+  private dealBoard(rng: () => number): Board {
+    this._boardId = pickBoardId(this._currentLevel + 1, rng);
+    if (this._size === 5) return Board.fromLayout(generateLayout(this._boardId, rng));
+    this._level = new Level(this._currentLevel, this._size);
+    return new Board(this._level, this._size);
+  }
+
+  public restartGame(rng: () => number = Math.random): void {
     this._gameStatus = "playing";
     this._currentScore = 0;
-    this._level = new Level(this._currentLevel, this._size);
-    this._board = new Board(this._level, this._size);
+    this._board = this.dealBoard(rng);
   }
 
   // Resume a saved session: `level` is the displayed 1-based level (what the
-  // currentLevel getter returns), and the board is rebuilt for it. Rules
-  // (payouts, level up/down) are untouched.
-  public restore(level: number, totalScore: number): void {
-    this._currentLevel = Math.max(0, Math.min(8, Math.round(level) - 1));
+  // currentLevel getter returns), and the board is rebuilt for it. `history`
+  // is the saved five-round history; anything else resets it.
+  public restore(level: number, totalScore: number, history?: readonly RoundSummary[]): void {
+    this._currentLevel = Math.max(0, Math.min(MAX_LEVEL, Math.round(level)) - 1);
     this._totalScore = Math.max(0, totalScore);
+    this._history =
+      history?.length === HISTORY_SIZE ? history.map((r) => ({ ...r })) : emptyHistory();
     this.restartGame();
   }
 
-  // Dev-only shortcut: force a win for the current level. Bumps score by the
-  // remaining coins-to-win and advances to the next level, mirroring what
-  // flipCell does when the last valuable tile is hit.
+  // Dev-only shortcut: force a win for the current round, as flipCell does
+  // when the last valuable tile is hit.
   public debugWinLevel(): void {
-    const target = this._board.maxLevelScore;
-    const bonus = Math.max(0, target - Math.max(1, this._currentScore));
-    this._currentScore = target;
-    this._totalScore += bonus;
-    this._currentLevel = Math.min(this._currentLevel + 1, 8);
+    this._currentScore = this._board.maxLevelScore;
+    this._totalScore += this._currentScore;
     this._gameStatus = "win";
+    this.endRound("won");
   }
 
   get cells() {
@@ -324,6 +388,10 @@ export class VoltorbFlip {
 
   get currentLevel() {
     return this._currentLevel + 1;
+  }
+
+  get history(): readonly RoundSummary[] {
+    return this._history;
   }
 }
 
