@@ -80,11 +80,15 @@ test.describe("Daily board", () => {
       await page.goto(GAME_PATH);
       await expect(page.locator("[data-cell]")).toHaveCount(25, { timeout: 20_000 });
       await page.locator("button:visible", { hasText: "Daily" }).first().click();
-      const region = page.getByRole("region", { name: "Daily board" });
-      await expect(region).toBeVisible();
-      await expect(region.locator("[data-cell]")).toHaveCount(25);
+      const heading = page.getByRole("heading", { name: "Daily board" });
+      await expect(heading).toBeVisible();
+      await expect(heading).toBeFocused();
+      // The main board stays mounted but hidden, so count only the visible tiles.
+      await expect(page.locator("[data-cell]:visible")).toHaveCount(25);
       await page.getByRole("button", { name: "Back to the game" }).click();
-      await expect(region).toHaveCount(0);
+      await expect(heading).toHaveCount(0);
+      await expect(page.locator("[data-daily-open]:visible")).toBeFocused();
+      await expect(page.locator("[data-cell]:visible")).toHaveCount(25);
     } finally {
       await context.close();
     }
