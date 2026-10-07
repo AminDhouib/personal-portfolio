@@ -188,3 +188,5 @@ export const CUES = {
     noise: NO_NOISE,
   },
 } satisfies Record<string, Cue>;
+
+export type CueName = keyof typeof CUES;
