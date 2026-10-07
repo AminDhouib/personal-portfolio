@@ -42,6 +42,7 @@ import { loadProgress } from "./super-voltorb-flip/progress";
 import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
+import { isTextEntryTarget } from "./super-voltorb-flip/keyboard";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
@@ -614,6 +615,8 @@ const Gameboard = ({
         "keydown",
         (e) => {
           if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+          // Never take keys meant for a text field elsewhere on the page.
+          if (isTextEntryTarget(e.target)) return;
           if (e.key === "Enter" || e.key === " " || e.key.length === 1) done();
         },
         { signal },
