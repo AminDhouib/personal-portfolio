@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { PixelSprite } from "../art/pixel-sprite";
 import { BurstFrame, CoinFrame, SparkleFrame } from "../art/frames";
-import { GLYPH_1, ORB } from "../art/sprites";
+import { ORB } from "../art/sprites";
 
 afterEach(cleanup);
 
@@ -37,14 +37,27 @@ describe("PixelSprite", () => {
 });
 
 describe("PixelSprite outline and layout", () => {
-  it("draws the outline in the SVG: a dark stroke painted under the fill", () => {
+  it("outlines the silhouette: a stroked underlay group, unstroked fills on top", () => {
     const { container } = render(
-      <PixelSprite sprite={GLYPH_1} size={10} outline="#1f2937" style={{ color: "#fff" }} />,
+      <PixelSprite sprite={ORB} size={10} outline="#1f2937" style={{ color: "#fff" }} />,
     );
-    const path = container.querySelector("svg path")!;
-    expect(path.getAttribute("stroke")).toBe("#1f2937");
-    expect(path.getAttribute("paint-order")).toBe("stroke");
-    expect(container.querySelector("svg")!.style.overflow).toBe("visible");
+    const svg = container.querySelector("svg")!;
+    expect(svg.style.overflow).toBe("visible");
+    const underlay = svg.querySelector("g[data-outline]")!;
+    const underPaths = [...underlay.querySelectorAll("path")];
+    expect(underPaths.length).toBeGreaterThan(3);
+    for (const p of underPaths) {
+      expect(p.getAttribute("stroke")).toBe("#1f2937");
+      expect(p.getAttribute("fill")).toBe("#1f2937");
+    }
+    // The colour layers come after the underlay and carry no stroke, so no
+    // internal colour boundary is outlined.
+    const fills = [...svg.querySelectorAll("path")].filter((p) => !underlay.contains(p));
+    expect(fills.length).toBe(underPaths.length);
+    for (const p of fills) expect(p.getAttribute("stroke")).toBeNull();
+    expect(
+      underlay.compareDocumentPosition(fills[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("draws no stroke without an outline", () => {
