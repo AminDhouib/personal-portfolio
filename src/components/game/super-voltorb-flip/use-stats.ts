@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MAX_LEVEL } from "./hgss";
 import {
   EMPTY_STATS,
   loadStats,
@@ -17,24 +18,34 @@ export function useStats(enabled: boolean) {
   const [stats, setStats] = useState<Stats>(() =>
     typeof window === "undefined" ? structuredClone(EMPTY_STATS) : loadStats(),
   );
+  // The object last read or written: a changed object is a change to persist.
+  const persistedRef = useRef(stats);
 
-  const commit = useCallback((update: (prev: Stats) => Stats) => {
-    setStats((prev) => {
-      const next = update(prev);
-      saveStats(next);
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    if (stats === persistedRef.current) return;
+    persistedRef.current = stats;
+    saveStats(stats);
+  }, [stats]);
 
   const record = useCallback(
     (round: RoundRecord) => {
       if (!enabled) return;
-      commit((prev) => recordRound(prev, round));
+      setStats((prev) => recordRound(prev, round));
     },
-    [enabled, commit],
+    [enabled],
   );
 
-  const reset = useCallback(() => commit(() => structuredClone(EMPTY_STATS)), [commit]);
+  /** Lifts highestLevel to the loaded save's level; never lowers it, never writes svf:progress. */
+  const raiseHighestLevel = useCallback(
+    (level: number) => {
+      if (!enabled) return;
+      const next = Math.min(MAX_LEVEL, Math.max(1, Math.floor(level)));
+      setStats((prev) => (next > prev.highestLevel ? { ...prev, highestLevel: next } : prev));
+    },
+    [enabled],
+  );
 
-  return { stats, record, reset, commit };
+  const reset = useCallback(() => setStats(structuredClone(EMPTY_STATS)), []);
+
+  return { stats, record, reset, raiseHighestLevel };
 }

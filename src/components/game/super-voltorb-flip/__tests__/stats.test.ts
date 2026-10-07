@@ -71,6 +71,24 @@ describe("stats storage", () => {
   });
 });
 
+describe("stats storage, repairs and guards", () => {
+  it("repairs each rounds count on its own", () => {
+    const parsed = parseStats({
+      ...EMPTY_STATS,
+      v: 1,
+      rounds: { played: 5, won: "x", lost: 2, quit: null },
+    });
+    expect(parsed.rounds).toEqual({ played: 5, won: 0, lost: 2, quit: 0 });
+  });
+
+  it("does not write over a value stored by a newer version", () => {
+    const newer = '{"v":2,"rounds":{"played":9}}';
+    window.localStorage.setItem("svf:stats", newer);
+    saveStats(EMPTY_STATS);
+    expect(window.localStorage.getItem("svf:stats")).toBe(newer);
+  });
+});
+
 describe("recordRound", () => {
   const round = { outcome: "won" as const, coins: 48, level: 3, assisted: false, seconds: 40 };
 
@@ -120,6 +138,13 @@ describe("recordRound", () => {
     expect(below.lv8Seconds).toBe(0);
     const long = recordRound(EMPTY_STATS, { ...round, level: 8, seconds: 999_999 });
     expect(long.lv8Seconds).toBe(LV8_SECONDS_PER_ROUND_CAP);
+  });
+
+  it("highest level takes the level after the result as well as the start level", () => {
+    const up = recordRound(EMPTY_STATS, { ...round, level: 4, levelAfter: 5 });
+    expect(up.highestLevel).toBe(5);
+    const down = recordRound(up, { ...round, level: 5, levelAfter: 2 });
+    expect(down.highestLevel).toBe(5);
   });
 
   it("does not mutate its input", () => {

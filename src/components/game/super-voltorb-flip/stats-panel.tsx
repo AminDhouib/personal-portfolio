@@ -34,25 +34,30 @@ export function StatsPanel({
 }) {
   const [confirming, setConfirming] = useState(false);
   const n = (x: number) => x.toLocaleString("en-US");
+  // Rows for features that do not exist yet (the odds assist, the Daily board)
+  // stay hidden until they have something to show.
+  const showAssisted = stats.assistedRounds > 0;
+  const showDaily = stats.dailyPlayed > 0 || stats.streak.current > 0 || stats.streak.best > 0;
   return (
     <ModalShell title="Statistics" onClose={onClose}>
       <p className="text-sm text-gray-500">
-        Kept on this device only. Rounds played with the odds assist on are counted as played and
-        nothing else.
+        {showAssisted
+          ? "Kept on this device only. Rounds played with the odds assist on are counted as played and nothing else."
+          : "Kept on this device only."}
       </p>
       <dl>
         <Line label="Rounds played" value={n(stats.rounds.played)} />
         <Line label="Won" value={n(stats.rounds.won)} />
         <Line label="Lost" value={n(stats.rounds.lost)} />
         <Line label="Quit" value={n(stats.rounds.quit)} />
-        <Line label="Assisted rounds" value={n(stats.assistedRounds)} />
+        {showAssisted && <Line label="Assisted rounds" value={n(stats.assistedRounds)} />}
         <Line label="Coins banked" value={n(stats.coins.total)} />
         <Line label="Best round" value={n(stats.coins.best)} />
         <Line label="Highest level" value={String(stats.highestLevel)} />
         <Line label="Time at Lv.8" value={duration(stats.lv8Seconds)} />
-        <Line label="Daily boards played" value={n(stats.dailyPlayed)} />
-        <Line label="Daily streak" value={n(stats.streak.current)} />
-        <Line label="Best daily streak" value={n(stats.streak.best)} />
+        {showDaily && <Line label="Daily boards played" value={n(stats.dailyPlayed)} />}
+        {showDaily && <Line label="Daily streak" value={n(stats.streak.current)} />}
+        {showDaily && <Line label="Best daily streak" value={n(stats.streak.best)} />}
       </dl>
       {confirming ? (
         <div className="flex items-center gap-2">

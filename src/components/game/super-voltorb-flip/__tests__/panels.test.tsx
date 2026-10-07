@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { useState } from "react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { SettingsPanel } from "../settings-panel";
 import { StatsPanel } from "../stats-panel";
 import { ModeRow } from "../mode-row";
@@ -17,11 +18,23 @@ describe("SettingsPanel", () => {
     );
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
     const undo = screen.getByRole("switch", { name: /memo undo/i });
-    const assist = screen.getByRole("switch", { name: /odds assist/i });
+    const stats = screen.getByRole("switch", { name: /statistics/i });
     expect(undo).toHaveAttribute("aria-checked", "true");
-    expect(assist).toHaveAttribute("aria-checked", "false");
-    fireEvent.click(assist);
-    expect(onChange).toHaveBeenCalledWith({ assist: true });
+    expect(stats).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(stats);
+    expect(onChange).toHaveBeenCalledWith({ stats: false });
+  });
+
+  it("does not offer the odds assist until it does something", () => {
+    render(
+      <SettingsPanel
+        settings={{ memoUndo: true, stats: true, assist: false }}
+        onChange={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("switch", { name: /odds assist/i })).toBeNull();
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
   });
 
   it("closes on Escape", () => {
@@ -62,7 +75,28 @@ describe("StatsPanel", () => {
     render(<StatsPanel stats={EMPTY_STATS} onReset={() => {}} onClose={() => {}} />);
     const dialog = screen.getByRole("dialog", { name: "Statistics" });
     expect(within(dialog).getByText("Rounds played")).toBeInTheDocument();
-    expect(within(dialog).getByText("Best daily streak")).toBeInTheDocument();
+    // Rows for features that do not exist yet stay hidden until they have data.
+    expect(within(dialog).queryByText("Best daily streak")).toBeNull();
+    expect(within(dialog).queryByText("Daily boards played")).toBeNull();
+    expect(within(dialog).queryByText("Assisted rounds")).toBeNull();
+  });
+
+  it("shows the assisted and daily rows once they are non-zero", () => {
+    render(
+      <StatsPanel
+        stats={{
+          ...EMPTY_STATS,
+          assistedRounds: 2,
+          dailyPlayed: 3,
+          streak: { current: 1, best: 2, lastDay: "2026-10-01" },
+        }}
+        onReset={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByText("Assisted rounds")).toBeInTheDocument();
+    expect(screen.getByText("Daily boards played")).toBeInTheDocument();
+    expect(screen.getByText("Best daily streak")).toBeInTheDocument();
   });
 
   it("shows the numbers and asks before resetting", () => {
@@ -99,5 +133,95 @@ describe("ModeRow", () => {
     expect(screen.getByRole("button", { name: "Statistics" })).toBeInTheDocument();
     rerender(<ModeRow statsEnabled={false} onOpenSettings={() => {}} onOpenStats={() => {}} />);
     expect(screen.queryByRole("button", { name: "Statistics" })).toBeNull();
+  });
+});
+
+describe("modal focus", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const settings = { memoUndo: true, stats: true, assist: false };
+
+  it("moves focus into the dialog when it opens", () => {
+    render(<SettingsPanel settings={settings} onChange={() => {}} onClose={() => {}} />);
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it("traps Tab and Shift+Tab inside the card", () => {
+    render(<SettingsPanel settings={settings} onChange={() => {}} onClose={() => {}} />);
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    const buttons = Array.from(dialog.querySelectorAll<HTMLElement>("button"));
+    expect(buttons.length).toBeGreaterThan(2);
+    const first = buttons[0]!;
+    const last = buttons[buttons.length - 1]!;
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    // From the card itself, Shift+Tab also wraps to the last control.
+    (document.activeElement as HTMLElement).blur();
+    const card = dialog.querySelector<HTMLElement>(".svf-modal-card")!;
+    card.focus();
+    fireEvent.keyDown(card, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("returns focus to the opener when it closes", () => {
+    vi.useFakeTimers();
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>open</button>
+          {open && (
+            <SettingsPanel settings={settings} onChange={() => {}} onClose={() => setOpen(false)} />
+          )}
+        </>
+      );
+    }
+    render(<Host />);
+    const opener = screen.getByRole("button", { name: "open" });
+    opener.focus();
+    fireEvent.click(opener);
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(window, { key: "Escape" });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("calls onClose once however many times it is closed", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(<SettingsPanel settings={settings} onChange={() => {}} onClose={onClose} />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    vi.advanceTimersByTime(500);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onClose after it unmounts mid-close", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <SettingsPanel settings={settings} onChange={() => {}} onClose={onClose} />,
+    );
+    fireEvent.keyDown(window, { key: "Escape" });
+    unmount();
+    vi.advanceTimersByTime(500);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("gives the close button a 44px touch target", () => {
+    render(<SettingsPanel settings={settings} onChange={() => {}} onClose={() => {}} />);
+    const cls = screen.getByRole("button", { name: "Close" }).className;
+    expect(cls).toContain("h-11");
+    expect(cls).toContain("w-11");
   });
 });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { storedVersionIsNewer } from "./stored-version";
 
 // Player settings. Their own key: svf:progress and svf:muted keep their shapes.
 export const SETTINGS_KEY = "svf:settings";
@@ -46,6 +47,8 @@ export function loadSettings(): Settings {
 }
 
 export function saveSettings(settings: Settings): void {
+  // A newer build wrote this: leave it alone rather than downgrade it.
+  if (storedVersionIsNewer(SETTINGS_KEY)) return;
   safeLocalSet(
     SETTINGS_KEY,
     JSON.stringify({
