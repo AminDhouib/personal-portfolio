@@ -26,6 +26,9 @@ for (const width of [360, 390]) {
         timeout: 20_000,
       });
 
+      // The role=button wrapper is exactly var(--svf-tile) (border-box, no border of
+      // its own); the visible face inside it is 4px larger, so this is the stricter
+      // measure and is the touch target.
       const tiles = await page
         .getByRole("button", { name: /^Row \d, Col \d, face down/ })
         .evaluateAll((els) =>

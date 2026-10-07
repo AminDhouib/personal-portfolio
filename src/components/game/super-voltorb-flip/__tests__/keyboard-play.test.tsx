@@ -164,4 +164,63 @@ describe("board keyboard play", () => {
     expect(target.tabIndex).toBe(0);
     expect(tile("Row 1, Col 1, face down").tabIndex).toBe(-1);
   });
+  it("memo keys do nothing on a flipped tile (they play the invalid cue)", async () => {
+    render(<SuperVoltorbFlipGame />);
+    const first = tile("Row 1, Col 1, face down");
+    first.focus();
+    fireEvent.keyDown(first, { key: "Enter" });
+    await advance(RISK_WARNING_MS + 600);
+    const flipped = screen.getByRole("button", { name: /^Row 1, Col 1, revealed/ });
+    audio.sfxCalls.length = 0;
+    fireEvent.keyDown(flipped, { key: "2" });
+    expect(audio.sfxCalls).toContain("invalidTap");
+    expect(audio.sfxCalls).not.toContain("memoToggle");
+  });
+
+  it("memo keys do nothing while a risk warning holds the board", async () => {
+    // Seed 33 deals a board where flipping Row 1, Col 1 raises the risk warning
+    // (found by search). The flip is held until the fanfare ends, so nothing is
+    // announced yet; once the hold releases the flip lands.
+    vi.spyOn(Math, "random").mockImplementation(seededRandom(33));
+    render(<SuperVoltorbFlipGame />);
+    const first = tile("Row 1, Col 1, face down");
+    first.focus();
+    fireEvent.keyDown(first, { key: "Enter" });
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("");
+
+    const other = tile("Row 5, Col 5, face down");
+    audio.sfxCalls.length = 0;
+    fireEvent.keyDown(other, { key: "2" });
+    expect(audio.sfxCalls).not.toContain("memoToggle");
+    expect(screen.queryByRole("button", { name: /memo 2/ })).toBeNull();
+
+    await advance(RISK_WARNING_MS + 600);
+    expect(status.textContent).toMatch(/^Row 1, Col 1: /);
+  });
+
+  it("memo keys do nothing while the quit confirmation is open", () => {
+    render(<SuperVoltorbFlipGame />);
+    fireEvent.click(screen.getByRole("button", { name: /quit/i }));
+    const first = tile("Row 1, Col 1, face down");
+    audio.sfxCalls.length = 0;
+    fireEvent.keyDown(first, { key: "2" });
+    expect(audio.sfxCalls).not.toContain("memoToggle");
+    expect(screen.queryByRole("button", { name: /memo 2/ })).toBeNull();
+  });
+
+  it("ignores keys typed in a text field inside the board", () => {
+    render(<SuperVoltorbFlipGame />);
+    const board = screen.getByRole("group", { name: "Board, 5 by 5" });
+    const input = document.createElement("input");
+    board.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    fireEvent.keyDown(input, { key: "2" });
+    expect(cursorCues()).toBe(0);
+    expect(audio.sfxCalls).not.toContain("memoToggle");
+    expect(screen.queryByRole("button", { name: /memo 2/ })).toBeNull();
+    expect(tile("Row 1, Col 1, face down").tabIndex).toBe(0);
+    input.remove();
+  });
 });
