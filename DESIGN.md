@@ -632,6 +632,45 @@ The following Password Game 2 entries were verified against the current tree on 
 - **The Voltorb tile reads the same public daily arcade board the other two do.** The Voltorb daily
   board is keyed by the UTC day on the server, the same day the game seeds from, so unlike Password
   Game 2 the tile is exactly today's board. The strip is two columns at md and four from xl.
+- **The Daily board is one seeded board per UTC day, and the server regenerates it.** The seed is
+  `svf-daily-v1-<YYYY-MM-DD>` (UTC, so it agrees with the arcade `daily:` board key) through the pg2
+  `fnv1a` and `mulberry32`, then `pickBoardId(5)` and `generateLayout`. The `v1` is a version: change
+  the recipe and an old day's board shifts under its stored scores, so bump it. Golden vectors for
+  three days are pinned in `daily-board.test.ts`. Lv.5 because its max payouts (384-576) make a win
+  a real result and a partial bank a meaningful score without a coin-flip board.
+- **The Daily validator checks what the board can pay, not that the run was honest.**
+  `checkVoltorbDaily` regenerates the day from the server clock and rejects a score above the
+  board's maximum, a score that is not 2^a * 3^b within the board's 2s and 3s, too few flips for it,
+  more flips than safe tiles, and any `day` that is not today's UTC day. It is still a ceiling on a
+  client-supplied number (see "Arcade scores are trusted up to plausibility ceilings"): a player can
+  post any score the board allows, and a cleared board is the cap for that day. There is no grace
+  window across 00:00 UTC; a round that runs past it cannot be posted and the screen says so. The
+  route reads the clock once and hands the same instant to the validator and the store.
+- **`daily-board.ts` is a lib-to-components import on purpose.** The validator needs the exact
+  generator the game uses, and duplicating `hgss.ts` on the server would let the two drift. Both
+  files are pure and DOM-free (types-only imports plus the pg2 rng); `daily-board.test.ts` runs in
+  the node environment so a DOM touch fails it. Do not move React or storage into either file.
+- **One counted attempt per device, kept by replaying the flips.** `svf:daily` stores the ordered
+  list of flipped tiles; a reload rebuilds the board and replays them, so refreshing never rerolls.
+  Clearing site data or using another browser is a second attempt: this is a device-level rule on a
+  trust-on-first-use leaderboard, the same as everything in "Arcade player ids are client generated".
+  The server's upsert keeps only a strictly higher score, so a second posted attempt can raise but
+  never lower a player's row. The Statistics Reset does not touch `svf:daily`, so a reset cannot buy
+  a second attempt.
+- **The Daily board has no odds assist, no level movement and no history.** It runs on its own
+  `VoltorbFlip.daily(...)` instance, so winning or losing it never moves the player's level, the
+  main round history, or `svf:progress`. Nothing on the Daily screen reads the assist setting, and
+  its round banner never says "Assisted". The main game stays mounted but hidden while the Daily
+  board is open, so a trip to Daily does not lose the main round; its undo is off meanwhile.
+- **The Voltorb leaderboard rows are daily results across all three boards.** A submit writes the
+  all-time, weekly and daily boards like every arcade game, so "all-time" for Voltorb means the best
+  single daily result and "weekly" the best of the week. The Daily panel and the Today tile read the
+  daily board only. The legacy localStorage import and the legacy row schema keep their own
+  two-slug list (`LEGACY_ARCADE_GAME_SLUGS`): Voltorb never had legacy rows.
+- **Streak: consecutive UTC days, kept alive by any played board.** A win or a quit that banked at
+  least one coin extends it. A loss or an empty quit counts as played, neither extends nor breaks
+  it, and carries its day forward, so only a UTC day with no board played lapses it (shown as 0 from
+  then on, the best is kept). Display-only and local like the rest of the statistics.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
