@@ -17,7 +17,10 @@ declare global {
   }
 }
 
-test("LCP of the game page: record the element and the time", async ({ browser, baseURL }) => {
+test("LCP of the game page is page content, not the game, and lands inside the budget", async ({
+  browser,
+  baseURL,
+}) => {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     hasTouch: true,
@@ -55,6 +58,10 @@ test("LCP of the game page: record the element and the time", async ({ browser, 
     test.info().annotations.push({ type: "lcp", description: JSON.stringify(records) });
     process.stdout.write(`LCP ${GAME_PATH}: ${JSON.stringify(records)}
 `);
+    expect(last?.inGame, "the game became the largest paint").toBe(false);
+    // A budget with headroom for a CI runner on an unthrottled local server: it
+    // exists to catch a regression of seconds, not to benchmark.
+    expect(last?.startTime ?? Infinity).toBeLessThan(4_000);
   } finally {
     await context.close();
   }
