@@ -164,10 +164,6 @@ const SCOPED_STYLES = `
   filter: drop-shadow(1px 1px white) drop-shadow(-1px -1px white)
     drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
 }
-.svf-root .svf-glyph-outline {
-  filter: drop-shadow(1px 0 0 #1f2937) drop-shadow(-1px 0 0 #1f2937)
-    drop-shadow(0 1px 0 #1f2937) drop-shadow(0 -1px 0 #1f2937);
-}
 .svf-root .voltorb { height: 28px; width: 28px; }
 .svf-root .rounded-5 { border-radius: 5px; }
 .svf-root .drop-shadow-default {
@@ -345,7 +341,7 @@ type CardProps = {
   /**
    * Spoken form of the tile's value ("1", "Voltorb", ...), announced only once
    * the tile is revealed. Kept separate from `children` because that is markup
-   * (the Voltorb face is an <img alt="">, which announces nothing) and because
+   * (the Voltorb face is an aria-hidden SVG, which announces nothing) and because
    * it must never reach the DOM while the tile is face down.
    */
   valueLabel?: string;
@@ -447,7 +443,7 @@ const Card = ({
                   <PixelSprite
                     sprite={GLYPHS[f]}
                     cssSize={flagSize}
-                    className="svf-glyph-outline"
+                    outline="#1f2937"
                     style={{ color: "#fff" }}
                   />
                 </div>

@@ -120,13 +120,14 @@ describe("Super Voltorb Flip assets", () => {
     expect(sourceText).not.toMatch(/samualtnorman/);
   });
 
-  it("has no asset-prep script that targets the removed sprites", () => {
-    const scripts = readdirSync(join(ROOT, "scripts"));
-    for (const name of scripts) {
-      const text = readFileSync(join(ROOT, "scripts", name), "utf8");
-      expect(text, `${name} still targets super-voltorb-flip sprites`).not.toMatch(
-        /super-voltorb-flip\/sprites/,
-      );
+  it("has no script, e2e spec or workflow that targets the removed sprites", () => {
+    for (const dir of ["scripts", "e2e", ".github"]) {
+      for (const file of walk(join(ROOT, dir))) {
+        const text = readFileSync(file, "utf8");
+        expect(text, `${file} still targets super-voltorb-flip sprites`).not.toMatch(
+          /super-voltorb-flip\/sprites/,
+        );
+      }
     }
   });
 });

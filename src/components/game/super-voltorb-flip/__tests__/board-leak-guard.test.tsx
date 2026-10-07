@@ -78,6 +78,11 @@ describe("SuperVoltorbFlip board", () => {
     }
   });
 
+  it("renders no <img> anywhere: all art is inline SVG", () => {
+    const { container } = render(<SuperVoltorbFlipGame />);
+    expect(container.querySelector("img")).toBeNull();
+  });
+
   it("keeps the round result slot under the board, outside its frame", () => {
     const { container, getByText } = render(<SuperVoltorbFlipGame />);
     // The idle line and the end-of-round banner share one slot; a banner

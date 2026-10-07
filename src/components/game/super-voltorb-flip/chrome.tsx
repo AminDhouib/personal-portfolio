@@ -52,7 +52,13 @@ function LoopingFrames({
   return (
     <span
       aria-hidden="true"
-      style={{ display: "inline-block", width: size, height: size, pointerEvents: "none" }}
+      style={{
+        display: "inline-block",
+        flexShrink: 0,
+        width: size,
+        height: size,
+        pointerEvents: "none",
+      }}
     >
       {render(frame)}
     </span>
