@@ -3,7 +3,7 @@ import type { GameContent } from "./types";
 export const superVoltorbFlipContent: GameContent = {
   seoTitle: "Voltorb Flip Online: Free Browser Puzzle Game",
   seoDescription:
-    "Play Voltorb Flip online, free in your browser with no download. Read the row and column clues, flip every 2 and 3, dodge the Voltorbs and climb 9 levels.",
+    "Play Voltorb Flip online, free in your browser with no download. Read the row and column clues, flip every 2 and 3, dodge the Voltorbs and climb 8 levels.",
   genre: ["Puzzle", "Logic"],
   playMode: "SinglePlayer",
   intro:
@@ -34,6 +34,10 @@ export const superVoltorbFlipContent: GameContent = {
         "Pick one, then select tiles to tag them. Pick it again, or use the clear button, to flip normally.",
     },
     {
+      input: "Quit button",
+      action: "Below the board while a round is live. It asks first, then banks your coins.",
+    },
+    {
       input: "End of a round",
       action: "Click the board, press Enter or Space, or use the Continue or Next round button.",
     },
@@ -52,11 +56,15 @@ export const superVoltorbFlipContent: GameContent = {
     },
     {
       label: "Levels",
-      value: "9, with difficulty topping out at level 8",
+      value: "8, as in HeartGold and SoulSilver",
     },
     {
       label: "Voltorbs per board",
-      value: "5 to 7 on level 1, 10 to 12 on levels 8 and 9",
+      value: "6 on level 1, up to 13 on level 7",
+    },
+    {
+      label: "Boards",
+      value: "80 layouts, 10 per level, dealt as in the original",
     },
     {
       label: "Saves",
@@ -79,12 +87,12 @@ export const superVoltorbFlipContent: GameContent = {
     {
       question: "How many levels are there in Voltorb Flip?",
       answer:
-        "This version has 9. Each cleared round moves you up one. Difficulty rises through level 8, and level 9 plays at the same difficulty.",
+        "This version has 8, as in HeartGold and SoulSilver. A cleared round moves you up one level through level 7. Reaching level 8 takes five rounds in a row without hitting a Voltorb and with at least eight tiles flipped in each, the last played on level 5 or higher.",
     },
     {
       question: "What happens when you flip a Voltorb?",
       answer:
-        "The round ends and no coins are banked. If you had flipped fewer safe tiles than your level minus 1, you fall to your flip count plus 1. Otherwise you keep your level.",
+        "The round ends and no coins are banked. You drop to the number of tiles you flipped that round, never below level 1 and never above the level you were on.",
     },
     {
       question: "Is there a Voltorb Flip solver?",
@@ -92,8 +100,9 @@ export const superVoltorbFlipContent: GameContent = {
         "No. This page is a game, not a solver. The strategy tips above show how to read the row and column clues yourself.",
     },
     {
-      question: "Can I play Voltorb Flip on my phone?",
-      answer: "Yes. The board resizes to your screen and you tap tiles to flip them.",
+      question: "Can I stop a round and keep my coins?",
+      answer:
+        "Yes. Quit banks the coins you have found so far after you confirm. Your level then moves as it does after a loss, by the number of tiles you flipped.",
     },
   ],
   credits: [
