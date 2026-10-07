@@ -42,7 +42,9 @@ export function estimateAcceptRate(
 // Generated with estimateAcceptRate(BOARD_CONFIGS[id], mulberry32(1), 400_000) for
 // each board id (mulberry32 is the seeded generator in solver-prior.test.ts; one
 // fresh generator per board; about 32 s in total). Rounded to 4 places. Regenerate
-// all 80 if hgss.ts ever changes. Ten boards per level, Lv.1 first.
+// all 80 if hgss.ts ever changes. Ten boards per level, Lv.1 first. Boards with
+// the same Voltorb count, multiplier-card counts and caps get identical rates
+// because the fixed seed gives them identical placements (for example 20 and 23).
 // prettier-ignore
 export const ACCEPT_RATE: readonly number[] = [
   // Lv.1

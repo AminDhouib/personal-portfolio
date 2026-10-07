@@ -38,8 +38,11 @@ export type SolverResult =
   | { status: "invalid"; reason: "line" | "totals" | "none" }
   | { status: "too-many" };
 
-/** Layout visits after which the solver gives up and asks for a revealed tile. */
+/** Complete fitting layouts after which the solver gives up and asks for a revealed tile. */
 export const MAX_LAYOUTS = 2_000_000;
+
+// Odds this close count as equal when picking the best tile (float noise).
+const TIE_EPSILON = 1e-12;
 
 const VALUES: readonly CellValue[] = ["V", 1, 2, 3];
 
@@ -96,12 +99,15 @@ export function validateClues(input: Pick<SolverInput, "rows" | "cols">): "line"
   return null;
 }
 
+// Unknown level: uniform over all 80 boards, not over how real play spreads
+// across levels.
 function prior(id: number, level: number | null): number {
   if (level === null) return 1 / 80;
   return Math.floor(id / 10) + 1 === level ? 1 / 10 : 0;
 }
 
-function hgssWeight(cells: readonly CellValue[], level: number | null): number {
+/** Relative HGSS probability of one fitting layout (0 when no allowed recipe deals it). */
+export function hgssWeight(cells: readonly CellValue[], level: number | null): number {
   let voltorbs = 0;
   let twos = 0;
   let threes = 0;
@@ -217,8 +223,9 @@ export function solve(input: SolverInput): SolverResult {
     const current = best === null ? undefined : tiles[best];
     if (
       !current ||
-      tile.voltorb < current.voltorb ||
-      (tile.voltorb === current.voltorb && multiplier > current.two + current.three)
+      tile.voltorb < current.voltorb - TIE_EPSILON ||
+      (Math.abs(tile.voltorb - current.voltorb) <= TIE_EPSILON &&
+        multiplier > current.two + current.three)
     ) {
       best = i;
     }
