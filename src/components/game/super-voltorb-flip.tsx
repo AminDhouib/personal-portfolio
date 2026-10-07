@@ -45,6 +45,7 @@ import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-r
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { isTextEntryTarget } from "./super-voltorb-flip/keyboard";
 import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
+import { afterPageLoad } from "./super-voltorb-flip/startup";
 import { isCursorKey, memoKeyFlag, moveCursor, type Cursor } from "./super-voltorb-flip/cursor";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
@@ -1806,14 +1807,18 @@ export function SuperVoltorbFlipGame() {
     }
   }
 
-  // Try autoplay on mount. Some browsers block this until the user has
-  // interacted with the page; if so, the audio.play().catch in playMusic
-  // swallows the rejection and handleFirstInteraction starts it on the
-  // first click. We still mark musicStartedRef so we don't double-start.
+  // Try autoplay once the page has loaded, so the MP3 fetch does not compete
+  // with the page's own render (it used to start the moment progress hydrated).
+  // A first tile flip before the load event starts the loop itself through
+  // handleFirstInteraction; playMusic is a no-op for a track that is already
+  // loaded. If the browser rejects autoplay, audio.ts retries on the first
+  // gesture (pointer or key), so musicStartedRef no longer strands the loop.
   useEffect(() => {
     if (muted || !hydrated) return;
-    musicStartedRef.current = true;
-    playMusic(levelRef.current);
+    return afterPageLoad(() => {
+      musicStartedRef.current = true;
+      playMusic(levelRef.current);
+    });
   }, [muted, hydrated]);
 
   return (
