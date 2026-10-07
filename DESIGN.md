@@ -31,7 +31,7 @@ component file (`hextris.tsx`, `tower-stacker.tsx`, `typing-speed.tsx`); non-com
 progressively being extracted into same-named subdirectories as each game gets touched —
 `password-game-2/` (a full `engine/` with `rules/`, `events/`, and a seeded core, plus `stage/`
 and `sound/` layers) and `super-voltorb-flip/` (`engine.ts`, `audio.ts` with `sound-cues.ts`,
-`synth.ts` and `music.ts` behind it, `chrome.tsx`) are
+`synth.ts` and `music.ts` behind it, `chrome.tsx`, `art/`) are
 furthest along; `space-shooter/` holds several
 extracted modules (`spawning.ts`, `boss-behaviors.ts`, `sound-manager.ts`, `run-init.ts`) but
 `space-shooter.tsx` and `hextris.tsx` still carry the bulk of their engine logic inline in the
@@ -391,6 +391,17 @@ current tree on 2026-07-07.
   Password Game 2's rather than imported, by the cross-game convention.
   `__tests__/assets-guard.test.ts` fails if ripped audio paths, unreferenced files or
   unattributed music come back.
+- **Super Voltorb Flip's art is original and defined as text.** The orb, memo glyphs and clear
+  mark are character maps in `super-voltorb-flip/art/sprites.ts` rendered as inline SVG by
+  `PixelSprite`; the bomb burst, success sparkle and spinning coin are pure frame geometry in
+  `art/fx.ts` drawn by `art/frames.tsx`. No sprite image ships, and the GPL-3.0 cartridge sprites
+  that used to ship (samualtnorman/voltorb-flip) were removed along with the scripts that fetched
+  and processed them. The orb is deliberately not the Pokemon creature (an indigo sphere with a
+  lightning bolt); to redraw anything, edit the strings and keep the grid size. The game keeps
+  its CSS look and the "Super Voltorb Flip" name, and shows an unofficial-fan-recreation
+  disclaimer in the About credits and in the How to play modal.
+  `__tests__/assets-guard.test.ts` fails on any image under the game's public folder, any
+  reference to a sprites or upstream path, and any asset-prep script that targets them.
 - **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
   `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
   license alongside). Known quirks live inside that bundle and are accepted while the game stays
@@ -424,10 +435,6 @@ current tree on 2026-07-07.
   state that upstream callers have already validated once; a second failure there indicates the
   first guard's own invariant broke, which is a bug in the guard itself, not user input worth
   reporting again.
-- **The `scripts/*.py` sprite-processing scripts are exempt from the TS toolchain by
-  construction** — `slice-voltorb-chrome.py`, `strip-sprite-bg.py`, `tint-chrome-per-theme.py`,
-  and siblings are one-off asset-prep tools run manually against the voltorb chrome sprites, never
-  imported by the app, and outside eslint/typescript/vitest's file globs entirely.
 - **`GuardedJson`'s `body: unknown` is a sanctioned narrow-me type, kept deliberately
   unexported** (`src/lib/route-guard.ts`). Every caller re-validates it with its own zod schema —
   this is the documented "accept `unknown` and narrow it" exception in

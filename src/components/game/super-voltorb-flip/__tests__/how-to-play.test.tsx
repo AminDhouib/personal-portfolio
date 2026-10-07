@@ -45,4 +45,13 @@ describe("SuperVoltorbFlip how to play", () => {
     expect(within(modal).getByText(/^There are 8 Levels\./)).toBeTruthy();
     expect(within(modal).getByText(/Press Quit to stop and keep your Coins/)).toBeTruthy();
   });
+
+  it("carries the unofficial fan-recreation disclaimer", () => {
+    render(<SuperVoltorbFlipGame />);
+    const [openButton] = screen.getAllByRole("button", { name: "How to play" });
+    if (!openButton) throw new Error("no How to play button");
+    fireEvent.click(openButton);
+    const modal = screen.getByRole("dialog", { name: "How to play" });
+    expect(within(modal).getByText(/Unofficial fan recreation\. Not affiliated with/)).toBeTruthy();
+  });
 });

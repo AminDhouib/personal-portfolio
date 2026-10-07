@@ -139,8 +139,9 @@ export const superVoltorbFlipContent: GameContent = {
         "Chiptune loops by TinyWorlds, Juhani Junkala (SubspaceAudio) and celestialghost8, all released under CC0.",
     },
     {
-      label: "Sound effects",
-      detail: "Original, generated in your browser. No audio from the Pokemon games is used.",
+      label: "Sound effects and artwork",
+      detail:
+        "Original: the sounds are generated in your browser and the pixel art is drawn for this site. No audio or sprites from the Pokemon games are used.",
     },
   ],
 };
