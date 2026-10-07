@@ -16,7 +16,9 @@ export function EffectsProvider({
   useEffect(() => {
     themes[themeName]?.().then(setTheme).catch(reportError);
   }, [themeName]);
-  if (!theme) return <>{children}</>;
+  // Always render the Provider, with a null theme until the import lands:
+  // swapping a Fragment for a Provider changes the root element type and
+  // remounts every child (the whole board flickered once per load).
   return <EffectsCtx.Provider value={theme}>{children}</EffectsCtx.Provider>;
 }
 
