@@ -162,7 +162,16 @@ describe("/api/password-game-2/leaderboard", () => {
       const body = (await res.json()) as Pg2GetResponse;
       expect(body.entries.map((e) => e.name)).toEqual(["C", "A"]);
       const select = captured.find((q) => q.sql.toUpperCase().includes("DAILY = TRUE"));
-      expect(select?.sql.toUpperCase()).toContain("CREATED_AT::DATE = NOW()::DATE");
+      expect(select).toBeDefined();
+    });
+
+    it("filters the daily board by the UTC calendar day, not the session timezone", async () => {
+      await GET(new Request("https://amindhou.com/api/password-game-2/leaderboard?daily=1"));
+      const sql = captured.map((c) => c.sql).join("\n");
+      expect(sql).toContain(
+        "(created_at AT TIME ZONE 'UTC')::date = (now() AT TIME ZONE 'UTC')::date",
+      );
+      expect(sql).not.toContain("created_at::date = now()::date");
     });
 
     it("sets a short public cache header", async () => {
