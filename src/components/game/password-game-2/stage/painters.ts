@@ -26,6 +26,7 @@ import type { SnakeData } from "../engine/events/snake";
 import type { TetrisData } from "../engine/events/tetris";
 import type { AutocorrectData } from "../engine/events/autocorrect";
 import { MISSILE_FALL_MS, type MissilesData } from "../engine/events/finale";
+import { hudSlots } from "./hud-slots";
 
 /** A rectangle in canvas-local CSS pixels. */
 export interface RectLike {
@@ -183,13 +184,17 @@ const METER_BAR_H = 6;
 // Inhabitant HUD slot convention — gerald, campfire, and garden never resolve
 // before the finale, so the director co-schedules them into the ONE shared
 // boxRect and their always-on HUD elements would otherwise share coordinates.
-// Crisis meters stack in a top-left column (row 0 garden HIVE at box.y + 26,
-// row 1 gerald GERALD; campfire FUEL keeps its own bottom slot); action chips
+// Crisis meters never draw on the password: they live in the reserved bands
+// hudSlots() derives from the box, stacked in the top band's left column (row 0
+// garden HIVE, row 1 gerald GERALD; campfire FUEL keeps its own bottom band); action chips
 // stack in a top-right column (row 0 gerald FEED at box.y + 12, row 1 garden
 // BASKET, row 2 campfire STOKE). Any new always-on element claims the next free
 // slot — never reuse one.
 const METER_ROW_H = 22; // vertical stride between stacked crisis meters
 const CHIP_ROW_H = 38; // vertical stride between stacked action chips (chip h 30 + gap)
+const METER_W = 120; // crisis meter bar width
+const METER_PAD = 16; // inset of a meter from its band's left edge
+const METER_ROW_Y = 22; // first meter bar sits this far below the top of its band
 
 export function drawCrisisMeter(ctx: CanvasRenderingContext2D, spec: MeterSpec): void {
   const { x, y, w, value, max, threshold, label, color } = spec;
@@ -348,16 +353,19 @@ const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(tMs / 160));
   const tier =
     d.hunger >= GERALD_MURKY_AT ? "STARVING" : d.hunger >= GERALD_HUNGRY_AT ? "HUNGRY" : "FED";
-  drawCrisisMeter(ctx, {
-    x: box.x + 16,
-    y: box.y + 26 + METER_ROW_H,
-    w: 120,
-    value: d.hunger,
-    max: 100,
-    label: "GERALD",
-    valueText: tier,
-    color: loud ? `rgba(248,113,113,${pulse})` : GREEN,
-  });
+  const slots = hudSlots(layout);
+  if (slots) {
+    drawCrisisMeter(ctx, {
+      x: slots.meter.x + METER_PAD,
+      y: slots.meter.y + METER_ROW_Y + METER_ROW_H,
+      w: Math.min(METER_W, slots.meter.w - METER_PAD),
+      value: d.hunger,
+      max: 100,
+      label: "GERALD",
+      valueText: tier,
+      color: loud ? `rgba(248,113,113,${pulse})` : GREEN,
+    });
+  }
 
   // Feed chip — chip row 0 (top-right) per the slot convention.
   const c = chip(ctx, box.x + box.w - 92, box.y + 12, "FEED", GREEN, true);
@@ -464,16 +472,18 @@ const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
 
   // Fuel gauge above the fire — its own bottom slot per the slot convention, so
   // it never collides with the top-left meter column garden and gerald share.
-  const gw = 70;
-  drawCrisisMeter(ctx, {
-    x: fx - gw / 2,
-    y: box.y + box.h - 70,
-    w: gw,
-    value: d.fuel,
-    max: 100,
-    label: "FUEL",
-    color: d.fuel < 25 ? RED : "#f59e0b",
-  });
+  const slots = hudSlots(layout);
+  if (slots) {
+    drawCrisisMeter(ctx, {
+      x: slots.bottom.x + METER_PAD,
+      y: slots.bottom.y + METER_ROW_Y,
+      w: Math.min(METER_W, slots.bottom.w - METER_PAD),
+      value: d.fuel,
+      max: 100,
+      label: "FUEL",
+      color: d.fuel < 25 ? RED : "#f59e0b",
+    });
+  }
 
   // Stoke chip — chip row 2 (top-right) per the slot convention; hops when
   // buttonHops changes.
@@ -625,17 +635,20 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const displayHoney = Math.round(d.honey * (1 - raidProgress));
   const loud = displayHoney < HIVE_THRESHOLD;
   const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(tMs / 160));
-  drawCrisisMeter(ctx, {
-    x: box.x + 16,
-    y: box.y + 26,
-    w: 120,
-    value: displayHoney,
-    max: 100,
-    threshold: HIVE_THRESHOLD,
-    label: "HIVE",
-    valueText: String(displayHoney),
-    color: loud ? `rgba(248,113,113,${pulse})` : AMBER,
-  });
+  const slots = hudSlots(layout);
+  if (slots) {
+    drawCrisisMeter(ctx, {
+      x: slots.meter.x + METER_PAD,
+      y: slots.meter.y + METER_ROW_Y,
+      w: Math.min(METER_W, slots.meter.w - METER_PAD),
+      value: displayHoney,
+      max: 100,
+      threshold: HIVE_THRESHOLD,
+      label: "HIVE",
+      valueText: String(displayHoney),
+      color: loud ? `rgba(248,113,113,${pulse})` : AMBER,
+    });
+  }
 
   // The bear: a looming shadow with a shrinking countdown arc when telegraphed,
   // the lumbering silhouette when raiding.
