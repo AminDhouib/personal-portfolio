@@ -13,6 +13,8 @@ const KNOB_ON = "absolute top-0.5 left-[22px] h-5 w-5 rounded-full bg-white shad
 
 type Row = { key: keyof Settings; label: string; hint: string };
 
+// The odds assist is part of the stored shape but has no effect until T2e-2,
+// which adds its row back here. Until then the panel does not offer it.
 const ROWS: readonly Row[] = [
   {
     key: "memoUndo",
@@ -23,11 +25,6 @@ const ROWS: readonly Row[] = [
     key: "stats",
     label: "Statistics",
     hint: "Keep a local record of your rounds on this device. Nothing is sent anywhere.",
-  },
-  {
-    key: "assist",
-    label: "Odds assist",
-    hint: "Shows how likely each face-down tile is to be a Voltorb. A round played with it on is marked, and it is never available on the Daily board.",
   },
 ];
 

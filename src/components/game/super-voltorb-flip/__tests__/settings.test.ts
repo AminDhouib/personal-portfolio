@@ -62,6 +62,28 @@ describe("settings storage", () => {
     expect(parseSettings({ v: 1 })).toEqual(DEFAULT_SETTINGS);
   });
 
+  it("corrupting one field resets only that field", () => {
+    const good = { v: 1, memoUndo: false, stats: false, assist: true };
+    const expected = { memoUndo: false, stats: false, assist: true };
+    for (const key of ["memoUndo", "stats", "assist"] as const) {
+      const parsed = parseSettings({ ...good, [key]: "corrupt" });
+      expect(parsed).toEqual({ ...expected, [key]: DEFAULT_SETTINGS[key] });
+    }
+  });
+
+  it("does not write over a value stored by a newer version", () => {
+    const newer = '{"v":2,"memoUndo":false,"stats":false,"assist":true,"extra":1}';
+    window.localStorage.setItem("svf:settings", newer);
+    saveSettings({ memoUndo: true, stats: true, assist: false });
+    expect(window.localStorage.getItem("svf:settings")).toBe(newer);
+  });
+
+  it("still overwrites its own and unreadable values", () => {
+    window.localStorage.setItem("svf:settings", "{not json");
+    saveSettings({ memoUndo: false, stats: true, assist: false });
+    expect(loadSettings().memoUndo).toBe(false);
+  });
+
   it("survives unreadable text and blocked storage", () => {
     window.localStorage.setItem("svf:settings", "{not json");
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);

@@ -27,4 +27,12 @@ describe("useSettings", () => {
     act(() => result.current[1]({ memoUndo: false }));
     expect(result.current[0]).toEqual({ memoUndo: false, stats: false, assist: false });
   });
+
+  it("does not write over a value stored by a newer version", () => {
+    const newer = '{"v":2,"memoUndo":false,"stats":false,"assist":true}';
+    window.localStorage.setItem("svf:settings", newer);
+    const { result } = renderHook(() => useSettings());
+    act(() => result.current[1]({ stats: true }));
+    expect(window.localStorage.getItem("svf:settings")).toBe(newer);
+  });
 });

@@ -52,6 +52,14 @@ import { isUndoKey, type MemoChange } from "./super-voltorb-flip/memo-undo";
 import { useMemoUndo } from "./super-voltorb-flip/use-memo-undo";
 import { useSettings } from "./super-voltorb-flip/use-settings";
 import { useStats } from "./super-voltorb-flip/use-stats";
+import {
+  clockSeconds,
+  endClock,
+  newRoundClock,
+  pauseClock,
+  resumeClock,
+  startClock,
+} from "./super-voltorb-flip/round-clock";
 import { ModeRow } from "./super-voltorb-flip/mode-row";
 import { SettingsPanel } from "./super-voltorb-flip/settings-panel";
 import { StatsPanel } from "./super-voltorb-flip/stats-panel";
@@ -551,6 +559,8 @@ type GameboardProps = {
   onFlipDownStart?: (dir: "up" | "down") => void;
   /** Called for every memo toggle (tap or key) so the parent can offer undo. */
   onMemoChange?: (change: MemoChange) => void;
+  /** Reports whether the board is held by the quit confirmation or a risk fanfare. */
+  onLockChange?: (locked: boolean) => void;
 };
 
 type ActiveEffect = {
@@ -572,6 +582,7 @@ const Gameboard = ({
   runPostFanfare,
   onFlipDownStart,
   onMemoChange,
+  onLockChange,
 }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
@@ -626,6 +637,11 @@ const Gameboard = ({
   useEffect(() => {
     return () => pendingWaitRef.current?.abort();
   }, []);
+
+  const locked = quitConfirmOpen || warningTile !== null;
+  useEffect(() => {
+    onLockChange?.(locked);
+  }, [locked, onLockChange]);
 
   function waitForUserInteraction() {
     pendingWaitRef.current?.abort();
@@ -1473,29 +1489,62 @@ export function SuperVoltorbFlipGame() {
   }, [muted]);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const [settings, updateSettings] = useSettings();
-  const { stats, record: recordStats, reset: resetStats } = useStats(settings.stats);
+  const {
+    stats,
+    record: recordStats,
+    reset: resetStats,
+    raiseHighestLevel,
+  } = useStats(settings.stats);
   const { canUndo, record: recordMemo, undo: undoMemoStack, reset: resetMemoUndo } = useMemoUndo();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
-  // Round clock and start level for the statistics. The level is read while the
-  // round is live (the engine moves currentLevel the instant a round ends).
-  const roundStartedAtRef = useRef<number>(Date.now());
+  // Held by the quit confirmation or a risk fanfare (reported by Gameboard).
+  const [boardLocked, setBoardLocked] = useState(false);
+  // Visible time since the round's first action, for the Lv.8 statistic.
+  const roundClockRef = useRef(newRoundClock());
+  // Start level for the statistics. The level is read while the round is live
+  // (the engine moves currentLevel the instant a round ends).
   const roundStartLevelRef = useRef<number>(1);
   const musicStartedRef = useRef(false);
 
+  // Undo is offered only while a memo could be made: a live round, no panel or
+  // modal over the board, and no quit confirmation or risk fanfare holding it.
+  const undoAllowed =
+    settings.memoUndo &&
+    !!game &&
+    (game.gameStatus === "playing" || game.gameStatus === "memo") &&
+    !settingsOpen &&
+    !statsOpen &&
+    !howToPlayOpen &&
+    !boardLocked;
+
   const undoMemo = useCallback(() => {
-    if (!settings.memoUndo || !game) return;
-    // Same gates as making a memo: not once the round is over.
-    if (game.gameStatus !== "playing" && game.gameStatus !== "memo") return;
+    if (!undoAllowed || !game) return;
     if (undoMemoStack(game, updateGame) && !muted) void sfx.memoToggle();
-  }, [settings.memoUndo, game, undoMemoStack, updateGame, muted]);
+  }, [undoAllowed, game, undoMemoStack, updateGame, muted]);
+
+  const handleMemoChange = useCallback(
+    (change: MemoChange) => {
+      roundClockRef.current = startClock(roundClockRef.current, Date.now(), document.hidden);
+      if (settings.memoUndo) recordMemo(change);
+    },
+    [settings.memoUndo, recordMemo],
+  );
+
+  // Switching statistics off closes their panel, so switching them back on does
+  // not pop it open again.
+  function changeSettings(patch: Partial<typeof settings>) {
+    if (patch.stats === false) setStatsOpen(false);
+    updateSettings(patch);
+  }
 
   // On .svf-root (React onKeyDown), not on document: it only hears keys pressed
   // while focus is inside the game, so the AI chat and every other field keep
   // theirs, and the text-field guard is a second belt.
   function handleRootKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.defaultPrevented || !isUndoKey(e)) return;
-    if (!settings.memoUndo || isTextEntryTarget(e.nativeEvent)) return;
+    if (isTextEntryTarget(e.nativeEvent)) return;
+    if (!undoAllowed) return;
     e.preventDefault();
     undoMemo();
   }
@@ -1772,7 +1821,11 @@ export function SuperVoltorbFlipGame() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     const saved = loadProgress();
-    if (saved) updateGame((g) => g.restore(saved.currentLevel, saved.totalScore, saved.history));
+    if (saved) {
+      updateGame((g) => g.restore(saved.currentLevel, saved.totalScore, saved.history));
+      // Statistics only mirror the save here; svf:progress is never written from them.
+      raiseHighestLevel(saved.currentLevel);
+    }
     setHydrated(true);
     // Mount-only by design; updateGame is recreated every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1826,16 +1879,22 @@ export function SuperVoltorbFlipGame() {
     }
     if (cur === "playing" || cur === "memo") roundStartLevelRef.current = game.currentLevel;
     if (cur === "playing" && prev !== "playing" && prev !== "memo") {
-      roundStartedAtRef.current = Date.now();
+      roundClockRef.current = newRoundClock();
     }
     if ((cur === "win" || cur === "lose" || cur === "quit") && prev !== cur) {
+      // The round is over: nothing left to undo, and the old board is still
+      // flipping down while the Undo button would otherwise stay live.
+      resetMemoUndo();
+      const now = Date.now();
       recordStats({
         outcome: cur === "win" ? "won" : cur === "lose" ? "lost" : "quit",
         coins: cur === "lose" ? 0 : game.currentScore,
         level: roundStartLevelRef.current,
+        levelAfter: game.currentLevel,
         assisted: false,
-        seconds: Math.round((Date.now() - roundStartedAtRef.current) / 1000),
+        seconds: clockSeconds(roundClockRef.current, now),
       });
+      roundClockRef.current = endClock(roundClockRef.current, now);
     }
     prevGameStatusRef.current = cur;
 
@@ -1852,7 +1911,20 @@ export function SuperVoltorbFlipGame() {
     levelRef.current = game?.currentLevel ?? 1;
   }, [game?.currentLevel]);
 
+  // Visible time only: a hidden tab banks the running stretch and stops counting.
+  useEffect(() => {
+    function onVisibility() {
+      const now = Date.now();
+      roundClockRef.current = document.hidden
+        ? pauseClock(roundClockRef.current, now)
+        : resumeClock(roundClockRef.current, now);
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
   function handleFirstInteraction() {
+    roundClockRef.current = startClock(roundClockRef.current, Date.now(), document.hidden);
     if (!musicStartedRef.current && !muted) {
       musicStartedRef.current = true;
       playMusic(levelRef.current);
@@ -1899,7 +1971,7 @@ export function SuperVoltorbFlipGame() {
           {settingsOpen && (
             <SettingsPanel
               settings={settings}
-              onChange={updateSettings}
+              onChange={changeSettings}
               onClose={() => setSettingsOpen(false)}
             />
           )}
@@ -1947,7 +2019,7 @@ export function SuperVoltorbFlipGame() {
                 size={32}
                 fullWidth
                 onUndo={settings.memoUndo ? undoMemo : undefined}
-                canUndo={canUndo}
+                canUndo={canUndo && undoAllowed}
               />
             </div>
             {game && <Scoreboard currentScore={displayCurrent} totalScore={displayTotal} />}
@@ -2046,7 +2118,7 @@ export function SuperVoltorbFlipGame() {
                   fullWidth
                   spread
                   onUndo={settings.memoUndo ? undoMemo : undefined}
-                  canUndo={canUndo}
+                  canUndo={canUndo && undoAllowed}
                 />
               </div>
             )}
@@ -2062,7 +2134,8 @@ export function SuperVoltorbFlipGame() {
                   peek={peek}
                   runPostFanfare={runPostFanfare}
                   onFlipDownStart={triggerLevelTransition}
-                  onMemoChange={settings.memoUndo ? recordMemo : undefined}
+                  onMemoChange={handleMemoChange}
+                  onLockChange={setBoardLocked}
                 />
                 <Footer />
               </>

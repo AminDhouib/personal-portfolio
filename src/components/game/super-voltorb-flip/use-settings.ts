@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "./settings";
 
 export function useSettings() {
@@ -8,12 +8,15 @@ export function useSettings() {
   const [settings, setSettings] = useState<Settings>(() =>
     typeof window === "undefined" ? { ...DEFAULT_SETTINGS } : loadSettings(),
   );
+  // The object last read or written: a changed object is a change to persist.
+  const persistedRef = useRef(settings);
   const update = useCallback((patch: Partial<Settings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      saveSettings(next);
-      return next;
-    });
+    setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
+  useEffect(() => {
+    if (settings === persistedRef.current) return;
+    persistedRef.current = settings;
+    saveSettings(settings);
+  }, [settings]);
   return [settings, update] as const;
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { storedVersionIsNewer } from "./stored-version";
 import { MAX_LEVEL } from "./hgss";
 
 // Local statistics. Their own key, never uploaded, display-only (DESIGN.md:
@@ -95,6 +96,8 @@ export function loadStats(): Stats {
 }
 
 export function saveStats(stats: Stats): void {
+  // A newer build wrote this: leave it alone rather than downgrade it.
+  if (storedVersionIsNewer(STATS_KEY)) return;
   safeLocalSet(STATS_KEY, JSON.stringify({ v: 1, ...stats }));
 }
 
@@ -104,6 +107,8 @@ export type RoundRecord = {
   coins: number;
   /** The level the round began at. */
   level: number;
+  /** The level after the result (the save moves it the moment a round ends). */
+  levelAfter?: number;
   assisted: boolean;
   /** Round length in whole seconds. */
   seconds: number;
@@ -117,7 +122,8 @@ export type RoundRecord = {
 export function recordRound(stats: Stats, round: RoundRecord): Stats {
   const next = structuredClone(stats);
   next.rounds.played = Math.min(COUNT_CAP, next.rounds.played + 1);
-  next.highestLevel = Math.max(next.highestLevel, Math.min(MAX_LEVEL, Math.max(1, round.level)));
+  const reached = Math.max(round.level, round.levelAfter ?? 0);
+  next.highestLevel = Math.max(next.highestLevel, Math.min(MAX_LEVEL, Math.max(1, reached)));
   if (round.level >= MAX_LEVEL) {
     const seconds = Math.min(LV8_SECONDS_PER_ROUND_CAP, Math.max(0, Math.floor(round.seconds)));
     next.lv8Seconds = Math.min(COUNT_CAP, next.lv8Seconds + seconds);
