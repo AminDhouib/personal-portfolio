@@ -865,6 +865,21 @@ function RunningView({
     ? "min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain"
     : "mt-6 min-w-0 lg:-m-1 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:p-1";
 
+  // Focus inside the pointerdown itself: iOS only summons the keyboard from a gesture.
+  const focusInput = useCallback(() => {
+    hiddenInputRef.current?.focus({ preventScroll: true });
+  }, [hiddenInputRef]);
+
+  // When the soft keyboard opens the sheet shrinks; keep the rule being worked on in view.
+  const keyboardOpen = viewport.keyboardOpen;
+  useEffect(() => {
+    if (!keyboardOpen) return;
+    const el = panelRef.current?.parentElement?.querySelector(".pg2-rule--active");
+    if (el instanceof HTMLElement && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }, [keyboardOpen, panelRef]);
+
   const play = (
     <div className={playClass}>
       <div ref={panelRef} data-testid="pg2-stage-card" className={cardClass}>
@@ -919,6 +934,7 @@ function RunningView({
                 boxRef={boxRef}
                 onCellClick={onCellClick}
                 onBoxClick={onBoxClick}
+                onBoxPointerDown={focusInput}
               />
               <div style={{ height: HUD_BOTTOM_H }} data-pg2-hud-bottom aria-hidden="true" />
 
@@ -926,6 +942,7 @@ function RunningView({
                   keydown preventDefault stops it from ever receiving those chars. */}
               <input
                 ref={hiddenInputRef}
+                data-testid="pg2-hidden-input"
                 onInput={onHiddenInput}
                 aria-hidden="true"
                 tabIndex={-1}
@@ -933,15 +950,7 @@ function RunningView({
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck={false}
-                style={{
-                  position: "absolute",
-                  width: 1,
-                  height: 1,
-                  opacity: 0,
-                  padding: 0,
-                  border: 0,
-                  left: -9999,
-                }}
+                className="absolute top-0 left-0 h-px w-px border-0 p-0 text-base opacity-0"
               />
             </>
           )}

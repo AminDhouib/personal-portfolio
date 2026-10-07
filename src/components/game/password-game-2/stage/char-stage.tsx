@@ -8,6 +8,8 @@ interface CharStageProps {
   boxRef?: RefObject<HTMLDivElement | null>;
   onCellClick: (id: number) => void;
   onBoxClick: () => void;
+  /** Fires on pointerdown, so the caller can focus the hidden input inside the gesture. */
+  onBoxPointerDown?: () => void;
 }
 
 /** Status → visual variant class. "normal"/"parasite" render as plain glyphs. */
@@ -54,6 +56,7 @@ export const CharStage = memo(function CharStage({
   boxRef,
   onCellClick,
   onBoxClick,
+  onBoxPointerDown,
 }: CharStageProps) {
   const clampedCaret = Math.max(0, Math.min(caret, cells.length));
 
@@ -86,6 +89,7 @@ export const CharStage = memo(function CharStage({
       role="textbox"
       aria-label="Password"
       aria-multiline="true"
+      onPointerDown={onBoxPointerDown}
       onMouseDown={(e) => {
         e.preventDefault();
         onBoxClick();

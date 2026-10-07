@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { GAMES, GAMES_BY_SLUG } from "../games-meta";
@@ -43,6 +43,10 @@ export const metadata = {
     description: CONTENT.seoDescription,
   },
 } satisfies Metadata;
+
+// The on-screen keyboard resizes only the visual viewport, never the layout viewport, so the
+// phone play sheet (which tracks visualViewport) is the one thing that reacts to it.
+export const viewport: Viewport = { interactiveWidget: "resizes-visual" };
 
 const jsonLd = graph(
   videoGameNode({
