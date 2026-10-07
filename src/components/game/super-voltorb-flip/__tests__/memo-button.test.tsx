@@ -44,4 +44,41 @@ describe("MemoBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear all memo flags" }));
     expect(onClear).toHaveBeenCalledTimes(1);
   });
+
+  it("grows the bar with the faces so a 44px face is a 44px target", () => {
+    render(
+      <MemoBar
+        activeFlags={new Set() as MemoFlagSet}
+        onToggle={() => {}}
+        onClear={() => {}}
+        size={44}
+        fullWidth
+        spread
+      />,
+    );
+    const group = screen.getByRole("group", { name: "Memo flags" });
+    expect(group.style.height).toBe("52px");
+    expect(group.classList.contains("w-full")).toBe(true);
+    expect(group.classList.contains("justify-between")).toBe(true);
+    for (const button of screen.getAllByRole("button")) {
+      const face = button.firstElementChild as HTMLElement;
+      expect(face.style.width).toBe("44px");
+      expect(face.style.height).toBe("44px");
+    }
+  });
+
+  it("keeps the 44px bar for the desktop 32px faces and does not spread them", () => {
+    render(
+      <MemoBar
+        activeFlags={new Set() as MemoFlagSet}
+        onToggle={() => {}}
+        onClear={() => {}}
+        size={32}
+        fullWidth
+      />,
+    );
+    const group = screen.getByRole("group", { name: "Memo flags" });
+    expect(group.style.height).toBe("44px");
+    expect(group.classList.contains("justify-between")).toBe(false);
+  });
 });

@@ -1834,24 +1834,24 @@ export function SuperVoltorbFlipGame() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-                    <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
-                    <PixelFullscreenButton
-                      active={fullscreenActive}
-                      onToggle={toggleFullscreen}
-                      size={44}
-                    />
-                  </div>
-                  <MemoBar
-                    activeFlags={memoFlags}
-                    onToggle={toggleMemoFlag}
-                    onClear={clearMemoFlags}
-                    size={28}
-                    showLabel={false}
+                <div className="flex items-center gap-2">
+                  <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+                  <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+                  <PixelFullscreenButton
+                    active={fullscreenActive}
+                    onToggle={toggleFullscreen}
+                    size={44}
                   />
                 </div>
+                <MemoBar
+                  activeFlags={memoFlags}
+                  onToggle={toggleMemoFlag}
+                  onClear={clearMemoFlags}
+                  size={44}
+                  showLabel={false}
+                  fullWidth
+                  spread
+                />
               </div>
             )}
             {game && (

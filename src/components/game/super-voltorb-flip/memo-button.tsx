@@ -46,6 +46,7 @@ export function MemoBar({
   size = 36,
   showLabel = true,
   fullWidth = false,
+  spread = false,
 }: {
   activeFlags: MemoFlagSet;
   onToggle: (f: MemoFlag) => void;
@@ -53,12 +54,15 @@ export function MemoBar({
   size?: number;
   showLabel?: boolean;
   fullWidth?: boolean;
+  spread?: boolean;
 }) {
   return (
     <div
       role="group"
       aria-label="Memo flags"
-      className={`flex h-11 ${fullWidth ? "w-full" : ""} items-center gap-1 rounded-[6px] border-2 border-gray-300 bg-white/95 px-1.5 outline outline-2 outline-gray-600`}
+      className={`flex ${fullWidth ? "w-full" : ""} ${spread ? "justify-between" : ""} items-center gap-1 rounded-[6px] border-2 border-gray-300 bg-white/95 px-1.5 outline outline-2 outline-gray-600`}
+      // 44px minimum; grows with large faces (4px border plus 4px of air).
+      style={{ height: Math.max(44, size + 8) }}
     >
       {showLabel && (
         <span className="pr-1 text-[10px] leading-none font-bold tracking-widest text-gray-500 uppercase">
