@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { generateLayout } from "../hgss";
-import { formatOdds, solve, validateClues, type LineClue, type SolverInput } from "../solver";
+import { BOARD_CONFIGS, generateLayout, isRejected } from "../hgss";
+import { ACCEPT_RATE, layoutCount } from "../solver-prior";
+import {
+  formatOdds,
+  hgssWeight,
+  solve,
+  validateClues,
+  type LineClue,
+  type SolverInput,
+} from "../solver";
 import type { CellValue } from "../types";
 
 function mulberry32(seed: number): () => number {
@@ -135,6 +143,90 @@ describe("solve", () => {
     );
     expect(best?.voltorb).toBe(minRisk);
     expect((best?.two ?? 0) + (best?.three ?? 0)).toBeGreaterThan(0);
+  });
+});
+
+describe("HGSS deal weighting", () => {
+  it("level-1 odds match how often each tile value actually occurs", () => {
+    const level = 1;
+    const deals = 2500;
+    const bins = 10;
+    const rng = mulberry32(11);
+    const values: CellValue[] = ["V", 1, 2, 3];
+    const sumP = Array<number>(bins).fill(0);
+    const hits = Array<number>(bins).fill(0);
+    const events = Array<number>(bins).fill(0);
+    for (let d = 0; d < deals; d++) {
+      const board = (level - 1) * 10 + Math.min(9, Math.floor(rng() * 10));
+      const cells = generateLayout(board, rng);
+      const result = solve({ ...cluesOf(cells), revealed: faceDown(), level });
+      if (result.status !== "solved") throw new Error(`board ${board} did not solve`);
+      result.tiles.forEach((t, i) => {
+        [t.voltorb, t.one, t.two, t.three].forEach((p, v) => {
+          const bin = Math.min(bins - 1, Math.floor(p * bins));
+          sumP[bin] = (sumP[bin] ?? 0) + p;
+          hits[bin] = (hits[bin] ?? 0) + (cells[i] === values[v] ? 1 : 0);
+          events[bin] = (events[bin] ?? 0) + 1;
+        });
+      });
+    }
+    for (let b = 0; b < bins; b++) {
+      const n = events[b] ?? 0;
+      if (n < 5000) continue;
+      expect(Math.abs((hits[b] ?? 0) / n - (sumP[b] ?? 0) / n), `bin ${b}`).toBeLessThan(0.03);
+    }
+  });
+
+  it("weighs two same-clue layouts by the boards that can deal each", () => {
+    // Boards 10 and 15 share card counts (7 Voltorbs, one 2, three 3s); 15 caps
+    // free multipliers on the whole board at 2 instead of 3. Swapping the
+    // values at the corners of a rectangle keeps every row and column clue, so
+    // find a layout and its swap twin that 10 accepts both of and 15 rejects
+    // only the twin. Weighed at the weighting-function level because other
+    // layouts also fit the same clues, which would blur an odds-level ratio.
+    const loose = BOARD_CONFIGS[10];
+    const tight = BOARD_CONFIGS[15];
+    if (!loose || !tight) throw new Error("missing configs");
+    const rng = mulberry32(5);
+    let pair: [CellValue[], CellValue[]] | null = null;
+    for (let n = 0; n < 3000 && !pair; n++) {
+      const a = generateLayout(10, rng);
+      if (isRejected(a, tight)) continue;
+      for (let r1 = 0; r1 < 5 && !pair; r1++) {
+        for (let r2 = r1 + 1; r2 < 5 && !pair; r2++) {
+          for (let c1 = 0; c1 < 5 && !pair; c1++) {
+            for (let c2 = c1 + 1; c2 < 5 && !pair; c2++) {
+              const x = a[r1 * 5 + c1] as CellValue;
+              const y = a[r1 * 5 + c2] as CellValue;
+              if (x === y || a[r2 * 5 + c1] !== y || a[r2 * 5 + c2] !== x) continue;
+              const b = a.slice();
+              b[r1 * 5 + c1] = y;
+              b[r1 * 5 + c2] = x;
+              b[r2 * 5 + c1] = x;
+              b[r2 * 5 + c2] = y;
+              if (!isRejected(b, loose) && isRejected(b, tight)) pair = [a, b];
+            }
+          }
+        }
+      }
+    }
+    if (!pair) throw new Error("no layout pair found");
+    const [a, b] = pair;
+    expect(cluesOf(a)).toEqual(cluesOf(b));
+
+    const inverse = (id: number) =>
+      1 /
+      (layoutCount(BOARD_CONFIGS[id] as (typeof BOARD_CONFIGS)[number]) * (ACCEPT_RATE[id] ?? 1));
+    // Level 2 allows boards 10 and 15 for these card counts, 1/10 each.
+    expect(hgssWeight(b, 2) / (0.1 * inverse(10))).toBeCloseTo(1, 9);
+    expect(hgssWeight(a, 2) / (0.1 * (inverse(10) + inverse(15)))).toBeCloseTo(1, 9);
+    const ratio = hgssWeight(a, 2) / hgssWeight(b, 2);
+    expect(ratio).toBeCloseTo(1 + inverse(15) / inverse(10), 9);
+    expect(ratio).toBeGreaterThan(1);
+    // Unknown level: still only boards 10 and 15 deal these counts, 1/80 each.
+    expect(hgssWeight(a, null) / hgssWeight(b, null)).toBeCloseTo(ratio, 9);
+    // A level with no board of these card counts cannot deal either layout.
+    expect(hgssWeight(a, 5)).toBe(0);
   });
 });
 
