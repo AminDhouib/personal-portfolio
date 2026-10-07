@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoBar, type MemoFlagSet } from "../memo-button";
+import { MemoBar, type MemoFlag, type MemoFlagSet } from "../memo-button";
 
 afterEach(cleanup);
 
@@ -80,5 +80,27 @@ describe("MemoBar", () => {
     const group = screen.getByRole("group", { name: "Memo flags" });
     expect(group.style.height).toBe("44px");
     expect(group.classList.contains("justify-between")).toBe(false);
+  });
+});
+
+describe("MemoBar undo", () => {
+  const base = { activeFlags: new Set<MemoFlag>(), onToggle: () => {}, onClear: () => {} };
+
+  it("has no Undo button unless onUndo is given", () => {
+    render(<MemoBar {...base} />);
+    expect(screen.queryByRole("button", { name: "Undo last memo" })).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(5);
+  });
+
+  it("adds a sixth button that is disabled when there is nothing to undo", () => {
+    const onUndo = vi.fn();
+    const { rerender } = render(<MemoBar {...base} onUndo={onUndo} canUndo={false} />);
+    const button = screen.getByRole("button", { name: "Undo last memo" });
+    expect(screen.getAllByRole("button")).toHaveLength(6);
+    expect(button).toBeDisabled();
+    rerender(<MemoBar {...base} onUndo={onUndo} canUndo />);
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(onUndo).toHaveBeenCalledTimes(1);
   });
 });

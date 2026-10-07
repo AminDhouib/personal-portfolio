@@ -47,6 +47,17 @@ export const GLYPH_CLEAR: Sprite = [
   "k.....k",
 ];
 
+/** The memo Undo mark: an arrow that turns back on itself. */
+export const GLYPH_UNDO: Sprite = [
+  "..k....",
+  ".kk....",
+  "kkkkkk.",
+  ".kk...k",
+  "..k...k",
+  ".....k.",
+  "..kkk..",
+];
+
 /** Sprite for each memo flag; "V" (Voltorb) is the orb itself. */
 export const GLYPHS = { 1: GLYPH_1, 2: GLYPH_2, 3: GLYPH_3, V: ORB } as const;
 

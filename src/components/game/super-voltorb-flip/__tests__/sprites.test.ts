@@ -5,6 +5,7 @@ import {
   GLYPH_2,
   GLYPH_3,
   GLYPH_CLEAR,
+  GLYPH_UNDO,
   ORB,
   PALETTE,
   spritePaths,
@@ -18,6 +19,7 @@ const ALL: [string, Sprite][] = [
   ["GLYPH_2", GLYPH_2],
   ["GLYPH_3", GLYPH_3],
   ["GLYPH_CLEAR", GLYPH_CLEAR],
+  ["GLYPH_UNDO", GLYPH_UNDO],
 ];
 
 describe("sprites", () => {
@@ -37,13 +39,15 @@ describe("sprites", () => {
     expect(silhouette).toEqual([...silhouette].reverse());
   });
 
-  it("glyph digits are 5 x 7 and the clear mark is 7 x 7", () => {
+  it("glyph digits are 5 x 7 and the clear and undo marks are 7 x 7", () => {
     for (const g of [GLYPH_1, GLYPH_2, GLYPH_3]) {
       expect(g).toHaveLength(7);
       expect(g[0]).toHaveLength(5);
     }
     expect(GLYPH_CLEAR).toHaveLength(7);
     expect(GLYPH_CLEAR[0]).toHaveLength(7);
+    expect(GLYPH_UNDO).toHaveLength(7);
+    expect(GLYPH_UNDO[0]).toHaveLength(7);
   });
 
   it("maps each memo flag to a sprite, with V as the orb", () => {
