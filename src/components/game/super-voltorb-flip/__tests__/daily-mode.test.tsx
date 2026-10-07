@@ -178,7 +178,8 @@ describe("the Daily board", () => {
       ctrlKey: true,
     });
     expect(dailyTile(1, 1).getAttribute("aria-label")).toContain("memo 3");
-  });
+    // Renders the whole game and a dialog; ~2.3 s under the coverage instrumentation.
+  }, 10_000);
 
   it("the main game's undo does nothing while the Daily screen is open", () => {
     render(<SuperVoltorbFlipGame />);
