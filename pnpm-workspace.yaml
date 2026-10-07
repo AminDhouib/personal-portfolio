@@ -25,3 +25,18 @@ overrides:
   # 7.0's one breaking change makes inserting nodes while iterating safe; the compiled
   # site CSS is byte-identical under 7.1.6.
   "@tailwindcss/typography>postcss-selector-parser": "^7.1.6"
+  # The rest of this block is dev only, all under @lhci/cli 0.15.1 (the latest), and each
+  # entry crosses a major its parent pins, scoped to that one parent.
+  # GHSA-ph9p-34f9-6g65 (high), GHSA-52f5-9888-hmc6 (low). tmp 0.2.x keeps the fileSync and
+  # tmpNameSync calls these parents make; 0.2.4+ only refuses a `dir` outside the temp
+  # directory, and neither parent passes one. lhci uses tmp only in `lhci open`,
+  # external-editor only in the `lhci wizard` prompt.
+  "@lhci/cli>tmp": "^0.2.6"
+  "external-editor>tmp": "^0.2.6"
+  # GHSA-w5hq-g745-h8pq (moderate). lhci collect calls uuid.v4() only; 11.x still ships the
+  # CommonJS build lhci requires.
+  "@lhci/cli>uuid": "^11.1.1"
+  # GHSA-c475-qrg2-pj4r (high) and GHSA-5rfr-xx34-2xxv. get-uri (proxy-agent's PAC loader)
+  # pins ^5.3.1, even in its latest release. 6.0's one breaking change refuses an FTP
+  # server's separate transfer host by default.
+  "get-uri>basic-ftp": "^6.2.2"
