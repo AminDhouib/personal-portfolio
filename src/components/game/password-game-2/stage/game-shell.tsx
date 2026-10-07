@@ -340,7 +340,7 @@ export function GameShell() {
       // this, Space is preventDefault-ed and typed, breaking Space-activation. The
       // hidden mobile input is deliberately NOT in this list — it is the game
       // surface, so desktop typing/Backspace still routes here when it has focus.
-      const t = e.target as HTMLElement | null;
+      const t = e.target instanceof Element ? e.target : null;
       if (t?.closest("button, a, select, textarea, [role=button]")) return;
       const g = gameRef.current;
       if (!g) return;

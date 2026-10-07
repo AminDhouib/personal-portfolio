@@ -87,3 +87,42 @@ describe("GameShell global keydown scope", () => {
     expect(cellCount()).toBe(0);
   });
 });
+
+/** Synthetic keydowns can target the window or document, which have no .closest. */
+describe("GameShell keydown from a non-Element target", () => {
+  beforeEach(() => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    vi.stubGlobal("requestAnimationFrame", () => 0);
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("ignores keydowns whose target is not an Element (no TypeError)", () => {
+    const errors: unknown[] = [];
+    const onError = (e: ErrorEvent) => errors.push(e.error);
+    window.addEventListener("error", onError);
+    try {
+      const { getByRole } = render(<GameShell />);
+      fireEvent.click(getByRole("button", { name: /random seed/i }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "a" }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "b", bubbles: true }));
+      expect(errors).toEqual([]);
+    } finally {
+      window.removeEventListener("error", onError);
+    }
+  });
+});
