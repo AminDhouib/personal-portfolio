@@ -10,9 +10,8 @@
  *
  * Coordinates are CSS pixels relative to the canvas origin (= panel border box).
  * The overlay pre-scales the context by devicePixelRatio, so painters think in CSS
- * px. Painters are pure functions of (data, layout, time); the only retained state
- * is a tiny per-instance animation store (ANIM) for effects that need a previous
- * value (a campfire hop, a parasite glyph). Keep per-frame allocation low.
+ * px. Painters are pure functions of (data, layout, time) with no retained state.
+ * Keep per-frame allocation low.
  */
 
 import type { EventInstance, GameState, PointerTarget } from "../engine/types";
@@ -72,17 +71,6 @@ const AMBER = "#fbbf24"; // chrome
 
 // --- shared helpers -----------------------------------------------------------
 
-/** Tiny retained animation state, keyed by the live event instance. */
-const ANIM = new WeakMap<object, Record<string, number>>();
-function anim(inst: object): Record<string, number> {
-  let a = ANIM.get(inst);
-  if (!a) {
-    a = {};
-    ANIM.set(inst, a);
-  }
-  return a;
-}
-
 function rectOfIndex(layout: StageLayout, g: GameState, i: number): RectLike | undefined {
   const cell = g.cells[i];
   if (!cell) return undefined;
@@ -130,36 +118,6 @@ function roundRect(
   ctx.closePath();
 }
 
-/** A small labelled action chip (feed / stoke / basket), returns its rect. */
-function chip(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  label: string,
-  color: string,
-  ready: boolean,
-): RectLike {
-  const w = 22 + label.length * 8.5;
-  const h = 30;
-  ctx.save();
-  withGlow(ctx, color, ready ? 14 : 0, () => {
-    roundRect(ctx, x, y, w, h, 8);
-    ctx.fillStyle = ready ? color : "rgba(148,163,184,0.55)";
-    ctx.fill();
-  });
-  roundRect(ctx, x, y, w, h, 8);
-  ctx.strokeStyle = "rgba(15,23,42,0.35)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.fillStyle = "#0b1220";
-  ctx.font = "700 13px ui-sans-serif, system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, x + w / 2, y + h / 2 + 0.5);
-  ctx.restore();
-  return { x, y, w, h };
-}
-
 /**
  * A shared crisis-meter idiom: a labelled horizontal bar with an optional
  * pass/fail threshold tick and a right-aligned readout. Full width is `max`, the
@@ -186,12 +144,10 @@ const METER_BAR_H = 6;
 // boxRect and their always-on HUD elements would otherwise share coordinates.
 // Crisis meters never draw on the password: they live in the reserved bands
 // hudSlots() derives from the box, stacked in the top band's left column (row 0
-// garden HIVE, row 1 gerald GERALD; campfire FUEL keeps its own bottom band); action chips
-// stack in a top-right column (row 0 gerald FEED at box.y + 12, row 1 garden
-// BASKET, row 2 campfire STOKE). Any new always-on element claims the next free
-// slot — never reuse one.
+// garden HIVE, row 1 gerald GERALD; campfire FUEL keeps its own bottom band).
+// The action chips (FEED, BASKET, STOKE) are DOM buttons in hud-actions.tsx, not
+// canvas art. Any new always-on meter claims the next free slot - never reuse one.
 const METER_ROW_H = 22; // vertical stride between stacked crisis meters
-const CHIP_ROW_H = 38; // vertical stride between stacked action chips (chip h 30 + gap)
 const METER_W = 120; // crisis meter bar width
 const METER_PAD = 16; // inset of a meter from its band's left edge
 const METER_ROW_Y = 22; // first meter bar sits this far below the top of its band
@@ -300,7 +256,7 @@ function bubble(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
 const GERALD_MURKY_AT = 85;
 const GERALD_HUNGRY_AT = 60;
 
-const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
+const paintGerald: Painter = (ctx, inst, layout, _g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as GeraldData;
@@ -366,10 +322,6 @@ const paintGerald: Painter = (ctx, inst, layout, g, tMs, hits) => {
       color: loud ? `rgba(248,113,113,${pulse})` : GREEN,
     });
   }
-
-  // Feed chip — chip row 0 (top-right) per the slot convention.
-  const c = chip(ctx, box.x + box.w - 92, box.y + 12, "FEED", GREEN, true);
-  pushRect(hits, c.x, c.y, c.w, c.h, { kind: "feed-button" });
 };
 
 // --- campfire -----------------------------------------------------------------
@@ -394,7 +346,7 @@ function drawFlame(
   ctx.fill();
 }
 
-const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
+const paintCampfire: Painter = (ctx, inst, layout, _g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as CampfireData;
@@ -484,26 +436,6 @@ const paintCampfire: Painter = (ctx, inst, layout, g, tMs, hits) => {
       color: d.fuel < 25 ? RED : "#f59e0b",
     });
   }
-
-  // Stoke chip — chip row 2 (top-right) per the slot convention; hops when
-  // buttonHops changes.
-  const a = anim(inst);
-  if (a.hops !== d.buttonHops) {
-    a.hops = d.buttonHops;
-    a.hopAt = tMs;
-  }
-  const hopT = a.hopAt ? Math.max(0, 1 - (tMs - a.hopAt) / 360) : 0;
-  const hop = Math.sin(hopT * Math.PI) * 8;
-  const ready = g.elapsedMs >= d.stokeReadyAtMs;
-  const c = chip(
-    ctx,
-    box.x + box.w - 96,
-    box.y + 12 + 2 * CHIP_ROW_H - hop,
-    "STOKE",
-    "#f59e0b",
-    ready,
-  );
-  pushRect(hits, c.x, c.y, c.w, c.h, { kind: "stoke-button" });
 };
 
 // --- garden -------------------------------------------------------------------
@@ -593,7 +525,7 @@ const HIVE_THRESHOLD = 40;
 const GARDEN_RAID_MS = 6000;
 const GARDEN_TELEGRAPH_MS = 8000;
 
-const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
+const paintGarden: Painter = (ctx, inst, layout, g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as GardenData;
@@ -671,33 +603,6 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs, hits) => {
     const t = Math.min(1, inst.phaseElapsedMs / 800);
     const bx = box.x - 40 + t * (box.w * 0.4 + 40);
     drawBear(ctx, bx, box.y + box.h * 0.5 + Math.sin(tMs / 200) * 4, 1.1, 1);
-  }
-
-  // Basket chip — chip row 1 (top-right, below gerald FEED) per the slot
-  // convention; lit while the bear is telegraphed or raiding, dimmed with a
-  // "bear away" sub-label otherwise.
-  const active = d.bearState !== "away";
-  const label = active ? "THROW BASKET" : "BASKET";
-  const chipW = 22 + label.length * 8.5;
-  const c = chip(
-    ctx,
-    box.x + box.w - chipW - 12,
-    box.y + 12 + CHIP_ROW_H,
-    label,
-    active ? "#16a34a" : GREEN,
-    active,
-  );
-  pushRect(hits, c.x, c.y, c.w, c.h, { kind: "basket-button" });
-  if (!active) {
-    // Sub-label sits LEFT of the chip, not below it: the row beneath belongs to
-    // the campfire STOKE slot per the chip-column convention.
-    ctx.save();
-    ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillStyle = "rgba(148,163,184,0.85)";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillText("bear away", c.x - 6, c.y + c.h / 2);
-    ctx.restore();
   }
 };
 

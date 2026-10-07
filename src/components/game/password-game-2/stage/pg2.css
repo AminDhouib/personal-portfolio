@@ -1642,3 +1642,27 @@
     opacity: 0.85;
   }
 }
+
+/* ---- Stage shell: HUD bands and action chips ------------------------------ */
+
+/* Event action chips (feed / basket / stoke): real buttons, 44 px targets. The
+   family colour is set inline while a chip is lit; idle is the muted slate. */
+.pg2-hudchip {
+  color: #0b1220;
+  border: 1px solid rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.pg2-hudchip--ready {
+  box-shadow: 0 0 14px -2px rgba(15, 23, 42, 0.35);
+}
+.pg2-hudchip--ready:hover {
+  filter: brightness(1.06);
+}
+.pg2-hudchip--idle {
+  background: rgba(148, 163, 184, 0.55);
+}
+.pg2-hudchip:focus-visible {
+  outline: 2px solid var(--pg2-primary);
+  outline-offset: 2px;
+}
