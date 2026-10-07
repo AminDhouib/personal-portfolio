@@ -25,6 +25,41 @@ describe("parseProgress", () => {
     expect(parseProgress({ currentLevel: -3, totalScore: 5 })?.currentLevel).toBe(1);
   });
 
+  it("clamps a saved Lv.9 to Lv.8 (HGSS has eight levels)", () => {
+    expect(parseProgress({ currentLevel: 9, totalScore: 10 })).toEqual({
+      currentLevel: 8,
+      totalScore: 10,
+    });
+  });
+
+  it("keeps a valid five-round history", () => {
+    const history = Array.from({ length: 5 }, (_, i) => ({
+      outcome: "won",
+      cardsFlipped: 8 + i,
+      boardId: 40 + i,
+    }));
+    expect(parseProgress({ currentLevel: 5, totalScore: 0, history })).toEqual({
+      currentLevel: 5,
+      totalScore: 0,
+      history,
+    });
+  });
+
+  it("drops a malformed history but keeps the level and coins", () => {
+    for (const history of [
+      [{ outcome: "won", cardsFlipped: 8, boardId: 40 }],
+      Array(5).fill({ outcome: "exploded", cardsFlipped: 8, boardId: 40 }),
+      Array(5).fill({ outcome: "won", cardsFlipped: 8, boardId: 80 }),
+      Array(5).fill({ outcome: "won", cardsFlipped: 26, boardId: 1 }),
+      "nope",
+    ]) {
+      expect(parseProgress({ currentLevel: 3, totalScore: 7, history })).toEqual({
+        currentLevel: 3,
+        totalScore: 7,
+      });
+    }
+  });
+
   it("returns null for null, strings, arrays and missing fields", () => {
     expect(parseProgress(null)).toBeNull();
     expect(parseProgress("nope")).toBeNull();

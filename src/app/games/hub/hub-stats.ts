@@ -47,7 +47,7 @@ const MAX_STAT = 10_000_000;
 // Mirror MAX_LEVEL and MAX_TOTAL_SCORE in super-voltorb-flip/progress.ts. That module
 // imports zod, which this client island must not pull in; hub-stats.test.ts pins the two
 // together, case by case, against the game's own schema.
-const SVF_MAX_LEVEL = 9;
+const SVF_MAX_LEVEL = 8;
 const SVF_MAX_COINS = 99_999;
 
 const BEST_LABEL = "Best on this device";
