@@ -64,6 +64,26 @@ describe("GameAbout", () => {
     expect(screen.getByText("Written by Amin Dhouib.").closest("a")).toBeNull();
   });
 
+  it("lists related pages under a More heading only when the content has links", () => {
+    const { rerender } = render(<GameAbout title="Hextris" content={content} />);
+    expect(screen.queryByRole("heading", { level: 3, name: "More" })).toBeNull();
+    rerender(
+      <GameAbout
+        title="Hextris"
+        content={{
+          ...content,
+          links: [{ label: "Solver", href: "/games/hextris/solver", description: "Odds." }],
+        }}
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 3, name: "More" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Solver" })).toHaveAttribute(
+      "href",
+      "/games/hextris/solver",
+    );
+    expect(screen.getByText("Odds.")).toBeInTheDocument();
+  });
+
   it("marks the section for the E2E word-count gate", () => {
     const { container } = render(<GameAbout title="Hextris" content={content} />);
     expect(container.querySelector("section[data-game-about]")).not.toBeNull();

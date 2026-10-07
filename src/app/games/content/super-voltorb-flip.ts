@@ -105,6 +105,13 @@ export const superVoltorbFlipContent: GameContent = {
         "Yes. Quit banks the coins you have found so far after you confirm. Your level then moves as it does after a loss, by the number of tiles you flipped.",
     },
   ],
+  links: [
+    {
+      label: "Voltorb Flip solver",
+      href: "/games/super-voltorb-flip/solver",
+      description: "Type in a board's clue numbers and see the odds for every tile.",
+    },
+  ],
   credits: [
     {
       label: "Original game",

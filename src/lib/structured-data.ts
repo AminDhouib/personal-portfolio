@@ -204,6 +204,35 @@ export function videoGameNode(game: {
   };
 }
 
+/**
+ * A free in-browser tool page (not a game), made by the Person; the image is
+ * the page's file-based Open Graph card.
+ */
+export function webApplicationNode(app: {
+  name: string;
+  description: string;
+  /** Site-relative page path, e.g. "/games/super-voltorb-flip/solver". */
+  path: string;
+}): JsonLdNode {
+  const url = `${SITE_ORIGIN}${app.path}`;
+  return {
+    "@type": "WebApplication",
+    "@id": `${url}#app`,
+    name: app.name,
+    description: app.description,
+    url,
+    image: `${url}/opengraph-image`,
+    applicationCategory: "UtilitiesApplication",
+    browserRequirements: "Requires JavaScript",
+    operatingSystem: "Any",
+    inLanguage: "en",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+    author: { "@id": PERSON_ID },
+    publisher: { "@id": PERSON_ID },
+  };
+}
+
 export function gameListNode(games: readonly { title: string; slug: string }[]): JsonLdNode {
   return {
     "@type": "ItemList",
