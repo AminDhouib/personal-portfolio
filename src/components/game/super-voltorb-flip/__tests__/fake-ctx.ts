@@ -2,7 +2,7 @@
 // CtxLike and keeps what the scheduler asked for so tests can assert on it.
 
 export interface ParamCall {
-  m: "set" | "lin" | "exp";
+  m: "set" | "lin" | "exp" | "cancel";
   v: number;
   t: number;
 }
@@ -13,6 +13,7 @@ export interface FakeParam {
   setValueAtTime(v: number, t: number): FakeParam;
   linearRampToValueAtTime(v: number, t: number): FakeParam;
   exponentialRampToValueAtTime(v: number, t: number): FakeParam;
+  cancelScheduledValues(t: number): FakeParam;
 }
 
 function param(): FakeParam {
@@ -31,24 +32,50 @@ function param(): FakeParam {
       p.calls.push({ m: "exp", v, t });
       return p;
     },
+    cancelScheduledValues(t) {
+      p.calls.push({ m: "cancel", v: 0, t });
+      return p;
+    },
   };
   return p;
 }
 
-export interface FakeSource {
+interface Disconnectable {
+  disconnected: number;
+  connect(d: unknown): void;
+  disconnect(): void;
+}
+
+function node<T extends object>(extra: T): T & Disconnectable {
+  const n: T & Disconnectable = {
+    ...extra,
+    disconnected: 0,
+    connect() {},
+    disconnect() {
+      n.disconnected++;
+    },
+  };
+  return n;
+}
+
+export interface FakeSource extends Disconnectable {
   type: string;
   frequency: FakeParam;
   buffer: { getChannelData(c: number): Float32Array } | null;
   started: number[];
   stopped: number[];
-  connect(d: unknown): void;
+  onended: ((ev: Event) => void) | null;
   start(t: number): void;
   stop(t: number): void;
 }
 
-export interface FakeGain {
+export interface FakeGain extends Disconnectable {
   gain: FakeParam;
-  connect(d: unknown): void;
+}
+
+export interface FakeFilter extends Disconnectable {
+  type: string;
+  frequency: FakeParam;
 }
 
 export interface FakeCtx {
@@ -56,21 +83,21 @@ export interface FakeCtx {
   sampleRate: number;
   state: string;
   resumed: number;
-  destination: { connect(d: unknown): void };
+  destination: Disconnectable;
   oscillators: FakeSource[];
   noiseSources: FakeSource[];
   gains: FakeGain[];
+  filters: FakeFilter[];
   resume(): Promise<void>;
   createGain(): FakeGain;
   createOscillator(): FakeSource;
-  createBiquadFilter(): { type: string; frequency: FakeParam; connect(d: unknown): void };
-  createDynamicsCompressor(): {
+  createBiquadFilter(): FakeFilter;
+  createDynamicsCompressor(): Disconnectable & {
     threshold: FakeParam;
     knee: FakeParam;
     ratio: FakeParam;
     attack: FakeParam;
     release: FakeParam;
-    connect(d: unknown): void;
   };
   createBuffer(
     channels: number,
@@ -81,20 +108,20 @@ export interface FakeCtx {
 }
 
 function source(): FakeSource {
-  const s: FakeSource = {
+  const s: FakeSource = node<Omit<FakeSource, keyof Disconnectable>>({
     type: "sine",
     frequency: param(),
     buffer: null,
     started: [],
     stopped: [],
-    connect() {},
+    onended: null,
     start(t) {
       s.started.push(t);
     },
     stop(t) {
       s.stopped.push(t);
     },
-  };
+  });
   return s;
 }
 
@@ -104,16 +131,17 @@ export function makeFakeCtx(): FakeCtx {
     sampleRate: 8000,
     state: "running",
     resumed: 0,
-    destination: { connect() {} },
+    destination: node({}),
     oscillators: [],
     noiseSources: [],
     gains: [],
+    filters: [],
     resume() {
       ctx.resumed++;
       return Promise.resolve();
     },
     createGain() {
-      const g: FakeGain = { gain: param(), connect() {} };
+      const g: FakeGain = node({ gain: param() });
       ctx.gains.push(g);
       return g;
     },
@@ -123,17 +151,18 @@ export function makeFakeCtx(): FakeCtx {
       return o;
     },
     createBiquadFilter() {
-      return { type: "lowpass", frequency: param(), connect() {} };
+      const f: FakeFilter = node({ type: "lowpass", frequency: param() });
+      ctx.filters.push(f);
+      return f;
     },
     createDynamicsCompressor() {
-      return {
+      return node({
         threshold: param(),
         knee: param(),
         ratio: param(),
         attack: param(),
         release: param(),
-        connect() {},
-      };
+      });
     },
     createBuffer(_channels, length) {
       return { getChannelData: () => new Float32Array(length) };

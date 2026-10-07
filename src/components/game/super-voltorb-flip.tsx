@@ -31,8 +31,10 @@ import {
   stopGameOver,
   playLevelWin,
   stopLevelWin,
+  stopAllCues,
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
+import { RISK_WARNING_MS } from "./super-voltorb-flip/sound-cues";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { loadProgress } from "./super-voltorb-flip/progress";
 import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
@@ -706,9 +708,9 @@ const Gameboard = ({
     if (highRisk) {
       // Lock the board, shake the targeted tile, fire the fanfare, wait
       // for it to finish, then pause 500ms before committing the flip.
-      // sfx.riskWarning() returns a promise that resolves on the audio
-      // element's `ended` event, so the reveal lands cleanly after the
-      // music — works for voltorb and coin tiles alike.
+      // sfx.riskWarning() returns a promise that resolves when the cue ends
+      // (RISK_WARNING_MS, with or without an AudioContext), so the reveal
+      // lands cleanly after the fanfare; works for voltorb and coin tiles alike.
       warningTileRef.current = { row, col };
       setWarningTile({ row, col });
       const release = () => {
@@ -721,9 +723,9 @@ const Gameboard = ({
           window.setTimeout(release, 500);
         });
       } else {
-        // Muted — match the canonical fanfare length so timing stays
-        // consistent regardless of audio state.
-        window.setTimeout(release, 2100);
+        // Muted: wait out the same fanfare length plus the same 500ms beat so
+        // timing stays consistent regardless of audio state.
+        window.setTimeout(release, RISK_WARNING_MS + 500);
       }
       return;
     }
@@ -1406,6 +1408,7 @@ export function SuperVoltorbFlipGame() {
       stopMusic();
       stopGameOver();
       stopLevelWin();
+      stopAllCues();
       musicStartedRef.current = false;
     };
   }, []);
@@ -1685,9 +1688,9 @@ export function SuperVoltorbFlipGame() {
       }, 320);
     }
     if ((cur === "win" && prev !== "win") || (cur === "quit" && prev !== "quit")) {
-      // Fade the loop so the level-win song plays cleanly (a quit fades too, so
+      // Fade the loop so the clear fanfare plays cleanly (a quit fades too, so
       // the payout is not played over the loop); Gameboard handles actually
-      // starting music_level_win.
+      // starting the clear fanfare.
       fadeOutMusic(250);
     }
     if ((prev === "win" || prev === "lose" || prev === "quit") && cur === "playing") {

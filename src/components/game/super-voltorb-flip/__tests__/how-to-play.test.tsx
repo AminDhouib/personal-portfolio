@@ -16,6 +16,7 @@ vi.mock("../audio", () => ({
   stopGameOver: () => {},
   playLevelWin: () => {},
   stopLevelWin: () => {},
+  stopAllCues: () => {},
   setMusicMuted: () => {},
 }));
 

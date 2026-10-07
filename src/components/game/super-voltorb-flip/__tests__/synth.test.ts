@@ -20,12 +20,17 @@ describe("createMaster", () => {
     expect(live.out.gain.value).toBe(1);
   });
 
-  it("setMasterMuted flips the master gain immediately", () => {
-    const master = createMaster(makeFakeCtx(), false);
+  it("setMasterMuted ramps the master gain instead of stepping it", () => {
+    const ctx = makeFakeCtx();
+    ctx.currentTime = 2;
+    const master = createMaster(ctx, false);
     setMasterMuted(master, true);
-    expect(master.out.gain.value).toBe(0);
-    setMasterMuted(master, false);
+    const calls = ctx.gains[0]!.gain.calls;
+    expect(calls[calls.length - 1]).toEqual({ m: "lin", v: 0, t: 2.01 });
+    expect(calls.some((c) => c.m === "set" && c.t === 2)).toBe(true);
     expect(master.out.gain.value).toBe(1);
+    setMasterMuted(master, false);
+    expect(calls[calls.length - 1]).toEqual({ m: "lin", v: 1, t: 2.01 });
   });
 });
 
@@ -74,14 +79,50 @@ describe("scheduleCue", () => {
     }
   });
 
-  it("stop() halts every voice at the current context time", () => {
+  it("stop() fades every voice over about 10 ms, then halts it", () => {
     const ctx = makeFakeCtx();
     const master = createMaster(ctx, false);
     const handle = scheduleCue(ctx, master.out, CUE, 0);
     ctx.currentTime = 0.3;
     handle.stop();
     for (const s of [...ctx.oscillators, ...ctx.noiseSources]) {
-      expect(s.stopped[s.stopped.length - 1]).toBe(0.3);
+      expect(s.stopped[s.stopped.length - 1]).toBeCloseTo(0.312, 6);
     }
+    for (const g of ctx.gains.slice(1)) {
+      const last = g.gain.calls[g.gain.calls.length - 1]!;
+      expect(last.m).toBe("lin");
+      expect(last.v).toBe(0);
+      expect(last.t).toBeCloseTo(0.31, 6);
+    }
+  });
+
+  it("gives every noise hit a short linear attack before it decays", () => {
+    const ctx = makeFakeCtx();
+    const master = createMaster(ctx, false);
+    scheduleCue(ctx, master.out, CUE, 0);
+    // gains[0] is the master; the cue has two notes, then one noise hit.
+    const noiseGain = ctx.gains[3]!;
+    expect(noiseGain.gain.calls[0]).toEqual({ m: "set", v: 0.0001, t: 0.05 });
+    expect(noiseGain.gain.calls[1]!.m).toBe("lin");
+    expect(noiseGain.gain.calls[1]!.v).toBe(0.1);
+    expect(noiseGain.gain.calls[1]!.t).toBeGreaterThan(0.05);
+    expect(noiseGain.gain.calls[1]!.t).toBeLessThanOrEqual(0.055);
+    expect(noiseGain.gain.calls[2]!.m).toBe("exp");
+  });
+
+  it("disconnects each voice from the graph when its source ends", () => {
+    const ctx = makeFakeCtx();
+    const master = createMaster(ctx, false);
+    scheduleCue(ctx, master.out, CUE, 0);
+    const osc = ctx.oscillators[0]!;
+    const noise = ctx.noiseSources[0]!;
+    expect(osc.onended).toBeTypeOf("function");
+    osc.onended?.(new Event("ended"));
+    noise.onended?.(new Event("ended"));
+    expect(osc.disconnected).toBe(1);
+    expect(ctx.gains[1]!.disconnected).toBe(1);
+    expect(noise.disconnected).toBe(1);
+    expect(ctx.filters[0]!.disconnected).toBe(1);
+    expect(ctx.gains[3]!.disconnected).toBe(1);
   });
 });

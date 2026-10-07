@@ -383,9 +383,10 @@ current tree on 2026-07-07.
   (scheduled by `synth.ts`, behind the `audio.ts` facade); no ripped game audio ships. The
   background loop is one of three CC0 tracks picked by level band in `music.ts` (Lv.1-3, 4-6,
   7-8), with per-track volumes trimmed to equal loudness. A cue's `ms` is what the round flow
-  waits on: the win sequence awaits the clear fanfare, the risk fanfare locks the board for exactly
-  `RISK_WARNING_MS` (2100, the same figure the muted path waits, so muted and unmuted pacing
-  match), and `sfx.*` promises resolve at the cue's end even with no `AudioContext`. Changing a
+  waits on: the win sequence awaits the clear fanfare, the risk fanfare locks the board for
+  `RISK_WARNING_MS` (2100) plus a 500 ms beat before the flip commits (muted waits the same
+  `RISK_WARNING_MS + 500`, so muted and unmuted pacing match; `__tests__/audio-timing.test.tsx`
+  pins both), and `sfx.*` promises resolve at the cue's end even with no `AudioContext`. Changing a
   cue length is a gameplay-timing change, not a sound tweak. The synth helpers are copied from
   Password Game 2's rather than imported, by the cross-game convention.
   `__tests__/assets-guard.test.ts` fails if ripped audio paths, unreferenced files or
