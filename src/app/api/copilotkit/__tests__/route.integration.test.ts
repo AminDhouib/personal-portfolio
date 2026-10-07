@@ -11,7 +11,7 @@
  * somewhere new fails loudly here instead of reaching the internet.
  *
  * The request envelopes below are the single-route shapes the installed client
- * (@copilotkitnext/core ProxiedCopilotRuntimeAgent) really sends: a JSON POST of
+ * (ProxiedCopilotRuntimeAgent in @copilotkitnext/core, now @copilotkit/core) really sends: a JSON POST of
  * `{ method, params?, body? }` where `body` is an AG-UI RunAgentInput.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -127,7 +127,7 @@ function makeReq(envelope: unknown, signal?: AbortSignal): NextRequest {
 // run gets its own thread, as a real chat does.
 let runCounter = 0;
 
-/** The agent/run envelope the 1.54 client sends for one chat turn. */
+/** The agent/run envelope the client sends for one chat turn. */
 function runEnvelope(text: string, runId = `run-${(runCounter += 1)}`) {
   return {
     method: "agent/run",
@@ -330,8 +330,10 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     const events = parseSse(await readBody(second));
 
     expect(upstreamCalls).toHaveLength(2);
-    const secondSignal = upstreamCalls[1]?.init?.signal;
-    expect(secondSignal?.aborted).toBe(false);
+    // The fake refuses to record a call whose signal is already aborted, so a
+    // second call being recorded at all means it was made with a live signal.
+    // (Its signal may well be aborted again by now: the runtime tears the run
+    // down when it finishes.)
     expect(events.at(-1)?.type).toBe("RUN_FINISHED");
     expect(events.some((e) => e.type === "RUN_ERROR")).toBe(false);
     expect(JSON.stringify(upstreamCalls[1]?.body)).toContain("second");

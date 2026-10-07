@@ -5,8 +5,8 @@ import { CopilotChat, useCopilotChatSuggestions } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 import { useLeadCollectorAction } from "@/hooks/use-lead-collector-action";
 
-// The assistant's grounding is not passed here: on CopilotKit 1.54's AG-UI chat
-// path the `instructions` prop never reaches the model. The system prompt is
+// The assistant's grounding is not passed here: on CopilotKit's AG-UI chat
+// path (1.54 through 1.77) the `instructions` prop never reaches the model. The system prompt is
 // built from the typed site data in src/lib/amin-ai-prompt.ts and injected
 // server-side in src/app/api/copilotkit/route.ts instead.
 

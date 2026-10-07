@@ -8,8 +8,9 @@
  * apart between the widget and the /ai page.
  *
  * Delivery: this prompt is injected SERVER-SIDE, in the copilotkit route, not
- * via CopilotKit's client `instructions` prop. In CopilotKit 1.54 the chat UI
- * runs on the AG-UI stack (`@copilotkitnext/core` + `@ag-ui/client`); the legacy
+ * via CopilotKit's client `instructions` prop. Since CopilotKit 1.54 (re-checked
+ * on 1.77) the chat UI runs on the AG-UI stack (`@copilotkit/core`, formerly
+ * `@copilotkitnext/core`, + `@ag-ui/client`); the legacy
  * `instructions` prop is captured into a React context value (`chatInstructions`)
  * that the AG-UI run path never reads, so it never reaches the model. The route
  * merges `buildAminAiSystemPrompt()` into the outbound OpenRouter request via
