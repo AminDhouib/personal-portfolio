@@ -8,8 +8,12 @@ describe("QuitConfirm", () => {
   it("states the coins a quit would bank and confirms", () => {
     const onConfirm = vi.fn();
     render(<QuitConfirm coins={48} onConfirm={onConfirm} onCancel={() => {}} />);
-    expect(screen.getByRole("alertdialog", { name: "Quit this round?" })).toBeTruthy();
-    expect(screen.getByText("Quit now and you keep 48 coins.")).toBeTruthy();
+    expect(
+      screen.getByRole("alertdialog", {
+        name: "Quit this round?",
+        description: "Quit now and you keep 48 coins.",
+      }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Quit" }));
     expect(onConfirm).toHaveBeenCalledOnce();
   });
