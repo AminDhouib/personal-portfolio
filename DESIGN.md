@@ -447,6 +447,12 @@ current tree on 2026-07-07.
   typed in the AI chat; the one document-level listener (the round-end wait) skips text fields via
   `isTextEntryTarget`. `1`, `2`, `3`, `V` mark the tile under the cursor without changing the memo
   bar's selection. Edges clamp rather than wrap. Do not move the handler to `document`.
+- **Super Voltorb Flip's mount-time music start waits for the page `load` event, and a blocked loop
+  retries on the first gesture** (`startup.ts` `afterPageLoad`, `audio.ts` `retryMusicOnGesture`).
+  The MP3 fetch used to start during page load; it is now off the load path. This was not an LCP
+  fix: the LCP of the game page was already the server-rendered tagline, not the game.
+  `e2e/voltorb-lcp.spec.ts` observes the page's LCP in a real browser and asserts the element is
+  page content, not the game. Do not move the music start back into the hydration effect.
 - **Super Voltorb Flip's face-down tile labels include its memo marks** ("Row 1, Col 1, face down,
   memo 2, V") and flips are spoken through one polite live region. The announcement only ever
   carries a tile that has already been flipped, so it never leaks a hidden value (the leak guard
