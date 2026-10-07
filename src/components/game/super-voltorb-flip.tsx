@@ -1182,6 +1182,8 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
               <li>{instructions[0]}</li>
               <li>{instructions[1]}</li>
               <li>{instructions[2]}</li>
+              <li>{instructions[3]}</li>
+              <li>{instructions[4]}</li>
             </ul>
             <div className="mt-3 flex items-center justify-around gap-3 rounded-md bg-[#eef5ef] p-3">
               <div className="flex flex-col items-center gap-1">
