@@ -9,6 +9,7 @@ overrides:
   '@ai-sdk/provider-utils@>=4.0.0 <4.0.33': 4.0.57
   qs@>=6.11.1 <6.16.0: ^6.16.0
   '@tailwindcss/typography>postcss-selector-parser': ^7.1.6
+  katex@>=0.11.0 <0.18.2: 0.18.3
   '@lhci/cli>tmp': ^0.2.6
   external-editor>tmp: ^0.2.6
   '@lhci/cli>uuid': ^11.1.1
@@ -5453,8 +5454,8 @@ packages:
   jws@4.0.1:
     resolution: {integrity: sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==}
 
-  katex@0.16.47:
-    resolution: {integrity: sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==}
+  katex@0.18.3:
+    resolution: {integrity: sha512-6kbPr8KiYZpRfNNIw+8Td33njnFzK/ELcw6bI9FzIHysYPatAUdepQimfCX1vG2VCD/5Lv+Gu6P5YA58k8HHmw==}
     hasBin: true
 
   keyv@4.5.4:
@@ -8976,7 +8977,7 @@ snapshots:
       '@tanstack/react-virtual': 3.14.13(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       class-variance-authority: 0.7.1
       clsx: 2.1.1
-      katex: 0.16.47
+      katex: 0.18.3
       lit: 3.3.2
       lucide-react: 0.525.0(react@19.2.4)
       react: 19.2.4
@@ -14327,7 +14328,7 @@ snapshots:
       jwa: 2.0.1
       safe-buffer: 5.2.1
 
-  katex@0.16.47:
+  katex@0.18.3:
     dependencies:
       commander: 8.3.0
 
@@ -14962,7 +14963,7 @@ snapshots:
       dompurify: 3.4.16
       es-toolkit: 1.52.0
       fastdom: 1.0.12
-      katex: 0.16.47
+      katex: 0.18.3
       khroma: 2.1.0
       marked: 16.4.2
       roughjs: 4.6.6
@@ -15108,7 +15109,7 @@ snapshots:
     dependencies:
       '@types/katex': 0.16.8
       devlop: 1.1.0
-      katex: 0.16.47
+      katex: 0.18.3
       micromark-factory-space: 2.0.1
       micromark-util-character: 2.1.1
       micromark-util-symbol: 2.0.1
@@ -16384,7 +16385,7 @@ snapshots:
       '@types/katex': 0.16.8
       hast-util-from-html-isomorphic: 2.0.0
       hast-util-to-text: 4.0.2
-      katex: 0.16.47
+      katex: 0.18.3
       unist-util-visit-parents: 6.0.2
       vfile: 6.0.3
 
@@ -17000,7 +17001,7 @@ snapshots:
       hast: 1.0.0
       hast-util-to-jsx-runtime: 2.3.6
       html-url-attributes: 3.0.1
-      katex: 0.16.47
+      katex: 0.18.3
       lucide-react: 0.542.0(react@19.2.4)
       marked: 16.4.2
       mermaid: 11.17.2

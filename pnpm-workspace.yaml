@@ -22,6 +22,13 @@ overrides:
   # 7.0's one breaking change makes inserting nodes while iterating safe; the compiled
   # site CSS is byte-identical under 7.1.6.
   "@tailwindcss/typography>postcss-selector-parser": "^7.1.6"
+  # GHSA-238p-pmpm-9mq7 (low): prototype pollution can bypass the trust setting, fixed in
+  # 0.18.2. 0.18.3 is the smallest fixed release and keeps katex's own dependencies as they
+  # are; later 0.18.x pulls commander 15, and 0.18.11 is deprecated upstream. Crosses a
+  # pre-1.0 minor (0.18 prefixes the generated CSS classes). @copilotkit/react-core (its
+  # latest, 1.77.0) and streamdown (rehype-katex, remark-math, mermaid) all pin ^0.16, so no
+  # parent update reaches the fix.
+  "katex@>=0.11.0 <0.18.2": "0.18.3"
   # The rest of this block is dev only, all under @lhci/cli 0.15.1 (the latest), and each
   # entry crosses a major its parent pins, scoped to that one parent.
   # GHSA-ph9p-34f9-6g65 (high), GHSA-52f5-9888-hmc6 (low). tmp 0.2.x keeps the fileSync and
