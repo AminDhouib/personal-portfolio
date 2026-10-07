@@ -18,6 +18,7 @@ export type QuitConfirmProps = {
  */
 export function QuitConfirm({ coins, onConfirm, onCancel }: QuitConfirmProps) {
   const titleId = useId();
+  const messageId = useId();
   const keepRef = useRef<HTMLButtonElement | null>(null);
   const quitRef = useRef<HTMLButtonElement | null>(null);
 
@@ -52,12 +53,13 @@ export function QuitConfirm({ coins, onConfirm, onCancel }: QuitConfirmProps) {
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={messageId}
         className="rounded-5 w-full max-w-[320px] border-2 border-gray-300 bg-white p-3 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600"
       >
         <h2 id={titleId} className="text-base font-bold text-gray-800">
           Quit this round?
         </h2>
-        <p className="mt-1 text-sm">
+        <p id={messageId} className="mt-1 text-sm">
           {coins > 0
             ? `Quit now and you keep ${coins} coins.`
             : "You have not found any coins this round."}
