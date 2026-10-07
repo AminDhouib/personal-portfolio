@@ -126,3 +126,64 @@ describe("GameShell keydown from a non-Element target", () => {
     }
   });
 });
+
+// --- stage layout ---------------------------------------------------------------
+
+/** matchMedia whose queries match when `matches(query)` is true (desktop = min-width 1024). */
+function stubMatchMedia(matches: (query: string) => boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: matches(query),
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+const isDesktop = (q: string) => q.includes("min-width: 1024px");
+
+function renderStartedShell() {
+  const utils = render(<GameShell />);
+  fireEvent.click(utils.getByRole("button", { name: /random seed/i }));
+  return utils;
+}
+
+describe("GameShell stage layout", () => {
+  beforeEach(() => {
+    vi.stubGlobal("requestAnimationFrame", () => 0);
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("desktop: rules sit beside the stage card, not inside it", () => {
+    stubMatchMedia(isDesktop);
+    const { getByTestId } = renderStartedShell();
+    const card = getByTestId("pg2-stage-card");
+    const rules = getByTestId("pg2-rules");
+    expect(card.contains(rules)).toBe(false);
+    expect(card.querySelector(".pg2-box")).not.toBeNull();
+    expect(card.parentElement).toBe(rules.parentElement); // siblings in the .pg2-play grid
+    expect(card.parentElement!.className).toContain("pg2-play");
+  });
+
+  it("scopes the canvas overlay to the stage card", () => {
+    stubMatchMedia(isDesktop);
+    const { getByTestId, container } = renderStartedShell();
+    const card = getByTestId("pg2-stage-card");
+    expect(card.contains(container.querySelector("canvas.pg2-overlay"))).toBe(true);
+  });
+
+  it("the rule column scrolls inside its own region", () => {
+    stubMatchMedia(isDesktop);
+    const { getByTestId } = renderStartedShell();
+    expect(getByTestId("pg2-rules").className).toContain("overflow-y-auto");
+  });
+});

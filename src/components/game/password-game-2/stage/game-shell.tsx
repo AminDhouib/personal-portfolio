@@ -577,40 +577,38 @@ export function GameShell() {
         </div>
       ) : null}
 
-      <div ref={panelRef} className="pg2-panel relative overflow-hidden">
-        {phase === "start" ? (
-          <StartScreen urlSeed={urlSeed} forceEvent={urlEvent} onStart={start} />
-        ) : g ? (
-          <RunningView
-            g={g}
-            seed={seed}
-            daily={daily}
-            soundOn={soundOn}
-            moods={moods}
-            boxRef={boxRef}
-            hiddenInputRef={hiddenInputRef}
-            onToggleSound={toggleSound}
-            onCopySeed={copySeed}
-            onCellClick={onCellClick}
-            onBoxClick={onBoxClick}
-            onHiddenInput={onHiddenInput}
-            onSubmit={onSubmit}
-            onPointer={applyTarget}
-            onChip={applyChip}
-            onWidgetText={onWidgetText}
-            onRuleState={onRuleState}
-            onPlayAgain={playAgain}
-            onPlayDaily={playDaily}
-          />
-        ) : null}
-
-        {g && phase === "running" ? <CanvasOverlay ref={overlayRef} /> : null}
-        {g && phase === "running" && g.outcome === "playing" && g.act !== "finale" ? (
-          <ChromeEvents g={g} onPointer={applyTarget} />
-        ) : null}
-
-        <div ref={flashRef} className="pg2-flash" aria-hidden="true" />
-      </div>
+      {phase === "start" ? (
+        <div className="max-w-3xl">
+          <div ref={panelRef} className="pg2-panel relative overflow-hidden">
+            <StartScreen urlSeed={urlSeed} forceEvent={urlEvent} onStart={start} />
+          </div>
+        </div>
+      ) : g ? (
+        <RunningView
+          g={g}
+          seed={seed}
+          daily={daily}
+          soundOn={soundOn}
+          moods={moods}
+          panelRef={panelRef}
+          overlayRef={overlayRef}
+          flashRef={flashRef}
+          boxRef={boxRef}
+          hiddenInputRef={hiddenInputRef}
+          onToggleSound={toggleSound}
+          onCopySeed={copySeed}
+          onCellClick={onCellClick}
+          onBoxClick={onBoxClick}
+          onHiddenInput={onHiddenInput}
+          onSubmit={onSubmit}
+          onPointer={applyTarget}
+          onChip={applyChip}
+          onWidgetText={onWidgetText}
+          onRuleState={onRuleState}
+          onPlayAgain={playAgain}
+          onPlayDaily={playDaily}
+        />
+      ) : null}
 
       {/* Toast stack — bottom-right, newest at the bottom. */}
       <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-72 flex-col gap-2">
@@ -750,6 +748,9 @@ function RunningView({
   daily,
   soundOn,
   moods,
+  panelRef,
+  overlayRef,
+  flashRef,
   boxRef,
   hiddenInputRef,
   onToggleSound,
@@ -770,6 +771,9 @@ function RunningView({
   daily: boolean;
   soundOn: boolean;
   moods: Record<string, string>;
+  panelRef: RefObject<HTMLDivElement | null>;
+  overlayRef: RefObject<OverlayHandle | null>;
+  flashRef: RefObject<HTMLDivElement | null>;
   boxRef: RefObject<HTMLDivElement | null>;
   hiddenInputRef: RefObject<HTMLInputElement | null>;
   onToggleSound: () => void;
@@ -802,109 +806,139 @@ function RunningView({
     return () => window.clearInterval(id);
   }, []);
 
+  // The rule column exists only while the form is being filled in; the finale and
+  // the receipt own the whole stage.
+  const inPlay = g.outcome !== "victory" && g.act !== "finale";
+
   return (
-    <>
-      <Hud
-        elapsedMs={g.elapsedMs}
-        act={g.act}
-        seed={seed}
-        soundOn={soundOn}
-        onToggleSound={onToggleSound}
-        onCopySeed={onCopySeed}
-      />
+    <div
+      className={
+        inPlay
+          ? "pg2-play lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,26rem)] lg:items-start lg:gap-6"
+          : "pg2-play mx-auto max-w-3xl"
+      }
+    >
+      <div
+        ref={panelRef}
+        data-testid="pg2-stage-card"
+        className="pg2-panel relative overflow-hidden lg:sticky lg:top-24"
+      >
+        <Hud
+          elapsedMs={g.elapsedMs}
+          act={g.act}
+          seed={seed}
+          soundOn={soundOn}
+          onToggleSound={onToggleSound}
+          onCopySeed={onCopySeed}
+        />
 
-      <div className="p-5 sm:p-6">
-        {g.outcome === "victory" ? (
-          <ReceiptCard
-            g={g}
-            seed={seed}
-            daily={daily}
-            onCopySeed={onCopySeed}
-            onPlayAgain={onPlayAgain}
-            onPlayDaily={onPlayDaily}
-          />
-        ) : g.act === "finale" ? (
-          <FinaleStage g={g} onPointer={onPointer} />
-        ) : (
-          <>
-            {moodEntries.length > 0 ? (
-              <div className="mb-3 flex flex-wrap gap-2">
-                {moodEntries.map(([id, text]) => (
-                  <span key={id} className="pg2-mood">
-                    {text}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            {/* Reserved HUD bands: meters paint on the canvas inside them, the
-                action chips are DOM buttons here, and nothing HUD-like ever
-                lands on the password. The top band grows (chips wrap) rather
-                than clip. */}
-            <div
-              className="flex items-center justify-end pl-36"
-              style={{ minHeight: HUD_TOP_H }}
-              data-pg2-hud-top
-            >
-              <HudActions g={g} onAction={onChip} />
-            </div>
-            <CharStage
-              cells={g.cells}
-              caret={g.caret}
-              boxRef={boxRef}
-              onCellClick={onCellClick}
-              onBoxClick={onBoxClick}
+        <div className="p-5 sm:p-6">
+          {g.outcome === "victory" ? (
+            <ReceiptCard
+              g={g}
+              seed={seed}
+              daily={daily}
+              onCopySeed={onCopySeed}
+              onPlayAgain={onPlayAgain}
+              onPlayDaily={onPlayDaily}
             />
-            <div style={{ height: HUD_BOTTOM_H }} data-pg2-hud-bottom aria-hidden="true" />
+          ) : g.act === "finale" ? (
+            <FinaleStage g={g} onPointer={onPointer} />
+          ) : (
+            <>
+              {moodEntries.length > 0 ? (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {moodEntries.map(([id, text]) => (
+                    <span key={id} className="pg2-mood">
+                      {text}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
 
-            {/* Visually-hidden input: summons the mobile soft keyboard. Desktop
-                keydown preventDefault stops it from ever receiving those chars. */}
-            <input
-              ref={hiddenInputRef}
-              onInput={onHiddenInput}
-              aria-hidden="true"
-              tabIndex={-1}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              style={{
-                position: "absolute",
-                width: 1,
-                height: 1,
-                opacity: 0,
-                padding: 0,
-                border: 0,
-                left: -9999,
-              }}
-            />
-
-            <p className="mt-5 mb-2 text-xs font-semibold tracking-wide text-[color:var(--pg2-muted)] uppercase">
-              Your password must satisfy
-            </p>
-            <RuleList
-              rules={g.rules}
-              password={password}
-              state={g}
-              api={api}
-              onWidgetText={onWidgetText}
-              onRuleState={onRuleState}
-              version={g.version}
-              validationTick={validationTick}
-            />
-
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                className="pg2-btn pg2-btn--primary px-6 py-2.5 text-[15px]"
-                onClick={onSubmit}
+              {/* Reserved HUD bands: meters paint on the canvas inside them, the
+                  action chips are DOM buttons here, and nothing HUD-like ever
+                  lands on the password. The top band grows (chips wrap) rather
+                  than clip. */}
+              <div
+                className="flex items-center justify-end pl-36"
+                style={{ minHeight: HUD_TOP_H }}
+                data-pg2-hud-top
               >
-                Create account
-              </button>
-            </div>
-          </>
-        )}
+                <HudActions g={g} onAction={onChip} />
+              </div>
+              <CharStage
+                cells={g.cells}
+                caret={g.caret}
+                boxRef={boxRef}
+                onCellClick={onCellClick}
+                onBoxClick={onBoxClick}
+              />
+              <div style={{ height: HUD_BOTTOM_H }} data-pg2-hud-bottom aria-hidden="true" />
+
+              {/* Visually-hidden input: summons the mobile soft keyboard. Desktop
+                  keydown preventDefault stops it from ever receiving those chars. */}
+              <input
+                ref={hiddenInputRef}
+                onInput={onHiddenInput}
+                aria-hidden="true"
+                tabIndex={-1}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                style={{
+                  position: "absolute",
+                  width: 1,
+                  height: 1,
+                  opacity: 0,
+                  padding: 0,
+                  border: 0,
+                  left: -9999,
+                }}
+              />
+            </>
+          )}
+        </div>
+
+        <CanvasOverlay ref={overlayRef} />
+        {g.outcome === "playing" && g.act !== "finale" ? (
+          <ChromeEvents g={g} onPointer={onPointer} />
+        ) : null}
+
+        <div ref={flashRef} className="pg2-flash" aria-hidden="true" />
       </div>
-    </>
+
+      {inPlay ? (
+        <div
+          data-testid="pg2-rules"
+          className="mt-6 min-w-0 lg:-m-1 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:p-1"
+        >
+          <p className="mb-2 text-xs font-semibold tracking-wide text-(--muted) uppercase">
+            Your password must satisfy
+          </p>
+          <RuleList
+            rules={g.rules}
+            password={password}
+            state={g}
+            api={api}
+            onWidgetText={onWidgetText}
+            onRuleState={onRuleState}
+            version={g.version}
+            validationTick={validationTick}
+          />
+
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              className="pg2-btn pg2-btn--primary px-6 py-2.5 text-[15px]"
+              onClick={onSubmit}
+            >
+              Create account
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
