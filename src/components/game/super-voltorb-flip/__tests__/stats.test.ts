@@ -180,6 +180,12 @@ describe("recordDay (the daily streak)", () => {
     expect(s.streak).toEqual({ current: 1, best: 2, lastDay: "2026-10-08" });
   });
 
+  it("a completed day earlier than the streak day (clock moved back) changes nothing", () => {
+    const s = done(done(EMPTY_STATS, "2026-10-06"), "2026-10-07");
+    expect(done(s, "2026-10-05")).toEqual(s);
+    expect(done(s, "2026-10-06")).toEqual(s);
+  });
+
   it("the same day twice does not extend it", () => {
     const s = done(done(EMPTY_STATS, "2026-10-07"), "2026-10-07");
     expect(s.streak.current).toBe(1);

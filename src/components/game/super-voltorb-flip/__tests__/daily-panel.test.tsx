@@ -59,6 +59,17 @@ describe("DailyPanel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/not accepted/i);
   });
 
+  it("keeps the name form usable after a failed post, to try again", () => {
+    const onPost = vi.fn();
+    render(<DailyPanel {...base} outcome="won" score={512} submitState="failed" onPost={onPost} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/try again/i);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("button", { name: "Post score" })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("Name for the board"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post score" }));
+    expect(onPost).toHaveBeenCalledWith("Ada");
+  });
+
   it("lists the board and marks the player's own row", () => {
     render(
       <DailyPanel

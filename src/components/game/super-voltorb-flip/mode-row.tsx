@@ -25,7 +25,13 @@ export function ModeRow({
   return (
     <div className="flex w-full items-center gap-2" role="group" aria-label="Game modes">
       {onOpenDaily && (
-        <button type="button" onClick={onOpenDaily} disabled={dailyDisabled} className={MODE_BTN}>
+        <button
+          type="button"
+          data-daily-open=""
+          onClick={onOpenDaily}
+          disabled={dailyDisabled}
+          className={MODE_BTN}
+        >
           Daily
         </button>
       )}

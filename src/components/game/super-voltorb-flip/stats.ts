@@ -151,6 +151,8 @@ export function recordRound(stats: Stats, round: RoundRecord): Stats {
  */
 export function recordDay(stats: Stats, dayKey: string, completed: boolean): Stats {
   const next = structuredClone(stats);
+  // A clock that moved backwards must not pull the streak back with it.
+  if (completed && next.streak.lastDay !== null && dayKey < next.streak.lastDay) return next;
   next.dailyPlayed = Math.min(COUNT_CAP, next.dailyPlayed + 1);
   if (!completed) {
     if (next.streak.lastDay === previousDay(dayKey)) next.streak.lastDay = dayKey;
