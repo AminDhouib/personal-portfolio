@@ -24,12 +24,22 @@ vi.mock("../effects/context", () => ({
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 
+// A test that times out is abandoned, not stopped: its body keeps awaiting
+// timers while the next tests start, and the open act scope leaves them an
+// empty tree. So a finished test refuses further advances and waits out the
+// one in flight before anything is torn down.
+let ended = false;
+let inFlight: Promise<unknown> = Promise.resolve();
 beforeEach(() => {
+  ended = false;
   window.localStorage.clear();
 });
-afterEach(() => {
+afterEach(async () => {
+  ended = true;
+  await inFlight;
   cleanup();
   vi.useRealTimers();
+  window.localStorage.clear();
 });
 
 // The phone and desktop columns both render a MemoBar (one is CSS-hidden), so
@@ -160,10 +170,14 @@ const quitRound = () => {
   fireEvent.click(first("Quit"));
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Quit" }));
 };
-const advance = (ms: number) =>
-  act(async () => {
+const advance = (ms: number) => {
+  if (ended) return Promise.reject(new Error("the test already ended"));
+  const step = act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
   });
+  inFlight = new Promise((done) => void step.then(done, done));
+  return step;
+};
 const savedStats = () => JSON.parse(window.localStorage.getItem("svf:stats") ?? "{}");
 const memoLabelled = () =>
   screen
@@ -205,11 +219,9 @@ describe("undo is gated", () => {
     expect(memoLabelled()).toHaveLength(1);
     quitRound();
     expect(first("Undo last memo")).toBeDisabled();
-    for (let i = 0; i < 40 && !screen.queryByRole("button", { name: /Next round|Continue/ }); i++) {
-      await advance(500);
-    }
+    await advance(1500); // the reveal, then the result banner
     fireEvent.click(screen.getByRole("button", { name: /Next round|Continue/ }));
-    await advance(15000);
+    await advance(3000);
     expect(memoLabelled()).toHaveLength(0);
     expect(first("Undo last memo")).toBeDisabled();
     fireEvent.keyDown(tile(0, 0), { key: "z", ctrlKey: true });
@@ -224,17 +236,16 @@ describe("undo is gated", () => {
     fireEvent.click(tile(0, 1));
     expect(memoLabelled()).toHaveLength(2);
     quitRound();
-    for (let i = 0; i < 40 && !screen.queryByRole("button", { name: /Next round|Continue/ }); i++) {
-      await advance(500);
-    }
+    await advance(1500); // the reveal, then the result banner
     fireEvent.click(screen.getByRole("button", { name: /Next round|Continue/ }));
     // From the first frame of the flip-down until the next board is dealt.
-    await advance(150);
-    for (let i = 0; i < 10; i++) {
+    for (const ms of [150, 800, 1500]) {
+      await advance(ms);
       expect(memoLabelled()).toHaveLength(0);
-      await advance(200);
     }
-  });
+    // Renders the whole board across several timer steps: about 2.5 s under
+    // coverage locally, so the 5 s default has no margin on a slower runner.
+  }, 20000);
 
   it("ignores Ctrl+Z typed in a text field inside the game", () => {
     render(<SuperVoltorbFlipGame />);
@@ -280,15 +291,17 @@ describe("the Lv.8 clock", () => {
     window.localStorage.setItem("svf:progress", JSON.stringify({ currentLevel: 8, totalScore: 0 }));
     vi.useFakeTimers();
     render(<SuperVoltorbFlipGame />);
-    await advance(60000); // idle before the first action: not counted
+    // Date jumps stand in for waiting: the clock reads Date.now, and running the
+    // timers across a minute would only make the test slow under coverage.
+    vi.setSystemTime(Date.now() + 60000); // idle before the first action: not counted
     const a = tile(0, 0);
     a.focus();
     fireEvent.keyDown(a, { key: "1" });
-    await advance(10000);
+    vi.setSystemTime(Date.now() + 10000);
     act(() => setHidden(true));
-    await advance(100000);
+    vi.setSystemTime(Date.now() + 100000);
     act(() => setHidden(false));
-    await advance(5000);
+    vi.setSystemTime(Date.now() + 5000);
     quitRound();
     expect(savedStats().lv8Seconds).toBe(15);
   });
