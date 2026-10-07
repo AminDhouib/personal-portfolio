@@ -1,7 +1,7 @@
 "use client";
 
 import { PixelSprite } from "./art/pixel-sprite";
-import { GLYPHS, GLYPH_CLEAR } from "./art/sprites";
+import { GLYPHS, GLYPH_CLEAR, GLYPH_UNDO } from "./art/sprites";
 
 export type MemoFlag = 1 | 2 | 3 | "V";
 
@@ -47,6 +47,8 @@ export function MemoBar({
   showLabel = true,
   fullWidth = false,
   spread = false,
+  onUndo,
+  canUndo = false,
 }: {
   activeFlags: MemoFlagSet;
   onToggle: (f: MemoFlag) => void;
@@ -55,6 +57,8 @@ export function MemoBar({
   showLabel?: boolean;
   fullWidth?: boolean;
   spread?: boolean;
+  onUndo?: () => void;
+  canUndo?: boolean;
 }) {
   return (
     <div
@@ -92,6 +96,17 @@ export function MemoBar({
       >
         <MemoFace sprite={GLYPH_CLEAR} active={false} size={size} />
       </button>
+      {onUndo && (
+        <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label="Undo last memo"
+          title="Undo last memo (Ctrl+Z)"
+          className="rounded-sm transition-opacity hover:opacity-80 disabled:opacity-40 disabled:hover:opacity-40"
+        >
+          <MemoFace sprite={GLYPH_UNDO} active={false} size={size} />
+        </button>
+      )}
     </div>
   );
 }
