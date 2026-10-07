@@ -64,7 +64,7 @@ export const passwordGameContent: GameContent = {
     },
     {
       label: "Best on",
-      value: "Desktop with a keyboard",
+      value: "Desktop, playable on phones",
     },
   ],
   faq: [
@@ -86,7 +86,7 @@ export const passwordGameContent: GameContent = {
     {
       question: "Can I play the Password Game 2 on my phone?",
       answer:
-        "Touch works for the clickable parts, and tapping the password box opens your on-screen keyboard. On narrow screens the page notes that the game is best played on desktop.",
+        "Yes. On a phone the run opens in a full-screen play sheet that stays above the on-screen keyboard, so the password box and the rule you are working on stay in view. Tap the box to type, and the action buttons are large touch targets. A physical keyboard on desktop is still the fastest way to play.",
     },
     {
       question: "How long does a run take?",

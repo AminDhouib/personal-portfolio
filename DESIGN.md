@@ -512,6 +512,15 @@ The following Password Game 2 entries were verified against the current tree on 
   grid 2 has no rejection branch, so the widget cannot soft-lock. The tile answers living in
   `aria-label` ("Storefront" and friends) are required for screen-reader play, not a leak to
   fix — the widget is a captcha parody, not a security control.
+- **PG2 plays in a stage shell, not a flowing page** (`stage/game-shell.tsx`, `stage/hud-slots.ts`,
+  `stage/hud-actions.tsx`). From 1024px the stage card is sticky beside a rule column that scrolls in
+  its own region; below that the run plays in a fixed phone sheet (`z-80`, toasts `z-85`, act title
+  card `z-90`) sized by `visualViewport` (`--pg2-vv-h`, `--pg2-vv-top`) with `pg2-lock` on `<html>`
+  for the whole run, released on Exit and on unmount. The page container is `max-w-6xl` to fit two
+  columns; the editorial blocks stay `max-w-5xl`. The canvas overlay paints meters only inside the
+  reserved HUD bands (`hudSlots`), never over the password; the event action chips are DOM buttons
+  (44px) in the top band. The old "best played on desktop" banner is gone on purpose. Exit needs a
+  second tap. Games are exempt from reduced-motion, so the chip hop is not gated.
 - **PG2's consent wall fights back when you switch a toggle off, by design** (`stage/widgets/consent.tsx`,
   `applyConsentMove` in `engine/rules/act1.ts`). Turning a switch OFF flips its seeded neighbor —
   declining one thing brings back something you already declined. That is the intended friction, not
@@ -813,6 +822,11 @@ trigger revisiting it.
   Deferred; trigger is any broader `RuleCard` a11y pass. Additionally, the consent widget's "Save
   preferences" control keeps `tabIndex=0` while disabled and signals its state via `aria-disabled`
   (rather than dropping out of the tab order) — ARIA-legal, flagged here for awareness.
+- **PG2's remaining canvas-only targets have no DOM equivalent** (`stage/painters.ts`).
+  Canvas hit regions for parasites, aliens and missiles are pointer-only:
+  a keyboard or screen-reader user cannot reach them, and some are under 44px on a phone. The event
+  action chips were moved to DOM buttons in T3-2; these were not. Known debt, same family as the
+  `RuleCard` nested-interactive item above; trigger is the next PG2 accessibility pass.
 - **Some defensive branches are provably dead** (audit ref NF(P7)-b) — error paths guarding
   conditions that current callers can no longer produce, left in place as cheap insurance rather
   than removed.
