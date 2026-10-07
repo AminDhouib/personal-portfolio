@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type RefObject,
 } from "react";
@@ -37,10 +38,15 @@ import { RuleList } from "./rule-list";
 import { Hud } from "./hud";
 import { HudActions } from "./hud-actions";
 import { HUD_BOTTOM_H, HUD_TOP_H } from "./hud-slots";
+import { useVisualViewport } from "./use-visual-viewport";
+import type { ViewportLayout } from "./viewport-layout";
 import "./pg2.css";
 
 /** Valid ?event= ids for the showcase URL param, resolved once from the manifest. */
 const EVENT_IDS: ReadonlySet<string> = new Set(EVENT_DEFS.map((d) => d.id));
+
+/** Desktop = the two-column stage; anything narrower plays in the fixed phone sheet. */
+const DESKTOP_QUERY = "(min-width: 1024px)";
 
 type Phase = "start" | "running";
 
@@ -91,14 +97,6 @@ function CompanyMark() {
   );
 }
 
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export function GameShell() {
   const searchParams = useSearchParams();
   const urlSeed = useMemo(() => {
@@ -126,10 +124,9 @@ export function GameShell() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [moods, setMoods] = useState<Record<string, string>>({});
   const [titleCard, setTitleCard] = useState<ActId | null>(null);
-  const [narrow, setNarrow] = useState(
-    () => window.matchMedia?.("(max-width: 767px)").matches ?? false,
-  );
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Layout mode is one media query: desktop (>= 1024px) is the two-column stage; below
+  // it a live run plays in a fixed sheet sized to the visible viewport.
+  const [desktop, setDesktop] = useState(() => window.matchMedia?.(DESKTOP_QUERY).matches ?? false);
 
   // Render is driven manually: the engine mutates a ref'd store, so we bump this
   // counter when g.version changes or on a heartbeat, rather than mirroring state.
@@ -140,6 +137,7 @@ export function GameShell() {
   const renderedVersionRef = useRef(-1);
   const overlayRef = useRef<OverlayHandle | null>(null);
   const autoStartedRef = useRef(false);
+  const exitedRef = useRef(false);
   const feedsLoadedRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const flashRef = useRef<HTMLDivElement | null>(null);
@@ -227,15 +225,40 @@ export function GameShell() {
   }, []);
 
   // Environment probes (client only): reduced-motion preference (a ref, read in
-  // the loop) and a live viewport-width listener for the mobile banner.
+  // the loop) and a live listener for the desktop/phone layout switch.
   useEffect(() => {
     reducedRef.current = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const mq = window.matchMedia?.("(max-width: 767px)");
+    const mq = window.matchMedia?.(DESKTOP_QUERY);
     if (!mq) return;
-    const update = () => setNarrow(mq.matches);
+    const update = () => setDesktop(mq.matches);
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  const sheet = phase === "running" && !desktop;
+  const viewport = useVisualViewport(sheet);
+
+  // The phone play sheet owns the screen: lock the page scroll while it is up and give
+  // everything back (lock released, focus returned) when it goes away, whether that is
+  // an Exit, a switch to desktop, or the shell unmounting.
+  useEffect(() => {
+    if (!sheet) return;
+    const root = document.documentElement;
+    const prevFocus = document.activeElement;
+    root.classList.add("pg2-lock");
+    return () => {
+      root.classList.remove("pg2-lock");
+      if (prevFocus instanceof HTMLElement && prevFocus.isConnected) prevFocus.focus();
+    };
+  }, [sheet]);
+
+  // After an Exit the start screen is a fresh tree, so the control that launched the run
+  // is gone; land focus on the start screen's primary button instead of on <body>.
+  useEffect(() => {
+    if (phase !== "start" || !exitedRef.current) return;
+    exitedRef.current = false;
+    panelRef.current?.querySelector<HTMLElement>("button")?.focus();
+  }, [phase]);
 
   // Fetch the three live feeds (wordle, country, chess) once on mount, so the
   // feed-backed rules capture real data at rule-create time instead of freebie
@@ -413,6 +436,20 @@ export function GameShell() {
   const playAgain = useCallback(() => start(randomSeed(), false), [start]);
   const playDaily = useCallback(() => start(dailySeed(), true), [start]);
 
+  // Leave a live run for the start screen. Nothing is submitted; the run is dropped.
+  const exit = useCallback(() => {
+    gameRef.current = null;
+    titleQueueRef.current = [];
+    showingCardRef.current = false;
+    exitedRef.current = true;
+    setTitleCard(null);
+    setToasts([]);
+    setMoods({});
+    setGame(null);
+    setDaily(false);
+    setPhase("start");
+  }, []);
+
   const focusHiddenInput = useCallback(() => {
     hiddenInputRef.current?.focus({ preventScroll: true });
   }, []);
@@ -563,20 +600,6 @@ export function GameShell() {
         ) : null}
       </header>
 
-      {narrow && !bannerDismissed ? (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-(--border) bg-(--card) px-4 py-2.5 text-sm text-(--muted)">
-          <span>Best played on desktop.</span>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={() => setBannerDismissed(true)}
-            className="text-(--muted) hover:text-(--foreground)"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      ) : null}
-
       {phase === "start" ? (
         <div className="max-w-3xl">
           <div ref={panelRef} className="pg2-panel relative overflow-hidden">
@@ -607,11 +630,20 @@ export function GameShell() {
           onRuleState={onRuleState}
           onPlayAgain={playAgain}
           onPlayDaily={playDaily}
+          sheet={sheet}
+          viewport={viewport}
+          onExit={exit}
         />
       ) : null}
 
-      {/* Toast stack — bottom-right, newest at the bottom. */}
-      <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-72 flex-col gap-2">
+      {/* Toast stack: bottom-right, newest at the bottom; above the phone sheet. */}
+      <div
+        className={
+          sheet
+            ? "pointer-events-none fixed right-4 bottom-4 z-85 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-2"
+            : "pointer-events-none fixed right-4 bottom-4 z-50 flex w-72 flex-col gap-2"
+        }
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -625,7 +657,7 @@ export function GameShell() {
       {/* Act title card overlay. */}
       {card ? (
         <div
-          className="pg2-titlecard"
+          className={sheet ? "pg2-titlecard pg2-titlecard--sheet" : "pg2-titlecard"}
           role="button"
           tabIndex={0}
           aria-label={`${card.kicker}: ${card.title}. Click to continue.`}
@@ -765,7 +797,13 @@ function RunningView({
   onRuleState,
   onPlayAgain,
   onPlayDaily,
+  sheet,
+  viewport,
+  onExit,
 }: {
+  sheet: boolean;
+  viewport: ViewportLayout;
+  onExit: () => void;
   g: GameState;
   seed: number;
   daily: boolean;
@@ -810,19 +848,26 @@ function RunningView({
   // the receipt own the whole stage.
   const inPlay = g.outcome !== "victory" && g.act !== "finale";
 
-  return (
-    <div
-      className={
-        inPlay
-          ? "pg2-play lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,26rem)] lg:items-start lg:gap-6"
-          : "pg2-play mx-auto max-w-3xl"
-      }
-    >
-      <div
-        ref={panelRef}
-        data-testid="pg2-stage-card"
-        className="pg2-panel relative overflow-hidden lg:sticky lg:top-24"
-      >
+  // On a phone the run plays in a fixed sheet that is exactly the visible area. While
+  // the form is being filled in the sheet itself never scrolls (the rule region does);
+  // the finale and the receipt are taller than a phone, so there the sheet scrolls.
+  const playClass = sheet
+    ? inPlay
+      ? "pg2-play flex h-full flex-col gap-3 px-3 pt-3 pb-2"
+      : "pg2-play mx-auto max-w-3xl px-3 py-3"
+    : inPlay
+      ? "pg2-play lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,26rem)] lg:items-start lg:gap-6"
+      : "pg2-play mx-auto max-w-3xl";
+  const cardClass = sheet
+    ? "pg2-panel relative flex-none touch-none overflow-hidden"
+    : "pg2-panel relative overflow-hidden lg:sticky lg:top-24";
+  const rulesClass = sheet
+    ? "min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain"
+    : "mt-6 min-w-0 lg:-m-1 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:p-1";
+
+  const play = (
+    <div className={playClass}>
+      <div ref={panelRef} data-testid="pg2-stage-card" className={cardClass}>
         <Hud
           elapsedMs={g.elapsedMs}
           act={g.act}
@@ -830,6 +875,7 @@ function RunningView({
           soundOn={soundOn}
           onToggleSound={onToggleSound}
           onCopySeed={onCopySeed}
+          onExit={sheet ? onExit : undefined}
         />
 
         <div className="p-5 sm:p-6">
@@ -910,10 +956,7 @@ function RunningView({
       </div>
 
       {inPlay ? (
-        <div
-          data-testid="pg2-rules"
-          className="mt-6 min-w-0 lg:-m-1 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:p-1"
-        >
+        <div data-testid="pg2-rules" className={rulesClass}>
           <p className="mb-2 text-xs font-semibold tracking-wide text-(--muted) uppercase">
             Your password must satisfy
           </p>
@@ -931,7 +974,7 @@ function RunningView({
           <div className="mt-6 flex justify-end">
             <button
               type="button"
-              className="pg2-btn pg2-btn--primary px-6 py-2.5 text-[15px]"
+              className="pg2-btn pg2-btn--primary min-h-11 px-6 py-2.5 text-[15px]"
               onClick={onSubmit}
             >
               Create account
@@ -939,6 +982,28 @@ function RunningView({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+
+  if (!sheet) return play;
+  return (
+    <div
+      data-testid="pg2-sheet"
+      className={
+        viewport.keyboardOpen
+          ? `pg2-sheet pg2-sheet--kb fixed inset-x-0 z-80 flex flex-col bg-(--background) ${inPlay ? "overflow-hidden" : "overflow-y-auto"}`
+          : `pg2-sheet fixed inset-x-0 z-80 flex flex-col bg-(--background) ${inPlay ? "overflow-hidden" : "overflow-y-auto"}`
+      }
+      style={
+        {
+          "--pg2-vv-h": viewport.height > 0 ? `${viewport.height}px` : "100dvh",
+          "--pg2-vv-top": `${viewport.top}px`,
+          top: "var(--pg2-vv-top)",
+          height: "var(--pg2-vv-h)",
+        } as CSSProperties
+      }
+    >
+      {play}
     </div>
   );
 }

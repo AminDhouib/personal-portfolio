@@ -1666,3 +1666,21 @@
   outline: 2px solid var(--pg2-primary);
   outline-offset: 2px;
 }
+
+/* Phone play sheet. The page behind it must not scroll, and while the soft keyboard
+   is up the box compacts so the password and the active rule both stay visible.
+   z-index ladder on a phone: sheet 80, toasts 85, act title card 90. */
+html.pg2-lock {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.pg2-sheet--kb .pg2-box {
+  min-height: 96px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.pg2-titlecard--sheet {
+  z-index: 90;
+}
