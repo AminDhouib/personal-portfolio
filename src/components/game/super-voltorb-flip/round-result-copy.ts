@@ -29,13 +29,20 @@ export function roundResultCopy({ kind, fromLevel, toLevel, coins }: RoundResult
   if (kind === "win") {
     const title = `Round cleared! +${coinsText(coins)}`;
     if (moved) return { title, detail: `Moved up to Level ${toLevel}.` };
-    if (toLevel >= MAX_LEVEL) return { title, detail: `Top level: Level ${toLevel}` };
+    if (toLevel >= MAX_LEVEL) return { title, detail: `Top level: Level ${toLevel}.` };
     return {
       title,
       detail: `Staying on Level ${toLevel}. Five strong rounds in a row reach Level ${MAX_LEVEL}.`,
     };
   }
-  const level = moved ? `Dropped to Level ${toLevel}.` : `Staying on Level ${toLevel}.`;
+  // A quit counts as "not lost" for the level rule, so at Lv.5+ with a streak it
+  // can climb: say which way the level actually went.
+  const level =
+    toLevel > fromLevel
+      ? `Moved up to Level ${toLevel}.`
+      : toLevel < fromLevel
+        ? `Dropped to Level ${toLevel}.`
+        : `Staying on Level ${toLevel}.`;
   if (kind === "lose") {
     return { title: "Voltorb! Round lost.", detail: `${level} No coins this round.` };
   }

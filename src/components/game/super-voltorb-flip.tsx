@@ -616,7 +616,7 @@ const Gameboard = ({
         (e) => {
           if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
           // Never take keys meant for a text field elsewhere on the page.
-          if (isTextEntryTarget(e.target)) return;
+          if (isTextEntryTarget(e)) return;
           if (e.key === "Enter" || e.key === " " || e.key.length === 1) done();
         },
         { signal },

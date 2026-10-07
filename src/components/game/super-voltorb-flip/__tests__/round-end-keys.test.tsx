@@ -28,7 +28,7 @@ import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 
 const BANNER = "You quit with no coins.";
 
-let stray: HTMLInputElement | null = null;
+let stray: HTMLElement | null = null;
 
 afterEach(() => {
   stray?.remove();
@@ -62,6 +62,14 @@ describe("round-end wait", () => {
     document.body.appendChild(stray);
     fireEvent.keyDown(stray, { key: "a" });
     fireEvent.keyDown(stray, { key: "Enter" });
+    await advance(0);
+    expect(screen.getByText(BANNER)).toBeTruthy();
+
+    // Same for a textarea.
+    stray.remove();
+    stray = document.createElement("textarea");
+    document.body.appendChild(stray);
+    fireEvent.keyDown(stray, { key: "b" });
     await advance(0);
     expect(screen.getByText(BANNER)).toBeTruthy();
 

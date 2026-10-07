@@ -40,7 +40,7 @@ describe("RoundResult", () => {
 
   it("names the top level when a win cannot move up", () => {
     render(<RoundResult kind="win" fromLevel={8} toLevel={8} coins={2187} onContinue={() => {}} />);
-    expect(screen.getByText("Top level: Level 8")).toBeTruthy();
+    expect(screen.getByText("Top level: Level 8.")).toBeTruthy();
   });
 
   it("a quit with coins says what was banked", () => {

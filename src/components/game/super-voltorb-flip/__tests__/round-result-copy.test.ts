@@ -18,7 +18,7 @@ describe("roundResultCopy", () => {
 
   it("a win at the top level names it", () => {
     expect(roundResultCopy({ kind: "win", fromLevel: 8, toLevel: 8, coins: 2187 }).detail).toBe(
-      "Top level: Level 8",
+      "Top level: Level 8.",
     );
   });
 
@@ -53,5 +53,22 @@ describe("roundResultCopy", () => {
       title: "You quit with no coins.",
       detail: "Staying on Level 1.",
     });
+  });
+
+  it("a quit that climbs says moved up, not dropped", () => {
+    expect(roundResultCopy({ kind: "quit", fromLevel: 5, toLevel: 8, coins: 40 })).toEqual({
+      title: "You quit. +40 coins",
+      detail: "Moved up to Level 8.",
+    });
+    expect(roundResultCopy({ kind: "quit", fromLevel: 5, toLevel: 8, coins: 0 })).toEqual({
+      title: "You quit with no coins.",
+      detail: "Moved up to Level 8.",
+    });
+  });
+
+  it("a loss that drops still says dropped", () => {
+    expect(roundResultCopy({ kind: "lose", fromLevel: 3, toLevel: 2, coins: 0 }).detail).toBe(
+      "Dropped to Level 2. No coins this round.",
+    );
   });
 });

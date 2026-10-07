@@ -631,6 +631,9 @@ existing enums for that category live rather than inventing a parallel one.
 Every deferral below was a deliberate scope decision, not an oversight. Each lists what would
 trigger revisiting it.
 
+- **Orbital Dodge has its own inline text-field exemption** (`space-shooter.tsx`, the keydown
+  guard) next to Super Voltorb Flip's `super-voltorb-flip/keyboard.ts` `isTextEntryTarget`. Make
+  the Voltorb helper the shared one when Orbital Dodge is next touched (T5).
 - **CopilotKit run failures never reach Sentry** — CLOSED 2026-07-31. The runtime emitted
   chat-run errors as `RUN_ERROR` events inside the SSE stream (plus the browser console) and
   swallowed them server-side, so the multi-day dead-chat outage fixed by the per-request
