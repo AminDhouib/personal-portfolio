@@ -301,3 +301,66 @@ describe("background music", () => {
     expect(FakeAudio.all).toHaveLength(2);
   });
 });
+
+class BlockedOnceAudio extends FakeAudio {
+  static blocked = true;
+  plays = 0;
+  override play() {
+    this.plays += 1;
+    if (BlockedOnceAudio.blocked) {
+      BlockedOnceAudio.blocked = false;
+      return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+    }
+    return super.play();
+  }
+}
+
+describe("blocked autoplay", () => {
+  beforeEach(() => {
+    BlockedOnceAudio.blocked = true;
+    vi.stubGlobal("Audio", BlockedOnceAudio);
+  });
+
+  it("retries the loop on the first gesture after the browser rejected play()", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    expect(el.paused).toBe(true);
+    expect(el.plays).toBe(1);
+
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(2);
+    expect(el.paused).toBe(false);
+
+    // One retry only: later gestures do not call play() again.
+    document.dispatchEvent(new Event("keydown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(2);
+    stopMusic();
+  });
+
+  it("does not retry once the music was stopped", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    stopMusic();
+
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(1);
+    expect(el.paused).toBe(true);
+  });
+
+  it("a track swap does not cancel the new track's own retry", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    playMusic(8); // a different band swaps the element before the first rejection lands
+    await vi.advanceTimersByTimeAsync(0);
+    const second = FakeAudio.all[1] as BlockedOnceAudio;
+    expect(second.paused).toBe(false); // the single block was spent on the first element
+    stopMusic();
+  });
+});

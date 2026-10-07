@@ -22,6 +22,32 @@ let musicSrc: string | null = null;
 // Loops being faded out; they have left the `music` slot but still sound.
 const fading = new Set<HTMLAudioElement>();
 
+// Cancels the pending "retry the loop on the next gesture" listeners, if armed.
+let cancelGestureRetry: (() => void) | null = null;
+
+// A browser can reject play() until the page has had a user gesture. Instead of
+// waiting for the next round change, retry on the first pointer press or key.
+// A rejection of the retry itself re-arms it for the next gesture.
+function retryMusicOnGesture(el: HTMLAudioElement): void {
+  if (typeof document === "undefined") return;
+  cancelGestureRetry?.();
+  const events = ["pointerdown", "keydown"] as const;
+  const cancel = () => {
+    for (const name of events) document.removeEventListener(name, retry, true);
+    if (cancelGestureRetry === cancel) cancelGestureRetry = null;
+  };
+  function retry() {
+    cancel();
+    if (music !== el) return;
+    // silent-ok: still blocked; re-armed for the next gesture
+    el.play().catch(() => {
+      if (music === el) retryMusicOnGesture(el);
+    });
+  }
+  for (const name of events) document.addEventListener(name, retry, true);
+  cancelGestureRetry = cancel;
+}
+
 function getMaster(): Master | null {
   if (master) return master;
   if (typeof window === "undefined") return null;
@@ -187,17 +213,24 @@ export function playMusic(level: number): void {
   if (typeof window === "undefined") return;
   const track = musicTrackForLevel(level);
   if (music && musicSrc === track.src) return;
+  cancelGestureRetry?.();
   music?.pause();
-  music = new Audio(track.src);
+  const el = new Audio(track.src);
+  music = el;
   musicSrc = track.src;
-  music.loop = true;
-  music.volume = track.volume;
-  music.muted = globalMuted;
-  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not surface
-  music.play().catch(() => undefined);
+  el.loop = true;
+  el.volume = track.volume;
+  el.muted = globalMuted;
+  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not
+  // surface. Only the element still in the slot may arm the retry: a swapped-out element's
+  // late rejection (pause() before play() settled) must not cancel the new one's.
+  el.play().catch(() => {
+    if (music === el) retryMusicOnGesture(el);
+  });
 }
 
 export function stopMusic(): void {
+  cancelGestureRetry?.();
   music?.pause();
   music = null;
   musicSrc = null;
@@ -205,6 +238,7 @@ export function stopMusic(): void {
 
 export function fadeOutMusic(ms = 400): void {
   if (!music) return;
+  cancelGestureRetry?.();
   const m = music;
   music = null;
   musicSrc = null;
