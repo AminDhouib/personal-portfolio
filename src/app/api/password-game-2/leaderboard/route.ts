@@ -84,7 +84,7 @@ export async function GET(req: Request) {
       const result = await pool.query(
         `SELECT ${SELECT_COLUMNS}
            FROM pg2_leaderboard_entries
-          WHERE daily = TRUE AND created_at::date = now()::date
+          WHERE daily = TRUE AND (created_at AT TIME ZONE 'UTC')::date = (now() AT TIME ZONE 'UTC')::date
           ORDER BY time_ms ASC
           LIMIT $1`,
         [RETURN_LIMIT],
