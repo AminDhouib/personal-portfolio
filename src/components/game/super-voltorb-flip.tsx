@@ -17,6 +17,7 @@
 import React, {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type Dispatch,
@@ -44,6 +45,7 @@ import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-r
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { isTextEntryTarget } from "./super-voltorb-flip/keyboard";
 import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
+import { isCursorKey, memoKeyFlag, moveCursor, type Cursor } from "./super-voltorb-flip/cursor";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
@@ -283,6 +285,14 @@ ${BOARD_FRAME_CSS}
   60%  { transform: translate(-1px, 2px) rotate(-0.8deg); }
   80%  { transform: translate(1px, -2px) rotate(0.8deg); }
 }
+/* Keyboard cursor: real DOM focus, drawn only for keyboard users. Dark ring
+   with enough contrast on the green board, clear of the tile's own 6px
+   border-plus-outline, lifted above its neighbours. */
+.svf-root .svf-tile-wrap:focus-visible {
+  outline: 3px solid #111827;
+  outline-offset: 6px;
+  z-index: 5;
+}
 
 /* When the game element is fullscreened, fill the viewport with the
    board background so the surrounding chrome doesn't bleed through. */
@@ -320,6 +330,12 @@ type CardProps = {
    * it must never reach the DOM while the tile is face down.
    */
   valueLabel?: string;
+  /** Roving tabindex: 0 for the keyboard cursor's tile, -1 for the rest. */
+  tabIndex?: 0 | -1;
+  /** "row-col", read by the board to move focus without a ref per tile. */
+  cellId?: string;
+  /** Fires when the tile takes focus (keyboard, click or script) so the cursor follows. */
+  onFocus?: () => void;
 };
 
 // Two complete static class strings (never a conditional fragment) so the
@@ -339,11 +355,21 @@ const Card = ({
   flags,
   warning,
   valueLabel,
+  tabIndex = 0,
+  cellId,
+  onFocus,
 }: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
   const faceTextStyle: React.CSSProperties = { fontSize: "calc(var(--svf-tile) * 0.6)" };
   const flagSize = "calc(var(--svf-tile) * 0.34)";
+  // Memo marks are part of what a screen reader hears for a face-down tile.
+  const memoText = flags
+    ? ([1, 2, 3, "V"] as const)
+        .filter((f) => flags[f])
+        .map(String)
+        .join(", ")
+    : "";
   return fake ? (
     <div className="relative box-content flex h-[var(--svf-tile)] w-[var(--svf-tile)] rounded-sm border-2 border-gray-700 outline outline-4 outline-gray-200 select-none">
       <div
@@ -357,11 +383,15 @@ const Card = ({
     <div
       className={warning ? TILE_WRAP_ANXIOUS : TILE_WRAP}
       role="button"
-      tabIndex={0}
+      tabIndex={tabIndex}
+      data-cell={cellId}
+      onFocus={onFocus}
       aria-label={
         row !== undefined && col !== undefined
           ? `Row ${row + 1}, Col ${col + 1}, ${
-              isFlipped ? `revealed${valueLabel ? `, ${valueLabel}` : ""}` : "face down"
+              isFlipped
+                ? `revealed${valueLabel ? `, ${valueLabel}` : ""}`
+                : `face down${memoText ? `, memo ${memoText}` : ""}`
             }`
           : undefined
       }
@@ -540,6 +570,13 @@ const Gameboard = ({
   // and gates handleFlip so no other tap can land while it's playing.
   const [warningTile, setWarningTile] = useState<{ row: number; col: number } | null>(null);
   const warningTileRef = useRef<{ row: number; col: number } | null>(null);
+  // Keyboard cursor: the tile that holds the single tab stop. Real DOM focus
+  // follows it, so the :focus-visible ring is the on-screen cursor.
+  const [cursor, setCursor] = useState<Cursor>({ row: 0, col: 0 });
+  // Last flip, spoken through a polite live region for screen readers.
+  const [announcement, setAnnouncement] = useState("");
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const hintId = useId();
 
   // Round-end banner (win or lose). The flow waits on it: the banner button,
   // a pointerdown on the board, or Enter/Space/any printable key continues.
@@ -670,6 +707,9 @@ const Gameboard = ({
     onFirstInteraction();
 
     const commitFlip = () => {
+      setAnnouncement(
+        `Row ${row + 1}, Col ${col + 1}: ${cell.value === "V" ? "Voltorb" : cell.value}`,
+      );
       if (theme) {
         const id = nextId.current++;
         const onDone = () => setEffects((prev) => prev.filter((x) => x.id !== id));
@@ -711,6 +751,43 @@ const Gameboard = ({
     }
 
     commitFlip();
+  }
+
+  // Memo mark by keyboard: toggles one flag on a tile without touching the
+  // memo-bar selection. Same gates as a tap (round over, quit dialog, risk hold).
+  function toggleMemoAt(row: number, col: number, flag: MemoFlag) {
+    if (game.gameStatus === "lose" || game.gameStatus === "win" || game.gameStatus === "quit") {
+      return;
+    }
+    if (quitConfirmOpen || warningTileRef.current) return;
+    const cell = game.cells[row]?.[col];
+    if (!cell) return;
+    if (cell.isFlipped) {
+      if (!muted) void sfx.invalidTap();
+      return;
+    }
+    if (!muted) void sfx.memoToggle();
+    updateGame((g) => g.flagCell(row, col, flag));
+  }
+
+  // Board-scoped on purpose (React onKeyDown on the grid, not a document
+  // listener): it only ever sees keys pressed while a tile has focus, so it
+  // cannot take keys from the AI chat or any other field.
+  function handleBoardKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isTextEntryTarget(e.nativeEvent)) return;
+    if (isCursorKey(e.key)) {
+      e.preventDefault();
+      const next = moveCursor(cursor, e.key, game.cells.length);
+      if (next.row === cursor.row && next.col === cursor.col) return;
+      setCursor(next);
+      if (!muted) void sfx.cursorMove();
+      gridRef.current?.querySelector<HTMLElement>(`[data-cell="${next.row}-${next.col}"]`)?.focus();
+      return;
+    }
+    const flag = memoKeyFlag(e.key);
+    if (flag === null || e.repeat) return;
+    toggleMemoAt(cursor.row, cursor.col, flag);
   }
 
   const flipCardsUp = useCallback(() => {
@@ -828,10 +905,22 @@ const Gameboard = ({
         className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)] outline outline-2 outline-gray-600`}
         style={{ "--svf-n": N } as React.CSSProperties}
       >
+        <p id={hintId} className="sr-only">
+          Arrow keys move between tiles. Enter or Space flips a tile. Press 1, 2, 3 or V to mark a
+          tile with a memo.
+        </p>
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
         <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-1 sm:p-2">
           <div className="flex flex-col gap-[var(--svf-gap)]">
             <div className="flex gap-[var(--svf-gap)]">
               <div
+                ref={gridRef}
+                role="group"
+                aria-label={`Board, ${N} by ${N}`}
+                aria-describedby={hintId}
+                onKeyDown={handleBoardKeyDown}
                 className="relative grid gap-[var(--svf-gap)]"
                 style={{
                   gridTemplateColumns: `repeat(${N}, var(--svf-tile))`,
@@ -846,6 +935,17 @@ const Gameboard = ({
                       col={coordinate[1]}
                       isFlipped={peek || cardsFlipped[i]?.isFlipped}
                       valueLabel={cell.value === "V" ? "Voltorb" : String(cell.value)}
+                      tabIndex={
+                        coordinate[0] === cursor.row && coordinate[1] === cursor.col ? 0 : -1
+                      }
+                      cellId={`${coordinate[0]}-${coordinate[1]}`}
+                      onFocus={() =>
+                        setCursor((c) =>
+                          c.row === coordinate[0] && c.col === coordinate[1]
+                            ? c
+                            : { row: coordinate[0], col: coordinate[1] },
+                        )
+                      }
                       flipCard={() => handleFlip(coordinate[0], coordinate[1])}
                       flags={peek || cell.isFlipped ? undefined : cell.flags}
                       warning={
