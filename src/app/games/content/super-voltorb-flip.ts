@@ -133,5 +133,14 @@ export const superVoltorbFlipContent: GameContent = {
       detail: "Pokemon DS Font by sergalbutt on FontStruct, released under CC0.",
       href: "https://fontstruct.com/fontstructions/show/1182741",
     },
+    {
+      label: "Music",
+      detail:
+        "Chiptune loops by TinyWorlds, Juhani Junkala (SubspaceAudio) and celestialghost8, all released under CC0.",
+    },
+    {
+      label: "Sound effects",
+      detail: "Original, generated in your browser. No audio from the Pokemon games is used.",
+    },
   ],
 };
