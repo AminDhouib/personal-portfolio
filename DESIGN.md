@@ -353,12 +353,15 @@ current tree on 2026-07-07.
   removed because it read as muddy grey, and the `invertedArmed` flag in `game-tick.ts`,
   `scene-components.tsx` and `types.ts` is now always false (dormant code; delete it the next time
   that subsystem is touched).
-- **Super Voltorb Flip waits for the player at the end of every round.** After the reveal (and,
-  on a win, the payout) a result banner names the outcome and the level change and offers
+- **Super Voltorb Flip waits for the player at the end of every round.** The order follows HGSS
+  (`voltorb_flip.c`): a win plays the clear fanfare and then the payout over the still-hidden
+  board, and only then reveals it; a quit pays out first too (when it banked coins); a loss goes
+  straight to the reveal. A result banner then names the outcome and the level change and offers
   Continue / Next round; a tap on the board or any key also continues. HGSS waits for a press
   after a clear as well, so the earlier auto-advance on a win is gone on purpose. The banner
-  lives in a slot under the board, never over it (the revealed board is worth reading), and the
-  slot shows a one-line hint between rounds so it keeps its height and the page never jumps.
+  lives in a slot under the board, never over it (the revealed board is worth reading). While a
+  round is live the slot shows a one-line hint plus the Quit button, so it keeps its height and
+  the page never jumps.
 - **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
   `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
   license alongside). Known quirks live inside that bundle and are accepted while the game stays
@@ -379,10 +382,15 @@ current tree on 2026-07-07.
   code's own comment calls it out as the same class of theater `env.ts`'s honesty pass removed
   elsewhere. The real control is an in-handler 60-second deadline via `createDeadlineFetch`,
   merged with the inbound request's own abort signal.
-- **The voltorb win-re-entry quirk is characterized, not fixed** (audit ref NF(P7)-a): once a
-  player exceeds the per-level max score, every further single-tile flip re-enters the win-state
-  block. This is pinned by tests as documented current behavior, not silently accepted — treat a
-  test change here as a deliberate behavior change, not a bug fix in passing.
+- **Super Voltorb Flip deals and scores by the HGSS rules** (`super-voltorb-flip/hgss.ts`,
+  ported from pret/pokeheartgold 9d8b759). The 80 board layouts, the free-multiplier re-roll
+  (including its quirks: a deal is accepted after 1000 rejections, and a placement call gives up
+  after 100 collisions), the level rule and the Lv.8 streak are the decomp's, pinned by
+  `hgss.test.ts`. Do not tune them. Flips after a round ends are ignored, which retired the old
+  NF(P7)-a re-entry quirk on purpose. Only `?size=N` boards (dev and layout testing) still use
+  the formula deal in `engine.ts`.
+- **Quit's confirmation starts on Keep playing**, unlike HGSS's yes/no prompt, which starts on
+  Yes. A mis-tap should not end a round.
 - **Chess-puzzle's inner replay-consistency guards are intentionally silent** — they re-validate
   state that upstream callers have already validated once; a second failure there indicates the
   first guard's own invariant broke, which is a bug in the guard itself, not user input worth
