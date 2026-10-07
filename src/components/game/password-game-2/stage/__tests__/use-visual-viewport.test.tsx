@@ -2,8 +2,8 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useVisualViewport } from "../use-visual-viewport";
 
-function fakeVV(height: number, width = 390) {
-  const vv = Object.assign(new EventTarget(), { height, offsetTop: 0, width });
+function fakeVV(height: number, width = 390, scale = 1) {
+  const vv = Object.assign(new EventTarget(), { height, offsetTop: 0, width, scale });
   Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
   return vv;
 }
@@ -50,6 +50,17 @@ describe("useVisualViewport", () => {
       vi.stubGlobal("innerHeight", 390); // the layout viewport rotates too
       vv.height = 390;
       vv.width = 844;
+      vv.dispatchEvent(new Event("resize"));
+    });
+    expect(result.current.keyboardOpen).toBe(false);
+  });
+
+  it("pinch-zoom shrinks the visual viewport but is not a keyboard", () => {
+    const vv = fakeVV(844);
+    const { result } = renderHook(() => useVisualViewport(true));
+    act(() => {
+      vv.scale = 2;
+      vv.height = 422; // half the CSS px visible, but zoomed: height * scale is unchanged
       vv.dispatchEvent(new Event("resize"));
     });
     expect(result.current.keyboardOpen).toBe(false);

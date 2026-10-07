@@ -24,11 +24,13 @@ function createStore() {
       lastWidth = width;
       baseline = 0;
     }
-    baseline = Math.max(baseline, height, window.innerHeight);
+    const scale = vv?.scale ?? 1;
+    baseline = Math.max(baseline, height * scale, window.innerHeight);
     const next = computeViewportLayout({
       baselineHeight: baseline,
       vvHeight: height,
       vvOffsetTop: vv ? vv.offsetTop : 0,
+      vvScale: scale,
     });
     if (
       next.keyboardOpen !== snap.keyboardOpen ||

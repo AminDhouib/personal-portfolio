@@ -238,18 +238,15 @@ export function GameShell() {
   const sheet = phase === "running" && !desktop;
   const viewport = useVisualViewport(sheet);
 
-  // The phone play sheet owns the screen: lock the page scroll while it is up and give
-  // everything back (lock released, focus returned) when it goes away, whether that is
-  // an Exit, a switch to desktop, or the shell unmounting.
+  // The phone play sheet owns the screen: lock the page scroll while it is up and give it
+  // back when it goes away, whether that is an Exit, a switch to desktop, or the shell
+  // unmounting. Focus after an Exit is handled below; the control that launched the run
+  // is already gone by the time the sheet mounts, so there is nothing to restore here.
   useEffect(() => {
     if (!sheet) return;
     const root = document.documentElement;
-    const prevFocus = document.activeElement;
     root.classList.add("pg2-lock");
-    return () => {
-      root.classList.remove("pg2-lock");
-      if (prevFocus instanceof HTMLElement && prevFocus.isConnected) prevFocus.focus();
-    };
+    return () => root.classList.remove("pg2-lock");
   }, [sheet]);
 
   // After an Exit the start screen is a fresh tree, so the control that launched the run
@@ -638,16 +635,22 @@ export function GameShell() {
 
       {/* Toast stack: bottom-right, newest at the bottom; above the phone sheet. */}
       <div
+        data-testid="pg2-toasts"
         className={
           sheet
-            ? "pointer-events-none fixed right-4 bottom-4 z-85 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-2"
+            ? "pointer-events-none fixed inset-x-0 z-85 flex flex-col items-end justify-end gap-2 p-4"
             : "pointer-events-none fixed right-4 bottom-4 z-50 flex w-72 flex-col gap-2"
+        }
+        style={
+          sheet
+            ? { top: viewport.top, height: viewport.height > 0 ? viewport.height : "100dvh" }
+            : undefined
         }
       >
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pg2-toast pg2-toast--${t.tone} px-4 py-2.5 text-sm text-[color:var(--pg2-ink)]`}
+            className={`pg2-toast pg2-toast--${t.tone} w-72 max-w-full px-4 py-2.5 text-sm text-[color:var(--pg2-ink)]`}
           >
             {t.text}
           </div>
@@ -859,10 +862,10 @@ function RunningView({
       ? "pg2-play lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,26rem)] lg:items-start lg:gap-6"
       : "pg2-play mx-auto max-w-3xl";
   const cardClass = sheet
-    ? "pg2-panel relative flex-none touch-none overflow-hidden"
+    ? "pg2-panel relative flex-none touch-pan-y overflow-hidden"
     : "pg2-panel relative overflow-hidden lg:sticky lg:top-24";
   const rulesClass = sheet
-    ? "min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain"
+    ? "min-h-32 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain"
     : "mt-6 min-w-0 lg:-m-1 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:p-1";
 
   // Focus inside the pointerdown itself: iOS only summons the keyboard from a gesture.
@@ -870,15 +873,34 @@ function RunningView({
     hiddenInputRef.current?.focus({ preventScroll: true });
   }, [hiddenInputRef]);
 
-  // When the soft keyboard opens the sheet shrinks; keep the rule being worked on in view.
+  // While the soft keyboard is up the sheet is short: keep the rule being worked on in view
+  // (whenever the active rule changes, not only when the keyboard opens) and, as the player
+  // types, the caret line of the password box. Runs after every render; the work is a query
+  // and two identity checks.
   const keyboardOpen = viewport.keyboardOpen;
+  const followedRuleRef = useRef<Element | null>(null);
+  const followedVersionRef = useRef(-1);
   useEffect(() => {
-    if (!keyboardOpen) return;
-    const el = panelRef.current?.parentElement?.querySelector(".pg2-rule--active");
-    if (el instanceof HTMLElement && typeof el.scrollIntoView === "function") {
-      el.scrollIntoView({ block: "nearest" });
+    if (!keyboardOpen) {
+      followedRuleRef.current = null;
+      followedVersionRef.current = -1;
+      return;
     }
-  }, [keyboardOpen, panelRef]);
+    const reveal = (el: Element | null | undefined) => {
+      if (el instanceof HTMLElement && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    };
+    const rule = panelRef.current?.parentElement?.querySelector(".pg2-rule--active") ?? null;
+    if (rule !== followedRuleRef.current) {
+      followedRuleRef.current = rule;
+      reveal(rule);
+    }
+    if (g.version !== followedVersionRef.current) {
+      followedVersionRef.current = g.version;
+      reveal(boxRef.current?.querySelector(".pg2-caret"));
+    }
+  });
 
   const play = (
     <div className={playClass}>
@@ -891,6 +913,7 @@ function RunningView({
           onToggleSound={onToggleSound}
           onCopySeed={onCopySeed}
           onExit={sheet ? onExit : undefined}
+          compact={viewport.keyboardOpen}
         />
 
         <div className="p-5 sm:p-6">
@@ -994,22 +1017,28 @@ function RunningView({
     </div>
   );
 
-  if (!sheet) return play;
+  // One wrapper in both layouts, so crossing the desktop breakpoint mid-run only changes
+  // its class and style and never remounts the stage (widget and canvas state survive).
+  // The sheet scrolls when the card plus the minimum rule region overflow a short phone,
+  // so the password is never clipped; overscroll-contain keeps that scroll off the page.
+  const wrapperClass = !sheet
+    ? undefined
+    : viewport.keyboardOpen
+      ? "pg2-sheet pg2-sheet--kb fixed inset-x-0 z-80 flex flex-col overflow-y-auto overscroll-contain bg-(--background)"
+      : "pg2-sheet fixed inset-x-0 z-80 flex flex-col overflow-y-auto overscroll-contain bg-(--background)";
   return (
     <div
-      data-testid="pg2-sheet"
-      className={
-        viewport.keyboardOpen
-          ? `pg2-sheet pg2-sheet--kb fixed inset-x-0 z-80 flex flex-col bg-(--background) ${inPlay ? "overflow-hidden" : "overflow-y-auto"}`
-          : `pg2-sheet fixed inset-x-0 z-80 flex flex-col bg-(--background) ${inPlay ? "overflow-hidden" : "overflow-y-auto"}`
-      }
+      data-testid={sheet ? "pg2-sheet" : undefined}
+      className={wrapperClass}
       style={
-        {
-          "--pg2-vv-h": viewport.height > 0 ? `${viewport.height}px` : "100dvh",
-          "--pg2-vv-top": `${viewport.top}px`,
-          top: "var(--pg2-vv-top)",
-          height: "var(--pg2-vv-h)",
-        } as CSSProperties
+        sheet
+          ? ({
+              "--pg2-vv-h": viewport.height > 0 ? `${viewport.height}px` : "100dvh",
+              "--pg2-vv-top": `${viewport.top}px`,
+              top: "var(--pg2-vv-top)",
+              height: "var(--pg2-vv-h)",
+            } as CSSProperties)
+          : undefined
       }
     >
       {play}

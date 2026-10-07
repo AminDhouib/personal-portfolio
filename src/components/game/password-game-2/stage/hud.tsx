@@ -12,6 +12,8 @@ interface HudProps {
   onCopySeed: () => void;
   /** When given, an Exit control is shown; it asks for a second tap before leaving. */
   onExit?: () => void;
+  /** Soft keyboard up on a phone: drop the seed chip so the row stays one line at 360px. */
+  compact?: boolean;
 }
 
 /** The five act titles from the design spec, formatted for the HUD strip. */
@@ -71,18 +73,23 @@ function ExitButton({ onExit }: { onExit: () => void }) {
     return () => window.clearTimeout(t);
   }, [armed]);
   return (
-    <button
-      type="button"
-      onClick={() => (armed ? onExit() : setArmed(true))}
-      aria-label={armed ? "Confirm exit" : "Exit"}
-      className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border px-3 text-xs font-semibold ${
-        armed
-          ? "border-[color:var(--pg2-invasion)] bg-[color:var(--pg2-invasion)] text-white"
-          : "border-[color:var(--pg2-line-strong)] text-[color:var(--pg2-body)] hover:bg-[color:var(--pg2-field)]"
-      }`}
-    >
-      {armed ? "Confirm exit" : "Exit"}
-    </button>
+    <>
+      <span role="status" aria-live="polite" className="sr-only">
+        {armed ? "Tap Exit again to leave" : ""}
+      </span>
+      <button
+        type="button"
+        onClick={() => (armed ? onExit() : setArmed(true))}
+        aria-label={armed ? "Confirm exit" : "Exit"}
+        className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border px-3 text-xs font-semibold ${
+          armed
+            ? "border-[color:var(--pg2-invasion)] bg-[color:var(--pg2-invasion)] text-white"
+            : "border-[color:var(--pg2-line-strong)] text-[color:var(--pg2-body)] hover:bg-[color:var(--pg2-field)]"
+        }`}
+      >
+        {armed ? "Confirm exit" : "Exit"}
+      </button>
+    </>
   );
 }
 
@@ -99,6 +106,7 @@ export function Hud({
   onToggleSound,
   onCopySeed,
   onExit,
+  compact = false,
 }: HudProps) {
   const full = ACT_LABELS[act];
   const short = full.split(" — ")[0]!;
@@ -124,7 +132,11 @@ export function Hud({
           type="button"
           onClick={onCopySeed}
           aria-label={`Copy race link for seed ${seed}`}
-          className="pg2-seedchip min-h-11 rounded-md border border-[color:var(--pg2-line-strong)] px-2.5 text-xs text-[color:var(--pg2-body)]"
+          className={
+            compact
+              ? "pg2-seedchip hidden min-h-11 rounded-md border border-[color:var(--pg2-line-strong)] px-2.5 text-xs text-[color:var(--pg2-body)]"
+              : "pg2-seedchip min-h-11 rounded-md border border-[color:var(--pg2-line-strong)] px-2.5 text-xs text-[color:var(--pg2-body)]"
+          }
         >
           seed {seed}
         </button>
