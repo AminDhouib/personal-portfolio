@@ -39,7 +39,27 @@ describe("RoundResult", () => {
   });
 
   it("names the top level when a win cannot move up", () => {
-    render(<RoundResult kind="win" fromLevel={9} toLevel={9} coins={500} onContinue={() => {}} />);
-    expect(screen.getByText("Top level: Level 9")).toBeTruthy();
+    render(<RoundResult kind="win" fromLevel={8} toLevel={8} coins={2187} onContinue={() => {}} />);
+    expect(screen.getByText("Top level: Level 8")).toBeTruthy();
+  });
+
+  it("a quit with coins says what was banked", () => {
+    render(<RoundResult kind="quit" fromLevel={4} toLevel={2} coins={36} onContinue={() => {}} />);
+    expect(screen.getByText("You quit. +36 coins")).toBeTruthy();
+    expect(screen.getByText("Level 4 to Level 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeTruthy();
+  });
+
+  it("a quit with no coins says so", () => {
+    render(<RoundResult kind="quit" fromLevel={1} toLevel={1} coins={0} onContinue={() => {}} />);
+    expect(screen.getByText("You quit with no coins.")).toBeTruthy();
+    expect(screen.getByText("Staying on Level 1")).toBeTruthy();
+  });
+
+  it("a win that keeps the level says how to reach Level 8", () => {
+    render(<RoundResult kind="win" fromLevel={7} toLevel={7} coins={1152} onContinue={() => {}} />);
+    expect(
+      screen.getByText("Staying on Level 7. Five strong rounds in a row reach Level 8."),
+    ).toBeTruthy();
   });
 });
