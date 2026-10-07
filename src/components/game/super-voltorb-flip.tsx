@@ -347,6 +347,13 @@ type CardProps = {
   valueLabel?: string;
 };
 
+// Two complete static class strings (never a conditional fragment) so the
+// Tailwind prettier plugin cannot re-fuse the separator before the modifier.
+const TILE_WRAP =
+  "svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]";
+const TILE_WRAP_ANXIOUS =
+  "svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px] svf-tile-anxious";
+
 const Card = ({
   children,
   fake,
@@ -373,7 +380,7 @@ const Card = ({
     </div>
   ) : (
     <div
-      className={`svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]${warning ? "svf-tile-anxious" : ""}`}
+      className={warning ? TILE_WRAP_ANXIOUS : TILE_WRAP}
       role="button"
       tabIndex={0}
       aria-label={
