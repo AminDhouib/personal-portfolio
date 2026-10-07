@@ -72,3 +72,24 @@ describe("RoundResult", () => {
     expect(root?.classList.contains("sm:min-h-[60px]")).toBe(true);
   });
 });
+
+describe("RoundResult (assisted)", () => {
+  it("says an assisted round is not in the record", () => {
+    render(
+      <RoundResult
+        kind="win"
+        fromLevel={1}
+        toLevel={2}
+        coins={24}
+        assisted
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByText(/Assisted: not in your record\./)).toBeTruthy();
+  });
+
+  it("says nothing of the sort for a plain round", () => {
+    render(<RoundResult kind="win" fromLevel={1} toLevel={2} coins={24} onContinue={() => {}} />);
+    expect(screen.queryByText(/Assisted/)).toBeNull();
+  });
+});

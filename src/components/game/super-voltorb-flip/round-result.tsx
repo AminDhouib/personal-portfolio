@@ -9,6 +9,8 @@ export type RoundResultProps = {
   toLevel: number;
   /** Coins banked this round; shown for a win or a quit. */
   coins?: number;
+  /** The round was played with the odds assist on: the detail line says it does not count. */
+  assisted?: boolean;
   onContinue: () => void;
 };
 
@@ -21,14 +23,27 @@ export type RoundResultProps = {
  * like the game's other light chrome (white card, grey outline, green action
  * button).
  */
-export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }: RoundResultProps) {
+export function RoundResult({
+  kind,
+  fromLevel,
+  toLevel,
+  coins = 0,
+  assisted,
+  onContinue,
+}: RoundResultProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     buttonRef.current?.focus();
   }, []);
 
-  const { title, detail } = roundResultCopy({ kind, fromLevel, toLevel, coins });
+  const { title, detail } = roundResultCopy({
+    kind,
+    fromLevel,
+    toLevel,
+    coins,
+    assisted,
+  });
 
   return (
     <div className="rounded-5 flex min-h-[72px] items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1.5 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600 sm:min-h-[60px]">
