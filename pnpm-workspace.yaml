@@ -3,8 +3,9 @@ ignoredBuiltDependencies:
   - unrs-resolver
 
 # Security pins for transitive dependencies whose parents hold them below the fixed version.
-# Each one stays inside the major its parent expects. Drop an entry once the parent ships
-# the fix itself (pnpm audit without the entry stays clean).
+# Each one stays inside the major its parent expects unless its comment says why it crosses
+# one. Drop an entry once the parent ships the fix itself (pnpm audit without the entry
+# stays clean).
 overrides:
   # GHSA-866g-f22w-33x8 (low). @ai-sdk/google-vertex 3.0.x (via @copilotkit/runtime) pins
   # 3.0.23. 3.0.30 is the newest fixed 3.0.x without undici ^5, whose 5.x line has
@@ -19,3 +20,8 @@ overrides:
   # GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx (moderate). Dev only:
   # express 4 under @lhci/cli pins ~6.14.0.
   "qs@>=6.11.1 <6.16.0": "^6.16.0"
+  # GHSA-rj75-hqrm-r3gf (moderate). Crosses a major, scoped to its only consumer:
+  # @tailwindcss/typography (0.5.19 and 0.5.20 alike) pins 6.0.10, and the fix is 7.1.6.
+  # 7.0's one breaking change makes inserting nodes while iterating safe; the compiled
+  # site CSS is byte-identical under 7.1.6.
+  "@tailwindcss/typography>postcss-selector-parser": "^7.1.6"
