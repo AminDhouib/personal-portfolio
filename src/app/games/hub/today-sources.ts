@@ -16,4 +16,5 @@ export const TODAY_SOURCES: readonly TodaySource[] = [
   { slug: "password-game", kind: "pg2" },
   { slug: "space-shooter", kind: "arcade" },
   { slug: "hextris", kind: "arcade" },
+  { slug: "super-voltorb-flip", kind: "arcade" },
 ];
