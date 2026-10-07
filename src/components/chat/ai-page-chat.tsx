@@ -29,7 +29,7 @@ function AiPageActions() {
 
 export function AiPageChat() {
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
+    <CopilotKit runtimeUrl="/api/copilotkit" useSingleEndpoint showDevConsole={false}>
       <AiPageActions />
       <CopilotChat
         labels={{
