@@ -89,3 +89,29 @@ describe("assisted rounds", () => {
     );
   });
 });
+
+describe("daily boards", () => {
+  const base = { fromLevel: 5, toLevel: 5 };
+  it("never talk about levels", () => {
+    expect(roundResultCopy({ ...base, kind: "win", coins: 512, daily: true })).toEqual({
+      title: "Board cleared! +512 coins",
+      detail: "Every coin on today's board. A new one lands at 00:00 UTC.",
+    });
+    expect(roundResultCopy({ ...base, kind: "lose", coins: 0, daily: true })).toEqual({
+      title: "Voltorb! Today's board is done.",
+      detail: "No coins banked. A new board lands at 00:00 UTC.",
+    });
+    expect(roundResultCopy({ ...base, kind: "quit", coins: 12, daily: true })).toEqual({
+      title: "You quit. +12 coins",
+      detail: "Banked for today. A new board lands at 00:00 UTC.",
+    });
+    expect(roundResultCopy({ ...base, kind: "quit", coins: 0, daily: true })).toEqual({
+      title: "You quit with no coins.",
+      detail: "Banked for today. A new board lands at 00:00 UTC.",
+    });
+  });
+  it("say nothing about assistance (there is no assist on the Daily board)", () => {
+    const copy = roundResultCopy({ ...base, kind: "win", coins: 4, daily: true, assisted: true });
+    expect(copy.detail).not.toContain("Assisted");
+  });
+});

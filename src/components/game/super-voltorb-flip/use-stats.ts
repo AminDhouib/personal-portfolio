@@ -4,6 +4,7 @@ import { MAX_LEVEL } from "./hgss";
 import {
   EMPTY_STATS,
   loadStats,
+  recordDay,
   recordRound,
   saveStats,
   type RoundRecord,
@@ -35,6 +36,14 @@ export function useStats(enabled: boolean) {
     [enabled],
   );
 
+  const recordDayResult = useCallback(
+    (dayKey: string, completed: boolean) => {
+      if (!enabled) return;
+      setStats((prev) => recordDay(prev, dayKey, completed));
+    },
+    [enabled],
+  );
+
   /** Lifts highestLevel to the loaded save's level; never lowers it, never writes svf:progress. */
   const raiseHighestLevel = useCallback(
     (level: number) => {
@@ -47,5 +56,5 @@ export function useStats(enabled: boolean) {
 
   const reset = useCallback(() => setStats(structuredClone(EMPTY_STATS)), []);
 
-  return { stats, record, reset, raiseHighestLevel };
+  return { stats, record, recordDay: recordDayResult, reset, raiseHighestLevel };
 }

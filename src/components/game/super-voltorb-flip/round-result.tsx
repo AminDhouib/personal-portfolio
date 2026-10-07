@@ -11,6 +11,8 @@ export type RoundResultProps = {
   coins?: number;
   /** The round was played with the odds assist on: the detail line says it does not count. */
   assisted?: boolean;
+  /** The Daily board: the copy drops levels and the button reads "See results". */
+  daily?: boolean;
   onContinue: () => void;
 };
 
@@ -29,6 +31,7 @@ export function RoundResult({
   toLevel,
   coins = 0,
   assisted,
+  daily,
   onContinue,
 }: RoundResultProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -43,6 +46,7 @@ export function RoundResult({
     toLevel,
     coins,
     assisted,
+    daily,
   });
 
   return (
@@ -61,7 +65,7 @@ export function RoundResult({
         onClick={onContinue}
         className="drop-shadow-default min-h-11 min-w-11 shrink-0 cursor-pointer rounded-[6px] border-2 border-white bg-[#3D7757] px-3 text-sm font-bold text-white outline outline-2 outline-gray-600 focus-visible:outline-[#ef2020]"
       >
-        {kind === "lose" ? "Continue" : "Next round"}
+        {daily ? "See results" : kind === "lose" ? "Continue" : "Next round"}
       </button>
     </div>
   );

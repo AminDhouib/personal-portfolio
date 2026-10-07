@@ -3,10 +3,13 @@ import {
   EMPTY_STATS,
   LV8_SECONDS_PER_ROUND_CAP,
   STATS_KEY,
+  activeStreak,
   loadStats,
   parseStats,
+  recordDay,
   recordRound,
   saveStats,
+  type Stats,
 } from "../stats";
 
 beforeEach(() => {
@@ -151,5 +154,86 @@ describe("recordRound", () => {
     const before = JSON.stringify(EMPTY_STATS);
     recordRound(EMPTY_STATS, round);
     expect(JSON.stringify(EMPTY_STATS)).toBe(before);
+  });
+});
+
+describe("recordDay (the daily streak)", () => {
+  const done = (s: Stats, day: string, completed = true) => recordDay(s, day, completed);
+
+  it("a first completed day starts a streak of one", () => {
+    const s = done(EMPTY_STATS, "2026-10-07");
+    expect(s.streak).toEqual({ current: 1, best: 1, lastDay: "2026-10-07" });
+    expect(s.dailyPlayed).toBe(1);
+  });
+
+  it("consecutive UTC days extend it, across month and year ends", () => {
+    let s = done(EMPTY_STATS, "2026-12-30");
+    s = done(s, "2026-12-31");
+    s = done(s, "2027-01-01");
+    expect(s.streak).toEqual({ current: 3, best: 3, lastDay: "2027-01-01" });
+  });
+
+  it("a missed day restarts it at one and keeps the best", () => {
+    let s = done(EMPTY_STATS, "2026-10-05");
+    s = done(s, "2026-10-06");
+    s = done(s, "2026-10-08");
+    expect(s.streak).toEqual({ current: 1, best: 2, lastDay: "2026-10-08" });
+  });
+
+  it("the same day twice does not extend it", () => {
+    const s = done(done(EMPTY_STATS, "2026-10-07"), "2026-10-07");
+    expect(s.streak.current).toBe(1);
+  });
+
+  it("a lost or zero-coin board counts as played and does not extend the streak", () => {
+    const base = done(EMPTY_STATS, "2026-10-06");
+    const s = done(base, "2026-10-07", false);
+    expect(s.dailyPlayed).toBe(2);
+    expect(s.streak.current).toBe(1);
+    expect(s.streak.best).toBe(1);
+  });
+
+  it("a loss does not break a live streak: the next completed day continues it", () => {
+    let s = done(EMPTY_STATS, "2026-10-05");
+    s = done(s, "2026-10-06");
+    s = done(s, "2026-10-07", false);
+    expect(s.streak).toEqual({ current: 2, best: 2, lastDay: "2026-10-07" });
+    expect(done(s, "2026-10-08").streak).toEqual({ current: 3, best: 3, lastDay: "2026-10-08" });
+  });
+
+  it("losses on consecutive days keep it alive, a missed day after one does not", () => {
+    let s = done(EMPTY_STATS, "2026-10-05");
+    s = done(s, "2026-10-06", false);
+    s = done(s, "2026-10-07", false);
+    expect(done(s, "2026-10-08").streak.current).toBe(2);
+    // A day with nothing played in between lapses it.
+    expect(done(s, "2026-10-09").streak.current).toBe(1);
+  });
+
+  it("a loss cannot revive a streak that already lapsed", () => {
+    const lapsed = done(EMPTY_STATS, "2026-10-01");
+    const s = done(lapsed, "2026-10-07", false);
+    expect(s.streak).toEqual(lapsed.streak);
+  });
+
+  it("does not mutate its input", () => {
+    const before = JSON.stringify(EMPTY_STATS);
+    recordDay(EMPTY_STATS, "2026-10-07", true);
+    expect(JSON.stringify(EMPTY_STATS)).toBe(before);
+  });
+});
+
+describe("activeStreak", () => {
+  const s = {
+    ...EMPTY_STATS,
+    streak: { current: 4, best: 6, lastDay: "2026-10-06" },
+  };
+  it("is the current streak through today and the day after the last completed one", () => {
+    expect(activeStreak(s, "2026-10-06")).toBe(4);
+    expect(activeStreak(s, "2026-10-07")).toBe(4);
+  });
+  it("is zero once a whole UTC day was missed, or when nothing was ever played", () => {
+    expect(activeStreak(s, "2026-10-08")).toBe(0);
+    expect(activeStreak(EMPTY_STATS, "2026-10-07")).toBe(0);
   });
 });
