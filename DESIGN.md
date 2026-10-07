@@ -377,6 +377,10 @@ current tree on 2026-07-07.
   lives in a slot under the board, never over it (the revealed board is worth reading). While a
   round is live the slot shows a one-line hint plus the Quit button, so it keeps its height and
   the page never jumps.
+  The wait ignores keys whose target is a text field (`keyboard.ts` `isTextEntryTarget`), so the AI
+  chat can be typed in while a banner is up. The banner wording lives in `round-result-copy.ts`
+  (original text; paraphrase, never Nintendo's strings) and keeps the reserved height, 72px below
+  sm and 60px from sm, which `round-result.test.tsx` pins.
 - **Super Voltorb Flip's sound is original and mostly synthesized, and its cue lengths are a
   timing contract.** Effects and the three fanfares (round cleared, round lost, risk warning) are
   generated at runtime with Web Audio from the pure tables in `super-voltorb-flip/sound-cues.ts`
@@ -391,6 +395,8 @@ current tree on 2026-07-07.
   Password Game 2's rather than imported, by the cross-game convention.
   `__tests__/assets-guard.test.ts` fails if ripped audio paths, unreferenced files or
   unattributed music come back.
+  The muted clear wait is `LEVEL_WIN_MS`, not a literal (T2d-1): `audio-timing.test.tsx` runs the
+  clear wait in both modes and pins the payout start at exactly that length.
 - **Super Voltorb Flip's art is original and defined as text.** The orb, memo glyphs and clear
   mark are character maps in `super-voltorb-flip/art/sprites.ts` rendered as inline SVG by
   `PixelSprite`; the bomb burst, success sparkle and spinning coin are pure frame geometry in
