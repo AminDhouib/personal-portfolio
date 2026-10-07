@@ -30,7 +30,8 @@ Games are self-contained under `src/components/game/`. Most games are a single t
 component file (`hextris.tsx`, `tower-stacker.tsx`, `typing-speed.tsx`); non-component logic is
 progressively being extracted into same-named subdirectories as each game gets touched —
 `password-game-2/` (a full `engine/` with `rules/`, `events/`, and a seeded core, plus `stage/`
-and `sound/` layers) and `super-voltorb-flip/` (`engine.ts`, `audio.ts`, `chrome.tsx`) are
+and `sound/` layers) and `super-voltorb-flip/` (`engine.ts`, `audio.ts` with `sound-cues.ts`,
+`synth.ts` and `music.ts` behind it, `chrome.tsx`) are
 furthest along; `space-shooter/` holds several
 extracted modules (`spawning.ts`, `boss-behaviors.ts`, `sound-manager.ts`, `run-init.ts`) but
 `space-shooter.tsx` and `hextris.tsx` still carry the bulk of their engine logic inline in the
@@ -376,6 +377,19 @@ current tree on 2026-07-07.
   lives in a slot under the board, never over it (the revealed board is worth reading). While a
   round is live the slot shows a one-line hint plus the Quit button, so it keeps its height and
   the page never jumps.
+- **Super Voltorb Flip's sound is original and mostly synthesized, and its cue lengths are a
+  timing contract.** Effects and the three fanfares (round cleared, round lost, risk warning) are
+  generated at runtime with Web Audio from the pure tables in `super-voltorb-flip/sound-cues.ts`
+  (scheduled by `synth.ts`, behind the `audio.ts` facade); no ripped game audio ships. The
+  background loop is one of three CC0 tracks picked by level band in `music.ts` (Lv.1-3, 4-6,
+  7-8), with per-track volumes trimmed to equal loudness. A cue's `ms` is what the round flow
+  waits on: the win sequence awaits the clear fanfare, the risk fanfare locks the board for exactly
+  `RISK_WARNING_MS` (2100, the same figure the muted path waits, so muted and unmuted pacing
+  match), and `sfx.*` promises resolve at the cue's end even with no `AudioContext`. Changing a
+  cue length is a gameplay-timing change, not a sound tweak. The synth helpers are copied from
+  Password Game 2's rather than imported, by the cross-game convention.
+  `__tests__/assets-guard.test.ts` fails if ripped audio paths, unreferenced files or
+  unattributed music come back.
 - **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
   `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
   license alongside). Known quirks live inside that bundle and are accepted while the game stays
