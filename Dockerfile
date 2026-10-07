@@ -41,6 +41,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# CopilotKit 1.77's runtime posts every event to telemetry.copilotkit.ai (about five
+# per chat run). It reads this switch once at import, so it has to be set at process
+# start; remove it to opt back in.
+ENV COPILOTKIT_TELEMETRY_DISABLED=true
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 

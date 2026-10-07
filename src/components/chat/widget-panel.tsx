@@ -98,7 +98,7 @@ export function ChatWidgetPanel({
   }, [openSignal]);
 
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" showDevConsole={false}>
+    <CopilotKit runtimeUrl="/api/copilotkit" useSingleEndpoint showDevConsole={false}>
       <ChatActions pathname={pathname} />
       <CopilotPopup
         labels={{
