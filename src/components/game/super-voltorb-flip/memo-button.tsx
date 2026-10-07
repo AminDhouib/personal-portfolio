@@ -1,5 +1,8 @@
 "use client";
 
+import { PixelSprite } from "./art/pixel-sprite";
+import { GLYPHS, GLYPH_CLEAR } from "./art/sprites";
+
 export type MemoFlag = 1 | 2 | 3 | "V";
 
 // Set of currently-active memo flags. The user can toggle multiple at
@@ -9,12 +12,31 @@ export type MemoFlagSet = ReadonlySet<MemoFlag>;
 
 const ALL_FLAGS: MemoFlag[] = ["V", 1, 2, 3];
 
-// Asset name in /button/memo/ — the upstream sprite file numbering does
-// NOT match the flag value. 0_*.png is the voltorb button, 1_*.png is
-// "1", 2_*.png is "2", 3_*.png is "3", and s_*.png is the back button.
-function assetForFlag(f: MemoFlag): string {
-  if (f === "V") return "0";
-  return String(f);
+// Two complete static class strings (never a conditional fragment) so the
+// Tailwind prettier plugin cannot re-fuse a modifier separator.
+const FACE_OFF =
+  "flex items-center justify-center rounded-[4px] border-2 border-gray-400 bg-gray-100";
+const FACE_ON =
+  "flex items-center justify-center rounded-[4px] border-2 border-[#b87512] bg-[#efa539]";
+
+function MemoFace({
+  sprite,
+  active,
+  size,
+}: {
+  sprite: (typeof GLYPHS)[MemoFlag] | typeof GLYPH_CLEAR;
+  active: boolean;
+  size: number;
+}) {
+  return (
+    <span className={active ? FACE_ON : FACE_OFF} style={{ width: size, height: size }}>
+      <PixelSprite
+        sprite={sprite}
+        cssSize="62%"
+        style={{ color: active ? "#1f2937" : "#4b5563" }}
+      />
+    </span>
+  );
 }
 
 export function MemoBar({
@@ -45,7 +67,6 @@ export function MemoBar({
       )}
       {ALL_FLAGS.map((f) => {
         const active = activeFlags.has(f);
-        const imgName = `${assetForFlag(f)}_${active ? "on" : "off"}`;
         return (
           <button
             key={String(f)}
@@ -55,14 +76,7 @@ export function MemoBar({
             title={`Tag tiles as ${f}`}
             className="rounded-sm transition-opacity hover:opacity-80"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/games/super-voltorb-flip/sprites/upstream/button/memo/${imgName}.png`}
-              width={size}
-              height={size}
-              alt=""
-              style={{ imageRendering: "pixelated" }}
-            />
+            <MemoFace sprite={GLYPHS[f]} active={active} size={size} />
           </button>
         );
       })}
@@ -72,14 +86,7 @@ export function MemoBar({
         title="Clear all memo flags"
         className="rounded-sm transition-opacity hover:opacity-80"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/games/super-voltorb-flip/sprites/upstream/button/memo/s_off.png"
-          width={size}
-          height={size}
-          alt=""
-          style={{ imageRendering: "pixelated" }}
-        />
+        <MemoFace sprite={GLYPH_CLEAR} active={false} size={size} />
       </button>
     </div>
   );

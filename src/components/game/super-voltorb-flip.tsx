@@ -7,9 +7,11 @@
  *
  * Modifications by <amin dhouib@outlook.com>:
  * - Next.js 16 / portfolio codebase integration
- * - Inline SVG voltorb icon instead of upstream Pokémon sprite PNGs
- *   (those are Nintendo IP not redistributed under upstream's MIT).
- * - Fonts shipped under public/games/voltorb-flip/fonts/ with LICENSE.
+ * - All art and sound are original: pixel sprites drawn as text in
+ *   super-voltorb-flip/art/, sound effects synthesized in
+ *   super-voltorb-flip/sound-cues.ts. No sprite or audio from the Pokemon
+ *   games or from upstream's asset folder ships.
+ * - Fonts shipped under public/games/voltorb-flip/fonts/.
  */
 
 import React, {
@@ -41,13 +43,14 @@ import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
+import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
+import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
 import { COLORS, type Cell, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
 import {
   VoltorbIcon,
   LoopingExplosion,
   LoopingSparkle,
-  PokeballIcon,
   CoinSpinner,
   InstructionsBtns,
   PixelMuteButton,
@@ -160,6 +163,10 @@ const SCOPED_STYLES = `
     drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
   filter: drop-shadow(1px 1px white) drop-shadow(-1px -1px white)
     drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
+}
+.svf-root .svf-glyph-outline {
+  filter: drop-shadow(1px 0 0 #1f2937) drop-shadow(-1px 0 0 #1f2937)
+    drop-shadow(0 1px 0 #1f2937) drop-shadow(0 -1px 0 #1f2937);
 }
 .svf-root .voltorb { height: 28px; width: 28px; }
 .svf-root .rounded-5 { border-radius: 5px; }
@@ -437,18 +444,11 @@ const Card = ({
                           : "items-end justify-end",
                   ].join(" ")}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    // Asset mapping: memo/0.png = voltorb glyph, 1.png = "1",
-                    // 2.png = "2", 3.png = "3". Was off-by-one before — flag
-                    // 1 was loading 0.png (voltorb), flag 3 was loading 2.png.
-                    src={`/games/super-voltorb-flip/sprites/upstream/memo/${f === "V" ? 0 : f}.png`}
-                    alt=""
-                    style={{
-                      imageRendering: "pixelated",
-                      width: flagSize,
-                      height: flagSize,
-                    }}
+                  <PixelSprite
+                    sprite={GLYPHS[f]}
+                    cssSize={flagSize}
+                    className="svf-glyph-outline"
+                    style={{ color: "#fff" }}
                   />
                 </div>
               ) : null,
@@ -872,26 +872,11 @@ const Gameboard = ({
                       }
                     >
                       {cell.value === "V" ? (
-                        // tile/voltorb.png is upstream's srcTile0 (22×22 with
-                        // salmon + voltorb body baked in, matching the
-                        // voltorb-tile region embedded in each explode_*.png
-                        // frame). Using it here makes the post-explosion
-                        // static voltorb pixel-identical in size and style
-                        // to the voltorb shown during the destruction frames,
-                        // eliminating the snap on overlay unmount.
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src="/games/super-voltorb-flip/sprites/upstream/tile/voltorb.png"
-                          alt=""
+                        <PixelSprite
+                          sprite={ORB}
+                          cssSize="calc(var(--svf-tile) * 0.95)"
                           className="picture-outline voltorb"
-                          style={{
-                            imageRendering: "pixelated",
-                            width: "calc(var(--svf-tile) * 0.95)",
-                            height: "calc(var(--svf-tile) * 0.95)",
-                            maxWidth: "none",
-                            maxHeight: "none",
-                            display: "block",
-                          }}
+                          style={{ maxWidth: "none", maxHeight: "none" }}
                         />
                       ) : (
                         cell.value
@@ -1130,7 +1115,7 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
       >
         <div className="flex items-center justify-between border-b-2 border-gray-200 px-4 py-2">
           <div className="flex items-center gap-2">
-            <PokeballIcon size={20} />
+            <VoltorbIcon size={20} />
             <h1 className="drop-shadow-soft text-2xl leading-none">{howToPlayTitle}</h1>
           </div>
           <button
