@@ -68,16 +68,21 @@ export default function PasswordGamePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <Link
-          href="/games"
-          className="mb-8 inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          All Games
-        </Link>
+      {/* The play stage is a two-column layout (sticky stage card + rule column), so
+          the container is max-w-6xl. The editorial blocks around it stay at max-w-5xl,
+          centred, so they sit where they always did. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <Link
+            href="/games"
+            className="mb-8 inline-flex items-center gap-2 text-sm text-(--muted) transition-colors hover:text-(--foreground)"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            All Games
+          </Link>
+        </div>
 
-        <div className="max-w-3xl">
+        <div>
           {/* Server-rendered heading: the interactive shell is client-only
               (ssr: false), so without this the page ships no h1 in its SSR HTML.
               sr-only because the shell renders its own visible wordmark. */}
@@ -85,18 +90,20 @@ export default function PasswordGamePage() {
           <PasswordGame2Loader />
         </div>
 
-        <GameAbout title={GAME.title} content={CONTENT} />
+        <div className="mx-auto max-w-5xl">
+          <GameAbout title={GAME.title} content={CONTENT} />
 
-        <section className="mt-16">
-          <h2 className="mb-4 font-display text-sm font-bold tracking-wider text-(--muted) uppercase">
-            Other games you can play
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {others.map((g) => (
-              <GameCard key={g.slug} game={g} size="sm" />
-            ))}
-          </div>
-        </section>
+          <section className="mt-16">
+            <h2 className="mb-4 font-display text-sm font-bold tracking-wider text-(--muted) uppercase">
+              Other games you can play
+            </h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {others.map((g) => (
+                <GameCard key={g.slug} game={g} size="sm" />
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );
