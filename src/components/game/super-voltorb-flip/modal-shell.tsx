@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { VoltorbIcon } from "./chrome";
 
 const FOCUSABLE =
@@ -65,27 +58,37 @@ export function ModalShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [close]);
 
-  function trapTab(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Tab") return;
-    const card = cardRef.current;
-    if (!card) return;
-    const nodes = Array.from(card.querySelectorAll<HTMLElement>(FOCUSABLE));
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (!first || !last) {
-      e.preventDefault();
-      card.focus();
-      return;
+  // On the document, not the backdrop: a focused button that unmounts (Reset
+  // swapping to its confirm row) drops focus to body, and a keydown there never
+  // reaches the backdrop. Tab from outside the card is pulled back in.
+  useEffect(() => {
+    function trapTab(e: globalThis.KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      const card = cardRef.current;
+      if (!card) return;
+      const nodes = Array.from(card.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (!first || !last) {
+        e.preventDefault();
+        card.focus();
+        return;
+      }
+      const active = document.activeElement;
+      if (!active || !card.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (e.shiftKey && (active === first || active === card)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
-    const active = document.activeElement;
-    if (e.shiftKey && (active === first || active === card)) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && active === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
+    document.addEventListener("keydown", trapTab);
+    return () => document.removeEventListener("keydown", trapTab);
+  }, []);
 
   return (
     <div
@@ -93,7 +96,6 @@ export function ModalShell({
         closing ? "svf-modal-closing" : "svf-modal-open"
       }`}
       onClick={close}
-      onKeyDown={trapTab}
       role="dialog"
       aria-modal="true"
       aria-label={title}

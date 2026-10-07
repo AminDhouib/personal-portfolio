@@ -588,6 +588,9 @@ const Gameboard = ({
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
   );
   const [effects, setEffects] = useState<ActiveEffect[]>([]);
+  // True from the first frame of the flip-down until the next board is dealt:
+  // the old round's memos must not show on the face-down tiles in between.
+  const [flipDownStarted, setFlipDownStarted] = useState(false);
   const theme = useEffectsTheme();
   const nextId = useRef(0);
   // Tile being announced by the risk fanfare. Renders the anxious shake
@@ -854,6 +857,7 @@ const Gameboard = ({
         // Fire onStart at the exact frame the first column begins flipping
         // — keeps the level-up/down flash + SE in lockstep with the cards.
         onStart?.();
+        setFlipDownStarted(true);
         let stagger = 0;
         for (let col = 0; col < 5; col++) {
           setTimeout(() => {
@@ -872,6 +876,7 @@ const Gameboard = ({
         }
         setTimeout(() => {
           updateGame((g) => g.restartGame());
+          setFlipDownStarted(false);
         }, stagger + 200);
       }, delay);
     },
@@ -987,7 +992,7 @@ const Gameboard = ({
                         )
                       }
                       flipCard={() => handleFlip(coordinate[0], coordinate[1])}
-                      flags={peek || cell.isFlipped ? undefined : cell.flags}
+                      flags={peek || cell.isFlipped || flipDownStarted ? undefined : cell.flags}
                       warning={
                         warningTile?.row === coordinate[0] && warningTile?.col === coordinate[1]
                       }

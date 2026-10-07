@@ -225,3 +225,36 @@ describe("modal focus", () => {
     expect(cls).toContain("w-11");
   });
 });
+describe("focus stays in the dialog", () => {
+  it("moves focus to Keep it after Reset, and back to Reset after", () => {
+    render(<StatsPanel stats={EMPTY_STATS} onReset={() => {}} onClose={() => {}} />);
+    const reset = screen.getByRole("button", { name: "Reset statistics" });
+    reset.focus();
+    fireEvent.click(reset);
+    const keep = screen.getByRole("button", { name: "Keep it" });
+    expect(document.activeElement).toBe(keep);
+    fireEvent.click(keep);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reset statistics" }));
+  });
+
+  it("moves focus back into the card after a confirmed reset", () => {
+    render(<StatsPanel stats={EMPTY_STATS} onReset={() => {}} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reset statistics" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, reset" }));
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
+  });
+
+  it("pulls Tab back in when focus has fallen to the body", () => {
+    render(
+      <SettingsPanel
+        settings={{ memoUndo: true, stats: true, assist: false }}
+        onChange={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    (document.activeElement as HTMLElement).blur();
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
+  });
+});
