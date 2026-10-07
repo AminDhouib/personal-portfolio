@@ -12,8 +12,12 @@ export function computeViewportLayout(i: {
   baselineHeight: number;
   vvHeight: number;
   vvOffsetTop: number;
+  /** visualViewport.scale; pinch-zoom shrinks the viewport without a keyboard (default 1). */
+  vvScale?: number;
 }): ViewportLayout {
   const height = Math.max(0, i.vvHeight);
   const top = Math.max(0, i.vvOffsetTop);
-  return { keyboardOpen: i.baselineHeight - height >= KEYBOARD_MIN_PX, height, top };
+  // Compare in unzoomed px: height * scale is unchanged by a pinch, but a keyboard cuts it.
+  const unzoomed = height * (i.vvScale ?? 1);
+  return { keyboardOpen: i.baselineHeight - unzoomed >= KEYBOARD_MIN_PX, height, top };
 }
