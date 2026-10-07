@@ -35,6 +35,8 @@ import { FinaleStage } from "./finale-stage";
 import { ReceiptCard } from "./receipt-card";
 import { RuleList } from "./rule-list";
 import { Hud } from "./hud";
+import { HudActions } from "./hud-actions";
+import { HUD_BOTTOM_H, HUD_TOP_H } from "./hud-slots";
 import "./pg2.css";
 
 /** Valid ?event= ids for the showcase URL param, resolved once from the manifest. */
@@ -462,6 +464,18 @@ export function GameShell() {
     };
   }, [phase, forceRender, focusHiddenInput]);
 
+  // A DOM action chip (feed / basket / stoke). Unlike a canvas hit it must not pull
+  // focus to the hidden input: a keyboard user pressing Enter on a chip keeps their place.
+  const applyChip = useCallback(
+    (target: PointerTarget) => {
+      const g = gameRef.current;
+      if (!g) return;
+      applyPointer(g, target);
+      forceRender();
+    },
+    [forceRender],
+  );
+
   const onCellClick = useCallback(
     (id: number) => {
       const g = gameRef.current;
@@ -582,6 +596,7 @@ export function GameShell() {
             onHiddenInput={onHiddenInput}
             onSubmit={onSubmit}
             onPointer={applyTarget}
+            onChip={applyChip}
             onWidgetText={onWidgetText}
             onRuleState={onRuleState}
             onPlayAgain={playAgain}
@@ -744,6 +759,7 @@ function RunningView({
   onHiddenInput,
   onSubmit,
   onPointer,
+  onChip,
   onWidgetText,
   onRuleState,
   onPlayAgain,
@@ -763,6 +779,7 @@ function RunningView({
   onHiddenInput: (e: FormEvent<HTMLInputElement>) => void;
   onSubmit: () => void;
   onPointer: (target: PointerTarget) => void;
+  onChip: (target: PointerTarget) => void;
   onWidgetText: (text: string) => void;
   onRuleState: (id: string, value: unknown) => void;
   onPlayAgain: () => void;
@@ -820,6 +837,17 @@ function RunningView({
               </div>
             ) : null}
 
+            {/* Reserved HUD bands: meters paint on the canvas inside them, the
+                action chips are DOM buttons here, and nothing HUD-like ever
+                lands on the password. The top band grows (chips wrap) rather
+                than clip. */}
+            <div
+              className="flex items-center justify-end pl-36"
+              style={{ minHeight: HUD_TOP_H }}
+              data-pg2-hud-top
+            >
+              <HudActions g={g} onAction={onChip} />
+            </div>
             <CharStage
               cells={g.cells}
               caret={g.caret}
@@ -827,6 +855,7 @@ function RunningView({
               onCellClick={onCellClick}
               onBoxClick={onBoxClick}
             />
+            <div style={{ height: HUD_BOTTOM_H }} data-pg2-hud-bottom aria-hidden="true" />
 
             {/* Visually-hidden input: summons the mobile soft keyboard. Desktop
                 keydown preventDefault stops it from ever receiving those chars. */}
