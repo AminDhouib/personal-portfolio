@@ -224,6 +224,21 @@ describe("the Daily board", () => {
     expect(savedStats().assistedRounds ?? 0).toBe(0);
     expect(screen.queryByText(/Assisted/)).toBeNull();
   });
+
+  it("the Statistics reset does not touch the saved Daily attempt", async () => {
+    render(<SuperVoltorbFlipGame />);
+    openDaily();
+    flipDaily(calm("V"));
+    await screen.findByText(/no score to post/i);
+    const saved = window.localStorage.getItem("svf:daily");
+    expect(savedStats().dailyPlayed).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Back to the game" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Statistics" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Reset statistics" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, reset" }));
+    expect(savedStats().dailyPlayed).toBe(0);
+    expect(window.localStorage.getItem("svf:daily")).toBe(saved);
+  });
 });
 
 describe("the Daily streak", () => {
