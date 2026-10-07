@@ -147,6 +147,7 @@ describe("solve", () => {
 });
 
 describe("HGSS deal weighting", () => {
+  // Simulates 2500 deals: about 1 s locally, but slower on CI runners.
   it("level-1 odds match how often each tile value actually occurs", () => {
     const level = 1;
     const deals = 2500;
@@ -175,7 +176,7 @@ describe("HGSS deal weighting", () => {
       if (n < 5000) continue;
       expect(Math.abs((hits[b] ?? 0) / n - (sumP[b] ?? 0) / n), `bin ${b}`).toBeLessThan(0.03);
     }
-  });
+  }, 30_000);
 
   it("weighs two same-clue layouts by the boards that can deal each", () => {
     // Boards 10 and 15 share card counts (7 Voltorbs, one 2, three 3s); 15 caps
