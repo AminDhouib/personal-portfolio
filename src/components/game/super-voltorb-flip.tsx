@@ -48,6 +48,13 @@ import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
 import { afterPageLoad } from "./super-voltorb-flip/startup";
 import { isCursorKey, memoKeyFlag, moveCursor, type Cursor } from "./super-voltorb-flip/cursor";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
+import { isUndoKey, type MemoChange } from "./super-voltorb-flip/memo-undo";
+import { useMemoUndo } from "./super-voltorb-flip/use-memo-undo";
+import { useSettings } from "./super-voltorb-flip/use-settings";
+import { useStats } from "./super-voltorb-flip/use-stats";
+import { ModeRow } from "./super-voltorb-flip/mode-row";
+import { SettingsPanel } from "./super-voltorb-flip/settings-panel";
+import { StatsPanel } from "./super-voltorb-flip/stats-panel";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
 import { COLORS, type Cell, type FlagValues } from "./super-voltorb-flip/types";
@@ -542,6 +549,8 @@ type GameboardProps = {
    * folding away (rather than after the new round has already loaded).
    */
   onFlipDownStart?: (dir: "up" | "down") => void;
+  /** Called for every memo toggle (tap or key) so the parent can offer undo. */
+  onMemoChange?: (change: MemoChange) => void;
 };
 
 type ActiveEffect = {
@@ -562,6 +571,7 @@ const Gameboard = ({
   peek = false,
   runPostFanfare,
   onFlipDownStart,
+  onMemoChange,
 }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
@@ -678,6 +688,7 @@ const Gameboard = ({
       // is kept since flagCell already toggles, but it runs at most
       // once. HG/SS plays DP_BOX01 each time a memo flag lands on a tile.
       if (!muted) void sfx.memoToggle();
+      for (const f of memoFlags) onMemoChange?.({ row, col, flag: f });
       updateGame((g) => {
         for (const f of memoFlags) g.flagCell(row, col, f);
       });
@@ -777,6 +788,7 @@ const Gameboard = ({
       return;
     }
     if (!muted) void sfx.memoToggle();
+    onMemoChange?.({ row, col, flag });
     updateGame((g) => g.flagCell(row, col, flag));
   }
 
@@ -1460,7 +1472,33 @@ export function SuperVoltorbFlipGame() {
     setMemoFlags(new Set<MemoFlag>());
   }, [muted]);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
+  const [settings, updateSettings] = useSettings();
+  const { stats, record: recordStats, reset: resetStats } = useStats(settings.stats);
+  const { canUndo, record: recordMemo, undo: undoMemoStack, reset: resetMemoUndo } = useMemoUndo();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  // Round clock and start level for the statistics. The level is read while the
+  // round is live (the engine moves currentLevel the instant a round ends).
+  const roundStartedAtRef = useRef<number>(Date.now());
+  const roundStartLevelRef = useRef<number>(1);
   const musicStartedRef = useRef(false);
+
+  const undoMemo = useCallback(() => {
+    if (!settings.memoUndo || !game) return;
+    // Same gates as making a memo: not once the round is over.
+    if (game.gameStatus !== "playing" && game.gameStatus !== "memo") return;
+    if (undoMemoStack(game, updateGame) && !muted) void sfx.memoToggle();
+  }, [settings.memoUndo, game, undoMemoStack, updateGame, muted]);
+
+  // On .svf-root (React onKeyDown), not on document: it only hears keys pressed
+  // while focus is inside the game, so the AI chat and every other field keep
+  // theirs, and the text-field guard is a second belt.
+  function handleRootKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.defaultPrevented || !isUndoKey(e)) return;
+    if (!settings.memoUndo || isTextEntryTarget(e.nativeEvent)) return;
+    e.preventDefault();
+    undoMemo();
+  }
 
   // Smoothly-rolled scoreboard values. Default to the live game values; the
   // payout animation overrides them while a round wraps up. Reading game
@@ -1777,6 +1815,7 @@ export function SuperVoltorbFlipGame() {
       fadeOutMusic(250);
     }
     if ((prev === "win" || prev === "lose" || prev === "quit") && cur === "playing") {
+      resetMemoUndo();
       clearMemoTimer = window.setTimeout(() => clearMemoFlags(), 0);
       stopGameOver();
       stopLevelWin();
@@ -1785,12 +1824,25 @@ export function SuperVoltorbFlipGame() {
         playMusic(game.currentLevel);
       }
     }
+    if (cur === "playing" || cur === "memo") roundStartLevelRef.current = game.currentLevel;
+    if (cur === "playing" && prev !== "playing" && prev !== "memo") {
+      roundStartedAtRef.current = Date.now();
+    }
+    if ((cur === "win" || cur === "lose" || cur === "quit") && prev !== cur) {
+      recordStats({
+        outcome: cur === "win" ? "won" : cur === "lose" ? "lost" : "quit",
+        coins: cur === "lose" ? 0 : game.currentScore,
+        level: roundStartLevelRef.current,
+        assisted: false,
+        seconds: Math.round((Date.now() - roundStartedAtRef.current) / 1000),
+      });
+    }
     prevGameStatusRef.current = cur;
 
     return () => {
       if (clearMemoTimer) window.clearTimeout(clearMemoTimer);
     };
-  }, [game, game?.gameStatus, muted, clearMemoFlags]);
+  }, [game, game?.gameStatus, muted, clearMemoFlags, resetMemoUndo, recordStats]);
 
   // The level the next loop should be picked for. A ref, not an effect
   // dependency: a level change mid-round (the win moves it at once) must not
@@ -1839,10 +1891,21 @@ export function SuperVoltorbFlipGame() {
         <div
           ref={svfRootRef}
           className={`svf-root relative ${pokemonFont.variable} ${numberFont.variable} ${scoreFont.variable} ${pokemonFont.className} flex flex-col items-center p-1 text-white sm:p-2 lg:grid lg:grid-cols-[auto_1fr] lg:items-start lg:gap-4`}
+          onKeyDown={handleRootKeyDown}
         >
           <style>{SCOPED_STYLES}</style>
 
           {howToPlayOpen && <InstructionsModal language="en" setModalOpen={setHowToPlayOpen} />}
+          {settingsOpen && (
+            <SettingsPanel
+              settings={settings}
+              onChange={updateSettings}
+              onClose={() => setSettingsOpen(false)}
+            />
+          )}
+          {statsOpen && settings.stats && (
+            <StatsPanel stats={stats} onReset={resetStats} onClose={() => setStatsOpen(false)} />
+          )}
 
           {/* Desktop / tablet left column (sm+ only). Holds everything except
             the board so the right column can devote full width to tiles. */}
@@ -1871,6 +1934,11 @@ export function SuperVoltorbFlipGame() {
                 </div>
               )}
             </div>
+            <ModeRow
+              statsEnabled={settings.stats}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenStats={() => setStatsOpen(true)}
+            />
             <div className="flex w-full">
               <MemoBar
                 activeFlags={memoFlags}
@@ -1878,6 +1946,8 @@ export function SuperVoltorbFlipGame() {
                 onClear={clearMemoFlags}
                 size={32}
                 fullWidth
+                onUndo={settings.memoUndo ? undoMemo : undefined}
+                canUndo={canUndo}
               />
             </div>
             {game && <Scoreboard currentScore={displayCurrent} totalScore={displayTotal} />}
@@ -1962,6 +2032,11 @@ export function SuperVoltorbFlipGame() {
                     size={44}
                   />
                 </div>
+                <ModeRow
+                  statsEnabled={settings.stats}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  onOpenStats={() => setStatsOpen(true)}
+                />
                 <MemoBar
                   activeFlags={memoFlags}
                   onToggle={toggleMemoFlag}
@@ -1970,6 +2045,8 @@ export function SuperVoltorbFlipGame() {
                   showLabel={false}
                   fullWidth
                   spread
+                  onUndo={settings.memoUndo ? undoMemo : undefined}
+                  canUndo={canUndo}
                 />
               </div>
             )}
@@ -1985,6 +2062,7 @@ export function SuperVoltorbFlipGame() {
                   peek={peek}
                   runPostFanfare={runPostFanfare}
                   onFlipDownStart={triggerLevelTransition}
+                  onMemoChange={settings.memoUndo ? recordMemo : undefined}
                 />
                 <Footer />
               </>
