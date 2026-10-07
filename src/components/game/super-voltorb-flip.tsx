@@ -285,13 +285,15 @@ ${BOARD_FRAME_CSS}
   60%  { transform: translate(-1px, 2px) rotate(-0.8deg); }
   80%  { transform: translate(1px, -2px) rotate(0.8deg); }
 }
-/* Keyboard cursor: real DOM focus, drawn only for keyboard users. Dark ring
-   with enough contrast on the green board, clear of the tile's own 6px
-   border-plus-outline, lifted above its neighbours. */
+/* Keyboard cursor: real DOM focus, drawn only for keyboard users as the same
+   red frame hover uses plus a dark rim (red alone is under 3:1 on the green
+   board). One rounded ring, lifted above its neighbours. */
 .svf-root .svf-tile-wrap:focus-visible {
-  outline: 3px solid #111827;
-  outline-offset: 6px;
+  outline: none;
   z-index: 5;
+}
+.svf-root .svf-tile-wrap:focus-visible::before {
+  box-shadow: 0 0 0 1px #6a0a0a, 0 0 0 4px #ef2020, 0 0 0 6px #111827;
 }
 
 /* When the game element is fullscreened, fill the viewport with the
@@ -577,6 +579,13 @@ const Gameboard = ({
   const [announcement, setAnnouncement] = useState("");
   const gridRef = useRef<HTMLDivElement | null>(null);
   const hintId = useId();
+  // The board can be resized (debug panel) while this stays mounted; clamp so
+  // exactly one tile always holds the tab stop.
+  const lastIndex = game.cells.length - 1;
+  const activeCursor: Cursor = {
+    row: Math.min(cursor.row, lastIndex),
+    col: Math.min(cursor.col, lastIndex),
+  };
 
   // Round-end banner (win or lose). The flow waits on it: the banner button,
   // a pointerdown on the board, or Enter/Space/any printable key continues.
@@ -778,8 +787,8 @@ const Gameboard = ({
     if (isTextEntryTarget(e.nativeEvent)) return;
     if (isCursorKey(e.key)) {
       e.preventDefault();
-      const next = moveCursor(cursor, e.key, game.cells.length);
-      if (next.row === cursor.row && next.col === cursor.col) return;
+      const next = moveCursor(activeCursor, e.key, game.cells.length);
+      if (next.row === activeCursor.row && next.col === activeCursor.col) return;
       setCursor(next);
       if (!muted) void sfx.cursorMove();
       gridRef.current?.querySelector<HTMLElement>(`[data-cell="${next.row}-${next.col}"]`)?.focus();
@@ -787,7 +796,7 @@ const Gameboard = ({
     }
     const flag = memoKeyFlag(e.key);
     if (flag === null || e.repeat) return;
-    toggleMemoAt(cursor.row, cursor.col, flag);
+    toggleMemoAt(activeCursor.row, activeCursor.col, flag);
   }
 
   const flipCardsUp = useCallback(() => {
@@ -936,7 +945,9 @@ const Gameboard = ({
                       isFlipped={peek || cardsFlipped[i]?.isFlipped}
                       valueLabel={cell.value === "V" ? "Voltorb" : String(cell.value)}
                       tabIndex={
-                        coordinate[0] === cursor.row && coordinate[1] === cursor.col ? 0 : -1
+                        coordinate[0] === activeCursor.row && coordinate[1] === activeCursor.col
+                          ? 0
+                          : -1
                       }
                       cellId={`${coordinate[0]}-${coordinate[1]}`}
                       onFocus={() =>

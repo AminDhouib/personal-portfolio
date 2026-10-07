@@ -442,7 +442,7 @@ current tree on 2026-07-07.
   360px the floor is best effort. The phone memo bar sits on its own row at 44px faces (`spread`);
   the desktop bar is untouched.
 - **Super Voltorb Flip's keyboard layer is board-scoped, not global.** Tiles use a roving tabindex
-  (one tab stop) inside a `role="group"`; the cursor is real DOM focus drawn by `:focus-visible`.
+  (one tab stop) inside a `role="group"`; the cursor is real DOM focus drawn by `:focus-visible` (the hover red frame plus a dark rim, one ring).
   The handler is a React `onKeyDown` on the grid, never a `document` listener, so it cannot see keys
   typed in the AI chat; the one document-level listener (the round-end wait) skips text fields via
   `isTextEntryTarget`. `1`, `2`, `3`, `V` mark the tile under the cursor without changing the memo
