@@ -501,7 +501,9 @@ describe("useArcadeBoard", () => {
   });
 
   describe("submitting a score", () => {
-    async function mounted(game: "space-shooter" | "hextris" = "space-shooter") {
+    async function mounted(
+      game: "space-shooter" | "hextris" | "super-voltorb-flip" = "space-shooter",
+    ) {
       fetchMock.mockResolvedValueOnce(okResponse(board([]))); // the mount GET
       const hook = renderHook(() => useArcadeBoard(game));
       await waitFor(() => expect(hook.result.current.loading).toBe(false));
@@ -595,6 +597,27 @@ describe("useArcadeBoard", () => {
       });
       const ss = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
       expect(ss.detail).toEqual({ seconds: 5, kills: 6, distance: 7 });
+    });
+
+    it("sends Super Voltorb Flip's day and flips as its whole detail", async () => {
+      const { result } = await mounted("super-voltorb-flip");
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({ name: "Ada", score: 64, day: 20261007, flips: 6 });
+      });
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect(body.game).toBe("super-voltorb-flip");
+      expect(body.score).toBe(64);
+      expect(body.detail).toEqual({ day: 20261007, flips: 6 });
+    });
+
+    it("reads day and flips off a Super Voltorb Flip row", async () => {
+      fetchMock.mockResolvedValueOnce(
+        okResponse(board([serverEntry({ detail: { day: 20261007, flips: 9 } })])),
+      );
+      const { result } = renderHook(() => useArcadeBoard("super-voltorb-flip"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(1));
+      expect(result.current.entries[0]).toMatchObject({ day: 20261007, flips: 9 });
     });
 
     it("a 422 is a rejection, not a retryable failure", async () => {

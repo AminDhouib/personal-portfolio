@@ -200,6 +200,12 @@ describe("legacy leaderboard row pin", () => {
     ).toBe(false);
   });
 
+  it("rejects an arcade game that never had legacy rows (a newer game must not read the frozen table)", () => {
+    expect(
+      legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, game: "super-voltorb-flip" }).success,
+    ).toBe(false);
+  });
+
   it("is strict and rejects fractional or missing numbers", () => {
     expect(legacyLeaderboardRowSchema.safeParse({ ...LEGACY_ROW, region: "Canada" }).success).toBe(
       false,

@@ -3,6 +3,7 @@ import {
   ARCADE_GAME_SLUGS,
   ARCADE_GAMES,
   ARCADE_SCORE_CAP,
+  LEGACY_ARCADE_GAME_SLUGS,
   validateArcadeSubmission,
 } from "../games";
 
@@ -21,7 +22,7 @@ function reasonOf(verdict: ReturnType<typeof spaceShooter>): string | null {
 describe("registry", () => {
   it("registers exactly the arcade game slugs", () => {
     expect(Object.keys(ARCADE_GAMES).sort()).toEqual([...ARCADE_GAME_SLUGS].sort());
-    expect([...ARCADE_GAME_SLUGS]).toEqual(["space-shooter", "hextris"]);
+    expect([...ARCADE_GAME_SLUGS]).toEqual(["space-shooter", "hextris", "super-voltorb-flip"]);
   });
 
   it("keeps the legacy 10,000,000 score ceiling", () => {
@@ -202,5 +203,86 @@ describe("hextris plausibility (audit 2.4, P' = kills + 80)", () => {
     });
     expect(hextris(0, 0, 2, 1).ok).toBe(true);
     expect(hextris(9, 0, 3, 1).ok).toBe(true);
+  });
+});
+
+describe("super-voltorb-flip (Daily board)", () => {
+  // 2026-10-07: board 43, nine 2s, no 3s, ten Voltorbs, 15 safe tiles, max 512.
+  const NOW = new Date("2026-10-07T12:00:00Z");
+  const today = 20261007;
+  const check = (score: number, detail: unknown, now: Date = NOW) =>
+    validateArcadeSubmission("super-voltorb-flip", score, detail, now);
+
+  it("is an arcade game", () => {
+    expect(ARCADE_GAME_SLUGS).toContain("super-voltorb-flip");
+  });
+
+  it("accepts a cleared board, a partial bank and the smallest bank", () => {
+    expect(check(512, { day: today, flips: 9 })).toEqual({
+      ok: true,
+      detail: { day: today, flips: 9 },
+    });
+    expect(check(64, { day: today, flips: 8 }).ok).toBe(true);
+    expect(check(1, { day: today, flips: 1 }).ok).toBe(true);
+  });
+
+  it("rejects a score above the regenerated board's maximum (422)", () => {
+    const verdict = check(513, { day: today, flips: 15 });
+    expect(verdict).toEqual({
+      ok: false,
+      kind: "implausible",
+      reason: "score above the board's maximum",
+    });
+  });
+
+  it("rejects a score the board's tiles cannot multiply to", () => {
+    expect(check(3, { day: today, flips: 3 })).toMatchObject({ ok: false, kind: "implausible" });
+    expect(check(5, { day: today, flips: 3 })).toMatchObject({ ok: false, kind: "implausible" });
+  });
+
+  it("rejects too few flips and impossible flip counts", () => {
+    expect(check(512, { day: today, flips: 8 })).toMatchObject({ ok: false, kind: "implausible" });
+    expect(check(2, { day: today, flips: 0 })).toMatchObject({ ok: false, kind: "implausible" });
+    expect(check(0, { day: today, flips: 16 })).toMatchObject({ ok: false, kind: "implausible" });
+  });
+
+  it("rejects any day but today's UTC day, either side of it", () => {
+    for (const day of [20261006, 20261008, 20260101]) {
+      expect(check(1, { day, flips: 1 })).toEqual({
+        ok: false,
+        kind: "implausible",
+        reason: "not today's board",
+      });
+    }
+  });
+
+  it("follows the supplied clock across midnight UTC", () => {
+    const justBefore = new Date("2026-10-07T23:59:59Z");
+    const justAfter = new Date("2026-10-08T00:00:00Z");
+    expect(check(1, { day: today, flips: 1 }, justBefore).ok).toBe(true);
+    expect(check(1, { day: today, flips: 1 }, justAfter).ok).toBe(false);
+    // 2026-10-08 is a different board (same id, different layout)
+    expect(check(512, { day: 20261008, flips: 9 }, justAfter).ok).toBe(true);
+  });
+
+  it("answers a malformed detail with kind detail (400), not implausible", () => {
+    const malformed = [
+      {},
+      { day: today },
+      { flips: 1 },
+      { day: today, flips: 26 },
+      { day: "x", flips: 1 },
+      { day: today, flips: 1, extra: 1 },
+      null,
+    ];
+    for (const bad of malformed) {
+      expect(check(1, bad)).toEqual({ ok: false, kind: "detail", reason: "invalid detail" });
+    }
+  });
+});
+
+describe("the legacy game list", () => {
+  it("is exactly the two games that ever had a legacy leaderboard", () => {
+    expect([...LEGACY_ARCADE_GAME_SLUGS]).toEqual(["space-shooter", "hextris"]);
   });
 });

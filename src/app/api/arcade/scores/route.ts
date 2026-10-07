@@ -83,7 +83,10 @@ export async function POST(req: Request) {
   }
   const body = parsed.data;
 
-  const verdict = validateArcadeSubmission(body.game, body.score, body.detail);
+  // One instant for the whole request: the validator's day check and the board keys the
+  // store writes must agree on it.
+  const now = new Date();
+  const verdict = validateArcadeSubmission(body.game, body.score, body.detail, now);
   if (!verdict.ok) {
     if (verdict.kind === "detail") {
       return NextResponse.json({ error: "invalid detail" }, { status: 400 });
@@ -105,7 +108,7 @@ export async function POST(req: Request) {
         score: body.score,
         detail: verdict.detail,
       },
-      new Date(),
+      now,
     );
     if (!outcome.ok) {
       return NextResponse.json({ error: "identity" }, { status: 403 });
