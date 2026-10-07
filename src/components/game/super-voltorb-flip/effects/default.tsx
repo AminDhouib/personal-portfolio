@@ -1,78 +1,54 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { EffectProps, EffectTheme } from ".";
+import { BurstFrame, SparkleFrame } from "../art/frames";
+import { BURST_FRAMES, SPARKLE_FRAMES } from "../art/fx";
 
-const EXPLODE_FRAMES = Array.from(
-  { length: 9 },
-  (_, i) => `/games/super-voltorb-flip/sprites/upstream/tile/explode_${i}.png`,
-);
+// Both overlays sit centred over the revealed tile and overflow its edges. The
+// orb stays visible underneath (the tile's own face), so the burst has no core.
+const overlayBox = (scale: number): CSSProperties => ({
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  transform: "translate(-50%, -50%)",
+  width: `calc(var(--svf-tile) * ${scale})`,
+  height: `calc(var(--svf-tile) * ${scale})`,
+  pointerEvents: "none",
+});
 
 function ExplosionSprite({ onDone }: EffectProps) {
   const [frame, setFrame] = useState(0);
   useEffect(() => {
-    if (frame === EXPLODE_FRAMES.length - 1) {
+    if (frame === BURST_FRAMES - 1) {
       const t = setTimeout(onDone, 80);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setFrame((f) => f + 1), 60);
     return () => clearTimeout(t);
   }, [frame, onDone]);
+  // Larger than the tile so the blast radius can extend past the cell.
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={EXPLODE_FRAMES[frame]}
-      alt=""
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-        // Larger than the tile so the blast radius can extend past the cell.
-        width: "calc(var(--svf-tile) * 2.4)",
-        height: "calc(var(--svf-tile) * 2.4)",
-        maxWidth: "none",
-        maxHeight: "none",
-        imageRendering: "pixelated",
-        pointerEvents: "none",
-      }}
-    />
+    <div style={overlayBox(2.4)}>
+      <BurstFrame frame={frame} cssSize="100%" />
+    </div>
   );
 }
-
-const SUCCESS_FRAMES = Array.from(
-  { length: 4 },
-  (_, i) => `/games/super-voltorb-flip/sprites/upstream/success_${i}.png`,
-);
 
 function SparkleSprite({ onDone }: EffectProps) {
   const [frame, setFrame] = useState(0);
   useEffect(() => {
-    if (frame === SUCCESS_FRAMES.length - 1) {
+    if (frame === SPARKLE_FRAMES - 1) {
       const t = setTimeout(onDone, 100);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setFrame((f) => f + 1), 80);
     return () => clearTimeout(t);
   }, [frame, onDone]);
+  // Slightly larger than the tile so the sparkle rays poke past edges.
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={SUCCESS_FRAMES[frame]}
-      alt=""
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-        // Slightly larger than the tile so the sparkle rays poke past edges.
-        width: "calc(var(--svf-tile) * 1.4)",
-        height: "calc(var(--svf-tile) * 1.4)",
-        maxWidth: "none",
-        maxHeight: "none",
-        imageRendering: "pixelated",
-        pointerEvents: "none",
-      }}
-    />
+    <div style={overlayBox(1.4)}>
+      <SparkleFrame frame={frame} cssSize="100%" />
+    </div>
   );
 }
 

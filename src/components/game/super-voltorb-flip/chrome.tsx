@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { BurstFrame, CoinFrame, SparkleFrame } from "./art/frames";
+import { BURST_FRAMES, COIN_FRAMES, SPARKLE_FRAMES } from "./art/fx";
+import { PixelSprite } from "./art/pixel-sprite";
+import { ORB } from "./art/sprites";
 
 // ---------------------------------------------------------------------------
-// Inline SVG voltorb — substitutes upstream's `voltorb.png` / `voltorb-flip.png`
-// (Nintendo IP we can't redistribute). Red-top, white-bottom face ball.
+// The orb icon: the original spark-orb sprite (art/sprites.ts) used wherever
+// the game shows its hazard, on the clue cards, in the legend and as the
+// How to play icon.
 // ---------------------------------------------------------------------------
 
-// Upstream sprite (28x28 PNG, mirrored into /public from jv-vogler/voltorb-flip).
 export function VoltorbIcon({
   size = 28,
   cssSize,
@@ -17,44 +21,21 @@ export function VoltorbIcon({
   cssSize?: string;
   className?: string;
 }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/games/super-voltorb-flip/sprites/upstream/voltorb.png"
-      width={cssSize ? undefined : size}
-      height={cssSize ? undefined : size}
-      alt=""
-      aria-hidden="true"
-      className={className}
-      style={{
-        display: "block",
-        imageRendering: "pixelated",
-        width: cssSize,
-        height: cssSize,
-      }}
-    />
-  );
+  return <PixelSprite sprite={ORB} size={size} cssSize={cssSize} className={className} />;
 }
 
-const EXPLODE_FRAME_URLS = Array.from(
-  { length: 9 },
-  (_, i) => `/games/super-voltorb-flip/sprites/upstream/tile/explode_${i}.png`,
-);
-const SUCCESS_FRAME_URLS = Array.from(
-  { length: 4 },
-  (_, i) => `/games/super-voltorb-flip/sprites/upstream/success_${i}.png`,
-);
-
 function LoopingFrames({
-  frames,
+  count,
   size,
   interval = 90,
   pauseMs = 0,
+  render,
 }: {
-  frames: string[];
+  count: number;
   size: number;
   interval?: number;
   pauseMs?: number;
+  render: (frame: number) => React.ReactNode;
 }) {
   const [frame, setFrame] = useState(0);
   // Scheduling the next tick inside the setFrame updater fires twice in
@@ -64,28 +45,40 @@ function LoopingFrames({
   useEffect(() => {
     const delay = frame === 0 && pauseMs > 0 ? pauseMs : interval;
     const t = window.setTimeout(() => {
-      setFrame((f) => (f + 1) % frames.length);
+      setFrame((f) => (f + 1) % count);
     }, delay);
     return () => window.clearTimeout(t);
-  }, [frame, frames.length, interval, pauseMs]);
+  }, [frame, count, interval, pauseMs]);
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={frames[frame]}
-      width={size}
-      height={size}
-      alt=""
-      style={{ imageRendering: "pixelated", pointerEvents: "none" }}
-    />
+    <span
+      aria-hidden="true"
+      style={{ display: "inline-block", width: size, height: size, pointerEvents: "none" }}
+    >
+      {render(frame)}
+    </span>
   );
 }
 
+// The legend and modal draw these over a card that already shows the orb, so
+// the burst carries no orb of its own.
 export const LoopingExplosion = ({ size }: { size: number }) => (
-  <LoopingFrames frames={EXPLODE_FRAME_URLS} size={size} interval={70} pauseMs={500} />
+  <LoopingFrames
+    count={BURST_FRAMES}
+    size={size}
+    interval={70}
+    pauseMs={500}
+    render={(f) => <BurstFrame frame={f} cssSize="100%" />}
+  />
 );
 
 export const LoopingSparkle = ({ size }: { size: number }) => (
-  <LoopingFrames frames={SUCCESS_FRAME_URLS} size={size} interval={110} pauseMs={700} />
+  <LoopingFrames
+    count={SPARKLE_FRAMES}
+    size={size}
+    interval={110}
+    pauseMs={700}
+    render={(f) => <SparkleFrame frame={f} cssSize="100%" />}
+  />
 );
 
 // ---------------------------------------------------------------------------
@@ -229,24 +222,12 @@ export function useFullscreen(targetRef: React.RefObject<HTMLElement | null>) {
   return [active, toggle] as const;
 }
 
-const COIN_FRAME_URLS = Array.from(
-  { length: 12 },
-  (_, i) => `/games/super-voltorb-flip/sprites/upstream/coin/coin_${i}.png`,
-);
-
 export const CoinSpinner = ({ size = 28 }: { size?: number }) => (
-  <LoopingFrames frames={COIN_FRAME_URLS} size={size} interval={90} />
-);
-
-export const PokeballIcon = ({ size = 22 }: { size?: number }) => (
-  // eslint-disable-next-line @next/next/no-img-element
-  <img
-    src="/games/super-voltorb-flip/sprites/upstream/pokeball.png"
-    width={size}
-    height={size}
-    alt=""
-    aria-hidden
-    style={{ imageRendering: "pixelated", display: "block" }}
+  <LoopingFrames
+    count={COIN_FRAMES}
+    size={size}
+    interval={90}
+    render={(f) => <CoinFrame frame={f} cssSize="100%" />}
   />
 );
 
@@ -257,7 +238,7 @@ export const InstructionsBtns = ({ onOpen }: { onOpen: () => void }) => (
     title="How to play"
     className="flex h-11 items-center gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-3 outline outline-2 outline-gray-600 hover:bg-zinc-200"
   >
-    <PokeballIcon size={32} />
+    <VoltorbIcon size={28} />
     <span className="drop-shadow-soft text-base leading-none font-bold text-gray-600">
       How to play
     </span>

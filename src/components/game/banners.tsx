@@ -2,6 +2,10 @@
 
 import { motion, useMotionValue, animate } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { BurstFrame } from "./super-voltorb-flip/art/frames";
+import { BURST_FRAMES, CORE_SCALE } from "./super-voltorb-flip/art/fx";
+import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
+import { ORB } from "./super-voltorb-flip/art/sprites";
 
 // ---------- shared ----------
 
@@ -690,28 +694,17 @@ export function TypingSpeedBanner() {
 // ---------- Super Voltorb Flip ----------
 // Pixel-accurate match: #58a66c/#448563 checkerboard tile backs, salmon
 // #bd8c84 face-up tiles, gray-200 outlines, colored clue cards from the
-// COLORS array, actual voltorb.png sprite, connector bars between tiles.
-
-// Upstream's `srcTile0` — the bomb tile face sprite (22×22, includes salmon
-// background + voltorb body + dark border). Different from the parent-level
-// voltorb.png (28×28) which is just the voltorb-body sprite for row/col
-// indicator cards. Mirrored from samualtnorman/voltorb-flip's
-// src/assets/tile/voltorb.png so its salmon (#bd8c84) matches the
-// explode_*.png frames' salmon, eliminating the color-shift on transition.
-const VOLTORB_SRC = "/games/super-voltorb-flip/sprites/upstream/tile/voltorb.png";
-const EXPLODE_FRAMES = Array.from(
-  { length: 9 },
-  (_, i) => `/games/super-voltorb-flip/sprites/upstream/tile/explode_${i}.png`,
-);
-
-// Mirrors upstream's blowup logic (samualtnorman/voltorb-flip src/index.ts):
-// 9 progressively-larger PNG frames (22×22 → 64×64 native). The artist
-// baked the growth into the assets — each frame is a larger image with
-// the voltorb portion at a consistent size and more debris around it.
-// Matches super-voltorb-flip/effects/default.tsx (60ms per frame, 80ms hold
-// after the last frame). Then a 200ms cross-fade so the explosion debris
-// dissolves smoothly into the static voltorb behind (which is pixel-
-// identical to the voltorb-tile portion baked into frame 8 — no snap).
+// COLORS array, the game's original spark-orb sprite, connector bars between
+// tiles. The orb and the burst are the same art the game uses
+// (super-voltorb-flip/art/).
+//
+// The burst plays over the tile for 9 frames at 60ms each with an 80ms hold
+// after the last, then a 200ms cross-fade. It is drawn with its own orb core
+// (the tile's static orb is hidden while it plays), at a scale that makes the
+// core match the 22px static orb, so the hand-off back to the static orb does
+// not snap.
+const BURST_BOX_PX = 64;
+const BURST_CORE_MATCH_SCALE = 22 / (11 * CORE_SCALE);
 const FRAME_DURATION_MS = 60;
 const FRAME_HOLD_MS = 80;
 const FADE_DURATION_MS = 200;
@@ -730,7 +723,7 @@ function ExplosionFrames({ onFadeStart, onDone }: { onFadeStart: () => void; onD
     onDoneRef.current = onDone;
   }, [onFadeStart, onDone]);
   useEffect(() => {
-    if (frame === EXPLODE_FRAMES.length - 1) {
+    if (frame === BURST_FRAMES - 1) {
       const startFade = setTimeout(() => {
         setFading(true);
         onFadeStartRef.current();
@@ -745,55 +738,31 @@ function ExplosionFrames({ onFadeStart, onDone }: { onFadeStart: () => void; onD
     return () => clearTimeout(t);
   }, [frame]);
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={EXPLODE_FRAMES[frame]}
-      alt=""
+    <div
       style={{
-        imageRendering: "pixelated",
+        width: BURST_BOX_PX,
+        height: BURST_BOX_PX,
         pointerEvents: "none",
-        maxWidth: "none",
-        maxHeight: "none",
-        width: "auto",
-        height: "auto",
-        display: "block",
         opacity: fading ? 0 : 1,
         transition: `opacity ${FADE_DURATION_MS}ms ease-out`,
       }}
-    />
+    >
+      <BurstFrame frame={frame} cssSize="100%" core />
+    </div>
   );
 }
 
-// Bomb tile face — just renders the voltorb sprite at native size. The
-// explosion plays in a separate overlay at the tile-outer level (see
-// BombExplosionOverlay). maxWidth/maxHeight overrides are needed because
-// Tailwind's preflight resets imgs to `max-width: 100%`, which would
-// otherwise clamp the voltorb to the parent salmon div's width.
+// Bomb tile face: the orb at the tile's face size. The burst plays in a
+// separate overlay at the tile-outer level (see BombExplosionOverlay).
 function BombFaceUp({ size }: { size: number }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={VOLTORB_SRC}
-      alt=""
-      width={size}
-      height={size}
-      style={{
-        imageRendering: "pixelated",
-        pointerEvents: "none",
-        maxWidth: "none",
-        maxHeight: "none",
-        display: "block",
-      }}
-    />
-  );
+  return <PixelSprite sprite={ORB} size={size} style={{ pointerEvents: "none" }} />;
 }
 
 // Sibling-of-tile-inner overlay rendered ON TOP of the tile (z=5 vs the
-// tile-inner's z=1). Sized at the sprite's native ~40px so the voltorb
-// portion of the sprite renders at the same scale as the static voltorb
-// on a normally-sized tile, and the outer debris ring overflows past the
-// tile boundary into the gap. After onDone fires, the overlay unmounts
-// and the static voltorb in the tile-inner is visible again at full size.
+// tile-inner's z=1). Scaled so the burst's own orb core matches the tile's
+// static orb, and the outer debris ring overflows past the tile boundary
+// into the gap. After onDone fires, the overlay unmounts and the static orb
+// in the tile-inner is visible again at full size.
 // One-shot explosion overlay. The owning cell remounts this with a fresh
 // `key` at each new cycle (or when its value flips to "bomb" again), so a
 // single-fire timer is sufficient — no internal interval.
@@ -1002,7 +971,7 @@ function BoardCell({
         <BombExplosionOverlay
           key={`bomb-${cycleTick}`}
           flipDelayMs={explosionDelayMs}
-          scale={1.0}
+          scale={BURST_CORE_MATCH_SCALE}
           onExplodingChange={setExploding}
         />
       )}
