@@ -594,12 +594,14 @@ trigger revisiting it.
   swallowed them server-side, so the multi-day dead-chat outage fixed by the per-request
   `CopilotRuntime` produced zero Sentry events. `src/lib/copilot-run-error-tap.ts` now tees the
   response body and forwards any `RUN_ERROR` frame to `captureException`, returning the client
-  branch untouched. It reads the stream rather than using a library hook because 1.54.1 has none
-  that works: `CopilotRuntime`'s `onError` is declared but never read on this path (and its own
-  docs call it a paid Cloud feature), the `observability_c` call sites are commented-out TODOs,
-  and `createCopilotEndpointSingleRoute` accepts only `{ runtime, basePath, cors }`. Recheck
-  those three on a major CopilotKit upgrade — a real hook would be less fragile than reading
-  frames off the wire.
+  branch untouched. It reads the stream rather than using a library hook because 1.54.1 had none
+  that worked: `CopilotRuntime`'s `onError` was declared but never read on this path (and its
+  own docs called it a paid Cloud feature), the `observability_c` call sites were commented-out
+  TODOs, and `createCopilotEndpointSingleRoute` accepted only `{ runtime, basePath, cors }`.
+  As of 1.77 `onError` is honoured without a key and fires for upstream HTTP errors and
+  mid-stream failures, so a hook is now possible and would be less fragile than reading frames
+  off the wire; the tap stays, pinned by `route.integration.test.ts`, until someone makes that
+  switch deliberately.
 - **`arcade_players` rows are never pruned.** Trimming a board to its 1000-row cap, or retention
   deleting an expired daily or weekly board, removes `arcade_scores` rows but leaves the
   player row behind, so the table grows without a bound of its own: growth is limited only by the

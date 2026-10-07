@@ -8,8 +8,8 @@
  * deadline bug (module-scope CopilotRuntime) ran dead in production for days
  * without raising a single event.
  *
- * The installed @copilotkit/runtime 1.54.1 offers no usable hook for this, and
- * that was checked in the package rather than assumed:
+ * This was written against @copilotkit/runtime 1.54.1, which offered no usable
+ * hook for it, checked in the package rather than assumed:
  *   - `CopilotRuntime`'s `onError` option is declared on the constructor type
  *     but never read anywhere in copilot-runtime.ts, and its own doc comment
  *     calls it a paid Copilot Cloud feature that needs a publicApiKey.
@@ -19,6 +19,12 @@
  *   - `createCopilotEndpointSingleRoute`, which actually serves this route,
  *     accepts only { runtime, basePath, cors }.
  * So the stream is read here instead.
+ *
+ * Since 1.77 the first of those no longer holds: `onError` is honoured with no
+ * key and fires for both an upstream HTTP error and a mid-stream failure
+ * (verified by passing it through this route under the integration test). The
+ * tap stays because it is pinned by that test and reads the frames the client
+ * actually receives; moving to `onError` is a separate, deliberate change.
  *
  * The body is tee'd: one branch goes back to the client untouched, the other is
  * drained concurrently by this module. The client is never blocked on the scan

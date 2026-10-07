@@ -24,9 +24,9 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.124",
-    "@copilotkit/react-core": "^1.54.1",
-    "@copilotkit/react-ui": "^1.54.1",
-    "@copilotkit/runtime": "^1.54.1",
+    "@copilotkit/react-core": "^1.77.0",
+    "@copilotkit/react-ui": "^1.77.0",
+    "@copilotkit/runtime": "^1.77.0",
     "@google-analytics/data": "^5.2.1",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",

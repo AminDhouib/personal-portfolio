@@ -35,7 +35,7 @@ const MODEL = "anthropic/claude-haiku-4.5";
 // The Amin AI grounding, built once at module load from the typed site data.
 // It is the single source of truth for the assistant's facts and is injected
 // into the LLM request server-side below (the client `instructions` prop does
-// not reach the model on CopilotKit 1.54's AG-UI chat path).
+// not reach the model on CopilotKit's AG-UI chat path, re-checked on 1.77).
 // The games registry lives in the app tree, so this route passes it in rather
 // than having lib import from a route directory.
 const AMIN_AI_SYSTEM_PROMPT = buildAminAiSystemPrompt(GAMES);
@@ -77,7 +77,7 @@ export const POST = async (req: NextRequest) => {
   const deadlineFetch = createDeadlineFetch({ timeoutMs: COPILOT_DEADLINE_MS, signal: req.signal });
 
   // Ground every outbound OpenRouter chat-completions call with Amin AI's
-  // system prompt. CopilotKit 1.54 runs the chat UI on the AG-UI stack, whose
+  // system prompt. CopilotKit 1.54 through 1.77 run the chat UI on the AG-UI stack, whose
   // run path never forwards the client `instructions` prop to the model, so
   // merging the prompt into the request body here is the one place the
   // grounding provably reaches the LLM. This wraps -- and never replaces -- the
@@ -107,7 +107,7 @@ export const POST = async (req: NextRequest) => {
   adapter.getLanguageModel = () => openrouter.chat(MODEL);
 
   // Constructed per request, and deliberately NOT hoisted to module scope.
-  // CopilotKit 1.54 creates the default agent lazily, once per CopilotRuntime
+  // CopilotKit (1.54 and still 1.77) creates the default agent lazily, once per CopilotRuntime
   // instance, and binds it to the serviceAdapter of whichever request built it
   // first. That adapter closes over this request's `groundedFetch`, which wraps
   // a one-shot `createDeadlineFetch` (a 60s AbortSignal.timeout plus this
