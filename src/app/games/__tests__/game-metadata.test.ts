@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import { GAMES } from "../games-meta";
 import { GAME_CONTENT } from "../content";
 import { generateMetadata } from "../[slug]/page";
-import { metadata as passwordGameMetadata } from "../password-game/page";
+import {
+  metadata as passwordGameMetadata,
+  viewport as passwordGameViewport,
+} from "../password-game/page";
 
 // The page modules pull in client-only game components; the metadata does not need them.
 vi.mock("@/components/game/game-loader", () => ({ GameLoader: () => null }));
@@ -63,5 +66,11 @@ describe("game page metadata", () => {
     expect(Object.hasOwn(meta.openGraph!, "images")).toBe(false);
     expect(Object.hasOwn(meta.twitter!, "images")).toBe(false);
     expect(meta.twitter?.card).toBe("summary_large_image");
+  });
+});
+
+describe("password-game viewport", () => {
+  it("lets the keyboard resize only the visual viewport", () => {
+    expect(passwordGameViewport.interactiveWidget).toBe("resizes-visual");
   });
 });

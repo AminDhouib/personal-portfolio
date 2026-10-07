@@ -129,4 +129,35 @@ describe("GameShell phone play sheet", () => {
     const { queryByText } = render(<GameShell />);
     expect(queryByText(/best played on desktop/i)).toBeNull();
   });
+
+  it("the hidden input is a 16px, on-screen field so iOS neither zooms nor scrolls", () => {
+    const { getByTestId } = renderStartedShell();
+    const input = getByTestId("pg2-hidden-input");
+    expect(input.className).toContain("text-base");
+    expect(input.className).toContain("absolute");
+    expect(input.style.left).toBe("");
+  });
+
+  it("a pointerdown on the password box focuses the hidden input inside the gesture", () => {
+    const { getByRole, getByTestId } = renderStartedShell();
+    fireEvent.pointerDown(getByRole("textbox", { name: "Password" }));
+    expect(document.activeElement).toBe(getByTestId("pg2-hidden-input"));
+  });
+
+  it("opening the keyboard scrolls the active rule into view", () => {
+    const vv = fakeVV(844);
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      renderStartedShell();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      act(() => {
+        vv.height = 480;
+        vv.dispatchEvent(new Event("resize"));
+      });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    } finally {
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
+  });
 });
