@@ -35,6 +35,7 @@ import {
 } from "./super-voltorb-flip/audio";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { loadProgress } from "./super-voltorb-flip/progress";
+import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
@@ -564,6 +565,14 @@ const Gameboard = ({
   // a pointerdown on the board, or Enter/Space/any printable key continues.
   const [roundResult, setRoundResult] = useState<Omit<RoundResultProps, "onContinue"> | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
+  const quitButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Quit is only offered while a round is live: not during a risk fanfare, an
+  // open confirmation, or the end-of-round sequence.
+  const canQuit =
+    (game.gameStatus === "playing" || game.gameStatus === "memo") &&
+    !warningTile &&
+    !quitConfirmOpen;
   // Level shown while the round was live; the engine moves currentLevel the
   // instant the round ends, so the "from" side has to be remembered.
   const roundStartLevelRef = useRef(game.currentLevel);
@@ -613,7 +622,11 @@ const Gameboard = ({
     if (!game) return;
     // Once the round is settled (voltorb hit or all valuable coins found),
     // the board freezes until restartGame() runs from the win/lose flow.
-    if (game.gameStatus === "lose" || game.gameStatus === "win") return;
+    if (game.gameStatus === "lose" || game.gameStatus === "win" || game.gameStatus === "quit") {
+      return;
+    }
+    // The quit confirmation is modal over the board.
+    if (quitConfirmOpen) return;
     // While ME_CARDGAME1 is announcing a high-risk tile, the board is
     // locked — only the targeted tile is "live" and it commits when the
     // delay below resolves. Mirrors voltorb_flip.c, which freezes input
@@ -773,15 +786,24 @@ const Gameboard = ({
   }, [game.cells]);
 
   useEffect(() => {
-    if (game.gameStatus === "win") {
-      // Win sequence (mirrors voltorb_flip.c WinRound_Main → AwardCoins_Main):
-      //   1. flipCardsUp                     — reveal the entire board
-      //   2. MUSHITORI3 fanfare (or silent)  — handled by playLevelWin
-      //   3. parent's runPostFanfare         — payout BGM + counter SE chain
-      //   4. onFlipDownStart("up")           — level-up flash + SLOT01 SE
-      //   5. flipCardsDown                   — fold cards, restartGame fires
-      void flipCardsUp().then(async () => {
-        // 2. Fanfare (or silent equivalent).
+    const status = game.gameStatus;
+    if (status !== "win" && status !== "lose" && status !== "quit") return;
+    const fromLevel = roundStartLevelRef.current;
+    const toLevel = game.currentLevel;
+    const coins = game.currentScore;
+    const dir: "up" | "down" = toLevel > fromLevel ? "up" : "down";
+
+    // Round-end order follows voltorb_flip.c:
+    //   win:  WinRound_Main (clear fanfare over the hidden board) -> AwardCoins_Main
+    //         (payout) -> RevealBoard_Main -> wait for a press
+    //   quit: QuitRound_Run goes to AwardCoins only when the payout is above 0,
+    //         then the same reveal and wait
+    //   lose: reveal -> wait (the game-over jingle plays from the parent)
+    // Then the level flash fires with the first column folding down, and
+    // flipCardsDown's restartGame deals the next board.
+    void (async () => {
+      if (status === "win") {
+        // 1. Clear fanfare (or the silent equivalent) while the board is still hidden.
         await new Promise<void>((resolve) => {
           if (muted) {
             window.setTimeout(resolve, 1500);
@@ -793,42 +815,23 @@ const Gameboard = ({
             });
           }
         });
-        // 3. Coin payout chain (BGM 64 + per-tick SE) lives in the parent.
-        if (runPostFanfare) {
-          await runPostFanfare();
-        }
-        if (waitForClick) {
-          setRoundResult({
-            kind: "win",
-            fromLevel: roundStartLevelRef.current,
-            toLevel: game.currentLevel,
-            coins: game.currentScore,
-          });
-          await waitForUserInteraction();
-          setRoundResult(null);
-        }
-        // 4 + 5. Cards flip down with the SLOT01 flash fired at the
-        //         same frame as the first column — keeps SE/visual in
-        //         lockstep instead of leading by the 100ms head delay.
-        flipCardsDown(100, () => onFlipDownStart?.("up"));
-      });
-    } else if (game.gameStatus === "lose") {
-      // Lose sequence: reveal → CARDGAME2 fanfare via playGameOver (parent)
-      // → wait for click (or instant) → level-down flash synchronized to
-      // the first card folding back down.
-      void flipCardsUp().then(async () => {
-        if (waitForClick) {
-          setRoundResult({
-            kind: "lose",
-            fromLevel: roundStartLevelRef.current,
-            toLevel: game.currentLevel,
-          });
-          await waitForUserInteraction();
-          setRoundResult(null);
-        }
-        flipCardsDown(100, () => onFlipDownStart?.("down"));
-      });
-    }
+      }
+      // 2. Coin payout chain (BGM 64 + per-tick SE) lives in the parent.
+      if ((status === "win" || status === "quit") && coins > 0 && runPostFanfare) {
+        await runPostFanfare();
+      }
+      // 3. Reveal the whole board.
+      await flipCardsUp();
+      // 4. Wait for a press with the result banner up.
+      if (waitForClick) {
+        setRoundResult({ kind: status, fromLevel, toLevel, coins });
+        await waitForUserInteraction();
+        setRoundResult(null);
+      }
+      // 5. Cards flip down with the level flash fired at the same frame as the
+      //    first column, keeping SE and visual in lockstep.
+      flipCardsDown(100, () => onFlipDownStart?.(dir));
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameStatus]);
 
@@ -927,6 +930,20 @@ const Gameboard = ({
             </div>
           </div>
         </div>
+        {quitConfirmOpen && (
+          <QuitConfirm
+            coins={game.currentScore}
+            onCancel={() => {
+              setQuitConfirmOpen(false);
+              // The button is disabled while the confirmation is open; focus it once it is live again.
+              window.setTimeout(() => quitButtonRef.current?.focus(), 0);
+            }}
+            onConfirm={() => {
+              setQuitConfirmOpen(false);
+              updateGame((g) => g.quit());
+            }}
+          />
+        )}
       </div>
       {/* The round result sits under the board, never over it: at the end of
           a round every tile is face up and the whole board is worth reading.
@@ -937,9 +954,18 @@ const Gameboard = ({
         {roundResult ? (
           <RoundResult {...roundResult} onContinue={() => continueRef.current?.()} />
         ) : (
-          <p className="rounded-5 flex min-h-[72px] items-center border-2 border-gray-300 bg-white px-3 text-sm text-gray-600 outline outline-2 outline-gray-600 sm:min-h-[60px] sm:text-base">
-            Flip the cards and collect coins!
-          </p>
+          <div className="rounded-5 flex min-h-[72px] items-center gap-2 border-2 border-gray-300 bg-white px-3 text-sm text-gray-600 outline outline-2 outline-gray-600 sm:min-h-[60px] sm:text-base">
+            <p className="min-w-0 flex-1">Flip the cards and collect coins!</p>
+            <button
+              ref={quitButtonRef}
+              type="button"
+              disabled={!canQuit}
+              onClick={() => setQuitConfirmOpen(true)}
+              className="min-h-11 min-w-11 shrink-0 cursor-pointer rounded-[6px] border-2 border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 outline outline-2 outline-gray-600 focus-visible:outline-[#ef2020] disabled:cursor-default disabled:opacity-50"
+            >
+              Quit
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -1616,7 +1642,7 @@ export function SuperVoltorbFlipGame() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     const saved = loadProgress();
-    if (saved) updateGame((g) => g.restore(saved.currentLevel, saved.totalScore));
+    if (saved) updateGame((g) => g.restore(saved.currentLevel, saved.totalScore, saved.history));
     setHydrated(true);
     // Mount-only by design; updateGame is recreated every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1631,9 +1657,10 @@ export function SuperVoltorbFlipGame() {
       JSON.stringify({
         currentLevel: game.currentLevel,
         totalScore: game.totalScore,
+        history: game.history,
       }),
     );
-  }, [game, game?.currentLevel, game?.totalScore, hydrated]);
+  }, [game, game?.currentLevel, game?.totalScore, game?.history, hydrated]);
 
   // Reset memo mode + drive music/game-over audio on status transitions.
   // restartGame sets status back to "playing" after cards flip down.
@@ -1651,12 +1678,13 @@ export function SuperVoltorbFlipGame() {
         if (!muted) playGameOver();
       }, 320);
     }
-    if (cur === "win" && prev !== "win") {
-      // Fade the loop so the level-win song plays cleanly; Gameboard handles
-      // actually starting music_level_win and auto-advancing on its end event.
+    if ((cur === "win" && prev !== "win") || (cur === "quit" && prev !== "quit")) {
+      // Fade the loop so the level-win song plays cleanly (a quit fades too, so
+      // the payout is not played over the loop); Gameboard handles actually
+      // starting music_level_win.
       fadeOutMusic(250);
     }
-    if ((prev === "win" || prev === "lose") && cur === "playing") {
+    if ((prev === "win" || prev === "lose" || prev === "quit") && cur === "playing") {
       clearMemoTimer = window.setTimeout(() => clearMemoFlags(), 0);
       stopGameOver();
       stopLevelWin();

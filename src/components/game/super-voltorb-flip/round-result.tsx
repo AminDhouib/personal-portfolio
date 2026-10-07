@@ -3,10 +3,10 @@
 import { useEffect, useRef } from "react";
 
 export type RoundResultProps = {
-  kind: "win" | "lose";
+  kind: "win" | "lose" | "quit";
   fromLevel: number;
   toLevel: number;
-  /** Coins banked this round; shown for a win. */
+  /** Coins banked this round; shown for a win or a quit. */
   coins?: number;
   onContinue: () => void;
 };
@@ -16,7 +16,8 @@ export type RoundResultProps = {
  * the board at the same height as the slot's idle line, so it neither covers
  * tiles nor shifts layout: 72px on phones, where a long win title such as
  * "Round cleared! +12345 coins" wraps to two lines, and 60px from sm up.
- * Styled like the game's other light chrome (white card, grey outline, green
+ * A win no longer always moves up (a Lv.7 or Lv.8 win keeps the level), so the
+ * level line says why. Styled like the game's other light chrome (white card, grey outline, green
  * action button).
  */
 export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }: RoundResultProps) {
@@ -26,14 +27,22 @@ export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }:
     buttonRef.current?.focus();
   }, []);
 
-  const title = kind === "lose" ? "Voltorb! Round lost." : `Round cleared! +${coins} coins`;
-  // A win always moves up a level unless the player is already at the top.
+  const title =
+    kind === "lose"
+      ? "Voltorb! Round lost."
+      : kind === "quit"
+        ? coins > 0
+          ? `You quit. +${coins} coins`
+          : "You quit with no coins."
+        : `Round cleared! +${coins} coins`;
   const levelLine =
     fromLevel !== toLevel
       ? `Level ${fromLevel} to Level ${toLevel}`
-      : kind === "win"
+      : kind === "win" && toLevel >= 8
         ? `Top level: Level ${toLevel}`
-        : `Staying on Level ${toLevel}`;
+        : kind === "win"
+          ? `Staying on Level ${toLevel}. Five strong rounds in a row reach Level 8.`
+          : `Staying on Level ${toLevel}`;
 
   return (
     <div className="rounded-5 flex min-h-[72px] items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1.5 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600 sm:min-h-[60px]">
