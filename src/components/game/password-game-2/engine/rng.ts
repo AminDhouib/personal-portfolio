@@ -52,12 +52,14 @@ export function fnv1a(str: string): number {
   return h >>> 0;
 }
 
-/** Deterministic daily seed from the local date (YYYY-MM-DD). */
+/** Deterministic daily seed for a UTC calendar day string (YYYY-MM-DD). */
+export function dailySeedForDay(day: string): number {
+  return fnv1a(`pg2-${day}`);
+}
+
+/** Deterministic daily seed from the UTC date, so it matches the leaderboard's UTC day. */
 export function dailySeed(date: Date = new Date()): number {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return fnv1a(`pg2-${y}-${m}-${d}`);
+  return dailySeedForDay(date.toISOString().slice(0, 10));
 }
 
 /** Stable sub-seed so each subsystem gets an independent stream. */
