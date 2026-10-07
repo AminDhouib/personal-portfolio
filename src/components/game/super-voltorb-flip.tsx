@@ -54,6 +54,11 @@ import { useSettings } from "./super-voltorb-flip/use-settings";
 import { tileOddsView, type TileOddsView } from "./super-voltorb-flip/odds-input";
 import { useOdds, type Odds } from "./super-voltorb-flip/use-odds";
 import { useStats } from "./super-voltorb-flip/use-stats";
+import { activeStreak } from "./super-voltorb-flip/stats";
+import { DailyPanel } from "./super-voltorb-flip/daily-panel";
+import { useDailyRound } from "./super-voltorb-flip/use-daily-round";
+import type { DailyOutcome } from "./super-voltorb-flip/daily-store";
+import { utcDayKey } from "@/lib/arcade/boards";
 import {
   clockSeconds,
   endClock,
@@ -590,6 +595,16 @@ type GameboardProps = {
   odds?: Odds | null;
   /** Whether the round that just ended was played with the odds assist (for the banner). */
   isAssisted?: () => boolean;
+  /**
+   * Daily board mode: the board is a fixed layout that is never redealt. `restored`
+   * is a finished board shown again after a reload (revealed, no end sequence).
+   */
+  daily?: {
+    restored: boolean;
+    idleLine: string;
+    onFlipped: (row: number, col: number) => void;
+    onFinished: () => void;
+  };
 };
 
 type ActiveEffect = {
@@ -614,9 +629,10 @@ const Gameboard = ({
   onLockChange,
   odds,
   isAssisted,
+  daily,
 }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
-    game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
+    game.cells.flat().map((cell) => ({ isFlipped: daily?.restored ? true : cell.isFlipped })),
   );
   const [effects, setEffects] = useState<ActiveEffect[]>([]);
   // True from the first frame of the flip-down until the next board is dealt:
@@ -793,6 +809,7 @@ const Gameboard = ({
           window.setTimeout(() => void sfx.voltorbPop(), 140);
         }
       }
+      daily?.onFlipped(row, col);
       updateGame((g) => g.flipCell(row, col));
     };
 
@@ -915,12 +932,15 @@ const Gameboard = ({
   );
 
   useEffect(() => {
-    setCardsFlipped(() => game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })));
-  }, [game.cells]);
+    setCardsFlipped(() =>
+      game.cells.flat().map((cell) => ({ isFlipped: daily?.restored ? true : cell.isFlipped })),
+    );
+  }, [game.cells, daily?.restored]);
 
   useEffect(() => {
     const status = game.gameStatus;
     if (status !== "win" && status !== "lose" && status !== "quit") return;
+    if (daily?.restored) return;
     const fromLevel = roundStartLevelRef.current;
     const toLevel = game.currentLevel;
     const coins = game.currentScore;
@@ -961,14 +981,21 @@ const Gameboard = ({
         setRoundResult({
           kind: status,
           fromLevel,
-          toLevel,
+          toLevel: daily ? fromLevel : toLevel,
           coins,
-          assisted: isAssisted?.() === true,
+          assisted: daily ? false : isAssisted?.() === true,
+          daily: daily !== undefined,
         });
         await waitForUserInteraction();
         setRoundResult(null);
       }
-      // 5. Cards flip down with the level flash fired at the same frame as the
+      // 5. A Daily board is never redealt: hand control back instead of folding
+      //    the cards down and restarting. Everything else folds down as before.
+      if (daily) {
+        daily.onFinished();
+        return;
+      }
+      //    Cards flip down with the level flash fired at the same frame as the
       //    first column, keeping SE and visual in lockstep.
       flipCardsDown(100, () => onFlipDownStart?.(dir));
     })();
@@ -1110,7 +1137,9 @@ const Gameboard = ({
           <RoundResult {...roundResult} onContinue={() => continueRef.current?.()} />
         ) : (
           <div className="rounded-5 flex min-h-[72px] items-center gap-2 border-2 border-gray-300 bg-white px-3 text-sm text-gray-600 outline outline-2 outline-gray-600 sm:min-h-[60px] sm:text-base">
-            <p className="min-w-0 flex-1">Flip the cards and collect coins!</p>
+            <p className="min-w-0 flex-1">
+              {daily?.idleLine ?? "Flip the cards and collect coins!"}
+            </p>
             <button
               ref={quitButtonRef}
               type="button"
@@ -1500,6 +1529,151 @@ function DebugPanel({
   );
 }
 
+// Static class strings (never built from parts): the Tailwind prettier plugin
+// strips leading spaces inside template literals.
+const MAIN_SHOWN = "contents";
+const MAIN_HIDDEN = "hidden";
+
+/**
+ * The Daily screen. It renders three grid children (header and memo bar, board,
+ * panel) so the root's grid places them like the main game and a phone stacks
+ * them in order. There is no odds assist here: nothing on this screen reads the
+ * setting, so a Daily board never shows odds and a Daily round is never assisted.
+ */
+function DailyGame({
+  muted,
+  memoUndoEnabled,
+  memoFlags,
+  onToggleMemo,
+  onClearMemo,
+  canUndo,
+  recordMemo,
+  undoMemoStack,
+  resetMemoUndo,
+  registerUndo,
+  onOutcome,
+  onFirstInteraction,
+  onExit,
+  streak,
+}: {
+  muted: boolean;
+  memoUndoEnabled: boolean;
+  memoFlags: MemoFlagSet;
+  onToggleMemo: (f: MemoFlag) => void;
+  onClearMemo: () => void;
+  canUndo: boolean;
+  recordMemo: (change: MemoChange) => void;
+  undoMemoStack: (game: VoltorbFlip, update: (cb: (g: VoltorbFlip) => void) => void) => boolean;
+  resetMemoUndo: () => void;
+  registerUndo: (fn: (() => void) | null) => void;
+  onOutcome: (outcome: DailyOutcome, dayKey: string, coins: number) => void;
+  onFirstInteraction: () => void;
+  onExit: () => void;
+  streak: (dayKey: string) => number;
+}) {
+  const d = useDailyRound({ onOutcome });
+  // Held by a risk fanfare (reported by Gameboard): no undo while the board is locked.
+  const [locked, setLocked] = useState(false);
+  const live = d.game.gameStatus === "playing" || d.game.gameStatus === "memo";
+
+  const undo = useCallback(() => {
+    if (!memoUndoEnabled || !live || locked) return;
+    if (undoMemoStack(d.game, d.updateGame) && !muted) void sfx.memoToggle();
+  }, [memoUndoEnabled, live, locked, undoMemoStack, d.game, d.updateGame, muted]);
+
+  // The root's Ctrl/Cmd+Z handler calls whatever is registered here.
+  useEffect(() => {
+    registerUndo(undo);
+    return () => registerUndo(null);
+  }, [registerUndo, undo]);
+
+  // Entering and leaving start from a clean memo state, and a Daily round's
+  // game-over jingle must not outlive the screen.
+  useEffect(() => {
+    resetMemoUndo();
+    onClearMemo();
+    return () => {
+      resetMemoUndo();
+      onClearMemo();
+      stopGameOver();
+      stopLevelWin();
+    };
+    // Mount and unmount only; the callbacks are recreated every render by the parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <>
+      <div className="order-1 flex w-full flex-col gap-2 lg:col-start-1 lg:row-start-1 lg:w-[360px]">
+        <div className="flex items-center gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 text-gray-700 outline outline-2 outline-gray-600">
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="text-base font-bold">Daily board</p>
+            <p className="text-xs text-gray-500">{d.dayKey} (UTC), Lv.5, no odds assist</p>
+          </div>
+          <button
+            type="button"
+            onClick={onExit}
+            className="min-h-11 min-w-11 shrink-0 cursor-pointer rounded-[6px] border-2 border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 outline outline-2 outline-gray-600 hover:bg-zinc-200 focus-visible:outline-[#ef2020]"
+          >
+            Back to the game
+          </button>
+        </div>
+        <MemoBar
+          activeFlags={memoFlags}
+          onToggle={onToggleMemo}
+          onClear={onClearMemo}
+          onUndo={memoUndoEnabled ? undo : undefined}
+          canUndo={canUndo && live && !locked}
+          size={44}
+          showLabel={false}
+          fullWidth
+          spread
+        />
+      </div>
+      <div
+        data-daily-board
+        className="order-2 flex flex-col items-center gap-2 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+      >
+        <Gameboard
+          game={d.game}
+          updateGame={d.updateGame}
+          waitForClick
+          muted={muted}
+          onFirstInteraction={onFirstInteraction}
+          memoFlags={memoFlags}
+          onMemoChange={memoUndoEnabled ? recordMemo : undefined}
+          onLockChange={setLocked}
+          daily={{
+            restored: d.restored,
+            idleLine: d.restored
+              ? "Today's board is done. See you at 00:00 UTC."
+              : "One board a day. Flip carefully.",
+            onFlipped: d.onFlipped,
+            onFinished: () => {},
+          }}
+        />
+        <Footer />
+      </div>
+      <div className="order-3 w-full lg:col-start-1 lg:row-start-2 lg:w-[360px]">
+        <DailyPanel
+          dayKey={d.dayKey}
+          outcome={d.outcome}
+          score={d.score}
+          handle={d.handle}
+          submitted={d.submitted}
+          submitState={d.submitState}
+          rank={d.rank}
+          streak={streak(d.dayKey)}
+          entries={d.leaderboard.entries}
+          loading={d.leaderboard.loading}
+          readError={d.leaderboard.readError}
+          onPost={(name) => void d.post(name)}
+        />
+      </div>
+    </>
+  );
+}
+
 export function SuperVoltorbFlipGame() {
   const { game, updateGame, size, setGameSize } = useGame();
   const [peek, setPeek] = useState(false);
@@ -1540,6 +1714,7 @@ export function SuperVoltorbFlipGame() {
   const {
     stats,
     record: recordStats,
+    recordDay: recordDayResult,
     reset: resetStats,
     raiseHighestLevel,
   } = useStats(settings.stats);
@@ -1556,17 +1731,26 @@ export function SuperVoltorbFlipGame() {
   // True once the odds assist was on at any point while this round was live.
   const assistedRoundRef = useRef(false);
   const musicStartedRef = useRef(false);
+  const [mode, setMode] = useState<"play" | "daily">("play");
+  const dailyUndoRef = useRef<(() => void) | null>(null);
+  const registerDailyUndo = useCallback((fn: (() => void) | null) => {
+    dailyUndoRef.current = fn;
+  }, []);
 
+  const overlayOpen = settingsOpen || statsOpen || howToPlayOpen;
   // Undo is offered only while a memo could be made: a live round, no panel or
   // modal over the board, and no quit confirmation or risk fanfare holding it.
+  // The main game's undo is off while the Daily screen is open (its board is hidden).
   const undoAllowed =
+    mode === "play" &&
     settings.memoUndo &&
     !!game &&
     (game.gameStatus === "playing" || game.gameStatus === "memo") &&
-    !settingsOpen &&
-    !statsOpen &&
-    !howToPlayOpen &&
+    !overlayOpen &&
     !boardLocked;
+  // Only between rounds of the main game: a round-end sequence is mid-flight otherwise.
+  const canSwitchMode =
+    !!game && (game.gameStatus === "playing" || game.gameStatus === "memo") && !boardLocked;
 
   const undoMemo = useCallback(() => {
     if (!undoAllowed || !game) return;
@@ -1594,10 +1778,41 @@ export function SuperVoltorbFlipGame() {
   function handleRootKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.defaultPrevented || !isUndoKey(e)) return;
     if (isTextEntryTarget(e.nativeEvent)) return;
+    if (mode === "daily") {
+      if (!settings.memoUndo || overlayOpen) return;
+      e.preventDefault();
+      dailyUndoRef.current?.();
+      return;
+    }
     if (!undoAllowed) return;
     e.preventDefault();
     undoMemo();
   }
+
+  // Everything the main game's status effect does for a finished round, for the
+  // Daily board: the jingle, then the day into the statistics and the streak.
+  // A loss is neutral for the streak, and so is a quit with no coins.
+  const handleDailyOutcome = useCallback(
+    (outcome: DailyOutcome, dayKey: string, coins: number) => {
+      if (outcome === "lost") {
+        fadeOutMusic(350);
+        window.setTimeout(() => {
+          if (!muted) playGameOver();
+        }, 320);
+      } else {
+        fadeOutMusic(250);
+      }
+      recordDayResult(dayKey, outcome === "won" || (outcome === "quit" && coins > 0));
+    },
+    [muted, recordDayResult],
+  );
+
+  const exitDaily = useCallback(() => {
+    stopGameOver();
+    stopLevelWin();
+    setMode("play");
+    if (!muted && game && musicStartedRef.current) playMusic(game.currentLevel);
+  }, [muted, game]);
 
   // Smoothly-rolled scoreboard values. Default to the live game values; the
   // payout animation overrides them while a round wraps up. Reading game
@@ -2038,63 +2253,31 @@ export function SuperVoltorbFlipGame() {
             />
           )}
           {statsOpen && settings.stats && (
-            <StatsPanel stats={stats} onReset={resetStats} onClose={() => setStatsOpen(false)} />
+            <StatsPanel
+              stats={stats}
+              today={utcDayKey(new Date())}
+              onReset={resetStats}
+              onClose={() => setStatsOpen(false)}
+            />
           )}
 
-          {/* Desktop / tablet left column (sm+ only). Holds everything except
+          {/* The Daily board replaces the two columns below while it is open; they
+            stay mounted (hidden) so the main round and its state survive the trip. */}
+          <div className={mode === "play" ? MAIN_SHOWN : MAIN_HIDDEN}>
+            {/* Desktop / tablet left column (sm+ only). Holds everything except
             the board so the right column can devote full width to tiles. */}
-          <div className="hidden flex-col items-center gap-2 lg:flex">
-            <div className="flex w-full items-center gap-2">
-              <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-              <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
-              <PixelFullscreenButton
-                active={fullscreenActive}
-                onToggle={toggleFullscreen}
-                size={44}
-              />
-              {game && (
-                <div
-                  className={`drop-shadow-default flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#3D7757] px-3 outline outline-2 outline-gray-600 ${
-                    levelDir === "up"
-                      ? "svf-lv-flash-up"
-                      : levelDir === "down"
-                        ? "svf-lv-flash-down"
-                        : ""
-                  }`}
-                >
-                  <span className="text-xs font-bold tracking-widest text-white uppercase">Lv</span>
-                  <span className="text-lg leading-none font-black">{displayLevel}</span>
-                  <span className="text-sm text-white/90">VOLTORB Flip</span>
-                </div>
-              )}
-            </div>
-            <ModeRow
-              statsEnabled={settings.stats}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onOpenStats={() => setStatsOpen(true)}
-            />
-            <div className="flex w-full">
-              <MemoBar
-                activeFlags={memoFlags}
-                onToggle={toggleMemoFlag}
-                onClear={clearMemoFlags}
-                size={32}
-                fullWidth
-                onUndo={settings.memoUndo ? undoMemo : undefined}
-                canUndo={canUndo && undoAllowed}
-              />
-            </div>
-            {game && <Scoreboard currentScore={displayCurrent} totalScore={displayTotal} />}
-          </div>
-
-          {/* Right column: board + footer (and mobile bar at <lg, sized
-            to match board width). */}
-          <div className="flex flex-col items-center gap-2">
-            {game && (
-              <div className="flex w-full flex-col gap-1.5 lg:hidden">
-                <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 text-gray-700 outline outline-2 outline-gray-600">
+            <div className="hidden flex-col items-center gap-2 lg:flex">
+              <div className="flex w-full items-center gap-2">
+                <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+                <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+                <PixelFullscreenButton
+                  active={fullscreenActive}
+                  onToggle={toggleFullscreen}
+                  size={44}
+                />
+                {game && (
                   <div
-                    className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#3D7757] px-2 leading-none text-white ${
+                    className={`drop-shadow-default flex h-11 flex-1 items-center justify-center gap-2 rounded-[6px] border-2 border-white bg-[#3D7757] px-3 outline outline-2 outline-gray-600 ${
                       levelDir === "up"
                         ? "svf-lv-flash-up"
                         : levelDir === "down"
@@ -2105,106 +2288,171 @@ export function SuperVoltorbFlipGame() {
                     <span className="text-xs font-bold tracking-widest text-white uppercase">
                       Lv
                     </span>
-                    <span className="text-xl font-black">{displayLevel}</span>
+                    <span className="text-lg leading-none font-black">{displayLevel}</span>
+                    <span className="text-sm text-white/90">VOLTORB Flip</span>
                   </div>
-                  <div className="flex flex-1 items-center justify-around gap-2">
-                    <div className="flex flex-col items-center gap-0.5 leading-none">
-                      <div className="flex items-center gap-1">
-                        <CoinSpinner size={14} />
-                        <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                          Total Coins
-                        </span>
-                      </div>
-                      <span className={`${scoreFont.className} flex text-xl`}>
-                        {displayTotal
-                          .toString()
-                          .padStart(5, "0")
-                          .split("")
-                          .map((d, i) => (
-                            <span
-                              key={i}
-                              className="inline-block text-center"
-                              style={{ width: "0.5em" }}
-                            >
-                              {d}
-                            </span>
-                          ))}
-                      </span>
-                    </div>
-                    <div className="h-8 w-[2px] bg-gray-200" />
-                    <div className="flex flex-col items-center gap-0.5 leading-none">
-                      <div className="flex items-center gap-1">
-                        <CoinSpinner size={14} />
-                        <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                          This Game
-                        </span>
-                      </div>
-                      <span className={`${scoreFont.className} flex text-xl`}>
-                        {displayCurrent
-                          .toString()
-                          .padStart(5, "0")
-                          .split("")
-                          .map((d, i) => (
-                            <span
-                              key={i}
-                              className="inline-block text-center"
-                              style={{ width: "0.5em" }}
-                            >
-                              {d}
-                            </span>
-                          ))}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
-                  <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
-                  <PixelFullscreenButton
-                    active={fullscreenActive}
-                    onToggle={toggleFullscreen}
-                    size={44}
-                  />
-                </div>
-                <ModeRow
-                  statsEnabled={settings.stats}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                  onOpenStats={() => setStatsOpen(true)}
-                />
+                )}
+              </div>
+              <ModeRow
+                statsEnabled={settings.stats}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenStats={() => setStatsOpen(true)}
+                onOpenDaily={() => setMode("daily")}
+                dailyDisabled={!canSwitchMode}
+              />
+              <div className="flex w-full">
                 <MemoBar
                   activeFlags={memoFlags}
                   onToggle={toggleMemoFlag}
                   onClear={clearMemoFlags}
-                  size={44}
-                  showLabel={false}
+                  size={32}
                   fullWidth
-                  spread
                   onUndo={settings.memoUndo ? undoMemo : undefined}
                   canUndo={canUndo && undoAllowed}
                 />
               </div>
-            )}
-            {game && (
-              <>
-                <Gameboard
-                  game={game}
-                  updateGame={updateGame}
-                  waitForClick
-                  muted={muted}
-                  onFirstInteraction={handleFirstInteraction}
-                  memoFlags={memoFlags}
-                  peek={peek}
-                  runPostFanfare={runPostFanfare}
-                  onFlipDownStart={triggerLevelTransition}
-                  onMemoChange={handleMemoChange}
-                  onLockChange={setBoardLocked}
-                  odds={odds}
-                  isAssisted={() => assistedRoundRef.current}
-                />
-                <Footer />
-              </>
-            )}
+              {game && <Scoreboard currentScore={displayCurrent} totalScore={displayTotal} />}
+            </div>
+
+            {/* Right column: board + footer (and mobile bar at <lg, sized
+            to match board width). */}
+            <div className="flex flex-col items-center gap-2">
+              {game && (
+                <div className="flex w-full flex-col gap-1.5 lg:hidden">
+                  <div className="flex items-stretch gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 text-gray-700 outline outline-2 outline-gray-600">
+                    <div
+                      className={`flex items-center justify-center gap-1.5 rounded-[3px] bg-[#3D7757] px-2 leading-none text-white ${
+                        levelDir === "up"
+                          ? "svf-lv-flash-up"
+                          : levelDir === "down"
+                            ? "svf-lv-flash-down"
+                            : ""
+                      }`}
+                    >
+                      <span className="text-xs font-bold tracking-widest text-white uppercase">
+                        Lv
+                      </span>
+                      <span className="text-xl font-black">{displayLevel}</span>
+                    </div>
+                    <div className="flex flex-1 items-center justify-around gap-2">
+                      <div className="flex flex-col items-center gap-0.5 leading-none">
+                        <div className="flex items-center gap-1">
+                          <CoinSpinner size={14} />
+                          <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+                            Total Coins
+                          </span>
+                        </div>
+                        <span className={`${scoreFont.className} flex text-xl`}>
+                          {displayTotal
+                            .toString()
+                            .padStart(5, "0")
+                            .split("")
+                            .map((d, i) => (
+                              <span
+                                key={i}
+                                className="inline-block text-center"
+                                style={{ width: "0.5em" }}
+                              >
+                                {d}
+                              </span>
+                            ))}
+                        </span>
+                      </div>
+                      <div className="h-8 w-[2px] bg-gray-200" />
+                      <div className="flex flex-col items-center gap-0.5 leading-none">
+                        <div className="flex items-center gap-1">
+                          <CoinSpinner size={14} />
+                          <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+                            This Game
+                          </span>
+                        </div>
+                        <span className={`${scoreFont.className} flex text-xl`}>
+                          {displayCurrent
+                            .toString()
+                            .padStart(5, "0")
+                            .split("")
+                            .map((d, i) => (
+                              <span
+                                key={i}
+                                className="inline-block text-center"
+                                style={{ width: "0.5em" }}
+                              >
+                                {d}
+                              </span>
+                            ))}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <InstructionsBtns onOpen={() => setHowToPlayOpen(true)} />
+                    <PixelMuteButton muted={muted} onToggle={handleMuteToggle} size={44} />
+                    <PixelFullscreenButton
+                      active={fullscreenActive}
+                      onToggle={toggleFullscreen}
+                      size={44}
+                    />
+                  </div>
+                  <ModeRow
+                    statsEnabled={settings.stats}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    onOpenStats={() => setStatsOpen(true)}
+                    onOpenDaily={() => setMode("daily")}
+                    dailyDisabled={!canSwitchMode}
+                  />
+                  <MemoBar
+                    activeFlags={memoFlags}
+                    onToggle={toggleMemoFlag}
+                    onClear={clearMemoFlags}
+                    size={44}
+                    showLabel={false}
+                    fullWidth
+                    spread
+                    onUndo={settings.memoUndo ? undoMemo : undefined}
+                    canUndo={canUndo && undoAllowed}
+                  />
+                </div>
+              )}
+              {game && (
+                <>
+                  <Gameboard
+                    game={game}
+                    updateGame={updateGame}
+                    waitForClick
+                    muted={muted}
+                    onFirstInteraction={handleFirstInteraction}
+                    memoFlags={memoFlags}
+                    peek={peek}
+                    runPostFanfare={runPostFanfare}
+                    onFlipDownStart={triggerLevelTransition}
+                    onMemoChange={handleMemoChange}
+                    onLockChange={setBoardLocked}
+                    odds={odds}
+                    isAssisted={() => assistedRoundRef.current}
+                  />
+                  <Footer />
+                </>
+              )}
+            </div>
           </div>
+          {mode === "daily" && (
+            <DailyGame
+              muted={muted}
+              memoUndoEnabled={settings.memoUndo}
+              memoFlags={memoFlags}
+              onToggleMemo={toggleMemoFlag}
+              onClearMemo={clearMemoFlags}
+              canUndo={canUndo && !overlayOpen}
+              recordMemo={recordMemo}
+              undoMemoStack={undoMemoStack}
+              resetMemoUndo={resetMemoUndo}
+              registerUndo={registerDailyUndo}
+              onOutcome={handleDailyOutcome}
+              onFirstInteraction={handleFirstInteraction}
+              onExit={exitDaily}
+              streak={(dayKey) => activeStreak(stats, dayKey)}
+            />
+          )}
         </div>
       </EffectsProvider>
     </>

@@ -103,6 +103,22 @@ describe("StatsPanel", () => {
     expect(screen.getByText("Best daily streak")).toBeInTheDocument();
   });
 
+  it("lapses the shown daily streak after a missed UTC day but keeps the best", () => {
+    const stats = {
+      ...EMPTY_STATS,
+      dailyPlayed: 4,
+      streak: { current: 3, best: 5, lastDay: "2026-10-06" },
+    };
+    const { rerender } = render(
+      <StatsPanel stats={stats} today="2026-10-07" onReset={() => {}} onClose={() => {}} />,
+    );
+    const value = (label: string) => screen.getByText(label).parentElement?.textContent;
+    expect(value("Daily streak")).toBe("Daily streak3");
+    rerender(<StatsPanel stats={stats} today="2026-10-09" onReset={() => {}} onClose={() => {}} />);
+    expect(value("Daily streak")).toBe("Daily streak0");
+    expect(value("Best daily streak")).toBe("Best daily streak5");
+  });
+
   it("shows the numbers and asks before resetting", () => {
     const onReset = vi.fn();
     render(

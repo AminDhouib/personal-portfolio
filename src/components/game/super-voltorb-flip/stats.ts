@@ -3,6 +3,7 @@ import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { storedVersionIsNewer } from "./stored-version";
 import { MAX_LEVEL } from "./hgss";
+import { previousDay } from "./daily-board";
 
 // Local statistics. Their own key, never uploaded, display-only (DESIGN.md:
 // forgeable, so nothing reads them to gate anything). The streak and daily
@@ -139,4 +140,32 @@ export function recordRound(stats: Stats, round: RoundRecord): Stats {
   next.coins.total = Math.min(COUNT_CAP, next.coins.total + coins);
   next.coins.best = Math.max(next.coins.best, coins);
   return next;
+}
+
+/**
+ * Folds one finished Daily board in. Every finished board counts as played. Only a
+ * completed one (coins banked) extends the streak: it continues it when the last
+ * day was yesterday, restarts it at one after a gap, and a repeat of the same day
+ * changes nothing. A loss or a 0-coin quit neither extends nor breaks a live
+ * streak: it carries the streak's day forward, so only a missed day lapses it.
+ */
+export function recordDay(stats: Stats, dayKey: string, completed: boolean): Stats {
+  const next = structuredClone(stats);
+  next.dailyPlayed = Math.min(COUNT_CAP, next.dailyPlayed + 1);
+  if (!completed) {
+    if (next.streak.lastDay === previousDay(dayKey)) next.streak.lastDay = dayKey;
+    return next;
+  }
+  if (next.streak.lastDay === dayKey) return next;
+  const continues = next.streak.lastDay === previousDay(dayKey);
+  next.streak.current = continues ? Math.min(COUNT_CAP, next.streak.current + 1) : 1;
+  next.streak.best = Math.max(next.streak.best, next.streak.current);
+  next.streak.lastDay = dayKey;
+  return next;
+}
+
+/** The streak as it stands today: it lapses once a whole UTC day passes with no board played. */
+export function activeStreak(stats: Stats, today: string): number {
+  const { lastDay, current } = stats.streak;
+  return lastDay === today || lastDay === previousDay(today) ? current : 0;
 }

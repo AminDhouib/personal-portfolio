@@ -73,6 +73,17 @@ describe("RoundResult", () => {
   });
 });
 
+describe("RoundResult (daily)", () => {
+  it("reads See results and drops the level talk", () => {
+    render(
+      <RoundResult kind="win" fromLevel={5} toLevel={5} coins={512} daily onContinue={() => {}} />,
+    );
+    expect(screen.getByRole("button", { name: "See results" })).toBeTruthy();
+    expect(screen.queryByText(/Level/)).toBeNull();
+    expect(screen.getByText("Board cleared! +512 coins")).toBeTruthy();
+  });
+});
+
 describe("RoundResult (assisted)", () => {
   it("says an assisted round is not in the record", () => {
     render(

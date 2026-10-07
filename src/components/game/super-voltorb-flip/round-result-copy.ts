@@ -10,9 +10,12 @@ export type RoundResultCopyInput = {
   coins: number;
   /** The round was played with the odds assist on. */
   assisted?: boolean;
+  /** The Daily board: one fixed board a day, no levels and no assist. */
+  daily?: boolean;
 };
 
 const ASSISTED_NOTE = " Assisted: not in your record.";
+const NEXT_BOARD = "A new board lands at 00:00 UTC.";
 
 function coinsText(coins: number): string {
   return `${coins} ${coins === 1 ? "coin" : "coins"}`;
@@ -27,8 +30,25 @@ function coinsText(coins: number): string {
  * one sentence to the detail and leaves the title alone.
  */
 export function roundResultCopy(input: RoundResultCopyInput): { title: string; detail: string } {
+  if (input.daily) return dailyCopy(input);
   const { title, detail } = baseCopy(input);
   return input.assisted ? { title, detail: `${detail}${ASSISTED_NOTE}` } : { title, detail };
+}
+
+// The Daily board never talks about levels, and never about assistance (there is none).
+function dailyCopy({ kind, coins }: RoundResultCopyInput): { title: string; detail: string } {
+  if (kind === "win") {
+    return {
+      title: `Board cleared! +${coinsText(coins)}`,
+      detail: "Every coin on today's board. A new one lands at 00:00 UTC.",
+    };
+  }
+  if (kind === "lose") {
+    return { title: "Voltorb! Today's board is done.", detail: `No coins banked. ${NEXT_BOARD}` };
+  }
+  return coins > 0
+    ? { title: `You quit. +${coinsText(coins)}`, detail: `Banked for today. ${NEXT_BOARD}` }
+    : { title: "You quit with no coins.", detail: `Banked for today. ${NEXT_BOARD}` };
 }
 
 function baseCopy({ kind, fromLevel, toLevel, coins }: RoundResultCopyInput): {

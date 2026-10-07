@@ -280,6 +280,17 @@ export class VoltorbFlip {
     this._board = this.dealBoard(Math.random);
   }
 
+  // The shared Daily board: a fixed layout dealt at a fixed displayed level,
+  // outside the level progression. The board and level fields are private, so
+  // the factory lives here. The constructor's random deal is thrown away.
+  public static daily(boardId: number, layout: CellValue[], displayLevel: number): VoltorbFlip {
+    const game = new VoltorbFlip(5);
+    game._currentLevel = Math.max(0, Math.min(MAX_LEVEL, Math.round(displayLevel)) - 1);
+    game._boardId = boardId;
+    game._board = Board.fromLayout(layout);
+    return game;
+  }
+
   public toggleMemo() {
     this._gameStatus = this._gameStatus === "playing" ? "memo" : "playing";
   }

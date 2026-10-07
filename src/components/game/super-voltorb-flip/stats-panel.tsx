@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ModalShell } from "./modal-shell";
-import type { Stats } from "./stats";
+import { activeStreak, type Stats } from "./stats";
 
 function duration(seconds: number): string {
   if (seconds <= 0) return "0s";
@@ -25,10 +25,13 @@ function Line({ label, value }: { label: string; value: string }) {
 
 export function StatsPanel({
   stats,
+  today,
   onReset,
   onClose,
 }: {
   stats: Stats;
+  /** The current UTC day key; lets the Daily streak lapse after a missed day. */
+  today?: string;
   onReset: () => void;
   onClose: () => void;
 }) {
@@ -69,7 +72,12 @@ export function StatsPanel({
         <Line label="Highest level" value={String(stats.highestLevel)} />
         <Line label="Time at Lv.8" value={duration(stats.lv8Seconds)} />
         {showDaily && <Line label="Daily boards played" value={n(stats.dailyPlayed)} />}
-        {showDaily && <Line label="Daily streak" value={n(stats.streak.current)} />}
+        {showDaily && (
+          <Line
+            label="Daily streak"
+            value={n(today ? activeStreak(stats, today) : stats.streak.current)}
+          />
+        )}
         {showDaily && <Line label="Best daily streak" value={n(stats.streak.best)} />}
       </dl>
       {confirming ? (

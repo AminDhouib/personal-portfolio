@@ -45,6 +45,31 @@ describe("useStats", () => {
     expect(window.localStorage.getItem("svf:stats")).toBe(newer);
   });
 
+  it("records a completed Daily day and persists a streak of one", () => {
+    const { result } = renderHook(() => useStats(true));
+    act(() => result.current.recordDay("2026-10-07", true));
+    expect(result.current.stats.streak).toEqual({ current: 1, best: 1, lastDay: "2026-10-07" });
+    expect(JSON.parse(window.localStorage.getItem("svf:stats") ?? "{}").dailyPlayed).toBe(1);
+  });
+
+  it("records no Daily day and writes nothing while statistics are off", () => {
+    const { result } = renderHook(() => useStats(false));
+    act(() => result.current.recordDay("2026-10-07", true));
+    expect(result.current.stats.dailyPlayed).toBe(0);
+    expect(window.localStorage.getItem("svf:stats")).toBeNull();
+  });
+
+  it("reset wipes the statistics but never touches the Daily attempt", () => {
+    const daily =
+      '{"v":1,"handle":"","day":"2026-10-07","flips":[1],"outcome":null,"submitted":false}';
+    window.localStorage.setItem("svf:daily", daily);
+    const { result } = renderHook(() => useStats(true));
+    act(() => result.current.recordDay("2026-10-07", true));
+    act(() => result.current.reset());
+    expect(result.current.stats.streak.current).toBe(0);
+    expect(window.localStorage.getItem("svf:daily")).toBe(daily);
+  });
+
   it("raises the highest level only upward, and not while disabled", () => {
     const { result } = renderHook(() => useStats(true));
     act(() => result.current.raiseHighestLevel(5));
