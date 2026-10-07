@@ -43,6 +43,7 @@ import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { isTextEntryTarget } from "./super-voltorb-flip/keyboard";
+import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
@@ -125,34 +126,7 @@ const SCOPED_STYLES = `
   --svf-tile: 40px;
   --svf-gap: 16px;
 }
-/* Fluid board sizing. .svf-board-frame is a container-query root so the
-   tiles/gaps can solve for any --svf-n (board size) from 2 to 7. Formula:
-     tile*(N+1) + gap*N = contentWidth, gap = 0.28*tile
-     -> tile = contentWidth / (1.28*N + 1)
-   The 12px constant accounts for outer tile outlines that sit outside each
-   grid cell (outline-4 = 4px, times ~1.5 cells on average). */
-.svf-root .svf-board-frame {
-  container-type: inline-size;
-  container-name: svf-board;
-  --svf-pad: 12px;
-  --svf-tile-cap: 72px;
-  --svf-tile-ideal: calc((100cqw - 2 * var(--svf-pad) - 16px) / (1.28 * var(--svf-n) + 1));
-  --svf-tile: min(var(--svf-tile-cap), var(--svf-tile-ideal));
-  --svf-gap: calc(var(--svf-tile) * 0.28);
-  /* Cap so a small board doesn't stretch the frame into empty green space
-     at the tile cap: cap width = tileCap * (1.28N + 1) + frame chrome. */
-  --svf-max-cap: calc(var(--svf-tile-cap) * (1.28 * var(--svf-n) + 1) + 2 * var(--svf-pad) + 16px);
-  /* Explicit width so a mobile parent (flex-col items-center) can't
-     collapse us to 0 — the container-query math needs a real inline size. */
-  width: min(92vw, 380px, var(--svf-max-cap));
-  margin-inline: auto;
-}
-@media (min-width: 640px) {
-  .svf-root .svf-board-frame { width: min(92vw, 460px, var(--svf-max-cap)); }
-}
-@media (min-width: 1024px) {
-  .svf-root .svf-board-frame { width: min(60vw, 560px, var(--svf-max-cap)); }
-}
+${BOARD_FRAME_CSS}
 .svf-root { font-family: var(--font-voltorb-ds), ui-monospace, monospace; color: #fff; background-color: #58a66c; }
 .svf-root *, .svf-root *::before, .svf-root *::after { box-sizing: border-box; text-rendering: geometricPrecision; }
 .svf-root .text-shadow-white {
@@ -854,7 +828,7 @@ const Gameboard = ({
         className={`svf-board-frame ${peek ? "svf-peek" : ""} relative border-4 border-white bg-[#448563] p-1.5 shadow-[0_4px_0_rgba(0,0,0,0.18),0_8px_24px_rgba(0,0,0,0.25)] outline outline-2 outline-gray-600`}
         style={{ "--svf-n": N } as React.CSSProperties}
       >
-        <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-2">
+        <div className="flex h-full w-full rounded-xl bg-[#58a66c] p-1 sm:p-2">
           <div className="flex flex-col gap-[var(--svf-gap)]">
             <div className="flex gap-[var(--svf-gap)]">
               <div
