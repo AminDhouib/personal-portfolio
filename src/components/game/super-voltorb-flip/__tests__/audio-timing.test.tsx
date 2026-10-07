@@ -82,6 +82,23 @@ async function advance(ms: number): Promise<void> {
   });
 }
 
+// The phone HUD's "This Game" readout. runPostFanfare snaps it to the round's
+// earnings the moment the payout starts, so it is a muted-safe marker for "the
+// clear wait is over" (no sound cue is involved).
+function thisGameDigits(): string {
+  const label = screen.getByText("This Game");
+  return label.parentElement?.nextElementSibling?.textContent ?? "";
+}
+
+function openDebugAndWin(): void {
+  // Ten taps on the mute button open the debug panel (back where we began).
+  for (let i = 0; i < 10; i++) {
+    fireEvent.click(screen.getAllByRole("button", { name: /^(Mute|Unmute)$/ })[0]!);
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Open debug panel" }));
+  fireEvent.click(screen.getByRole("button", { name: "Win current level" }));
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   audio.sfxCalls.length = 0;
@@ -151,6 +168,24 @@ describe("level-clear fanfare", () => {
     // Fanfare over (+ the 320 ms pause, rounded up to the next 60 ms slice).
     await advance(1 + 400);
     expect(audio.sfxCalls).toContain("payoutTickBank");
+  });
+});
+
+describe.each([
+  { label: "unmuted", muted: false },
+  { label: "muted", muted: true },
+])("clear wait ($label)", ({ muted }) => {
+  it("holds the payout for exactly LEVEL_WIN_MS", async () => {
+    seedStorage(muted);
+    render(<SuperVoltorbFlipGame />);
+    openDebugAndWin();
+
+    expect(thisGameDigits()).toBe("00000");
+    await advance(LEVEL_WIN_MS - 1);
+    expect(thisGameDigits()).toBe("00000");
+
+    await advance(2);
+    expect(thisGameDigits()).not.toBe("00000");
   });
 });
 
