@@ -20,4 +20,4 @@ export type RowColValues = {
   voltorbs: number;
 };
 
-export type GameStatus = "playing" | "win" | "lose" | "memo";
+export type GameStatus = "playing" | "win" | "lose" | "memo" | "quit";

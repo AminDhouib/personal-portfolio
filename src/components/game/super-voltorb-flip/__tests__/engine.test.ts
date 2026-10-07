@@ -8,11 +8,11 @@ import {
   VoltorbFlip,
   cloneGame,
 } from "../engine";
+import { BOARD_CONFIGS } from "../hgss";
 import type { Cell } from "../types";
 
-// Characterization tests (RC-3-lite): pin CURRENT behavior of engine.ts,
-// including quirks, via its public API only. No engine.ts edits. Math.random
-// is handled via invariant assertions over many iterations for randomized
+// Engine tests. The VoltorbFlip block pins the HGSS rules (hgss.ts) as the engine applies them; the Level/Board/shuffle blocks still characterize the formula path that only ?size=N boards use.
+// Math.random is handled via invariant assertions over many iterations for randomized
 // paths, and vi.spyOn only where an exact value is asserted -- neither
 // touches engine code.
 
@@ -267,49 +267,26 @@ describe("VoltorbFlip", () => {
     expect(game.totalScore).toBe(targetScore);
   });
 
-  it("NF(P7)-a: every 1-valued flip after winning re-enters the win block (current behavior, not fixed here)", () => {
-    const game = new VoltorbFlip();
-    const ones: Array<[number, number]> = [];
-    const others: Array<[number, number]> = [];
-    for (let r = 0; r < game.cells.length; r++) {
-      const row = game.cells[r];
-      if (!row) continue;
-      for (let c = 0; c < row.length; c++) {
-        const value = row[c]?.value;
-        if (value === "V") continue;
-        if (value === 1) ones.push([r, c]);
-        else others.push([r, c]);
-      }
+  it("ignores flips once the round is won (the NF(P7)-a re-entry quirk is gone on purpose)", () => {
+    const g = new VoltorbFlip();
+    const cells = g.cells.flat();
+    // Flip every non-Voltorb card in board order until the round is won.
+    for (let i = 0; i < 25 && g.gameStatus === "playing"; i++) {
+      const cell = cells[i];
+      if (cell && cell.value !== "V") g.flipCell(Math.floor(i / 5), i % 5);
     }
-
-    // Need at least two spare "1" cells left after the win, to show the
-    // quirk re-fires repeatedly (not just once).
-    expect(ones.length).toBeGreaterThanOrEqual(2);
-
-    for (const [r, c] of others) {
-      game.flipCell(r, c);
+    expect(g.gameStatus).toBe("win");
+    const total = g.totalScore;
+    const level = g.currentLevel;
+    const score = g.currentScore;
+    for (let i = 0; i < 25; i++) {
+      const cell = cells[i];
+      if (cell && !cell.isFlipped && cell.value !== "V") g.flipCell(Math.floor(i / 5), i % 5);
     }
-    expect(game.gameStatus).toBe("win");
-    const scoreAtWin = game.currentScore;
-    const levelAtWin = game.currentLevel;
-    const totalAtWin = game.totalScore;
-
-    // Pinned quirk: currentScore * 1 === currentScore, so it never departs
-    // from maxLevelScore once reached -- every further "1" flip satisfies
-    // the win condition again. currentLevel keeps advancing (capped at 9,
-    // since the internal _currentLevel caps at 8) and totalScore keeps
-    // accumulating scoreAtWin on every re-entry, uncapped.
-    game.flipCell(ones[0]![0], ones[0]![1]);
-    expect(game.currentScore).toBe(scoreAtWin);
-    expect(game.gameStatus).toBe("win");
-    expect(game.currentLevel).toBe(levelAtWin + 1);
-    expect(game.totalScore).toBe(totalAtWin + scoreAtWin);
-
-    game.flipCell(ones[1]![0], ones[1]![1]);
-    expect(game.currentScore).toBe(scoreAtWin);
-    expect(game.gameStatus).toBe("win");
-    expect(game.currentLevel).toBe(Math.min(levelAtWin + 2, 9));
-    expect(game.totalScore).toBe(totalAtWin + scoreAtWin * 2);
+    expect(g.gameStatus).toBe("win");
+    expect(g.totalScore).toBe(total);
+    expect(g.currentLevel).toBe(level);
+    expect(g.currentScore).toBe(score);
   });
 
   it("restartGame resets status and score and rebuilds the board", () => {
@@ -323,11 +300,96 @@ describe("VoltorbFlip", () => {
 
   it("debugWinLevel sets win status, advances the level, and adds to totalScore", () => {
     const game = new VoltorbFlip();
-    const totalBefore = game.totalScore;
+    const maxScore = game.cells
+      .flat()
+      .reduce((product, cell) => (cell.value === "V" ? product : product * cell.value), 1);
     game.debugWinLevel();
     expect(game.gameStatus).toBe("win");
     expect(game.currentLevel).toBe(2);
-    expect(game.totalScore).toBeGreaterThan(totalBefore);
+    expect(game.totalScore).toBe(maxScore);
+  });
+
+  it("deals a board from the HGSS table for the current level on 5x5", () => {
+    const g = new VoltorbFlip();
+    const flat = g.cells.flat().map((c) => c.value);
+    const voltorbs = flat.filter((v) => v === "V").length;
+    // Every Lv.1 board has exactly 6 Voltorbs.
+    expect(voltorbs).toBe(6);
+    expect(BOARD_CONFIGS.slice(0, 10)).toContainEqual(
+      expect.objectContaining({
+        voltorbs: 6,
+        twos: flat.filter((v) => v === 2).length,
+        threes: flat.filter((v) => v === 3).length,
+      }),
+    );
+  });
+
+  it("a loss drops the level to the number of cards flipped", () => {
+    const g = new VoltorbFlip();
+    g.restore(5, 0);
+    const cells = g.cells.flat();
+    let flipped = 0;
+    for (let i = 0; i < 25 && flipped < 2; i++) {
+      const cell = cells[i];
+      if (cell && cell.value !== "V") {
+        g.flipCell(Math.floor(i / 5), i % 5);
+        flipped += 1;
+      }
+    }
+    const v = cells.findIndex((c) => c.value === "V");
+    g.flipCell(Math.floor(v / 5), v % 5);
+    expect(g.gameStatus).toBe("lose");
+    expect(g.currentLevel).toBe(2);
+  });
+
+  it("quit banks the round's coins and records the round", () => {
+    const g = new VoltorbFlip();
+    const cells = g.cells.flat();
+    const i = cells.findIndex((c) => c.value !== "V");
+    g.flipCell(Math.floor(i / 5), i % 5);
+    const payout = g.currentScore;
+    g.quit();
+    expect(g.gameStatus).toBe("quit");
+    expect(g.totalScore).toBe(payout);
+    expect(g.history.at(-1)).toEqual(expect.objectContaining({ outcome: "quit", cardsFlipped: 1 }));
+    // One card flipped at Lv.1: stays at Lv.1.
+    expect(g.currentLevel).toBe(1);
+  });
+
+  it("quit is ignored once the round has ended", () => {
+    const g = new VoltorbFlip();
+    const cells = g.cells.flat();
+    const v = cells.findIndex((c) => c.value === "V");
+    g.flipCell(Math.floor(v / 5), v % 5);
+    g.quit();
+    expect(g.gameStatus).toBe("lose");
+  });
+
+  it("restartGame deals from an injected rng", () => {
+    const a = new VoltorbFlip();
+    const b = new VoltorbFlip();
+    const rng = () => {
+      let s = 1;
+      return () => {
+        s = (s * 16807) % 2147483647;
+        return s / 2147483647;
+      };
+    };
+    a.restartGame(rng());
+    b.restartGame(rng());
+    expect(a.cells.flat().map((c) => c.value)).toEqual(b.cells.flat().map((c) => c.value));
+  });
+
+  it("keeps a five-round history that survives cloneGame and restore", () => {
+    const g = new VoltorbFlip();
+    expect(g.history).toHaveLength(5);
+    g.quit();
+    const clone = cloneGame(g);
+    expect(clone.history).toEqual(g.history);
+    const h = g.history;
+    const r = new VoltorbFlip();
+    r.restore(3, 50, h);
+    expect(r.history).toEqual(h);
   });
 });
 
@@ -380,5 +442,11 @@ describe("VoltorbFlip.restore", () => {
     const clone = cloneGame(game);
     expect(clone.currentLevel).toBe(7);
     expect(clone.totalScore).toBe(3714);
+  });
+
+  it("caps the restored level at 8 (HGSS has no Lv.9)", () => {
+    const game = new VoltorbFlip();
+    game.restore(9, 10);
+    expect(game.currentLevel).toBe(8);
   });
 });
