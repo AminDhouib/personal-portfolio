@@ -1,5 +1,6 @@
 import { CUES, type CueName } from "./sound-cues";
 import { musicTrackForLevel } from "./music";
+import { isTextEntryTarget } from "./keyboard";
 import {
   createMaster,
   scheduleCue,
@@ -22,30 +23,47 @@ let musicSrc: string | null = null;
 // Loops being faded out; they have left the `music` slot but still sound.
 const fading = new Set<HTMLAudioElement>();
 
-// Cancels the pending "retry the loop on the next gesture" listeners, if armed.
+// Cancels the pending "retry the loop on the next gesture" listeners, if armed,
+// and the function that runs that retry now (used when the player unmutes).
 let cancelGestureRetry: (() => void) | null = null;
+let runGestureRetry: (() => void) | null = null;
 
 // A browser can reject play() until the page has had a user gesture. Instead of
-// waiting for the next round change, retry on the first pointer press or key.
-// A rejection of the retry itself re-arms it for the next gesture.
+// waiting for the next round change, retry on the first gesture: a pointer press
+// or release, a touch end (on touch the activation arrives with the release, so
+// the press alone can still be rejected) or a key. A key typed in a text field
+// is not a game gesture and a muted game stays silent; both leave the retry
+// armed. A rejection of the retry itself re-arms it for the next gesture.
 function retryMusicOnGesture(el: HTMLAudioElement): void {
   if (typeof document === "undefined") return;
   cancelGestureRetry?.();
-  const events = ["pointerdown", "keydown"] as const;
+  const events = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
   const cancel = () => {
-    for (const name of events) document.removeEventListener(name, retry, true);
-    if (cancelGestureRetry === cancel) cancelGestureRetry = null;
+    for (const name of events) document.removeEventListener(name, onGesture, true);
+    if (cancelGestureRetry === cancel) {
+      cancelGestureRetry = null;
+      runGestureRetry = null;
+    }
   };
-  function retry() {
+  function attempt() {
+    if (music !== el) {
+      cancel();
+      return;
+    }
+    if (globalMuted) return;
     cancel();
-    if (music !== el) return;
     // silent-ok: still blocked; re-armed for the next gesture
     el.play().catch(() => {
       if (music === el) retryMusicOnGesture(el);
     });
   }
-  for (const name of events) document.addEventListener(name, retry, true);
+  function onGesture(event: Event) {
+    if (event.type === "keydown" && isTextEntryTarget(event)) return;
+    attempt();
+  }
+  for (const name of events) document.addEventListener(name, onGesture, true);
   cancelGestureRetry = cancel;
+  runGestureRetry = attempt;
 }
 
 function getMaster(): Master | null {
@@ -265,4 +283,6 @@ export function setMusicMuted(muted: boolean): void {
   if (music) music.muted = muted;
   for (const m of fading) m.muted = muted;
   if (master) setMasterMuted(master, muted);
+  // A loop that was waiting for a gesture while muted starts now: unmuting is one.
+  if (!muted) runGestureRetry?.();
 }
