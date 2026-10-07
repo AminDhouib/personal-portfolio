@@ -456,7 +456,7 @@ describe("password-game-2 full-run integration", () => {
     expect(r.galagaTimedOutWaves).toBe(0);
   });
 
-  it("advances each act only after its last blocking beat resolves on the authored timeline", () => {
+  it("advances each act once its blocking beats resolve, pulled forward from the authored timeline", () => {
     const r = driveRun(SEED);
     const byFrom = new Map(r.transitions.map((t) => [t.from, t]));
 
@@ -468,13 +468,14 @@ describe("password-game-2 full-run integration", () => {
     // act1 and act2 are gated by their last blocking (non-inhabitant) event. act1's
     // chrome resolves on the driver's tendChrome (a dismiss/toggle, or the loading bar's
     // brief keyboard seizure); act2's forces resolve on the driver's cure/collapse/evict
-    // timing. Both land in a generous window after the last blocking onset — never before
-    // it, and not idling minutes after.
+    // timing. The instant solver finishes the rules early, so pull-forward brings the
+    // blocking beats sooner than the authored clock: the act ends BEFORE the authored
+    // last onset, and still not idling minutes after.
     for (const act of ["act1", "act2"] as const) {
       const t = byFrom.get(act)!;
-      const onset = lastBlockingOnsetMs(r.g, act);
+      const onset = lastBlockingOnsetMs(boot(SEED), act); // authored, not pulled forward
       expect(onset).toBeGreaterThan(0);
-      expect(t.actDurationMs).toBeGreaterThanOrEqual(onset);
+      expect(t.actDurationMs).toBeLessThan(onset);
       expect(t.actDurationMs).toBeLessThanOrEqual(onset + 60_000);
 
       // Lifecycle at the boundary: every blocking beat done; inhabitant past telegraph.
@@ -493,8 +494,23 @@ describe("password-game-2 full-run integration", () => {
   it("reaches the finale in well under 15 simulated minutes with the instant solver", () => {
     const r = driveRun(SEED);
     expect(r.elapsedAtFinaleMs).toBeLessThan(15 * 60 * 1_000);
-    // Sanity: it is not instantaneous either — the scripted acts take real sim time.
-    expect(r.elapsedAtFinaleMs).toBeGreaterThan(5 * 60 * 1_000);
+    // Sanity: it is not instantaneous either - every event still plays out. Measured for
+    // SEED: 521.3 s before pull-forward, 174.3 s after; the floor is about 60 percent of
+    // the current value.
+    expect(r.elapsedAtFinaleMs).toBeGreaterThan(100_000);
+  });
+
+  it("pull-forward never skips an event: every event of a passed act was inited and finished", () => {
+    const r = driveRun(SEED);
+    for (const act of ["act1", "act2"] as const) {
+      const evs = r.g.events.filter((e) => e.act === act);
+      expect(evs.length).toBeGreaterThan(0);
+      expect(evs.every((e) => e.data !== undefined)).toBe(true);
+      expect(evs.filter((e) => e.family !== "inhabitant").every((e) => e.phase === "done")).toBe(
+        true,
+      );
+    }
+    expect(r.act3NonInhabAllDoneAtFinale).toBe(true);
   });
 
   it("keeps every scripted inhabitant early enough in its act to onset before the act ends", () => {
@@ -533,7 +549,12 @@ describe("password-game-2 full-run integration", () => {
     let sawEmberCell = false;
     let sawEatToast = false;
     let sawTrample = false;
-    for (let i = 0; i < 6000 && g.act !== "act3"; i++) {
+    // Pull-forward reaches act3 before the fire has burned out, so keep playing in act3
+    // (no submit) until the creatures' fate has played out.
+    const campfireOut = () =>
+      (g.events.find((e) => e.defId === "campfire")?.data as { burning: boolean } | undefined)
+        ?.burning === false;
+    for (let i = 0; i < 6000 && !(g.act === "act3" && campfireOut() && sawTrample); i++) {
       // Solve the roster and tend the forces (to advance acts), neglect the creatures.
       solveAndTick(g, api, { tendInhabitants: false });
       // An ember scar is wiped by the next frame's retype, so scan every frame.

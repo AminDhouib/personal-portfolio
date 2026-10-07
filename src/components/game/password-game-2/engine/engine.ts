@@ -16,6 +16,7 @@ import { cellsToPassword, deleteRange, findCellIndex, insertText } from "./cells
 import { pushEffect } from "./effects";
 import { CORE_RULES } from "./rules/index";
 import { buildSchedule } from "./director";
+import { PULL_FORWARD_BEAT_MS, inhabitantsArrived, pullForwardTargets } from "./pacing";
 import { EVENT_DEFS } from "./events/index";
 import { createFinale, finalePointer, tickFinale } from "./events/finale";
 
@@ -150,6 +151,7 @@ export function tick(g: GameState, dtMs: number): void {
   const password = cellsToPassword(g.cells);
   const api = makeRuleApi(g, clockOf(g));
   revalidateAndReveal(g, password, api);
+  pullForwardIfSolved(g, password, api);
   advanceActIfComplete(g, password, api);
 }
 
@@ -412,15 +414,8 @@ function revalidateAndReveal(g: GameState, password: string, api: RuleApi): void
   if (next) revealRule(g, next);
 }
 
-/**
- * Advance the act once every core rule assigned to it is revealed and passing and
- * every non-inhabitant event scheduled for it has resolved. Inhabitants persist
- * until the finale, so they never gate advancement.
- */
-function advanceActIfComplete(g: GameState, password: string, api: RuleApi): void {
-  const next = NEXT_ACT[g.act];
-  if (next === null) return;
-
+/** Every core rule assigned to the current act is revealed and passing. */
+function actCoreSolved(g: GameState, password: string, api: RuleApi): boolean {
   const revealed = new Set(g.rules.map((r) => r.id));
   const allActRulesRevealed = CORE_RULES.filter((d) => d.act === g.act).every((d) =>
     revealed.has(d.id),
@@ -428,9 +423,36 @@ function advanceActIfComplete(g: GameState, password: string, api: RuleApi): voi
   const allActRulesPass = g.rules
     .filter((r) => CORE_RULE_IDS.has(r.id) && r.act === g.act)
     .every((r) => r.validate(password, g, api).passed);
+  return allActRulesRevealed && allActRulesPass;
+}
+
+/**
+ * Once the act's rules are solved, the authored clock is dead time: reschedule the
+ * next unstarted events to arrive after a short beat. Events are never dropped, so a
+ * fast player meets the same set, only sooner. act3 uses the same pull so its submit
+ * gate (nonInhabitantEventsResolvedForAct) does not idle either.
+ */
+function pullForwardIfSolved(g: GameState, password: string, api: RuleApi): void {
+  if (g.act === "finale" || !actCoreSolved(g, password, api)) return;
+  const targets = pullForwardTargets(g.events, g.act, g.actElapsedMs, PULL_FORWARD_BEAT_MS);
+  if (targets.size === 0) return;
+  for (const [inst, at] of targets) inst.scheduledAtMs = at;
+  bump(g);
+}
+
+/**
+ * Advance the act once every core rule assigned to it is revealed and passing and
+ * every non-inhabitant event scheduled for it has resolved. Inhabitants persist
+ * until the finale and never gate advancement, except that each must have arrived and
+ * finished its telegraph so a fast solver cannot skip one.
+ */
+function advanceActIfComplete(g: GameState, password: string, api: RuleApi): void {
+  const next = NEXT_ACT[g.act];
+  if (next === null) return;
+
   const eventsResolved = nonInhabitantEventsResolvedForAct(g, g.act);
 
-  if (allActRulesRevealed && allActRulesPass && eventsResolved) {
+  if (actCoreSolved(g, password, api) && eventsResolved && inhabitantsArrived(g.events, g.act)) {
     g.act = next;
     g.actElapsedMs = 0;
     pushEffect(g, { kind: "title-card", act: next });
