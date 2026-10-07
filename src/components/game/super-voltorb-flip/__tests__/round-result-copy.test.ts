@@ -72,3 +72,20 @@ describe("roundResultCopy", () => {
     );
   });
 });
+
+describe("assisted rounds", () => {
+  const base = { fromLevel: 3, toLevel: 3, coins: 12 };
+  it("say so, on every kind of round, without touching the title", () => {
+    for (const kind of ["win", "lose", "quit"] as const) {
+      const plain = roundResultCopy({ ...base, kind });
+      const assisted = roundResultCopy({ ...base, kind, assisted: true });
+      expect(assisted.title).toBe(plain.title);
+      expect(assisted.detail).toBe(`${plain.detail} Assisted: not in your record.`);
+    }
+  });
+  it("are unchanged when assisted is false or absent", () => {
+    expect(roundResultCopy({ ...base, kind: "win", assisted: false })).toEqual(
+      roundResultCopy({ ...base, kind: "win" }),
+    );
+  });
+});

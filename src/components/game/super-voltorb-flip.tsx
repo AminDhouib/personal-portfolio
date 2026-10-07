@@ -51,6 +51,8 @@ import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/m
 import { isUndoKey, type MemoChange } from "./super-voltorb-flip/memo-undo";
 import { useMemoUndo } from "./super-voltorb-flip/use-memo-undo";
 import { useSettings } from "./super-voltorb-flip/use-settings";
+import { tileOddsView, type TileOddsView } from "./super-voltorb-flip/odds-input";
+import { useOdds, type Odds } from "./super-voltorb-flip/use-odds";
 import { useStats } from "./super-voltorb-flip/use-stats";
 import {
   clockSeconds,
@@ -354,6 +356,8 @@ type CardProps = {
   cellId?: string;
   /** Fires when the tile takes focus (keyboard, click or script) so the cursor follows. */
   onFocus?: () => void;
+  /** Odds assist: the Voltorb chance shown on a face-down tile, and its spoken form. */
+  odds?: TileOddsView;
 };
 
 // Two complete static class strings (never a conditional fragment) so the
@@ -362,6 +366,10 @@ const TILE_WRAP =
   "svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px]";
 const TILE_WRAP_ANXIOUS =
   "svf-tile-wrap relative h-[var(--svf-tile)] w-[var(--svf-tile)] cursor-pointer place-self-center [perspective:1000px] svf-tile-anxious";
+
+// Two complete static class strings, the suggested flip in the game's gold.
+const ODDS_PILL = "rounded-[3px] bg-black/70 px-[2px] leading-none font-bold text-white";
+const ODDS_PILL_BEST = "rounded-[3px] bg-[#efa539] px-[2px] leading-none font-bold text-black";
 
 const Card = ({
   children,
@@ -376,6 +384,7 @@ const Card = ({
   tabIndex = 0,
   cellId,
   onFocus,
+  odds,
 }: CardProps) => {
   const rowColor = row !== undefined ? COLORS[row] : undefined;
   const colColor = col !== undefined ? COLORS[col] : undefined;
@@ -409,7 +418,9 @@ const Card = ({
           ? `Row ${row + 1}, Col ${col + 1}, ${
               isFlipped
                 ? `revealed${valueLabel ? `, ${valueLabel}` : ""}`
-                : `face down${memoText ? `, memo ${memoText}` : ""}`
+                : `face down${memoText ? `, memo ${memoText}` : ""}${
+                    odds ? `, ${odds.spoken}${odds.best ? ", suggested next flip" : ""}` : ""
+                  }`
             }`
           : undefined
       }
@@ -479,6 +490,20 @@ const Card = ({
                 </div>
               ) : null,
             )}
+          </div>
+        )}
+        {odds && !isFlipped && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
+            <span
+              data-odds-pill=""
+              className={odds.best ? ODDS_PILL_BEST : ODDS_PILL}
+              style={{ fontSize: "calc(var(--svf-tile) * 0.27)" }}
+            >
+              {odds.text}
+            </span>
           </div>
         )}
       </div>
@@ -561,6 +586,10 @@ type GameboardProps = {
   onMemoChange?: (change: MemoChange) => void;
   /** Reports whether the board is held by the quit confirmation or a risk fanfare. */
   onLockChange?: (locked: boolean) => void;
+  /** Odds assist answer for the live board; null while off, unsolved or the round is over. */
+  odds?: Odds | null;
+  /** Whether the round that just ended was played with the odds assist (for the banner). */
+  isAssisted?: () => boolean;
 };
 
 type ActiveEffect = {
@@ -583,6 +612,8 @@ const Gameboard = ({
   onFlipDownStart,
   onMemoChange,
   onLockChange,
+  odds,
+  isAssisted,
 }: GameboardProps) => {
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: cell.isFlipped })),
@@ -927,7 +958,13 @@ const Gameboard = ({
       await flipCardsUp();
       // 4. Wait for a press with the result banner up.
       if (waitForClick) {
-        setRoundResult({ kind: status, fromLevel, toLevel, coins });
+        setRoundResult({
+          kind: status,
+          fromLevel,
+          toLevel,
+          coins,
+          assisted: isAssisted?.() === true,
+        });
         await waitForUserInteraction();
         setRoundResult(null);
       }
@@ -993,6 +1030,11 @@ const Gameboard = ({
                       }
                       flipCard={() => handleFlip(coordinate[0], coordinate[1])}
                       flags={peek || cell.isFlipped || flipDownStarted ? undefined : cell.flags}
+                      odds={tileOddsView(odds, i, {
+                        flipped: cell.isFlipped,
+                        peek,
+                        flipDown: flipDownStarted,
+                      })}
                       warning={
                         warningTile?.row === coordinate[0] && warningTile?.col === coordinate[1]
                       }
@@ -1494,6 +1536,7 @@ export function SuperVoltorbFlipGame() {
   }, [muted]);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
   const [settings, updateSettings] = useSettings();
+  const odds = useOdds(game, settings.assist);
   const {
     stats,
     record: recordStats,
@@ -1510,6 +1553,8 @@ export function SuperVoltorbFlipGame() {
   // Start level for the statistics. The level is read while the round is live
   // (the engine moves currentLevel the instant a round ends).
   const roundStartLevelRef = useRef<number>(1);
+  // True once the odds assist was on at any point while this round was live.
+  const assistedRoundRef = useRef(false);
   const musicStartedRef = useRef(false);
 
   // Undo is offered only while a memo could be made: a live round, no panel or
@@ -1874,6 +1919,7 @@ export function SuperVoltorbFlipGame() {
     }
     if ((prev === "win" || prev === "lose" || prev === "quit") && cur === "playing") {
       resetMemoUndo();
+      assistedRoundRef.current = false;
       clearMemoTimer = window.setTimeout(() => clearMemoFlags(), 0);
       stopGameOver();
       stopLevelWin();
@@ -1896,7 +1942,7 @@ export function SuperVoltorbFlipGame() {
         coins: cur === "lose" ? 0 : game.currentScore,
         level: roundStartLevelRef.current,
         levelAfter: game.currentLevel,
-        assisted: false,
+        assisted: assistedRoundRef.current,
         seconds: clockSeconds(roundClockRef.current, now),
       });
       roundClockRef.current = endClock(roundClockRef.current, now);
@@ -1907,6 +1953,17 @@ export function SuperVoltorbFlipGame() {
       if (clearMemoTimer) window.clearTimeout(clearMemoTimer);
     };
   }, [game, game?.gameStatus, muted, clearMemoFlags, resetMemoUndo, recordStats]);
+
+  // A round is assisted if the odds assist was on at any point while it was
+  // live; switching it off mid-round does not clean the round. It must be
+  // declared AFTER the status effect: on the commit that deals a new round that
+  // effect clears the flag first and this one re-marks it. Turning the assist on
+  // while the result banner is up affects the next round, not the one just over.
+  useEffect(() => {
+    if (!game) return;
+    const live = game.gameStatus === "playing" || game.gameStatus === "memo";
+    if (live && settings.assist) assistedRoundRef.current = true;
+  }, [game, game?.gameStatus, settings.assist]);
 
   // The level the next loop should be picked for. A ref, not an effect
   // dependency: a level change mid-round (the win moves it at once) must not
@@ -2141,6 +2198,8 @@ export function SuperVoltorbFlipGame() {
                   onFlipDownStart={triggerLevelTransition}
                   onMemoChange={handleMemoChange}
                   onLockChange={setBoardLocked}
+                  odds={odds}
+                  isAssisted={() => assistedRoundRef.current}
                 />
                 <Footer />
               </>

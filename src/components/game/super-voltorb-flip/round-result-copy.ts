@@ -8,7 +8,11 @@ export type RoundResultCopyInput = {
   toLevel: number;
   /** Coins banked this round; only a win or a quit pays. */
   coins: number;
+  /** The round was played with the odds assist on. */
+  assisted?: boolean;
 };
+
+const ASSISTED_NOTE = " Assisted: not in your record.";
 
 function coinsText(coins: number): string {
   return `${coins} ${coins === 1 ? "coin" : "coins"}`;
@@ -19,9 +23,15 @@ function coinsText(coins: number): string {
  * game's flow: a win pays and moves up (or explains why it stays), a loss pays
  * nothing and drops, a quit banks what it has and drops the same way. The
  * detail stays short on purpose: the banner has a fixed height (72px on
- * phones, 60px from sm) and a long line would grow it.
+ * phones, 60px from sm) and a long line would grow it. An assisted round adds
+ * one sentence to the detail and leaves the title alone.
  */
-export function roundResultCopy({ kind, fromLevel, toLevel, coins }: RoundResultCopyInput): {
+export function roundResultCopy(input: RoundResultCopyInput): { title: string; detail: string } {
+  const { title, detail } = baseCopy(input);
+  return input.assisted ? { title, detail: `${detail}${ASSISTED_NOTE}` } : { title, detail };
+}
+
+function baseCopy({ kind, fromLevel, toLevel, coins }: RoundResultCopyInput): {
   title: string;
   detail: string;
 } {

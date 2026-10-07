@@ -25,16 +25,20 @@ describe("SettingsPanel", () => {
     expect(onChange).toHaveBeenCalledWith({ stats: false });
   });
 
-  it("does not offer the odds assist until it does something", () => {
+  it("offers the odds assist, off by default, and reports a change", () => {
+    const onChange = vi.fn();
     render(
       <SettingsPanel
         settings={{ memoUndo: true, stats: true, assist: false }}
-        onChange={() => {}}
+        onChange={onChange}
         onClose={() => {}}
       />,
     );
-    expect(screen.queryByRole("switch", { name: /odds assist/i })).toBeNull();
-    expect(screen.getAllByRole("switch")).toHaveLength(2);
+    const assist = screen.getByRole("switch", { name: /odds assist/i });
+    expect(assist).toHaveAttribute("aria-checked", "false");
+    expect(screen.getAllByRole("switch")).toHaveLength(3);
+    fireEvent.click(assist);
+    expect(onChange).toHaveBeenCalledWith({ assist: true });
   });
 
   it("closes on Escape", () => {
