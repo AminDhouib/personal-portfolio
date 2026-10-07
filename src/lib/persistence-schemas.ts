@@ -11,7 +11,7 @@
  * compile time, no zod in the bundle); the schema VALUES are server-only.
  */
 import { z } from "zod";
-import { ARCADE_GAME_SLUGS } from "@/lib/arcade/games";
+import { LEGACY_ARCADE_GAME_SLUGS } from "@/lib/arcade/games";
 
 export const PERSISTENCE_SCHEMA_VERSION = 1;
 
@@ -116,7 +116,7 @@ export const arcadeTokenRowSchema = z.strictObject({ token_hash: z.string().min(
  */
 export const legacyLeaderboardRowSchema = z.strictObject({
   id: pgInteger,
-  game: z.enum(ARCADE_GAME_SLUGS),
+  game: z.enum(LEGACY_ARCADE_GAME_SLUGS),
   name: z.string(),
   score: pgInteger,
   level: pgInteger,

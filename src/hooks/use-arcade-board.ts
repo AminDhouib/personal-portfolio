@@ -17,6 +17,8 @@ export interface ArcadeBoardEntry {
   seconds?: number;
   kills?: number;
   distance?: number;
+  day?: number;
+  flips?: number;
   createdAt: string;
   /** Set only when the server said so; Hextris falls back to its old heuristic otherwise. */
   isYou?: boolean;
@@ -71,6 +73,7 @@ export interface UseArcadeBoardOptions {
 const DETAIL_KEYS: { [G in ArcadeGameSlug]: readonly (keyof ArcadeDetail<G> & string)[] } = {
   "space-shooter": ["seconds", "kills", "distance"],
   hextris: ["seconds", "kills", "level"],
+  "super-voltorb-flip": ["day", "flips"],
 };
 
 // Mirrors ARCADE_SCORE_CAP in src/lib/arcade/games.ts. That module imports zod and the
@@ -107,6 +110,8 @@ function toEntry(x: unknown): ArcadeBoardEntry | null {
   const seconds = finite(detail.seconds);
   const kills = finite(detail.kills);
   const distance = finite(detail.distance);
+  const day = finite(detail.day);
+  const flips = finite(detail.flips);
   return {
     rank,
     name: handle,
@@ -115,6 +120,8 @@ function toEntry(x: unknown): ArcadeBoardEntry | null {
     ...(seconds !== undefined && { seconds }),
     ...(kills !== undefined && { kills }),
     ...(distance !== undefined && { distance }),
+    ...(day !== undefined && { day }),
+    ...(flips !== undefined && { flips }),
     createdAt: achievedAt,
     ...(typeof isYou === "boolean" && { isYou }),
   };

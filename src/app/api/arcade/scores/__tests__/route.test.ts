@@ -485,6 +485,58 @@ describe("POST /api/arcade/scores", () => {
     expect(bad.status).toBe(422);
   });
 
+  describe("Super Voltorb Flip Daily board", () => {
+    // 2026-10-07: board 43, nine 2s, ten Voltorbs, 15 safe tiles, max 512.
+    const voltorb = (score: number, day: number, flips: number) => ({
+      game: "super-voltorb-flip",
+      score,
+      detail: { day, flips },
+    });
+
+    it("accepts a cleared board and writes all three boards from the server clock", async () => {
+      vi.setSystemTime(new Date("2026-10-07T12:00:00.000Z"));
+      const { res, json } = await submit(voltorb(512, 20261007, 9));
+      expect(res.status).toBe(200);
+      expect(json.ok).toBe(true);
+      expect(emu.scores().map((s) => s.board)).toEqual([
+        "all-time",
+        "weekly:2026-W41",
+        "daily:2026-10-07",
+      ]);
+      expect(emu.scores().every((s) => s.score === 512)).toBe(true);
+    });
+
+    it("rejects a score above the regenerated board's maximum with 422 and writes nothing", async () => {
+      vi.setSystemTime(new Date("2026-10-07T12:00:00.000Z"));
+      const { res, json } = await submit(voltorb(513, 20261007, 15));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "score above the board's maximum" });
+      expect(emu.scores()).toHaveLength(0);
+      expect(emu.players().size).toBe(0);
+    });
+
+    it("rejects yesterday's board with 422", async () => {
+      vi.setSystemTime(new Date("2026-10-07T12:00:00.000Z"));
+      const { res, json } = await submit(voltorb(1, 20261006, 1));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "not today's board" });
+      expect(emu.scores()).toHaveLength(0);
+    });
+
+    it("judges the day by the server clock, down to the last second of the UTC day", async () => {
+      vi.setSystemTime(new Date("2026-10-07T23:59:59.000Z"));
+      const { res } = await submit(voltorb(512, 20261007, 9));
+      expect(res.status).toBe(200);
+      expect(emu.scores().map((s) => s.board)).toContain("daily:2026-10-07");
+    });
+
+    it("closes yesterday's board at 00:00 UTC", async () => {
+      vi.setSystemTime(new Date("2026-10-08T00:00:00.000Z"));
+      const { res } = await submit(voltorb(1, 20261007, 1));
+      expect(res.status).toBe(422);
+    });
+  });
+
   describe("guard chain", () => {
     it("rejects a cross-origin request with 403 before touching the database", async () => {
       const res = await post(body(), { origin: "https://evil.example" });

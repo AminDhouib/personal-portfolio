@@ -3,10 +3,10 @@ import type { PoolClient } from "pg";
 import { legacyLeaderboardRowSchema, type LegacyLeaderboardRow } from "@/lib/persistence-schemas";
 import { sanitizePlayerName } from "@/lib/player-name";
 import {
-  ARCADE_GAME_SLUGS,
   ARCADE_SCORE_CAP,
+  LEGACY_ARCADE_GAME_SLUGS,
   validateArcadeSubmission,
-  type ArcadeGameSlug,
+  type LegacyArcadeGameSlug,
 } from "./games";
 
 // Renaming this key would re-run the import: it is the "already done" marker row.
@@ -34,7 +34,7 @@ type LegacyClient = Pick<PoolClient, "query">;
 
 interface Candidate {
   id: number;
-  game: ArcadeGameSlug;
+  game: LegacyArcadeGameSlug;
   handle: string;
   score: number;
   detail: Record<string, number>;
@@ -63,7 +63,7 @@ const INSERT_LEGACY_SCORE = `INSERT INTO arcade_scores (game, board, player_id, 
 
 /** The detail a legacy row can supply for its game, or null when a needed column is NULL. */
 function legacyDetail(
-  game: ArcadeGameSlug,
+  game: LegacyArcadeGameSlug,
   row: LegacyLeaderboardRow,
 ): Record<string, number> | null {
   if (row.seconds === null || row.kills === null) return null;
@@ -102,7 +102,7 @@ export async function importLegacyLeaderboard(
   const table = await client.query(LEGACY_TABLE_PRESENT);
   if (table.rows[0]?.present !== true) return { status: "no-legacy-table" };
 
-  const result = await client.query(READ_LEGACY, [[...ARCADE_GAME_SLUGS]]);
+  const result = await client.query(READ_LEGACY, [[...LEGACY_ARCADE_GAME_SLUGS]]);
   let skippedUnverifiable = 0;
   let skippedImplausible = 0;
   let superseded = 0;

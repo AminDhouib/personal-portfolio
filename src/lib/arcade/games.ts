@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { GameSlug } from "@/app/games/games-meta";
+import {
+  checkDailyScore,
+  dailyBoard,
+  dayNumber,
+} from "@/components/game/super-voltorb-flip/daily-board";
+import { utcDayKey } from "./boards";
 
 /**
  * The arcade plausibility registry. Games are fully client side, so every submitted
@@ -16,9 +22,22 @@ import type { GameSlug } from "@/app/games/games-meta";
 export const ARCADE_GAME_SLUGS = [
   "space-shooter",
   "hextris",
+  "super-voltorb-flip",
 ] as const satisfies readonly GameSlug[];
 
 export type ArcadeGameSlug = (typeof ARCADE_GAME_SLUGS)[number];
+
+/**
+ * The games that had rows in the frozen legacy leaderboard_entries table. The
+ * one-time legacy import and the legacy row schema use THIS list, not the full
+ * registry: a game added to the arcade later never had legacy rows.
+ */
+export const LEGACY_ARCADE_GAME_SLUGS = [
+  "space-shooter",
+  "hextris",
+] as const satisfies readonly ArcadeGameSlug[];
+
+export type LegacyArcadeGameSlug = (typeof LEGACY_ARCADE_GAME_SLUGS)[number];
 
 /** The legacy score ceiling (src/app/api/leaderboard/route.ts SCORE_CAP). */
 export const ARCADE_SCORE_CAP = 10_000_000;
@@ -44,8 +63,17 @@ const hextrisDetailSchema = z.strictObject({
   level: z.number().int().min(0).max(1_000),
 });
 
+// Super Voltorb Flip's Daily board: the UTC day it was played (YYYYMMDD) and how
+// many safe tiles were flipped. The bounds here are loose; checkVoltorbDaily
+// regenerates the day's board and decides.
+const voltorbDailyDetailSchema = z.strictObject({
+  day: z.number().int().min(20_000_101).max(99_991_231),
+  flips: z.number().int().min(0).max(25),
+});
+
 type SpaceShooterDetail = z.infer<typeof spaceShooterDetailSchema>;
 type HextrisDetail = z.infer<typeof hextrisDetailSchema>;
+type VoltorbDailyDetail = z.infer<typeof voltorbDailyDetailSchema>;
 
 /**
  * Orbital Dodge. s = seconds + 2 (floor, a stale UI sync, slack). Every term uses its
@@ -86,10 +114,25 @@ function checkHextris(score: number, detail: HextrisDetail): Verdict {
   return { ok: true };
 }
 
+/**
+ * Super Voltorb Flip, Daily board. The server regenerates today's board from the
+ * UTC date (the same seeded recipe the game uses) and bounds the score by what
+ * that board can pay: at most its maximum, a product of its 2s and 3s, reached
+ * with enough flips. The claimed day must be today's UTC day by the server's own
+ * clock; there is no grace window across midnight (DESIGN.md).
+ */
+function checkVoltorbDaily(score: number, detail: VoltorbDailyDetail, now: Date): Verdict {
+  const today = utcDayKey(now);
+  if (detail.day !== dayNumber(today)) return reject("not today's board");
+  const reason = checkDailyScore(dailyBoard(today), score, detail.flips);
+  return reason === null ? { ok: true } : reject(reason);
+}
+
 /** Slug to strict detail schema; `validateArcadeSubmission` dispatches to the game's check. */
 export const ARCADE_GAMES = {
   "space-shooter": { detailSchema: spaceShooterDetailSchema },
   hextris: { detailSchema: hextrisDetailSchema },
+  "super-voltorb-flip": { detailSchema: voltorbDailyDetailSchema },
 } satisfies Record<ArcadeGameSlug, { detailSchema: z.ZodType }>;
 
 export type ArcadeSubmissionVerdict =
@@ -110,11 +153,14 @@ function verdictFor<T extends Record<string, number>>(
  * Parse `rawDetail` with the game's strict schema, then run its plausibility check.
  * `kind: "detail"` is a malformed body (HTTP 400); `kind: "implausible"` is HTTP 422.
  * The common score range (integer 0..ARCADE_SCORE_CAP) is the route's body schema's job.
+ * `now` is the server clock the route also uses for the board key, so a clock-dependent
+ * check (the Voltorb Daily day) and the board a score lands on agree on the instant.
  */
 export function validateArcadeSubmission(
   game: ArcadeGameSlug,
   score: number,
   rawDetail: unknown,
+  now: Date = new Date(),
 ): ArcadeSubmissionVerdict {
   switch (game) {
     case "space-shooter":
@@ -124,6 +170,11 @@ export function validateArcadeSubmission(
     case "hextris":
       return verdictFor(ARCADE_GAMES.hextris.detailSchema.safeParse(rawDetail), (detail) =>
         checkHextris(score, detail),
+      );
+    case "super-voltorb-flip":
+      return verdictFor(
+        ARCADE_GAMES["super-voltorb-flip"].detailSchema.safeParse(rawDetail),
+        (detail) => checkVoltorbDaily(score, detail, now),
       );
   }
 }
