@@ -17,10 +17,6 @@ const AUDIO_EXT = /\.(mp3|ogg|wav|m4a|flac)$/i;
 // Stacker's game is a vendored minified bundle"). Nothing else may.
 const OTHER_AUDIO_ALLOWED = ["tower_stacker"];
 
-// Directories under the game's public folder that T2c-2 deletes. Remove this
-// list in that PR (the guard there asserts the directory is gone instead).
-const NOT_YET_REMOVED = ["sprites"];
-
 // CC0 tracks for the abandoned skin variants. Kept on purpose (owner ruling:
 // the existing CC0 music stays); nothing plays them, so the "referenced from
 // source" check skips exactly these. The credits check still covers them.
@@ -41,9 +37,7 @@ function walk(dir: string): string[] {
 }
 
 function shippedFiles(): string[] {
-  return walk(GAME_DIR).filter(
-    (f) => !NOT_YET_REMOVED.some((d) => f.startsWith(join(GAME_DIR, d))),
-  );
+  return walk(GAME_DIR);
 }
 
 function isAsset(file: string): boolean {
@@ -111,5 +105,28 @@ describe("Super Voltorb Flip assets", () => {
 
   it("loads no removed audio path from source", () => {
     expect(sourceText).not.toMatch(/super-voltorb-flip\/(audio|sfx)\//);
+  });
+
+  it("ships no sprite folder or image files", () => {
+    expect(existsSync(join(GAME_DIR, "sprites"))).toBe(false);
+    for (const file of shippedFiles()) {
+      expect(file).not.toMatch(/\.(png|gif|jpe?g|webp|svg)$/i);
+    }
+  });
+
+  it("loads nothing from a sprites or upstream path", () => {
+    expect(sourceText).not.toMatch(/super-voltorb-flip\/sprites/);
+    expect(sourceText).not.toMatch(/sprites\/upstream/);
+    expect(sourceText).not.toMatch(/samualtnorman/);
+  });
+
+  it("has no asset-prep script that targets the removed sprites", () => {
+    const scripts = readdirSync(join(ROOT, "scripts"));
+    for (const name of scripts) {
+      const text = readFileSync(join(ROOT, "scripts", name), "utf8");
+      expect(text, `${name} still targets super-voltorb-flip sprites`).not.toMatch(
+        /super-voltorb-flip\/sprites/,
+      );
+    }
   });
 });
