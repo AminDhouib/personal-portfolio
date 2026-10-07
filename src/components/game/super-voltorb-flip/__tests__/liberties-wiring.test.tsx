@@ -216,6 +216,26 @@ describe("undo is gated", () => {
     expect(memoLabelled()).toHaveLength(0);
   });
 
+  it("shows none of the old round's memos while the board flips down", async () => {
+    vi.useFakeTimers();
+    render(<SuperVoltorbFlipGame />);
+    fireEvent.click(first("Memo 2"));
+    fireEvent.click(tile(0, 0));
+    fireEvent.click(tile(0, 1));
+    expect(memoLabelled()).toHaveLength(2);
+    quitRound();
+    for (let i = 0; i < 40 && !screen.queryByRole("button", { name: /Next round|Continue/ }); i++) {
+      await advance(500);
+    }
+    fireEvent.click(screen.getByRole("button", { name: /Next round|Continue/ }));
+    // From the first frame of the flip-down until the next board is dealt.
+    await advance(150);
+    for (let i = 0; i < 10; i++) {
+      expect(memoLabelled()).toHaveLength(0);
+      await advance(200);
+    }
+  });
+
   it("ignores Ctrl+Z typed in a text field inside the game", () => {
     render(<SuperVoltorbFlipGame />);
     fireEvent.click(first("Memo 3"));

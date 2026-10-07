@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ModalShell } from "./modal-shell";
 import type { Stats } from "./stats";
 
@@ -33,6 +33,19 @@ export function StatsPanel({
   onClose: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const resetRef = useRef<HTMLButtonElement | null>(null);
+  const keepRef = useRef<HTMLButtonElement | null>(null);
+  const swappedRef = useRef(false);
+  // The focused button unmounts on each swap: hand focus to the one that
+  // replaces it, so Tab never falls out of the dialog.
+  useEffect(() => {
+    if (confirming) {
+      swappedRef.current = true;
+      keepRef.current?.focus();
+    } else if (swappedRef.current) {
+      resetRef.current?.focus();
+    }
+  }, [confirming]);
   const n = (x: number) => x.toLocaleString("en-US");
   // Rows for features that do not exist yet (the odds assist, the Daily board)
   // stay hidden until they have something to show.
@@ -73,6 +86,7 @@ export function StatsPanel({
             Yes, reset
           </button>
           <button
+            ref={keepRef}
             type="button"
             onClick={() => setConfirming(false)}
             className="min-h-11 rounded-[6px] border-2 border-gray-300 bg-white px-3 text-sm font-bold text-gray-700 outline outline-2 outline-gray-600"
@@ -82,6 +96,7 @@ export function StatsPanel({
         </div>
       ) : (
         <button
+          ref={resetRef}
           type="button"
           onClick={() => setConfirming(true)}
           aria-label="Reset statistics"
