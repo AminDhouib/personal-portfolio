@@ -201,8 +201,7 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2)
   the board with no "Your best" row and no error.
 - **Daily-seed convention.** Anything that seeds a daily challenge must seed from `utcDayKey`
   (`src/lib/arcade/boards.ts`), so the seed and the daily board turn over at the same instant.
-  Password Game 2 seeds from the local date today: a finding owed to T3, deliberately not changed
-  here.
+  Password Game 2 follows it: `dailySeed` hashes the UTC day, and its board filters on the UTC day.
 - **Higher is better only.** The upsert replaces a row only on a strictly higher score. A
   lower-is-better game (a timed run) needs a new direction column and a store change, not a flag.
 - **Identity is trust on first use.** The browser mints a UUID and a 32-byte token; the first
@@ -554,6 +553,16 @@ The following Password Game 2 entries were verified against the current tree on 
   stray symbol injection, the invader shooter — so previously satisfied rules re-open, including
   a captcha re-verification. Rules always evaluate against the mutated text. A scripted solver
   that only repairs text will lose ground here; that is the design, not a regression.
+- **PG2 pulls the next event forward once an act's rules are solved (pull-forward pacing).** The
+  authored clock used to leave a fast solver idle for up to ~100 s at an act gate. Now, when every
+  core rule of the act is revealed and passing (`engine/pacing.ts`, called from `tick`), each
+  unstarted inhabitant and the single earliest unstarted blocking event are rescheduled to
+  `actElapsedMs + PULL_FORWARD_BEAT_MS` (4 s). One blocking event at a time, so the overlapping
+  act-2 force slots do not stack. Events are never dropped or delayed: the gate still waits for
+  every blocking event of the act to resolve and every inhabitant to have arrived and left
+  telegraph, so a fast player meets the same set, only sooner. Act 3 never advances on time; the
+  same pull shortens the wait before submit opens. Measured for seed 7 with the instant solver:
+  act 1 158.8 s to 13.4 s, act 2 158.0 s to 33.8 s, finale 521.3 s to 174.3 s.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to
@@ -620,11 +629,12 @@ The following Password Game 2 entries were verified against the current tree on 
   the label "Best on this device" (Voltorb Flip: "Saved progress", never "best level"). Nothing
   is written, uploaded, compared with a board or used to gate anything. It does not read
   Password Game 2 storage, `walletCoins` or `arcade:player:v1`.
-- **The Password Game 2 tile is labelled by UTC day, and the seed is still local until T3.** The
-  board's `daily=1` filter is the database's UTC day, while the game seeds its daily from the
-  visitor's local date, so for a few hours each day the two disagree. The tile says "(UTC)" and
-  "Fastest daily runs posted today" rather than promising it is the board of the visitor's own
-  puzzle. The seed alignment is T3.
+- **The Password Game 2 daily is one UTC day for the seed and the board.** `dailySeed` hashes the
+  UTC calendar day and the board's `daily=1` filter is `(created_at AT TIME ZONE 'UTC')::date =
+(now() AT TIME ZONE 'UTC')::date`, so it no longer depends on the Postgres session timezone.
+  The tile says "(UTC)". On deploy day the seed moves for players outside UTC (their local date
+  and the UTC date differ for part of each day), so that day's daily board mixes the old and new
+  puzzles. No migration is needed; the board turns over at 00:00 UTC.
 - **Read cost of the hub.** One visit that reaches the strip issues three arcade reads and
   one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
   who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an

@@ -81,7 +81,7 @@ export const passwordGameContent: GameContent = {
     {
       question: "How does the daily password game work?",
       answer:
-        "Start today's daily and the seed comes from your local calendar date, so everyone on that date gets the same puzzles and events. The daily board lists that day's fastest runs.",
+        "Start today's daily and the seed comes from the UTC calendar day, so everyone on that day gets the same puzzles and events. The board resets at 00:00 UTC and lists that day's fastest runs.",
     },
     {
       question: "Can I play the Password Game 2 on my phone?",
@@ -91,7 +91,7 @@ export const passwordGameContent: GameContent = {
     {
       question: "How long does a run take?",
       answer:
-        "Longer than a quick puzzle. Scheduled events start as late as 150 seconds into Acts 1 and 2 and 280 seconds into Act 3. A reload ends the run.",
+        "Longer than a quick puzzle. Events arrive on a schedule, and sooner once you have solved an act's rules. A reload ends the run.",
     },
   ],
   credits: [
