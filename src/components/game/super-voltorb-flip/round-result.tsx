@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { roundResultCopy } from "./round-result-copy";
 
 export type RoundResultProps = {
   kind: "win" | "lose" | "quit";
@@ -16,9 +17,9 @@ export type RoundResultProps = {
  * the board at the same height as the slot's idle line, so it neither covers
  * tiles nor shifts layout: 72px on phones, where a long win title such as
  * "Round cleared! +12345 coins" wraps to two lines, and 60px from sm up.
- * A win no longer always moves up (a Lv.7 or Lv.8 win keeps the level), so the
- * level line says why. Styled like the game's other light chrome (white card, grey outline, green
- * action button).
+ * The detail line reports the level move (see round-result-copy.ts). Styled
+ * like the game's other light chrome (white card, grey outline, green action
+ * button).
  */
 export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }: RoundResultProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -27,22 +28,7 @@ export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }:
     buttonRef.current?.focus();
   }, []);
 
-  const title =
-    kind === "lose"
-      ? "Voltorb! Round lost."
-      : kind === "quit"
-        ? coins > 0
-          ? `You quit. +${coins} coins`
-          : "You quit with no coins."
-        : `Round cleared! +${coins} coins`;
-  const levelLine =
-    fromLevel !== toLevel
-      ? `Level ${fromLevel} to Level ${toLevel}`
-      : kind === "win" && toLevel >= 8
-        ? `Top level: Level ${toLevel}`
-        : kind === "win"
-          ? `Staying on Level ${toLevel}. Five strong rounds in a row reach Level 8.`
-          : `Staying on Level ${toLevel}`;
+  const { title, detail } = roundResultCopy({ kind, fromLevel, toLevel, coins });
 
   return (
     <div className="rounded-5 flex min-h-[72px] items-center gap-2 border-2 border-gray-300 bg-white px-2 py-1.5 text-gray-700 shadow-[0_4px_0_rgba(0,0,0,0.18)] outline outline-2 outline-gray-600 sm:min-h-[60px]">
@@ -52,7 +38,7 @@ export function RoundResult({ kind, fromLevel, toLevel, coins = 0, onContinue }:
         >
           {title}
         </p>
-        <p className="text-xs text-gray-500 sm:text-sm">{levelLine}</p>
+        <p className="text-xs text-gray-500 sm:text-sm">{detail}</p>
       </div>
       <button
         ref={buttonRef}
