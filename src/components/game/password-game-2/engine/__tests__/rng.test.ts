@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   dailySeed,
   dailySeedForDay,
@@ -73,6 +73,17 @@ describe("rng", () => {
 });
 
 describe("dailySeed (UTC day)", () => {
+  // CI runs under UTC, where local and UTC days coincide; pin a zone behind UTC so the
+  // instants below straddle local midnight and the old local-getter code would fail.
+  const originalTz = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = "America/Toronto";
+  });
+  afterAll(() => {
+    if (originalTz === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
   it("hashes the UTC calendar day, golden value", () => {
     expect(dailySeed(new Date("2026-10-08T12:00:00Z"))).toBe(fnv1a("pg2-2026-10-08"));
   });

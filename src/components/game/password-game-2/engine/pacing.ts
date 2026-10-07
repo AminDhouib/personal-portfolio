@@ -11,7 +11,10 @@ const isLiveBlocking = (e: EventInstance): boolean =>
  * Once an act's core rules are solved the authored clock is dead time. Returns the new
  * scheduledAtMs for events that should come sooner: every unstarted inhabitant, and the
  * single earliest unstarted blocking event while no other blocking event is live (so the
- * overlapping authored slots do not stack). Never delays an event, never drops one.
+ * overlapping authored slots do not stack). Pulled events are staggered in authored
+ * order: each lands at least beatMs after the one before it, so they do not arrive on
+ * the same frame. Never delays an event, never drops one, and is idempotent across
+ * frames (an event already pulled keeps its slot, so the chain holds).
  */
 export function pullForwardTargets(
   events: readonly EventInstance[],
@@ -20,14 +23,22 @@ export function pullForwardTargets(
   beatMs: number,
 ): Map<EventInstance, number> {
   const out = new Map<EventInstance, number>();
-  const target = actElapsedMs + beatMs;
   const unstarted = events.filter((e) => e.act === act && e.data === undefined);
-  for (const e of unstarted) {
-    if (e.family === "inhabitant" && e.scheduledAtMs > target) out.set(e, target);
-  }
+  const candidates = unstarted.filter((e) => !isBlocking(e));
   if (!events.some((e) => e.act === act && isLiveBlocking(e))) {
     const first = unstarted.filter(isBlocking).sort((a, b) => a.scheduledAtMs - b.scheduledAtMs)[0];
-    if (first && first.scheduledAtMs > target) out.set(first, target);
+    if (first) candidates.push(first);
+  }
+  candidates.sort((a, b) => a.scheduledAtMs - b.scheduledAtMs);
+  let previousAt = Number.NEGATIVE_INFINITY;
+  for (const e of candidates) {
+    const slot = Math.max(actElapsedMs + beatMs, previousAt + beatMs);
+    if (e.scheduledAtMs > slot) {
+      out.set(e, slot);
+      previousAt = slot;
+    } else {
+      previousAt = e.scheduledAtMs;
+    }
   }
   return out;
 }

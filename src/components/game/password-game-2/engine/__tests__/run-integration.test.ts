@@ -495,7 +495,7 @@ describe("password-game-2 full-run integration", () => {
     const r = driveRun(SEED);
     expect(r.elapsedAtFinaleMs).toBeLessThan(15 * 60 * 1_000);
     // Sanity: it is not instantaneous either - every event still plays out. Measured for
-    // SEED: 521.3 s before pull-forward, 174.3 s after; the floor is about 60 percent of
+    // SEED: 521.3 s before pull-forward, 178.3 s after; the floor is about 60 percent of
     // the current value.
     expect(r.elapsedAtFinaleMs).toBeGreaterThan(100_000);
   });
