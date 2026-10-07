@@ -36,7 +36,7 @@ import {
   stopAllCues,
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
-import { RISK_WARNING_MS } from "./super-voltorb-flip/sound-cues";
+import { LEVEL_WIN_MS, RISK_WARNING_MS } from "./super-voltorb-flip/sound-cues";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { loadProgress } from "./super-voltorb-flip/progress";
 import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
@@ -811,7 +811,8 @@ const Gameboard = ({
         // 1. Clear fanfare (or the silent equivalent) while the board is still hidden.
         await new Promise<void>((resolve) => {
           if (muted) {
-            window.setTimeout(resolve, 1500);
+            // Same length as the audible clear fanfare (the audio-timing contract).
+            window.setTimeout(resolve, LEVEL_WIN_MS);
           } else {
             const fallback = window.setTimeout(resolve, 4000);
             playLevelWin(() => {
