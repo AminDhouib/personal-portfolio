@@ -82,7 +82,8 @@ export const GAMES: GameMeta[] = [
     tagline: "Flip tiles, deduce, don't pop the bomb",
     description:
       "A fan recreation of the HGSS Pokémon Game Corner classic. Flip tiles to collect multipliers, use the row and column clues to deduce where Voltorbs hide, and climb 8 levels.",
-    controls: "Click or tap tiles to flip. Use the memo buttons to mark what a tile could be.",
+    controls:
+      "Click or tap tiles to flip. Use the memo buttons to mark what a tile could be. On a keyboard, use the arrow keys, Enter, and 1, 2, 3 or V.",
     accent: "#fbbf24",
     accentTailwind: "accent-amber",
   },

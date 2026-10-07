@@ -26,12 +26,12 @@ export const superVoltorbFlipContent: GameContent = {
     },
     {
       input: "Keyboard",
-      action: "Tab to a tile, then press Enter or Space.",
+      action: "Arrow keys move, Enter or Space flips, and 1, 2, 3 or V marks the tile.",
     },
     {
       input: "Memo buttons (V, 1, 2, 3)",
       action:
-        "Pick one, then select tiles to tag them. Pick it again, or use the clear button, to flip normally.",
+        "Pick one, then select tiles to tag them. Pick it again or press clear to flip normally.",
     },
     {
       input: "Quit button",
@@ -97,12 +97,12 @@ export const superVoltorbFlipContent: GameContent = {
     {
       question: "Is there a Voltorb Flip solver?",
       answer:
-        "No. This page is a game, not a solver. The strategy tips above show how to read the row and column clues yourself.",
+        "No. This page is a game, not a solver. The strategy tips above show how to read the clues yourself.",
     },
     {
       question: "Can I stop a round and keep my coins?",
       answer:
-        "Yes. Quit banks the coins you have found so far after you confirm. Your level then moves as it does after a loss, by the number of tiles you flipped.",
+        "Yes. Quit banks the coins you have found after you confirm. Your level then moves as it does after a loss, by the number of tiles you flipped.",
     },
   ],
   links: [
