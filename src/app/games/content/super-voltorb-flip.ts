@@ -7,13 +7,14 @@ export const superVoltorbFlipContent: GameContent = {
   genre: ["Puzzle", "Logic"],
   playMode: "SinglePlayer",
   intro:
-    "Super Voltorb Flip is a free browser recreation of the Voltorb Flip minigame from Pokemon HeartGold and SoulSilver. Flip tiles on a 5 x 5 board to find the 2s and 3s while avoiding the Voltorbs. The clue numbers beside every row and column tell you where the danger is.",
+    "Super Voltorb Flip is a free browser recreation of the Voltorb Flip minigame from Pokemon HeartGold and SoulSilver. Flip tiles on a 5 x 5 board to find the 2s and 3s while avoiding the Voltorbs. The row and column clues show where the danger is.",
   howToPlay: [
     "Read each row and column clue: the top number is its coin total, and the Voltorb icon shows its Voltorb count.",
     "Click or tap tiles to flip them. A 2 or 3 multiplies your coins for the round, and a 1 changes nothing.",
     "Flip every 2 and 3 to clear the round and bank your coins. The 1s are optional.",
     "Flip a Voltorb and the round ends with nothing banked.",
     "Use the memo buttons to tag what a tile could be.",
+    "Open Daily for one board a day, the same for everyone. You get one attempt, and a streak counts the days you play.",
   ],
   controls: [
     {
@@ -49,9 +50,9 @@ export const superVoltorbFlipContent: GameContent = {
   strategy: [
     "Start with any row or column showing 0 Voltorbs. Every tile in it is safe.",
     "A line holds 5 minus its Voltorb count safe tiles. If its coin total equals that number, they are all 1s, so skip it.",
-    "Each coin above that count is a hidden multiplier: a 2 adds 1 and a 3 adds 2. With 2 Voltorbs and a total of 5, the line holds one 3 or two 2s, plus 1s.",
+    "Each coin above that count is a hidden multiplier: a 2 adds 1 and a 3 adds 2. With 2 Voltorbs and a total of 5, the line holds one 3 or two 2s.",
     "Cross-check lines. If coins plus Voltorbs in a line equal 5, its tiles are 1s or Voltorbs, so a tile there whose other line shows 0 Voltorbs is a safe 1.",
-    "A shaking tile with a warning sits in a line where 75 percent or more of the unflipped tiles are Voltorbs, though not all of them. Look for a safer tile first.",
+    "A shaking tile with a warning sits in a line where 75 percent or more of the unflipped tiles are Voltorbs. Look for a safer tile first.",
   ],
   facts: [
     {
@@ -76,7 +77,7 @@ export const superVoltorbFlipContent: GameContent = {
     },
     {
       label: "Leaderboard",
-      value: "None",
+      value: "Daily board only",
     },
     {
       label: "Phones",
@@ -91,7 +92,7 @@ export const superVoltorbFlipContent: GameContent = {
     {
       question: "How many levels are there in Voltorb Flip?",
       answer:
-        "This version has 8, as in HeartGold and SoulSilver. A cleared round moves you up one level through level 7. Reaching level 8 takes five rounds in a row without hitting a Voltorb and with at least eight tiles flipped in each, the last played on level 5 or higher.",
+        "This version has 8, as in HeartGold and SoulSilver. A cleared round moves you up one level through level 7. Reaching level 8 takes five clean rounds in a row, each with at least eight tiles flipped, the last on level 5 or higher.",
     },
     {
       question: "What happens when you flip a Voltorb?",
@@ -106,7 +107,7 @@ export const superVoltorbFlipContent: GameContent = {
     {
       question: "Can I stop a round and keep my coins?",
       answer:
-        "Yes. Quit banks the coins you have found after you confirm. Your level then moves as it does after a loss, by the number of tiles you flipped.",
+        "Yes. Quit banks your coins after you confirm. Your level then moves as it does after a loss.",
     },
   ],
   links: [

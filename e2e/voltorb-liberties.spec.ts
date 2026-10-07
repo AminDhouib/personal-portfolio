@@ -61,3 +61,57 @@ test("odds assist: off by default, on from Settings, one badge per face-down til
     await context.close();
   }
 });
+
+// T2e-3: the Daily board. The scores route is stubbed so nothing reaches a
+// database; these checks cover structure and layout only, never a score.
+test.describe("Daily board", () => {
+  test("opens from the mode row, shows the day board and returns", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await blockThirdParties(context, baseURL);
+    await context.route("**/api/arcade/scores**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ entries: [], you: null }),
+      }),
+    );
+    const page = await context.newPage();
+    try {
+      await page.goto(GAME_PATH);
+      await expect(page.locator("[data-cell]")).toHaveCount(25, { timeout: 20_000 });
+      await page.locator("button:visible", { hasText: "Daily" }).first().click();
+      const region = page.getByRole("region", { name: "Daily board" });
+      await expect(region).toBeVisible();
+      await expect(region.locator("[data-cell]")).toHaveCount(25);
+      await page.getByRole("button", { name: "Back to the game" }).click();
+      await expect(region).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("the Daily screen does not overflow a 360 px phone", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width: 360, height: 740 } });
+    await blockThirdParties(context, baseURL);
+    await context.route("**/api/arcade/scores**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ entries: [], you: null }),
+      }),
+    );
+    const page = await context.newPage();
+    try {
+      await page.goto(GAME_PATH);
+      await expect(page.locator("[data-cell]")).toHaveCount(25, { timeout: 20_000 });
+      await page.locator("button:visible", { hasText: "Daily" }).first().click();
+      await expect(page.getByRole("region", { name: "Daily board" })).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    } finally {
+      await context.close();
+    }
+  });
+});
