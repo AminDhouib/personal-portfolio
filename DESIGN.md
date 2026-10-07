@@ -435,6 +435,22 @@ current tree on 2026-07-07.
   `hgss.test.ts`. Do not tune them. Flips after a round ends are ignored, which retired the old
   NF(P7)-a re-entry quirk on purpose. Only `?size=N` boards (dev and layout testing) still use
   the formula deal in `engine.ts`.
+- **Super Voltorb Flip's phone board trades gap for tile.** Below sm the frame is the viewport minus
+  16px, the gap ratio is 0.2 (not the desktop 0.28) and the inner padding is 4px, so a 5x5 board
+  gets 44px tiles at 360px wide (`board-size.ts`: the constants, `BOARD_FRAME_CSS` and a unit test
+  that pins the 44px floor across 360-639px). From sm up every value is the original. Narrower than
+  360px the floor is best effort. The phone memo bar sits on its own row at 44px faces (`spread`);
+  the desktop bar is untouched.
+- **Super Voltorb Flip's keyboard layer is board-scoped, not global.** Tiles use a roving tabindex
+  (one tab stop) inside a `role="group"`; the cursor is real DOM focus drawn by `:focus-visible`.
+  The handler is a React `onKeyDown` on the grid, never a `document` listener, so it cannot see keys
+  typed in the AI chat; the one document-level listener (the round-end wait) skips text fields via
+  `isTextEntryTarget`. `1`, `2`, `3`, `V` mark the tile under the cursor without changing the memo
+  bar's selection. Edges clamp rather than wrap. Do not move the handler to `document`.
+- **Super Voltorb Flip's face-down tile labels include its memo marks** ("Row 1, Col 1, face down,
+  memo 2, V") and flips are spoken through one polite live region. The announcement only ever
+  carries a tile that has already been flipped, so it never leaks a hidden value (the leak guard
+  covers it).
 - **Quit's confirmation starts on Keep playing**, unlike HGSS's yes/no prompt, which starts on
   Yes. A mis-tap should not end a round.
 - **Chess-puzzle's inner replay-consistency guards are intentionally silent** — they re-validate
