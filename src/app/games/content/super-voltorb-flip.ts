@@ -7,7 +7,7 @@ export const superVoltorbFlipContent: GameContent = {
   genre: ["Puzzle", "Logic"],
   playMode: "SinglePlayer",
   intro:
-    "Super Voltorb Flip is a free browser recreation of the Voltorb Flip minigame from Pokemon HeartGold and SoulSilver. Flip tiles on a 5 x 5 board to find the 2s and 3s while avoiding the Voltorbs. The clue numbers beside every row and column tell you where the danger is. Your level and coins are saved in your browser.",
+    "Super Voltorb Flip is a free browser recreation of the Voltorb Flip minigame from Pokemon HeartGold and SoulSilver. Flip tiles on a 5 x 5 board to find the 2s and 3s while avoiding the Voltorbs. The clue numbers beside every row and column tell you where the danger is.",
   howToPlay: [
     "Read each row and column clue: the top number is its coin total, and the Voltorb icon shows its Voltorb count.",
     "Click or tap tiles to flip them. A 2 or 3 multiplies your coins for the round, and a 1 changes nothing.",
@@ -32,6 +32,10 @@ export const superVoltorbFlipContent: GameContent = {
       input: "Memo buttons (V, 1, 2, 3)",
       action:
         "Pick one, then select tiles to tag them. Pick it again or press clear to flip normally.",
+    },
+    {
+      input: "Undo",
+      action: "Ctrl+Z, Cmd+Z or the button undoes a tag.",
     },
     {
       input: "Quit button",
@@ -68,7 +72,7 @@ export const superVoltorbFlipContent: GameContent = {
     },
     {
       label: "Saves",
-      value: "Level and total coins, in your browser",
+      value: "Level, coins and statistics, in your browser",
     },
     {
       label: "Leaderboard",

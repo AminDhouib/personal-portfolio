@@ -459,6 +459,21 @@ current tree on 2026-07-07.
   covers it).
 - **Quit's confirmation starts on Keep playing**, unlike HGSS's yes/no prompt, which starts on
   Yes. A mis-tap should not end a round.
+- **Voltorb Flip settings, statistics and memo undo are local, forgeable and separate from the save.**
+  `svf:settings` (`{v:1,memoUndo,stats,assist}`) and `svf:stats` are their own keys, parsed field by
+  field with defaults, and never touch `svf:progress` or `svf:muted`. Statistics are display-only
+  like "On this device": a visitor can edit them, nothing reads them to gate anything, nothing is
+  uploaded. An assisted round counts as played and assisted only, so wins, coins and best stay
+  honest; highest level mirrors `svf:progress` and counts every round. Time at Lv.8 adds at most
+  one hour per round (a forgotten tab).
+- **Memo undo is a toggle replay, not a snapshot.** `flagCell` is a toggle, so undoing a change is
+  the same call on the same tile. An entry for a tile that was flipped since is skipped (flipping
+  clears the flags). The stack is bounded (50) and cleared when a new round starts. Ctrl/Cmd+Z is a
+  React handler on `.svf-root`, not a document listener, so it cannot see keys typed in the AI chat;
+  the text-field guard is a second belt. Shift+Z is left alone.
+- **The new Voltorb buttons are text, not sprites.** The mode row (Settings, Statistics, later
+  Daily) uses text labels in the light chrome, like How to play. Owner ruling: the CSS chrome stays;
+  the one new sprite is the Undo glyph, drawn like the Clear X.
 - **Chess-puzzle's inner replay-consistency guards are intentionally silent** — they re-validate
   state that upstream callers have already validated once; a second failure there indicates the
   first guard's own invariant broke, which is a bug in the guard itself, not user input worth
