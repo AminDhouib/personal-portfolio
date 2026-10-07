@@ -159,6 +159,30 @@ describe("useDailyRound", () => {
     });
   });
 
+  it.each([
+    ["a 500", () => new Response("{}", { status: 500 })],
+    ["a network error", () => Promise.reject(new TypeError("offline"))],
+  ])("%s leaves the attempt unposted and allows a retry", async (_name, fail) => {
+    const { result } = renderHook(() => useDailyRound({ onOutcome: () => {} }));
+    play(result, twos);
+    fetchMock.mockImplementationOnce(async (_u: string, init?: RequestInit) => {
+      if (init?.method !== "POST") throw new Error("unexpected");
+      return fail();
+    });
+    await act(async () => {
+      await result.current.post("Ada");
+    });
+    expect(result.current.submitState).toBe("failed");
+    expect(result.current.submitted).toBe(false);
+    expect(JSON.parse(window.localStorage.getItem("svf:daily") ?? "{}").submitted).toBe(false);
+    await act(async () => {
+      await result.current.post("Ada");
+    });
+    expect(result.current.submitState).toBe("sent");
+    expect(result.current.submitted).toBe(true);
+    expect(posts(fetchMock)).toHaveLength(2);
+  });
+
   it("will not post a loss", async () => {
     const { result } = renderHook(() => useDailyRound({ onOutcome: () => {} }));
     play(result, [index((v) => v === 2), index((v) => v === "V")]);

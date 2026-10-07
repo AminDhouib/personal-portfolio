@@ -226,6 +226,54 @@ describe("the Daily board", () => {
     expect(screen.queryByText(/Assisted/)).toBeNull();
   });
 
+  it("the Daily result banner never says Assisted, and no assisted round is counted", async () => {
+    window.localStorage.setItem(
+      "svf:settings",
+      '{"v":1,"memoUndo":true,"stats":true,"assist":true}',
+    );
+    render(<SuperVoltorbFlipGame />);
+    // The main round is live with the assist on: its flag is set while Daily plays.
+    openDaily();
+    await new Promise((r) => setTimeout(r, 30));
+    flipDaily(calm("V"));
+    const seeResults = await screen.findByRole(
+      "button",
+      { name: "See results" },
+      { timeout: 8000 },
+    );
+    expect(screen.queryByText(/Assisted/)).toBeNull();
+    fireEvent.click(seeResults);
+    expect(savedStats().assistedRounds ?? 0).toBe(0);
+    expect(screen.queryByText(/Assisted/)).toBeNull();
+  });
+
+  it("moves focus into the Daily screen when it opens", () => {
+    render(<SuperVoltorbFlipGame />);
+    openDaily();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Daily board" }));
+  });
+
+  it("returns focus to the Daily button on Back", () => {
+    render(<SuperVoltorbFlipGame />);
+    openDaily();
+    fireEvent.click(screen.getByRole("button", { name: "Back to the game" }));
+    expect(screen.getAllByRole("button", { name: "Daily" })).toContain(document.activeElement);
+  });
+
+  it("keeps the main memo history across a trip to Daily", () => {
+    render(<SuperVoltorbFlipGame />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Memo 2" })[0]!);
+    const mainTile = screen
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("data-cell") === "0-0")!;
+    fireEvent.click(mainTile);
+    expect(mainTile.getAttribute("aria-label")).toContain("memo 2");
+    openDaily();
+    fireEvent.click(screen.getByRole("button", { name: "Back to the game" }));
+    fireEvent.keyDown(mainTile, { key: "z", ctrlKey: true });
+    expect(mainTile.getAttribute("aria-label")).not.toContain("memo");
+  });
+
   it("the Statistics reset does not touch the saved Daily attempt", async () => {
     render(<SuperVoltorbFlipGame />);
     openDaily();

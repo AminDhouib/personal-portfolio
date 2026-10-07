@@ -1546,10 +1546,7 @@ function DailyGame({
   memoFlags,
   onToggleMemo,
   onClearMemo,
-  canUndo,
-  recordMemo,
-  undoMemoStack,
-  resetMemoUndo,
+  overlayOpen,
   registerUndo,
   onOutcome,
   onFirstInteraction,
@@ -1561,10 +1558,7 @@ function DailyGame({
   memoFlags: MemoFlagSet;
   onToggleMemo: (f: MemoFlag) => void;
   onClearMemo: () => void;
-  canUndo: boolean;
-  recordMemo: (change: MemoChange) => void;
-  undoMemoStack: (game: VoltorbFlip, update: (cb: (g: VoltorbFlip) => void) => void) => boolean;
-  resetMemoUndo: () => void;
+  overlayOpen: boolean;
   registerUndo: (fn: (() => void) | null) => void;
   onOutcome: (outcome: DailyOutcome, dayKey: string, coins: number) => void;
   onFirstInteraction: () => void;
@@ -1572,6 +1566,9 @@ function DailyGame({
   streak: (dayKey: string) => number;
 }) {
   const d = useDailyRound({ onOutcome });
+  // Its own history, so the paused main round keeps the one it had.
+  const { canUndo, record: recordMemo, undo: undoMemoStack } = useMemoUndo();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   // Held by a risk fanfare (reported by Gameboard): no undo while the board is locked.
   const [locked, setLocked] = useState(false);
   const live = d.game.gameStatus === "playing" || d.game.gameStatus === "memo";
@@ -1587,13 +1584,12 @@ function DailyGame({
     return () => registerUndo(null);
   }, [registerUndo, undo]);
 
-  // Entering and leaving start from a clean memo state, and a Daily round's
-  // game-over jingle must not outlive the screen.
+  // Entering and leaving start from a clean memo selection, a Daily round's
+  // game-over jingle must not outlive the screen, and focus lands on the heading.
   useEffect(() => {
-    resetMemoUndo();
     onClearMemo();
+    headingRef.current?.focus();
     return () => {
-      resetMemoUndo();
       onClearMemo();
       stopGameOver();
       stopLevelWin();
@@ -1607,7 +1603,9 @@ function DailyGame({
       <div className="order-1 flex w-full flex-col gap-2 lg:col-start-1 lg:row-start-1 lg:w-[360px]">
         <div className="flex items-center gap-2 rounded-[6px] border-2 border-gray-300 bg-white px-2 py-1 text-gray-700 outline outline-2 outline-gray-600">
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="text-base font-bold">Daily board</p>
+            <h2 ref={headingRef} tabIndex={-1} className="text-base font-bold outline-none">
+              Daily board
+            </h2>
             <p className="text-xs text-gray-500">{d.dayKey} (UTC), Lv.5, no odds assist</p>
           </div>
           <button
@@ -1623,7 +1621,7 @@ function DailyGame({
           onToggle={onToggleMemo}
           onClear={onClearMemo}
           onUndo={memoUndoEnabled ? undo : undefined}
-          canUndo={canUndo && live && !locked}
+          canUndo={canUndo && !overlayOpen && live && !locked}
           size={44}
           showLabel={false}
           fullWidth
@@ -1733,6 +1731,7 @@ export function SuperVoltorbFlipGame() {
   const musicStartedRef = useRef(false);
   const [mode, setMode] = useState<"play" | "daily">("play");
   const dailyUndoRef = useRef<(() => void) | null>(null);
+  const returnFocusRef = useRef(false);
   const registerDailyUndo = useCallback((fn: (() => void) | null) => {
     dailyUndoRef.current = fn;
   }, []);
@@ -1811,8 +1810,18 @@ export function SuperVoltorbFlipGame() {
     stopGameOver();
     stopLevelWin();
     setMode("play");
+    returnFocusRef.current = true;
     if (!muted && game && musicStartedRef.current) playMusic(game.currentLevel);
   }, [muted, game]);
+
+  // After Back, focus returns to the Daily button that opened the screen (the
+  // visible one: the phone and desktop columns each render a mode row).
+  useEffect(() => {
+    if (mode !== "play" || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    const buttons = Array.from(document.querySelectorAll<HTMLElement>("[data-daily-open]"));
+    (buttons.find((b) => b.getClientRects().length > 0) ?? buttons[0])?.focus();
+  }, [mode]);
 
   // Smoothly-rolled scoreboard values. Default to the live game values; the
   // payout animation overrides them while a round wraps up. Reading game
@@ -2442,10 +2451,7 @@ export function SuperVoltorbFlipGame() {
               memoFlags={memoFlags}
               onToggleMemo={toggleMemoFlag}
               onClearMemo={clearMemoFlags}
-              canUndo={canUndo && !overlayOpen}
-              recordMemo={recordMemo}
-              undoMemoStack={undoMemoStack}
-              resetMemoUndo={resetMemoUndo}
+              overlayOpen={overlayOpen}
               registerUndo={registerDailyUndo}
               onOutcome={handleDailyOutcome}
               onFirstInteraction={handleFirstInteraction}
