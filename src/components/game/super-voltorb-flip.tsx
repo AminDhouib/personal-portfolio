@@ -1204,6 +1204,11 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
               <li>{tips[1]}</li>
             </ul>
           </section>
+
+          <p className="text-xs leading-snug text-gray-500">
+            Unofficial fan recreation. Not affiliated with or endorsed by Nintendo, Creatures Inc.
+            or GAME FREAK inc. Pokemon and Voltorb are trademarks of their owners.
+          </p>
         </div>
       </div>
     </div>
