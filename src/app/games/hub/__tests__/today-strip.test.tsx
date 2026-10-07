@@ -58,14 +58,14 @@ describe("TodayStrip", () => {
     vi.restoreAllMocks();
   });
 
-  it("server-renders three placeholder tiles and a static reset line", () => {
+  it("server-renders four placeholder tiles and a static reset line", () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     const html = renderToString(<TodayStrip />);
-    expect(html.match(/data-state="idle"/g)).toHaveLength(3);
+    expect(html.match(/data-state="idle"/g)).toHaveLength(4);
     expect(html).toContain('data-state="loading"');
     expect(html).toContain("Resets at 00:00 UTC");
     expect(html).not.toContain("Resets in");
-    expect(html.split("\u2014").length - 1).toBe(9);
+    expect(html.split("\u2014").length - 1).toBe(12);
     for (const source of TODAY_SOURCES) {
       expect(html).toContain(`href="/games/${source.slug}"`);
     }
@@ -88,11 +88,14 @@ describe("TodayStrip", () => {
       if (url.includes("game=space-shooter")) {
         return Promise.resolve(reply(200, arcadeBody([{ handle: "Nova", score: 48210 }])));
       }
+      if (url.includes("game=super-voltorb-flip")) {
+        return Promise.resolve(reply(200, arcadeBody([{ handle: "Pika", score: 384 }])));
+      }
       return Promise.resolve(reply(200, arcadeBody([{ handle: "Pixel", score: 9100 }])));
     });
     render(<TodayStrip />);
     await settled();
-    const [pg2, orbital, hextris] = tiles();
+    const [pg2, orbital, hextris, voltorb] = tiles();
     expect(pg2).toHaveAttribute("data-state", "ready");
     expect(pg2).toHaveTextContent("Ada");
     expect(pg2).toHaveTextContent("1:23.4");
@@ -103,17 +106,20 @@ describe("TodayStrip", () => {
     expect(orbital).toHaveTextContent("48,210");
     expect(hextris).toHaveTextContent("Pixel");
     expect(hextris).toHaveTextContent("9,100");
+    expect(voltorb).toHaveTextContent("Pika");
+    expect(voltorb).toHaveTextContent("384");
   });
 
-  it("asks for the three public daily boards, from three URLs and never sends a player id", async () => {
+  it("asks for the four public daily boards, from four URLs and never sends a player id", async () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     render(<TodayStrip />);
     await settled();
-    expect(fn).toHaveBeenCalledTimes(3);
+    expect(fn).toHaveBeenCalledTimes(4);
     const urls = fn.mock.calls.map((call) => String(call[0])).sort();
     expect(urls).toEqual([
       "/api/arcade/scores?game=hextris&board=daily",
       "/api/arcade/scores?game=space-shooter&board=daily",
+      "/api/arcade/scores?game=super-voltorb-flip&board=daily",
       "/api/password-game-2/leaderboard?daily=1",
     ]);
     for (const url of urls) expect(url).not.toContain("player");
@@ -196,7 +202,7 @@ describe("TodayStrip", () => {
     const { container } = render(<TodayStrip />);
     // Every tile body has the fixed-height class in every state (the real measurement is in
     // e2e/games-hub.spec.ts).
-    expect(container.querySelectorAll("[data-tile-body]")).toHaveLength(3);
+    expect(container.querySelectorAll("[data-tile-body]")).toHaveLength(4);
     for (const body of container.querySelectorAll("[data-tile-body]")) {
       expect(body.className).toContain("h-18");
     }

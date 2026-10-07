@@ -249,8 +249,8 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
 - **Featured.** The `featured?: true` flag on `GameMeta` (set on `space-shooter` only; pinned by
   `games-meta.test.ts`) picks the featured game through `partitionGames`, never array position.
   `GAMES` order is the registry order and is unchanged.
-- **Today strip.** `TODAY_SOURCES` names three tiles: Password Game 2 (its daily board),
-  Orbital Dodge and Hextris (the arcade daily boards). `useHubBoards` starts the three reads once
+- **Today strip.** `TODAY_SOURCES` names four tiles: Password Game 2 (its daily board),
+  Orbital Dodge, Hextris and Super Voltorb Flip (the arcade daily boards). `useHubBoards` starts the four reads once
   the strip is within 200px of the viewport (immediately if `IntersectionObserver` is missing),
   never polls, and aborts on unmount. `fetchHubBoard` has its own 5 s timeout, never reports, and
   turns every failure into the "Board unavailable right now" tile.
@@ -625,10 +625,13 @@ The following Password Game 2 entries were verified against the current tree on 
   visitor's local date, so for a few hours each day the two disagree. The tile says "(UTC)" and
   "Fastest daily runs posted today" rather than promising it is the board of the visitor's own
   puzzle. The seed alignment is T3.
-- **Read cost of the hub.** One visit that reaches the strip issues about two arcade reads and
+- **Read cost of the hub.** One visit that reaches the strip issues three arcade reads and
   one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
   who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an
   error; the Password Game 2 read has no rate limit. Both are cacheable for 10 s at the edge.
+- **The Voltorb tile reads the same public daily arcade board the other two do.** The Voltorb daily
+  board is keyed by the UTC day on the server, the same day the game seeds from, so unlike Password
+  Game 2 the tile is exactly today's board. The strip is two columns at md and four from xl.
 
 ## Adversarial standoffs (restated from the audit's final report)
 

@@ -90,8 +90,10 @@ function seeded(data: Record<string, string>) {
 }
 
 function arcadeBody(slug: string, variant: Variant, longNames: boolean) {
-  const top = slug === "space-shooter" ? 48210 : 9100;
-  const first = slug === "space-shooter" ? "Nova" : "Kite";
+  // Voltorb scores are coins on a board that pays at most a few hundred, so its rows step by 100.
+  const voltorb = slug === "super-voltorb-flip";
+  const top = slug === "space-shooter" ? 48210 : voltorb ? 384 : 9100;
+  const first = slug === "space-shooter" ? "Nova" : voltorb ? "Pika" : "Kite";
   const names = [longNames ? LONG_NAME : first, "Orbit", "Vega"];
   const entries =
     variant === "empty"
@@ -99,7 +101,7 @@ function arcadeBody(slug: string, variant: Variant, longNames: boolean) {
       : names.map((handle, index) => ({
           rank: index + 1,
           handle,
-          score: top - index * 1000,
+          score: top - index * (voltorb ? 100 : 1000),
           detail: null,
           achievedAt: "2026-10-06T12:00:00.000Z",
         }));
@@ -173,7 +175,7 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
-/** Scrolls the Today strip into view (which starts its reads) and waits for all three tiles to settle. */
+/** Scrolls the Today strip into view (which starts its reads) and waits for all four tiles to settle. */
 async function settle(page: Page) {
   const today = page.getByTestId("hub-today");
   await today.scrollIntoViewIfNeeded();
@@ -270,7 +272,7 @@ test.describe("Today strip", () => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
-    await expect(page.getByTestId("today-tile")).toHaveCount(3);
+    await expect(page.getByTestId("today-tile")).toHaveCount(4);
     await expect(tile(page, "password-game")).toHaveAttribute("data-state", "ready");
     await expect(tile(page, "password-game")).toContainText("Daily run");
     await expect(tile(page, "password-game")).toContainText("Ada");
@@ -282,6 +284,8 @@ test.describe("Today strip", () => {
     await expect(tile(page, "space-shooter")).toContainText("48,210");
     await expect(tile(page, "hextris")).toContainText("Kite");
     await expect(tile(page, "hextris")).toContainText("9,100");
+    await expect(tile(page, "super-voltorb-flip")).toContainText("Pika");
+    await expect(tile(page, "super-voltorb-flip")).toContainText("384");
     await expect(page.getByTestId("hub-today-reset")).toContainText("(00:00 UTC)");
   });
 
@@ -310,7 +314,7 @@ test.describe("Today strip", () => {
       storageState: seeded({ ...SEEDED, "arcade:player:v1": '{"id":"should-never-be-sent"}' }),
     });
 
-    test("asks for exactly three public reads and never passes a player id", async ({ page }) => {
+    test("asks for exactly four public reads and never passes a player id", async ({ page }) => {
       const requested = await mockBoards(page, "populated");
       await page.goto("/games");
       await settle(page);
@@ -318,6 +322,7 @@ test.describe("Today strip", () => {
         [
           "/api/arcade/scores?game=hextris&board=daily",
           "/api/arcade/scores?game=space-shooter&board=daily",
+          "/api/arcade/scores?game=super-voltorb-flip&board=daily",
           "/api/password-game-2/leaderboard?daily=1",
         ].sort(),
       );
@@ -342,7 +347,7 @@ test.describe("Today strip", () => {
       expect(top, "the strip must start below the 200px preload margin").toBeGreaterThan(650);
       expect(requested).toEqual([]);
       await settle(page);
-      expect(requested).toHaveLength(3);
+      expect(requested).toHaveLength(4);
     });
   });
 });
@@ -581,11 +586,11 @@ test.describe("at phone width", () => {
 test.describe("at desktop width", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("lays the tiles out in three columns and the chips in four", async ({ page }) => {
+  test("lays the tiles out in four columns and the chips in four", async ({ page }) => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
-    expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(3);
+    expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(4);
     expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(4);
   });
 });
