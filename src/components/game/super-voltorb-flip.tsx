@@ -1816,6 +1816,9 @@ export function SuperVoltorbFlipGame() {
   useEffect(() => {
     if (muted || !hydrated) return;
     return afterPageLoad(() => {
+      // A tab opened in the background still fires load; the hidden-tab stop
+      // only reacts to a change, so do not start the loop for a hidden page.
+      if (document.hidden) return;
       musicStartedRef.current = true;
       playMusic(levelRef.current);
     });

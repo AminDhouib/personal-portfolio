@@ -302,23 +302,71 @@ describe("background music", () => {
   });
 });
 
+// Every element created while `remaining` is above zero has its first play() rejected,
+// as a browser does before the page has had a user gesture.
 class BlockedOnceAudio extends FakeAudio {
-  static blocked = true;
+  static remaining = 1;
   plays = 0;
   override play() {
     this.plays += 1;
-    if (BlockedOnceAudio.blocked) {
-      BlockedOnceAudio.blocked = false;
+    if (BlockedOnceAudio.remaining > 0) {
+      BlockedOnceAudio.remaining -= 1;
       return Promise.reject(new DOMException("blocked", "NotAllowedError"));
     }
     return super.play();
   }
 }
 
+const RETRY_EVENTS = ["pointerdown", "pointerup", "touchend", "keydown"];
+
+// Counts the document listeners the retry has armed right now, so a missing
+// cancel is visible even when the retry's own element guard would hide it.
+function trackRetryListeners(): { armed: () => number } {
+  const live = new Map<string, unknown>();
+  const add = document.addEventListener.bind(document) as typeof document.addEventListener;
+  const remove = document.removeEventListener.bind(document) as typeof document.removeEventListener;
+  vi.spyOn(document, "addEventListener").mockImplementation((type, listener, options) => {
+    if (RETRY_EVENTS.includes(type)) live.set(type, listener);
+    add(type, listener, options);
+  });
+  vi.spyOn(document, "removeEventListener").mockImplementation((type, listener, options) => {
+    if (live.get(type) === listener) live.delete(type);
+    remove(type, listener, options);
+  });
+  return { armed: () => live.size };
+}
+
+async function gesture(event: Event): Promise<void> {
+  document.dispatchEvent(event);
+  await vi.advanceTimersByTimeAsync(0);
+}
+
 describe("blocked autoplay", () => {
+  let listeners: { armed: () => number };
+
   beforeEach(() => {
-    BlockedOnceAudio.blocked = true;
+    BlockedOnceAudio.remaining = 1;
     vi.stubGlobal("Audio", BlockedOnceAudio);
+    listeners = trackRetryListeners();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("arms the retry when the browser rejects play(), and not before", async () => {
+    const { playMusic, stopMusic } = await load();
+    BlockedOnceAudio.remaining = 0;
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listeners.armed()).toBe(0);
+    stopMusic();
+
+    BlockedOnceAudio.remaining = 1;
+    playMusic(8);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+    stopMusic();
   });
 
   it("retries the loop on the first gesture after the browser rejected play()", async () => {
@@ -329,15 +377,169 @@ describe("blocked autoplay", () => {
     expect(el.paused).toBe(true);
     expect(el.plays).toBe(1);
 
-    document.dispatchEvent(new Event("pointerdown"));
+    await gesture(new Event("pointerdown"));
+    expect(el.plays).toBe(2);
+    expect(el.paused).toBe(false);
+    expect(listeners.armed()).toBe(0);
+
+    // One retry only: later gestures do not call play() again.
+    await gesture(new Event("keydown"));
+    await gesture(new Event("pointerup"));
+    expect(el.plays).toBe(2);
+    stopMusic();
+  });
+
+  it.each(["pointerup", "touchend"])(
+    "a %s alone retries the loop (touch activation)",
+    async (name) => {
+      const { playMusic, stopMusic } = await load();
+      playMusic(1);
+      await vi.advanceTimersByTimeAsync(0);
+      const el = FakeAudio.all[0] as BlockedOnceAudio;
+
+      await gesture(new Event(name));
+      expect(el.plays).toBe(2);
+      expect(el.paused).toBe(false);
+      stopMusic();
+    },
+  );
+
+  it("a rejected retry re-arms for the next gesture", async () => {
+    const { playMusic, stopMusic } = await load();
+    BlockedOnceAudio.remaining = 2;
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = FakeAudio.all[0] as BlockedOnceAudio;
+
+    await gesture(new Event("pointerdown"));
+    expect(el.plays).toBe(2);
+    expect(el.paused).toBe(true);
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+
+    await gesture(new Event("pointerup"));
+    expect(el.plays).toBe(3);
+    expect(el.paused).toBe(false);
+    stopMusic();
+  });
+
+  it("a key typed in a text field does not retry and leaves it armed", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const input = document.createElement("input");
+    document.body.append(input);
+
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(1);
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+
+    await gesture(new Event("pointerdown"));
+    expect(el.plays).toBe(2);
+    input.remove();
+    stopMusic();
+  });
+
+  it("does not call play() while muted, stays armed, and an unmute starts the loop", async () => {
+    const { playMusic, setMusicMuted, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    setMusicMuted(true);
+
+    await gesture(new Event("pointerdown"));
+    await gesture(new Event("keydown"));
+    expect(el.plays).toBe(1);
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+
+    setMusicMuted(false);
     await vi.advanceTimersByTimeAsync(0);
     expect(el.plays).toBe(2);
     expect(el.paused).toBe(false);
+    expect(listeners.armed()).toBe(0);
+    stopMusic();
+  });
 
-    // One retry only: later gestures do not call play() again.
-    document.dispatchEvent(new Event("keydown"));
+  it("stopMusic cancels the pending retry", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    expect(el.plays).toBe(2);
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+    stopMusic();
+    expect(listeners.armed()).toBe(0);
+
+    BlockedOnceAudio.remaining = 0;
+    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    await gesture(new Event("pointerdown"));
+    expect(first.plays).toBe(1);
+    expect(first.paused).toBe(true);
+  });
+
+  it("fadeOutMusic cancels the pending retry", async () => {
+    const { playMusic, fadeOutMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+    fadeOutMusic(100);
+    expect(listeners.armed()).toBe(0);
+    await vi.advanceTimersByTimeAsync(300);
+
+    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    await gesture(new Event("pointerdown"));
+    expect(first.plays).toBe(1);
+  });
+
+  it("a track swap cancels the old retry; a swapped-out late rejection does not arm one", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    playMusic(8); // a different band swaps the element before the first rejection lands
+    await vi.advanceTimersByTimeAsync(0);
+    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    const second = FakeAudio.all[1] as BlockedOnceAudio;
+    expect(second.plays).toBe(1);
+    expect(second.paused).toBe(false); // the single block was spent on the first element
+    expect(listeners.armed()).toBe(0);
+
+    await gesture(new Event("pointerdown"));
+    expect(first.plays).toBe(1);
+    expect(second.plays).toBe(1);
+    stopMusic();
+  });
+
+  it("a swap to a track that plays fine leaves no retry armed for the old one", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+
+    playMusic(8); // the block is spent: this element plays at once
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listeners.armed()).toBe(0);
+
+    await gesture(new Event("pointerdown"));
+    expect(first.plays).toBe(1);
+    stopMusic();
+  });
+
+  it("a swap away from a blocked track cancels its retry, and the new track retries on its own", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+
+    BlockedOnceAudio.remaining = 1;
+    playMusic(8);
+    await vi.advanceTimersByTimeAsync(0);
+    const second = FakeAudio.all[1] as BlockedOnceAudio;
+    expect(listeners.armed()).toBe(RETRY_EVENTS.length);
+
+    await gesture(new Event("pointerdown"));
+    expect(first.plays).toBe(1);
+    expect(second.plays).toBe(2);
+    expect(second.paused).toBe(false);
     stopMusic();
   });
 
@@ -348,19 +550,8 @@ describe("blocked autoplay", () => {
     const el = FakeAudio.all[0] as BlockedOnceAudio;
     stopMusic();
 
-    document.dispatchEvent(new Event("pointerdown"));
-    await vi.advanceTimersByTimeAsync(0);
+    await gesture(new Event("pointerdown"));
     expect(el.plays).toBe(1);
     expect(el.paused).toBe(true);
-  });
-
-  it("a track swap does not cancel the new track's own retry", async () => {
-    const { playMusic, stopMusic } = await load();
-    playMusic(1);
-    playMusic(8); // a different band swaps the element before the first rejection lands
-    await vi.advanceTimersByTimeAsync(0);
-    const second = FakeAudio.all[1] as BlockedOnceAudio;
-    expect(second.paused).toBe(false); // the single block was spent on the first element
-    stopMusic();
   });
 });

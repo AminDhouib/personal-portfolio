@@ -50,6 +50,7 @@ test("LCP of the game page is page content, not the game, and lands inside the b
     });
     // Let late paints land; LCP entries stop at the first input, and we send none.
     await expect.poll(() => page.evaluate(() => document.readyState)).toBe("complete");
+    // Lets late paints land before the entries are read.
     await page.waitForTimeout(2_000);
 
     const records = await page.evaluate(() => window.__lcp);
