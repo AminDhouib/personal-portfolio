@@ -47,4 +47,29 @@ describe("pullForwardTargets", () => {
     const soon = ev({ family: "chrome", scheduledAtMs: 11_000 });
     expect(pullForwardTargets([other, soon], "act2", 10_000, 4_000).size).toBe(0);
   });
+
+  it("staggers pulled events in authored order, each a beat after the previous", () => {
+    const i1 = ev({ defId: "i1", family: "inhabitant", scheduledAtMs: 40_000 });
+    const i2 = ev({ defId: "i2", family: "inhabitant", scheduledAtMs: 60_000 });
+    const c = ev({ defId: "c", family: "chrome", scheduledAtMs: 150_000 });
+    const t = pullForwardTargets([c, i2, i1], "act2", 10_000, 4_000);
+    expect(t.get(i1)).toBe(14_000);
+    expect(t.get(i2)).toBe(18_000);
+    expect(t.get(c)).toBe(22_000);
+  });
+
+  it("keeps the chain stable on the next frame (a pulled event holds its slot)", () => {
+    const i1 = ev({ defId: "i1", family: "inhabitant", scheduledAtMs: 14_000 });
+    const i2 = ev({ defId: "i2", family: "inhabitant", scheduledAtMs: 18_000 });
+    const c = ev({ defId: "c", family: "chrome", scheduledAtMs: 22_000 });
+    expect(pullForwardTargets([c, i2, i1], "act2", 10_100, 4_000).size).toBe(0);
+  });
+
+  it("starts the chain a beat after an event that is already due soon", () => {
+    const soon = ev({ defId: "s", family: "inhabitant", scheduledAtMs: 13_000 });
+    const later = ev({ defId: "l", family: "inhabitant", scheduledAtMs: 90_000 });
+    const t = pullForwardTargets([soon, later], "act2", 10_000, 4_000);
+    expect(t.get(soon)).toBeUndefined();
+    expect(t.get(later)).toBe(17_000);
+  });
 });

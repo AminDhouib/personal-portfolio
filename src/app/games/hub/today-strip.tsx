@@ -13,8 +13,7 @@ const PLACEHOLDER_RANKS = [1, 2, 3] as const;
 type TileState = "idle" | "ready" | "empty" | "error";
 
 const TILE_COPY: Record<TodaySource["kind"], { kicker: string; note: string }> = {
-  // The PG2 board is "today" by the database's UTC day; the seed is still the visitor's
-  // local day until T3 (DESIGN.md, Games hub), so the tile says what the board is.
+  // The PG2 board is "today" by the database's UTC day, and so is the daily seed.
   pg2: { kicker: "Daily run", note: "Fastest daily runs posted today (UTC)" },
   arcade: { kicker: "Daily top scores", note: "Highest scores posted today (UTC)" },
 };

@@ -73,9 +73,8 @@ export function ReceiptCard({
   const timeMs = Math.round(g.elapsedMs);
   const crisis = CRISIS_NAMES[stats.biggestCrisis] ?? "None, somehow";
   const date = new Date();
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
+  // The UTC day, matching the daily seed and the daily board.
+  const dateStr = date.toISOString().slice(0, 10);
 
   // Read the board on mount, whenever the board identity changes (seed vs. daily),
   // and after a successful post (via refreshKey). The fetch lives in a nested async

@@ -557,12 +557,16 @@ The following Password Game 2 entries were verified against the current tree on 
   authored clock used to leave a fast solver idle for up to ~100 s at an act gate. Now, when every
   core rule of the act is revealed and passing (`engine/pacing.ts`, called from `tick`), each
   unstarted inhabitant and the single earliest unstarted blocking event are rescheduled to
-  `actElapsedMs + PULL_FORWARD_BEAT_MS` (4 s). One blocking event at a time, so the overlapping
-  act-2 force slots do not stack. Events are never dropped or delayed: the gate still waits for
+  `actElapsedMs + PULL_FORWARD_BEAT_MS` (4 s). Pulled events are staggered: in authored order,
+  each lands at least one beat after the previous pulled one, so they never arrive on the same
+  frame. One blocking event at a time, so act 2's overlapping force slot is serialized by
+  pull-forward rather than stacked. Events are never dropped or delayed: the gate still waits for
   every blocking event of the act to resolve and every inhabitant to have arrived and left
-  telegraph, so a fast player meets the same set, only sooner. Act 3 never advances on time; the
-  same pull shortens the wait before submit opens. Measured for seed 7 with the instant solver:
-  act 1 158.8 s to 13.4 s, act 2 158.0 s to 33.8 s, finale 521.3 s to 174.3 s.
+  telegraph, so a fast player meets the same set, only sooner. A rule that regresses during the
+  beat does not cancel the pull, precisely because events are never delayed or dropped. Act 3
+  never advances on time; the same pull shortens the wait before submit opens. Measured for seed
+  7 with the instant solver: act 1 158.8 s to 17.4 s, act 2 158.0 s to 33.8 s, finale 521.3 s to
+  178.3 s.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to
