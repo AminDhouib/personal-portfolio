@@ -92,7 +92,7 @@ export const superVoltorbFlipContent: GameContent = {
     {
       question: "What happens when you flip a Voltorb?",
       answer:
-        "The round ends and no coins are banked. You drop to the number of tiles you flipped that round, never below level 1 and never above the level you were on.",
+        "The round ends and no coins are banked. Your new level is the number of tiles you flipped that round, but never below 1, never above the level you were on, and never above 7.",
     },
     {
       question: "Is there a Voltorb Flip solver?",
