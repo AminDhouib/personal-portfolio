@@ -55,7 +55,7 @@ export function FinaleStage({ g, onPointer }: FinaleStageProps) {
   const allies = finale?.allies ?? [];
 
   return (
-    <div className="pg2-finale">
+    <div className="pg2-finale" data-testid="pg2-finale">
       <div className="pg2-finale__banner">
         <span className="pg2-finale__kicker">The Submission — Phase {label.n} of 3</span>
         <span className="pg2-finale__title">{label.sub}</span>
