@@ -11,6 +11,8 @@ import {
 } from "./fx";
 import { ORB, spritePaths } from "./sprites";
 
+const ORB_PATHS = spritePaths(ORB);
+
 interface FrameSize {
   /** Pixel size; ignored when cssSize is given. */
   size?: number;
@@ -71,7 +73,7 @@ export function BurstFrame({
     <Frame box={BURST_BOX} {...size}>
       {core && (
         <g transform={`translate(${CORE_OFFSET} ${CORE_OFFSET}) scale(${CORE_SCALE})`}>
-          {spritePaths(ORB).map((p) => (
+          {ORB_PATHS.map((p) => (
             <path key={p.color} d={p.d} fill={p.color} />
           ))}
         </g>

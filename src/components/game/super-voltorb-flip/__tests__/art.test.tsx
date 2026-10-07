@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { PixelSprite } from "../art/pixel-sprite";
 import { BurstFrame, CoinFrame, SparkleFrame } from "../art/frames";
-import { ORB } from "../art/sprites";
+import { GLYPH_1, ORB } from "../art/sprites";
 
 afterEach(cleanup);
 
@@ -33,6 +33,28 @@ describe("PixelSprite", () => {
     const svg = container.querySelector("svg")!;
     expect(svg.classList.contains("voltorb")).toBe(true);
     expect(svg.style.color).toBe("rgb(255, 255, 255)");
+  });
+});
+
+describe("PixelSprite outline and layout", () => {
+  it("draws the outline in the SVG: a dark stroke painted under the fill", () => {
+    const { container } = render(
+      <PixelSprite sprite={GLYPH_1} size={10} outline="#1f2937" style={{ color: "#fff" }} />,
+    );
+    const path = container.querySelector("svg path")!;
+    expect(path.getAttribute("stroke")).toBe("#1f2937");
+    expect(path.getAttribute("paint-order")).toBe("stroke");
+    expect(container.querySelector("svg")!.style.overflow).toBe("visible");
+  });
+
+  it("draws no stroke without an outline", () => {
+    const { container } = render(<PixelSprite sprite={ORB} size={10} />);
+    expect(container.querySelector("svg path")!.getAttribute("stroke")).toBeNull();
+  });
+
+  it("never shrinks as a flex child", () => {
+    const { container } = render(<PixelSprite sprite={ORB} size={10} />);
+    expect(container.querySelector("svg")!.style.flexShrink).toBe("0");
   });
 });
 
