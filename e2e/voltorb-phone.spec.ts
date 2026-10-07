@@ -54,11 +54,23 @@ for (const width of [360, 390]) {
             }),
           ),
       );
-      expect(memo).toHaveLength(5);
+      // Four flags, Clear and Undo (on by default).
+      expect(memo).toHaveLength(6);
       for (const [w, h] of memo) {
         expect(w).toBeGreaterThanOrEqual(44);
         expect(h).toBeGreaterThanOrEqual(44);
       }
+
+      // The sixth face must not push the bar past the viewport.
+      const memoRight = await page
+        .getByRole("group", { name: "Memo flags" })
+        .evaluateAll((groups) =>
+          groups
+            .filter((g) => (g as HTMLElement).offsetParent !== null)
+            .map((g) => g.getBoundingClientRect().right),
+        );
+      expect(memoRight).toHaveLength(1);
+      expect(memoRight[0]).toBeLessThanOrEqual(width);
 
       const overflow = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,
