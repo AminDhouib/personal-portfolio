@@ -474,6 +474,22 @@ current tree on 2026-07-07.
 - **The new Voltorb buttons are text, not sprites.** The mode row (Settings, Statistics, later
   Daily) uses text labels in the light chrome, like How to play. Owner ruling: the CSS chrome stays;
   the one new sprite is the Undo glyph, drawn like the Clear X.
+- **The odds assist reuses the T2b solver unchanged and runs off the main thread.** `solve()` is
+  exact: a 5x5 board takes a median 1.6 ms, p95 17 ms and up to about 160 ms for an empty board at
+  round start (measured with the shipped solver, 600 random boards, node 22). `solve-client.ts`
+  posts the clues to a Web Worker (`solver-worker.ts`) and answers a latest-wins promise; with no
+  Worker, or if it errors, the same solver runs inline from a `setTimeout(0)`. One client (one
+  worker) serves every solve while the assist is on, and is disposed when it goes off. It is off by
+  default and not a hint button: it shows the Voltorb chance on every face-down tile and speaks it
+  in the tile's aria-label. The odds are a probability, not a promise: the solver weights layouts
+  by how HGSS deals boards, so a "0%" tile is exact and a "12%" tile still loses one time in eight.
+  The badge hides on flipped tiles, under the peek debug view and during the flip-down, the same
+  gates the memo marks use (`tileOddsView`).
+- **An assisted round is sticky and never counts.** If the assist was on at any point while a round
+  was live, the round is assisted even if it was switched off again; the banner says so, statistics
+  count it as played and assisted only, and the Daily board (T2e-3) has no assist at all.
+  Switching it on while a result banner is up affects the next round, not the
+  one just over. This is honesty bookkeeping on a local, forgeable record, not enforcement.
 - **Chess-puzzle's inner replay-consistency guards are intentionally silent** — they re-validate
   state that upstream callers have already validated once; a second failure there indicates the
   first guard's own invariant broke, which is a bug in the guard itself, not user input worth
