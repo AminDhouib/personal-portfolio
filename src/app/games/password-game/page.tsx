@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { GAMES, GAMES_BY_SLUG } from "../games-meta";
 import { GAME_CONTENT } from "../content";
+import { PASSWORD_GAME_CREDIT, PASSWORD_GAME_PAGE_INTRO } from "../content/password-game";
+import { PG2_HINTS_PATH } from "./hints/hints-content";
 import { GameCard } from "@/components/game/game-card";
 import { GameAbout } from "@/components/game/game-about";
 import { PasswordGame2Loader } from "@/components/game/password-game-2";
@@ -87,10 +89,40 @@ export default function PasswordGamePage() {
         </div>
 
         <div>
-          {/* Server-rendered heading: the interactive shell is client-only
-              (ssr: false), so without this the page ships no h1 in its SSR HTML.
-              sr-only because the shell renders its own visible wordmark. */}
-          <h1 className="sr-only">{GAME.title}</h1>
+          {/* Server-rendered heading, intro and credit: the interactive shell is
+              client-only (ssr: false), so without these the page ships no h1 and no
+              visible copy in its SSR HTML. The shell renders its own wordmark below. */}
+          <div className="mx-auto mb-6 max-w-5xl">
+            <h1 className="font-display text-lg font-bold tracking-tight text-(--muted) sm:text-xl">
+              {GAME.title}: the sign-up form that fights back
+            </h1>
+            <p
+              data-testid="pg2-page-intro"
+              className="mt-2 max-w-2xl text-sm leading-relaxed text-(--foreground)/85"
+            >
+              {PASSWORD_GAME_PAGE_INTRO}
+            </p>
+            <p data-testid="pg2-credit" className="mt-2 text-xs text-(--muted)">
+              {PASSWORD_GAME_CREDIT.before}
+              <a
+                href={PASSWORD_GAME_CREDIT.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-(--foreground)"
+              >
+                {PASSWORD_GAME_CREDIT.linkText}
+              </a>
+              {PASSWORD_GAME_CREDIT.after}
+            </p>
+            <p className="mt-2 text-xs">
+              <Link
+                href={PG2_HINTS_PATH}
+                className="font-semibold underline underline-offset-2 hover:text-(--foreground)"
+              >
+                Stuck? Rules and hints (spoilers behind a click)
+              </Link>
+            </p>
+          </div>
           <PasswordGame2Loader />
         </div>
 
