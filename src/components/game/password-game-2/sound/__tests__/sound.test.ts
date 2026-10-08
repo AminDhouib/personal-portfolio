@@ -60,14 +60,19 @@ interface FakeCtx {
   sampleRate: number;
   destination: { connect(): void };
   gains: { gain: FakeParam; connect(): void }[];
-  oscillators: { type: string; frequency: FakeParam; detune: FakeParam }[];
+  oscillators: { type: string; frequency: FakeParam; detune: FakeParam; stops: number[] }[];
   compressors: Record<"threshold" | "knee" | "ratio" | "attack" | "release", FakeParam>[];
   filters: { type: string; frequency: FakeParam }[];
   sources: { buffer: unknown }[];
   buffers: { getChannelData(): Float32Array }[];
   starts: number;
   createGain(): { gain: FakeParam; connect(): void };
-  createOscillator(): { type: string; frequency: FakeParam; detune: FakeParam };
+  createOscillator(): {
+    type: string;
+    frequency: FakeParam;
+    detune: FakeParam;
+    stops: number[];
+  };
   createBiquadFilter(): { type: string; frequency: FakeParam };
   createDynamicsCompressor(): Record<
     "threshold" | "knee" | "ratio" | "attack" | "release",
@@ -99,11 +104,14 @@ function makeCtx(): FakeCtx {
         type: "sine",
         frequency: param(),
         detune: param(),
+        stops: [] as number[],
         connect() {},
         start() {
           ctx.starts++;
         },
-        stop() {},
+        stop(t: number) {
+          o.stops.push(t);
+        },
       };
       ctx.oscillators.push(o);
       return o;
@@ -169,6 +177,10 @@ const EXPECTED_KEYS = [
   "eula-burn",
   "knockback",
   "victory",
+  "key-tick",
+  "rule-reveal",
+  "rule-pass",
+  "rule-fail",
 ];
 
 beforeEach(() => {
@@ -229,9 +241,9 @@ describe("playNoise", () => {
 });
 
 describe("MOTIFS registry", () => {
-  it("contains exactly the sixteen named cues", () => {
+  it("contains exactly the twenty named cues", () => {
     expect(Object.keys(MOTIFS).sort()).toEqual([...EXPECTED_KEYS].sort());
-    expect(Object.keys(MOTIFS)).toHaveLength(16);
+    expect(Object.keys(MOTIFS)).toHaveLength(20);
   });
 
   it("every cue schedules at least one node without throwing", () => {
@@ -240,6 +252,42 @@ describe("MOTIFS registry", () => {
       expect(() => cue(bus), name).not.toThrow();
       expect(ctx.starts, name).toBeGreaterThanOrEqual(1);
     }
+  });
+});
+
+describe("core-play cues", () => {
+  const CORE = ["key-tick", "rule-reveal", "rule-pass", "rule-fail"];
+
+  it("are short: no oscillator is scheduled past 400ms", () => {
+    for (const name of CORE) {
+      const { ctx, bus } = makeBus();
+      MOTIFS[name]!(bus);
+      expect(ctx.oscillators.length, name).toBeGreaterThan(0);
+      for (const o of ctx.oscillators) {
+        expect(o.stops.length, name).toBeGreaterThan(0);
+        for (const stop of o.stops) expect(stop, name).toBeLessThanOrEqual(ctx.currentTime + 0.4);
+      }
+    }
+  });
+
+  it("the pass cue is two notes and the key tick is one", () => {
+    const pass = makeBus();
+    MOTIFS["rule-pass"]!(pass.bus);
+    expect(pass.ctx.oscillators.map((o) => o.frequency.calls[0]!.v)).toEqual([523.25, 783.99]);
+    const tick = makeBus();
+    MOTIFS["key-tick"]!(tick.bus);
+    expect(tick.ctx.oscillators).toHaveLength(1);
+  });
+
+  it("the fail cue falls and the reveal cue rises", () => {
+    const fail = makeBus();
+    MOTIFS["rule-fail"]!(fail.bus);
+    const [f0, f1] = fail.ctx.oscillators[0]!.frequency.calls;
+    expect(f1!.v).toBeLessThan(f0!.v);
+    const reveal = makeBus();
+    MOTIFS["rule-reveal"]!(reveal.bus);
+    const [r0, r1] = reveal.ctx.oscillators[0]!.frequency.calls;
+    expect(r1!.v).toBeGreaterThan(r0!.v);
   });
 });
 
@@ -265,7 +313,7 @@ describe("getAudio / enabled state", () => {
     expect(getAudio()).toBeNull();
   });
 
-  it("defaults to disabled and toggles via setEnabled", () => {
+  it("toggles via setEnabled", () => {
     setEnabled(false);
     expect(isEnabled()).toBe(false);
     setEnabled(true);
