@@ -18,4 +18,5 @@ export const TODAY_SOURCES: readonly TodaySource[] = [
   { slug: "hextris", kind: "arcade" },
   { slug: "super-voltorb-flip", kind: "arcade" },
   { slug: "tower-stacker", kind: "arcade" },
+  { slug: "typing-speed", kind: "arcade" },
 ];

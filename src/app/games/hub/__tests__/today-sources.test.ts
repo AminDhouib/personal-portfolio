@@ -4,13 +4,14 @@ import { ARCADE_GAME_SLUGS } from "@/lib/arcade/games";
 import { TODAY_SOURCES } from "../today-sources";
 
 describe("TODAY_SOURCES", () => {
-  it("lists Password Game 2, Orbital Dodge, Hextris, Super Voltorb Flip and Tower Stacker, in that order", () => {
+  it("lists Password Game 2, Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker and Typing Speed, in that order", () => {
     expect(TODAY_SOURCES.map((source) => [source.slug, source.kind])).toEqual([
       ["password-game", "pg2"],
       ["space-shooter", "arcade"],
       ["hextris", "arcade"],
       ["super-voltorb-flip", "arcade"],
       ["tower-stacker", "arcade"],
+      ["typing-speed", "arcade"],
     ]);
   });
 
