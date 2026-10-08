@@ -9,7 +9,7 @@ export const hextrisContent: GameContent = {
   intro:
     "Hextris is a fast hexagon puzzle game that runs in your browser. Colored blocks fall toward a central hexagon from six directions. You rotate the hexagon to catch each block on the side you want, then match three or more of the same color to clear them. Clears build combos and a momentum meter, and the play area slowly tightens, so every minute you last is harder than the one before.",
   howToPlay: [
-    "Click, tap or press Space, Enter, an arrow key or A, S, D to start.",
+    "Click, tap or press Space, Enter, an arrow key or A, S, D to start. A 3, 2, 1 countdown follows, and you can already rotate during it.",
     "Rotate the hexagon with the arrow keys or A and D, or tap the left or right half of the screen.",
     "Catch each falling block on a side that already holds blocks of its color.",
     "Match three or more connected blocks of one color to clear them and score.",
@@ -47,6 +47,7 @@ export const hextrisContent: GameContent = {
     "Each clear scores the number of blocks squared, times your combo. Five blocks at 2x is 50 points, so bigger groups pay far more than several small ones.",
     "Bombs appear once you have reached a 3x combo, and rainbow blocks at 5x. A rainbow matches any color, and a bomb in a match also clears the blocks near it: two rows either way on its own side and one row either way on each neighboring side.",
     "The momentum meter fills as you clear. At 100 percent, Panic Clear removes every block for 30 points each, so save it for a crisis.",
+    "Clears score only while you are playing. Before your first input, or after 8 seconds without one, a clear still happens but scores nothing until you move again.",
     "After your first rotation the limit shrinks by one block every 60 seconds, from 12 down to 4. A countdown warns you ten seconds before.",
   ],
   facts: [
