@@ -38,6 +38,8 @@ export function createRefs(): GameRefs {
     powerUps: [],
     coins: [],
     coinsThisRun: 0,
+    coinPickupsThisRun: 0,
+    coinBoostBonusThisRun: 0,
     coinMagnetExtra: 0,
     coinValueBonus: 0,
     scoreMultiplier: 1,
@@ -149,6 +151,8 @@ export function resetToArmed(g: GameRefs): void {
   g.powerUps.length = 0;
   g.coins.length = 0;
   g.coinsThisRun = 0;
+  g.coinPickupsThisRun = 0;
+  g.coinBoostBonusThisRun = 0;
   g.boss = null;
   g.bossProjectiles.length = 0;
   g.bossSchedule = buildBossSchedule();

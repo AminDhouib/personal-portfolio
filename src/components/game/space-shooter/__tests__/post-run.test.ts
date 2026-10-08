@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { countUp, postRunGoals, unownedCatalog } from "../post-run";
+import { coinBreakdown, countUp, postRunGoals, unownedCatalog } from "../post-run";
 import { SHIPS, COSMETICS } from "../../shop-data";
 
 describe("countUp", () => {
@@ -95,5 +95,28 @@ describe("unownedCatalog", () => {
     const cat = unownedCatalog(["ship:juggernaut", "hull-crimson"]);
     expect(cat.some((i) => i.label === "Juggernaut")).toBe(false);
     expect(cat.some((i) => i.label === "Crimson")).toBe(false);
+  });
+});
+
+describe("coinBreakdown", () => {
+  const sum = (rows: { amount: number }[]) => rows.reduce((n, r) => n + r.amount, 0);
+
+  it("lists pickups only when no boost was active", () => {
+    const rows = coinBreakdown({ total: 18, boostBonus: 0, pickups: 6 });
+    expect(rows).toEqual([{ label: "6 pickups", amount: 18 }]);
+  });
+
+  it("splits out the coin boost and still sums to the total", () => {
+    const rows = coinBreakdown({ total: 30, boostBonus: 10, pickups: 7 });
+    expect(rows).toEqual([
+      { label: "7 pickups", amount: 20 },
+      { label: "Coin Boost", amount: 10 },
+    ]);
+    expect(sum(rows)).toBe(30);
+  });
+
+  it("singularises one pickup and is empty for a run with no coins", () => {
+    expect(coinBreakdown({ total: 3, boostBonus: 0, pickups: 1 })[0]?.label).toBe("1 pickup");
+    expect(coinBreakdown({ total: 0, boostBonus: 0, pickups: 0 })).toEqual([]);
   });
 });
