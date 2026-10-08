@@ -687,6 +687,21 @@ The following Password Game 2 entries were verified against the current tree on 
   act so a queued card wipes again. That rule sits after the reduced-motion block on purpose, so
   it overrides the block's `animation: none` on `.pg2-titlecard`: the wipe is the card's own 2.2 s
   timing, not a flourish. A restart drops the last run's sparks.
+- **PG2's rules and hints live on their own static page, behind closed spoiler guards**
+  (`src/app/games/password-game/hints/`). `/games/password-game/hints` is server-rendered from
+  `hints-content.ts`: `RULE_HINTS` is keyed by `CORE_RULES` id and `EVENT_HINTS` by `EVENT_DEFS`
+  id, and an exhaustiveness test fails when a rule or event has no entry. The page exists for
+  search and answer-engine reach on "password game 2 hints" without putting spoilers on the game
+  page. Every hint sits in a closed `<details>` (never `open`), summaries are spoiler-free titles,
+  and no hint names a seeded value (the tests ban digit runs of 4 or more), so they hold for every
+  run.
+- **PG2's page names the game once, in a server-rendered h1 above the stage.** The h1, the intro
+  and the credit ("An independent tribute to The Password Game by Neal Agarwal. Not affiliated
+  with neal.fun.")
+  render from `PASSWORD_GAME_PAGE_INTRO` and `PASSWORD_GAME_CREDIT` in
+  `src/app/games/content/password-game.ts`; the old sr-only h1 is gone. The stage shell's own
+  "The Password Game 2" wordmark is a styled `<p>`, not a heading, so the page has one h1 and no
+  competing h2 for the same name.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to

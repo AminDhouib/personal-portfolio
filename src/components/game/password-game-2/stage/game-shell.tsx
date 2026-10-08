@@ -680,9 +680,10 @@ export function GameShell() {
     <div className="pg2-root">
       <header className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h2 className="font-display text-2xl font-black tracking-tight text-(--foreground) sm:text-3xl">
+          {/* Not a heading: the page's server-rendered h1 already names the game. */}
+          <p className="font-display text-2xl font-black tracking-tight text-(--foreground) sm:text-3xl">
             The Password Game 2
-          </h2>
+          </p>
           <p className="text-sm text-(--muted)">Terms and Conditions Apply</p>
         </div>
         {daily && phase === "running" ? (
