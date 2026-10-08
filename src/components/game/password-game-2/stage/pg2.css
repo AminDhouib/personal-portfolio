@@ -1787,6 +1787,12 @@ html.pg2-lock {
   overscroll-behavior: none;
 }
 
+/* The sheet is the only scroller with the keyboard open and the stage card sticks to its top:
+   a followed rule must stop below the card (--pg2-card-h is set by the shell). */
+.pg2-sheet--kb .pg2-rule--active {
+  scroll-margin-top: var(--pg2-card-h, 0px);
+}
+
 .pg2-sheet--kb .pg2-box {
   min-height: 96px;
   padding-top: 12px;

@@ -122,6 +122,26 @@ describe("GameShell phone sheet review fixes", () => {
     expect(toasts.style.height).toBe("500px");
   });
 
+  it("with the keyboard open the sheet is the only scroller; closed, the rule region scrolls", () => {
+    controllableMedia(false);
+    const vv = fakeVV(844);
+    const utils = render(<GameShell />);
+    startRun(utils);
+    expect(utils.getByTestId("pg2-rules").className).toContain("overflow-y-auto");
+    expect(utils.getByTestId("pg2-stage-card").className).not.toContain("sticky");
+    act(() => {
+      vv.height = 450;
+      vv.dispatchEvent(new Event("resize"));
+    });
+    expect(utils.getByTestId("pg2-rules").className).not.toContain("overflow-y-auto");
+    expect(utils.getByTestId("pg2-stage-card").className).toContain("sticky");
+    act(() => {
+      vv.height = 844;
+      vv.dispatchEvent(new Event("resize"));
+    });
+    expect(utils.getByTestId("pg2-rules").className).toContain("overflow-y-auto");
+  });
+
   it("follows the active rule while the keyboard is open, not only when it opens", () => {
     vi.useFakeTimers();
     controllableMedia(false);
