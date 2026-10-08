@@ -34,4 +34,11 @@ describe("Typing Speed copy describes the engine", () => {
     expect(meta?.controls).toMatch(/passage/);
     expect(meta?.description).not.toContain(String.fromCharCode(0x2014));
   });
+  it("describes the phone sheet: text above the keyboard, tap the text to come back", () => {
+    const phone = typingSpeedContent.controls.find((c) => c.input === "Phone");
+    expect(phone?.action).toMatch(/above the keyboard/);
+    expect(phone?.action).toMatch(/tap the text/i);
+    const fact = typingSpeedContent.facts.find((f) => f.label === "Phones");
+    expect(fact?.value).toMatch(/above the keyboard/);
+  });
 });
