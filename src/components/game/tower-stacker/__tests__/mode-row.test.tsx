@@ -83,6 +83,23 @@ describe("the mode row", () => {
     expect(daily().getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("captions Free build by where its tower comes from", () => {
+    const { unmount } = render(<Stage />);
+    expect(free().textContent).toContain("Random, unranked");
+    unmount();
+    render(<Stage seedText="e2e" />);
+    expect(free().textContent).toContain("Fixed seed, unranked");
+    expect(free().textContent).not.toContain("Random");
+  });
+
+  it("reserves two lines for each caption so the countdown cannot nudge the row", () => {
+    render(<Stage />);
+    for (const button of [daily(), free()]) {
+      const caption = button.querySelectorAll("span")[1];
+      expect(caption?.className).toContain("min-h-[2.5em]");
+    }
+  });
+
   it("switches mode on a click", () => {
     render(<Stage />);
     fireEvent.click(free());

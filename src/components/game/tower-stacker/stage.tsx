@@ -497,7 +497,7 @@ export function Stage({ seedText }: { seedText?: string }) {
                 Tap when the block is over the tower. Land it dead centre for a perfect.
               </p>
             )}
-            <ModeRow mode={mode} onChange={setMode} />
+            <ModeRow mode={mode} seeded={Boolean(seedText)} onChange={setMode} />
             <button
               ref={startRef}
               type="button"
