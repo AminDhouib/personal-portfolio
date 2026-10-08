@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { blockThirdParties } from "./helpers";
 
 // Tower Stacker is a first-party canvas game: it must boot, take a drop, end a run and
-// restart, all without any request that leaves the page. The game is hidden from the
-// grid but its route still serves.
+// restart, all without any request that leaves the page. It is listed in the grid
+// and the sitemap like the other games.
 
 const GAME_PATH = "/games/tower-stacker?tower-seed=e2e";
 
