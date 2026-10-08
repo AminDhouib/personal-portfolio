@@ -64,6 +64,7 @@ import {
 import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
 import { PanelClose } from "./space-shooter/panel-close";
 import { CountUp } from "./space-shooter/count-up";
+import { postRunGoals, unownedCatalog } from "./space-shooter/post-run";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -297,6 +298,8 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   const [tick, setTick] = useState(0);
   const [ui, setUi] = useState<UiState>(createInitialUiState);
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
+  // The best before this run, for the death card's score-vs-best bar.
+  const [previousBest, setPreviousBest] = useState<number | null>(null);
   const [crashed, setCrashed] = useState(false);
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
   const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
@@ -483,6 +486,16 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   const [profile, setProfile] = useState(() => loadProfile());
   const refreshProfile = useCallback(() => setProfile(loadProfile()), []);
   const isReturningPlayer = profile.firstRunCompleted;
+  const goals = useMemo(
+    () =>
+      postRunGoals({
+        score: ui.score,
+        previousBest,
+        wallet: profile.walletCoins,
+        catalog: unownedCatalog(profile.ownedCosmetics),
+      }),
+    [ui.score, previousBest, profile.walletCoins, profile.ownedCosmetics],
+  );
   // Tutorial removed — players learn the game by playing it.
   // Save on change + mirror to gameRefs for per-frame access
   useEffect(() => {
@@ -750,6 +763,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
       const final = Math.floor(g.score * g.scoreMultiplier);
       // Compare against the current state value synchronously so the celebration
       // flag is correct in the same render cycle.
+      setPreviousBest(hasStoredBest ? highScore : null);
       const bestKind = personalBestKind(final, hasStoredBest ? highScore : null);
       if (bestKind !== null) {
         safeLocalSet(HS_KEY, String(final));
@@ -1924,6 +1938,37 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                     <Trophy className="h-3.5 w-3.5" />
                     {celebration === "first" ? "First Flight" : "Personal Best"}
                   </motion.div>
+                )}
+                {goals.bar && (
+                  <div className="mx-auto mt-3 w-full max-w-xs px-2">
+                    <div
+                      className="h-2 overflow-hidden rounded-full bg-white/10"
+                      role="progressbar"
+                      aria-label="Score compared with your best"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(goals.bar.fraction * 100)}
+                    >
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${goals.bar.fraction * 100}%` }}
+                        transition={{ duration: 0.9, ease: "easeOut" }}
+                        className={
+                          goals.bar.beaten
+                            ? "h-full rounded-full bg-accent-amber"
+                            : "h-full rounded-full bg-accent-blue"
+                        }
+                      />
+                    </div>
+                    <div className="mt-1 text-xs text-white/70">{goals.bar.label}</div>
+                  </div>
+                )}
+                {goals.unlock && (
+                  <div className="mt-1 text-xs text-white/70">
+                    {goals.unlock.coinsNeeded > 0
+                      ? `${goals.unlock.coinsNeeded} coins to ${goals.unlock.label}`
+                      : `${goals.unlock.label} is ready in the Shop`}
+                  </div>
                 )}
                 {ui.coinsThisRun > 0 && (
                   <motion.div
