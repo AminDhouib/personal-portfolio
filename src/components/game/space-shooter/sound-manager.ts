@@ -156,7 +156,9 @@ export class SoundManager {
     else if (this.desiredTrack === "leaderboard") this.startLeaderboardMusic();
   }
 
-  play(type: SoundType) {
+  // `opts.pitch` is a playback-rate style multiplier; only "boom" reads it
+  // (kill sounds rise with the combo).
+  play(type: SoundType, opts?: { pitch?: number }) {
     if (!this.enabled || !this.sfxEnabled) return;
     this.ensure();
     if (!this.ctx) return;
@@ -170,7 +172,7 @@ export class SoundManager {
         this.playLaser();
         break;
       case "boom":
-        this.playBoom();
+        this.playBoom(opts?.pitch ?? 1);
         break;
       case "chime":
         this.playChime();
@@ -395,7 +397,7 @@ export class SoundManager {
   //  2. Pitched-down sub-bass thump (the deep body, ~0.35s)
   //  3. Long rumbling debris tail (low-passed noise, ~0.7s) so the explosion
   //     decays into space rather than ending abruptly.
-  private playBoom() {
+  private playBoom(pitch = 1) {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
     this.duckMusic(0.4, 0.08);
@@ -412,7 +414,7 @@ export class SoundManager {
     crackSrc.buffer = crackBuf;
     const crackFilt = ctx.createBiquadFilter();
     crackFilt.type = "highpass";
-    crackFilt.frequency.value = 1500;
+    crackFilt.frequency.value = 1500 * pitch;
     const crackGain = ctx.createGain();
     crackGain.gain.setValueAtTime(0.1, t);
     crackGain.gain.exponentialRampToValueAtTime(0.001, t + crackDur);
@@ -423,8 +425,8 @@ export class SoundManager {
     const sub = ctx.createOscillator();
     const subGain = ctx.createGain();
     sub.type = "sine";
-    sub.frequency.setValueAtTime(110, t);
-    sub.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+    sub.frequency.setValueAtTime(110 * pitch, t);
+    sub.frequency.exponentialRampToValueAtTime(28 * pitch, t + 0.4);
     subGain.gain.setValueAtTime(0.18, t);
     subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
     sub.connect(subGain).connect(this.sfxOut());
