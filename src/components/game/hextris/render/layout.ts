@@ -1,4 +1,4 @@
-import { SPAWN_ROWS } from "../engine/state";
+import { START_LIMIT_ROWS } from "../engine/state";
 
 // Canvas geometry for the painter. Distances are measured along a side's outward normal, from the
 // centre: the hexagon's apothem, then one rowHeight per row of cells.
@@ -19,13 +19,14 @@ const CORE_ROWS = 2.5;
 const CORNER_SCALE = 2 / Math.sqrt(3);
 
 /**
- * Fits the board to the canvas: the outermost corner of a piece that has just spawned stays inside
- * the shorter dimension, less a margin (smaller when the game fills the screen).
+ * Fits the board to the canvas: the corners of the start limit ring plus one row stay inside the
+ * shorter dimension, less a margin (smaller when the game fills the screen). Pieces spawn further
+ * out, so toward the shorter side they can start beyond the edge (spec sections 1.4 and 10.11).
  */
 export function layout(width: number, height: number, immersive: boolean): Layout {
   const short = Math.min(width, height);
   const margin = short * (immersive ? 0.02 : 0.05);
-  const reachRows = CORE_ROWS + SPAWN_ROWS + 1;
+  const reachRows = CORE_ROWS + START_LIMIT_ROWS + 1;
   const rowHeight = (short / 2 - margin) / CORNER_SCALE / reachRows;
   return {
     width,

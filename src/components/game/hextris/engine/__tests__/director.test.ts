@@ -37,11 +37,11 @@ describe("tuning curves", () => {
     }
   });
 
-  it("raises the fall speed from 2.6 to 8.5 rows per second", () => {
-    expect(fallRowsPerSecond(1)).toBeCloseTo(2.6, 9);
-    expect(fallRowsPerSecond(35)).toBeCloseTo(8.5, 9);
-    expect(fallRowsPerSecond(18)).toBeGreaterThan(2.6);
-    expect(fallRowsPerSecond(18)).toBeLessThan(8.5);
+  it("raises the fall speed from 5.8 to 12 rows per second", () => {
+    expect(fallRowsPerSecond(1)).toBeCloseTo(5.8, 9);
+    expect(fallRowsPerSecond(35)).toBeCloseTo(12, 9);
+    expect(fallRowsPerSecond(18)).toBeGreaterThan(5.8);
+    expect(fallRowsPerSecond(18)).toBeLessThan(12);
   });
 
   it("shrinks the combo window from 2800 ms to 1500 ms", () => {
