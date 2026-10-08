@@ -7,12 +7,9 @@ function layoutTop(el: HTMLElement): number {
   return top;
 }
 
-function scrollParent(el: HTMLElement): HTMLElement | null {
-  for (let n = el.parentElement; n; n = n.parentElement) {
-    const overflowY = getComputedStyle(n).overflowY;
-    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return n;
-  }
-  return null;
+function isScroller(n: HTMLElement): boolean {
+  const overflowY = getComputedStyle(n).overflowY;
+  return overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay";
 }
 
 function inFlight(el: HTMLElement): boolean {
@@ -25,7 +22,7 @@ function inFlight(el: HTMLElement): boolean {
 /**
  * Smoothly scroll the active rule into view. While a FLIP or entrance animation is moving the
  * card, its painted rect is off by the transform, so the target comes from layout offsets
- * (which ignore transforms) against the nearest scrolling ancestor instead.
+ * (which ignore transforms) against every scrolling ancestor instead.
  */
 export function followRule(rule: HTMLElement): void {
   if (!inFlight(rule)) {
@@ -34,13 +31,18 @@ export function followRule(rule: HTMLElement): void {
     }
     return;
   }
-  const scroller = scrollParent(rule);
-  if (!scroller || typeof scroller.scrollTo !== "function") return;
-  const top = layoutTop(rule) - layoutTop(scroller) - scroller.clientTop;
-  const bottom = top + rule.offsetHeight;
-  if (top < scroller.scrollTop) {
-    scroller.scrollTo({ top, behavior: "smooth" });
-  } else if (bottom > scroller.scrollTop + scroller.clientHeight) {
-    scroller.scrollTo({ top: bottom - scroller.clientHeight, behavior: "smooth" });
+  // Like scrollIntoView({ block: "nearest" }) on every scrolling ancestor, innermost first,
+  // but from layout offsets. `consumed` is how far the inner scrollers will have moved the
+  // card by then, so each outer scroller sees where the card will actually be.
+  let consumed = 0;
+  for (let n = rule.parentElement; n; n = n.parentElement) {
+    if (!isScroller(n) || typeof n.scrollTo !== "function") continue;
+    const top = layoutTop(rule) - layoutTop(n) - n.clientTop - consumed;
+    const bottom = top + rule.offsetHeight;
+    let target = n.scrollTop;
+    if (top < n.scrollTop) target = top;
+    else if (bottom > n.scrollTop + n.clientHeight) target = bottom - n.clientHeight;
+    if (target !== n.scrollTop) n.scrollTo({ top: target, behavior: "smooth" });
+    consumed += target;
   }
 }
