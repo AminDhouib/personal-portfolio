@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { GameState, Pg2Rule, RuleApi, ValidationResult } from "../engine/types";
 import type { CaptchaChallenge } from "../engine/rules/prologue";
 import type { ConsentPuzzle } from "../engine/rules/act1";
@@ -8,6 +8,8 @@ import { ChessBoard } from "./widgets/chess";
 import { CaptchaWidget } from "./widgets/captcha";
 import { ConsentWidget } from "./widgets/consent";
 import { ColorSwatch } from "./widgets/color";
+import { useFlip } from "./use-flip";
+import { diffRuleStates, explainRegression, type RuleFlips } from "./regression";
 
 interface RuleListProps {
   rules: readonly Pg2Rule[];
@@ -36,6 +38,10 @@ interface RuleListProps {
    * flips stay on screen even with zero other engine activity.
    */
   validationTick: number;
+  /** Ids of events currently running (past telegraph, not done); names a regression's likely cause. */
+  liveEvents?: readonly string[];
+  /** Told once per change when rules went from passing to failing or back (drives the pass/fail cues). */
+  onRuleFlips?(flips: RuleFlips): void;
 }
 
 interface Evaluated {
@@ -310,29 +316,44 @@ function RuleCard({
   variant,
   live,
   widget,
+  entering,
+  shaking,
+  reason,
+  onMotionEnd,
 }: {
   ev: Evaluated;
   variant: "active" | "pass" | "idle";
   live: string | null;
   widget: WidgetChannel;
+  entering: boolean;
+  shaking: boolean;
+  reason: string | null;
+  onMotionEnd(id: string, animationName: string): void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const passed = variant === "pass";
   const open = variant !== "pass" || expanded;
 
   return (
-    <li>
+    <li data-flip-id={ev.rule.id}>
       <button
         type="button"
         onClick={() => passed && setExpanded((x) => !x)}
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget) onMotionEnd(ev.rule.id, e.animationName);
+        }}
         aria-expanded={open}
         aria-label={`Rule ${ev.badge}: ${ev.rule.description}${passed ? " (satisfied)" : ""}`}
         className={`pg2-rule w-full px-4 py-3 text-left ${
           variant === "active" ? "pg2-rule--active" : variant === "pass" ? "pg2-rule--pass" : ""
-        } ${passed ? "cursor-pointer" : "cursor-default"}`}
+        } ${passed ? "cursor-pointer" : "cursor-default"} ${entering ? "pg2-rule-enter" : ""} ${
+          shaking ? "pg2-rule-shake" : ""
+        }`}
       >
         <div className="flex items-start gap-3">
           <span
+            data-badge
+            data-state={passed ? "pass" : "fail"}
             className={`pg2-badge ${
               variant === "active"
                 ? "pg2-badge--active"
@@ -341,7 +362,10 @@ function RuleCard({
                   : "pg2-badge--idle"
             }`}
           >
-            {passed ? <CheckIcon /> : ev.badge}
+            <span className="pg2-badge__num">{ev.badge}</span>
+            <span className="pg2-badge__check">
+              <CheckIcon />
+            </span>
           </span>
           <div className="min-w-0 flex-1">
             <p
@@ -351,6 +375,15 @@ function RuleCard({
             >
               {ev.rule.description}
             </p>
+            {reason && !passed ? (
+              <span
+                role="status"
+                aria-live="polite"
+                className="pg2-rule-reason mt-1 block text-xs font-semibold"
+              >
+                {reason}
+              </span>
+            ) : null}
             {open && !passed && (ev.result.message || live) ? (
               <p className="mt-1 font-mono text-xs text-[color:var(--pg2-body)]">
                 {live ?? ev.result.message}
@@ -379,6 +412,8 @@ export const RuleList = memo(function RuleList({
   api,
   onWidgetText,
   onRuleState,
+  liveEvents,
+  onRuleFlips,
 }: RuleListProps) {
   const widget: WidgetChannel = { onWidgetText, onRuleState };
   const evaluated: Evaluated[] = rules.map((rule, i) => ({
@@ -387,18 +422,81 @@ export const RuleList = memo(function RuleList({
     result: rule.validate(password, state, api),
   }));
 
+  // Per-card motion state, derived from the pass map during render (the "adjust state
+  // while rendering" pattern) so a regression is seen on the very render that shows it.
+  const passNow: Record<string, boolean> = {};
+  for (const e of evaluated) passNow[e.rule.id] = e.result.passed;
+  const [motion, setMotion] = useState<{
+    pass: Record<string, boolean>;
+    shaking: ReadonlySet<string>;
+    reasons: Readonly<Record<string, string>>;
+    flips: RuleFlips | null;
+  }>({ pass: passNow, shaking: new Set(), reasons: {}, flips: null });
+  const [entered, setEntered] = useState<ReadonlySet<string>>(new Set());
+  const listRef = useRef<HTMLOListElement>(null);
+
+  const passChanged =
+    Object.keys(passNow).length !== Object.keys(motion.pass).length ||
+    Object.keys(passNow).some((id) => passNow[id] !== motion.pass[id]);
+  if (passChanged) {
+    const flips = diffRuleStates(motion.pass, passNow);
+    const hasFlips = flips.regressed.length > 0 || flips.recovered.length > 0;
+    const shaking = new Set(motion.shaking);
+    const reasons = { ...motion.reasons };
+    for (const id of flips.regressed) {
+      shaking.add(id);
+      reasons[id] = explainRegression({ ruleId: id, liveEvents: liveEvents ?? [] });
+    }
+    for (const id of flips.recovered) {
+      shaking.delete(id);
+      delete reasons[id];
+    }
+    setMotion({ pass: passNow, shaking, reasons, flips: hasFlips ? flips : motion.flips });
+  }
+
+  const lastFlips = motion.flips;
+  useEffect(() => {
+    if (lastFlips) onRuleFlips?.(lastFlips);
+  }, [lastFlips, onRuleFlips]);
+
+  const onMotionEnd = (id: string, animationName: string) => {
+    if (animationName === "pg2-rule-in") {
+      setEntered((prev) => new Set(prev).add(id));
+    } else if (animationName === "pg2-rule-shake") {
+      setMotion((prev) => {
+        const shaking = new Set(prev.shaking);
+        shaking.delete(id);
+        return { ...prev, shaking };
+      });
+    }
+  };
+
   const firstFailing = evaluated.find((e) => !e.result.passed) ?? null;
   const ordered = firstFailing
     ? [firstFailing, ...evaluated.filter((e) => e !== firstFailing)]
     : evaluated;
 
+  useFlip(listRef, ordered.map((e) => e.rule.id).join(","));
+
   return (
-    <ol className="flex flex-col gap-2">
+    <ol ref={listRef} className="flex flex-col gap-2">
       {ordered.map((ev) => {
         const isActive = ev === firstFailing;
         const variant = ev.result.passed ? "pass" : isActive ? "active" : "idle";
         const live = ev.rule.id === "current-time" ? api.nowHHMM() : null;
-        return <RuleCard key={ev.rule.id} ev={ev} variant={variant} live={live} widget={widget} />;
+        return (
+          <RuleCard
+            key={ev.rule.id}
+            ev={ev}
+            variant={variant}
+            live={live}
+            widget={widget}
+            entering={!entered.has(ev.rule.id)}
+            shaking={motion.shaking.has(ev.rule.id)}
+            reason={motion.reasons[ev.rule.id] ?? null}
+            onMotionEnd={onMotionEnd}
+          />
+        );
       })}
     </ol>
   );
