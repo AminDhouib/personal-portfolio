@@ -304,6 +304,8 @@ export function Stage({ seedText }: { seedText?: string }) {
     const onKey = (event: KeyboardEvent) => {
       if (shouldBlockScroll(event, true)) event.preventDefault();
       if (!dropKey(event) || isTextEntryTarget(event)) return;
+      // A held key repeats keydown; one press releases one block.
+      if (event.repeat) return;
       // A focused button handles its own Space and Enter.
       if (event.target instanceof HTMLButtonElement) return;
       if (phaseRef.current === "paused") resume();
