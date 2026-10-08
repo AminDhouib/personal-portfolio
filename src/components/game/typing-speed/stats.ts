@@ -50,10 +50,11 @@ const keySchema = z.object({ hits: count, misses: count });
 
 const statsSchema = z.object({
   v: z.literal(1),
-  runs: count,
+  // Each field falls back on its own, so one bad field never costs the rest.
+  runs: count.catch(0),
   lastMode: z.unknown(),
-  bests: z.record(z.string(), z.unknown()),
-  keys: z.record(z.string(), z.unknown()),
+  bests: z.record(z.string(), z.unknown()).catch({}),
+  keys: z.record(z.string(), z.unknown()).catch({}),
   daily: z
     .object({ streak: count, bestStreak: count, lastDay: day.nullable(), days: count })
     .catch(emptyStats().daily),
@@ -142,7 +143,8 @@ export function recordRun(stats: Stats, r: RunRecord): Stats {
   next.lastMode = r.mode;
   if (r.bulk > 0) return next;
   const best = next.bests[r.mode];
-  if (!best || r.netWpm > best.wpm) {
+  // A zero-WPM run is played, but it is not a best to beat.
+  if (r.netWpm > 0 && (!best || r.netWpm > best.wpm)) {
     next.bests[r.mode] = { wpm: r.netWpm, raw: r.rawWpm, acc: r.accuracy, day: r.day };
   }
   next.keys = mergeKeyStats(next.keys, r.keys);
