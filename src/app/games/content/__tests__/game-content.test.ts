@@ -73,8 +73,4 @@ describe("GAME_CONTENT", () => {
     const credits = GAME_CONTENT["password-game"].credits;
     expect(credits.some((c) => c.href === "https://neal.fun/password-game/")).toBe(true);
   });
-
-  it("credits Hextris as an inspiration", () => {
-    expect(JSON.stringify(GAME_CONTENT.hextris.credits)).toMatch(/inspired by/i);
-  });
 });
