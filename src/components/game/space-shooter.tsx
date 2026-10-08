@@ -1832,6 +1832,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
         <AnimatePresence>
           {ui.status === "armed" && !isReturningPlayer && (
             <motion.div
+              inert={panelOpen}
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
@@ -1857,6 +1858,8 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
           )}
           {ui.status === "armed" && isReturningPlayer && (
             <motion.div
+              // An open panel covers these buttons; inert keeps Tab off them.
+              inert={panelOpen}
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
@@ -1911,6 +1914,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
         <AnimatePresence>
           {ui.status === "dead" && (
             <motion.div
+              inert={panelOpen}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
