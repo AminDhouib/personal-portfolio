@@ -38,6 +38,8 @@ describe("/games page", () => {
   it("hands the client the tags of public games only", () => {
     render(<GamesPage />);
     const slugs = screen.getByTestId("games-client").getAttribute("data-tag-slugs");
-    expect(slugs).toBe("hextris,password-game,space-shooter,super-voltorb-flip,typing-speed");
+    expect(slugs).toBe(
+      "hextris,password-game,space-shooter,super-voltorb-flip,tower-stacker,typing-speed",
+    );
   });
 });
