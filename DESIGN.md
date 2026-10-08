@@ -414,6 +414,16 @@ current tree on 2026-07-07.
   on lives), and PERFECT is awarded leniently. Fixing either means re-vendoring from patched
   source, not editing the dist. The parent React overlay owns the leaderboard form; an empty
   name deliberately falls back to "Stacker".
+- **Hextris is GPL-3.0 derived (until T5-3 replaces the engine).** The engine in `hextris.tsx`,
+  `hextris/logic.ts` and `hextris/types.ts` is a port of upstream Hextris (Logan Engstrom et al.,
+  GPL-3.0), so those files carry an SPDX/copyright header, the licence text sits beside them in
+  `hextris/COPYING`, and `hextris/NOTICE.md` lists what is derived, the site modules the program
+  imports, and the source location. The About credits (`content/hextris.ts`) name the authors
+  and link the upstream repo and this repo's `hextris/` tree (GPL section 6 source offer). The
+  repo must stay public while it holds this code. `hextris/__tests__/licence.test.ts` and
+  `content/__tests__/hextris-credits.test.ts` pin all of it; do not delete the notices before
+  the derived files are gone. The T5-3 clean-room engine removes the derived files and these
+  notices with them.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
