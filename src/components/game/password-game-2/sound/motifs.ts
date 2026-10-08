@@ -291,6 +291,74 @@ function victory(bus: AudioBus): void {
   });
 }
 
+// --- Core play ---------------------------------------------------------------
+
+// A single enveloped oscillator whose pitch glides between two frequencies.
+function sweepAt(
+  ctx: AudioContextLike,
+  dest: Destination,
+  o: {
+    from: number;
+    to: number;
+    durMs: number;
+    peak: number;
+    type: "sine" | "sawtooth";
+    attackMs: number;
+  },
+): void {
+  const t = ctx.currentTime;
+  const dur = o.durMs / 1000;
+  const osc = ctx.createOscillator();
+  osc.type = o.type;
+  osc.frequency.setValueAtTime(o.from, t);
+  osc.frequency.exponentialRampToValueAtTime(o.to, t + dur);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(o.peak, t + o.attackMs / 1000);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(gain);
+  gain.connect(dest);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
+
+// Key tick: a barely-there 40 ms triangle click for every accepted edit.
+function keyTick(bus: AudioBus): void {
+  playTone(bus, { freq: 1400, durMs: 40, type: "triangle", gainPeak: 0.05, attackMs: 2 });
+}
+
+// Rule reveal: a short rising sine sweep -- a new rule slides in.
+function ruleReveal(bus: AudioBus): void {
+  sweepAt(bus.ctx, bus.sfx, {
+    from: 330,
+    to: 660,
+    durMs: 180,
+    peak: 0.14,
+    type: "sine",
+    attackMs: 12,
+  });
+}
+
+// Rule pass: two quick rising notes, a fifth apart -- a tick in the box.
+function rulePass(bus: AudioBus): void {
+  const { ctx } = bus;
+  const t = ctx.currentTime;
+  toneAt(ctx, bus.sfx, { freq: 523.25, at: t, durMs: 90, peak: 0.14, type: "sine" });
+  toneAt(ctx, bus.sfx, { freq: 783.99, at: t + 0.09, durMs: 90, peak: 0.14, type: "sine" });
+}
+
+// Rule fail: a short falling sawtooth buzz -- a rule reopened.
+function ruleFail(bus: AudioBus): void {
+  sweepAt(bus.ctx, bus.sfx, {
+    from: 180,
+    to: 110,
+    durMs: 160,
+    peak: 0.12,
+    type: "sawtooth",
+    attackMs: 6,
+  });
+}
+
 /**
  * Registry of every named cue. Keys are the `sound` effect identifiers the
  * engine emits; the shell drain looks a cue up here and calls it.
@@ -312,6 +380,10 @@ export const MOTIFS: Record<string, (bus: AudioBus) => void> = {
   "eula-burn": eulaBurn,
   knockback,
   victory,
+  "key-tick": keyTick,
+  "rule-reveal": ruleReveal,
+  "rule-pass": rulePass,
+  "rule-fail": ruleFail,
 };
 
 /**
