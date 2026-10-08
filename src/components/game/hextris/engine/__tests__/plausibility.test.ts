@@ -63,6 +63,8 @@ function verdict(s: RunState) {
   return { detail, score: s.score, verdict: validateArcadeSubmission("hextris", s.score, detail) };
 }
 
+// The seeded simulations below run whole games headlessly: about 2 s locally for the greedy
+// bot and slower on CI and under coverage, so each takes a 30 s timeout, not vitest's 5 s.
 describe("seeded runs stay plausible for the arcade board", () => {
   it("passes the Hextris check for a random rotator on 40 seeds", () => {
     for (const seed of SEEDS) {
@@ -71,7 +73,7 @@ describe("seeded runs stay plausible for the arcade board", () => {
       const v = verdict(s);
       expect(v.verdict, `seed ${seed}: ${JSON.stringify(v)}`).toMatchObject({ ok: true });
     }
-  });
+  }, 30_000);
 
   it("passes the Hextris check for a greedy bot on 40 seeds", () => {
     let scored = 0;
@@ -84,7 +86,7 @@ describe("seeded runs stay plausible for the arcade board", () => {
     }
     // The greedy bot really plays: most seeds clear something.
     expect(scored).toBeGreaterThan(SEEDS.length / 2);
-  });
+  }, 30_000);
 
   it("passes the check straight after a forced Panic Clear and again at game over", () => {
     // Panic is the biggest single burst of points, so test it where it hurts most: early, on a
@@ -132,7 +134,7 @@ describe("seeded runs stay plausible for the arcade board", () => {
     // Pinned per seed set, so a change that stops panics firing fails here instead of passing on
     // no cases. Some random-rotator seeds die before any clear and never qualify.
     expect(panics).toEqual({ random: 6, greedy: 10 });
-  });
+  }, 30_000);
 
   it("only ever has momentum once a group of at least 3 has cleared", () => {
     for (const seed of SEEDS.slice(0, 10)) {
@@ -147,7 +149,7 @@ describe("seeded runs stay plausible for the arcade board", () => {
         }
       }
     }
-  });
+  }, 30_000);
 
   it.todo("scores 0 for an idle bot (enabled by T5-4)");
 });
