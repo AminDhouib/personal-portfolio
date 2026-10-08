@@ -360,3 +360,27 @@ describe("Typing Speed results and stats", () => {
     expect(document.querySelectorAll("[data-state='correct']")).toHaveLength(0);
   });
 });
+
+describe("Typing Speed leaves other text fields alone", () => {
+  it("Tab and Escape inside an unrelated textarea are not hijacked", () => {
+    render(<TypingSpeedGame />);
+    typeKey("a", 0);
+    const chat = document.createElement("textarea");
+    document.body.appendChild(chat);
+    chat.focus();
+    const tab = fireEvent.keyDown(chat, { key: "Tab" });
+    const esc = fireEvent.keyDown(chat, { key: "Escape" });
+    expect(tab).toBe(true);
+    expect(esc).toBe(true);
+    expect(document.activeElement).toBe(chat);
+    expect(document.querySelectorAll("[data-state='correct']")).toHaveLength(1);
+    chat.remove();
+  });
+});
+
+describe("Typing Speed live graph slot", () => {
+  it("reserves the sparkline height before the run starts", () => {
+    render(<TypingSpeedGame />);
+    expect(screen.getByTestId("ts-live-slot")).toHaveClass("h-10");
+  });
+});
