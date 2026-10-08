@@ -28,7 +28,7 @@ export function Hud({
 }) {
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-14 pt-[calc(env(safe-area-inset-top)+2.25rem)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-14 pt-[calc(env(safe-area-inset-top)+3rem)]">
         <div className="flex flex-col items-start leading-none">
           <div className="text-foreground/70 font-mono text-[9px] font-bold tracking-[0.3em] uppercase">
             Floors
