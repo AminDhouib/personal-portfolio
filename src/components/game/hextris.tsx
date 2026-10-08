@@ -34,6 +34,8 @@ import {
 } from "./hextris/types";
 import { rotatePoint, randInt } from "./hextris/logic";
 import { isRecordableRun } from "./hextris/session";
+import { hextrisKeyAction } from "./hextris/input";
+import { isTextEntryTarget } from "./text-entry";
 import { safeJsonParse } from "@/lib/safe-json";
 import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
@@ -2131,39 +2133,50 @@ export function HextrisGame() {
     // ─── INPUT ───────────────────────────────────────────────
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (gameState === 0) {
-        startGame();
-        return;
-      }
-
       // After game-over the player must explicitly click "Play again" so
-      // they have time to read the final score. Stray keys are ignored.
-      if (gameState === 2) {
-        return;
-      }
-
-      if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
-        e.preventDefault();
-        if (gameState === 1) hexRotate(1);
-      }
-      if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
-        e.preventDefault();
-        if (gameState === 1) hexRotate(-1);
-      }
-      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
-        e.preventDefault();
-        if (gameState === 1 && !settings.speedUpKeyHeld) {
-          settings.speedUpKeyHeld = true;
-          rush *= 4;
-        }
-      }
-      if (e.key === " " || e.key === "p" || e.key === "P") {
-        e.preventDefault();
-        togglePause();
-      }
-      if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        if (gameState === 1) panicClear();
+      // they have time to read the final score: the router ignores stray keys.
+      const { action, preventDefault } = hextrisKeyAction({
+        key: e.key,
+        phase:
+          gameState === 0
+            ? "ready"
+            : gameState === 1
+              ? "playing"
+              : gameState === -1
+                ? "paused"
+                : "over",
+        textEntry: isTextEntryTarget(e),
+        onControl:
+          e.target instanceof Element &&
+          e.target.closest("button, a") !== null &&
+          (e.key === " " || e.key === "Enter"),
+        modifier: e.ctrlKey || e.metaKey || e.altKey,
+      });
+      if (preventDefault) e.preventDefault();
+      switch (action) {
+        case "start":
+          startGame();
+          break;
+        case "rotate-ccw":
+          hexRotate(1);
+          break;
+        case "rotate-cw":
+          hexRotate(-1);
+          break;
+        case "rush":
+          if (!settings.speedUpKeyHeld) {
+            settings.speedUpKeyHeld = true;
+            rush *= 4;
+          }
+          break;
+        case "toggle-pause":
+          togglePause();
+          break;
+        case "panic":
+          panicClear();
+          break;
+        case "none":
+          break;
       }
     }
 
