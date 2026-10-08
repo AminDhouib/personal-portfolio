@@ -43,6 +43,11 @@ describe("/api/leaderboard", () => {
       expect(res.status).toBe(400);
     });
 
+    it("returns 400 for an empty ?game=", async () => {
+      const res = await GET(new Request("https://amindhou.com/api/leaderboard?game="));
+      expect(res.status).toBe(400);
+    });
+
     it("returns an empty list for an unrecognized game slug", async () => {
       const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=not-a-game"));
       expect(res.status).toBe(200);
