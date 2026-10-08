@@ -209,6 +209,8 @@ export interface ScorePopup {
   y: number;
   z: number;
   amount: number;
+  // "coins" popups render amber with a coin glyph; "points" are score gains.
+  kind: "points" | "coins";
   spawnedAt: number;
   ttl: number;
 }

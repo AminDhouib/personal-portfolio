@@ -328,13 +328,21 @@ export function spawnExplosion(
   });
 }
 
-export function spawnScorePopup(g: GameRefs, x: number, y: number, z: number, amount: number) {
+export function spawnScorePopup(
+  g: GameRefs,
+  x: number,
+  y: number,
+  z: number,
+  amount: number,
+  kind: "points" | "coins" = "points",
+) {
   g.scorePopups.push({
     id: nextId(g),
     x,
     y,
     z,
     amount,
+    kind,
     spawnedAt: performance.now(),
     ttl: 1100,
   });
