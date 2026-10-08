@@ -11,6 +11,18 @@ export const CHAIN_WINDOW_MS = 400;
 export const CLEAN_SWEEP_MIN_CELLS = 10;
 const CLEAN_SWEEP_PER_COMBO = 1000;
 
+/** How long a clear holds the action (spec section 3.8): 90 ms for a chain, 60 for 4+ cells. */
+export function hitStopMs(cells: number, chain: boolean): number {
+  if (chain) return 90;
+  return cells >= 4 ? 60 : 0;
+}
+
+/** Starts or extends the hit-stop for a clear happening now. */
+function holdFor(state: RunState, cells: number, chain: boolean): void {
+  const hold = hitStopMs(cells, chain);
+  if (hold > 0) state.freezeUntilMs = Math.max(state.freezeUntilMs, state.elapsedMs + hold);
+}
+
 export function clearPoints(cells: number, combo: number): number {
   return cells * cells * combo;
 }
@@ -57,6 +69,7 @@ export function scoreClear(
       chain: false,
       points: 0,
     });
+    holdFor(state, cells.length, false);
     return;
   }
   const now = state.elapsedMs;
@@ -88,6 +101,7 @@ export function scoreClear(
     emit(state, { type: "combo", cells: copy(cells), combo: state.combo, points });
   addScore(state, points);
   addMomentum(state, count, state.combo);
+  holdFor(state, count, chain);
 
   if (boardEmpty && count >= CLEAN_SWEEP_MIN_CELLS) {
     const bonus = CLEAN_SWEEP_PER_COMBO * state.combo;

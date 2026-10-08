@@ -330,6 +330,42 @@ describe("rush", () => {
   });
 });
 
+describe("hit-stop (spec section 3.8)", () => {
+  it("holds falling and spawning after a big clear while the clock and turns go on", () => {
+    const s = playing(71);
+    s.afk = false;
+    s.queue = [];
+    s.nextSpawnAtMs = 1e12;
+    s.falling = [];
+    // Side 0 holds three of colour 0; a fourth lands on it and clears 4 cells.
+    s.sides[0] = [0, 1, 2].map(() => ({ colour: 0 as const, special: "none" as const }));
+    s.falling.push(
+      { id: 1, lane: 0, distance: 3.01, colour: 0, special: "none" },
+      { id: 2, lane: 3, distance: 12, colour: 1, special: "none" },
+    );
+    for (let i = 0; i < 100 && !s.events.some((e) => e.type === "clear"); i++) advance(s, TICK_MS);
+    const clearAt = s.elapsedMs;
+    expect(s.freezeUntilMs).toBeCloseTo(clearAt + 60, 6);
+    // A spawn falls due inside the hold.
+    s.queue.push({ atMs: clearAt + 20, lane: 5 });
+    const held = s.falling.find((p) => p.id === 2)!.distance;
+    let frozenTicks = 0;
+    while (s.elapsedMs + TICK_MS < s.freezeUntilMs) {
+      advance(s, TICK_MS);
+      frozenTicks++;
+      expect(s.falling.find((p) => p.id === 2)!.distance).toBe(held);
+      expect(s.falling).toHaveLength(1);
+    }
+    expect(frozenTicks).toBe(7);
+    rotate(s, 1);
+    expect(s.facing).toBe(1);
+    advance(s, TICK_MS);
+    expect(s.elapsedMs).toBeGreaterThan(s.freezeUntilMs);
+    expect(s.falling.find((p) => p.id === 2)!.distance).toBeLessThan(held);
+    expect(s.falling).toHaveLength(2);
+  });
+});
+
 describe("away (spec section 6.9)", () => {
   it("is away from the start until the first input, and the start is not an input", () => {
     const s = createRun({ seed: 61 });
