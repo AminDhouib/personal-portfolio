@@ -9,7 +9,6 @@ import { configFor, modeLabel, parseMode, type ModeId } from "./typing-speed/eng
 import type { Op, TypingRun } from "./typing-speed/engine/types";
 import {
   charCounts,
-  isNewBest,
   liveWpm,
   runMetrics,
   streaks,
@@ -35,7 +34,6 @@ interface Burst {
 interface Result {
   metrics: RunMetrics;
   maxStreak: number;
-  newBest: boolean;
   bulk: boolean;
   counts: CharCounts;
   series: SeriesPoint[];
@@ -111,7 +109,6 @@ export function TypingSpeedGame() {
     (run: TypingRun) => {
       const metrics = runMetrics(run);
       const bulk = run.bulk > 0;
-      const newBest = !bulk && isNewBest(metrics.netWpm, highScore > 0 ? highScore : null);
       if (!bulk && metrics.netWpm > highScore) {
         setHighScore(metrics.netWpm);
         safeLocalSet(HIGH_SCORE_KEY, String(metrics.netWpm));
@@ -132,7 +129,6 @@ export function TypingSpeedGame() {
       setResult({
         metrics,
         maxStreak: streaks(run).best,
-        newBest,
         bulk,
         counts: charCounts(run),
         series: wpmSeries(run),
@@ -415,7 +411,7 @@ export function TypingSpeedGame() {
         <ResultsCard
           metrics={result.metrics}
           maxStreak={result.maxStreak}
-          newBest={result.newBest}
+
           bulk={result.bulk}
           counts={result.counts}
           series={result.series}
