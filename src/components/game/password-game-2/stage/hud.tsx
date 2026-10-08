@@ -113,7 +113,7 @@ export function Hud({
   return (
     <div
       data-testid="pg2-hud"
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-[color:var(--pg2-line)] px-4 py-1.5 sm:px-5 sm:py-2"
+      className="relative z-30 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-[color:var(--pg2-line)] px-4 py-1.5 sm:px-5 sm:py-2"
     >
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <span

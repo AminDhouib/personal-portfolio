@@ -138,6 +138,9 @@ export function GameShell() {
   const overlayRef = useRef<OverlayHandle | null>(null);
   const autoStartedRef = useRef(false);
   const exitedRef = useRef(false);
+  // Bumped by every player input that can move the caret; the phone sheet reveals the caret
+  // on this, never on an event-driven version bump.
+  const inputSeqRef = useRef(0);
   const feedsLoadedRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const flashRef = useRef<HTMLDivElement | null>(null);
@@ -373,6 +376,7 @@ export function GameShell() {
       if (!handled) return;
       e.preventDefault();
       applyKey(g, k);
+      inputSeqRef.current += 1;
       forceRender();
     }
 
@@ -475,6 +479,9 @@ export function GameShell() {
       const overlay = overlayRef.current;
       const g = gameRef.current;
       if (!overlay || !g) return;
+      // A real button under the pointer (HUD controls, action chips) always wins over a
+      // canvas sprite drawn beneath it, so the fleet can never swallow a Sound or Exit tap.
+      if (e.target instanceof Element && e.target.closest("button")) return;
       const target = overlay.hitTest(e.clientX, e.clientY);
       consumed = target !== null;
       if (!target) return;
@@ -515,6 +522,7 @@ export function GameShell() {
       const g = gameRef.current;
       if (!g) return;
       applyPointer(g, { kind: "cell", id });
+      inputSeqRef.current += 1;
       forceRender();
       focusHiddenInput();
     },
@@ -552,6 +560,7 @@ export function GameShell() {
     const g = gameRef.current;
     if (!g) return;
     applyKey(g, "End"); // caret to end
+    inputSeqRef.current += 1;
     forceRender();
     focusHiddenInput();
   }, [forceRender, focusHiddenInput]);
@@ -561,6 +570,7 @@ export function GameShell() {
       const g = gameRef.current;
       const val = e.currentTarget.value;
       if (g && val) for (const ch of val) applyKey(g, ch);
+      inputSeqRef.current += 1;
       e.currentTarget.value = "";
       forceRender();
     },
@@ -615,6 +625,7 @@ export function GameShell() {
           flashRef={flashRef}
           boxRef={boxRef}
           hiddenInputRef={hiddenInputRef}
+          inputSeqRef={inputSeqRef}
           onToggleSound={toggleSound}
           onCopySeed={copySeed}
           onCellClick={onCellClick}
@@ -788,6 +799,7 @@ function RunningView({
   flashRef,
   boxRef,
   hiddenInputRef,
+  inputSeqRef,
   onToggleSound,
   onCopySeed,
   onCellClick,
@@ -817,6 +829,7 @@ function RunningView({
   flashRef: RefObject<HTMLDivElement | null>;
   boxRef: RefObject<HTMLDivElement | null>;
   hiddenInputRef: RefObject<HTMLInputElement | null>;
+  inputSeqRef: RefObject<number>;
   onToggleSound: () => void;
   onCopySeed: () => void;
   onCellClick: (id: number) => void;
@@ -874,16 +887,17 @@ function RunningView({
   }, [hiddenInputRef]);
 
   // While the soft keyboard is up the sheet is short: keep the rule being worked on in view
-  // (whenever the active rule changes, not only when the keyboard opens) and, as the player
-  // types, the caret line of the password box. Runs after every render; the work is a query
+  // (whenever the active rule changes, not only when the keyboard opens) and, when the
+  // player types or taps the box, the caret line of the password box. Input only: an event
+  // that bumps the engine version (infection and the like) must not yank the view back
+  // while the player is reading the rules. Runs after every render; the work is a query
   // and two identity checks.
   const keyboardOpen = viewport.keyboardOpen;
   const followedRuleRef = useRef<Element | null>(null);
-  const followedVersionRef = useRef(-1);
+  const followedInputRef = useRef(0);
   useEffect(() => {
     if (!keyboardOpen) {
       followedRuleRef.current = null;
-      followedVersionRef.current = -1;
       return;
     }
     const reveal = (el: Element | null | undefined) => {
@@ -896,8 +910,8 @@ function RunningView({
       followedRuleRef.current = rule;
       reveal(rule);
     }
-    if (g.version !== followedVersionRef.current) {
-      followedVersionRef.current = g.version;
+    if (inputSeqRef.current !== followedInputRef.current) {
+      followedInputRef.current = inputSeqRef.current;
       reveal(boxRef.current?.querySelector(".pg2-caret"));
     }
   });

@@ -27,6 +27,14 @@ import { makeRuleApi, requestSubmit } from "../../engine/engine";
 import { CORE_RULES } from "../../engine/rules/index";
 import { HHMM, coreRevealed, nonInhabDone, solveAndTick } from "../../engine/__tests__/drive";
 
+const ACT_LABEL: Record<string, string> = {
+  prologue: "Prologue",
+  act1: "Act 1",
+  act2: "Act 2",
+  act3: "Act 3",
+  finale: "Finale",
+};
+
 const isDesktop = (q: string) => q.includes("min-width: 1024px");
 
 /**
@@ -73,6 +81,11 @@ describe("GameShell full seeded run", () => {
       });
     };
 
+    // The stage card is always on screen, so also read the HUD: it must name the live act.
+    const hudNames = (act: string) =>
+      expect(getByTestId("pg2-hud").textContent).toContain(ACT_LABEL[act]);
+    hudNames("prologue");
+
     const seen: string[] = [g.act];
     const step = () => {
       const before = g.act;
@@ -82,6 +95,7 @@ describe("GameShell full seeded run", () => {
         seen.push(g.act);
         pump();
         expect(getByTestId("pg2-stage-card")).toBeTruthy();
+        hudNames(g.act);
       }
     };
 
@@ -111,6 +125,7 @@ describe("GameShell full seeded run", () => {
     expect(seen).toEqual(expect.arrayContaining(["prologue", "act1", "act2", "act3"]));
     expect(g.act).toBe("finale");
     expect(getByTestId("pg2-stage-card")).toBeTruthy();
+    hudNames("finale");
     expect(getByTestId("pg2-finale")).toBeTruthy();
   });
 });
