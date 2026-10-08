@@ -18,7 +18,9 @@ export function addMomentum(state: RunState, cells: number, combo: number): void
 
 /**
  * Clears every settled cell for PANIC_POINTS_PER_CELL each, not multiplied by the combo, and
- * empties the meter. Refused below a full meter, outside play, or on an empty board.
+ * empties the meter. Refused below a full meter, outside play, or on an empty board. A separate
+ * bonus (spec 6.6 and 8): the cells do not count toward cellsCleared, so they raise neither the
+ * level nor the arcade kills (spec 4.6 counts only group clears).
  */
 export function panic(state: RunState): boolean {
   if (state.phase !== "playing" || state.momentum < MOMENTUM_MAX) return false;
@@ -26,7 +28,6 @@ export function panic(state: RunState): boolean {
   if (cells === 0) return false;
   state.sides = state.sides.map(() => []);
   const points = PANIC_POINTS_PER_CELL * cells;
-  state.cellsCleared += cells;
   state.momentum = 0;
   emit(state, { type: "panic", cells, points });
   emit(state, { type: "momentum", value: 0 });

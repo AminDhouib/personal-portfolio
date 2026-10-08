@@ -87,38 +87,66 @@ describe("seeded runs stay plausible for the arcade board", () => {
   });
 
   it("passes the check straight after a forced Panic Clear and again at game over", () => {
-    // Panic is the biggest single burst of cleared cells, so test it where it hurts most: early,
-    // on a crowded board, submitted at once. Momentum is forced to 100 because bots rarely fill it.
-    let panics = 0;
-    for (const seed of SEEDS.slice(0, 10)) {
-      const s = createRun({ seed });
-      start(s);
-      const bot = randomRotator(seed);
-      let panicked = false;
-      for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
-        const settled = s.sides.reduce((sum, stack) => sum + stack.length, 0);
-        const actions = bot(s);
-        if (!panicked && settled >= 12) {
-          s.momentum = 100;
-          actions.push({ atMs: 0, action: "panic" });
+    // Panic is the biggest single burst of points, so test it where it hurts most: early, on a
+    // crowded board, submitted at once. Momentum is forced to 100 because bots rarely fill it.
+    const bots: [string, (seed: number) => Bot][] = [
+      ["random", (seed) => randomRotator(seed)],
+      ["greedy", () => greedy],
+    ];
+    const panics: Record<string, number> = {};
+    for (const [name, makeBot] of bots) {
+      panics[name] = 0;
+      for (const seed of SEEDS.slice(0, 10)) {
+        const s = createRun({ seed });
+        start(s);
+        const bot = makeBot(seed);
+        let panicked = false;
+        for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
+          const settled = s.sides.reduce((sum, stack) => sum + stack.length, 0);
+          const actions = bot(s);
+          // Momentum only comes from group clears, and a clear removes at least 3 cells, so a
+          // real run can only reach a full meter once cellsCleared >= 3. Forcing it earlier
+          // would build a state play cannot reach.
+          if (!panicked && settled >= 12 && s.cellsCleared >= 3) {
+            s.momentum = 100;
+            actions.push({ atMs: 0, action: "panic" });
+          }
+          advance(s, STEP_MS, actions);
+          const burst = drainEvents(s).find((e) => e.type === "panic");
+          if (burst?.type === "panic") {
+            panicked = true;
+            panics[name] = (panics[name] ?? 0) + 1;
+            expect(burst.cells).toBeGreaterThanOrEqual(12);
+            const now = verdict(s);
+            expect(
+              now.verdict,
+              `${name} ${seed} after panic: ${JSON.stringify(now)}`,
+            ).toMatchObject({ ok: true });
+          }
         }
-        advance(s, STEP_MS, actions);
-        const burst = drainEvents(s).find((e) => e.type === "panic");
-        if (burst?.type === "panic") {
-          panicked = true;
-          panics++;
-          expect(burst.cells).toBeGreaterThanOrEqual(12);
-          const now = verdict(s);
-          expect(now.verdict, `seed ${seed} after panic: ${JSON.stringify(now)}`).toMatchObject({
-            ok: true,
-          });
+        expect(s.phase).toBe("over");
+        const end = verdict(s);
+        expect(end.verdict, `${name} ${seed}: ${JSON.stringify(end)}`).toMatchObject({ ok: true });
+      }
+    }
+    // Pinned per seed set, so a change that stops panics firing fails here instead of passing on
+    // no cases. Some random-rotator seeds die before any clear and never qualify.
+    expect(panics).toEqual({ random: 6, greedy: 10 });
+  });
+
+  it("only ever has momentum once a group of at least 3 has cleared", () => {
+    for (const seed of SEEDS.slice(0, 10)) {
+      for (const bot of [randomRotator(seed), greedy]) {
+        const s = createRun({ seed });
+        start(s);
+        for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
+          advance(s, STEP_MS, bot(s));
+          drainEvents(s);
+          if (s.momentum > 0)
+            expect(s.cellsCleared, `seed ${seed} step ${i}`).toBeGreaterThanOrEqual(3);
         }
       }
-      expect(s.phase).toBe("over");
-      const end = verdict(s);
-      expect(end.verdict, `seed ${seed}: ${JSON.stringify(end)}`).toMatchObject({ ok: true });
     }
-    expect(panics).toBe(10);
   });
 
   it.todo("scores 0 for an idle bot (enabled by T5-4)");
