@@ -89,3 +89,21 @@ describe("createTowerAudio", () => {
     }).not.toThrow();
   });
 });
+
+describe("close", () => {
+  it("closes the AudioContext it created and is safe to repeat", () => {
+    stubAudioContext();
+    const audio = createTowerAudio();
+    audio.unlock();
+    audio.close();
+    audio.close();
+    expect(created[0]?.closed).toBe(1);
+  });
+
+  it("does nothing before unlock()", () => {
+    stubAudioContext();
+    const audio = createTowerAudio();
+    expect(() => audio.close()).not.toThrow();
+    expect(created).toHaveLength(0);
+  });
+});

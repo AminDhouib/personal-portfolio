@@ -23,6 +23,8 @@ export interface TowerAudio {
   setMuted(muted: boolean): void;
   /** Silence every cue still sounding. */
   stop(): void;
+  /** Release the AudioContext (unmount). Safe to call twice; unlock() can reopen one. */
+  close(): void;
 }
 
 function readMuted(): boolean {
@@ -78,6 +80,14 @@ export function createTowerAudio(): TowerAudio {
     stop() {
       for (const handle of live) handle.stop();
       live.clear();
+    },
+    close() {
+      for (const handle of live) handle.stop();
+      live.clear();
+      const current = master;
+      master = null;
+      // silent-ok: close() rejects on a context that is already closed.
+      current?.ctx.close?.().catch(() => undefined);
     },
   };
 }
