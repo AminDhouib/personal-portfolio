@@ -1,5 +1,7 @@
 import { fallRowsPerSecond, refreshLevel, runDirector } from "./director";
+import { armBoundary, checkGameOver, tickBoundary } from "./limit";
 import { resolveClears } from "./match";
+import { panic } from "./momentum";
 import { expireCombo } from "./scoring";
 import { TICK_MS, emit, rotationOffset, sideFacingLane, wrapSide } from "./state";
 import type { EngineAction, Piece, RunState, TimedAction } from "./types";
@@ -44,6 +46,7 @@ export function rotate(state: RunState, dir: 1 | -1): void {
   state.rotationAt = state.elapsedMs;
   state.lastInputMs = state.elapsedMs;
   emit(state, { type: "rotate", dir });
+  armBoundary(state);
 }
 
 export function setRush(state: RunState, on: boolean): void {
@@ -78,6 +81,7 @@ export function applyAction(state: RunState, action: EngineAction): void {
       togglePause(state);
       return;
     case "panic":
+      panic(state);
       return;
   }
 }
@@ -90,6 +94,7 @@ function settle(state: RunState, piece: Piece): void {
   stack.push({ colour: piece.colour, special: piece.special });
   emit(state, { type: "settle", side, row, colour: piece.colour, special: piece.special });
   resolveClears(state, side, row);
+  checkGameOver(state, side);
 }
 
 function movePieces(state: RunState): void {
@@ -116,6 +121,8 @@ function tick(state: RunState): void {
   movePieces(state);
   if (state.phase !== "playing") return;
   expireCombo(state);
+  tickBoundary(state);
+  if (state.phase !== "playing") return;
   refreshLevel(state);
 }
 
