@@ -642,6 +642,42 @@ The following Password Game 2 entries were verified against the current tree on 
   clock alone just recolours, and a recovery always cues. The reason is announced by one persistent
   polite region beside the rule list, prefixed "Rule N:" and cleared on recovery so the next
   regression is read out again; the in-card reason text is `aria-hidden`.
+- **PG2's event telegraphs are read off engine state by the stage, not added to the engine**
+  (`stage/telegraph.ts`, `stage/telegraph-banner.tsx`, `stage/use-telegraph-cue.ts`). An instance
+  is telegraphing when its data is set and its phase is still `"telegraph"`; the time left is its
+  def's `telegraphMs` minus the phase clock. From that one derivation the stage card's edge glows
+  in the family colour (`--pg2-tg`, a `::after` at z 26, between the canvas and the HUD), a banner
+  names the soonest threat in voice ("Invaders inbound") with a seconds countdown, and a family
+  cue plays once per instance. The banner lives in the reserved bottom HUD band, absolutely
+  placed, so nothing in the layout moves and the phone keyboard sheet keeps the active rule and
+  the password in view; it steps right of the FUEL meter while the campfire is live. The banner is
+  `aria-hidden`: a separate persistent polite region, outside any button, carries the label only,
+  so it is read once and not on every heartbeat change of the countdown. The cue goes through the
+  shell's `playSound` (sound on, unlocked by a gesture, running context, 150 ms per key), and a
+  WeakSet of instances keeps the 250 ms heartbeat from replaying it. galaga, snake and tetris
+  already emit `telegraph-doom` from the engine on their first telegraph tick, so the stage skips
+  them (`ENGINE_EMITS_TELEGRAPH`, checked against the engine by its test) and every telegraph
+  start is exactly one cue. Known and accepted: the autocorrect tell pill and the banner can say
+  similar things at once.
+- **PG2's event art is drawn larger through one table, and narrows rather than leave the card**
+  (`stage/art-scale.ts`, `stage/painters.ts`). `ART_SCALE` holds each painter's factor (1.4 or
+  more) and painters multiply sprite sizes, strokes and offsets by it. Art anchored near an edge
+  (the black hole on an end glyph, the galaga fleet on a 390 px phone) narrows through `fitScale`
+  or its column spacing to stay inside the stage card, so on a phone some of it draws at less than
+  its table factor. Hit circles never go below a 22 px radius (`hitRadius`) and a parasite's
+  target is at least 44 x 44 around its glyph, so a tap on a neighbouring glyph close to a
+  parasite evicts the parasite (accepted: that is what the player wants there). The art test
+  paints real forced runs on phone, phone-keyboard and desktop stage shapes and checks every drawn
+  point stays on the card.
+- **PG2's hit-stop freezes the painters' clock, never the game** (`stage/hit-fx.ts`,
+  `stage/canvas-overlay.tsx`). A press that lands on an alien, a parasite or a finale missile (the
+  engine changed `version` or a hit counter) bursts seeded sparks from the target's centre, holds
+  the canvas art still for 60 ms and shakes the card 3, 5 or 9 px by weight, fading over 180 ms.
+  The engine keeps ticking through the hold, so timers and the run clock are unaffected. The hit
+  shake uses the same `--pg2-shake-*` variables as the engine's trauma shake and does not branch
+  on reduced motion; PG2's existing reduced-motion CSS still pins the card's transform, for both
+  shakes alike. The act title card wipes in and out with a `clip-path` across its 2.2 s, keyed by
+  act so a queued card wipes again; that rule sits after the reduced-motion block on purpose.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to
