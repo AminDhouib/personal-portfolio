@@ -1377,12 +1377,15 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
         const speed = Math.hypot(c.vx, c.vy);
         trail.visible = speed > 0.6;
         if (trail.visible) {
-          trail.position.set(c.x - c.vx * 0.06, c.y - c.vy * 0.06, c.z);
-          const len = Math.min(1.6, 0.5 + speed * 0.08);
-          trail.scale.set(len, len * 0.6, 1);
+          // Magnet speeds sit around 0.6-2.5, so the streak is sized for that range and centred
+          // behind the coin's halo; a short, faint one hid inside the halo.
+          const len = Math.min(2.2, 0.9 + speed * 0.45);
+          const back = (len * 0.5) / speed;
+          trail.position.set(c.x - c.vx * back, c.y - c.vy * back, c.z);
+          trail.scale.set(len, 0.38, 1);
           // Sprite rotation is screen-space (CCW, y up), so the long axis follows the travel direction.
           (trail.material as THREE.SpriteMaterial).rotation = Math.atan2(c.vy, c.vx);
-          (trail.material as THREE.SpriteMaterial).opacity = Math.min(0.55, speed * 0.06);
+          (trail.material as THREE.SpriteMaterial).opacity = Math.min(0.6, 0.25 + speed * 0.12);
         }
       }
     }
