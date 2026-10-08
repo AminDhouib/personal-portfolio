@@ -1,4 +1,5 @@
 import { comboWindowMs } from "./director";
+import { addMomentum } from "./momentum";
 import { emit } from "./state";
 import type { Colour, Pos, RunState } from "./types";
 
@@ -50,6 +51,7 @@ export function scoreClear(
   if (chain) emit(state, { type: "chain", cells, combo: state.combo, points });
   if (state.combo !== before) emit(state, { type: "combo", cells, combo: state.combo, points });
   addScore(state, points);
+  addMomentum(state, count, state.combo);
 
   if (boardEmpty && count >= CLEAN_SWEEP_MIN_CELLS) {
     const bonus = CLEAN_SWEEP_PER_COMBO * state.combo;
