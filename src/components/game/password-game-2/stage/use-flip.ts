@@ -1,16 +1,6 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 import { FLIP_EASING, FLIP_MS, planFlip } from "./flip";
 
-/**
- * FLIP reorder animation over the Web Animations API. When `orderKey` changes, the layout
- * top of each `[data-flip-id]` child is read and compared with the previous reading; items
- * that sit somewhere else are animated from the old position to the new one. Positions come
- * from offsetTop (layout, relative to the same offset parent as the container), never from
- * getBoundingClientRect, so a running FLIP, entrance or shake transform cannot skew them.
- * Positions are re-read after every commit so they never go stale, but only an order change
- * animates. The first reading only records. A
- * no-op where Element.animate is missing (jsdom).
- */
 /** The vertical translation in a computed matrix(...) or matrix3d(...) transform. */
 function translateY(transform: string): number {
   const m = /^matrix(3d)?\(([^)]+)\)$/.exec(transform.trim());
@@ -20,10 +10,26 @@ function translateY(transform: string): number {
   return Number.isFinite(ty) ? ty! : 0;
 }
 
-export function useFlip(containerRef: RefObject<HTMLElement | null>, orderKey: string): void {
+/**
+ * FLIP reorder animation over the Web Animations API. When `orderKey` changes, the layout
+ * top of each `[data-flip-id]` child is read and compared with the previous reading; items
+ * that sit somewhere else are animated from the old position to the new one. Positions come
+ * from offsetTop (layout, relative to the same offset parent as the container), never from
+ * getBoundingClientRect, so a running FLIP, entrance or shake transform cannot skew them.
+ * Positions are re-read after every commit so they never go stale, but only an order change
+ * animates. The first reading only records, and so does the first after `runId` changes
+ * (a new run reuses the rule ids, so old-run positions mean nothing). A no-op where
+ * Element.animate is missing (jsdom).
+ */
+export function useFlip(
+  containerRef: RefObject<HTMLElement | null>,
+  orderKey: string,
+  runId = 0,
+): void {
   const prevTops = useRef<Map<string, number> | null>(null);
   const prevKey = useRef<string | null>(null);
   const running = useRef(new Map<string, Animation>());
+  const prevRun = useRef(runId);
 
   // Runs after every commit: the reading is cheap (offsetTop) and must stay current, or a
   // height change between two reorders (a wrapping message, an expanded card, an entrance)
@@ -40,6 +46,13 @@ export function useFlip(containerRef: RefObject<HTMLElement | null>, orderKey: s
       next.set(id, el.offsetTop - origin);
     }
 
+    if (prevRun.current !== runId) {
+      prevRun.current = runId;
+      for (const anim of running.current.values()) anim.cancel();
+      running.current.clear();
+      prevTops.current = null;
+      prevKey.current = null;
+    }
     const prev = prevTops.current;
     const reordered = prevKey.current !== null && prevKey.current !== orderKey;
     prevTops.current = next;

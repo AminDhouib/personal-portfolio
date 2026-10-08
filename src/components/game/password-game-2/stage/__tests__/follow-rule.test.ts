@@ -50,6 +50,19 @@ describe("followRule", () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: 300, behavior: "smooth" }); // 500 + 100 - 300
   });
 
+  it("a different in-flight transform does not move the scroll target", () => {
+    const target = (paintedTop: number) => {
+      const { card, scrollTo } = setup({ animating: true, cardTop: 500, scrollTop: 0 });
+      card.getBoundingClientRect = () => ({ top: paintedTop, bottom: paintedTop + 100 }) as DOMRect;
+      followRule(card);
+      const call = scrollTo.mock.calls[0] as [{ top: number }] | undefined;
+      document.body.innerHTML = "";
+      return call?.[0].top;
+    };
+    expect(target(-300)).toBe(300);
+    expect(target(900)).toBe(300);
+  });
+
   it("does not scroll when the rule already sits inside the scroller", () => {
     const { card, scrollTo } = setup({ animating: true, cardTop: 50, scrollTop: 0 });
     followRule(card);
