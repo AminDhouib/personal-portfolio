@@ -86,5 +86,40 @@ describe("seeded runs stay plausible for the arcade board", () => {
     expect(scored).toBeGreaterThan(SEEDS.length / 2);
   });
 
+  it("passes the check straight after a forced Panic Clear and again at game over", () => {
+    // Panic is the biggest single burst of cleared cells, so test it where it hurts most: early,
+    // on a crowded board, submitted at once. Momentum is forced to 100 because bots rarely fill it.
+    let panics = 0;
+    for (const seed of SEEDS.slice(0, 10)) {
+      const s = createRun({ seed });
+      start(s);
+      const bot = randomRotator(seed);
+      let panicked = false;
+      for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
+        const settled = s.sides.reduce((sum, stack) => sum + stack.length, 0);
+        const actions = bot(s);
+        if (!panicked && settled >= 12) {
+          s.momentum = 100;
+          actions.push({ atMs: 0, action: "panic" });
+        }
+        advance(s, STEP_MS, actions);
+        const burst = drainEvents(s).find((e) => e.type === "panic");
+        if (burst?.type === "panic") {
+          panicked = true;
+          panics++;
+          expect(burst.cells).toBeGreaterThanOrEqual(12);
+          const now = verdict(s);
+          expect(now.verdict, `seed ${seed} after panic: ${JSON.stringify(now)}`).toMatchObject({
+            ok: true,
+          });
+        }
+      }
+      expect(s.phase).toBe("over");
+      const end = verdict(s);
+      expect(end.verdict, `seed ${seed}: ${JSON.stringify(end)}`).toMatchObject({ ok: true });
+    }
+    expect(panics).toBe(10);
+  });
+
   it.todo("scores 0 for an idle bot (enabled by T5-4)");
 });
