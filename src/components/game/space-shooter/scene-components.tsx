@@ -1380,6 +1380,8 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
           trail.position.set(c.x - c.vx * 0.06, c.y - c.vy * 0.06, c.z);
           const len = Math.min(1.6, 0.5 + speed * 0.08);
           trail.scale.set(len, len * 0.6, 1);
+          // Sprite rotation is screen-space (CCW, y up), so the long axis follows the travel direction.
+          (trail.material as THREE.SpriteMaterial).rotation = Math.atan2(c.vy, c.vx);
           (trail.material as THREE.SpriteMaterial).opacity = Math.min(0.55, speed * 0.06);
         }
       }
@@ -1586,7 +1588,7 @@ function scoreTexture(amount: number, kind: "points" | "coins"): THREE.CanvasTex
     ctx.arc(cx, c.height / 2, 9, 0, Math.PI * 2);
     ctx.stroke();
   } else {
-    ctx.fillStyle = "#e0f2fe";
+    ctx.fillStyle = "#fde047";
     ctx.strokeText(txt, c.width / 2, c.height / 2);
     ctx.fillText(txt, c.width / 2, c.height / 2);
   }
