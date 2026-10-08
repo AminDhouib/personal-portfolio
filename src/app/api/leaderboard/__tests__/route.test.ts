@@ -1,60 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { makeJsonPostRequest } from "@/test/api-route-helpers";
-import { LEADERBOARD_GAMES } from "@/lib/leaderboard-games";
 
 type Row = Record<string, unknown>;
 const rows: Record<string, Row[]> = {};
+const statements: string[] = [];
 
 vi.mock("@/lib/db", () => ({
   getPool: () => ({
     query: vi.fn(async (sql: string, params?: unknown[]) => {
-      const text = sql.trim().toUpperCase();
-      if (text.includes("COUNT(*)")) {
-        const game = params?.[0] as string;
-        const score = params?.[1] as number;
-        const above = (rows[game] ?? []).filter(
-          (r: Record<string, unknown>) => (r.score as number) > score,
-        ).length;
-        return { rows: [{ rank: above + 1 }] };
-      }
-      if (text.startsWith("SELECT")) {
-        const game = params?.[0] as string;
-        const limit = params?.[1] as number | undefined;
-        const board = [...(rows[game] ?? [])].sort(
-          (a, b) => (b.score as number) - (a.score as number),
-        );
-        return { rows: limit ? board.slice(0, limit) : board };
-      }
-      if (text.startsWith("INSERT")) {
-        const game = params?.[0] as string;
-        const entry = {
-          id: Math.random(),
-          name: params?.[1],
-          score: params?.[2],
-          level: params?.[3],
-          seconds: params?.[4],
-          kills: params?.[5],
-          distance: params?.[6],
-          region: params?.[7],
-          createdAt: new Date().toISOString(),
-        };
-        if (!rows[game]) rows[game] = [];
-        rows[game].push(entry);
-        return { rows: [{ id: entry.id }] };
-      }
-      if (text.startsWith("DELETE")) {
-        const game = params?.[0] as string;
-        const limit = params?.[1] as number;
-        if (rows[game]) {
-          rows[game].sort(
-            (a: Record<string, unknown>, b: Record<string, unknown>) =>
-              (b.score as number) - (a.score as number),
-          );
-          rows[game] = rows[game].slice(0, limit);
-        }
-        return { rows: [] };
-      }
-      return { rows: [] };
+      statements.push(sql.trim().toUpperCase());
+      const game = params?.[0] as string;
+      const limit = params?.[1] as number | undefined;
+      const board = [...(rows[game] ?? [])].sort(
+        (a, b) => (b.score as number) - (a.score as number),
+      );
+      return { rows: limit ? board.slice(0, limit) : board };
     }),
   }),
 }));
@@ -65,13 +24,8 @@ vi.mock("@/lib/log", () => ({
   logError: vi.fn(),
 }));
 
-const { GET, POST } = await import("../route");
-
-interface PostResponse {
-  ok?: boolean;
-  rank?: number;
-  error?: string;
-}
+const mod = await import("../route");
+const { GET } = mod;
 
 interface LeaderboardGetResponse {
   entries: Array<{ name: string; score: number }>;
@@ -80,6 +34,7 @@ interface LeaderboardGetResponse {
 describe("/api/leaderboard", () => {
   beforeEach(() => {
     for (const key of Object.keys(rows)) delete rows[key];
+    statements.length = 0;
   });
 
   describe("GET", () => {
@@ -110,28 +65,16 @@ describe("/api/leaderboard", () => {
       const res = await GET(new Request("https://amindhou.com/api/leaderboard?game=tower-stacker"));
       expect(res.headers.get("Cache-Control")).toBe("s-maxage=10, stale-while-revalidate=30");
     });
-  });
 
-  describe("frozen games", () => {
-    // Orbital Dodge and Hextris moved to /api/arcade/scores (T1b-2). Their legacy rows were
-    // imported once, and this endpoint no longer accepts new ones: a deliberate behaviour change.
-    it("pins the legacy games that are left (T6 empties this when Tower Stacker moves)", () => {
-      expect([...LEADERBOARD_GAMES]).toEqual(["tower-stacker"]);
+    it("only ever reads: the one statement it runs is a SELECT", async () => {
+      await GET(new Request("https://amindhou.com/api/leaderboard?game=tower-stacker"));
+      expect(statements).toHaveLength(1);
+      expect(statements[0]).toMatch(/^SELECT\b/);
     });
 
-    it.each(["space-shooter", "hextris"])(
-      "rejects a POST for the moved game %s with 400 and writes nothing",
-      async (game) => {
-        const res = await POST(makeJsonPostRequest({ name: "Ada", score: 500, level: 1, game }));
-        expect(res.status).toBe(400);
-        expect(await res.json()).toEqual({ error: "invalid game" });
-        expect(Object.keys(rows)).toEqual([]);
-      },
-    );
-
-    // The freeze is POST only: the rows already stored stay readable.
-    it.each(["space-shooter", "hextris"])(
-      "still serves the stored rows of the moved game %s on GET",
+    // Every game that ever wrote here stays readable: the rows are frozen history.
+    it.each(["tower-stacker", "space-shooter", "hextris"])(
+      "still serves the stored rows of %s",
       async (game) => {
         rows[game] = [
           { name: "Old", score: 10, level: 1, createdAt: "2026-01-01T00:00:00.000Z" },
@@ -145,68 +88,10 @@ describe("/api/leaderboard", () => {
     );
   });
 
-  describe("POST", () => {
-    it("persists a valid score and returns ok:true + rank", async () => {
-      const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: 500, level: 3, game: "tower-stacker" }),
-      );
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as PostResponse;
-      expect(body).toMatchObject({ ok: true, rank: 1 });
-    });
-
-    it("rejects a missing game with 400", async () => {
-      const res = await POST(makeJsonPostRequest({ name: "Ada", score: 10, level: 1 }));
-      expect(res.status).toBe(400);
-    });
-
-    it("rejects an unrecognized game slug with 400", async () => {
-      const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: 10, level: 1, game: "not-a-real-game" }),
-      );
-      expect(res.status).toBe(400);
-    });
-
-    it("rejects invalid score with 400", async () => {
-      const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: -1, level: 1, game: "tower-stacker" }),
-      );
-      expect(res.status).toBe(400);
-    });
-
-    it("rejects invalid level with 400", async () => {
-      const res = await POST(
-        makeJsonPostRequest({ name: "Ada", score: 10, level: 0, game: "tower-stacker" }),
-      );
-      expect(res.status).toBe(400);
-    });
-
-    it("rejects cross-origin with 403", async () => {
-      const res = await POST(
-        makeJsonPostRequest(
-          { name: "Ada", score: 10, level: 1, game: "tower-stacker" },
-          { origin: "https://evil.example" },
-        ),
-      );
-      expect(res.status).toBe(403);
-    });
-
-    it("rejects malformed JSON with 400", async () => {
-      const res = await POST(makeJsonPostRequest("{not json"));
-      expect(res.status).toBe(400);
-    });
-
-    it("returns 413 for oversized body", async () => {
-      const res = await POST(
-        makeJsonPostRequest({
-          name: "Ada",
-          score: 10,
-          level: 1,
-          game: "tower-stacker",
-          filler: "x".repeat(20_000),
-        }),
-      );
-      expect(res.status).toBe(413);
+  describe("frozen history", () => {
+    it("is read-only: the route exports GET and no POST (T6 retired the last writer)", () => {
+      expect(typeof mod.GET).toBe("function");
+      expect("POST" in mod).toBe(false);
     });
   });
 });
