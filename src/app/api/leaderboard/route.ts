@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { captureException } from "@/lib/log";
 
@@ -10,12 +11,16 @@ export const dynamic = "force-dynamic";
 // this route has no writer and the table is never dropped (DESIGN.md "Arcade backend").
 const RETURN_LIMIT = 25;
 
+// Any non-empty slug is a valid query (an unknown game just has no rows).
+const gameSchema = z.string().min(1);
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const game = url.searchParams.get("game");
-  if (!game) {
+  const parsedGame = gameSchema.safeParse(url.searchParams.get("game"));
+  if (!parsedGame.success) {
     return NextResponse.json({ error: "missing game" }, { status: 400 });
   }
+  const game = parsedGame.data;
   try {
     const { rows } = await getPool().query(
       `SELECT name, score, level, seconds, kills, distance, region,
