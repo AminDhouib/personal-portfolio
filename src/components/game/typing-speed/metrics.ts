@@ -47,6 +47,21 @@ export interface CharCounts {
   missed: number;
 }
 
+/** Consecutive correct keystrokes now and at best; Backspace neither extends nor breaks one. */
+export function streaks(run: TypingRun): { current: number; best: number } {
+  let current = 0;
+  let best = 0;
+  for (const k of run.log) {
+    if (k.correct === true) {
+      current++;
+      best = Math.max(best, current);
+    } else if (k.correct === false) {
+      current = 0;
+    }
+  }
+  return { current, best };
+}
+
 function isTextRunDone(run: TypingRun): boolean {
   return run.config.kind === "text" && run.status === "done";
 }

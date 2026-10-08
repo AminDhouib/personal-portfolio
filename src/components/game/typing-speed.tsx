@@ -1,59 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 import { safeLocalSet } from "@/lib/safe-storage";
-import { accuracyPercent, isNewBest, liveWpm, wpm } from "./typing-speed/metrics";
+import { passageAt } from "./typing-speed/engine/text";
+import type { Op, TypingRun } from "./typing-speed/engine/types";
+import { isNewBest, liveWpm, runMetrics, streaks, type RunMetrics } from "./typing-speed/metrics";
+import { ResultsCard } from "./typing-speed/results-card";
+import { TextView } from "./typing-speed/text-view";
+import { useTypingRun } from "./typing-speed/use-typing-run";
 
-const SENTENCES = [
-  "The quick brown fox jumps over the lazy dog near the riverbank.",
-  "Pack my box with five dozen liquor jugs before the sunrise.",
-  "How vexingly quick daft zebras jump across the open plains!",
-  "Sphinx of black quartz, judge my vow on this quiet morning.",
-  "Curiosity is the wick in the candle of a truly creative mind.",
-  "Stars can't shine without darkness, and ideas need silence to grow.",
-  "The only way to do great work is to love what you build every day.",
-  "Simplicity is the ultimate sophistication in design and in life.",
-  "A smooth sea never made a skilled sailor worth writing about.",
-  "Coffee tastes better when you earned it after shipping something real.",
-  "Typing fast is a dance between your fingers and your attention span.",
-  "Wild waves crash softly against the warm golden shore at dusk.",
-  "Every expert was once a complete beginner who refused to quit.",
-  "The mountains are calling and I really must go find my boots.",
-  "Small daily improvements are the key to staggering long-term results.",
-  "Dream big, start small, but most of all, just start today.",
-  "The best time to plant a tree was twenty years ago, the second best is now.",
-  "Good code is like a good joke: it needs no explanation.",
-  "She sells seashells by the seashore and sings ancient sailor songs.",
-  "Bright neon signs hummed quietly above the rainy midnight street.",
-  "A friendly robot waved from the moon and asked about the weather.",
-  "Pixels are just tiny lights pretending to tell you a big story.",
-  "Keyboards clack, ideas flow, and somehow the universe keeps spinning.",
-  "Focus is the rare art of politely declining every other thing.",
-  "The fog rolled in slowly like a cat deciding whether to stay.",
-];
-
-// SENTENCES is a fixed non-empty literal, so this fallback (used below for
-// the random-index lookup) is a type-safety guard that never actually fires.
-function firstOf<T>(arr: T[]): T {
-  const first = arr[0];
-  if (!first) throw new Error("expected a non-empty array");
-  return first;
-}
-const FIRST_SENTENCE = firstOf(SENTENCES);
-
-type GameState = "idle" | "playing" | "done";
-
-function pickSentence(exclude?: string): string {
-  let s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)] ?? FIRST_SENTENCE;
-  let tries = 0;
-  while (s === exclude && tries < 5) {
-    s = SENTENCES[Math.floor(Math.random() * SENTENCES.length)] ?? FIRST_SENTENCE;
-    tries++;
-  }
-  return s;
-}
+const HIGH_SCORE_KEY = "typing-high-score";
 
 interface Burst {
   id: number;
@@ -61,90 +19,42 @@ interface Burst {
   y: number;
 }
 
+interface Result {
+  metrics: RunMetrics;
+  maxStreak: number;
+  newBest: boolean;
+  bulk: boolean;
+}
+
+function drawSeed(): number {
+  const a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return a[0] ?? 1;
+}
+
+function readHighScore(): number {
+  const saved = window.localStorage.getItem(HIGH_SCORE_KEY);
+  const n = saved ? parseInt(saved, 10) : 0;
+  return Number.isFinite(n) ? n : 0;
+}
+
+function passageConfig(seed: number, n: number) {
+  return { kind: "text", text: passageAt(seed, n).text } as const;
+}
+
 export function TypingSpeedGame() {
-  const [target, setTarget] = useState<string>(() => pickSentence());
-  const [state, setState] = useState<GameState>("idle");
-  const [typed, setTyped] = useState("");
-  const [elapsed, setElapsed] = useState(0);
-  const [highScore, setHighScore] = useState<number>(() => {
-    if (typeof window === "undefined") return 0;
-    const saved = window.localStorage.getItem("typing-high-score");
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [streak, setStreak] = useState(0);
-  const [maxStreak, setMaxStreak] = useState(0);
-  const [errors, setErrors] = useState(0);
-  const [correctKeys, setCorrectKeys] = useState(0);
-  const [totalKeys, setTotalKeys] = useState(0);
-  const [newBest, setNewBest] = useState(false);
+  const [seed] = useState(drawSeed);
+  const [passageNo, setPassageNo] = useState(0);
+  const [highScore, setHighScore] = useState(readHighScore);
+  const [result, setResult] = useState<Result | null>(null);
   const [shake, setShake] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
-
-  const CONFETTI = useMemo(() => {
-    const colors = ["#22c55e", "#60a5fa", "#f59e0b", "#a78bfa", "#ec4899"];
-    const count = 22;
-    return Array.from({ length: count }, (_, i) => {
-      const angle = (i / count) * Math.PI * 2 + (i % 3) * 0.4;
-      const dist = 140 + (i % 5) * 40;
-      return {
-        id: i,
-        dx: Math.cos(angle) * dist,
-        dy: Math.sin(angle) * dist - 60,
-        rot: (i * 47) % 360,
-        color: colors[i % colors.length],
-      };
-    });
-  }, []);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const charRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const burstIdRef = useRef(0);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
-
-  // Arms the round: the clock does not run until the first keystroke that
-  // changes the text (see handleInput), so reading time is not penalised.
-  const startGame = useCallback(() => {
-    setState("playing");
-    setTyped("");
-    setStreak(0);
-    setMaxStreak(0);
-    setErrors(0);
-    setCorrectKeys(0);
-    setTotalKeys(0);
-    setNewBest(false);
-    setBursts([]);
-    startTimeRef.current = 0;
-    setElapsed(0);
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-    // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
-    inputRef.current?.focus();
-  }, []);
-
-  const resetGame = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setState("idle");
-    setTyped("");
-    setElapsed(0);
-    setStreak(0);
-    setErrors(0);
-    setCorrectKeys(0);
-    setTotalKeys(0);
-    setNewBest(false);
-    setBursts([]);
-    startTimeRef.current = 0;
-    setTarget((prev) => pickSentence(prev));
-  }, []);
-
-  const spawnBurst = useCallback((charIndex: number) => {
-    const el = charRefs.current[charIndex];
+  const spawnBurst = useCallback(() => {
+    const el = containerRef.current?.querySelector("[data-ts-caret]");
     const container = containerRef.current;
     if (!el || !container) return;
     const elRect = el.getBoundingClientRect();
@@ -161,183 +71,130 @@ export function TypingSpeedGame() {
     }, 700);
   }, []);
 
-  const handleInput = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      if (state !== "playing") return;
-      const val = e.target.value;
-      if (val.length > target.length) return;
-
-      const prevLen = typed.length;
-      const newLen = val.length;
-
-      if (newLen !== prevLen && startTimeRef.current === 0) {
-        const now = Date.now();
-        startTimeRef.current = now;
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setElapsed(Date.now() - now);
-        }, 80);
-      }
-
-      if (newLen > prevLen) {
-        const newChar = val[newLen - 1];
-        const expected = target[newLen - 1];
-        setTotalKeys((t) => t + 1);
-        if (newChar === expected) {
-          setCorrectKeys((c) => c + 1);
-          setStreak((s) => {
-            const next = s + 1;
-            setMaxStreak((m) => Math.max(m, next));
-            if (next > 0 && next % 10 === 0) {
-              spawnBurst(newLen - 1);
-            }
-            return next;
-          });
-        } else {
-          setStreak(0);
-          setErrors((e) => e + 1);
-          setShake((s) => s + 1);
-        }
-      }
-
-      setTyped(val);
-
-      if (val === target) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        const finalElapsed = Date.now() - startTimeRef.current;
-        setElapsed(finalElapsed);
-        setState("done");
-        const score = wpm(target.length, finalElapsed);
-        setNewBest(isNewBest(score, highScore > 0 ? highScore : null));
-        if (score > highScore) {
-          setHighScore(score);
-          safeLocalSet("typing-high-score", String(score));
-        }
+  const onKey = useCallback(
+    (run: TypingRun) => {
+      const last = run.log.at(-1);
+      if (!last) return;
+      if (last.correct === false) {
+        setShake((s) => s + 1);
+      } else if (last.correct === true) {
+        const { current } = streaks(run);
+        if (current > 0 && current % 10 === 0) spawnBurst();
       }
     },
-    [state, target, typed.length, highScore, spawnBurst],
+    [spawnBurst],
   );
 
-  const totalTyped = typed.length;
-  const currentWPM =
-    state === "playing"
-      ? liveWpm(totalTyped, elapsed)
-      : state === "done"
-        ? wpm(target.length, elapsed)
-        : 0;
-  const accuracy = accuracyPercent(correctKeys, totalKeys);
-  const progress = (totalTyped / target.length) * 100;
-
-  // Enter starts from the idle screen; Escape restarts the current sentence.
-  useEffect(() => {
-    if (state === "done") return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && state === "idle") {
-        const el = e.target instanceof Element ? e.target : null;
-        if (el?.closest("button, a, input, textarea, select")) return;
-        e.preventDefault();
-        startGame();
-      } else if (e.key === "Escape" && state === "playing") {
-        e.preventDefault();
-        startGame();
+  const onFinish = useCallback(
+    (run: TypingRun) => {
+      const metrics = runMetrics(run);
+      const bulk = run.bulk > 0;
+      const newBest = !bulk && isNewBest(metrics.netWpm, highScore > 0 ? highScore : null);
+      if (!bulk && metrics.netWpm > highScore) {
+        setHighScore(metrics.netWpm);
+        safeLocalSet(HIGH_SCORE_KEY, String(metrics.netWpm));
       }
+      setResult({ metrics, maxStreak: streaks(run).best, newBest, bulk });
+    },
+    [highScore],
+  );
+
+  const typing = useTypingRun(passageConfig(seed, 0), { inputRef, onFinish, onKey });
+  const { run, reset, press } = typing;
+
+  const newRound = useCallback(
+    (n: number) => {
+      setPassageNo(n);
+      setResult(null);
+      setBursts([]);
+      reset(passageConfig(seed, n));
+      // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
+      inputRef.current?.focus();
+    },
+    [seed, reset],
+  );
+
+  // Any printable key starts the run, Enter focuses it, Escape restarts it.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      const inTextField = !!el?.closest("input, textarea, select, [contenteditable='true']");
+      const inButton = !!el?.closest("button, a");
+      if (e.key === "Escape") {
+        if (run.status === "running") {
+          e.preventDefault();
+          newRound(passageNo);
+        }
+        return;
+      }
+      if (run.status === "done") return;
+      if (e.key === "Enter") {
+        if (inTextField || inButton || run.status !== "ready") return;
+        e.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+      if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey || inTextField) return;
+      // Space on a fresh round keeps scrolling the page.
+      if (e.key === " " && (run.status === "ready" || inButton)) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+      const op: Op = e.key === " " ? { kind: "space" } : { kind: "char", ch: e.key };
+      press([op]);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state, startGame]);
+  }, [run, passageNo, newRound, press]);
 
-  const renderChar = (char: string, i: number) => {
-    const isTyped = i < typed.length;
-    const isCorrect = isTyped && typed[i] === char;
-    const isWrong = isTyped && typed[i] !== char;
-    const isCursor = i === typed.length && state === "playing";
-
-    let cls = "transition-colors duration-100";
-    if (isCorrect) cls += " text-accent-green";
-    else if (isWrong) cls += " text-red-400 bg-red-500/15 rounded";
-    else cls += " text-(--muted)/50";
-    if (isCursor)
-      cls += " border-b-2 border-accent-blue animate-pulse shadow-[0_2px_8px_rgba(96,165,250,0.6)]";
-
-    return (
-      <span
-        key={i}
-        ref={(el) => {
-          charRefs.current[i] = el;
-        }}
-        className={cls}
-      >
-        {char}
-      </span>
-    );
-  };
-
-  const renderTarget = () => {
-    // Walk the sentence and group runs of non-space chars into word spans
-    // (display: inline-block so each word stays unbroken, but the browser
-    // can break between words at the spaces).
-    const nodes: React.ReactNode[] = [];
-    let i = 0;
-    let wordKey = 0;
-    while (i < target.length) {
-      if (target[i] === " ") {
-        // render the space char (with cursor support) as its own inline node
-        nodes.push(renderChar(" ", i));
-        i++;
-        continue;
-      }
-      const wordStart = i;
-      while (i < target.length && target[i] !== " ") i++;
-      const wordEnd = i;
-      const chars: React.ReactNode[] = [];
-      for (let k = wordStart; k < wordEnd; k++) chars.push(renderChar(target[k] ?? "", k));
-      nodes.push(
-        <span key={`w${wordKey++}`} className="inline-block">
-          {chars}
-        </span>,
-      );
-    }
-    return nodes;
-  };
+  const metrics = runMetrics(run, typing.now);
+  const { current: streak } = streaks(run);
+  const playing = run.status === "running";
+  const done = run.status === "done";
+  const liveNet = done ? metrics.netWpm : liveWpm(metrics.netChars, metrics.elapsedMs);
+  const totalChars = run.words.reduce((n, w) => n + w.length, 0);
+  const typedChars =
+    run.typed.slice(0, run.cursor).reduce((n, t) => n + t.length, 0) +
+    (done ? 0 : (run.typed[run.cursor]?.length ?? 0));
+  const progress = done ? 100 : Math.min(100, (typedChars / Math.max(1, totalChars)) * 100);
 
   return (
     <div className="space-y-5">
       {/* Stats bar */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <motion.div
-          animate={{ scale: state === "playing" ? [1, 1.05, 1] : 1 }}
+          animate={{ scale: playing ? [1, 1.05, 1] : 1 }}
           transition={{ duration: 0.3 }}
           className="flex items-center gap-1.5 text-(--muted)"
         >
           <Timer className="h-3.5 w-3.5" />
           <span
             className={
-              state === "playing"
+              playing
                 ? "font-mono font-semibold text-accent-blue tabular-nums"
                 : "font-mono tabular-nums"
             }
           >
-            {(elapsed / 1000).toFixed(1)}s
+            {(metrics.elapsedMs / 1000).toFixed(1)}s
           </span>
         </motion.div>
         <div className="flex items-center gap-1.5 text-(--muted)">
           <Target className="h-3.5 w-3.5" />
           <motion.span
-            key={currentWPM}
+            key={liveNet}
             initial={{ scale: 1.2, color: "#22c55e" }}
             animate={{ scale: 1 }}
             className={
-              state === "playing" || state === "done"
+              playing || done
                 ? "font-mono font-semibold text-accent-green tabular-nums"
                 : "font-mono tabular-nums"
             }
           >
-            {currentWPM} WPM
+            {liveNet} WPM
           </motion.span>
         </div>
         <div className="flex items-center gap-1.5 font-mono text-(--muted) tabular-nums">
           <Percent className="h-3.5 w-3.5" />
-          {accuracy}% acc
+          {metrics.accuracy}% acc
         </div>
         <AnimatePresence>
           {streak >= 5 && (
@@ -374,30 +231,19 @@ export function TypingSpeedGame() {
         />
       </div>
 
-      {/* Sentence display */}
+      {/* Passage */}
       <motion.div
         ref={containerRef}
         key={shake}
         animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
         transition={{ duration: 0.3 }}
         className="relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
-        onClick={() => state === "playing" && inputRef.current?.focus()}
+        onClick={() => !done && inputRef.current?.focus()}
         style={{
           background: "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
         }}
       >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={target}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.35 }}
-            className="relative tracking-wide"
-          >
-            {renderTarget()}
-          </motion.div>
-        </AnimatePresence>
+        <TextView run={run} caret />
 
         {/* Combo bursts */}
         <AnimatePresence>
@@ -416,111 +262,52 @@ export function TypingSpeedGame() {
             </motion.div>
           ))}
         </AnimatePresence>
-
-        {/* Idle overlay */}
-        <AnimatePresence>
-          {state === "idle" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center rounded-2xl bg-(--bg)/85 backdrop-blur-sm"
-            >
-              <motion.button
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={startGame}
-                className="rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
-              >
-                Start typing
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
 
-      {/* Hidden textarea */}
-      <textarea
+      {/* Hidden input: always SENTINEL + the current word, see engine/input.ts */}
+      <input
         ref={inputRef}
-        value={typed}
-        onChange={handleInput}
-        className="sr-only"
-        aria-label="Type the sentence"
+        type="text"
+        data-ts-hidden
+        aria-label="Typing area"
         autoComplete="off"
         autoCorrect="off"
-        autoCapitalize="off"
+        autoCapitalize="none"
         spellCheck={false}
-        tabIndex={-1}
+        defaultValue=" "
+        className="sr-only"
       />
 
-      {/* Done overlay */}
-      <AnimatePresence>
-        {state === "done" && (
-          <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ type: "spring", stiffness: 220, damping: 22 }}
-            className="relative overflow-hidden rounded-2xl border border-accent-green/40 bg-gradient-to-br from-accent-green/10 via-transparent to-accent-blue/10 p-6 text-center"
+      {run.status === "ready" && (
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.focus()}
+            className="min-h-11 rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
           >
-            {/* Confetti pieces */}
-            {CONFETTI.map((c) => (
-              <motion.div
-                key={c.id}
-                className="absolute top-1/2 left-1/2 h-2 w-2 rounded-sm"
-                initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-                animate={{
-                  x: c.dx,
-                  y: c.dy,
-                  opacity: 0,
-                  rotate: c.rot,
-                }}
-                transition={{ duration: 1.2, ease: "easeOut", delay: c.id * 0.02 }}
-                style={{ background: c.color }}
-              />
-            ))}
-            <motion.div
-              initial={{ scale: 0.5 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 14, delay: 0.1 }}
-              className="relative font-display text-5xl font-black text-accent-green"
-            >
-              {currentWPM}
-              <span className="ml-1 text-xl font-semibold text-(--muted)">WPM</span>
-            </motion.div>
-            <div className="relative mt-2 text-sm text-(--muted)">
-              {accuracy}% accuracy · {(elapsed / 1000).toFixed(1)}s · best streak {maxStreak} ·{" "}
-              {errors} error{errors === 1 ? "" : "s"}
-              {newBest && (
-                <motion.span
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="ml-2 inline-flex items-center gap-1 font-semibold text-accent-amber"
-                >
-                  <Trophy className="h-3.5 w-3.5" />
-                  New best!
-                </motion.span>
-              )}
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={resetGame}
-              className="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/15 px-5 py-2 text-sm font-semibold text-accent-green transition-colors hover:bg-accent-green/25"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Next sentence
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Start typing
+          </button>
+          <p className="text-sm text-(--muted)">Click the text or press any key to start.</p>
+        </div>
+      )}
+
+      {done && result && (
+        <ResultsCard
+          metrics={result.metrics}
+          maxStreak={result.maxStreak}
+          newBest={result.newBest}
+          bulk={result.bulk}
+          onNext={() => newRound(passageNo + 1)}
+          onAgain={() => newRound(passageNo)}
+        />
+      )}
 
       {/* Skip button */}
-      {state === "playing" && (
+      {playing && (
         <button
-          onClick={resetGame}
-          className="inline-flex min-h-11 items-center gap-1.5 text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+          type="button"
+          onClick={() => newRound(passageNo + 1)}
+          className="inline-flex min-h-11 items-center gap-1.5 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <RotateCcw className="h-3 w-3" />
           Skip
