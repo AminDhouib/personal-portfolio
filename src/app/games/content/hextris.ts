@@ -9,7 +9,7 @@ export const hextrisContent: GameContent = {
   intro:
     "Hextris is a fast hexagon puzzle game that runs in your browser. Colored blocks fall toward a central hexagon from six directions. You rotate the hexagon to catch each block on the side you want, then match three or more of the same color to clear them. Clears build combos and a momentum meter, and the play area slowly tightens, so every minute you last is harder than the one before.",
   howToPlay: [
-    "Click, tap or press any key to start.",
+    "Click, tap or press Space, Enter, an arrow key or A, S, D to start.",
     "Rotate the hexagon with the arrow keys or A and D, or tap the left or right half of the screen.",
     "Catch each falling block on a side that already holds blocks of its color.",
     "Match three or more connected blocks of one color to clear them and score.",
