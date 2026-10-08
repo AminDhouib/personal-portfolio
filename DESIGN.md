@@ -37,6 +37,14 @@ extracted modules (`spawning.ts`, `boss-behaviors.ts`, `sound-manager.ts`, `run-
 `space-shooter.tsx` and `hextris.tsx` still carry the bulk of their engine logic inline in the
 component. See Extract-before-edit doctrine below before touching either.
 
+`tower-stacker/` is first-party and fully extracted: `engine.ts` (pure, seedable, with
+`scoring.ts`, which the server imports) and `daily.ts` are DOM-free; `painter.ts` draws
+through a structural `CanvasLike`; `stage.tsx` owns the DOM HUD, the phase machine and the
+phone play sheet, with `use-tower-loop.ts`, `audio.ts`, `controls.ts` and `play-sheet.ts`
+behind it. `tower-stacker.tsx` is a thin entry that forwards `?tower-seed=`. Its RNG helpers
+come from `password-game-2/engine/rng` (the one cross-game import; the audio and control
+helpers are copies, as games do not import each other's modules).
+
 `src/env.ts` is the sole `process.env` gateway for everything except four narrow, allowlisted
 exceptions (`next.config.ts`, `src/instrumentation.ts`, `src/instrumentation-client.ts`, and
 `src/components/game/space-shooter.tsx` for `NODE_ENV`-gated dev-only affordances — an FPS
@@ -175,8 +183,8 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2)
 - **The legacy route is frozen for the two moved games.** `LEADERBOARD_GAMES`
   (`src/lib/leaderboard-games.ts`) is `["tower-stacker"]`, so `POST /api/leaderboard` answers 400
   for `space-shooter` and `hextris` (a deliberate, pinned change). The legacy GET is unchanged
-  and still serves stored rows. T6 moves Tower Stacker and retires the route, its hook and the
-  table.
+  and still serves stored rows. T6 moves Tower Stacker and retires the route and the table;
+  the hook is already gone, as Tower Stacker no longer posts scores.
 - **Browser identity.** `src/lib/arcade/identity.ts` keeps `{ playerId, token }` in
   `localStorage` under `arcade:player:v1`. A read never creates one (so first-time visitors stay
   cacheable); the first submit does, with an in-memory copy that wins over storage for the page
@@ -446,13 +454,6 @@ current tree on 2026-07-07.
   disclaimer in the About credits and in the How to play modal.
   `__tests__/assets-guard.test.ts` fails on any image under the game's public folder, any
   reference to a sprites or upstream path, and any asset-prep script that targets them.
-- **Tower Stacker's game is a vendored minified bundle — do not patch it in place.**
-  `public/tower_stacker/dist/main.js` is the built output of upstream `iamkun/tower_game` (MIT,
-  license alongside). Known quirks live inside that bundle and are accepted while the game stays
-  hidden: the tower can drift far enough sideways that no drop can land (the run then bleeds out
-  on lives), and PERFECT is awarded leniently. Fixing either means re-vendoring from patched
-  source, not editing the dist. The parent React overlay owns the leaderboard form; an empty
-  name deliberately falls back to "Stacker".
 - **Hextris is GPL-3.0 derived (until T5-3 replaces the engine).** The engine in `hextris.tsx`,
   `hextris/logic.ts` and `hextris/types.ts` is a port of upstream Hextris (Logan Engstrom et al.,
   GPL-3.0), so those files carry an SPDX/copyright header, the licence text sits beside them in
@@ -463,6 +464,17 @@ current tree on 2026-07-07.
   `content/__tests__/hextris-credits.test.ts` pin all of it; do not delete the notices before
   the derived files are gone. The T5-3 clean-room engine removes the derived files and these
   notices with them.
+- **Tower Stacker is first-party; its rules are pinned.** The vendored `iamkun/tower_game`
+  bundle and its page are gone, so nothing under `public/` loads a third-party tag (pinned by
+  `no-third-party-tags.test.ts`). The numbers that define the game are pinned by
+  `tower-stacker/__tests__/engine.test.ts` and `scoring.test.ts`: perfect within 8 units of
+  centre, a trim needs 4 units of overlap or the run ends, every third perfect regrows 12
+  (capped at the starting width), points are 10 per trim and 20 to 60 per perfect. There are no
+  lives, on purpose: the tower cannot drift out of reach, because the crane sweeps around the
+  top slab. Do not tune a constant without updating its pin and the copy in
+  `games/content/tower-stacker.ts`. The game stays `hidden: true` until the owner un-hides it.
+- **Tower Stacker keeps its blueprint palette in both themes, deliberately.** The canvas uses
+  `tower-stacker/palette.ts`, not the site tokens; do not wire it to the theme toggle.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
@@ -970,10 +982,9 @@ trigger revisiting it.
   single well-tested module can currently offset an untested one; the ratchet only guards the
   aggregate. (The companion scope debt NF(P7)-c is resolved: pass-2 set coverage `include` to all
   of `src/`, so untested files now count in the denominator instead of being invisible.)
-- **`tower-stacker.tsx` has zero tests** (audit ref P2-TEST-004, deferred), a single-file game
-  whose pure math (block overlap/trim) would extract cheaply under the extract-before-edit
-  doctrine. Trigger: any gameplay edit to it. Typing Speed has since been rebuilt on a tested
-  engine (see the Typing Speed section).
+- **Untested single-file games** (audit ref P2-TEST-004) — resolved. Typing Speed is rebuilt on
+  a tested engine (see the Typing Speed section) and Tower Stacker under `tower-stacker/` with
+  tests.
 - **No browser-level smoke test runs in CI** (audit ref P2-TEST-005, deferred) — route tests
   exercise handlers in-process; nothing in CI loads a real page in a browser. The scoped design
   if revisited: a Playwright job hitting `/`, one game page, and `/api/health` against
