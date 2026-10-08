@@ -330,6 +330,54 @@ describe("rush", () => {
   });
 });
 
+describe("away (spec section 6.9)", () => {
+  it("is away from the start until the first input, and the start is not an input", () => {
+    const s = createRun({ seed: 61 });
+    expect(s.afk).toBe(true);
+    start(s);
+    advance(s, COUNTDOWN_MS + 3000);
+    expect(s.afk).toBe(true);
+    applyAction(s, "rotate-cw");
+    expect(s.afk).toBe(false);
+  });
+
+  it("goes away 8 s of play after the last input and comes back on any input", () => {
+    const inputs = [
+      "rotate-cw",
+      "rotate-ccw",
+      "rush",
+      "rush-off",
+      "toggle-pause",
+      "panic",
+    ] as const;
+    for (const action of inputs) {
+      const s = playing(62);
+      s.nextSpawnAtMs = 1e12;
+      rotate(s, 1);
+      expect(s.afk).toBe(false);
+      advance(s, 8000 - 10);
+      expect(s.afk, action).toBe(false);
+      advance(s, 20);
+      expect(s.afk, action).toBe(true);
+      applyAction(s, action);
+      expect(s.afk, action).toBe(false);
+    }
+  });
+
+  it("does not count paused time toward going away", () => {
+    const s = playing(63);
+    s.nextSpawnAtMs = 1e12;
+    rotate(s, 1);
+    advance(s, 4000);
+    applyAction(s, "toggle-pause");
+    advance(s, 60_000);
+    applyAction(s, "toggle-pause");
+    // The resume was itself an input, so the 8 s start again from here.
+    advance(s, 7900);
+    expect(s.afk).toBe(false);
+  });
+});
+
 describe("pause", () => {
   it("freezes play time while paused and emits pause and resume", () => {
     const s = playing(51);

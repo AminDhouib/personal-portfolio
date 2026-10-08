@@ -15,9 +15,11 @@ function cellOf(ch: string): Cell {
   return { colour: colour as Colour, special: ch === ch.toUpperCase() ? "bomb" : "none" };
 }
 
+/** A run in play, with the player present (not away, spec section 6.9), on a hand-built board. */
 export function boardState(sides: Partial<Record<number, string>>, seed = 1): RunState {
   const s = createRun({ seed });
   s.phase = "playing";
+  s.afk = false;
   for (let side = 0; side < 6; side++) {
     s.sides[side] = [...(sides[side] ?? "")].map(cellOf);
   }

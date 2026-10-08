@@ -20,6 +20,14 @@ function copy(cells: Pos[]): Pos[] {
   return cells.map((p) => ({ side: p.side, row: p.row }));
 }
 
+/** How long without an input before the player counts as away (spec section 6.9). */
+export const AFK_AFTER_MS = 8000;
+
+/** Marks the player as away once AFK_AFTER_MS of play has passed since their last input. */
+export function checkAway(state: RunState): void {
+  if (!state.afk && state.elapsedMs - state.lastInputMs >= AFK_AFTER_MS) state.afk = true;
+}
+
 export function addScore(state: RunState, points: number): void {
   if (points <= 0) return;
   state.score += points;
@@ -28,7 +36,8 @@ export function addScore(state: RunState, points: number): void {
 
 /**
  * Updates the combo for a clear happening now, then scores it (spec section 6.3). A gravity chain
- * always counts as a chain. `boardEmpty` is whether the clear left no settled cells.
+ * always counts as a chain. `boardEmpty` is whether the clear left no settled cells. While the
+ * player is away the clear only counts its cells and reports 0 points (spec section 6.9).
  */
 export function scoreClear(
   state: RunState,
@@ -37,6 +46,19 @@ export function scoreClear(
   gravityChain: boolean,
   boardEmpty: boolean,
 ): void {
+  if (state.afk) {
+    state.cellsCleared += cells.length;
+    emit(state, {
+      type: "clear",
+      cells: copy(cells),
+      count: cells.length,
+      colour,
+      combo: state.combo,
+      chain: false,
+      points: 0,
+    });
+    return;
+  }
   const now = state.elapsedMs;
   const before = state.combo;
   const hadClear = state.lastClearAtMs >= 0;
