@@ -54,7 +54,27 @@ export function loadStats(): Pg2Stats {
   return result.success ? result.data : emptyStats();
 }
 
+/**
+ * True when the stored value is an object whose `v` is above this code's version: a
+ * newer build wrote it (a rollback, an old tab). Saving over it would destroy it.
+ */
+function storedIsNewer(): boolean {
+  let text: string | null;
+  try {
+    text = window.localStorage.getItem(STATS_KEY);
+  } catch {
+    // silent-ok: blocked storage cannot hold a newer value, and the save will fail on its own
+    return false;
+  }
+  if (text === null) return false;
+  const value = safeJsonParse<unknown>(text, "pg2:stats");
+  if (typeof value !== "object" || value === null) return false;
+  const v = (value as { v?: unknown }).v;
+  return typeof v === "number" && v > 1;
+}
+
 export function saveStats(stats: Pg2Stats): void {
+  if (storedIsNewer()) return;
   safeLocalSet(STATS_KEY, JSON.stringify(stats));
 }
 

@@ -84,3 +84,21 @@ describe("streakAsOf", () => {
     expect(streakAsOf(s, "2026-10-08")).toBe(0);
   });
 });
+
+describe("newer stored version", () => {
+  const newer = JSON.stringify({ v: 99, bestMs: 1, extra: "from a newer build" });
+
+  it("reads as empty and leaves the stored value untouched on save", () => {
+    localStorage.setItem(STATS_KEY, newer);
+    expect(loadStats()).toEqual(emptyStats());
+    saveStats(recordRun(emptyStats(), { ms: 5, daily: true, day: "2026-10-08", seed: 1 }));
+    expect(localStorage.getItem(STATS_KEY)).toBe(newer);
+  });
+
+  it("still overwrites corrupt or older-shaped values", () => {
+    localStorage.setItem(STATS_KEY, "{not json");
+    const s = recordRun(emptyStats(), { ms: 5, daily: false, day: "2026-10-08", seed: 1 });
+    saveStats(s);
+    expect(loadStats()).toEqual(s);
+  });
+});
