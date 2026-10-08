@@ -23,7 +23,7 @@ const TIER_CLASS = [
 ];
 
 const TAB =
-  "inline-flex min-h-11 items-center rounded-lg px-4 font-sans text-sm font-semibold transition-colors";
+  "inline-flex min-h-11 min-w-11 touch-manipulation items-center rounded-lg px-4 font-sans text-sm font-semibold transition-colors";
 
 function Key({ label, stats, wide }: { label: string; stats: KeyStats; wide?: boolean }) {
   const count = stats[label];

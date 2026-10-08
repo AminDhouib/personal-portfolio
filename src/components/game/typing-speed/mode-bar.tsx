@@ -2,7 +2,7 @@ import { DURATIONS, modeId, parseMode, type ModeId } from "./engine/modes";
 import type { Content, Seconds } from "./engine/types";
 
 const BUTTON =
-  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 font-sans text-sm font-semibold transition-colors";
+  "inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg px-3 font-sans text-sm font-semibold transition-colors";
 const ON = "bg-accent-blue/20 text-accent-blue";
 const OFF = "text-(--muted) hover:text-(--foreground)";
 

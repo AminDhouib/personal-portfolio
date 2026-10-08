@@ -119,7 +119,7 @@ export function ResultsCard({
           <button
             type="button"
             onClick={onNext}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/15 px-5 py-2 font-sans text-sm font-semibold text-accent-green transition-colors hover:bg-accent-green/25"
+            className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/15 px-5 py-2 font-sans text-sm font-semibold text-accent-green transition-colors hover:bg-accent-green/25"
           >
             <SkipForward className="h-3.5 w-3.5" />
             Next passage
@@ -128,7 +128,7 @@ export function ResultsCard({
         <button
           type="button"
           onClick={onAgain}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-(--border) px-5 py-2 font-sans text-sm font-semibold text-(--muted) transition-colors hover:text-(--foreground)"
+          className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-2 rounded-lg border border-(--border) px-5 py-2 font-sans text-sm font-semibold text-(--muted) transition-colors hover:text-(--foreground)"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Again

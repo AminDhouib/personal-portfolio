@@ -479,7 +479,7 @@ export function TypingSpeedGame() {
             type="button"
             ref={restartRef}
             onClick={restart}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+            className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
           >
             <RotateCcw className="h-3 w-3" />
             Restart
@@ -488,7 +488,7 @@ export function TypingSpeedGame() {
             <button
               type="button"
               onClick={nextPassage}
-              className="inline-flex min-h-11 items-center gap-1.5 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+              className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-1.5 px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
             >
               <RotateCcw className="h-3 w-3" />
               Skip
@@ -501,7 +501,7 @@ export function TypingSpeedGame() {
             <button
               type="button"
               onClick={startTyping}
-              className="min-h-11 rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
+              className="min-h-11 min-w-11 touch-manipulation rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
             >
               Start typing
             </button>
