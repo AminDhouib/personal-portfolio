@@ -63,6 +63,7 @@ import {
 } from "./space-shooter/types";
 import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
 import { PanelClose } from "./space-shooter/panel-close";
+import { CountUp } from "./space-shooter/count-up";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -1900,7 +1901,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                   Ship destroyed
                 </div>
                 <div className="mt-1 font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
-                  {ui.score}
+                  <CountUp target={ui.score} />
                 </div>
                 {celebration === "world" && (
                   <motion.div
@@ -1931,7 +1932,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                     transition={{ delay: 0.4 }}
                     className="mt-2 flex items-center justify-center gap-1.5 font-mono text-sm text-accent-amber"
                   >
-                    <CoinsIcon className="h-4 w-4" />+{ui.coinsThisRun} coins
+                    <CoinsIcon className="h-4 w-4" />+<CountUp target={ui.coinsThisRun} /> coins
                   </motion.div>
                 )}
                 <div className="mx-auto mt-3 grid max-w-md grid-cols-2 gap-2 px-2 text-xs text-white/75 sm:grid-cols-4">
