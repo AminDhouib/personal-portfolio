@@ -22,7 +22,12 @@ function reasonOf(verdict: ReturnType<typeof spaceShooter>): string | null {
 describe("registry", () => {
   it("registers exactly the arcade game slugs", () => {
     expect(Object.keys(ARCADE_GAMES).sort()).toEqual([...ARCADE_GAME_SLUGS].sort());
-    expect([...ARCADE_GAME_SLUGS]).toEqual(["space-shooter", "hextris", "super-voltorb-flip"]);
+    expect([...ARCADE_GAME_SLUGS]).toEqual([
+      "space-shooter",
+      "hextris",
+      "super-voltorb-flip",
+      "tower-stacker",
+    ]);
   });
 
   it("keeps the legacy 10,000,000 score ceiling", () => {
@@ -284,5 +289,97 @@ describe("super-voltorb-flip (Daily board)", () => {
 describe("the legacy game list", () => {
   it("is exactly the two games that ever had a legacy leaderboard", () => {
     expect([...LEGACY_ARCADE_GAME_SLUGS]).toEqual(["space-shooter", "hextris"]);
+  });
+});
+
+describe("tower-stacker (daily tower)", () => {
+  const NOW = new Date("2026-10-15T12:00:00Z");
+  const today = 20261015;
+  const detail = (over: Partial<Record<string, unknown>> = {}) => ({
+    day: today,
+    blocks: 7,
+    perfects: 5,
+    streak: 5,
+    seconds: 7,
+    ...over,
+  });
+  const check = (score: number, d: unknown, now: Date = NOW) =>
+    validateArcadeSubmission("tower-stacker", score, d, now);
+
+  it("is an arcade game, and not a legacy one", () => {
+    expect(ARCADE_GAME_SLUGS).toContain("tower-stacker");
+    expect([...LEGACY_ARCADE_GAME_SLUGS]).toEqual(["space-shooter", "hextris"]);
+  });
+
+  it("accepts the scripted run and both ends of a score range", () => {
+    expect(check(220, detail())).toEqual({ ok: true, detail: detail() });
+    const twenty = detail({ blocks: 20, perfects: 6, streak: 3, seconds: 30 });
+    expect(check(290, twenty).ok).toBe(true);
+    expect(check(320, twenty).ok).toBe(true);
+    expect(check(300, twenty).ok).toBe(true);
+  });
+
+  it("rejects a score outside the range, or not a multiple of 10", () => {
+    const twenty = detail({ blocks: 20, perfects: 6, streak: 3, seconds: 30 });
+    for (const score of [280, 330, 305]) {
+      expect(check(score, twenty)).toEqual({
+        ok: false,
+        kind: "implausible",
+        reason: "score does not match the landings",
+      });
+    }
+  });
+
+  it("rejects counts that contradict each other", () => {
+    for (const d of [
+      detail({ perfects: 8 }), // more perfects than floors
+      detail({ streak: 6 }), // streak longer than the perfects
+      detail({ perfects: 2, streak: 0 }),
+    ]) {
+      expect(check(220, d)).toEqual({
+        ok: false,
+        kind: "implausible",
+        reason: "counts do not add up",
+      });
+    }
+    expect(check(30, detail({ blocks: 3, perfects: 0, streak: 0 })).ok).toBe(true);
+  });
+
+  it("caps floors by the run length (one per 400 ms, plus slack)", () => {
+    const at = (blocks: number) => detail({ blocks, perfects: 0, streak: 0, seconds: 10 });
+    expect(check(290, at(29)).ok).toBe(true);
+    expect(check(300, at(30))).toEqual({
+      ok: false,
+      kind: "implausible",
+      reason: "too many floors for the run length",
+    });
+  });
+
+  it("rejects any day but today's UTC day, and follows the supplied clock", () => {
+    for (const day of [20261014, 20261016]) {
+      expect(check(220, detail({ day }))).toEqual({
+        ok: false,
+        kind: "implausible",
+        reason: "not today's tower",
+      });
+    }
+    expect(check(220, detail(), new Date("2026-10-15T23:59:59Z")).ok).toBe(true);
+    expect(check(220, detail(), new Date("2026-10-16T00:00:00Z")).ok).toBe(false);
+  });
+
+  it("answers a malformed detail with kind detail (400)", () => {
+    const missingSeconds: Record<string, unknown> = detail();
+    delete missingSeconds.seconds;
+    for (const bad of [
+      {},
+      missingSeconds,
+      detail({ extra: 1 }),
+      detail({ blocks: 1.5 }),
+      detail({ blocks: -1 }),
+      detail({ day: "x" }),
+      null,
+    ]) {
+      expect(check(220, bad)).toEqual({ ok: false, kind: "detail", reason: "invalid detail" });
+    }
   });
 });

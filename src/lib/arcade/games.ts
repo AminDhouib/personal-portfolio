@@ -5,6 +5,9 @@ import {
   dailyBoard,
   dayNumber,
 } from "@/components/game/super-voltorb-flip/daily-board";
+import { dayNumber as towerDayNumber } from "@/components/game/tower-stacker/daily";
+import { maxBlocksFor } from "@/components/game/tower-stacker/engine";
+import { LAND_POINTS, scoreRange } from "@/components/game/tower-stacker/scoring";
 import { utcDayKey } from "./boards";
 
 /**
@@ -23,6 +26,7 @@ export const ARCADE_GAME_SLUGS = [
   "space-shooter",
   "hextris",
   "super-voltorb-flip",
+  "tower-stacker",
 ] as const satisfies readonly GameSlug[];
 
 export type ArcadeGameSlug = (typeof ARCADE_GAME_SLUGS)[number];
@@ -71,9 +75,20 @@ const voltorbDailyDetailSchema = z.strictObject({
   flips: z.number().int().min(0).max(25),
 });
 
+// Tower Stacker's daily tower: the UTC day (YYYYMMDD), floors landed, perfects, the
+// longest perfect streak and whole seconds of active play. checkTowerStacker decides.
+const towerDetailSchema = z.strictObject({
+  day: z.number().int().min(20_000_101).max(99_991_231),
+  blocks: z.number().int().min(0).max(99_999),
+  perfects: z.number().int().min(0).max(99_999),
+  streak: z.number().int().min(0).max(99_999),
+  seconds: z.number().int().min(0).max(86_399),
+});
+
 type SpaceShooterDetail = z.infer<typeof spaceShooterDetailSchema>;
 type HextrisDetail = z.infer<typeof hextrisDetailSchema>;
 type VoltorbDailyDetail = z.infer<typeof voltorbDailyDetailSchema>;
+type TowerDetail = z.infer<typeof towerDetailSchema>;
 
 /**
  * Orbital Dodge. s = seconds + 2 (floor, a stale UI sync, slack). Every term uses its
@@ -128,11 +143,31 @@ function checkVoltorbDaily(score: number, detail: VoltorbDailyDetail, now: Date)
   return reason === null ? { ok: true } : reject(reason);
 }
 
+/**
+ * Tower Stacker, daily tower. The day must be today's UTC day by the server clock (no
+ * grace across midnight, the Voltorb rule); the counts must agree; the engine spawns at
+ * most one block per CYCLE_MS of active play; and the score must lie in the range the
+ * landings allow. Ceilings on client numbers, not proof of an honest run.
+ */
+function checkTowerStacker(score: number, detail: TowerDetail, now: Date): Verdict {
+  if (detail.day !== towerDayNumber(utcDayKey(now))) return reject("not today's tower");
+  const range = scoreRange(detail.blocks, detail.perfects, detail.streak);
+  if (range === null) return reject("counts do not add up");
+  if (detail.blocks > maxBlocksFor(detail.seconds)) {
+    return reject("too many floors for the run length");
+  }
+  if (score % LAND_POINTS !== 0 || score < range.min || score > range.max) {
+    return reject("score does not match the landings");
+  }
+  return { ok: true };
+}
+
 /** Slug to strict detail schema; `validateArcadeSubmission` dispatches to the game's check. */
 export const ARCADE_GAMES = {
   "space-shooter": { detailSchema: spaceShooterDetailSchema },
   hextris: { detailSchema: hextrisDetailSchema },
   "super-voltorb-flip": { detailSchema: voltorbDailyDetailSchema },
+  "tower-stacker": { detailSchema: towerDetailSchema },
 } satisfies Record<ArcadeGameSlug, { detailSchema: z.ZodType }>;
 
 export type ArcadeSubmissionVerdict =
@@ -175,6 +210,10 @@ export function validateArcadeSubmission(
       return verdictFor(
         ARCADE_GAMES["super-voltorb-flip"].detailSchema.safeParse(rawDetail),
         (detail) => checkVoltorbDaily(score, detail, now),
+      );
+    case "tower-stacker":
+      return verdictFor(ARCADE_GAMES["tower-stacker"].detailSchema.safeParse(rawDetail), (detail) =>
+        checkTowerStacker(score, detail, now),
       );
   }
 }

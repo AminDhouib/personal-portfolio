@@ -435,7 +435,7 @@ describe("POST /api/arcade/scores", () => {
       ["score over the 10,000,000 cap", { score: 10_000_001 }],
       ["string score", { score: "100" }],
       ["unknown game", { game: "not-a-game" }],
-      ["a real game that is not in the arcade", { game: "tower-stacker" }],
+      ["a real game that is not in the arcade", { game: "password-game" }],
       ["missing detail field", { detail: { seconds: 60, kills: 40 } }],
       ["extra detail key (region is not accepted)", { detail: { ...SS_DETAIL, region: 1 } }],
       ["non-integer detail value", { detail: { ...SS_DETAIL, seconds: 1.5 } }],
@@ -537,6 +537,46 @@ describe("POST /api/arcade/scores", () => {
     });
   });
 
+  describe("Tower Stacker daily tower", () => {
+    const tower = (score: number, day: number) => ({
+      game: "tower-stacker",
+      score,
+      detail: { day, blocks: 7, perfects: 5, streak: 5, seconds: 7 },
+    });
+
+    it("accepts a scripted run and writes all three boards from the server clock", async () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+      const { res, json } = await submit(tower(220, 20261015));
+      expect(res.status).toBe(200);
+      expect(json.ok).toBe(true);
+      expect(emu.scores().map((s) => s.board)).toEqual([
+        "all-time",
+        "weekly:2026-W42",
+        "daily:2026-10-15",
+      ]);
+    });
+
+    it("rejects a score the landings cannot pay with 422 and writes nothing", async () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+      const { res, json } = await submit(tower(230, 20261015));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({
+        error: "implausible",
+        reason: "score does not match the landings",
+      });
+      expect(emu.scores()).toHaveLength(0);
+      expect(emu.players().size).toBe(0);
+    });
+
+    it("rejects yesterday's tower with 422", async () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+      const { res, json } = await submit(tower(220, 20261014));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "not today's tower" });
+      expect(emu.scores()).toHaveLength(0);
+    });
+  });
+
   describe("guard chain", () => {
     it("rejects a cross-origin request with 403 before touching the database", async () => {
       const res = await post(body(), { origin: "https://evil.example" });
@@ -620,7 +660,7 @@ describe("GET /api/arcade/scores", () => {
     ["missing board", "game=space-shooter"],
     ["missing game", "board=all-time"],
     ["unknown game", "game=nope&board=all-time"],
-    ["a real game that is not in the arcade", "game=tower-stacker&board=all-time"],
+    ["a real game that is not in the arcade", "game=password-game&board=all-time"],
     ["unknown board", "game=space-shooter&board=monthly"],
     ["malformed player", `game=space-shooter&board=all-time&player=xyz`],
   ])("returns 400 for %s", async (_name, query) => {
