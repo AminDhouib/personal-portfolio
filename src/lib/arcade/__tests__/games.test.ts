@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { dailyText } from "@/components/game/typing-speed/engine/daily";
 import {
   ARCADE_GAME_SLUGS,
   ARCADE_GAMES,
@@ -27,6 +28,7 @@ describe("registry", () => {
       "hextris",
       "super-voltorb-flip",
       "tower-stacker",
+      "typing-speed",
     ]);
   });
 
@@ -392,6 +394,81 @@ describe("tower-stacker (daily tower)", () => {
       null,
     ]) {
       expect(check(220, bad)).toEqual({ ok: false, kind: "detail", reason: "invalid detail" });
+    }
+  });
+});
+
+describe("typing-speed daily", () => {
+  const NOW = new Date("2026-10-08T12:00:00Z");
+  const L = dailyText("2026-10-08").text.length;
+  const detail = (over: Record<string, unknown> = {}) => ({
+    day: 20261008,
+    ms: L * 200,
+    chars: L,
+    acc: 97,
+    ...over,
+  });
+  const check = (score: number, d: unknown, now: Date = NOW) =>
+    validateArcadeSubmission("typing-speed", score, d, now);
+
+  it("accepts an honest run and the exact 300 WPM ceiling", () => {
+    expect(check(60, detail()).ok).toBe(true);
+    expect(check(300, detail({ ms: L * 40 })).ok).toBe(true);
+  });
+
+  it("rejects a run shorter than the text allows", () => {
+    expect(check(300, detail({ ms: L * 40 - 1 }))).toEqual({
+      ok: false,
+      kind: "implausible",
+      reason: "run shorter than the text allows",
+    });
+  });
+
+  it("rejects more characters than the text has", () => {
+    expect(check(61, detail({ ms: 60_000, chars: L + 5 }))).toEqual({
+      ok: false,
+      kind: "implausible",
+      reason: "more characters than the text has",
+    });
+  });
+
+  it("rejects a score that does not match the characters and time", () => {
+    for (const score of [59, 61]) {
+      expect(check(score, detail())).toEqual({
+        ok: false,
+        kind: "implausible",
+        reason: "score does not match the run",
+      });
+    }
+  });
+
+  it("rejects any day but today's UTC day, and follows the supplied clock", () => {
+    for (const day of [20261007, 20261009]) {
+      expect(check(60, detail({ day }))).toEqual({
+        ok: false,
+        kind: "implausible",
+        reason: "not today's text",
+      });
+    }
+    expect(check(60, detail(), new Date("2026-10-08T23:59:59Z")).ok).toBe(true);
+    expect(check(60, detail(), new Date("2026-10-09T00:00:00Z")).ok).toBe(false);
+  });
+
+  it("answers a malformed detail with kind detail (400)", () => {
+    const missingMs: Record<string, unknown> = detail();
+    delete missingMs.ms;
+    for (const bad of [
+      {},
+      missingMs,
+      detail({ extra: 1 }),
+      detail({ ms: 1.5 }),
+      detail({ ms: 0 }),
+      detail({ chars: 0 }),
+      detail({ acc: 101 }),
+      detail({ day: "x" }),
+      null,
+    ]) {
+      expect(check(60, bad)).toEqual({ ok: false, kind: "detail", reason: "invalid detail" });
     }
   });
 });

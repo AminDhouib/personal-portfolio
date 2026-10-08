@@ -8,6 +8,11 @@ import {
 import { dayNumber as towerDayNumber } from "@/components/game/tower-stacker/daily";
 import { maxBlocksFor } from "@/components/game/tower-stacker/engine";
 import { LAND_POINTS, scoreRange } from "@/components/game/tower-stacker/scoring";
+import {
+  checkTypingDaily,
+  dailyText,
+  dayNumber as typingDayNumber,
+} from "@/components/game/typing-speed/engine/daily";
 import { utcDayKey } from "./boards";
 
 /**
@@ -27,6 +32,7 @@ export const ARCADE_GAME_SLUGS = [
   "hextris",
   "super-voltorb-flip",
   "tower-stacker",
+  "typing-speed",
 ] as const satisfies readonly GameSlug[];
 
 export type ArcadeGameSlug = (typeof ARCADE_GAME_SLUGS)[number];
@@ -89,10 +95,20 @@ const towerDetailSchema = z.strictObject({
   seconds: z.number().int().min(0).max(TOWER_MAX_SECONDS),
 });
 
+// Typing Speed's daily text: the UTC day (YYYYMMDD), the run's whole milliseconds, the net
+// characters typed and the accuracy percent. checkTypingDailyAt decides; the bounds are loose.
+const typingDetailSchema = z.strictObject({
+  day: z.number().int().min(20_000_101).max(99_991_231),
+  ms: z.number().int().min(1).max(3_600_000),
+  chars: z.number().int().min(1).max(5_000),
+  acc: z.number().int().min(0).max(100),
+});
+
 type SpaceShooterDetail = z.infer<typeof spaceShooterDetailSchema>;
 type HextrisDetail = z.infer<typeof hextrisDetailSchema>;
 type VoltorbDailyDetail = z.infer<typeof voltorbDailyDetailSchema>;
 type TowerDetail = z.infer<typeof towerDetailSchema>;
+type TypingDetail = z.infer<typeof typingDetailSchema>;
 
 /**
  * Orbital Dodge. s = seconds + 2 (floor, a stale UI sync, slack). Every term uses its
@@ -166,12 +182,26 @@ function checkTowerStacker(score: number, detail: TowerDetail, now: Date): Verdi
   return { ok: true };
 }
 
+/**
+ * Typing Speed, daily text. The day must be today's UTC day by the server clock (no grace
+ * across midnight); the server regenerates that day's text and bounds the run by its
+ * length (checkTypingDaily: 300 WPM ceiling, chars <= text, score = net WPM of the run).
+ * Ceilings on client numbers, not proof of an honest run.
+ */
+function checkTypingDailyAt(score: number, detail: TypingDetail, now: Date): Verdict {
+  const today = utcDayKey(now);
+  if (detail.day !== typingDayNumber(today)) return reject("not today's text");
+  const reason = checkTypingDaily(dailyText(today).text.length, score, detail);
+  return reason === null ? { ok: true } : reject(reason);
+}
+
 /** Slug to strict detail schema; `validateArcadeSubmission` dispatches to the game's check. */
 export const ARCADE_GAMES = {
   "space-shooter": { detailSchema: spaceShooterDetailSchema },
   hextris: { detailSchema: hextrisDetailSchema },
   "super-voltorb-flip": { detailSchema: voltorbDailyDetailSchema },
   "tower-stacker": { detailSchema: towerDetailSchema },
+  "typing-speed": { detailSchema: typingDetailSchema },
 } satisfies Record<ArcadeGameSlug, { detailSchema: z.ZodType }>;
 
 export type ArcadeSubmissionVerdict =
@@ -218,6 +248,10 @@ export function validateArcadeSubmission(
     case "tower-stacker":
       return verdictFor(ARCADE_GAMES["tower-stacker"].detailSchema.safeParse(rawDetail), (detail) =>
         checkTowerStacker(score, detail, now),
+      );
+    case "typing-speed":
+      return verdictFor(ARCADE_GAMES["typing-speed"].detailSchema.safeParse(rawDetail), (detail) =>
+        checkTypingDailyAt(score, detail, now),
       );
   }
 }
