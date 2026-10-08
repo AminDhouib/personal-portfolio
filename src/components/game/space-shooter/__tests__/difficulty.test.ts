@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   difficulty,
+  EARLY_BOOST,
+  EARLY_FADE_S,
   elapsedSeconds,
   comboMultiplier,
   comboColor,
@@ -11,6 +13,8 @@ import type { GameRefs } from "../types";
 // Characterization tests: pin the CURRENT behavior of the pure difficulty
 // helpers. These are not aspirational -- every asserted value was derived by
 // evaluating the shipped formulas, so they lock in the implementation as-is.
+// The late-time values (t >= EARLY_FADE_S) and the cap are unchanged from the
+// pre-boost curve; only the early values moved with the early boost.
 //
 // difficulty() and elapsedSeconds() both read `performance.now() - g.startedAt`,
 // so the elapsed seconds `t` is controlled by fixing `g.startedAt` and stubbing
@@ -45,10 +49,10 @@ describe("difficulty helpers", () => {
 
   describe("difficulty (desktop)", () => {
     const cases: Array<[number, number]> = [
-      [0, 0.25], // sqrt(0)*0.22 + 0.25 = 0.25
-      [1, 0.47], // sqrt(1)*0.22 + 0.25 = 0.47
-      [4, 0.69], // sqrt(4)=2 -> 2*0.22 + 0.25 = 0.69
-      [25, 1.35], // sqrt(25)=5 -> 5*0.22 + 0.25 = 1.35
+      [0, 0.6], // 0.25 + 0 + 0.35 boost
+      [1, 0.47 + 0.35 * (1 - 1 / 45)],
+      [4, 0.69 + 0.35 * (1 - 4 / 45)],
+      [45, 0.25 + Math.sqrt(45) * 0.22], // boost fully faded
       [100, 2.45], // sqrt(100)=10 -> 10*0.22 + 0.25 = 2.45
     ];
     for (const [seconds, expected] of cases) {
@@ -70,7 +74,7 @@ describe("difficulty helpers", () => {
   describe("difficulty (mobile)", () => {
     it("scales the desktop value by 0.88", () => {
       vi.spyOn(performance, "now").mockReturnValue(0);
-      expect(difficulty(refAt(0, true))).toBeCloseTo(0.25 * 0.88, 10);
+      expect(difficulty(refAt(0, true))).toBeCloseTo(0.6 * 0.88, 10);
     });
 
     it("caps at 3.0 * 0.88 = 2.64 for large t", () => {
@@ -156,6 +160,31 @@ describe("difficulty helpers", () => {
         "zapper",
         "drone",
       ]);
+    });
+  });
+
+  describe("difficulty early boost", () => {
+    const at = (s: number, mobile = false) => {
+      vi.spyOn(performance, "now").mockReturnValue(s * 1000);
+      return difficulty(refAt(s * 1000, mobile));
+    };
+
+    it("starts at 0.6 instead of 0.25", () => {
+      expect(at(0)).toBeCloseTo(0.6, 5);
+    });
+
+    it("fades the boost out by EARLY_FADE_S", () => {
+      expect(at(10)).toBeCloseTo(
+        0.25 + Math.sqrt(10) * 0.22 + EARLY_BOOST * (1 - 10 / EARLY_FADE_S),
+        5,
+      );
+      expect(at(EARLY_FADE_S)).toBeCloseTo(0.25 + Math.sqrt(EARLY_FADE_S) * 0.22, 5);
+      expect(at(100)).toBeCloseTo(0.25 + Math.sqrt(100) * 0.22, 5);
+    });
+
+    it("keeps the cap and the mobile factor", () => {
+      expect(at(10_000)).toBe(3);
+      expect(at(0, true)).toBeCloseTo(0.6 * 0.88, 5);
     });
   });
 });

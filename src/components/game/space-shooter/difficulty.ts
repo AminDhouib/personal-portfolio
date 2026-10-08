@@ -1,8 +1,13 @@
 import type { GameRefs, ObstacleVariant } from "./types";
 
+// Extra ramp at the very start of a run, fading linearly to zero by
+// EARLY_FADE_S so the late-game curve and the cap are untouched.
+export const EARLY_BOOST = 0.35;
+export const EARLY_FADE_S = 45;
+
 export function difficulty(g: GameRefs): number {
   const t = (performance.now() - g.startedAt) / 1000;
-  const ramp = 0.25 + Math.sqrt(t) * 0.22;
+  const ramp = 0.25 + Math.sqrt(t) * 0.22 + EARLY_BOOST * Math.max(0, 1 - t / EARLY_FADE_S);
   const base = Math.min(ramp, 3.0);
   return g.isMobile ? base * 0.88 : base;
 }
