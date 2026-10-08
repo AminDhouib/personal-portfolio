@@ -325,6 +325,9 @@ export interface GameRefs {
   powerUps: PowerUp[];
   coins: Coin[];
   coinsThisRun: number;
+  // Pickup count and the extra coins the Coin Boost added, for the death card.
+  coinPickupsThisRun: number;
+  coinBoostBonusThisRun: number;
   shipFireRateMul: number;
   shipDamageMul: number;
   shipAgilityMul: number;

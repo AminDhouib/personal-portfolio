@@ -258,6 +258,8 @@ describe("run-init", () => {
       g.comboTier = 2;
       g.comboTierUpAt = 77;
       g.coinsThisRun = 30;
+      g.coinPickupsThisRun = 4;
+      g.coinBoostBonusThisRun = 8;
       g.bossesDefeatedThisRun = 2;
       g.damageTakenThisRun = 1;
       g.bossScheduleIdx = 3;
@@ -311,6 +313,8 @@ describe("run-init", () => {
         "kills",
         "distance",
         "coinsThisRun",
+        "coinPickupsThisRun",
+        "coinBoostBonusThisRun",
         "bossesDefeatedThisRun",
         "damageTakenThisRun",
         "normalSpawningPausedUntil",

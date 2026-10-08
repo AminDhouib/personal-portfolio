@@ -73,3 +73,27 @@ export function postRunGoals(input: {
   }
   return { bar, unlock };
 }
+
+export interface CoinRow {
+  label: string;
+  amount: number;
+}
+
+/**
+ * Where a run's coins came from. onDeath banks exactly `coinsThisRun`, so the
+ * rows always sum to `total`: base pickup value, plus whatever the Coin Boost
+ * power-up added on top.
+ */
+export function coinBreakdown(input: {
+  total: number;
+  boostBonus: number;
+  pickups: number;
+}): CoinRow[] {
+  const { total, boostBonus, pickups } = input;
+  if (total <= 0) return [];
+  const rows: CoinRow[] = [
+    { label: `${pickups} ${pickups === 1 ? "pickup" : "pickups"}`, amount: total - boostBonus },
+  ];
+  if (boostBonus > 0) rows.push({ label: "Coin Boost", amount: boostBonus });
+  return rows;
+}

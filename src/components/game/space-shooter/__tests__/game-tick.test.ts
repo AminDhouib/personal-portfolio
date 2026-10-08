@@ -607,3 +607,46 @@ describe("death beat", () => {
     expect(onDeath).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("coin breakdown tracking", () => {
+  beforeEach(() => {
+    stubMatchMedia();
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("counts pickups and the part of each coin the boost added", () => {
+    const g = createRefs();
+    let clock = 100_000;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    startVulnerableRun(g, clock);
+    g.coinBoostMul = 2;
+    g.coins.push({
+      id: 1,
+      x: g.shipX,
+      y: g.shipY,
+      z: g.shipZ,
+      rx: 0,
+      ry: 0,
+      rz: 0,
+      vx: 0,
+      vy: 0,
+      value: 3,
+    });
+    clock += 16;
+    runTick(
+      g,
+      0.016,
+      VIEWPORT,
+      () => {},
+      () => {},
+    );
+    expect(g.coinsThisRun).toBe(6);
+    expect(g.coinPickupsThisRun).toBe(1);
+    expect(g.coinBoostBonusThisRun).toBe(3);
+  });
+});

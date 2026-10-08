@@ -64,7 +64,7 @@ import {
 import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
 import { PanelClose } from "./space-shooter/panel-close";
 import { CountUp } from "./space-shooter/count-up";
-import { postRunGoals, unownedCatalog } from "./space-shooter/post-run";
+import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/post-run";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -134,6 +134,8 @@ interface UiState {
   comboPeak: number;
   comboFlash: boolean;
   coinsThisRun: number;
+  coinPickups: number;
+  coinBoostBonus: number;
   active: { type: PowerUpType; remainingMs: number }[];
   objectCounts: {
     obstacles: number;
@@ -196,6 +198,8 @@ function createInitialUiState(): UiState {
     comboPeak: 1,
     comboFlash: false,
     coinsThisRun: 0,
+    coinPickups: 0,
+    coinBoostBonus: 0,
     active: [],
     objectCounts: { obstacles: 0, bossProjectiles: 0, explosions: 0 },
     dashCooldown: { pct: 1, onCooldown: false },
@@ -233,6 +237,8 @@ function createUiStateFromGame(g: GameRefs, now: number): UiState {
     comboPeak: g.comboPeak,
     comboFlash: g.comboTierUpAt > 0 && now - g.comboTierUpAt < COMBO_FLASH_MS,
     coinsThisRun: g.coinsThisRun,
+    coinPickups: g.coinPickupsThisRun,
+    coinBoostBonus: g.coinBoostBonusThisRun,
     active: g.activePowerUps.map((p) => ({
       type: p.type,
       remainingMs: Math.max(0, p.expiresAt - now),
@@ -774,6 +780,9 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
         ...u,
         status: "dead",
         score: final,
+        coinsThisRun: g.coinsThisRun,
+        coinPickups: g.coinPickupsThisRun,
+        coinBoostBonus: g.coinBoostBonusThisRun,
         kills: g.kills,
         distance: Math.floor(g.distance),
       }));
@@ -1979,6 +1988,19 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                   >
                     <CoinsIcon className="h-4 w-4" />+<CountUp target={ui.coinsThisRun} /> coins
                   </motion.div>
+                )}
+                {ui.coinsThisRun > 0 && (
+                  <ul className="mt-1 text-xs text-white/60">
+                    {coinBreakdown({
+                      total: ui.coinsThisRun,
+                      boostBonus: ui.coinBoostBonus,
+                      pickups: ui.coinPickups,
+                    }).map((row) => (
+                      <li key={row.label}>
+                        {row.label}: +{row.amount}
+                      </li>
+                    ))}
+                  </ul>
                 )}
                 <div className="mx-auto mt-3 grid max-w-md grid-cols-2 gap-2 px-2 text-xs text-white/75 sm:grid-cols-4">
                   <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">

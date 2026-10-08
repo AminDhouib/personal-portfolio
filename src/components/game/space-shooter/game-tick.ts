@@ -847,6 +847,8 @@ export function runTick(
     if (d3 < pickupR) {
       const val = Math.round(c.value * g.coinBoostMul);
       g.coinsThisRun += val;
+      g.coinPickupsThisRun += 1;
+      g.coinBoostBonusThisRun += val - c.value;
       spawnScorePopup(g, c.x, c.y, c.z, val, "coins");
       sounds.play("chime");
       // Sparkle burst — a warm amber flash + a few offset flecks for sparkle feel
