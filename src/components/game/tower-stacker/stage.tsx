@@ -21,6 +21,7 @@ import { createTowerAudio, type TowerAudio } from "./audio";
 import { CornerTick, Hud, OverCard, type HudState } from "./hud";
 import { stageLayout, type StageLayout } from "./layout";
 import { PULSE_MS, paintFrame } from "./painter";
+import { usePlaySheet } from "./play-sheet";
 import { CUES, perfectCue } from "./sound-cues";
 import { useTowerLoop } from "./use-tower-loop";
 
@@ -73,6 +74,8 @@ export function Stage({ seedText }: { seedText?: string }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const startRef = useRef<HTMLButtonElement | null>(null);
+  const { sheet, enter: enterSheet, exit: exitSheet } = usePlaySheet();
 
   const [phase, setPhase] = useState<Phase>("ready");
   const [hud, setHud] = useState<HudState>(EMPTY_HUD);
@@ -121,9 +124,11 @@ export function Stage({ seedText }: { seedText?: string }) {
     if (!el) return;
     const apply = () => {
       const next = stageLayout({
-        containerWidth: el.parentElement?.clientWidth || el.clientWidth || 440,
+        containerWidth: sheet
+          ? window.innerWidth
+          : el.parentElement?.clientWidth || el.clientWidth || 440,
         viewportHeight: window.innerHeight || 900,
-        sheet: false,
+        sheet,
       });
       layoutRef.current = next;
       setLayout((prev) =>
@@ -133,7 +138,7 @@ export function Stage({ seedText }: { seedText?: string }) {
     apply();
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
-  }, []);
+  }, [sheet]);
 
   // ---- painting ----------------------------------------------------------
   const paint = useCallback(
@@ -219,7 +224,8 @@ export function Stage({ seedText }: { seedText?: string }) {
     setCallout(null);
     setSettled(false);
     setPhaseBoth("live");
-  }, [seedText, setPhaseBoth]);
+    enterSheet();
+  }, [seedText, setPhaseBoth, enterSheet]);
 
   const resume = useCallback(() => {
     const run = runRef.current;
@@ -309,7 +315,22 @@ export function Stage({ seedText }: { seedText?: string }) {
 
   useEffect(() => {
     if (phase === "over") cardRef.current?.focus();
+    if (phase === "ready") startRef.current?.focus({ preventScroll: true });
   }, [phase]);
+
+  // Exit abandons the run and puts the stage back on the ready screen.
+  const leave = useCallback(() => {
+    runRef.current = null;
+    debrisRef.current = [];
+    pulsesRef.current = [];
+    cameraRef.current = { x: 0, y: 0 };
+    setHud(EMPTY_HUD);
+    setAnnouncement("");
+    setMilestone(null);
+    setCallout(null);
+    setPhaseBoth("ready");
+    exitSheet();
+  }, [exitSheet, setPhaseBoth]);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -326,13 +347,22 @@ export function Stage({ seedText }: { seedText?: string }) {
   };
 
   return (
-    <div className="relative flex w-full flex-col items-center gap-2">
-      <div
-        className="text-foreground/40 flex w-full items-end justify-between font-mono text-[10px] tracking-[0.3em] uppercase"
-        style={{ maxWidth: layout.cssWidth }}
-      >
-        <span>TWR-01 / REV.A</span>
-      </div>
+    <div
+      data-testid="tower-sheet"
+      className={
+        sheet
+          ? "fixed inset-0 z-80 flex h-[100dvh] w-screen flex-col items-center justify-center overscroll-contain bg-[#05070d]"
+          : "relative flex w-full flex-col items-center gap-2"
+      }
+    >
+      {!sheet && (
+        <div
+          className="text-foreground/40 flex w-full items-end justify-between font-mono text-[10px] tracking-[0.3em] uppercase"
+          style={{ maxWidth: layout.cssWidth }}
+        >
+          <span>TWR-01 / REV.A</span>
+        </div>
+      )}
       <div
         ref={(el) => {
           rootRef.current = el;
@@ -379,6 +409,15 @@ export function Stage({ seedText }: { seedText?: string }) {
           />
         )}
 
+        {sheet && (
+          <button
+            type="button"
+            onClick={leave}
+            className="text-foreground/70 hover:text-foreground absolute top-[calc(env(safe-area-inset-top)+0.5rem)] left-2 z-40 flex min-h-11 min-w-11 items-center justify-center px-2 font-mono text-[10px] tracking-[0.25em] uppercase"
+          >
+            Exit
+          </button>
+        )}
         <button
           type="button"
           onClick={toggleMute}
@@ -400,6 +439,7 @@ export function Stage({ seedText }: { seedText?: string }) {
               </p>
             )}
             <button
+              ref={startRef}
               type="button"
               onClick={startRun}
               className="min-h-11 min-w-11 border border-accent-red/70 bg-accent-red/10 px-8 py-2 font-mono text-xs font-bold tracking-[0.3em] text-accent-red uppercase transition hover:border-accent-red hover:bg-accent-red/20"
