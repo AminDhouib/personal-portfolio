@@ -13,10 +13,11 @@ import type { EngineAction, Piece, RunState, TimedAction } from "./types";
 /** Rush multiplies the fall speed while held (spec section 3.2). */
 export const RUSH_FACTOR = 4;
 
-// Float slack so that, say, sixty 1000/60 ms frames run exactly the 120 ticks one 1000 ms call
-// does.
-const TICK_SLACK = 1e-9;
-const CARRY_PRECISION = 1e6;
+// Time inside `advance` is counted in whole sub-tick units (a million per tick, so 120,000 per
+// ms) rather than float milliseconds, so no frame split can move a tick boundary: many short
+// frames run exactly the ticks one long call of the same total does.
+const UNITS_PER_MS = 120_000;
+const TICK_UNITS = 1_000_000;
 
 export function start(state: RunState): void {
   if (state.phase !== "ready") return;
@@ -127,17 +128,24 @@ function tick(state: RunState): void {
 }
 
 /**
- * Runs `ms` of real time. `input` actions are applied at the first tick boundary at or after
- * their `atMs` (measured from the start of this call); any left over apply at the end.
+ * Runs `ms` of real time. Each `input` action is applied just before the tick whose time span
+ * contains its `atMs` (measured from the start of this call); any left over apply at the end.
+ * A non-finite or negative `ms` is ignored.
  */
 export function advance(state: RunState, ms: number, input: readonly TimedAction[] = []): void {
+  if (!Number.isFinite(ms) || ms < 0) return;
   const actions = [...input].sort((a, b) => a.atMs - b.atMs);
   let next = 0;
-  const budget = state.carryMs + Math.max(0, ms);
-  const ticks = Math.floor(budget / TICK_MS + TICK_SLACK);
+  // `carryMs` always holds a whole number of units, so this round trip is exact.
+  const carry = Math.round(state.carryMs * UNITS_PER_MS);
+  const budget = carry + Math.round(ms * UNITS_PER_MS);
+  const ticks = Math.floor(budget / TICK_UNITS);
   for (let k = 0; k < ticks; k++) {
-    const tickStart = k * TICK_MS - state.carryMs;
-    while (next < actions.length && (actions[next]?.atMs ?? Infinity) <= tickStart) {
+    const tickEnd = (k + 1) * TICK_UNITS - carry;
+    while (
+      next < actions.length &&
+      Math.round((actions[next]?.atMs ?? 0) * UNITS_PER_MS) < tickEnd
+    ) {
       const due = actions[next];
       next += 1;
       if (due) applyAction(state, due.action);
@@ -148,6 +156,5 @@ export function advance(state: RunState, ms: number, input: readonly TimedAction
     const due = actions[next];
     if (due) applyAction(state, due.action);
   }
-  const carry = budget - ticks * TICK_MS;
-  state.carryMs = Math.max(0, Math.round(carry * CARRY_PRECISION) / CARRY_PRECISION);
+  state.carryMs = (budget - ticks * TICK_UNITS) / UNITS_PER_MS;
 }

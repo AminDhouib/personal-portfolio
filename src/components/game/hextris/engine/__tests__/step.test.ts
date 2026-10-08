@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { advance, applyAction, releaseRush, rotate, setRush, start } from "../step";
-import { TICK_MS, createRun, wrapSide } from "../state";
+import { TICK_MS, createRun, drainEvents, wrapSide } from "../state";
 import type { EngineEvent, RunState, TimedAction } from "../types";
 
 function playing(seed: number): RunState {
@@ -39,7 +39,8 @@ describe("advance", () => {
   it("is deterministic: the same seed and script give the same state after 120 s", () => {
     const a = runScripted(5);
     const b = runScripted(5);
-    expect(a.elapsedMs).toBeGreaterThan(0);
+    expect(a.phase).toBe("over");
+    expect(a.cellsCleared).toBeGreaterThan(0);
     expect(a).toEqual(b);
     expect(runScripted(6)).not.toEqual(a);
   });
@@ -53,6 +54,48 @@ describe("advance", () => {
     expect(once.elapsedMs).toBeCloseTo(1000, 6);
   });
 
+  it("plays 40 s with turns the same at any frame rate, event for event", () => {
+    function run(frameMs: number): { s: RunState; events: EngineEvent[] } {
+      const s = playing(77);
+      const events: EngineEvent[] = [];
+      // Turn every 500 ms of play: both frame lengths divide 500 ms exactly.
+      for (let half = 0; half < 80; half++) {
+        const n = Math.round(500 / frameMs);
+        for (let i = 0; i < n; i++) advance(s, frameMs);
+        rotate(s, half % 3 === 0 ? -1 : 1);
+        events.push(...drainEvents(s));
+      }
+      return { s, events };
+    }
+    const coarse = run(500);
+    const fine = run(1000 / 60);
+    expect(fine.events).toEqual(coarse.events);
+    expect(fine.s).toEqual(coarse.s);
+    expect(coarse.events.filter((e) => e.type === "settle").length).toBeGreaterThan(10);
+  });
+
+  it("runs the same ticks for many odd frames as for one call of the same total", () => {
+    const frames = playing(3);
+    for (let i = 0; i < 6000; i++) advance(frames, 16.7);
+    const once = playing(3);
+    advance(once, 100_200);
+    expect(frames.ticks).toBe(12_024);
+    expect(frames).toEqual(once);
+  });
+
+  it("ignores a non-finite or negative frame and keeps running afterwards", () => {
+    const s = playing(4);
+    advance(s, 100);
+    const before = structuredClone(s);
+    advance(s, Number.NaN);
+    advance(s, Number.POSITIVE_INFINITY);
+    advance(s, -50);
+    expect(s).toEqual(before);
+    advance(s, 100);
+    expect(s.elapsedMs).toBeGreaterThan(before.elapsedMs);
+    expect(Number.isFinite(s.carryMs)).toBe(true);
+  });
+
   it("does nothing before the run starts", () => {
     const s = createRun({ seed: 1 });
     advance(s, 5000);
@@ -60,11 +103,20 @@ describe("advance", () => {
     expect(s.falling).toEqual([]);
   });
 
-  it("applies timed actions at the next tick boundary", () => {
+  it("applies a timed action before the tick whose time span contains it", () => {
     const s = playing(2);
+    // 40 ms falls in the fifth tick (33.3 to 41.7 ms), so four ticks have run.
     advance(s, 100, [{ atMs: 40, action: "rotate-cw" }]);
     expect(s.facing).toBe(1);
-    expect(s.rotationAt).toBeCloseTo(5 * TICK_MS, 6);
+    expect(s.rotationAt).toBeCloseTo(4 * TICK_MS, 6);
+  });
+
+  it("applies an action at 0 ms before the first tick even with time carried over", () => {
+    const s = playing(2);
+    advance(s, 5);
+    expect(s.ticks).toBe(0);
+    advance(s, 100, [{ atMs: 0, action: "rotate-cw" }]);
+    expect(s.rotationAt).toBe(0);
   });
 
   it("starts a run from an action", () => {
