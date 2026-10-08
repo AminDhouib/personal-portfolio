@@ -182,7 +182,7 @@ test.describe("Typing Speed", () => {
     await page.route("**/api/arcade/scores**", async (route) => {
       const request = route.request();
       if (request.method() === "POST") {
-        posts.push(JSON.parse(request.postData() ?? "{}"));
+        posts.push(request.postDataJSON());
         await route.fulfill({
           json: {
             ok: true,
