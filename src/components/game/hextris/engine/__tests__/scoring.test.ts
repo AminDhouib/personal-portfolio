@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveClears } from "../match";
-import { CHAIN_WINDOW_MS, clearPoints, expireCombo } from "../scoring";
+import { CHAIN_WINDOW_MS, clearPoints, expireCombo, hitStopMs } from "../scoring";
 import type { EngineEvent, RunState } from "../types";
 import { boardState, sidesOf } from "./boards";
 
@@ -52,6 +52,36 @@ describe("the idle guard (spec section 6.9)", () => {
     expect(s.sides[0]).toEqual([]);
     expect(s.score).toBe(0);
     expect(ofType(s.events, "clean-sweep")).toEqual([]);
+  });
+});
+
+describe("hit-stop (spec section 3.8)", () => {
+  it("is 0 for a plain clear of 3, 60 ms for 4 or more cells and 90 ms for a chain", () => {
+    expect(hitStopMs(3, false)).toBe(0);
+    expect(hitStopMs(4, false)).toBe(60);
+    expect(hitStopMs(12, false)).toBe(60);
+    expect(hitStopMs(3, true)).toBe(90);
+    expect(hitStopMs(9, true)).toBe(90);
+  });
+
+  it("sets freezeUntilMs from the clear, keeping whichever hold ends later", () => {
+    const s = boardState({});
+    s.elapsedMs = 1000;
+    clearThree(s);
+    expect(s.freezeUntilMs).toBe(0);
+    s.elapsedMs = 1200;
+    clearThree(s);
+    // Inside 400 ms of the last clear: a chain.
+    expect(s.freezeUntilMs).toBe(1290);
+    s.elapsedMs = 1210;
+    s.sides[1] = [0, 1, 2, 3].map(() => ({ colour: 1 as const, special: "none" as const }));
+    s.lastClearAtMs = -1;
+    resolveClears(s, 1, 3);
+    expect(s.freezeUntilMs).toBe(1290);
+    s.elapsedMs = 5000;
+    s.sides[1] = [0, 1, 2, 3].map(() => ({ colour: 1 as const, special: "none" as const }));
+    resolveClears(s, 1, 3);
+    expect(s.freezeUntilMs).toBe(5060);
   });
 });
 

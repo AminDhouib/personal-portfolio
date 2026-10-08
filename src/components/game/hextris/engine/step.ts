@@ -163,8 +163,11 @@ function tick(state: RunState): void {
   state.ticks += 1;
   state.elapsedMs = state.ticks * TICK_MS;
   checkAway(state);
-  runDirector(state);
-  movePieces(state);
+  // Hit-stop (spec section 3.8): the clock runs on, but nothing falls or spawns.
+  if (state.elapsedMs >= state.freezeUntilMs) {
+    runDirector(state);
+    movePieces(state);
+  }
   if (state.phase !== "playing") return;
   expireCombo(state);
   tickBoundary(state);

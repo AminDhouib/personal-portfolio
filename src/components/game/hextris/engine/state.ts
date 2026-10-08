@@ -41,6 +41,7 @@ export function createRun(options: { seed: number }): RunState {
     ticks: 0,
     elapsedMs: 0,
     carryMs: 0,
+    freezeUntilMs: 0,
     level: 1,
     nextSpawnAtMs: 0,
     queue: [],

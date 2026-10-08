@@ -111,6 +111,11 @@ export interface RunState {
   elapsedMs: number;
   /** Real time not yet consumed by a whole tick. */
   carryMs: number;
+  /**
+   * Hit-stop (spec section 3.8): ticks that start before this `elapsedMs` move no pieces and
+   * release no spawns. The clock, the combo window and the boundary keep running.
+   */
+  freezeUntilMs: number;
   level: number;
   nextSpawnAtMs: number;
   queue: QueuedSpawn[];
