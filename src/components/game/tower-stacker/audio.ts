@@ -27,7 +27,7 @@ export interface TowerAudio {
   close(): void;
 }
 
-function readMuted(): boolean {
+export function readMuted(): boolean {
   if (typeof window === "undefined") return false;
   try {
     return window.localStorage.getItem(SOUND_KEY) === "0";

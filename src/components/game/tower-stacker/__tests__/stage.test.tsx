@@ -202,3 +202,12 @@ describe("held keys", () => {
     expect(stage().dataset.floors).toBe("0");
   });
 });
+
+describe("persisted mute", () => {
+  it("starts muted, with the right label, when storage says muted", () => {
+    localStorage.setItem("tower:sound", "0");
+    render(<Stage seedText="e2e" />);
+    expect(screen.getByRole("button", { name: "Unmute sound" })).toBeTruthy();
+    localStorage.clear();
+  });
+});
