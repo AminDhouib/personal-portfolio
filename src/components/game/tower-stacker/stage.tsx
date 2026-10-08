@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { cameraTarget, stepCamera, type Camera } from "./camera";
 import { dropKey, isTextEntryTarget, shouldBlockScroll } from "./controls";
 import { freeSeed } from "./daily";
@@ -17,7 +17,7 @@ import {
   type DropOutcome,
   type TowerRun,
 } from "./engine";
-import { createTowerAudio, type TowerAudio } from "./audio";
+import { createTowerAudio, readMuted, type TowerAudio } from "./audio";
 import { CornerTick, Hud, OverCard, type HudState } from "./hud";
 import { stageLayout, type StageLayout } from "./layout";
 import { PULSE_MS, paintFrame } from "./painter";
@@ -45,6 +45,10 @@ const EMPTY_HUD: HudState = {
 };
 
 /** The first-run hint stays until the first landing; kept in memory for this page load. */
+function noopSubscribe(): () => void {
+  return () => undefined;
+}
+
 let hintDismissed = false;
 
 function randomSeed(): number {
@@ -89,7 +93,10 @@ export function Stage({ seedText }: { seedText?: string }) {
   const [milestone, setMilestone] = useState<number | null>(null);
   const [callout, setCallout] = useState<string | null>(null);
   const [best, setBest] = useState(0);
-  const [muted, setMuted] = useState(false);
+  // The stored choice (false on the server, so hydration agrees); a click overrides it.
+  const storedMuted = useSyncExternalStore(noopSubscribe, readMuted, () => false);
+  const [mutedChoice, setMuted] = useState<boolean | null>(null);
+  const muted = mutedChoice ?? storedMuted;
   const [showHint, setShowHint] = useState(() => !hintDismissed);
   const [settled, setSettled] = useState(false);
 
