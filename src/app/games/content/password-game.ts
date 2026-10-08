@@ -33,6 +33,11 @@ export const passwordGameContent: GameContent = {
       input: "Seed chip",
       action: "Click it to copy a link that replays your seed.",
     },
+    {
+      input: "Sound button",
+      action:
+        "Sound is on once you start a run; use the speaker button to mute it. The choice is remembered.",
+    },
   ],
   strategy: [
     "Recheck every rule after each event. Events delete, rewrite and add letters, so a green rule can turn red.",
