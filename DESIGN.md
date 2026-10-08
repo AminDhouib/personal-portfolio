@@ -386,10 +386,10 @@ current tree on 2026-07-07.
   `NeedsWebGL` notice instead. A software-rendered context still counts as WebGL: the gate asks
   whether three.js can start, not how fast it will run. A new Canvas outside those two wrappers
   needs the same gate.
-- **The `/games` grid shows 5 cards, not 6, on purpose.** `games-meta.ts` marks `tower-stacker`
-  `hidden: true`, taking it out of rotation without deleting any code — the route still works if
+- **The `/games` grid shows all 6 games.** No game is currently `hidden`; the flag in `games-meta.ts`
+  stays as the way to take a game out of rotation without deleting code (the route still works if
   visited directly, but its page is `noindex` and it is left out of the sitemap and every "other
-  games" list. `password-game` (The Password Game 2) is `external: true`: its card is live in
+  games" list). Tower Stacker was hidden until its first-party rebuild. `password-game` (The Password Game 2) is `external: true`: its card is live in
   the grid, but it links to its own top-level route (`/games/password-game`) outside the shared
   game-loader rather than to a `[slug]` page; it is still in the sitemap. The first public game
   renders as a featured card spanning both columns, so an odd count never leaves a lone card in
@@ -459,7 +459,7 @@ current tree on 2026-07-07.
   (capped at the starting width), points are 10 per trim and 20 to 60 per perfect. There are no
   lives, on purpose: the tower cannot drift out of reach, because the crane sweeps around the
   top slab. Do not tune a constant without updating its pin and the copy in
-  `games/content/tower-stacker.ts`. The game stays `hidden: true` until the owner un-hides it.
+  `games/content/tower-stacker.ts`.
 - **Tower Stacker keeps its blueprint palette in both themes, deliberately.** The canvas uses
   `tower-stacker/palette.ts`, not the site tokens; do not wire it to the theme toggle.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their

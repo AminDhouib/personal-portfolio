@@ -64,7 +64,6 @@ export const GAMES: GameMeta[] = [
     controls: "Click, tap, Space or Enter to drop the block.",
     accent: "#f87171",
     accentTailwind: "accent-red",
-    hidden: true,
   },
   {
     slug: "typing-speed",

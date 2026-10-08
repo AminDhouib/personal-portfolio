@@ -51,6 +51,7 @@ describe("partitionGames", () => {
     expect(featured?.slug).toBe("space-shooter");
     expect(rest.map((item) => item.slug)).toEqual([
       "hextris",
+      "tower-stacker",
       "typing-speed",
       "super-voltorb-flip",
       "password-game",

@@ -320,7 +320,7 @@ test("the sitemap and llms.txt cover every public game and no hidden one; hidden
 }) => {
   // Guard the derived lists: a wrong `hidden` flag must not pass silently.
   expect(publicGames.length).toBeGreaterThan(1);
-  expect(GAMES.find((g) => g.slug === "tower-stacker")?.hidden).toBe(true);
+  expect(GAMES.find((g) => g.slug === "tower-stacker")?.hidden).toBeUndefined();
   const sitemapPaths = (await sitemapUrls(request)).map(pathOf);
   const llms = await (await request.get("/llms.txt")).text();
 
