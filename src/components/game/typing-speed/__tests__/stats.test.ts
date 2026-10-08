@@ -99,3 +99,42 @@ describe("recordRun", () => {
     expect(s.keys).toEqual({});
   });
 });
+
+describe("zero-WPM runs", () => {
+  it("count as played but never become the first best", () => {
+    const next = recordRun(emptyStats(), run({ netWpm: 0, rawWpm: 0, accuracy: 0 }));
+    expect(next.runs).toBe(1);
+    expect(next.bests["words-30"]).toBeUndefined();
+  });
+});
+
+describe("one bad field", () => {
+  const good = () => {
+    const s = recordRun(emptyStats(), run());
+    return JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
+  };
+  it("resets only runs when runs is corrupted", () => {
+    const raw = { ...good(), runs: "many" };
+    localStorage.setItem(STATS_KEY, JSON.stringify(raw));
+    const s = loadStats();
+    expect(s.runs).toBe(0);
+    expect(s.bests["words-30"]?.wpm).toBe(70);
+    expect(s.keys.e).toEqual({ hits: 10, misses: 1 });
+  });
+  it("resets only bests when bests is corrupted", () => {
+    const raw = { ...good(), bests: 7 };
+    localStorage.setItem(STATS_KEY, JSON.stringify(raw));
+    const s = loadStats();
+    expect(s.bests).toEqual({});
+    expect(s.runs).toBe(1);
+    expect(s.keys.e).toEqual({ hits: 10, misses: 1 });
+  });
+  it("resets only keys when keys is corrupted", () => {
+    const raw = { ...good(), keys: [] };
+    localStorage.setItem(STATS_KEY, JSON.stringify(raw));
+    const s = loadStats();
+    expect(s.keys).toEqual({});
+    expect(s.runs).toBe(1);
+    expect(s.bests["words-30"]?.wpm).toBe(70);
+  });
+});
