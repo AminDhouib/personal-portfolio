@@ -17,14 +17,14 @@ export function hextrisKeyAction(input: {
   textEntry: boolean;
   onControl: boolean;
   modifier: boolean;
+  repeat: boolean;
 }): { action: HexKeyAction; preventDefault: boolean } {
   const none = { action: "none", preventDefault: false } as const;
   if (input.textEntry || input.modifier || input.onControl || input.phase === "over") return none;
   const key = input.key;
   if (input.phase === "ready") {
-    return START_KEYS.has(key.length === 1 ? key.toLowerCase() : key)
-      ? { action: "start", preventDefault: true }
-      : none;
+    if (!START_KEYS.has(key.length === 1 ? key.toLowerCase() : key)) return none;
+    return { action: input.repeat ? "none" : "start", preventDefault: true };
   }
   const lower = key.length === 1 ? key.toLowerCase() : key;
   let action: HexKeyAction;
@@ -34,6 +34,11 @@ export function hextrisKeyAction(input: {
   else if (lower === " " || lower === "p") action = "toggle-pause";
   else if (lower === "f") action = "panic";
   else return none;
+  // A held Space must not start the run and then flip pause on every repeat;
+  // rotation and rush keep repeating.
+  if (input.repeat && action === "toggle-pause") {
+    return { action: "none", preventDefault: true };
+  }
   // Pause swallows the steering and panic keys but only Space and P act.
   if (input.phase === "paused" && action !== "toggle-pause") {
     return { action: "none", preventDefault: true };

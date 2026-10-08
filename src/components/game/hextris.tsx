@@ -2151,6 +2151,7 @@ export function HextrisGame() {
           e.target.closest("button, a") !== null &&
           (e.key === " " || e.key === "Enter"),
         modifier: e.ctrlKey || e.metaKey || e.altKey,
+        repeat: e.repeat,
       });
       if (preventDefault) e.preventDefault();
       switch (action) {

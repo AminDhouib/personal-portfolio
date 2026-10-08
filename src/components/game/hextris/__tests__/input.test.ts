@@ -6,7 +6,15 @@ const k = (
   phase: HexRunPhase,
   extra: Partial<Parameters<typeof hextrisKeyAction>[0]> = {},
 ) =>
-  hextrisKeyAction({ key, phase, textEntry: false, onControl: false, modifier: false, ...extra });
+  hextrisKeyAction({
+    key,
+    phase,
+    textEntry: false,
+    onControl: false,
+    modifier: false,
+    repeat: false,
+    ...extra,
+  });
 
 describe("hextrisKeyAction", () => {
   it("starts only on play keys, and claims them", () => {
@@ -61,5 +69,22 @@ describe("hextrisKeyAction", () => {
   it("ignores everything on game over", () => {
     expect(k(" ", "over")).toEqual({ action: "none", preventDefault: false });
     expect(k("ArrowLeft", "over")).toEqual({ action: "none", preventDefault: false });
+  });
+
+  it("starts on uppercase A, S and D", () => {
+    for (const key of ["A", "S", "D"]) {
+      expect(k(key, "ready")).toEqual({ action: "start", preventDefault: true });
+    }
+  });
+
+  it("does not start or toggle pause on auto-repeat, but still claims the key", () => {
+    expect(k(" ", "ready", { repeat: true })).toEqual({ action: "none", preventDefault: true });
+    expect(k(" ", "playing", { repeat: true })).toEqual({ action: "none", preventDefault: true });
+    expect(k("p", "paused", { repeat: true })).toEqual({ action: "none", preventDefault: true });
+  });
+
+  it("keeps rotating on auto-repeat", () => {
+    expect(k("ArrowLeft", "playing", { repeat: true }).action).toBe("rotate-ccw");
+    expect(k("d", "playing", { repeat: true }).action).toBe("rotate-cw");
   });
 });
