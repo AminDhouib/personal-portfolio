@@ -32,10 +32,11 @@ progressively being extracted into same-named subdirectories as each game gets t
 `password-game-2/` (a full `engine/` with `rules/`, `events/`, and a seeded core, plus `stage/`
 and `sound/` layers) and `super-voltorb-flip/` (`engine.ts`, `audio.ts` with `sound-cues.ts`,
 `synth.ts` and `music.ts` behind it, `chrome.tsx`, `art/`) are
-furthest along; `space-shooter/` holds several
+furthest along, and `hextris/` now holds a clean-room `engine/` and `render/` with `hextris.tsx`
+left as the shell; `space-shooter/` holds several
 extracted modules (`spawning.ts`, `boss-behaviors.ts`, `sound-manager.ts`, `run-init.ts`) but
-`space-shooter.tsx` and `hextris.tsx` still carry the bulk of their engine logic inline in the
-component. See Extract-before-edit doctrine below before touching either.
+`space-shooter.tsx` still carries the bulk of its engine logic inline in the component. See
+Extract-before-edit doctrine below before touching it.
 
 `tower-stacker/` is first-party and fully extracted: `engine.ts` (pure, seedable, with
 `scoring.ts`, which the server imports) and `daily.ts` are DOM-free; `painter.ts` draws
@@ -454,16 +455,6 @@ current tree on 2026-07-07.
   disclaimer in the About credits and in the How to play modal.
   `__tests__/assets-guard.test.ts` fails on any image under the game's public folder, any
   reference to a sprites or upstream path, and any asset-prep script that targets them.
-- **Hextris is GPL-3.0 derived (until T5-3 replaces the engine).** The engine in `hextris.tsx`,
-  `hextris/logic.ts` and `hextris/types.ts` is a port of upstream Hextris (Logan Engstrom et al.,
-  GPL-3.0), so those files carry an SPDX/copyright header, the licence text sits beside them in
-  `hextris/COPYING`, and `hextris/NOTICE.md` lists what is derived, the site modules the program
-  imports, and the source location. The About credits (`content/hextris.ts`) name the authors
-  and link the upstream repo and this repo's `hextris/` tree (GPL section 6 source offer). The
-  repo must stay public while it holds this code. `hextris/__tests__/licence.test.ts` and
-  `content/__tests__/hextris-credits.test.ts` pin all of it; do not delete the notices before
-  the derived files are gone. The T5-3 clean-room engine removes the derived files and these
-  notices with them.
 - **Tower Stacker is first-party; its rules are pinned.** The upstream `iamkun/tower_game`
   files under `public/tower_stacker/` (`game.html`, `dist/`, `assets/`, `LICENSE`) are still
   tracked but unused; only the `index.html` that loaded a Google tag is gone, and
@@ -477,6 +468,22 @@ current tree on 2026-07-07.
   `games/content/tower-stacker.ts`.
 - **Tower Stacker keeps its blueprint palette in both themes, deliberately.** The canvas uses
   `tower-stacker/palette.ts`, not the site tokens; do not wire it to the theme toggle.
+- **The Hextris engine is a clean-room rewrite; keep the wall.** T5-3 replaced the GPL-3.0
+  port of upstream Hextris (Logan Engstrom et al.) with an engine written only from the
+  behaviour spec `docs/specs/2026-10-hextris-engine-behaviour.md`. Its author never read the old
+  engine or the upstream source; the integrator, who did read the old shell, added glue only
+  (`hextris/feedback.ts` maps engine events to sound, haptics and React state;
+  `hextris/session.ts` holds the high-score list, the arcade submission and the seed). The
+  engine (`hextris/engine/`) is a seeded fixed-step simulation that emits events, the painter
+  (`hextris/render/`) is a pure function of the run, and `hextris.tsx` is the shell.
+  `hextris/__tests__/provenance-guard.test.ts` fails if any file under `hextris/` or
+  `hextris.tsx` carries an upstream identifier or tuning constant: grow its denylist, never
+  loosen it, and never port behaviour from the upstream or from this repo's pre-T5-3 history
+  (those versions stay GPL-3.0). A rule change starts in the spec. The About credits say
+  "Inspired by Hextris" and link the upstream; `content/__tests__/hextris-credits.test.ts` pins
+  it. The shell reads `NODE_ENV` once, through a justified `eslint-disable-next-line`, for the
+  dev-only `?seed=<uint32>` replay seam (spec section 12.3); production always draws a fresh
+  seed.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
@@ -861,8 +868,8 @@ recorded here so a future pass doesn't re-litigate them from scratch.
 - **Hextris's original engine split is disputed as "move-only."** An earlier refactor commit
   split sound handling, types, and two math helpers out of `hextris.tsx` into `hextris/`, but the
   bulk of the grid/collision/match-3 logic stayed inline. Whether that commit counts as
-  meaningful progress on RC-3 or mostly relocated code without reducing the monolith is an open
-  disagreement — treat `hextris.tsx` as still-inline for planning purposes regardless.
+  meaningful progress on RC-3 or mostly relocated code without reducing the monolith was left
+  open. Moot since T5-3: the clean-room engine replaced the inline one outright.
 - **The absence of an HTML contact form is intentional, not a gap.** Lead capture happens through
   the AI chat widget's "talk to a human" flow plus a "Book a Call" link, not a traditional form.
   This was reframed during review as deliberate product personality for an AI consultancy,
@@ -870,10 +877,12 @@ recorded here so a future pass doesn't re-litigate them from scratch.
 
 ## Extract-before-edit doctrine
 
-Any future gameplay change to `hextris.tsx` or `space-shooter.tsx` starts by extracting the
+Any future gameplay change to `space-shooter.tsx` starts by extracting the
 touched subsystem into its own tested module first, following the pattern `super-voltorb-flip/`
 and `password-game-2/` already establish (a plain, seedable, unit-testable engine module; the
-component file left as the render/glue layer). Do not add logic to either monolith in place —
+component file left as the render/glue layer). Hextris is extracted (T5-3): a Hextris gameplay
+change goes into `hextris/engine/`, test first, and `hextris.tsx` stays glue. Do not add logic
+to the Orbital Dodge monolith in place:
 that is exactly the change-cost pattern the audit measured directly (a site-wide reduce-motion
 change touched 32 files; adding a game touches 3 dispatch points by design, but editing an
 already-inline engine has no such bound).
@@ -921,9 +930,9 @@ trigger revisiting it.
   POST rate limit (10 submits per minute per client IP). Each row is small. Trigger: the table
   reaching a size that matters, or a privacy request; the fix is a periodic delete of players
   with no score rows left (and, for an abandoned player, the data-surgery recipe in `RUNBOOK.md`).
-- **RC-3 — full engine extraction for `space-shooter.tsx`/`hextris.tsx`** (High severity, large
+- **RC-3: full engine extraction for `space-shooter.tsx` (Orbital Dodge)** (High severity, large
   effort). Deferred; the extract-before-edit doctrine covers incremental progress. Trigger: any
-  gameplay-affecting edit to either file.
+  gameplay-affecting edit to it. Hextris left this item when T5-3 replaced its engine.
 - **RC-6 — a user-facing motion/settings toggle** (Medium). The current fix is OS-preference-only
   (chrome honors `prefers-reduced-motion`, games opt out). A user-facing in-app toggle, and a
   shared settings provider to host it, remain undone.

@@ -45,7 +45,7 @@ export const hextrisContent: GameContent = {
   strategy: [
     "Matches are connected groups, and they can cross into a neighboring side. Stack the same color next to itself to let groups join.",
     "Each clear scores the number of blocks squared, times your combo. Five blocks at 2x is 50 points, so bigger groups pay far more than several small ones.",
-    "Bombs appear once you have reached a 3x combo, and rainbow blocks at 5x. A rainbow matches any color, and a bomb in a match wipes its whole side.",
+    "Bombs appear once you have reached a 3x combo, and rainbow blocks at 5x. A rainbow matches any color, and a bomb in a match also clears the blocks near it: two rows either way on its own side and one row either way on each neighboring side.",
     "The momentum meter fills as you clear. At 100 percent, Panic Clear removes every block for 30 points each, so save it for a crisis.",
     "After your first rotation the limit shrinks by one block every 60 seconds, from 12 down to 4. A countdown warns you ten seconds before.",
   ],
@@ -98,16 +98,9 @@ export const hextrisContent: GameContent = {
   ],
   credits: [
     {
-      label: "Based on",
-      detail:
-        "Based on Hextris by Logan Engstrom, Garrett Finucane, Noah Moroze and Michael Yang, licensed GPL-3.0.",
+      label: "Inspired by",
+      detail: "Inspired by Hextris (Logan Engstrom et al.).",
       href: "https://github.com/Hextris/hextris",
-    },
-    {
-      label: "Licence",
-      detail:
-        "This modified Hextris is licensed GPL-3.0 and comes with no warranty. Source code for this version.",
-      href: "https://github.com/AminDhouib/personal-portfolio/tree/main/src/components/game/hextris",
     },
   ],
 };
