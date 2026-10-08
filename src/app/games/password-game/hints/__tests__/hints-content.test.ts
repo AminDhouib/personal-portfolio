@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { CORE_RULES } from "@/components/game/password-game-2/engine/rules/index";
 import { EVENT_DEFS } from "@/components/game/password-game-2/engine/events/index";
-import { EVENT_HINTS, PG2_HINTS_PATH, RULE_HINTS } from "../hints-content";
+import {
+  EVENT_HINTS,
+  PG2_HINTS_DESCRIPTION,
+  PG2_HINTS_INTRO,
+  PG2_HINTS_PATH,
+  RULE_HINTS,
+} from "../hints-content";
 
 describe("hints coverage", () => {
   it("has a hint block for every core rule, in reveal order", () => {
@@ -45,5 +51,21 @@ describe("hints coverage", () => {
 
   it("exports the hints path under the game", () => {
     expect(PG2_HINTS_PATH).toBe("/games/password-game/hints");
+  });
+
+  it("does not claim events have three hints", () => {
+    expect(PG2_HINTS_DESCRIPTION).not.toMatch(/rule and event/i);
+    expect(PG2_HINTS_DESCRIPTION.length).toBeGreaterThanOrEqual(50);
+    expect(PG2_HINTS_DESCRIPTION.length).toBeLessThanOrEqual(160);
+  });
+
+  it("states only what the rules do: no digits from junk blocks, no flag artwork", () => {
+    expect(EVENT_HINTS.tetris!.tip).not.toMatch(/digit/i);
+    for (const t of RULE_HINTS["country-name"]!.hints) expect(t).not.toMatch(/picture|flag/i);
+  });
+
+  it("does not promise that nothing is revealed, and warns that numbers can shift", () => {
+    expect(PG2_HINTS_INTRO).not.toMatch(/nothing is revealed/i);
+    expect(PG2_HINTS_INTRO).toMatch(/shift/i);
   });
 });
