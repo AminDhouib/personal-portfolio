@@ -11,9 +11,10 @@ import {
   spawnIntervalMs,
   type PatternName,
 } from "../director";
-import { advance, start } from "../step";
+import { advance } from "../step";
 import { COLOURS, TICK_MS, createRun } from "../state";
 import type { EngineEvent } from "../types";
+import { startedRun } from "./boards";
 
 function levels(): number[] {
   const out: number[] = [];
@@ -200,8 +201,7 @@ describe("makePiece", () => {
 
 describe("spawning", () => {
   it("opens a run with a single piece at the outer edge", () => {
-    const s = createRun({ seed: 21 });
-    start(s);
+    const s = startedRun(21);
     advance(s, 100);
     const spawns = s.events.filter((e): e is Extract<EngineEvent, { type: "spawn" }> => {
       return e.type === "spawn";
@@ -215,8 +215,7 @@ describe("spawning", () => {
     let wouldBeMulti = 0;
     for (let seed = 1; seed <= 12; seed++) {
       if (pickPattern(createRun({ seed }), 20).name !== "single") wouldBeMulti++;
-      const s = createRun({ seed });
-      start(s);
+      const s = startedRun(seed);
       s.level = 20;
       advance(s, TICK_MS);
       expect(s.events.filter((e) => e.type === "spawn")).toHaveLength(1);
@@ -225,8 +224,7 @@ describe("spawning", () => {
   });
 
   it("keeps spawning on the beat for the current level", () => {
-    const s = createRun({ seed: 22 });
-    start(s);
+    const s = startedRun(22);
     advance(s, 1500 * 4 + 50);
     const spawns = s.events.filter((e) => e.type === "spawn");
     // Level stays near 1 for six seconds, so roughly one beat per 1.5 s.

@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { advance, applyAction, releaseRush, rotate, setRush, start } from "../step";
-import { TICK_MS, createRun, drainEvents, wrapSide } from "../state";
+import { COUNTDOWN_MS, TICK_MS, createRun, drainEvents, wrapSide } from "../state";
 import type { EngineEvent, RunState, TimedAction } from "../types";
+import { startedRun } from "./boards";
 
 function playing(seed: number): RunState {
-  const s = createRun({ seed });
-  start(s);
-  return s;
+  return startedRun(seed);
 }
 
 function script(seed: number): TimedAction[][] {
@@ -122,8 +121,98 @@ describe("advance", () => {
   it("starts a run from an action", () => {
     const s = createRun({ seed: 2 });
     advance(s, 100, [{ atMs: 0, action: "start" }]);
+    expect(s.phase).toBe("countdown");
+    expect(s.events.slice(0, 2)).toEqual([{ type: "run-start" }, { type: "countdown", count: 3 }]);
+  });
+});
+
+describe("countdown", () => {
+  function begun(seed = 8): RunState {
+    const s = createRun({ seed });
+    start(s);
+    return s;
+  }
+
+  it("enters the countdown at -2400 ms with a 3", () => {
+    const s = begun();
+    expect(s.phase).toBe("countdown");
+    expect(s.elapsedMs).toBe(-COUNTDOWN_MS);
+    expect(s.events).toEqual([{ type: "run-start" }, { type: "countdown", count: 3 }]);
+  });
+
+  it("counts 2 at 800 ms, 1 at 1600 ms and goes at 2400 ms with the clock at 0", () => {
+    const s = begun();
+    drainEvents(s);
+    const seen: [string, number][] = [];
+    for (let i = 0; i < 400; i++) {
+      advance(s, TICK_MS);
+      for (const e of drainEvents(s)) {
+        const at = Math.round(s.elapsedMs + COUNTDOWN_MS);
+        if (e.type === "countdown") seen.push([`countdown ${e.count}`, at]);
+        if (e.type === "go") seen.push(["go", at]);
+      }
+    }
+    expect(seen).toEqual([
+      ["countdown 2", 800],
+      ["countdown 1", 1600],
+      ["go", 2400],
+    ]);
+    const s2 = begun();
+    advance(s2, COUNTDOWN_MS - 1);
+    expect(s2.phase).toBe("countdown");
+    advance(s2, 1);
+    expect(s2.phase).toBe("playing");
+    expect(s2.elapsedMs).toBe(0);
+    expect(s2.ticks).toBe(0);
+  });
+
+  it("spawns and drops nothing before go, then spawns straight after", () => {
+    const s = begun();
+    advance(s, COUNTDOWN_MS);
+    expect(s.events.filter((e) => e.type === "spawn")).toEqual([]);
+    expect(s.falling).toEqual([]);
+    expect(s.level).toBe(1);
+    advance(s, TICK_MS);
+    expect(s.falling.length).toBeGreaterThan(0);
+  });
+
+  it("lets the player rotate and press rush, but not panic", () => {
+    const s = begun();
+    advance(s, 500, [
+      { atMs: 100, action: "rotate-cw" },
+      { atMs: 200, action: "rush" },
+    ]);
+    expect(s.facing).toBe(1);
+    expect(s.events.some((e) => e.type === "rotate")).toBe(true);
+    expect(s.rush).toBe(true);
+    s.momentum = 100;
+    s.sides[0]?.push({ colour: 0, special: "none" });
+    applyAction(s, "panic");
+    expect(s.events.some((e) => e.type === "panic")).toBe(false);
+    advance(s, COUNTDOWN_MS);
     expect(s.phase).toBe("playing");
-    expect(s.events[0]).toEqual({ type: "run-start" });
+    expect(s.rush).toBe(true);
+  });
+
+  it("starts the boundary timer at go when the first rotation comes early", () => {
+    const s = begun();
+    rotate(s, 1);
+    expect(s.boundaryArmed).toBe(true);
+    expect(s.nextShrinkAtMs).toBe(60_000);
+  });
+
+  it("holds while paused and resumes into the countdown", () => {
+    const s = begun();
+    advance(s, 1000);
+    applyAction(s, "toggle-pause");
+    expect(s.phase).toBe("paused");
+    const held = s.elapsedMs;
+    advance(s, 5000);
+    expect(s.elapsedMs).toBe(held);
+    applyAction(s, "toggle-pause");
+    expect(s.phase).toBe("countdown");
+    advance(s, 1400);
+    expect(s.phase).toBe("playing");
   });
 });
 

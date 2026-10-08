@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { mulberry32 } from "@/components/game/password-game-2/engine/rng";
 import { validateArcadeSubmission } from "@/lib/arcade/games";
 import { findGroup } from "../match";
-import { createRun, drainEvents, wrapSide } from "../state";
-import { advance, start } from "../step";
+import { drainEvents, wrapSide } from "../state";
+import { advance } from "../step";
 import type { RunState, TimedAction } from "../types";
+import { startedRun } from "./boards";
 
 // Seeded headless runs of the new engine must always pass the arcade board's Hextris check
 // (src/lib/arcade/games.ts), whatever the player does. Two bots play each seed to game over.
@@ -45,8 +46,7 @@ const greedy: Bot = (s) => {
 };
 
 function play(seed: number, bot: Bot): RunState {
-  const s = createRun({ seed });
-  start(s);
+  const s = startedRun(seed);
   for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
     advance(s, STEP_MS, bot(s));
     drainEvents(s);
@@ -99,8 +99,7 @@ describe("seeded runs stay plausible for the arcade board", () => {
     for (const [name, makeBot] of bots) {
       panics[name] = 0;
       for (const seed of SEEDS.slice(0, 10)) {
-        const s = createRun({ seed });
-        start(s);
+        const s = startedRun(seed);
         const bot = makeBot(seed);
         let panicked = false;
         for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
@@ -139,8 +138,7 @@ describe("seeded runs stay plausible for the arcade board", () => {
   it("only ever has momentum once a group of at least 3 has cleared", () => {
     for (const seed of SEEDS.slice(0, 10)) {
       for (const bot of [randomRotator(seed), greedy]) {
-        const s = createRun({ seed });
-        start(s);
+        const s = startedRun(seed);
         for (let i = 0; i < MAX_STEPS && s.phase === "playing"; i++) {
           advance(s, STEP_MS, bot(s));
           drainEvents(s);

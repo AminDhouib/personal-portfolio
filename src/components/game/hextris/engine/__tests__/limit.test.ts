@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { advance, rotate, start } from "../step";
-import { createRun, drainEvents, sideFacingLane } from "../state";
+import { advance, rotate } from "../step";
+import { drainEvents, sideFacingLane } from "../state";
 import type { EngineEvent, RunState } from "../types";
-import { boardState } from "./boards";
+import { boardState, startedRun } from "./boards";
 
 function ofType<T extends EngineEvent["type"]>(events: EngineEvent[], type: T) {
   return events.filter((e): e is Extract<EngineEvent, { type: T }> => e.type === type);
@@ -10,8 +10,7 @@ function ofType<T extends EngineEvent["type"]>(events: EngineEvent[], type: T) {
 
 // A started run whose director never spawns, so only the boundary and hand-placed pieces act.
 function quietRun(): RunState {
-  const s = createRun({ seed: 1 });
-  start(s);
+  const s = startedRun(1);
   s.nextSpawnAtMs = 1e12;
   return s;
 }
