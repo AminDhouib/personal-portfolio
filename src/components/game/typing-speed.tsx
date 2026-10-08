@@ -458,6 +458,8 @@ export function TypingSpeedGame() {
         type="text"
         data-ts-hidden
         aria-label="Typing area"
+        inputMode="text"
+        enterKeyHint="next"
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="none"
@@ -465,7 +467,10 @@ export function TypingSpeedGame() {
         defaultValue=" "
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="sr-only"
+        // Fixed at the top of the visible area so focusing it never scrolls the page; 16 px so
+        // iOS does not zoom in; invisible and untouchable, the text is what the player taps.
+        className="pointer-events-none fixed left-0 h-px w-px text-base opacity-0"
+        style={{ top: viewport.top }}
       />
 
       <div inert={sheet} className="space-y-5">
