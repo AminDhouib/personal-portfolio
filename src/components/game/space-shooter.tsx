@@ -61,7 +61,7 @@ import {
   POWERUP_DEFS,
   tryDash,
 } from "./space-shooter/types";
-import { isWorldRecord } from "./space-shooter/celebration";
+import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
 import { PanelClose } from "./space-shooter/panel-close";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -155,7 +155,7 @@ interface UiState {
   bossesDefeatedThisRun: number;
 }
 
-type CelebrationKind = "personal" | "world" | null;
+type CelebrationKind = "first" | "personal" | "world" | null;
 
 const DEFAULT_SPACE_SHOOTER_PREFS = {
   reducedMotion: false,
@@ -304,6 +304,12 @@ export function SpaceShooterGame() {
     const parsed = saved ? parseInt(saved, 10) : 0;
     // Corrupt/tampered storage must not poison the PB comparison with NaN.
     return Number.isFinite(parsed) ? parsed : 0;
+  });
+  // Whether a best is stored at all: an absent key is a first flight, not a personal best.
+  const [hasStoredBest, setHasStoredBest] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const saved = window.localStorage.getItem(HS_KEY);
+    return saved !== null && Number.isFinite(parseInt(saved, 10));
   });
   const [name, setName] = useState<string>(() => {
     if (typeof window === "undefined") return "";
@@ -772,10 +778,11 @@ export function SpaceShooterGame() {
       const final = Math.floor(g.score * g.scoreMultiplier);
       // Compare against the current state value synchronously so the celebration
       // flag is correct in the same render cycle.
-      const isPersonalBest = final > highScore && final > 0;
-      if (isPersonalBest) {
+      const bestKind = personalBestKind(final, hasStoredBest ? highScore : null);
+      if (bestKind !== null) {
         safeLocalSet(HS_KEY, String(final));
         setHighScore(final);
+        setHasStoredBest(true);
       }
       setUi((u) => ({
         ...u,
@@ -786,7 +793,7 @@ export function SpaceShooterGame() {
       }));
       setSubmitted(false);
       setRejected(false);
-      setCelebration(isPersonalBest ? "personal" : null);
+      setCelebration(bestKind === "first" ? "first" : bestKind === "best" ? "personal" : null);
       void refreshLeaderboard();
       refreshProfile();
     } catch (err) {
@@ -794,7 +801,7 @@ export function SpaceShooterGame() {
       if (crash) reportError(crash);
       setCrashed(true);
     }
-  }, [highScore, refreshProfile, refreshLeaderboard]);
+  }, [highScore, hasStoredBest, refreshProfile, refreshLeaderboard]);
 
   // "Fly again" — reset everything to the armed state. The next mouse/touch
   // /key press starts a fresh run.
@@ -1975,7 +1982,7 @@ export function SpaceShooterGame() {
                     World Record
                   </motion.div>
                 )}
-                {celebration === "personal" && (
+                {(celebration === "personal" || celebration === "first") && (
                   <motion.div
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -1983,7 +1990,7 @@ export function SpaceShooterGame() {
                     className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-accent-amber/60 bg-accent-amber/20 px-3 py-1 text-xs font-bold tracking-widest text-accent-amber uppercase"
                   >
                     <Trophy className="h-3.5 w-3.5" />
-                    Personal Best
+                    {celebration === "first" ? "First Flight" : "Personal Best"}
                   </motion.div>
                 )}
                 {ui.coinsThisRun > 0 && (
