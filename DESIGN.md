@@ -268,8 +268,8 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
 - **Featured.** The `featured?: true` flag on `GameMeta` (set on `space-shooter` only; pinned by
   `games-meta.test.ts`) picks the featured game through `partitionGames`, never array position.
   `GAMES` order is the registry order and is unchanged.
-- **Today strip.** `TODAY_SOURCES` names five tiles: Password Game 2 (its daily board),
-  Orbital Dodge, Hextris, Super Voltorb Flip and Tower Stacker (the arcade daily boards). `useHubBoards` starts the five reads once
+- **Today strip.** `TODAY_SOURCES` names six tiles: Password Game 2 (its daily board),
+  Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker and Typing Speed (the arcade daily boards). `useHubBoards` starts the six reads once
   the strip is within 200px of the viewport (immediately if `IntersectionObserver` is missing),
   never polls, and aborts on unmount. `fetchHubBoard` has its own 5 s timeout, never reports, and
   turns every failure into the "Board unavailable right now" tile.
@@ -902,13 +902,13 @@ The following Password Game 2 entries were verified against the current tree on 
   The tile says "(UTC)". On deploy day the seed moves for players outside UTC (their local date
   and the UTC date differ for part of each day), so that day's daily board mixes the old and new
   puzzles. No migration is needed; the board turns over at 00:00 UTC.
-- **Read cost of the hub.** One visit that reaches the strip issues four arcade reads and
+- **Read cost of the hub.** One visit that reaches the strip issues five arcade reads and
   one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
   who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an
   error; the Password Game 2 read has no rate limit. Both are cacheable for 10 s at the edge.
 - **The Voltorb tile reads the same public daily arcade board the other two do.** The Voltorb daily
   board is keyed by the UTC day on the server, the same day the game seeds from, so unlike Password
-  Game 2 the tile is exactly today's board. The strip is two columns at md and five from xl; a lone last tile
+  Game 2 the tile is exactly today's board. The strip is one column on phones, two at md and three from xl; a lone last tile
   (or chip) spans the row below that, so no card is left alone. "On this device" reads a sixth
   key, `tower:stats` (best daily and best free score), through `parseTowerStats`, read-only.
 - **The Daily board is one seeded board per UTC day, and the server regenerates it.** The seed is
