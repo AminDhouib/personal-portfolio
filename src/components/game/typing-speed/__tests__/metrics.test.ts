@@ -1,7 +1,15 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { applyOp, createRun } from "../engine/run";
-import { accuracyPercent, charCounts, isNewBest, liveWpm, runMetrics, wpm } from "../metrics";
+import {
+  accuracyPercent,
+  charCounts,
+  isNewBest,
+  liveWpm,
+  runMetrics,
+  streaks,
+  wpm,
+} from "../metrics";
 
 describe("typing-speed metrics", () => {
   it("liveWpm stays 0 for the first second, then matches wpm", () => {
@@ -91,6 +99,18 @@ describe("runMetrics", () => {
       accuracy: 100,
       elapsedMs: 0,
     });
+  });
+});
+
+describe("streaks", () => {
+  it("counts consecutive correct keystrokes; a slip resets, Backspace is neutral", () => {
+    const run = createRun({ kind: "text", text: "abcd efgh" });
+    typeAt(run, "abx", 10); // 2 right, then a slip
+    expect(streaks(run)).toEqual({ current: 0, best: 2 });
+    applyOp(run, { kind: "back" }, 100);
+    applyOp(run, { kind: "char", ch: "c" }, 110);
+    applyOp(run, { kind: "char", ch: "d" }, 120);
+    expect(streaks(run)).toEqual({ current: 2, best: 2 });
   });
 });
 
