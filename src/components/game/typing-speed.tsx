@@ -411,7 +411,6 @@ export function TypingSpeedGame() {
         <ResultsCard
           metrics={result.metrics}
           maxStreak={result.maxStreak}
-
           bulk={result.bulk}
           counts={result.counts}
           series={result.series}
