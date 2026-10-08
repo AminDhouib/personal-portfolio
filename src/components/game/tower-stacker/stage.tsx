@@ -345,7 +345,7 @@ export function Stage({ seedText }: { seedText?: string }) {
     const timers = timersRef.current;
     return () => {
       for (const id of timers) window.clearTimeout(id);
-      audioRef.current?.stop();
+      audioRef.current?.close();
     };
   }, []);
 

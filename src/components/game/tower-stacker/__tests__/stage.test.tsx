@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { freeSeed } from "../daily";
 import { craneOffset, drop, newRun, perfectDropTime, type TowerRun } from "../engine";
 import { Stage } from "../stage";
+import { makeFakeCtx } from "./fake-ctx";
 
 const realGetContext =
   Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext") ?? {};
@@ -209,5 +210,29 @@ describe("persisted mute", () => {
     render(<Stage seedText="e2e" />);
     expect(screen.getByRole("button", { name: "Unmute sound" })).toBeTruthy();
     localStorage.clear();
+  });
+});
+
+describe("audio lifetime", () => {
+  it("closes the AudioContext on unmount", () => {
+    const closes: number[] = [];
+    vi.stubGlobal(
+      "AudioContext",
+      class {
+        constructor() {
+          const ctx = makeFakeCtx();
+          const close = ctx.close;
+          ctx.close = () => {
+            closes.push(1);
+            return close();
+          };
+          return ctx;
+        }
+      },
+    );
+    const view = render(<Stage seedText="e2e" />);
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    view.unmount();
+    expect(closes).toHaveLength(1);
   });
 });
