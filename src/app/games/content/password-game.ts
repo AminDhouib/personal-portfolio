@@ -1,4 +1,17 @@
 import type { GameContent } from "./types";
+import { PG2_HINTS_PATH } from "../password-game/hints/hints-content";
+
+/** The short pitch shown above the game, under the h1. */
+export const PASSWORD_GAME_PAGE_INTRO =
+  "A free browser game about signing up for an account. Type a password while rules stack up, creatures move in and the form fights back. Your finish time is your score, and every run has a seed you can share or race.";
+
+/** The credit shown above the game; the link text is the original's author. */
+export const PASSWORD_GAME_CREDIT = {
+  before: "An independent tribute to The Password Game by ",
+  linkText: "Neal Agarwal",
+  href: "https://neal.fun/password-game/",
+  after: ". Not affiliated with neal.fun.",
+} as const;
 
 export const passwordGameContent: GameContent = {
   seoTitle: "Password Game Online: The Password Game 2",
@@ -97,6 +110,13 @@ export const passwordGameContent: GameContent = {
       question: "How long does a run take?",
       answer:
         "Longer than a quick puzzle. Events arrive on a schedule, and sooner once you have solved an act's rules. A reload ends the run.",
+    },
+  ],
+  links: [
+    {
+      label: "Rules and hints",
+      href: PG2_HINTS_PATH,
+      description: "Stuck? Every rule and event explained, with the spoilers behind a click.",
     },
   ],
   credits: [
