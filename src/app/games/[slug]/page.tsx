@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -62,6 +62,17 @@ export async function generateMetadata({
     // A hidden game still serves, but must not be indexed.
     ...(game.hidden ? { robots: { index: false, follow: true } } : {}),
   };
+}
+
+// Typing Speed plays in a phone sheet that tracks visualViewport, so on this page the on-screen
+// keyboard resizes only the visual viewport. Every other game keeps the root layout viewport.
+export async function generateViewport({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Viewport> {
+  const { slug } = await params;
+  return slug === "typing-speed" ? { interactiveWidget: "resizes-visual" } : {};
 }
 
 export default async function GameDetailPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { GAMES } from "../games-meta";
 import { GAME_CONTENT } from "../content";
-import { generateMetadata } from "../[slug]/page";
+import { generateMetadata, generateViewport } from "../[slug]/page";
 import {
   metadata as passwordGameMetadata,
   viewport as passwordGameViewport,
@@ -73,4 +73,19 @@ describe("password-game viewport", () => {
   it("lets the keyboard resize only the visual viewport", () => {
     expect(passwordGameViewport.interactiveWidget).toBe("resizes-visual");
   });
+});
+
+describe("game detail viewport", () => {
+  const viewportFor = (slug: string) => generateViewport({ params: Promise.resolve({ slug }) });
+
+  it("lets the keyboard resize only the visual viewport on the typing page", async () => {
+    expect((await viewportFor("typing-speed")).interactiveWidget).toBe("resizes-visual");
+  });
+
+  it.each(["hextris", "super-voltorb-flip"])(
+    "leaves %s with the default viewport",
+    async (slug) => {
+      expect(await viewportFor(slug)).not.toHaveProperty("interactiveWidget");
+    },
+  );
 });
