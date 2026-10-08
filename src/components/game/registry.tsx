@@ -59,7 +59,7 @@ export const GAME_CLIENT: Record<GameSlug, GameClientEntry> = {
     Banner: SpaceShooterBanner,
     render: () => (
       <WebGLOnly fallback={<NeedsWebGL />} pending={<GameSkeleton />}>
-        <SpaceShooterGame />
+        <SpaceShooterGame variant="page" />
       </WebGLOnly>
     ),
   },
