@@ -12,10 +12,9 @@ const PUBLIC = join(ROOT, "public");
 const SRC = join(ROOT, "src");
 const AUDIO_EXT = /\.(mp3|ogg|wav|m4a|flac)$/i;
 
-// The only audio under public/ besides this game's music folder: Tower Stacker's
-// vendored upstream bundle ships its own sound files (see DESIGN.md, "Tower
-// Stacker's game is a vendored minified bundle"). Nothing else may.
-const OTHER_AUDIO_ALLOWED = ["tower_stacker"];
+// The only audio under public/ besides this game's music folder: none. Kept as a list so
+// a future exception needs a justifying comment here.
+const OTHER_AUDIO_ALLOWED: string[] = [];
 
 // CC0 tracks for the abandoned skin variants. Kept on purpose (owner ruling:
 // the existing CC0 music stays); nothing plays them, so the "referenced from
@@ -76,7 +75,7 @@ describe("Super Voltorb Flip assets", () => {
     }
   });
 
-  it("ships no audio file anywhere else under public/ (other than the vendored Tower Stacker)", () => {
+  it("ships no audio file anywhere else under public/", () => {
     const strays = walk(PUBLIC)
       .map((f) => f.replaceAll("\\", "/"))
       .filter((f) => AUDIO_EXT.test(f))

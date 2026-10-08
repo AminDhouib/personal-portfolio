@@ -172,7 +172,6 @@ export default defineConfig([
     "next-env.d.ts",
     "**/graphify-out/**",
     "_to-remove-voltorb/**",
-    "public/tower_stacker/**",
     "audit/**",
     "coverage/**",
     "playwright-report/**",
