@@ -46,10 +46,12 @@ behind it. `tower-stacker.tsx` is a thin entry that forwards `?tower-seed=`. Its
 come from `password-game-2/engine/rng` (the one cross-game import; the audio and control
 helpers are copies, as games do not import each other's modules).
 
-`src/env.ts` is the sole `process.env` gateway for everything except four narrow, allowlisted
-exceptions (`next.config.ts`, `src/instrumentation.ts`, `src/instrumentation-client.ts`, and
-`src/components/game/space-shooter.tsx` for `NODE_ENV`-gated dev-only affordances — an FPS
-overlay and a boss-cycle hotkey, not a schema-covered integration var). Everywhere else,
+`src/env.ts` is the sole `process.env` gateway for everything except five narrow exceptions:
+four allowlisted files (`next.config.ts`, `src/instrumentation.ts`,
+`src/instrumentation-client.ts`, and `src/components/game/space-shooter.tsx` for `NODE_ENV`-gated
+dev-only affordances: an FPS overlay and a boss-cycle hotkey, not a schema-covered integration
+var), and one line of `src/components/game/hextris.tsx` that reads `NODE_ENV` through a justified
+`eslint-disable-next-line` for its dev-only `?seed=` replay seam. Everywhere else,
 `no-restricted-properties` bans reading `process.env` directly.
 
 ## Conventions in force
@@ -475,7 +477,9 @@ current tree on 2026-07-07.
   (`hextris/feedback.ts` maps engine events to sound, haptics and React state;
   `hextris/session.ts` holds the high-score list, the arcade submission and the seed). The
   engine (`hextris/engine/`) is a seeded fixed-step simulation that emits events, the painter
-  (`hextris/render/`) is a pure function of the run, and `hextris.tsx` is the shell.
+  (`hextris/render/`) is a pure function of the run, and `hextris.tsx` is the shell. The shell and
+  UI code `hextris.tsx` kept (overlays, HUD, input, fullscreen and sound wiring) is site-authored
+  and carries no upstream engine code.
   `hextris/__tests__/provenance-guard.test.ts` fails if any file under `hextris/` or
   `hextris.tsx` carries an upstream identifier or tuning constant: grow its denylist, never
   loosen it, and never port behaviour from the upstream or from this repo's pre-T5-3 history
