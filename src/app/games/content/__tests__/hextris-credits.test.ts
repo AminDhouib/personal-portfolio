@@ -2,26 +2,19 @@
 import { describe, it, expect } from "vitest";
 import { GAME_CONTENT } from "..";
 
+// The engine is a clean-room rewrite (docs/specs/2026-10-hextris-engine-behaviour.md), so
+// Hextris is credited as the inspiration rather than as the licensed source.
 describe("Hextris credits", () => {
-  it("credit the Hextris authors and its GPL-3.0 licence", () => {
-    const credits = GAME_CONTENT.hextris.credits;
-    const text = JSON.stringify(credits);
-    expect(text).toMatch(/Logan Engstrom/);
-    expect(text).toMatch(/Garrett Finucane/);
-    expect(text).toMatch(/Noah Moroze/);
-    expect(text).toMatch(/Michael Yang/);
-    expect(text).toMatch(/GPL-3\.0/);
+  const credits = GAME_CONTENT.hextris.credits;
+  const text = JSON.stringify(credits);
+
+  it("credit Hextris as the inspiration and link the upstream", () => {
+    expect(text).toMatch(/Inspired by Hextris \(Logan Engstrom et al\.\)/);
     expect(credits.some((c) => c.href === "https://github.com/Hextris/hextris")).toBe(true);
   });
 
-  it("point at the source of this modified version (GPL section 6)", () => {
-    const credits = GAME_CONTENT.hextris.credits;
-    expect(
-      credits.some((c) =>
-        c.href?.startsWith(
-          "https://github.com/AminDhouib/personal-portfolio/tree/main/src/components/game/hextris",
-        ),
-      ),
-    ).toBe(true);
+  it("no longer claim the GPL or offer this repo as the game's source", () => {
+    expect(text).not.toMatch(/GPL/);
+    expect(credits.some((c) => c.href?.includes("AminDhouib/personal-portfolio"))).toBe(false);
   });
 });
