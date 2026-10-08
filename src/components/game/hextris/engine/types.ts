@@ -1,7 +1,7 @@
 // Plain data shapes for the clean-room engine (docs/specs/2026-10-hextris-engine-behaviour.md).
 // Everything here is JSON-safe so a run can be copied, compared and replayed.
 
-export type Phase = "ready" | "playing" | "paused" | "over";
+export type Phase = "ready" | "countdown" | "playing" | "paused" | "over";
 
 /** One of the four piece colours, as an index into the painter's palette. */
 export type Colour = 0 | 1 | 2 | 3;
@@ -47,6 +47,8 @@ export interface TimedAction {
 
 export type EngineEvent =
   | { type: "run-start" }
+  | { type: "countdown"; count: number }
+  | { type: "go" }
   | { type: "pause" }
   | { type: "resume" }
   | { type: "game-over"; side: number; score: number; cellsCleared: number }
@@ -99,7 +101,10 @@ export interface RunState {
   /** Highest combo reached this run (unlocks specials). */
   bestCombo: number;
   cellsCleared: number;
-  /** Fixed ticks of unpaused play; `elapsedMs` is derived from it. */
+  /**
+   * Fixed ticks of unpaused play, counted from GO: negative during the countdown. `elapsedMs`
+   * is derived from it, so the run clock reads -2400 ms at the start and 0 at GO.
+   */
   ticks: number;
   elapsedMs: number;
   /** Real time not yet consumed by a whole tick. */

@@ -11,6 +11,9 @@ export const START_LIMIT_ROWS = 12;
 export const SPAWN_ROWS = START_LIMIT_ROWS + 2;
 /** How long the drawn hexagon takes to ease into a new rotation. */
 export const ROTATION_EASE_MS = 90;
+/** The countdown before play (spec section 3.7): 3, 2, 1, each this long, then GO. */
+export const COUNTDOWN_STEP_MS = 800;
+export const COUNTDOWN_MS = 3 * COUNTDOWN_STEP_MS;
 
 // mulberry32 advances its 32-bit state by this constant on every draw, so one draw from a fresh
 // generator seeded with the stored state, plus this step, continues the same stream.

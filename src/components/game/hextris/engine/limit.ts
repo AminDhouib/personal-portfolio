@@ -9,12 +9,12 @@ export const WARN_BEFORE_MS = 10_000;
 // Tick times are multiples of 1000/120, so allow float slack when they meet a whole-ms deadline.
 const TIME_SLACK = 1e-6;
 
-/** Starts the shrink timer on the run's first rotation. */
+/** Starts the shrink timer on the run's first rotation, or at GO for one in the countdown. */
 export function armBoundary(state: RunState): void {
   if (state.boundaryArmed) return;
   state.boundaryArmed = true;
   state.boundaryWarned = false;
-  state.nextShrinkAtMs = state.elapsedMs + SHRINK_EVERY_MS;
+  state.nextShrinkAtMs = Math.max(0, state.elapsedMs) + SHRINK_EVERY_MS;
 }
 
 /** The first side whose stack is above the limit, checking `prefer` first, or -1. */

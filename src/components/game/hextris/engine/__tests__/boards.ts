@@ -2,7 +2,8 @@
 // a, b, c, d are colours 0..3, the same letter in upper case is a bomb of that colour, and
 // * is a rainbow.
 
-import { createRun } from "../state";
+import { COUNTDOWN_MS, createRun, drainEvents } from "../state";
+import { advance, start } from "../step";
 import type { Cell, Colour, RunState } from "../types";
 
 const LETTERS = "abcd";
@@ -20,6 +21,15 @@ export function boardState(sides: Partial<Record<number, string>>, seed = 1): Ru
   for (let side = 0; side < 6; side++) {
     s.sides[side] = [...(sides[side] ?? "")].map(cellOf);
   }
+  return s;
+}
+
+/** A started run taken through its countdown: the clock at 0, play just begun, no events. */
+export function startedRun(seed: number): RunState {
+  const s = createRun({ seed });
+  start(s);
+  advance(s, COUNTDOWN_MS);
+  drainEvents(s);
   return s;
 }
 

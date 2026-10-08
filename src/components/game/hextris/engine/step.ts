@@ -3,7 +3,15 @@ import { armBoundary, endIfOverflowing, tickBoundary } from "./limit";
 import { resolveClears } from "./match";
 import { panic } from "./momentum";
 import { expireCombo } from "./scoring";
-import { TICK_MS, emit, rotationOffset, sideFacingLane, wrapSide } from "./state";
+import {
+  COUNTDOWN_MS,
+  COUNTDOWN_STEP_MS,
+  TICK_MS,
+  emit,
+  rotationOffset,
+  sideFacingLane,
+  wrapSide,
+} from "./state";
 import type { EngineAction, Piece, RunState, TimedAction } from "./types";
 
 // The fixed-step machine (spec sections 3 and 12). The shell feeds real time to `advance`, which
@@ -19,27 +27,40 @@ export const RUSH_FACTOR = 4;
 const UNITS_PER_MS = 120_000;
 const TICK_UNITS = 1_000_000;
 
+// The countdown in whole ticks: 800 ms is exactly 96 of them, so GO lands on tick 0.
+const COUNTDOWN_STEP_TICKS = Math.round(COUNTDOWN_STEP_MS / TICK_MS);
+const COUNTDOWN_TICKS = Math.round(COUNTDOWN_MS / TICK_MS);
+
+/** Whether the run's clock is running: the countdown or play. */
+function running(state: RunState): boolean {
+  return state.phase === "countdown" || state.phase === "playing";
+}
+
+/** Starts the countdown (spec section 3.7). Play begins at GO, 2400 ms later. */
 export function start(state: RunState): void {
   if (state.phase !== "ready") return;
-  state.phase = "playing";
+  state.phase = "countdown";
+  state.ticks = -COUNTDOWN_TICKS;
+  state.elapsedMs = -COUNTDOWN_MS;
   emit(state, { type: "run-start" });
+  emit(state, { type: "countdown", count: COUNTDOWN_TICKS / COUNTDOWN_STEP_TICKS });
 }
 
 export function pauseOrResume(state: RunState): void {
-  if (state.phase === "playing") {
+  if (running(state)) {
     state.phase = "paused";
     // A rush key lifted while paused never reaches the engine, so a pause ends the rush.
     state.rush = false;
     emit(state, { type: "pause" });
   } else if (state.phase === "paused") {
-    state.phase = "playing";
+    state.phase = state.ticks < 0 ? "countdown" : "playing";
     emit(state, { type: "resume" });
   }
 }
 
 /** Turns the hexagon one side: 1 clockwise, -1 counter-clockwise. */
 export function rotate(state: RunState, dir: 1 | -1): void {
-  if (state.phase !== "playing") return;
+  if (!running(state)) return;
   // Keep the drawn angle continuous: start the new ease from wherever the last one had reached.
   const offset = rotationOffset(state, state.elapsedMs);
   state.facing = wrapSide(state.facing + dir);
@@ -51,7 +72,7 @@ export function rotate(state: RunState, dir: 1 | -1): void {
 }
 
 export function setRush(state: RunState, on: boolean): void {
-  if (state.phase !== "playing") return;
+  if (!running(state)) return;
   state.rush = on;
   state.lastInputMs = state.elapsedMs;
 }
@@ -115,6 +136,19 @@ function movePieces(state: RunState): void {
   if (landed.size > 0) state.falling = state.falling.filter((p) => !landed.has(p.id));
 }
 
+/** One countdown tick: the clock runs and the count is called, but nothing moves. */
+function countdownTick(state: RunState): void {
+  state.ticks += 1;
+  state.elapsedMs = state.ticks * TICK_MS;
+  if (state.ticks % COUNTDOWN_STEP_TICKS !== 0) return;
+  if (state.ticks < 0) {
+    emit(state, { type: "countdown", count: -state.ticks / COUNTDOWN_STEP_TICKS });
+    return;
+  }
+  state.phase = "playing";
+  emit(state, { type: "go" });
+}
+
 function tick(state: RunState): void {
   state.ticks += 1;
   state.elapsedMs = state.ticks * TICK_MS;
@@ -151,6 +185,7 @@ export function advance(state: RunState, ms: number, input: readonly TimedAction
       if (due) applyAction(state, due.action);
     }
     if (state.phase === "playing") tick(state);
+    else if (state.phase === "countdown") countdownTick(state);
   }
   for (; next < actions.length; next++) {
     const due = actions[next];
