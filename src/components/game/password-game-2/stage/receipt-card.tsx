@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { GameState } from "../engine/types";
+import { buildShareText, shareResult, type ShareOutcome } from "../stats/share";
+import { loadStats, streakAsOf } from "../stats/stats";
 
 /**
  * Password Game 2 — the end-run receipt.
@@ -68,6 +70,7 @@ export function ReceiptCard({
   const [board, setBoard] = useState<BoardEntry[] | null>(null);
   const [posted, setPosted] = useState<{ name: string; timeMs: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [shareNote, setShareNote] = useState<ShareOutcome | null>(null);
 
   const stats = g.stats;
   const timeMs = Math.round(g.elapsedMs);
@@ -132,6 +135,21 @@ export function ReceiptCard({
       // silent-ok: same expected-failure path as the board read — quiet fallback, no report.
       setPost({ kind: "unavailable" });
     }
+  };
+
+  const share = async () => {
+    // The streak is read at click time: the shell records the run in its own effect.
+    const text = buildShareText(
+      {
+        day: dateStr,
+        ms: timeMs,
+        streak: daily ? streakAsOf(loadStats(), dateStr) : 0,
+        daily,
+        biggestCrisis: crisis.replace(/[^\x20-\x7e]/g, "'"),
+      },
+      `${location.origin}${location.pathname}`,
+    );
+    setShareNote(await shareResult(text));
   };
 
   const isMine = (e: BoardEntry): boolean =>
@@ -280,6 +298,17 @@ export function ReceiptCard({
           >
             Play the daily
           </button>
+          <button
+            type="button"
+            className="pg2-btn pg2-btn--ghost min-h-11 px-4 py-2 text-sm"
+            onClick={() => void share()}
+          >
+            Share result
+          </button>
+          <p className="pg2-postrun__note" role="status">
+            {shareNote === "copied" ? "Result copied to the clipboard." : null}
+            {shareNote === "unavailable" ? "Sharing is not available here." : null}
+          </p>
         </div>
       </div>
     </div>
