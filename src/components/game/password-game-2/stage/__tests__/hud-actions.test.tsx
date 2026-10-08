@@ -72,6 +72,7 @@ describe("the canvas no longer draws action chips", () => {
     cellRects: new Map(),
     boxRect: { x: 20, y: 120, w: 520, h: 160 },
     panelRect: { x: 0, y: 0, w: 560, h: 380 },
+    hudRect: null,
   };
   it.each(["gerald", "garden", "campfire"])("%s registers no hit regions", (id) => {
     const g = bootWith(id);

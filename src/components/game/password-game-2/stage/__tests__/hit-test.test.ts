@@ -23,6 +23,7 @@ function parasiteRegions(): { hits: HitRegion[]; cells: RectLike[] } {
     ]),
     boxRect: { x: 20, y: 90, w: 300, h: 60 },
     panelRect: { x: 0, y: 0, w: 340, h: 400 },
+    hudRect: null,
   };
   const g = { cells: [{ id: 6 }, { id: 7 }] } as unknown as GameState;
   const inst = {

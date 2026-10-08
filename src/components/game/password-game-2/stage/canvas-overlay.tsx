@@ -69,6 +69,7 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
     const origin = canvas.getBoundingClientRect();
     const cellRects = new Map<number, RectLike>();
     let boxRect: RectLike | null = null;
+    let hudRect: RectLike | null = null;
     const rel = (r: DOMRect): RectLike => ({
       x: r.left - origin.left,
       y: r.top - origin.top,
@@ -82,8 +83,15 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
       });
       const box = panel.querySelector<HTMLElement>("[data-pg2-box]");
       if (box) boxRect = rel(box.getBoundingClientRect());
+      const hud = panel.querySelector<HTMLElement>("[data-pg2-hud]");
+      if (hud) hudRect = rel(hud.getBoundingClientRect());
     }
-    return { cellRects, boxRect, panelRect: { x: 0, y: 0, w: origin.width, h: origin.height } };
+    return {
+      cellRects,
+      boxRect,
+      panelRect: { x: 0, y: 0, w: origin.width, h: origin.height },
+      hudRect,
+    };
   }
 
   useImperativeHandle(

@@ -36,6 +36,7 @@ const layout: StageLayout = {
   cellRects: new Map(),
   boxRect: box,
   panelRect: { x: 0, y: 0, w: 560, h: 380 },
+  hudRect: null,
 };
 
 /** A run with `id` forced, advanced into its peak so every HUD element is live. */

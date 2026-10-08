@@ -6,18 +6,20 @@ import type { GameState } from "../../engine/types";
 // One spy painter stands in for the cast: it records the clock it was given and
 // registers an alien hit circle, as the galaga painter does.
 const seen: number[] = [];
+const layouts: unknown[] = [];
 vi.mock("../painters", () => ({
   FINALE_INST: { defId: "finale-missiles" },
   PAINTERS: {
     galaga: (
       _ctx: unknown,
       _inst: unknown,
-      _layout: unknown,
+      layout: unknown,
       _g: unknown,
       tMs: number,
       hits: unknown[],
     ) => {
       seen.push(tMs);
+      layouts.push(layout);
       hits.push({
         shape: "circle",
         x: 50,
@@ -71,6 +73,7 @@ describe("CanvasOverlay hit feedback", () => {
 
   beforeEach(() => {
     seen.length = 0;
+    layouts.length = 0;
     arcs = [];
     const ctx = fakeContext(arcs);
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
@@ -128,5 +131,34 @@ describe("CanvasOverlay hit feedback", () => {
     overlay.paint(game, 1_016);
     expect(arcs).toHaveLength(0);
     expect(seen.at(-1)).toBe(1_016);
+  });
+});
+
+describe("CanvasOverlay layout", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("measures the HUD band for the painters, relative to the canvas", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() =>
+      fakeContext([])) as unknown as HTMLCanvasElement["getContext"]);
+    vi.spyOn(HTMLCanvasElement.prototype, "clientWidth", "get").mockReturnValue(300);
+    vi.spyOn(HTMLCanvasElement.prototype, "clientHeight", "get").mockReturnValue(200);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const h = this instanceof HTMLCanvasElement ? 200 : 69;
+      return { left: 10, top: 20, width: 300, height: h } as DOMRect;
+    });
+    const ref = createRef<OverlayHandle>();
+    render(
+      <div>
+        <div data-pg2-hud />
+        <CanvasOverlay ref={ref} />
+      </div>,
+    );
+    ref.current!.paint(game, 1_000);
+    expect(layouts.at(-1)).toMatchObject({ hudRect: { x: 0, y: 0, w: 300, h: 69 } });
   });
 });
