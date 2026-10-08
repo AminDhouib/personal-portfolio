@@ -1,5 +1,6 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 
 // Provenance guard for the clean-room Hextris engine (PR T5-3,
@@ -85,6 +86,28 @@ describe("provenance matcher", () => {
 
   it("passes the clean-room vocabulary", () => {
     expect(denylistHits("advance(state, ms); findGroup(sides, side, row); TICK_MS")).toEqual([]);
+  });
+});
+
+describe("file scan", () => {
+  it("reports a hit in a real file, naming the file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hx-guard-"));
+    try {
+      const file = join(dir, "probe.ts");
+      writeFileSync(file, "export const comboTime = 1;\n");
+      expect(walk(dir)).toEqual([file]);
+      const hits = scan(walk(dir));
+      expect(hits).toHaveLength(1);
+      expect(hits[0]).toContain(basename(file));
+      expect(hits[0]).toContain("comboTime");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips only this file, which does carry the denylisted names", () => {
+    expect(denylistHits(readFileSync(SELF, "utf8")).length).toBeGreaterThan(0);
+    expect(scan([SELF])).toEqual([]);
   });
 });
 
