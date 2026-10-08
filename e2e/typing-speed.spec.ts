@@ -20,7 +20,7 @@ test.describe("Typing Speed", () => {
     await page.goto(GAME_PATH);
     const target = page.getByTestId("ts-target");
     await expect(target).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("button", { name: "Quote" }).click();
+    await page.getByRole("button", { name: "Quote", exact: true }).click();
     const passage = (await target.locator(".sr-only").textContent()) ?? "";
     expect(passage.length).toBeGreaterThan(100);
 
@@ -41,8 +41,8 @@ test.describe("Typing Speed", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(GAME_PATH);
     await expect(page.getByTestId("ts-target")).toBeVisible({ timeout: 20_000 });
-    await page.getByRole("button", { name: "Words" }).click();
-    await page.getByRole("button", { name: "15 seconds" }).click();
+    await page.getByRole("button", { name: "Words", exact: true }).click();
+    await page.getByRole("button", { name: "15 seconds", exact: true }).click();
     await page.getByTestId("ts-target").click();
 
     const results = page.getByTestId("ts-net-wpm");
@@ -57,7 +57,7 @@ test.describe("Typing Speed", () => {
     await expect(page.locator("[data-key]").first()).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole("button", { name: "15 seconds" })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: "15 seconds", exact: true })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
