@@ -41,6 +41,8 @@ export interface StageLayout {
   cellRects: Map<number, RectLike>;
   boxRect: RectLike | null;
   panelRect: RectLike;
+  /** The HUD band across the card's top (timer, seed, mute, exit), or null if unmounted. */
+  hudRect: RectLike | null;
 }
 
 /** A clickable region a painter registers for the current frame. */
@@ -851,19 +853,35 @@ function fleetScale(panel: RectLike): number {
   return Math.min(artScale("galaga"), fleetSpacing(panel) / 40);
 }
 
+// The glow drawAlien wraps a ship in, outside the carrying flare.
+const SHIP_GLOW = 8;
+
+/**
+ * How far a ship reaches from its centre: the wingtips (19 px across, 9 up at scale 1) and
+ * their glow, or the tap target where that is larger.
+ */
+function shipReach(s: number): { x: number; y: number } {
+  const r = hitRadius(16, s);
+  return { x: Math.max(r, 19 * s + SHIP_GLOW), y: Math.max(r, 9 * s + SHIP_GLOW) };
+}
+
 function alienSlot(
+  layout: StageLayout,
   box: RectLike,
-  panel: RectLike,
   formationIndex: number,
   assembled: number,
 ): { x: number; y: number } {
+  const panel = layout.panelRect;
   const col = formationIndex % COLS;
   const row = Math.floor(formationIndex / COLS);
   const s = fleetScale(panel);
   const cx = box.x + box.w / 2 + (col - (COLS - 1) / 2) * fleetSpacing(panel);
-  const targetY = panel.y + (24 + row * 30) * s;
-  // during assembly, slots drop into place from the top edge of the card
-  const top = panel.y + 12 * s;
+  // The top row sits a ship's reach under the HUD band, so no ship covers (or steals a
+  // tap from) the timer, seed, mute or exit.
+  const hud = layout.hudRect;
+  const top = (hud ? hud.y + hud.h : panel.y) + shipReach(s).y;
+  const targetY = top + row * 30 * s;
+  // during assembly, the lower row drops into place from the top row
   const y = top + assembled * (targetY - top);
   return { x: cx, y };
 }
@@ -913,17 +931,18 @@ const paintGalaga: Painter = (ctx, inst, layout, g, tMs, hits) => {
   if (!box) return;
   const d = inst.data as GalagaData;
   const s = fleetScale(panel);
-  // A wingtip reaches 19 px from the body's centre; keep the whole ship on the card.
-  const minX = panel.x + 20 * s;
-  const maxX = panel.x + panel.w - 20 * s;
+  // Keep the whole ship, glow and target on the card, however it sways or dives.
+  const reach = shipReach(s).x;
+  const minX = panel.x + reach;
+  const maxX = panel.x + panel.w - reach;
 
   // Assembly progress: telegraph slides the fleet in row by row.
   const assembled = inst.phase === "telegraph" ? Math.min(1, inst.phaseElapsedMs / 9000) : 1;
 
   for (const a of d.aliens as Alien[]) {
     if (a.state === "fled" || a.state === "down") continue;
-    const slot = alienSlot(box, panel, a.formationIndex, assembled);
-    let x = slot.x + Math.sin(tMs / 600 + a.formationIndex) * 3;
+    const slot = alienSlot(layout, box, a.formationIndex, assembled);
+    let x = clamp(slot.x + Math.sin(tMs / 600 + a.formationIndex) * 3, minX, maxX);
     let y = slot.y;
 
     if (a.state === "diving" && a.diveStartedAtMs !== null) {
@@ -937,7 +956,7 @@ const paintGalaga: Painter = (ctx, inst, layout, g, tMs, hits) => {
       const t =
         a.diveStartedAtMs !== null ? Math.min(1, (g.elapsedMs - a.diveStartedAtMs) / 3000) : 0;
       y = box.y + box.h * 0.4 - t * (box.h * 0.4);
-      x = slot.x;
+      x = clamp(slot.x, minX, maxX);
       const cell =
         a.carriedCellId !== null ? g.cells.find((c) => c.id === a.carriedCellId) : undefined;
       if (cell) {

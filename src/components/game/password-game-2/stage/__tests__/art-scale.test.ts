@@ -3,7 +3,7 @@ import { applyKey, createRun, tick } from "../../engine/engine";
 import { drainEffects } from "../../engine/effects";
 import { EVENT_DEFS } from "../../engine/events/index";
 import type { FinaleMissile, MissilesData } from "../../engine/events/finale";
-import type { GameState } from "../../engine/types";
+import type { EventInstance, GameState } from "../../engine/types";
 import { ART_SCALE } from "../art-scale";
 import { pickHit } from "../hit-test";
 import {
@@ -17,11 +17,12 @@ import {
 type Matrix = [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
-/** The text state a real context saves and restores with the transform. */
+/** The text and glow state a real context saves and restores with the transform. */
 interface TextState {
   font: string;
   textAlign: string;
   textBaseline: string;
+  shadowBlur: number;
 }
 
 /** A sans glyph averages about 0.6 em across; enough to bound a label's ink. */
@@ -36,15 +37,28 @@ function fontPx(font: string): number {
  * A recording 2D context that tracks the transform stack and logs every coordinate a
  * painter draws through (path points, arc and ellipse bounds, rects, and the box a
  * fillText covers by its measured width) in canvas space, so a test can bound the art
- * without a real canvas.
+ * without a real canvas. With `glow`, each point also reaches out by the live shadowBlur.
  */
-function recordingCtx() {
+function recordingCtx({ glow = false } = {}) {
   const points: { x: number; y: number; op: string }[] = [];
   let m: Matrix = [...IDENTITY];
-  let text: TextState = { font: "10px sans-serif", textAlign: "start", textBaseline: "alphabetic" };
+  let text: TextState = {
+    font: "10px sans-serif",
+    textAlign: "start",
+    textBaseline: "alphabetic",
+    shadowBlur: 0,
+  };
   const stack: { m: Matrix; text: TextState }[] = [];
   const mark = (op: string, x: number, y: number) => {
-    points.push({ op, x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] });
+    const cx = m[0] * x + m[2] * y + m[4];
+    const cy = m[1] * x + m[3] * y + m[5];
+    const b = glow ? text.shadowBlur : 0;
+    for (const [dx, dy] of [
+      [-b, -b],
+      [b, b],
+    ]) {
+      points.push({ op, x: cx + dx!, y: cy + dy! });
+    }
   };
   const bounds = (op: string, x: number, y: number, rx: number, ry = rx) => {
     mark(op, x - rx, y - ry);
@@ -126,13 +140,16 @@ function recordingCtx() {
         return () => ({ addColorStop: () => {} });
       }
       if (p === "fillText") return fillText;
-      if (p === "font" || p === "textAlign" || p === "textBaseline") return text[p];
+      if (p === "font" || p === "textAlign" || p === "textBaseline" || p === "shadowBlur") {
+        return text[p];
+      }
       if (p in ops) return ops[p];
       if (p in t) return t[p];
       return () => undefined;
     },
     set(t, p: string, v) {
       if (p === "font" || p === "textAlign" || p === "textBaseline") text[p] = String(v);
+      else if (p === "shadowBlur") text.shadowBlur = Number(v);
       else t[p] = v;
       return true;
     },
@@ -171,7 +188,9 @@ function layoutFor(g: GameState, stage: { panel: RectLike; box: RectLike }): Sta
     cellRects.set(cell.id, { x, y, w: cw, h: ch });
     x += cw;
   }
-  return { cellRects, boxRect: box, panelRect: stage.panel };
+  // The HUD band ends where the card's padding and the top meter band (77 px) begin.
+  const hudRect = { x: stage.panel.x, y: stage.panel.y, w: stage.panel.w, h: box.y - 77 };
+  return { cellRects, boxRect: box, panelRect: stage.panel, hudRect };
 }
 
 /**
@@ -329,4 +348,77 @@ describe("finale missiles art", () => {
       }
     }
   });
+});
+
+describe("galaga fleet", () => {
+  // The 390 and 360 phones' cards, with the HUD band and box where the walk measured them.
+  const cards = [336, 366].map((w) => ({
+    w,
+    layout: {
+      cellRects: new Map(),
+      boxRect: { x: 21, y: 146, w: w - 42, h: 160 },
+      panelRect: { x: 0, y: 0, w, h: 420 },
+      hudRect: { x: 0, y: 0, w, h: 69 },
+    } satisfies StageLayout,
+  }));
+
+  /** A full wave: ten ships in formation, one diving and one carrying a glyph off. */
+  function fleet(phase: "telegraph" | "peak", phaseElapsedMs: number, diveMs: number) {
+    const aliens = Array.from({ length: 12 }, (_unused, i) => ({
+      id: i,
+      formationIndex: i,
+      state: i === 10 ? "diving" : i === 11 ? "carrying" : "formation",
+      carriedCellId: i === 11 ? 1 : null,
+      diveStartedAtMs: i >= 10 ? 10_000 - diveMs : null,
+    }));
+    const inst = {
+      defId: "galaga",
+      phase,
+      phaseElapsedMs,
+      data: { wave: 1, aliens, waveStartedAtMs: 0, nextDiveAtMs: 0, timedOutWaves: 0 },
+    } as unknown as EventInstance;
+    const g = { cells: [{ id: 1, ch: "W" }], elapsedMs: 10_000 } as unknown as GameState;
+    return { inst, g };
+  }
+
+  it.each(cards)(
+    "on a $w px card no ship leaves the card or touches the HUD band, through a whole sway",
+    ({ layout }) => {
+      const hudBottom = layout.hudRect.y + layout.hudRect.h;
+      const panel = layout.panelRect;
+      const samples: [phase: "telegraph" | "peak", phaseElapsedMs: number][] = [
+        ["telegraph", 0],
+        ["telegraph", 4_500],
+        ["peak", 0],
+      ];
+      for (const [phase, phaseElapsedMs] of samples) {
+        for (const diveMs of [0, 500, 1_000, 1_500, 2_000, 3_000]) {
+          const { inst, g } = fleet(phase, phaseElapsedMs, diveMs);
+          // The sway is sin(tMs / 600): one cycle is 2 * PI * 600 ms.
+          for (let tMs = 0; tMs <= 2 * Math.PI * 600; tMs += 40) {
+            const { ctx, points } = recordingCtx({ glow: true });
+            const hits: HitRegion[] = [];
+            PAINTERS.galaga!(ctx, inst, layout, g, tMs, hits);
+            const tag = `galaga ${phase} ${phaseElapsedMs}ms, dive ${diveMs}ms, t=${tMs}`;
+            expect(hits.length, tag).toBeGreaterThan(0);
+            expectInside(points, panel, tag);
+            for (const p of points) {
+              if (p.y < hudBottom) {
+                expect.fail(
+                  `${tag}: ${p.op} at (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) is on the HUD`,
+                );
+              }
+            }
+            for (const h of hits) {
+              const at = `${tag}: alien ${String(h.target.id)} target`;
+              expect(h.x - h.r, at).toBeGreaterThanOrEqual(panel.x);
+              expect(h.x + h.r, at).toBeLessThanOrEqual(panel.x + panel.w);
+              expect(h.y - h.r, at).toBeGreaterThanOrEqual(hudBottom);
+              expect(h.y + h.r, at).toBeLessThanOrEqual(panel.y + panel.h);
+            }
+          }
+        }
+      }
+    },
+  );
 });
