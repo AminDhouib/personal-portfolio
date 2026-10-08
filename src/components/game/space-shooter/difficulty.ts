@@ -25,6 +25,17 @@ export function comboMultiplier(combo: number): number {
   return 10;
 }
 
+// 0..5 index over the same thresholds as comboMultiplier; the HUD flashes the
+// combo chip whenever a kill raises it.
+export function comboTier(combo: number): number {
+  if (combo < 3) return 0;
+  if (combo < 5) return 1;
+  if (combo < 10) return 2;
+  if (combo < 20) return 3;
+  if (combo < 40) return 4;
+  return 5;
+}
+
 export function comboColor(combo: number): string {
   if (combo >= 40) return "#f472b6";
   if (combo >= 20) return "#fb923c";

@@ -443,3 +443,68 @@ describe("death sequence explosions", () => {
     expect(g.explosions).toHaveLength(4);
   });
 });
+
+describe("combo tier flash", () => {
+  beforeEach(() => {
+    stubMatchMedia();
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  // One bullet sitting on one basic obstacle, away from the ship: the next
+  // tick resolves exactly one kill.
+  function killAtCombo(combo: number, tier: number, upAt: number): GameRefs {
+    const g = createRefs();
+    let clock = 100_000;
+    const spy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    startVulnerableRun(g, clock);
+    g.combo = combo;
+    g.comboTier = tier;
+    g.comboTierUpAt = upAt;
+    g.comboLastAt = clock;
+    g.obstacles.push(makeObstacle({ id: 1, x: 4, y: 0, z: -20 }));
+    g.bullets.push({
+      id: 2,
+      x: 4,
+      y: 0,
+      z: -20,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      size: 0.1,
+      damage: 5,
+      color: "#fff",
+      hp: 1,
+      style: "bolt",
+    });
+    clock += 16;
+    runTick(
+      g,
+      0.016,
+      VIEWPORT,
+      () => {},
+      () => {},
+    );
+    spy.mockRestore();
+    return g;
+  }
+
+  it("records the new tier and its time when a kill crosses a tier boundary", () => {
+    const g = killAtCombo(4, 1, 0);
+    expect(g.kills).toBe(1);
+    expect(g.combo).toBe(5);
+    expect(g.comboTier).toBe(2);
+    expect(g.comboTierUpAt).toBe(g.now);
+  });
+
+  it("leaves comboTierUpAt alone when a kill stays inside a tier", () => {
+    const g = killAtCombo(5, 2, 123);
+    expect(g.combo).toBe(6);
+    expect(g.comboTier).toBe(2);
+    expect(g.comboTierUpAt).toBe(123);
+  });
+});

@@ -314,6 +314,8 @@ export interface GameRefs {
   combo: number;
   comboLastAt: number;
   comboPeak: number;
+  comboTier: number;
+  comboTierUpAt: number;
   obstacles: Obstacle[];
   bullets: Bullet[];
   explosions: Explosion[];

@@ -29,6 +29,8 @@ export function createRefs(): GameRefs {
     combo: 1,
     comboLastAt: 0,
     comboPeak: 1,
+    comboTier: 0,
+    comboTierUpAt: 0,
     obstacles: [],
     bullets: [],
     explosions: [],
@@ -137,6 +139,8 @@ export function startRun(g: GameRefs): boolean {
   g.status = "playing";
   g.startedAt = now;
   g.pausedAt = 0;
+  g.comboTier = 0;
+  g.comboTierUpAt = 0;
   g.deathFxStage = 0;
   g.shakeTrauma = 0;
   g.invulnUntil = now + START_INVULN_MS;
@@ -255,6 +259,7 @@ export function shiftRunTimestamps(g: GameRefs, delta: number): void {
   g.startedAt += delta;
   g.invulnUntil += delta;
   g.comboLastAt += delta;
+  if (g.comboTierUpAt > 0) g.comboTierUpAt += delta;
   g.lastBullet += delta;
   g.lastSpawn += delta;
   g.lastPowerUpSpawn += delta;
