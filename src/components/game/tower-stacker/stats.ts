@@ -115,8 +115,7 @@ export type RunRecord = {
 /**
  * Folds one finished run in. Every run counts; a best rises only on a strictly higher
  * score. Only a finished daily tower touches the streak: a repeat of the same day keeps
- * it, the next UTC day extends it, a gap restarts it at one. A clock that moved
- * backwards does not pull the streak back.
+ * it, the next UTC day extends it, a gap, or a last day ahead of the run, restarts it at one.
  */
 export function recordRun(stats: TowerStats, run: RunRecord): TowerStats {
   const next = structuredClone(stats);
@@ -130,8 +129,9 @@ export function recordRun(stats: TowerStats, run: RunRecord): TowerStats {
     next.bestDaily = { day: run.day, score };
   }
   const last = next.lastDailyDay;
-  if (last !== null && run.day < last) return next;
   if (last === run.day) return next;
+  // A last day ahead of this run means the clock was wrong once; restart on the run's day
+  // rather than freeze the streak until real time catches up (the same call as PG2's streak).
   next.streakDays = last === previousDay(run.day) ? Math.min(COUNT_CAP, next.streakDays + 1) : 1;
   next.bestStreakDays = Math.max(next.bestStreakDays, next.streakDays);
   next.lastDailyDay = run.day;
