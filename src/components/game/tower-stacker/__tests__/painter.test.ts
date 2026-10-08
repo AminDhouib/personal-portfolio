@@ -6,7 +6,7 @@ import { PALETTE } from "../palette";
 import { PULSE_MS, paintFrame, type CanvasLike, type Scene } from "../painter";
 
 interface Rec {
-  strokeRects: { x: number; y: number; w: number; h: number; style: string }[];
+  strokeRects: { x: number; y: number; w: number; h: number; style: unknown }[];
   accentRingStrokes: number;
   fillTexts: string[];
 }
