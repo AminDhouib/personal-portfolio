@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRefs, startRun, pickNextBiomeDistance, pauseRun, resumeRun } from "../run-init";
+import {
+  createRefs,
+  startRun,
+  pickNextBiomeDistance,
+  pauseRun,
+  resumeRun,
+  FIRST_WALL_MS,
+} from "../run-init";
 import { spawnBoss } from "../boss-behaviors";
 import { ENVIRONMENTS, START_INVULN_MS } from "../types";
 import type { GameRefs } from "../types";
@@ -121,6 +128,13 @@ describe("run-init", () => {
       expect(g.invulnUntil).toBeGreaterThanOrEqual(g.startedAt + START_INVULN_MS - 1);
       expect(g.nextWallAt).toBeGreaterThan(g.startedAt); // first wall scheduled ahead
       expect(g.lastSpawn).toBe(g.startedAt);
+    });
+
+    it("schedules the first wall FIRST_WALL_MS (10 s) after the run starts", () => {
+      const g = createRefs();
+      startRun(g);
+      expect(FIRST_WALL_MS).toBe(10_000);
+      expect(g.nextWallAt - g.startedAt).toBe(FIRST_WALL_MS);
     });
 
     it("is idempotent: a second call returns false and leaves status 'playing'", () => {

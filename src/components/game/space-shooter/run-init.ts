@@ -6,6 +6,9 @@ import { sounds } from "./sound-manager";
 import { loadProfile, saveProfile } from "../profile";
 import { upgradeById, shipById, SHIPS, cosmeticById } from "../shop-data";
 
+// Delay from run start to the first wall of obstacles.
+export const FIRST_WALL_MS = 10_000;
+
 // Random distance until next biome change -- keeps transitions unpredictable.
 export function pickNextBiomeDistance(currentDist: number): number {
   return currentDist + 700 + Math.random() * 900; // 700-1600m further
@@ -140,9 +143,9 @@ export function startRun(g: GameRefs): boolean {
   g.lastSpawn = now;
   g.lastPowerUpSpawn = now;
   g.lastUiSync = 0;
-  // First wall at least 20s into the run -- the player needs warm-up time
-  // before facing a forced-positioning challenge.
-  g.nextWallAt = now + 20_000;
+  // First wall 10s into the run -- a short warm-up before the first
+  // forced-positioning challenge.
+  g.nextWallAt = now + FIRST_WALL_MS;
 
   // Apply purchased upgrades as per-run modifiers. All lookups happen here --
   // per-frame logic reads these fields, never the profile/catalog directly.
