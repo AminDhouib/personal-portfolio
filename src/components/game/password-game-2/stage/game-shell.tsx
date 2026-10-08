@@ -41,6 +41,7 @@ import { Hud } from "./hud";
 import { HudActions } from "./hud-actions";
 import { HUD_BOTTOM_H, HUD_TOP_H } from "./hud-slots";
 import { FAMILY_TINT, activeTelegraphs } from "./telegraph";
+import { hitKindFor, hitLanded, hitSnapshot, shakeFor } from "./hit-fx";
 import { TelegraphBanner } from "./telegraph-banner";
 import { useTelegraphCue } from "./use-telegraph-cue";
 import { useVisualViewport } from "./use-visual-viewport";
@@ -59,6 +60,8 @@ type Phase = "start" | "running";
 const KEY_TICK_GAP_MS = 30;
 /** Minimum gap between two rule-fail cues, and between two rule-pass cues. */
 const RULE_CUE_GAP_MS = 150;
+/** How long a canvas hit's shake takes to die away. */
+const HIT_SHAKE_MS = 180;
 
 interface Toast {
   id: number;
@@ -159,6 +162,8 @@ export function GameShell() {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const hiddenInputRef = useRef<HTMLInputElement | null>(null);
   const shakeRef = useRef(0);
+  // A canvas hit's own shake: a kick in px that fades out over HIT_SHAKE_MS.
+  const hitShakeRef = useRef({ px: 0, leftMs: 0 });
   const reducedRef = useRef(false);
   const soundDebounceRef = useRef<Map<string, number>>(new Map());
   const lastTickRef = useRef(-Infinity);
@@ -377,12 +382,16 @@ export function GameShell() {
       // Repaint the canvas overlay every frame — the whole event-visibility layer.
       overlayRef.current?.paint(g, ts);
 
-      // Screen shake: jitter the panel by the decaying trauma, then decay it.
+      // Screen shake: jitter the panel by the decaying trauma (or a fresh hit's kick,
+      // whichever is larger), then decay both.
       const panel = panelRef.current;
+      const hs = hitShakeRef.current;
+      const hitMag = hs.leftMs > 0 ? hs.px * (hs.leftMs / HIT_SHAKE_MS) : 0;
+      hs.leftMs = Math.max(0, hs.leftMs - dt);
       if (panel) {
         const s = shakeRef.current;
-        if (s > 0.001) {
-          const mag = s * s * 9;
+        if (s > 0.001 || hitMag > 0) {
+          const mag = Math.max(s * s * 9, hitMag);
           panel.style.setProperty("--pg2-shake-x", `${(Math.random() * 2 - 1) * mag}px`);
           panel.style.setProperty("--pg2-shake-y", `${(Math.random() * 2 - 1) * mag}px`);
         } else {
@@ -543,7 +552,16 @@ export function GameShell() {
       if (!target) return;
       e.preventDefault();
       e.stopPropagation();
+      const before = hitSnapshot(g);
       applyPointer(g, target);
+      // A press that landed bursts, holds the art for a beat and shakes the card by weight.
+      const kind = hitKindFor(target);
+      if (kind && hitLanded(before, g)) {
+        overlay.onHit(target, e.clientX, e.clientY);
+        const hs = hitShakeRef.current;
+        hs.px = Math.max(hs.px * (hs.leftMs / HIT_SHAKE_MS), shakeFor(kind));
+        hs.leftMs = HIT_SHAKE_MS;
+      }
       forceRender();
       focusHiddenInput();
     };

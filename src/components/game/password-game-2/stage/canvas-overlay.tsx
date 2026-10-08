@@ -3,11 +3,34 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { GameState, PointerTarget } from "../engine/types";
 import { PAINTERS, FINALE_INST, type HitRegion, type RectLike, type StageLayout } from "./painters";
+import {
+  BURST,
+  burstAt,
+  hitKindFor,
+  newPaintClock,
+  requestHitStop,
+  stepPaintClock,
+  stepParticles,
+  type Particle,
+} from "./hit-fx";
 
-/** The shell drives paint() from its rAF loop and hitTest() from a pointer listener. */
+/**
+ * The shell drives paint() from its rAF loop and hitTest() from a pointer listener, and
+ * calls onHit() when a press on a canvas target landed.
+ */
 export interface OverlayHandle {
   paint(g: GameState, tMs: number): void;
   hitTest(clientX: number, clientY: number): PointerTarget | null;
+  onHit(target: PointerTarget, clientX: number, clientY: number): void;
+}
+
+interface Burst {
+  color: string;
+  ps: Particle[];
+}
+
+function sameTarget(a: PointerTarget, b: PointerTarget): boolean {
+  return a.kind === b.kind && a.id === b.id;
 }
 
 /**
@@ -24,6 +47,9 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
   const layoutVersionRef = useRef(-1);
   const sizeRef = useRef({ w: 0, h: 0, dpr: 1 });
   const hitsRef = useRef<HitRegion[]>([]);
+  const clockRef = useRef(newPaintClock());
+  const burstsRef = useRef<Burst[]>([]);
+  const burstSeedRef = useRef(0);
 
   // Invalidate the cached layout on any panel resize; the next paint re-measures.
   useEffect(() => {
@@ -103,14 +129,59 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
         const hits = hitsRef.current;
         hits.length = 0;
 
+        // Painters run on the paint clock, which a hit-stop holds still for a beat.
+        const clock = clockRef.current;
+        const dt = stepPaintClock(clock, tMs);
+        const paintMs = clock.paintMs;
+
         for (const inst of g.events) {
           if (inst.data === undefined || inst.phase === "done") continue;
           const painter = PAINTERS[inst.defId];
-          if (painter) painter(ctx, inst, layout, g, tMs, hits);
+          if (painter) painter(ctx, inst, layout, g, paintMs, hits);
         }
         if (g.finale && g.finale.phase === "missiles") {
-          PAINTERS["finale-missiles"]?.(ctx, FINALE_INST, layout, g, tMs, hits);
+          PAINTERS["finale-missiles"]?.(ctx, FINALE_INST, layout, g, paintMs, hits);
         }
+
+        // Hit sparks, over the art.
+        const bursts: Burst[] = [];
+        for (const b of burstsRef.current) {
+          const ps = dt > 0 ? stepParticles(b.ps, dt) : b.ps;
+          if (ps.length === 0) continue;
+          bursts.push({ color: b.color, ps });
+          ctx.save();
+          ctx.fillStyle = b.color;
+          for (const p of ps) {
+            ctx.globalAlpha = p.alpha;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+        burstsRef.current = bursts;
+      },
+      onHit(target, clientX, clientY) {
+        const kind = hitKindFor(target);
+        const canvas = canvasRef.current;
+        if (!kind || !canvas) return;
+        // Burst from the centre of the target the press landed on; fall back to the
+        // pointer when the region is gone (it is from last frame).
+        const region = hitsRef.current.find((h) => sameTarget(h.target, target));
+        let x: number;
+        let y: number;
+        if (region) {
+          x = region.shape === "rect" ? region.x + region.w / 2 : region.x;
+          y = region.shape === "rect" ? region.y + region.h / 2 : region.y;
+        } else {
+          const rect = canvas.getBoundingClientRect();
+          x = clientX - rect.left;
+          y = clientY - rect.top;
+        }
+        const { n, color } = BURST[kind];
+        burstSeedRef.current += 1;
+        burstsRef.current.push({ color, ps: burstAt(x, y, n, burstSeedRef.current) });
+        requestHitStop(clockRef.current);
       },
       hitTest(clientX, clientY) {
         const canvas = canvasRef.current;
