@@ -32,10 +32,10 @@ function setup(opts: { animating: boolean; cardTop: number; scrollTop: number })
 }
 
 describe("followRule", () => {
-  it("scrolls smoothly to the rule when nothing is animating", () => {
+  it("scrolls instantly to the rule when nothing is animating", () => {
     const { card, scrollIntoView } = setup({ animating: false, cardTop: 0, scrollTop: 0 });
     followRule(card);
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
   });
 
   it("while the card animates, the target comes from layout, not the transformed rect", () => {
@@ -48,7 +48,7 @@ describe("followRule", () => {
     card.getBoundingClientRect = () => ({ top: -999, bottom: -899 }) as DOMRect;
     followRule(card);
     expect(scrollIntoView).not.toHaveBeenCalled();
-    expect(scrollTo).toHaveBeenCalledWith({ top: 300, behavior: "smooth" }); // 500 + 100 - 300
+    expect(scrollTo).toHaveBeenCalledWith({ top: 300, behavior: "auto" }); // 500 + 100 - 300
   });
 
   it("a different in-flight transform does not move the scroll target", () => {
@@ -91,15 +91,9 @@ describe("followRule", () => {
     );
     followRule(card);
     // List: card spans 300-386 in its content, visible height 128 -> scroll to 258.
-    expect(listTo).toHaveBeenCalledWith({ top: 258, behavior: "smooth" });
+    expect(listTo).toHaveBeenCalledWith({ top: 258, behavior: "auto" });
     // Sheet: after that the card sits at 442-528 in the sheet, visible height 450 -> 78.
-    expect(sheetTo).toHaveBeenCalledWith({ top: 78, behavior: "smooth" });
-  });
-
-  it("keeps a sticky card's height clear above the rule", () => {
-    const { card, scrollTo } = setup({ animating: true, cardTop: 200, scrollTop: 250 });
-    followRule(card, 80);
-    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: "smooth" }); // 200 - 80
+    expect(sheetTo).toHaveBeenCalledWith({ top: 78, behavior: "auto" });
   });
 
   it("does not scroll when the rule already sits inside the scroller", () => {

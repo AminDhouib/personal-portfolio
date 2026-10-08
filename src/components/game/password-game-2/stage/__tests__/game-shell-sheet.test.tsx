@@ -155,7 +155,7 @@ describe("GameShell phone play sheet", () => {
         vv.height = 480;
         vv.dispatchEvent(new Event("resize"));
       });
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
     } finally {
       Reflect.deleteProperty(Element.prototype, "scrollIntoView");
     }

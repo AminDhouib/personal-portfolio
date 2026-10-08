@@ -44,6 +44,8 @@ interface RuleListProps {
   onRuleFlips?(flips: RuleFlips): void;
   /** Changes on every new run; the cards start fresh even when the rule ids repeat. */
   runId?: number;
+  /** False while the phone keyboard is open: reorders just take their new place. */
+  slide?: boolean;
 }
 
 interface Evaluated {
@@ -413,6 +415,7 @@ export const RuleList = memo(function RuleList({
   liveEvents,
   onRuleFlips,
   runId = 0,
+  slide = true,
 }: RuleListProps) {
   // Any widget input counts as a player action even when it leaves the password text alone
   // (a captcha stage, a chess move, a wordle verdict), so it earns the shake and the cue.
@@ -540,7 +543,7 @@ export const RuleList = memo(function RuleList({
     ? [firstFailing, ...evaluated.filter((e) => e !== firstFailing)]
     : evaluated;
 
-  useFlip(listRef, ordered.map((e) => e.rule.id).join(","), runId);
+  useFlip(listRef, ordered.map((e) => e.rule.id).join(","), runId, slide);
 
   return (
     <>
