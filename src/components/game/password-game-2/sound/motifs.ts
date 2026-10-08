@@ -397,7 +397,9 @@ export function playCue(name: string): void {
   const cue = MOTIFS[name];
   if (!cue) return;
   const bus = getAudio();
-  if (!bus) return;
+  // A context the browser still holds suspended has a frozen clock: scheduling now would
+  // queue the cue and burst it out on the next gesture. Drop it instead.
+  if (!bus || bus.ctx.state !== "running") return;
   try {
     cue(bus);
   } catch {

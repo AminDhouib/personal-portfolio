@@ -174,14 +174,14 @@ export function setEnabled(on: boolean): void {
 }
 
 /**
- * Call from a user gesture (the Start tap, the sound toggle): creates the context and
+ * Call ONLY from a real user gesture (the Start tap, a keydown, a pointerdown, the sound toggle): creates the context and
  * resumes it if the browser left it suspended, and opens the gate playCue checks. Never
  * throws; a platform without audio just leaves the gate open on a null bus.
  */
 export function unlockAudio(): void {
   unlocked = true;
-  const b = getAudio();
-  const ctx = b?.ctx;
+  if (!isEnabled()) return; // no context for a muted player; the toggle unlocks again
+  const ctx = getAudio()?.ctx;
   if (!ctx || ctx.state !== "suspended" || !ctx.resume) return;
   void resumeQuietly(ctx);
 }

@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { GameState, Pg2Rule } from "../../engine/types";
 
+let search = "";
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(""),
+  useSearchParams: () => new URLSearchParams(search),
 }));
 
 const cues: string[] = [];
@@ -54,6 +55,7 @@ describe("GameShell motion and sound wiring", () => {
     cues.length = 0;
     unlock.mockClear();
     live = null;
+    search = "";
     vi.useFakeTimers();
     vi.stubGlobal("requestAnimationFrame", () => 0);
     vi.stubGlobal("cancelAnimationFrame", () => {});
@@ -81,6 +83,47 @@ describe("GameShell motion and sound wiring", () => {
     expect(unlock).not.toHaveBeenCalled();
     fireEvent.click(getByRole("button", { name: /random seed/i }));
     expect(unlock).toHaveBeenCalled();
+  });
+
+  it("a run auto-started from the URL does not unlock audio until a real gesture", async () => {
+    search = "event=infection&seed=7";
+    render(<GameShell />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(unlock).not.toHaveBeenCalled();
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(unlock).toHaveBeenCalledTimes(1);
+  });
+
+  it("one regression plays one fail cue, and a recovery inside the gate is silent", async () => {
+    startRun();
+    cues.length = 0;
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(cues.filter((c) => c === "rule-fail")).toHaveLength(1);
+    expect(cues).not.toContain("rule-pass");
+    fireEvent.keyDown(document.body, { key: "Backspace" });
+    expect(cues).not.toContain("rule-pass");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(cues.filter((c) => c === "rule-fail")).toHaveLength(2);
+  });
+
+  it("a restart starts the cards fresh: no carried shake, the entrance plays again", () => {
+    const { getByTestId, getByRole } = startRun();
+    const card = () =>
+      getByTestId("pg2-rules").querySelector('[data-flip-id="test-empty"] button') as HTMLElement;
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(card().className).toContain("pg2-rule-shake");
+    act(() => {
+      live!.outcome = "victory";
+      vi.advanceTimersByTime(1500);
+    });
+    fireEvent.click(getByRole("button", { name: /play again|new run|random/i }));
+    expect(card().className).not.toContain("pg2-rule-shake");
+    expect(card().className).toContain("pg2-rule-enter");
   });
 
   it("typing fast plays at most one tick per 30ms", async () => {
@@ -119,13 +162,16 @@ describe("GameShell motion and sound wiring", () => {
     expect(cues.filter((c) => c === "rule-reveal")).toHaveLength(1);
   });
 
-  it("a regression plays the fail cue and a recovery plays the pass cue", () => {
+  it("a regression plays the fail cue and a recovery plays the pass cue", async () => {
     startRun();
     cues.length = 0;
     fireEvent.keyDown(document.body, { key: "a" });
     expect(cues).toContain("rule-fail");
     expect(cues).not.toContain("rule-pass");
     cues.length = 0;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
     fireEvent.keyDown(document.body, { key: "Backspace" });
     expect(cues).toContain("rule-pass");
   });
@@ -173,7 +219,7 @@ describe("GameShell motion and sound wiring", () => {
     const card = getByTestId("pg2-rules").querySelector(
       '[data-flip-id="test-empty"]',
     ) as HTMLElement;
-    expect(within(card).getByText("Your last edit broke this rule")).toBeTruthy();
+    expect(within(card).getByText("This rule is no longer satisfied")).toBeTruthy();
   });
 
   it("the chrome event layer lives inside the stage card, so its modal cannot leave it", () => {

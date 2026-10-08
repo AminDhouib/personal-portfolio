@@ -154,3 +154,32 @@ describe("nothing plays before the Start tap", () => {
     expect(created.oscillators).toBe(0);
   });
 });
+
+describe("a suspended context never builds a backlog", () => {
+  it("cues while the context is suspended schedule nothing, and a later gesture does not flush them", async () => {
+    const { Ctx, created } = makeCtxClass({ state: "suspended" });
+    vi.stubGlobal("AudioContext", Ctx);
+    const { playCue, unlockAudio, getAudio } = await fresh();
+    unlockAudio();
+    for (let i = 0; i < 5; i++) playCue("rule-fail");
+    expect(created.oscillators).toBe(0);
+    // The browser lets the context run on a later gesture: only cues after that play.
+    (getAudio()!.ctx as unknown as { state: string }).state = "running";
+    expect(created.oscillators).toBe(0);
+    playCue("rule-fail");
+    const oneCue = created.oscillators;
+    expect(oneCue).toBeGreaterThan(0);
+    playCue("rule-fail");
+    expect(created.oscillators).toBe(oneCue * 2);
+  });
+
+  it("unlocking with the sound off does not build a context", async () => {
+    localStorage.setItem("pg2-sound", "0");
+    const { Ctx } = makeCtxClass({ state: "suspended" });
+    const ctor = vi.fn(Ctx);
+    vi.stubGlobal("AudioContext", ctor);
+    const { unlockAudio } = await fresh();
+    unlockAudio();
+    expect(ctor).not.toHaveBeenCalled();
+  });
+});
