@@ -95,4 +95,10 @@ describe("GamesClient", () => {
     expect(section).not.toBeNull();
     expect(section?.querySelectorAll("a[data-game-card]")).toHaveLength(rest.length);
   });
+
+  it("lets a lone last card span the row in the two-column More games grid", () => {
+    const { container } = render(<GamesClient tags={hubTags()} />);
+    const grid = container.querySelector("#hub-more-heading + div");
+    expect(grid?.className).toContain("sm:[&>*:last-child:nth-child(odd)]:col-span-2");
+  });
 });
