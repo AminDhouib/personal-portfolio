@@ -30,7 +30,7 @@ export function GamesClient({ tags }: { tags: GameTags }) {
         >
           More games
         </h2>
-        <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
           {rest.map((game) => (
             <GameCard
               key={game.slug}

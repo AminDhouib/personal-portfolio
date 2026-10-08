@@ -142,7 +142,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ slu
           <h2 className="mb-4 font-display text-sm font-bold tracking-wider text-(--muted) uppercase">
             Other games you can play
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
             {others.map((g) => (
               <GameCard key={g.slug} game={g} size="sm" />
             ))}
