@@ -1500,71 +1500,75 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
               )}
             </AnimatePresence>
 
-            <div className="pointer-events-none absolute top-3 right-3 left-3 flex flex-col gap-1.5 text-[10px] sm:right-auto sm:text-sm">
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 backdrop-blur-sm sm:gap-4 sm:px-3">
-                <span className="flex items-center gap-1.5 font-mono font-bold text-accent-blue tabular-nums">
-                  <Rocket className="h-3.5 w-3.5" />
-                  {ui.score}
-                </span>
-                <span className="font-mono text-white/80 tabular-nums">{ui.distance}m</span>
-                <span className="font-mono text-white/80 tabular-nums">{ui.kills} kills</span>
-                {ui.combo > 1 && (
-                  <motion.span
-                    key={ui.combo}
-                    initial={{ scale: 0.7, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                    className="font-mono font-bold tabular-nums"
-                    style={{ color: comboColor(ui.combo) }}
-                  >
-                    {"\u00d7"}
-                    {ui.combo}
-                  </motion.span>
-                )}
-                <span className="font-mono text-white/50 tabular-nums">
-                  {ui.seconds.toFixed(0)}s
-                </span>
-              </div>
-              {/* Active power-ups */}
-              {ui.active.length > 0 && (
-                <div className="flex items-center gap-2">
-                  {ui.active.map((a) => {
-                    const def = POWERUP_DEFS[a.type];
-                    const Icon =
-                      a.type === "shield"
-                        ? Shield
-                        : a.type === "triple"
-                          ? Crosshair
-                          : a.type === "rapid"
-                            ? Zap
-                            : a.type === "warp"
-                              ? Rocket
-                              : a.type === "magnet"
-                                ? Magnet
-                                : Target;
-                    const pct = Math.min(100, (a.remainingMs / POWERUP_DURATION_MS) * 100);
-                    return (
-                      <div
-                        key={a.type}
-                        className="flex items-center gap-1 rounded-md border border-white/10 bg-black/50 px-2 py-1 backdrop-blur-sm"
-                        style={{ borderColor: `${def.color}55` }}
-                      >
-                        <Icon className="h-3 w-3" style={{ color: def.color }} />
-                        <div className="h-1 w-10 overflow-hidden rounded-full bg-white/15">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, background: def.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+            {/* The run HUD shows only during a run, never behind a modal on the
+                armed or dead screen. */}
+            {(ui.status === "playing" || ui.status === "paused") && (
+              <div className="pointer-events-none absolute top-3 right-3 left-3 flex flex-col gap-1.5 text-[10px] sm:right-auto sm:text-sm">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 backdrop-blur-sm sm:gap-4 sm:px-3">
+                  <span className="flex items-center gap-1.5 font-mono font-bold text-accent-blue tabular-nums">
+                    <Rocket className="h-3.5 w-3.5" />
+                    {ui.score}
+                  </span>
+                  <span className="font-mono text-white/80 tabular-nums">{ui.distance}m</span>
+                  <span className="font-mono text-white/80 tabular-nums">{ui.kills} kills</span>
+                  {ui.combo > 1 && (
+                    <motion.span
+                      key={ui.combo}
+                      initial={{ scale: 0.7, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                      className="font-mono font-bold tabular-nums"
+                      style={{ color: comboColor(ui.combo) }}
+                    >
+                      {"\u00d7"}
+                      {ui.combo}
+                    </motion.span>
+                  )}
+                  <span className="font-mono text-white/50 tabular-nums">
+                    {ui.seconds.toFixed(0)}s
+                  </span>
                 </div>
-              )}
-            </div>
+                {/* Active power-ups */}
+                {ui.active.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    {ui.active.map((a) => {
+                      const def = POWERUP_DEFS[a.type];
+                      const Icon =
+                        a.type === "shield"
+                          ? Shield
+                          : a.type === "triple"
+                            ? Crosshair
+                            : a.type === "rapid"
+                              ? Zap
+                              : a.type === "warp"
+                                ? Rocket
+                                : a.type === "magnet"
+                                  ? Magnet
+                                  : Target;
+                      const pct = Math.min(100, (a.remainingMs / POWERUP_DURATION_MS) * 100);
+                      return (
+                        <div
+                          key={a.type}
+                          className="flex items-center gap-1 rounded-md border border-white/10 bg-black/50 px-2 py-1 backdrop-blur-sm"
+                          style={{ borderColor: `${def.color}55` }}
+                        >
+                          <Icon className="h-3 w-3" style={{ color: def.color }} />
+                          <div className="h-1 w-10 overflow-hidden rounded-full bg-white/15">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: def.color }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Top-right: best + controls (pause / mute / fullscreen) */}
-            {!shopOpen && (
+            {!shopOpen && !achievementsOpen && (
               <div className="absolute top-3 right-3 flex items-center gap-2">
                 {highScore > 0 && (
                   <div className="pointer-events-none flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-accent-amber tabular-nums backdrop-blur-sm">
@@ -1609,10 +1613,12 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
             )}
 
             {/* Biome label — bottom center */}
-            <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 font-mono text-[10px] tracking-widest text-white/40 uppercase">
-              <span className="h-1 w-1 animate-pulse rounded-full bg-accent-blue/60" />
-              {env.name}
-            </div>
+            {(ui.status === "playing" || ui.status === "paused") && (
+              <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 font-mono text-[10px] tracking-widest text-white/40 uppercase">
+                <span className="h-1 w-1 animate-pulse rounded-full bg-accent-blue/60" />
+                {env.name}
+              </div>
+            )}
           </>
         )}
 
@@ -2020,7 +2026,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                   onChange={(e) => setName(e.target.value.slice(0, 12))}
                   placeholder="Pilot name"
                   maxLength={12}
-                  className="min-h-11 flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-base text-white placeholder-white/40 focus:border-accent-blue focus:outline-none sm:text-sm"
+                  className="min-h-11 flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-base text-white placeholder-white/40 focus:border-accent-blue focus:outline-none"
                 />
                 <motion.button
                   whileHover={{ scale: 1.04 }}
