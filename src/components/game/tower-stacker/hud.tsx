@@ -1,4 +1,4 @@
-import type { CSSProperties, RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 
 /** What the DOM overlay shows. The canvas never carries text the player must read. */
 export interface HudState {
@@ -105,11 +105,15 @@ export function OverCard({
   best,
   cardRef,
   onPlayAgain,
+  children,
 }: {
   hud: HudState;
+  /** The best score on this device for the mode just played. */
   best: number;
   cardRef: RefObject<HTMLDivElement | null>;
   onPlayAgain: () => void;
+  /** The board panel (or the free-build pointer), between the stats and Play again. */
+  children?: ReactNode;
 }) {
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
@@ -119,7 +123,7 @@ export function OverCard({
         role="group"
         aria-label="Game over"
         data-testid="tower-over-card"
-        className="ts-gameover-in relative w-full max-w-sm border border-accent-red/40 bg-[#05070d] p-6 text-center outline-none"
+        className="ts-gameover-in relative max-h-full w-full max-w-sm overflow-y-auto border border-accent-red/40 bg-[#05070d] p-6 text-center outline-none"
         style={{ boxShadow: "0 0 80px -10px rgba(239, 68, 68, 0.5)" }}
       >
         <CornerTick position="tl" variant="card" />
@@ -141,8 +145,9 @@ export function OverCard({
           <Stat label="Best streak" value={hud.bestStreak} />
         </div>
         <div className="text-muted mb-4 font-mono text-[10px] tracking-[0.25em] uppercase">
-          Best this session <span className="text-foreground tabular-nums">{best}</span>
+          Best on this device <span className="text-foreground tabular-nums">{best}</span>
         </div>
+        {children}
         <button
           type="button"
           onClick={onPlayAgain}

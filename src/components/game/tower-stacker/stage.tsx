@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { BoardPanel, type FinishedRun } from "./board-panel";
 import { cameraTarget, stepCamera, type Camera } from "./camera";
 import { dropKey, isTextEntryTarget, shouldBlockScroll } from "./controls";
 import { utcDayKey } from "@/lib/arcade/boards";
@@ -14,6 +15,7 @@ import {
   newRun,
   pauseRun,
   resumeRun,
+  runSeconds,
   topSlab,
   type DropOutcome,
   type TowerRun,
@@ -24,8 +26,10 @@ import { stageLayout, type StageLayout } from "./layout";
 import { ModeRow, type TowerMode } from "./mode-row";
 import { PULSE_MS, paintFrame } from "./painter";
 import { usePlaySheet } from "./play-sheet";
+import { activeStreak, markHintSeen, recordRun, setHandle } from "./stats";
 import { CUES, perfectCue } from "./sound-cues";
 import { useTowerLoop } from "./use-tower-loop";
+import { useTowerStats } from "./use-tower-stats";
 
 type Phase = "ready" | "live" | "paused" | "over";
 
@@ -51,7 +55,10 @@ function noopSubscribe(): () => void {
   return () => undefined;
 }
 
-/** The first-run hint stays until the first landing; kept in memory for this page load. */
+/**
+ * The first-run hint stays until the first landing. Kept in memory for this page load too,
+ * so a blocked localStorage still dismisses it; tower:stats remembers it across visits.
+ */
 let hintDismissed = false;
 
 function randomSeed(): number {
@@ -95,12 +102,13 @@ export function Stage({ seedText }: { seedText?: string }) {
   const [perfectFlashKey, setPerfectFlashKey] = useState(0);
   const [milestone, setMilestone] = useState<number | null>(null);
   const [callout, setCallout] = useState<string | null>(null);
-  const [best, setBest] = useState(0);
   // The stored choice (false on the server, so hydration agrees); a click overrides it.
   const storedMuted = useSyncExternalStore(noopSubscribe, readMuted, () => false);
   const [mutedChoice, setMuted] = useState<boolean | null>(null);
   const muted = mutedChoice ?? storedMuted;
-  const [showHint, setShowHint] = useState(() => !hintDismissed);
+  const { stats, update: updateStats } = useTowerStats();
+  const [showHint, setShowHint] = useState(() => !hintDismissed && !stats.seenHint);
+  const [finished, setFinished] = useState<FinishedRun | null>(null);
   // A ?tower-seed= text preselects Free build; otherwise Today's tower is the default.
   const [mode, setMode] = useState<TowerMode>(seedText ? "free" : "daily");
   // The mode and UTC day the live run began with, taken at Start so a run that crosses
@@ -109,6 +117,7 @@ export function Stage({ seedText }: { seedText?: string }) {
   const [settled, setSettled] = useState(false);
 
   const runRef = useRef<TowerRun | null>(null);
+  const runInfoRef = useRef<{ mode: TowerMode; dayKey: string } | null>(null);
   const phaseRef = useRef<Phase>("ready");
   const cameraRef = useRef<Camera>({ x: 0, y: 0 });
   const debrisRef = useRef<DebrisPiece[]>([]);
@@ -221,31 +230,40 @@ export function Stage({ seedText }: { seedText?: string }) {
   const { targetRef } = useTowerLoop({ active: animating, frame, onPause: pauseLive });
 
   // ---- run lifecycle -----------------------------------------------------
-  const startRun = useCallback(() => {
-    if (!audioRef.current) audioRef.current = createTowerAudio();
-    audioRef.current.unlock();
-    setMuted(audioRef.current.isMuted());
-    const dayKey = utcDayKey(new Date());
-    const seed =
-      mode === "daily" ? dailyTowerSeed(dayKey) : seedText ? freeSeed(seedText) : randomSeed();
-    const run = newRun(seed, performance.now());
-    setRunInfo({ mode, dayKey });
-    runRef.current = run;
-    cameraRef.current = { x: 0, y: 0 };
-    debrisRef.current = [];
-    pulsesRef.current = [];
-    landedAtRef.current = null;
-    shakeRef.current = { until: 0, amp: 0 };
-    setHud(hudOf(run));
-    setAnnouncement("");
-    setMilestone(null);
-    setCallout(null);
-    setSettled(false);
-    for (const id of timersRef.current) window.clearTimeout(id);
-    timersRef.current.length = 0;
-    setPhaseBoth("live");
-    enterSheet();
-  }, [mode, seedText, setPhaseBoth, enterSheet]);
+  // `forced` starts a given mode at once (the over card's "Play today's tower"), since a
+  // setMode in the same tick would not yet be visible here.
+  const startRun = useCallback(
+    (forced?: TowerMode) => {
+      if (!audioRef.current) audioRef.current = createTowerAudio();
+      audioRef.current.unlock();
+      setMuted(audioRef.current.isMuted());
+      const runMode = forced ?? mode;
+      if (forced) setMode(forced);
+      const dayKey = utcDayKey(new Date());
+      const seed =
+        runMode === "daily" ? dailyTowerSeed(dayKey) : seedText ? freeSeed(seedText) : randomSeed();
+      const run = newRun(seed, performance.now());
+      runInfoRef.current = { mode: runMode, dayKey };
+      setRunInfo({ mode: runMode, dayKey });
+      setFinished(null);
+      runRef.current = run;
+      cameraRef.current = { x: 0, y: 0 };
+      debrisRef.current = [];
+      pulsesRef.current = [];
+      landedAtRef.current = null;
+      shakeRef.current = { until: 0, amp: 0 };
+      setHud(hudOf(run));
+      setAnnouncement("");
+      setMilestone(null);
+      setCallout(null);
+      setSettled(false);
+      for (const id of timersRef.current) window.clearTimeout(id);
+      timersRef.current.length = 0;
+      setPhaseBoth("live");
+      enterSheet();
+    },
+    [mode, seedText, setPhaseBoth, enterSheet],
+  );
 
   const resume = useCallback(() => {
     const run = runRef.current;
@@ -309,14 +327,31 @@ export function Stage({ seedText }: { seedText?: string }) {
 
     hintDismissed = true;
     setShowHint(false);
+    updateStats(markHintSeen);
     setHud(hudOf(next));
     setAnnouncement(describeLanding(floors, outcome));
     if (next.over) {
-      setBest((b) => Math.max(b, next.score));
+      const info = runInfoRef.current;
+      if (info) {
+        setFinished({
+          mode: info.mode,
+          dayKey: info.dayKey,
+          score: next.score,
+          floors,
+          perfects: next.perfects,
+          bestStreak: next.bestStreak,
+          seconds: runSeconds(next, now),
+          // The UTC day turned over mid-run: today's board no longer takes this tower.
+          closed: info.mode === "daily" && utcDayKey(new Date()) !== info.dayKey,
+        });
+        updateStats((prev) =>
+          recordRun(prev, { mode: info.mode, score: next.score, day: info.dayKey }),
+        );
+      }
       setPhaseBoth("over");
       later(() => setSettled(true), 1500);
     }
-  }, [later, setPhaseBoth]);
+  }, [later, setPhaseBoth, updateStats]);
 
   // ---- input -------------------------------------------------------------
   useEffect(() => {
@@ -347,6 +382,7 @@ export function Stage({ seedText }: { seedText?: string }) {
     pulsesRef.current = [];
     cameraRef.current = { x: 0, y: 0 };
     setHud(EMPTY_HUD);
+    setFinished(null);
     setAnnouncement("");
     setMilestone(null);
     setCallout(null);
@@ -465,7 +501,7 @@ export function Stage({ seedText }: { seedText?: string }) {
             <button
               ref={startRef}
               type="button"
-              onClick={startRun}
+              onClick={() => startRun()}
               className="min-h-11 min-w-11 border border-accent-red/70 bg-accent-red/10 px-8 py-2 font-mono text-xs font-bold tracking-[0.3em] text-accent-red uppercase transition hover:border-accent-red hover:bg-accent-red/20"
             >
               Start
@@ -483,8 +519,21 @@ export function Stage({ seedText }: { seedText?: string }) {
           </button>
         )}
 
-        {phase === "over" && (
-          <OverCard hud={hud} best={best} cardRef={cardRef} onPlayAgain={startRun} />
+        {phase === "over" && finished && (
+          <OverCard
+            hud={hud}
+            best={finished.mode === "daily" ? (stats.bestDaily?.score ?? 0) : stats.bestFree}
+            cardRef={cardRef}
+            onPlayAgain={() => startRun()}
+          >
+            <BoardPanel
+              run={finished}
+              handle={stats.handle}
+              streakDays={activeStreak(stats, finished.dayKey)}
+              onHandle={(name) => updateStats((prev) => setHandle(prev, name))}
+              onPlayDaily={() => startRun("daily")}
+            />
+          </OverCard>
         )}
       </div>
       <div data-testid="tower-live-region" role="status" aria-live="polite" className="sr-only">
