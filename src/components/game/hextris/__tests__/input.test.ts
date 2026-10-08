@@ -66,6 +66,14 @@ describe("hextrisKeyAction", () => {
     expect(k("f", "paused")).toEqual({ action: "none", preventDefault: true });
   });
 
+  it("steers, rushes and pauses during the countdown, and claims the keys", () => {
+    expect(k("ArrowLeft", "countdown")).toEqual({ action: "rotate-ccw", preventDefault: true });
+    expect(k("d", "countdown")).toEqual({ action: "rotate-cw", preventDefault: true });
+    expect(k("ArrowDown", "countdown")).toEqual({ action: "rush", preventDefault: true });
+    expect(k(" ", "countdown")).toEqual({ action: "toggle-pause", preventDefault: true });
+    expect(k("Enter", "countdown")).toEqual({ action: "none", preventDefault: false });
+  });
+
   it("ignores everything on game over", () => {
     expect(k(" ", "over")).toEqual({ action: "none", preventDefault: false });
     expect(k("ArrowLeft", "over")).toEqual({ action: "none", preventDefault: false });

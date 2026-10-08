@@ -167,6 +167,8 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
         out.scorePulse = true;
         break;
       // A chain is read from its clear's `chain` flag; the music follows the level once a second.
+      case "countdown":
+      case "go":
       case "chain":
       case "spawn":
       case "gravity":

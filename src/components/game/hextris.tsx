@@ -435,7 +435,8 @@ export function HextrisGame() {
         // A long gap (a background tab) is not fed to the run in one go.
         const dt = Math.min(MAX_FRAME_MS, Math.max(0, now - lastFrameAt));
         lastFrameAt = now;
-        if (run.phase === "playing") {
+        // The countdown runs the run clock too; play starts at GO.
+        if (run.phase === "playing" || run.phase === "countdown") {
           advance(run, dt);
           // The music follows the level about once a second; the rush key never changes it.
           if (now - lastTempoAt > 1000) {
@@ -535,6 +536,7 @@ export function HextrisGame() {
           // game is over: let the player read the score and use the "Play
           // again" button.
           return;
+        case "countdown":
         case "playing": {
           const clientX =
             "touches" in e
@@ -586,7 +588,7 @@ export function HextrisGame() {
       // The keyup for a held rush key is lost with focus; release it so the
       // speed-up cannot stay stuck after the player returns.
       act("rush-off");
-      if (run.phase === "playing") act("toggle-pause");
+      if (run.phase === "playing" || run.phase === "countdown") act("toggle-pause");
     }
     window.addEventListener("blur", handleBlur);
 
