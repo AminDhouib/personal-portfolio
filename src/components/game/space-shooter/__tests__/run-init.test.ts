@@ -95,7 +95,6 @@ describe("run-init", () => {
       const g = createRefs();
       expect(g.reviveAvailable).toBe(false);
       expect(g.reviveUsed).toBe(false);
-      expect(g.invertedArmed).toBe(false);
       expect(g.devHotkeyArmed).toBe(false);
       expect(g.nextId).toBe(1);
       expect(g.shipX).toBe(0);

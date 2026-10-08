@@ -105,7 +105,6 @@ export function createRefs(): GameRefs {
       typeof window !== "undefined" &&
       (matchMedia("(pointer: coarse)").matches || window.innerWidth < 640),
     warpIntensity: 0,
-    invertedArmed: false,
     currentEnv: initEnv,
     nextBiomeAt: pickNextBiomeDistance(0),
     nextWallAt: 0, // set by startRun

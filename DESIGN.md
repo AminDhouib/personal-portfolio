@@ -411,9 +411,7 @@ current tree on 2026-07-07.
   loses focus, when the tab is hidden, or when less than 35% of the game is on screen (the home
   page embed scrolled away), so a run never plays out unwatched; the player always resumes. The
   scene is always the dark space palette: the light-theme "inverted armed" menu backdrop was
-  removed because it read as muddy grey, and the `invertedArmed` flag in `game-tick.ts`,
-  `scene-components.tsx` and `types.ts` is now always false (dormant code; delete it the next time
-  that subsystem is touched).
+  removed because it read as muddy grey, and its dormant `invertedArmed` flag has been deleted.
 - **Super Voltorb Flip waits for the player at the end of every round.** The order follows HGSS
   (`voltorb_flip.c`): a win plays the clear fanfare and then the payout over the still-hidden
   board, and only then reveals it; a quit pays out first too (when it banked coins); a loss goes
