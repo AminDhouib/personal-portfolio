@@ -125,7 +125,7 @@ export function drop(run: TowerRun, now: number): { run: TowerRun; outcome: Drop
   const left = top.left + offset;
   const overlap = top.width - Math.abs(offset);
 
-  if (Math.abs(offset) > PERFECT_TOLERANCE && overlap < MIN_OVERLAP) {
+  if (overlap < MIN_OVERLAP) {
     return {
       run: { ...run, swing: null, over: true, streak: 0, endedAt: now },
       outcome: { kind: "miss", piece: { left, width: top.width } },

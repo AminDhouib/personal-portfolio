@@ -195,3 +195,16 @@ describe("maxBlocksFor", () => {
     expect(maxBlocksFor(60)).toBe(154);
   });
 });
+
+describe("a block that is fully off a very narrow slab", () => {
+  it("misses instead of scoring a perfect", () => {
+    const base = newRun(7, 0);
+    const run = { ...base, slabs: [{ left: -3, width: 6 }] };
+    const swing = must(run.swing);
+    let t = swing.spawnAt;
+    while (Math.round(craneOffset(swing, t)) !== 6) t++;
+    const result = must(drop(run, t));
+    expect(result.outcome.kind).toBe("miss");
+    expect(result.run.over).toBe(true);
+  });
+});
