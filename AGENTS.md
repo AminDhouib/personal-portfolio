@@ -72,8 +72,9 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 - Arcade leaderboard v2: `src/lib/arcade/` (UTC board keys, per-game plausibility registry,
   store, ensure-step) behind `src/app/api/arcade/scores/route.ts`. Its tables are created
   idempotently at first use and mirrored in `db/init.sql`; see DESIGN.md's "Arcade backend".
-  Orbital Dodge and Hextris read and write it through `src/hooks/use-arcade-board.ts`; Tower
-  Stacker keeps the legacy `/api/leaderboard` route until T6.
+  Orbital Dodge, Hextris, Super Voltorb Flip and Tower Stacker read and write it through
+  `src/hooks/use-arcade-board.ts`. `/api/leaderboard` is a read-only archive of the frozen
+  legacy rows (no POST, the table is never written or dropped).
 - `/games` hub: `src/app/games/hub/` holds the client islands (Today strip over the public daily
   reads, read-only "On this device" stats) behind the static `src/app/games/page.tsx`; the
   featured card is chosen by `featured` on `GameMeta`. See DESIGN.md's "Games hub".

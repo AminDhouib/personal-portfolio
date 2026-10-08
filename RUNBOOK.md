@@ -216,8 +216,10 @@ Logs above for how to read it). A database without the legacy table logs "no lea
 table" instead, and every later start logs nothing. The marker is a row in `arcade_migrations`
 (key `legacy-leaderboard-import-v1`); imported players have `token_hash = 'legacy'` and their
 score rows carry `detail.legacy = true`. `leaderboard_entries` is left untouched: it is the
-source and the backup, and since `POST /api/leaderboard` now answers 400 for these two games
-(only Tower Stacker still writes there), their rows in it are frozen history. Prod's legacy
+source and the backup, and since T6-3 `/api/leaderboard` answers GET only (no POST exists, so
+nothing writes the table), its rows are frozen history. To count the classic Tower Stacker
+rows (read-only): `SELECT count(*), max(score), max(created_at) FROM leaderboard_entries WHERE
+game = 'tower-stacker'`. Prod's legacy
 leaderboard was empty when Part 1 deployed (2026-10-06), so expect the line to report 0 or very
 few scores there; that is a correct run, not a failure.
 Inspect (read-only):
