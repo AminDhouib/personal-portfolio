@@ -550,3 +550,60 @@ describe("coin pickup popup", () => {
     expect(g.scorePopups.map((p) => p.kind)).toEqual(["coins"]);
   });
 });
+
+describe("death beat", () => {
+  beforeEach(() => {
+    stubMatchMedia();
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  // Fatal zapper hit on the first tick, then `later` ms of wall time.
+  function dieThenTick(laterMs: number, onDeath: () => void = () => {}) {
+    const g = createRefs();
+    let clock = 100_000;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    startVulnerableRun(g, clock);
+    g.obstacles.push(makeObstacle({ id: 1, variant: "zapper", x: 0, y: 0, z: 0, hp: 3 }));
+    clock += 16;
+    runTick(g, 0.016, VIEWPORT, onDeath, () => {});
+    expect(g.status).toBe("dying");
+    const before = { x: g.shipX, y: g.shipY, z: g.shipZ };
+    clock += laterMs;
+    runTick(g, 0.05, VIEWPORT, onDeath, () => {});
+    return { g, before };
+  }
+
+  it("freezes the wreck during the 90 ms hit-stop", () => {
+    const { g, before } = dieThenTick(50);
+    expect(g.status).toBe("dying");
+    expect([g.shipX, g.shipY, g.shipZ]).toEqual([before.x, before.y, before.z]);
+  });
+
+  it("moves the wreck again once the hit-stop is over", () => {
+    const { g, before } = dieThenTick(200);
+    expect([g.shipX, g.shipY, g.shipZ]).not.toEqual([before.x, before.y, before.z]);
+  });
+
+  it("still calls onDeath exactly once on the old 2.2 s wall clock", () => {
+    const g = createRefs();
+    let clock = 100_000;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    startVulnerableRun(g, clock);
+    g.obstacles.push(makeObstacle({ id: 1, variant: "zapper", x: 0, y: 0, z: 0, hp: 3 }));
+    const onDeath = vi.fn();
+    clock += 16;
+    runTick(g, 0.016, VIEWPORT, onDeath, () => {});
+    clock += 2100;
+    runTick(g, 0.05, VIEWPORT, onDeath, () => {});
+    expect(onDeath).not.toHaveBeenCalled();
+    clock += 200;
+    runTick(g, 0.05, VIEWPORT, onDeath, () => {});
+    runTick(g, 0.05, VIEWPORT, onDeath, () => {});
+    expect(onDeath).toHaveBeenCalledTimes(1);
+  });
+});

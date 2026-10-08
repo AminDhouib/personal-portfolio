@@ -23,6 +23,7 @@ import {
 } from "./types";
 import { difficulty, elapsedSeconds, comboMultiplier, comboTier, killPitch } from "./difficulty";
 import { sounds } from "./sound-manager";
+import { deathTimeScale } from "./death";
 import {
   spawnIntervalMs,
   fireIntervalMs,
@@ -153,12 +154,15 @@ export function runTick(
     // Stop the zoom-lines — the world isn't flowing past the ship anymore
     g.speedLines.length = 0;
     const elapsed = (now - g.dyingAt) / 1000;
+    // Hit-stop then slow motion: only the wreck physics is scaled; the staged
+    // bursts and onDeath below keep the wall clock.
+    const dstep = step * deathTimeScale(now - g.dyingAt);
     // Velocity integration + gravity on Y
-    g.deathVelY -= step * 6.5;
-    g.shipX += g.deathVelX * step;
-    g.shipY += g.deathVelY * step;
-    g.shipZ += g.deathVelZ * step;
-    g.shipRotZ += g.deathAngVel * step;
+    g.deathVelY -= dstep * 6.5;
+    g.shipX += g.deathVelX * dstep;
+    g.shipY += g.deathVelY * dstep;
+    g.shipZ += g.deathVelZ * dstep;
+    g.shipRotZ += g.deathAngVel * dstep;
 
     // Camera locks onto the falling ship for a cinematic close-up
     g.cameraTargetX = g.shipX * 0.55;
@@ -204,13 +208,13 @@ export function runTick(
     for (let i = g.debris.length - 1; i >= 0; i--) {
       const d = g.debris[i];
       if (!d) continue;
-      d.vy -= step * 6.5;
-      d.x += d.vx * step;
-      d.y += d.vy * step;
-      d.z += d.vz * step;
-      d.rx += d.rsx * step;
-      d.ry += d.rsy * step;
-      d.rz += d.rsz * step;
+      d.vy -= dstep * 6.5;
+      d.x += d.vx * dstep;
+      d.y += d.vy * dstep;
+      d.z += d.vz * dstep;
+      d.rx += d.rsx * dstep;
+      d.ry += d.rsy * dstep;
+      d.rz += d.rsz * dstep;
       if (now - d.spawnedAt > d.ttl) g.debris.splice(i, 1);
     }
     // Throttle like the live-HUD path: an unthrottled sync here re-rendered
