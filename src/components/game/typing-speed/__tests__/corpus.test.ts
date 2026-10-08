@@ -43,6 +43,10 @@ describe("passages", () => {
         s.id,
       ).toBe(true);
   });
+  it("keeps violent, sexual and slur wording out of every passage", () => {
+    const DENYLIST = /half-breed|undress|throat|blood|bleeding|corpse|dead body|murderer/i;
+    for (const p of PASSAGES) expect(p.text, p.id).not.toMatch(DENYLIST);
+  });
   it("has at least 30 passages in the daily range (180-360 characters)", () => {
     expect(
       PASSAGES.filter((p) => p.text.length >= 180 && p.text.length <= 360).length,

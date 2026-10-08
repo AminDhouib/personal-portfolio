@@ -177,7 +177,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "shelley-6",
     source: "shelley",
-    text: "I know not by what chain of thought the idea presented itself, but it instantly darted into my mind that the murderer had come to mock at my misery and taunt me with the death of Clerval, as a new incitement for me to comply with his hellish desires.",
+    text: "The saintly soul of Elizabeth shone like a shrine-dedicated lamp in our peaceful home. Her sympathy was ours; her smile, her soft voice, the sweet glance of her celestial eyes, were ever there to bless and animate us.",
   },
   {
     id: "shelley-7",
@@ -202,12 +202,12 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "dickens-tale-4",
     source: "dickens-tale",
-    text: "The result of that conference was, that Gabelle again withdrew himself to his housetop behind his stack of chimneys; this time resolved, if his door were broken in (he was a small Southern man of retaliative temperament), to pitch himself head foremost over the parapet, and crush a man or two below.",
+    text: "Only his daughter had the power of charming this black brooding from his mind. She was the golden thread that united him to a Past beyond his misery, and to a Present beyond his misery: and the sound of her voice, the light of her face, the touch of her hand, had a strong beneficial influence with him almost always.",
   },
   {
     id: "dickens-tale-5",
     source: "dickens-tale",
-    text: "The great grindstone, Earth, had turned when Mr. Lorry looked out again, and the sun was red on the courtyard. But, the lesser grindstone stood alone there in the calm morning air, with a red upon it that the sun had never given, and would never take away.",
+    text: "You see how composed he has become, and you cannot be afraid to leave him with me now. Why should you be? If you will lock the door to secure us from interruption, I do not doubt that you will find him, when you come back, as quiet as you leave him.",
   },
   {
     id: "dickens-tale-6",
@@ -352,7 +352,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "wilde-6",
     source: "wilde",
-    text: "Two red sparks flashed for a moment in the woman's sodden eyes, then flickered out and left them dull and glazed. She tossed her head and raked the coins off the counter with greedy fingers.",
+    text: "Dorian Gray frowned and turned his head away. He could not help liking the tall, graceful young man who was standing by him. His romantic, olive-coloured face and worn expression interested him.",
   },
   {
     id: "wilde-7",
@@ -362,12 +362,12 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "stevenson-ti-1",
     source: "stevenson-ti",
-    text: "The neighbourhood, to our ears, seemed haunted by approaching footsteps; and what between the dead body of the captain on the parlour floor and the thought of that detestable blind beggar hovering near at hand and ready to return, there were moments when, as the saying goes, I jumped in my skin for terror.",
+    text: "The whole schooner had been overhauled; six berths had been made astern out of what had been the after-part of the main hold; and this set of cabins was only joined to the galley and forecastle by a sparred passage on the port side.",
   },
   {
     id: "stevenson-ti-2",
     source: "stevenson-ti",
-    text: "Long John even got rid of two out of the six or seven I had already engaged. He showed me in a moment that they were just the sort of fresh-water swabs we had to fear in an adventure of importance.",
+    text: "I saw, besides, many old sailors, with rings in their ears, and whiskers curled in ringlets, and tarry pigtails, and their swaggering, clumsy sea-walk; and if I had seen as many kings or archbishops I could not have been more delighted.",
   },
   {
     id: "stevenson-ti-3",
@@ -472,7 +472,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "stoker-2",
     source: "stoker",
-    text: "Strangely enough, Lucy did not wake; but she got up twice and dressed herself. Fortunately, each time I awoke in time and managed to undress her without waking her, and got her back to bed.",
+    text: "I went on to make a thorough examination of the various stairs and passages, and to try the doors that opened from them. One or two small rooms near the hall were open, but there was nothing to see in them except old furniture, dusty with age and moth-eaten.",
   },
   {
     id: "stoker-3",
@@ -482,7 +482,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "stoker-4",
     source: "stoker",
-    text: "On the bed lay two women, Lucy and her mother. The latter lay farthest in, and she was covered with a white sheet, the edge of which had been blown back by the draught through the broken window, showing the drawn, white face, with a look of terror fixed upon it.",
+    text: "I thought I would watch for the Count's return, and for a long time sat doggedly at the window. Then I began to notice that there were some quaint little specks floating in the rays of the moonlight.",
   },
   {
     id: "stoker-5",
@@ -497,7 +497,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "stoker-7",
     source: "stoker",
-    text: "Again I waked with a sense of guilt and of time passed, and found Madam Mina still sleeping, and the sun low down. But all was indeed changed; the frowning mountains seemed further away, and we were near the top of a steep-rising hill, on summit of which was such a castle as Jonathan tell of in his diary.",
+    text: "When we are married I shall be able to be useful to Jonathan, and if I can stenograph well enough I can take down what he wants to say in this way and write it out for him on the typewriter, at which also I am practising very hard.",
   },
   {
     id: "conrad-1",
@@ -527,7 +527,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "conrad-6",
     source: "conrad",
-    text: "I had cut him off cleverly; but when actually confronting him I seemed to come to my senses, I saw the danger in its right proportion. It was by no means over yet. Suppose he began to shout?",
+    text: "The idleness of a passenger, my isolation amongst all these men with whom I had no point of contact, the oily and languid sea, the uniform sombreness of the coast, seemed to keep me away from the truth of things, within the toil of a mournful and senseless delusion.",
   },
   {
     id: "conrad-7",
@@ -552,12 +552,12 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "london-4",
     source: "london",
-    text: "In vain Buck strove to sink his teeth in the neck of the big white dog. Wherever his fangs struck for the softer flesh, they were countered by the fangs of Spitz. Fang clashed fang, and lips were cut and bleeding, but Buck could not penetrate his enemy's guard.",
+    text: "No lazy, sun-kissed life was this, with nothing to do but loaf and be bored. Here was neither peace, nor rest, nor a moment's safety. All was confusion and action, and every moment life and limb were in peril.",
   },
   {
     id: "london-5",
     source: "london",
-    text: "The Scotch half-breed called a halt and took him out of the team, making the next dog, Sol-leks, fast to the sled. His intention was to rest Dave, letting him run free behind the sled.",
+    text: "Day after day, for days unending, Buck toiled in the traces. Always, they broke camp in the dark, and the first gray of dawn found them hitting the trail with fresh miles reeled off behind them.",
   },
   {
     id: "london-6",
@@ -567,7 +567,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "london-7",
     source: "london",
-    text: "The man saved his life by instinctively throwing out his arm, but was hurled backward to the floor with Buck on top of him. Buck loosed his teeth from the flesh of the arm and drove in again for the throat.",
+    text: "All passiveness and unconcern had dropped from them. They were alert and active, anxious that the work should go well, and fiercely irritable with whatever, by delay or confusion, retarded that work.",
   },
   {
     id: "eliot-1",
@@ -602,7 +602,7 @@ export const PASSAGES: readonly Passage[] = [
   {
     id: "eliot-7",
     source: "eliot",
-    text: "When Rosamond's convulsed throat was subsiding into calm, and she withdrew the handkerchief with which she had been hiding her face, her eyes met Dorothea's as helplessly as if they had been blue flowers.",
+    text: "Hence Mr. Bulstrode's close attention was not agreeable to the publicans and sinners in Middlemarch; it was attributed by some to his being a Pharisee, and by others to his being Evangelical.",
   },
   {
     id: "alcott-1",
