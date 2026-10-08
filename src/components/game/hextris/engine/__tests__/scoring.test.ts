@@ -143,3 +143,23 @@ describe("clean sweep", () => {
     expect(ofType(partial.events, "clean-sweep")).toEqual([]);
   });
 });
+
+describe("event payloads", () => {
+  it("give every event its own copy of the cleared cells", () => {
+    const s = boardState({ 0: "aaaa", 1: "aaa", 2: "aaa" });
+    s.lastClearAtMs = 0;
+    s.comboUntilMs = 2800;
+    s.elapsedMs = 1000;
+    resolveClears(s, 0, 3);
+    const clear = ofType(s.events, "clear")[0];
+    const combo = ofType(s.events, "combo")[0];
+    const sweep = ofType(s.events, "clean-sweep")[0];
+    expect(clear && combo && sweep).toBeTruthy();
+    const before = structuredClone(sweep?.cells);
+    clear?.cells.splice(0, 5);
+    const first = combo?.cells[0];
+    if (first) first.side = 99;
+    expect(sweep?.cells).toEqual(before);
+    expect(combo?.cells).toHaveLength(10);
+  });
+});
