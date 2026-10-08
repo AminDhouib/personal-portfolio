@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { HextrisSounds } from "./hextris/sound-manager";
 import { createRun, drainEvents } from "./hextris/engine/state";
+import { AFK_AFTER_MS } from "./hextris/engine/scoring";
 import { advance, applyAction } from "./hextris/engine/step";
 import type { EngineAction, RunState } from "./hextris/engine/types";
 import { layout, type Layout } from "./hextris/render/layout";
@@ -93,6 +94,8 @@ export function HextrisGame() {
   const [showTutorial, setShowTutorial] = useState(true);
   // The one-time Panic Clear tip, shown above the button the first time the meter fills.
   const [panicTip, setPanicTip] = useState(false);
+  // The player has gone AFK_AFTER_MS without input, so clears score nothing (spec 6.9).
+  const [uiAway, setUiAway] = useState(false);
   // Combo milestone text (e.g., "×5 COMBO!") displayed briefly on crossing thresholds
   const [milestone, setMilestone] = useState<{ id: number; text: string; color: string } | null>(
     null,
@@ -368,6 +371,7 @@ export function HextrisGame() {
     let panicTipDecided = false;
     // The size the canvas backing store was last given, as width x height @ DPR, immersive.
     let fittedTo = "";
+    let shownAway = false;
     // The shake is the one effect that follows the OS reduced-motion preference.
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -512,6 +516,12 @@ export function HextrisGame() {
         }
         flush();
         syncCountdown();
+        // Not before AFK_AFTER_MS of play: a run starts away until the first input.
+        const away = run.phase === "playing" && run.afk && run.elapsedMs >= AFK_AFTER_MS;
+        if (away !== shownAway) {
+          shownAway = away;
+          setUiAway(away);
+        }
         // Run time keeps moving through a hit-stop, so popups and easing play on while it holds.
         const nowMs = run.elapsedMs + run.carryMs;
         if (popups.length > 0) popups = popups.filter((p) => nowMs - p.bornMs < POPUP_MS);
@@ -752,6 +762,11 @@ export function HextrisGame() {
           tappable button (thumb-friendly on mobile). */}
       {uiState === "playing" && (
         <div className="pointer-events-none absolute bottom-6 left-1/2 flex w-[min(80%,320px)] -translate-x-1/2 flex-col items-center gap-1.5">
+          {uiAway && !(uiMomentum >= 100 && panicTip) && (
+            <div className="absolute bottom-full mb-2 font-mono text-[10px] tracking-wider whitespace-nowrap text-white/45 uppercase">
+              Away: clears score 0 until you move
+            </div>
+          )}
           {uiMomentum >= 100 && panicTip && (
             <div
               role="status"
