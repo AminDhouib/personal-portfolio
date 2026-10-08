@@ -46,11 +46,11 @@ export function wpmSeries(run: TypingRun): SeriesPoint[] {
   return points;
 }
 
-/** Hits and misses by lowercased expected character; extras and Backspace are ignored. */
+/** Hits and misses by lowercased expected character; spaces, extras and Backspace are ignored. */
 export function keyStats(run: TypingRun): KeyStats {
   const out: KeyStats = {};
   for (const k of run.log) {
-    if (k.correct === undefined || !k.expected) continue;
+    if (k.correct === undefined || !k.expected || k.expected === " ") continue;
     const key = k.expected.toLowerCase();
     const entry = (out[key] ??= { hits: 0, misses: 0 });
     if (k.correct) entry.hits++;

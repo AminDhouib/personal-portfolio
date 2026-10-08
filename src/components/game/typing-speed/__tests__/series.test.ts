@@ -67,7 +67,7 @@ describe("wpmSeries", () => {
 });
 
 describe("keyStats", () => {
-  it("counts hits and misses by lowercased expected key, spaces as a space", () => {
+  it("counts hits and misses by lowercased expected key and skips spaces", () => {
     const run = createRun({ kind: "text", text: "Ab cd" });
     play(run, [
       [ch("A"), 0],
@@ -81,10 +81,17 @@ describe("keyStats", () => {
     expect(keyStats(run)).toEqual({
       a: { hits: 1, misses: 0 },
       b: { hits: 1, misses: 1 },
-      " ": { hits: 1, misses: 0 },
       c: { hits: 1, misses: 0 },
       d: { hits: 0, misses: 1 },
     });
+  });
+  it("never counts a space as a missed key, even one pressed too early", () => {
+    const run = createRun({ kind: "text", text: "abc de" });
+    play(run, [
+      [ch("a"), 0],
+      [{ kind: "space" }, 10],
+    ]);
+    expect(keyStats(run)).toEqual({ a: { hits: 1, misses: 0 } });
   });
   it("ignores extra letters and back ops", () => {
     const run = createRun({ kind: "text", text: "a b" });
