@@ -79,7 +79,8 @@ import {
   resumeRun,
 } from "./space-shooter/run-init";
 import { Scene } from "./space-shooter/scene-components";
-import { keyboardStep, shouldCaptureTouch } from "./space-shooter/input";
+import { keyboardStep, orbitalKeyDecision, shouldCaptureTouch } from "./space-shooter/input";
+import { isTextEntryTarget } from "./text-entry";
 
 // ---------- constants ----------
 
@@ -1026,26 +1027,16 @@ export function SpaceShooterGame() {
       // Keys typed into a text field (the AI chat, the pilot name box) belong
       // to that field: they neither steer, resume nor get swallowed.
       const target = e.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest("input, textarea, select") !== null)
-      ) {
-        return;
-      }
-      // While a run is live and on screen, claim the steering keys and Space
-      // so the page does not scroll under the player.
       const runLive = gameRefs.current.status === "playing" || gameRefs.current.status === "paused";
-      // Space still activates a focused control (e.g. the Pause button).
-      const onControl = target instanceof Element && target.closest("button, a") !== null;
-      if (
-        runLive &&
-        inViewRef.current &&
-        ["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"]
-          .concat(onControl ? [] : [" "])
-          .includes(k)
-      ) {
-        e.preventDefault();
-      }
+      const d = orbitalKeyDecision({
+        key: k,
+        textEntry: isTextEntryTarget(e),
+        onControl: target instanceof Element && target.closest("button, a") !== null,
+        runLive,
+        inView: inViewRef.current,
+      });
+      if (d.ignore) return;
+      if (d.preventDefault) e.preventDefault();
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(k)) {
         // Keydown is a user gesture too — resume a suspended AudioContext so
         // keyboard-only players are not stuck in silence until a mouse move.
