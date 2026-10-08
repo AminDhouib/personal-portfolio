@@ -2,34 +2,32 @@ import { useLayoutEffect, useRef, type RefObject } from "react";
 import { FLIP_EASING, FLIP_MS, planFlip } from "./flip";
 
 /**
- * FLIP reorder animation over the Web Animations API. After every commit the top of each
- * `[data-flip-id]` child (relative to the container, so an ancestor scrolling between
- * commits is not mistaken for a move) is recorded. When `orderKey` changed since the
- * previous commit, items that sit somewhere else than before are animated from the old
- * position to the new one. The first commit only records. A no-op where Element.animate
- * is missing (jsdom).
+ * FLIP reorder animation over the Web Animations API. When `orderKey` changes, the layout
+ * top of each `[data-flip-id]` child is read and compared with the previous reading; items
+ * that sit somewhere else are animated from the old position to the new one. Positions come
+ * from offsetTop (layout, relative to the same offset parent as the container), never from
+ * getBoundingClientRect, so a running FLIP, entrance or shake transform cannot skew them.
+ * Nothing is measured on renders that keep the order. The first reading only records. A
+ * no-op where Element.animate is missing (jsdom).
  */
 export function useFlip(containerRef: RefObject<HTMLElement | null>, orderKey: string): void {
   const prevTops = useRef<Map<string, number> | null>(null);
-  const prevKey = useRef(orderKey);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const origin = container.getBoundingClientRect().top;
+    const origin = container.offsetTop;
     const next = new Map<string, number>();
     const els = new Map<string, HTMLElement>();
     for (const el of container.querySelectorAll<HTMLElement>("[data-flip-id]")) {
       const id = el.dataset.flipId!;
       els.set(id, el);
-      next.set(id, el.getBoundingClientRect().top - origin);
+      next.set(id, el.offsetTop - origin);
     }
 
     const prev = prevTops.current;
-    const reordered = prevKey.current !== orderKey;
     prevTops.current = next;
-    prevKey.current = orderKey;
-    if (!prev || !reordered) return;
+    if (!prev) return;
 
     for (const { id, dy } of planFlip(prev, next)) {
       const el = els.get(id);
@@ -39,5 +37,5 @@ export function useFlip(containerRef: RefObject<HTMLElement | null>, orderKey: s
         easing: FLIP_EASING,
       });
     }
-  });
+  }, [containerRef, orderKey]);
 }
