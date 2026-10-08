@@ -122,6 +122,12 @@ export interface RunState {
   boundaryArmed: boolean;
   boundaryWarned: boolean;
   momentum: number;
+  /** `elapsedMs` of the player's last input (meaningful once `afk` has first gone false). */
   lastInputMs: number;
+  /**
+   * The player is away (spec section 6.9): no input yet this run, or none for 8 s of play.
+   * Clears still happen but score nothing. Any input sets it back to false.
+   */
+  afk: boolean;
   events: EngineEvent[];
 }

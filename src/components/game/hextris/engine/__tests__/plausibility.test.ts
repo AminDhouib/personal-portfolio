@@ -149,5 +149,17 @@ describe("seeded runs stay plausible for the arcade board", () => {
     }
   }, 30_000);
 
-  it.todo("scores 0 for an idle bot (enabled by T5-4)");
+  it("scores 0 for an idle bot that never touches the controls, on 10 seeds", () => {
+    let cleared = 0;
+    for (const seed of SEEDS.slice(0, 10)) {
+      const s = play(seed, () => []);
+      expect(s.phase, `seed ${seed} did not end`).toBe("over");
+      expect(s.score, `seed ${seed}`).toBe(0);
+      expect(s.momentum).toBe(0);
+      expect(verdict(s).verdict).toMatchObject({ ok: true });
+      cleared += s.cellsCleared;
+    }
+    // Pieces still match by chance while nobody plays; those clears just score nothing.
+    expect(cleared).toBeGreaterThan(0);
+  }, 30_000);
 });

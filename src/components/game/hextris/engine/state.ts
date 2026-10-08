@@ -52,6 +52,7 @@ export function createRun(options: { seed: number }): RunState {
     boundaryWarned: false,
     momentum: 0,
     lastInputMs: 0,
+    afk: true,
     events: [],
   };
 }

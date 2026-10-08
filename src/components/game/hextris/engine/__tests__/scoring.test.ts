@@ -18,6 +18,43 @@ function clearThree(s: RunState): void {
   resolveClears(s, 3, 2);
 }
 
+describe("the idle guard (spec section 6.9)", () => {
+  it("clears while away but scores 0 and leaves the combo, its window and momentum alone", () => {
+    const s = boardState({});
+    s.elapsedMs = 1000;
+    clearThree(s);
+    const before = structuredClone(s);
+    s.events = [];
+    s.afk = true;
+    s.elapsedMs = 1200;
+    clearThree(s);
+    expect(s.sides[3]).toEqual([]);
+    expect(s.cellsCleared).toBe(before.cellsCleared + 3);
+    expect(s.score).toBe(before.score);
+    expect(s.combo).toBe(before.combo);
+    expect(s.bestCombo).toBe(before.bestCombo);
+    expect(s.comboUntilMs).toBe(before.comboUntilMs);
+    expect(s.lastClearAtMs).toBe(before.lastClearAtMs);
+    expect(s.momentum).toBe(before.momentum);
+    expect(ofType(s.events, "clear")).toEqual([
+      expect.objectContaining({ count: 3, colour: 2, combo: 1, chain: false, points: 0 }),
+    ]);
+    const types = s.events.map((e) => e.type);
+    for (const t of ["chain", "combo", "score", "momentum", "clean-sweep"] as const) {
+      expect(types).not.toContain(t);
+    }
+  });
+
+  it("gives no clean-sweep bonus while away", () => {
+    const s = boardState({ 0: "aaaaaaaaaa" });
+    s.afk = true;
+    resolveClears(s, 0, 9);
+    expect(s.sides[0]).toEqual([]);
+    expect(s.score).toBe(0);
+    expect(ofType(s.events, "clean-sweep")).toEqual([]);
+  });
+});
+
 describe("clearPoints", () => {
   it("is cells squared times the combo level", () => {
     expect(clearPoints(4, 2)).toBe(32);

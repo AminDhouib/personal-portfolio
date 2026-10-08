@@ -2,7 +2,7 @@ import { fallRowsPerSecond, refreshLevel, runDirector } from "./director";
 import { armBoundary, endIfOverflowing, tickBoundary } from "./limit";
 import { resolveClears } from "./match";
 import { panic } from "./momentum";
-import { expireCombo } from "./scoring";
+import { checkAway, expireCombo } from "./scoring";
 import {
   COUNTDOWN_MS,
   COUNTDOWN_STEP_MS,
@@ -31,6 +31,12 @@ const TICK_UNITS = 1_000_000;
 const COUNTDOWN_STEP_TICKS = Math.round(COUNTDOWN_STEP_MS / TICK_MS);
 const COUNTDOWN_TICKS = Math.round(COUNTDOWN_MS / TICK_MS);
 
+/** Any player input: ends the away state (spec section 6.9). */
+function noteInput(state: RunState): void {
+  state.lastInputMs = state.elapsedMs;
+  state.afk = false;
+}
+
 /** Whether the run's clock is running: the countdown or play. */
 function running(state: RunState): boolean {
   return state.phase === "countdown" || state.phase === "playing";
@@ -47,6 +53,7 @@ export function start(state: RunState): void {
 }
 
 export function pauseOrResume(state: RunState): void {
+  if (running(state) || state.phase === "paused") noteInput(state);
   if (running(state)) {
     state.phase = "paused";
     // A rush key lifted while paused never reaches the engine, so a pause ends the rush.
@@ -66,7 +73,7 @@ export function rotate(state: RunState, dir: 1 | -1): void {
   state.facing = wrapSide(state.facing + dir);
   state.rotationFrom = offset - dir;
   state.rotationAt = state.elapsedMs;
-  state.lastInputMs = state.elapsedMs;
+  noteInput(state);
   emit(state, { type: "rotate", dir });
   armBoundary(state);
 }
@@ -74,12 +81,13 @@ export function rotate(state: RunState, dir: 1 | -1): void {
 export function setRush(state: RunState, on: boolean): void {
   if (!running(state)) return;
   state.rush = on;
-  state.lastInputMs = state.elapsedMs;
+  noteInput(state);
 }
 
 /** Always allowed, so a release can never be lost. */
 export function releaseRush(state: RunState): void {
   state.rush = false;
+  if (running(state)) noteInput(state);
 }
 
 export function applyAction(state: RunState, action: EngineAction): void {
@@ -103,6 +111,8 @@ export function applyAction(state: RunState, action: EngineAction): void {
       pauseOrResume(state);
       return;
     case "panic":
+      // An attempt is an input even when the meter is not full.
+      if (running(state)) noteInput(state);
       panic(state);
       return;
   }
@@ -152,6 +162,7 @@ function countdownTick(state: RunState): void {
 function tick(state: RunState): void {
   state.ticks += 1;
   state.elapsedMs = state.ticks * TICK_MS;
+  checkAway(state);
   runDirector(state);
   movePieces(state);
   if (state.phase !== "playing") return;
