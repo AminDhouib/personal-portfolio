@@ -69,6 +69,9 @@ export interface AudioContextLike {
   readonly currentTime: number;
   readonly sampleRate: number;
   readonly destination: AudioNodeLike;
+  /** Browsers start a context suspended until a user gesture resumes it. */
+  readonly state?: string;
+  resume?(): Promise<void>;
   createGain(): GainNodeLike;
   createOscillator(): OscillatorNodeLike;
   createBiquadFilter(): BiquadFilterNodeLike;
@@ -120,6 +123,8 @@ const STORAGE_KEY = "pg2-sound";
 
 let bus: AudioBus | null = null;
 let enabled: boolean | null = null;
+// Nothing plays before the player's first gesture (the Start tap), whatever the stored choice.
+let unlocked = false;
 
 function browserWindow(): (Window & typeof globalThis) | null {
   return typeof window === "undefined" ? null : window;
@@ -136,27 +141,55 @@ function readStore(): Storage | null {
   }
 }
 
-function hydrateEnabled(): boolean {
+/**
+ * The stored choice. Sound is ON unless the player turned it off: an absent key is on, a
+ * legacy "1" is on, and only an explicit "0" is off. Unreadable storage is on too.
+ */
+export function hydrateEnabled(): boolean {
   const store = readStore();
-  if (!store) return false;
+  if (!store) return true;
   try {
-    return store.getItem(STORAGE_KEY) === "1";
+    return store.getItem(STORAGE_KEY) !== "0";
   } catch {
-    // silent-ok: read failures fall back to the muted default.
-    return false;
+    // silent-ok: read failures fall back to the default (on).
+    return true;
   }
 }
 
-/** Playback gate. Sound is OFF by default until the player opts in. */
+/** Playback gate. Sound is on by default, but see isUnlocked: nothing plays before the first gesture. */
 export function isEnabled(): boolean {
   if (enabled === null) enabled = hydrateEnabled();
   return enabled;
+}
+
+/** True once unlockAudio has run, i.e. the player has made a gesture (the Start tap). */
+export function isUnlocked(): boolean {
+  return unlocked;
 }
 
 /** Toggle playback and persist the choice when localStorage is available. */
 export function setEnabled(on: boolean): void {
   enabled = on;
   safeLocalSet(STORAGE_KEY, on ? "1" : "0");
+}
+
+/**
+ * Call from a user gesture (the Start tap, the sound toggle): creates the context and
+ * resumes it if the browser left it suspended, and opens the gate playCue checks. Never
+ * throws; a platform without audio just leaves the gate open on a null bus.
+ */
+export function unlockAudio(): void {
+  unlocked = true;
+  const b = getAudio();
+  const ctx = b?.ctx;
+  if (!ctx || ctx.state !== "suspended" || !ctx.resume) return;
+  try {
+    void ctx.resume().catch(() => {
+      // silent-ok: a refused resume leaves the game silent, which is the safe outcome.
+    });
+  } catch {
+    // silent-ok: a synchronous resume failure is handled the same way.
+  }
 }
 
 /**

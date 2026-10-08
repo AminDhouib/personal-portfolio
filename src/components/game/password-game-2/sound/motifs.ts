@@ -13,6 +13,7 @@ import {
   playTone,
   getAudio,
   isEnabled,
+  isUnlocked,
 } from "./audio";
 
 type Destination = AudioBus["sfx"];
@@ -387,12 +388,12 @@ export const MOTIFS: Record<string, (bus: AudioBus) => void> = {
 };
 
 /**
- * Play a named cue. No-ops silently when sound is disabled, when there is no
+ * Play a named cue. No-ops silently when sound is disabled, before the first gesture (unlockAudio), when there is no
  * browser AudioContext, or when the key is unknown -- unknown keys never throw
  * and never log, so the shell can forward arbitrary engine effect names.
  */
 export function playCue(name: string): void {
-  if (!isEnabled()) return;
+  if (!isEnabled() || !isUnlocked()) return;
   const cue = MOTIFS[name];
   if (!cue) return;
   const bus = getAudio();
