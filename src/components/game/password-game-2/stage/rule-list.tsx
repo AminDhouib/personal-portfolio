@@ -42,6 +42,8 @@ interface RuleListProps {
   liveEvents?: readonly string[];
   /** Told once per change when rules went from passing to failing or back (drives the pass/fail cues). */
   onRuleFlips?(flips: RuleFlips): void;
+  /** Changes on every new run; the cards start fresh even when the rule ids repeat. */
+  runId?: number;
 }
 
 interface Evaluated {
@@ -410,8 +412,21 @@ export const RuleList = memo(function RuleList({
   onRuleState,
   liveEvents,
   onRuleFlips,
+  runId = 0,
 }: RuleListProps) {
-  const widget: WidgetChannel = { onWidgetText, onRuleState };
+  // Any widget input counts as a player action even when it leaves the password text alone
+  // (a captcha stage, a chess move, a wordle verdict), so it earns the shake and the cue.
+  const [widgetSeq, setWidgetSeq] = useState(0);
+  const widget: WidgetChannel = {
+    onWidgetText: (text) => {
+      setWidgetSeq((n) => n + 1);
+      onWidgetText(text);
+    },
+    onRuleState: (id, value) => {
+      setWidgetSeq((n) => n + 1);
+      onRuleState(id, value);
+    },
+  };
   const evaluated: Evaluated[] = rules.map((rule, i) => ({
     rule,
     badge: i + 1,
@@ -428,34 +443,64 @@ export const RuleList = memo(function RuleList({
     reasons: Readonly<Record<string, string>>;
     flips: RuleFlips | null;
     pw: string;
+    ws: number;
     latest: string;
-  }>({ pass: passNow, shaking: new Set(), reasons: {}, flips: null, pw: password, latest: "" });
+  }>({
+    pass: passNow,
+    shaking: new Set(),
+    reasons: {},
+    flips: null,
+    pw: password,
+    ws: widgetSeq,
+    latest: "",
+  });
+  const [run, setRun] = useState(runId);
   const [entered, setEntered] = useState<ReadonlySet<string>>(new Set());
   const listRef = useRef<HTMLOListElement>(null);
 
   const passChanged =
     Object.keys(passNow).length !== Object.keys(motion.pass).length ||
     Object.keys(passNow).some((id) => passNow[id] !== motion.pass[id]);
-  if (passChanged || password !== motion.pw) {
-    // Only a change to the password text (a keystroke, a widget, an event rewriting it)
-    // earns the shake, the reason and the cue. A rule that flips on the clock alone, or from
-    // a coupled rule, just recolours.
-    const edited = password !== motion.pw;
-    const flips = diffRuleStates(motion.pass, passNow);
-    const hasFlips = edited && (flips.regressed.length > 0 || flips.recovered.length > 0);
+  if (run !== runId) {
+    // A new run reuses the same rule ids: start every card fresh (entrance, no shake).
+    setRun(runId);
+    setEntered(new Set());
+    setMotion({
+      pass: passNow,
+      shaking: new Set(),
+      reasons: {},
+      flips: null,
+      pw: password,
+      ws: widgetSeq,
+      latest: "",
+    });
+  } else if (passChanged || password !== motion.pw || widgetSeq !== motion.ws) {
+    // A regression shakes, explains itself and cues only when the player or the engine did
+    // something since the last render: the password text changed or a widget reported. A rule
+    // that flips on the clock alone, or from a coupled rule, just recolours. A recovery always
+    // reports.
+    const acted = password !== motion.pw || widgetSeq !== motion.ws;
+    const diff = diffRuleStates(motion.pass, passNow);
+    const flips: RuleFlips = {
+      regressed: acted ? diff.regressed : [],
+      recovered: diff.recovered,
+    };
+    const hasFlips = flips.regressed.length > 0 || flips.recovered.length > 0;
     const shaking = new Set(motion.shaking);
     const reasons = { ...motion.reasons };
     let latest = motion.latest;
-    if (edited) {
-      for (const id of flips.regressed) {
-        shaking.add(id);
-        reasons[id] = explainRegression({ ruleId: id, liveEvents: liveEvents ?? [] });
-        latest = reasons[id];
-      }
-      if (flips.regressed.length > 0) {
-        // The shake replaces the entrance on this card; it must not replay afterwards.
-        setEntered((prev) => new Set([...prev, ...flips.regressed]));
-      }
+    if (flips.recovered.length > 0) latest = "";
+    const announced: string[] = [];
+    for (const id of flips.regressed) {
+      shaking.add(id);
+      reasons[id] = explainRegression({ ruleId: id, liveEvents: liveEvents ?? [] });
+      const badge = evaluated.findIndex((e) => e.rule.id === id) + 1;
+      announced.push(`Rule ${badge}: ${reasons[id]}`);
+    }
+    if (flips.regressed.length > 0) {
+      latest = announced.join(". ");
+      // The shake replaces the entrance on this card; it must not replay afterwards.
+      setEntered((prev) => new Set([...prev, ...flips.regressed]));
     }
     for (const id of flips.recovered) {
       shaking.delete(id);
@@ -468,6 +513,7 @@ export const RuleList = memo(function RuleList({
       reasons,
       flips: hasFlips ? flips : motion.flips,
       pw: password,
+      ws: widgetSeq,
       latest,
     });
   }

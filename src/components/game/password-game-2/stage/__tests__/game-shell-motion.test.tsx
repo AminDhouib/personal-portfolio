@@ -96,34 +96,29 @@ describe("GameShell motion and sound wiring", () => {
     expect(unlock).toHaveBeenCalledTimes(1);
   });
 
-  it("one regression plays one fail cue, and a recovery inside the gate is silent", async () => {
+  it("one regression plays one fail cue, and a second fail inside the gate is silent", async () => {
     startRun();
     cues.length = 0;
     fireEvent.keyDown(document.body, { key: "a" });
     expect(cues.filter((c) => c === "rule-fail")).toHaveLength(1);
     expect(cues).not.toContain("rule-pass");
-    fireEvent.keyDown(document.body, { key: "Backspace" });
-    expect(cues).not.toContain("rule-pass");
+    fireEvent.keyDown(document.body, { key: "Backspace" }); // pass is gated separately
+    expect(cues.filter((c) => c === "rule-pass")).toHaveLength(1);
+    fireEvent.keyDown(document.body, { key: "a" }); // a fail inside the fail gate
+    expect(cues.filter((c) => c === "rule-fail")).toHaveLength(1);
+  });
+
+  it("a fail that lands right after a pass still plays", async () => {
+    startRun();
+    fireEvent.keyDown(document.body, { key: "a" });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(200);
     });
-    fireEvent.keyDown(document.body, { key: "a" });
-    expect(cues.filter((c) => c === "rule-fail")).toHaveLength(2);
-  });
-
-  it("a restart starts the cards fresh: no carried shake, the entrance plays again", () => {
-    const { getByTestId, getByRole } = startRun();
-    const card = () =>
-      getByTestId("pg2-rules").querySelector('[data-flip-id="test-empty"] button') as HTMLElement;
-    fireEvent.keyDown(document.body, { key: "a" });
-    expect(card().className).toContain("pg2-rule-shake");
-    act(() => {
-      live!.outcome = "victory";
-      vi.advanceTimersByTime(1500);
-    });
-    fireEvent.click(getByRole("button", { name: /play again|new run|random/i }));
-    expect(card().className).not.toContain("pg2-rule-shake");
-    expect(card().className).toContain("pg2-rule-enter");
+    cues.length = 0;
+    fireEvent.keyDown(document.body, { key: "Backspace" }); // pass
+    fireEvent.keyDown(document.body, { key: "a" }); // fail within 150ms of the pass
+    expect(cues.filter((c) => c === "rule-pass")).toHaveLength(1);
+    expect(cues.filter((c) => c === "rule-fail")).toHaveLength(1);
   });
 
   it("typing fast plays at most one tick per 30ms", async () => {

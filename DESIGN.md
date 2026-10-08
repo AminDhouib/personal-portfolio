@@ -583,6 +583,8 @@ The following Password Game 2 entries were verified against the current tree on 
   keydown, creates the context, resumes it when the browser left it suspended, and opens the gate
   `playCue` checks. Key ticks have their own 30 ms rate limit in the shell, separate from the 150 ms
   effect-flood debounce, so fast typing is not swallowed.
+  Known and accepted: the very first cue after Start is dropped while the browser's `resume()` is
+  still pending (`playCue` needs a running context), rather than queued and burst out later.
 - **PG2's rule-card motion is a hand-rolled Web Animations FLIP, and it ignores reduced motion on
   purpose** (`stage/flip.ts`, `stage/use-flip.ts`, `.pg2-rule-*` in `pg2.css`). framer-motion is a
   dependency but is not imported into PG2: the shell re-renders on a 250 ms heartbeat and a hook

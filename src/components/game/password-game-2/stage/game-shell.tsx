@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -35,6 +36,7 @@ import { ChromeEvents } from "./chrome-events";
 import { FinaleStage } from "./finale-stage";
 import { ReceiptCard } from "./receipt-card";
 import { RuleList } from "./rule-list";
+import { followRule } from "./follow-rule";
 import type { RuleFlips } from "./regression";
 import { Hud } from "./hud";
 import { HudActions } from "./hud-actions";
@@ -53,7 +55,7 @@ type Phase = "start" | "running";
 
 /** Minimum gap between two key ticks, so fast typing is a patter and not a buzz. */
 const KEY_TICK_GAP_MS = 30;
-/** Minimum gap between two rule pass/fail cues. */
+/** Minimum gap between two rule-fail cues, and between two rule-pass cues. */
 const RULE_CUE_GAP_MS = 150;
 
 interface Toast {
@@ -158,7 +160,8 @@ export function GameShell() {
   const reducedRef = useRef(false);
   const soundDebounceRef = useRef<Map<string, number>>(new Map());
   const lastTickRef = useRef(-Infinity);
-  const lastFlipCueRef = useRef(-Infinity);
+  const lastFailCueRef = useRef(-Infinity);
+  const lastPassCueRef = useRef(-Infinity);
   const ruleCountRef = useRef(0);
   const toastIdRef = useRef(0);
   const moodTimersRef = useRef<Map<string, number>>(new Map());
@@ -236,15 +239,17 @@ export function GameShell() {
     playCue("key-tick");
   }, []);
 
-  // One set of flips plays one cue (fail wins), and pass/fail share a short gate so a paste,
-  // an event or a rule that flips on every keystroke cannot stack buzzes on the key ticks.
+  // One set of flips plays one cue (fail wins). Pass and fail are gated separately so a pass
+  // never swallows the buzz that follows it, while a rule that flips on every keystroke cannot
+  // stack chimes or buzzes on the key ticks.
   const onRuleFlips = useCallback((flips: RuleFlips) => {
     const t = performance.now();
-    if (t - lastFlipCueRef.current < RULE_CUE_GAP_MS) return;
-    if (flips.regressed.length > 0) playCue("rule-fail");
-    else if (flips.recovered.length > 0) playCue("rule-pass");
-    else return;
-    lastFlipCueRef.current = t;
+    const fail = flips.regressed.length > 0;
+    const gate = fail ? lastFailCueRef : lastPassCueRef;
+    if (!fail && flips.recovered.length === 0) return;
+    if (t - gate.current < RULE_CUE_GAP_MS) return;
+    gate.current = t;
+    playCue(fail ? "rule-fail" : "rule-pass");
   }, []);
 
   const triggerFlash = useCallback((ms: number) => {
@@ -966,7 +971,7 @@ function RunningView({
   const keyboardOpen = viewport.keyboardOpen;
   const followedRuleRef = useRef<Element | null>(null);
   const followedInputRef = useRef(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!keyboardOpen) {
       followedRuleRef.current = null;
       return;
@@ -979,7 +984,9 @@ function RunningView({
     const rule = panelRef.current?.parentElement?.querySelector(".pg2-rule--active") ?? null;
     if (rule !== followedRuleRef.current) {
       followedRuleRef.current = rule;
-      reveal(rule);
+      // A layout effect, so the follow starts before the frame paints and the new rule is
+      // never painted out of view first. Smooth, and transform-safe while the card animates.
+      if (rule instanceof HTMLElement) followRule(rule);
     }
     if (inputSeqRef.current !== followedInputRef.current) {
       followedInputRef.current = inputSeqRef.current;
@@ -1078,7 +1085,7 @@ function RunningView({
             Your password must satisfy
           </p>
           <RuleList
-            key={runId}
+            runId={runId}
             rules={g.rules}
             password={password}
             state={g}
