@@ -1,0 +1,47 @@
+NOTICE
+======
+
+Third-party content used by this site and its credits. Each section is
+self-contained under its own heading.
+
+
+Typing Speed
+------------
+
+The practice passages and the common-word list in the Typing Speed game
+(src/components/game/typing-speed/corpus/) come from the public-domain works
+below. Every author died before 1926 and every work was published before 1929,
+so each is in the public domain in the United States and under life+100 terms.
+
+The passages are short excerpts, normalized to typeable ASCII (curly quotes
+straightened, italic markers removed, line breaks joined) and otherwise
+verbatim. The word list is derived from word counts across these works; it
+contains no running text.
+
+  Pride and Prejudice, Jane Austen, 1813       https://www.gutenberg.org/ebooks/1342
+  Emma, Jane Austen, 1815                      https://www.gutenberg.org/ebooks/158
+  Moby Dick, Herman Melville, 1851             https://www.gutenberg.org/ebooks/2701
+  Alice's Adventures in Wonderland,
+    Lewis Carroll, 1865                        https://www.gutenberg.org/ebooks/11
+  Frankenstein, Mary Shelley, 1818             https://www.gutenberg.org/ebooks/84
+  A Tale of Two Cities, Charles Dickens, 1859  https://www.gutenberg.org/ebooks/98
+  Great Expectations, Charles Dickens, 1861    https://www.gutenberg.org/ebooks/1400
+  Walden, Henry David Thoreau, 1854            https://www.gutenberg.org/ebooks/205
+  Adventures of Huckleberry Finn,
+    Mark Twain, 1884                           https://www.gutenberg.org/ebooks/76
+  The Picture of Dorian Gray,
+    Oscar Wilde, 1890                          https://www.gutenberg.org/ebooks/174
+  Treasure Island,
+    Robert Louis Stevenson, 1883               https://www.gutenberg.org/ebooks/120
+  The Strange Case of Dr Jekyll and Mr Hyde,
+    Robert Louis Stevenson, 1886               https://www.gutenberg.org/ebooks/43
+  Jane Eyre, Charlotte Bronte, 1847            https://www.gutenberg.org/ebooks/1260
+  Dracula, Bram Stoker, 1897                   https://www.gutenberg.org/ebooks/345
+  Heart of Darkness, Joseph Conrad, 1899       https://www.gutenberg.org/ebooks/219
+  The Call of the Wild, Jack London, 1903      https://www.gutenberg.org/ebooks/215
+  Middlemarch, George Eliot, 1872              https://www.gutenberg.org/ebooks/145
+  Little Women, Louisa May Alcott, 1868        https://www.gutenberg.org/ebooks/514
+
+The texts were obtained from Project Gutenberg, which is cited here as the
+publication source only. This site is not affiliated with or endorsed by
+Project Gutenberg, and its trademark is not used to promote anything.

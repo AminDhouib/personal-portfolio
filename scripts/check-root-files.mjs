@@ -33,6 +33,7 @@ const ROOT_ALLOWLIST = new Set([
   "compose.yml",
   "DESIGN.md",
   "Dockerfile",
+  "NOTICE", // third-party content credits (Typing Speed corpus)
   "README.md",
   "RUNBOOK.md",
   "eslint.config.mjs",
