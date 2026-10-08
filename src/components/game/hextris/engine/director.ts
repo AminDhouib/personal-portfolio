@@ -47,6 +47,20 @@ export function refreshLevel(state: RunState): void {
   if (after !== before) emit(state, { type: "level", level: after });
 }
 
+// The first minute (spec section 10.10): a busier start that hands over to the real level.
+const FIRST_MINUTE_MS = 60_000;
+const FIRST_MINUTE_LEVEL = 4;
+const FIRST_MINUTE_MAX_INTERVAL_MS = 1100;
+
+/** The level the director picks patterns by, and the beat it spaces them on, right now. */
+export function pace(state: RunState): { level: number; intervalMs: number } {
+  if (state.elapsedMs >= FIRST_MINUTE_MS) {
+    return { level: state.level, intervalMs: spawnIntervalMs(state.level) };
+  }
+  const level = Math.max(state.level, FIRST_MINUTE_LEVEL);
+  return { level, intervalMs: Math.min(spawnIntervalMs(level), FIRST_MINUTE_MAX_INTERVAL_MS) };
+}
+
 export type PatternName = "single" | "opposite" | "fan" | "ring" | "sweep" | "zipper";
 
 export interface Pattern {
@@ -105,13 +119,18 @@ export function patternBeats(state: RunState, name: PatternName): number[][] {
   }
 }
 
+/** The pieces that make up the opening (spec section 10.9) are the run's first three. */
+const OPENING_PIECES = 3;
+
 /**
- * Deals a piece's colour and special. No colour comes up three times running, except in the
- * opening, which passes its colour in.
+ * Deals a piece's colour and special. No colour comes up three times running, and no piece gets
+ * the opening's colour while an opening piece is still falling. The opening passes its colour in.
  */
 export function makePiece(state: RunState, lane: number, dealt?: Colour): Piece {
+  const opening = state.falling.find((p) => p.id <= OPENING_PIECES)?.colour ?? -1;
+  const barred = (c: number) => (state.colourRun >= 2 && c === state.lastColour) || c === opening;
   let colour: number = dealt ?? randomBelow(state, COLOURS);
-  if (dealt === undefined && state.colourRun >= 2 && colour === state.lastColour) {
+  while (dealt === undefined && barred(colour)) {
     colour = (colour + 1 + randomBelow(state, COLOURS - 1)) % COLOURS;
   }
   state.colourRun = colour === state.lastColour ? state.colourRun + 1 : 1;
@@ -153,8 +172,8 @@ export function runDirector(state: RunState): void {
   if (state.nextPieceId === 1 && state.queue.length === 0 && now >= state.nextSpawnAtMs) {
     scheduleOpening(state, now);
   } else if (state.queue.length === 0 && now >= state.nextSpawnAtMs) {
-    const interval = spawnIntervalMs(state.level);
-    const pattern = pickPattern(state, state.level);
+    const { level, intervalMs: interval } = pace(state);
+    const pattern = pickPattern(state, level);
     const beats = patternBeats(state, pattern.name);
     beats.forEach((lanes, beat) => {
       for (const lane of lanes) state.queue.push({ atMs: now + beat * interval, lane });

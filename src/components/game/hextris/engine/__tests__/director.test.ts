@@ -6,6 +6,7 @@ import {
   levelFor,
   makePiece,
   patternBeats,
+  pace,
   pickPattern,
   refreshLevel,
   spawnIntervalMs,
@@ -247,12 +248,26 @@ describe("the opening (spec section 10.9)", () => {
     }
   });
 
-  it("never gives the next piece the opening's colour", () => {
+  it("deals no other piece the opening's colour while an opening piece is falling", () => {
+    let held = 0;
     for (const seed of SEEDS) {
-      const spawns = timedSpawns(startedRun(seed), 3000);
-      expect(spawns.length).toBeGreaterThan(3);
-      expect(spawns[3]?.spawn.colour).not.toBe(spawns[0]?.spawn.colour);
+      const s = startedRun(seed);
+      let colour = -1;
+      for (let i = 0; i < 3000 && (s.nextPieceId <= 3 || s.falling.some((p) => p.id <= 3)); i++) {
+        const live = s.falling.some((p) => p.id <= 3);
+        advance(s, TICK_MS);
+        for (const e of drainEvents(s)) {
+          if (e.type !== "spawn") continue;
+          if (e.id === 1) colour = e.colour;
+          if (e.id > 3 && live) {
+            held++;
+            expect(e.colour, `seed ${seed} piece ${e.id}`).not.toBe(colour);
+          }
+        }
+      }
     }
+    // The rule is exercised: several pieces come out while the opening is still falling.
+    expect(held).toBeGreaterThan(SEEDS.length);
   });
 
   it("is one clockwise turn from a first match, and no match without it", () => {
@@ -273,8 +288,14 @@ describe("the opening (spec section 10.9)", () => {
       return events;
     }
     for (const seed of SEEDS) {
-      const clears = (turn: 0 | 1 | -1) =>
-        playOpening(seed, turn).filter((e) => e.type === "clear").length;
+      // Later pieces can land sooner on taller stacks and clear among themselves, so only
+      // clears in the opening's colour count.
+      const clears = (turn: 0 | 1 | -1) => {
+        const events = playOpening(seed, turn);
+        const first = events.find((e) => e.type === "spawn");
+        const colour = first?.type === "spawn" ? first.colour : -1;
+        return events.filter((e) => e.type === "clear" && e.colour === colour).length;
+      };
       expect(clears(0), `seed ${seed} untouched`).toBe(0);
       expect(clears(-1), `seed ${seed} counter-clockwise`).toBe(0);
       expect(clears(1), `seed ${seed} clockwise`).toBe(1);
@@ -282,12 +303,58 @@ describe("the opening (spec section 10.9)", () => {
   });
 });
 
+describe("the first minute (spec section 10.10)", () => {
+  it("paces the director at level 4 or more with beats of at most 1100 ms until 60 s", () => {
+    const s = startedRun(1);
+    const at = (ms: number, level: number) => {
+      s.elapsedMs = ms;
+      s.level = level;
+      return pace(s);
+    };
+    expect(at(0, 1)).toEqual({ level: 4, intervalMs: 1100 });
+    expect(at(59_999, 2.3)).toEqual({ level: 4, intervalMs: 1100 });
+    expect(at(30_000, 10)).toEqual({ level: 10, intervalMs: 1100 });
+    expect(at(30_000, 20)).toEqual({ level: 20, intervalMs: spawnIntervalMs(20) });
+    expect(spawnIntervalMs(20)).toBeLessThan(1100);
+    expect(at(60_000, 2.3)).toEqual({ level: 2.3, intervalMs: spawnIntervalMs(2.3) });
+  });
+
+  it("averages a spawn every 1000 ms or less over the first 30 s, over 20 seeds", () => {
+    const means: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const s = startedRun(500 + i * 31);
+      // Spawn times do not depend on where pieces land, so keep the board empty and alive.
+      let count = 0;
+      for (let t = 0; t < 30_000; t += 250) {
+        advance(s, 250);
+        count += drainEvents(s).filter((e) => e.type === "spawn").length;
+        s.sides = s.sides.map(() => []);
+      }
+      expect(s.phase).toBe("playing");
+      means.push(30_000 / count);
+    }
+    const mean = means.reduce((a, b) => a + b, 0) / means.length;
+    // It was about 1500 ms; the expected value is about 880 ms.
+    expect(mean).toBeLessThanOrEqual(1000);
+    expect(mean).toBeGreaterThan(700);
+    for (const m of means) expect(m).toBeLessThan(1100);
+  });
+});
+
 describe("spawning", () => {
-  it("keeps spawning on the beat for the current level after the opening", () => {
+  it("spawns on the beat for the real level after the first minute", () => {
     const s = startedRun(22);
-    const spawns = timedSpawns(s, 1000 + 1500 * 4 + 50).filter((x) => x.at > 1000);
-    // Level stays near 1 for seven seconds, so roughly one beat per 1.5 s.
+    // Jump the clock past the first minute and the opening, with the director due.
+    s.ticks = 60_000 / TICK_MS;
+    s.elapsedMs = 60_000;
+    s.nextSpawnAtMs = 60_000;
+    s.falling = [];
+    s.queue = [];
+    s.nextPieceId = 10;
+    const spawns = timedSpawns(s, 1500 * 4 + 50);
+    // The level is about 2.4, below the pairs, so about one single per 1.45 s.
+    expect(s.level).toBeLessThan(3);
     expect(spawns.length).toBeGreaterThanOrEqual(4);
-    expect(spawns.length).toBeLessThanOrEqual(6);
+    expect(spawns.length).toBeLessThanOrEqual(5);
   });
 });
