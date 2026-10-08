@@ -16,6 +16,7 @@ import {
   type CharCounts,
   type RunMetrics,
 } from "./typing-speed/metrics";
+import { isTextEntryTarget } from "./text-entry";
 import { ModeBar } from "./typing-speed/mode-bar";
 import { ResultsCard } from "./typing-speed/results-card";
 import { loadStats, recordRun, saveStats } from "./typing-speed/stats";
@@ -185,14 +186,17 @@ export function TypingSpeedGame() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const el = e.target instanceof Element ? e.target : null;
-      const inTextField = !!el?.closest("input, textarea, select, [contenteditable='true']");
+      const inTextField = isTextEntryTarget(e);
+      // Tab and Escape belong to the game only from its own input or from outside any field.
+      const ownInput = !!el && el === inputRef.current;
       const inButton = !!el?.closest("button, a");
-      if (e.key === "Tab" && !e.shiftKey && inTextField && run.status !== "done") {
+      if (e.key === "Tab" && !e.shiftKey && ownInput && run.status !== "done") {
         e.preventDefault();
         restartRef.current?.focus();
         return;
       }
       if (e.key === "Escape") {
+        if (inTextField && !ownInput) return;
         if (run.status !== "ready") {
           e.preventDefault();
           restart();
@@ -320,7 +324,10 @@ export function TypingSpeedGame() {
         />
       </div>
 
-      {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
+      {/* The sparkline's slot is always there so it appearing does not shift the page. */}
+      <div className="h-10" data-testid="ts-live-slot">
+        {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
+      </div>
 
       {/* Passage */}
       <motion.div
