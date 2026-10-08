@@ -52,6 +52,8 @@ export interface HitRegion {
   h: number;
   r: number;
   target: PointerTarget;
+  /** A glyph target's own box: all a fine pointer gets (see hit-test.ts). */
+  core?: RectLike;
 }
 
 export type Painter = (
@@ -85,8 +87,9 @@ function pushRect(
   w: number,
   h: number,
   target: PointerTarget,
+  core?: RectLike,
 ) {
-  hits.push({ shape: "rect", x, y, w, h, r: 0, target });
+  hits.push({ shape: "rect", x, y, w, h, r: 0, target, core });
 }
 function pushCircle(hits: HitRegion[], x: number, y: number, r: number, target: PointerTarget) {
   hits.push({ shape: "circle", x, y, w: 0, h: 0, r, target });
@@ -795,12 +798,19 @@ const paintParasite: Painter = (ctx, inst, layout, g, tMs, hits) => {
     const r = layout.cellRects.get(id);
     if (!r) continue;
     // The target is the cell plus 2 px a side, but never under 44 px across a narrow glyph.
+    // The floor is for touch only: pickHit trims it to the glyph's own box (core) for a
+    // fine pointer, and never lets it reach into a neighbouring glyph.
     const hw = Math.max(44, r.w + 4);
     const hh = Math.max(44, r.h + 4);
-    pushRect(hits, r.x + r.w / 2 - hw / 2, r.y + r.h / 2 - hh / 2, hw, hh, {
-      kind: "parasite",
-      id,
-    });
+    pushRect(
+      hits,
+      r.x + r.w / 2 - hw / 2,
+      r.y + r.h / 2 - hh / 2,
+      hw,
+      hh,
+      { kind: "parasite", id },
+      r,
+    );
     if (!wiggling) continue;
     // Reveal-window tell: a bright ring pulsing around the mimic, lighter than the
     // violet glyph glow so an attentive player can catch it against the force accent.
