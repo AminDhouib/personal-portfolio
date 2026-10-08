@@ -10,7 +10,7 @@ const START_KEYS = new Set([" ", "Enter", "ArrowLeft", "ArrowRight", "ArrowDown"
 // a focused button or link) all leave the key to the browser. `preventDefault`
 // is set for every key the game claims, so Space and the arrows do not scroll
 // the page; on game over nothing is claimed, since the player must press
-// "Play again" deliberately. Left rotates counter-clockwise (`hexRotate(1)`).
+// "Play again" deliberately. Left rotates counter-clockwise.
 export function hextrisKeyAction(input: {
   key: string;
   phase: HexRunPhase;

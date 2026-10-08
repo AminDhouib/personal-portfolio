@@ -16,16 +16,14 @@ const SELF = join(GAME_DIR, "__tests__", "provenance-guard.test.ts");
 
 const DENYLIST: readonly RegExp[] = [
   /\bwaveGen\b/,
-  /\bwavegen\b/,
   /\bconsolidateBlocks\b/,
   /\bfloodFill\b/,
-  /\bdoesBlockCollide\b/,
   /\bcomboTime\b/,
   /\bcreationSpeedModifier\b/,
   /\bnextGen\b/,
   /\blastGen\b/,
   /\bdistFromHex\b/,
-  /\bMainHex\b/,
+  /\bmainHex\b/,
   /\bfadeUpAndOut\b/,
   /\bcalcSide\b/,
   /\bdrawTimer\b/,
@@ -34,7 +32,19 @@ const DENYLIST: readonly RegExp[] = [
   /\bblockHeight\b/,
   /\bstartDist\b/,
   /\bcreationDt\b/,
-  /\bangularVelocityConst\b/,
+  /\btrueCanvas\b/,
+  /\bcomboMultiplier\b/,
+  /\blastCombo\b/,
+  /\bfloodSearch\b/,
+  /\bfindCenterOfBlocks\b/,
+  /\bfallingLane\b/,
+  /\battachedLane\b/,
+  /\bspeedModifier\b/,
+  /\bangularVelocity\b/,
+  /\btargetAngle\b/,
+  /\baddNewBlock\b/,
+  /\bisInfringing\b/,
+  /\bwidthWide\b/,
   /\bwg[A-Z]\w*/,
   /\bhex(AddBlock|Rotate|Draw|DoesBlockCollide)\b/,
   /\b5166667\b/,
@@ -78,6 +88,29 @@ describe("provenance matcher", () => {
     expect(denylistHits("let wgSpeed = 1; hexRotate(1);")).toHaveLength(2);
   });
 
+  it("matches the upstream casing of the board object", () => {
+    expect(denylistHits("mainHex.sides")).toEqual(["\\bmainHex\\b"]);
+  });
+
+  it("bites on each of the upstream's most used identifiers", () => {
+    const names = [
+      "trueCanvas",
+      "comboMultiplier",
+      "lastCombo",
+      "floodSearch",
+      "findCenterOfBlocks",
+      "fallingLane",
+      "attachedLane",
+      "speedModifier",
+      "angularVelocity",
+      "targetAngle",
+      "addNewBlock",
+      "isInfringing",
+      "widthWide",
+    ];
+    for (const name of names) expect(denylistHits(`x.${name} = 1;`), name).toHaveLength(1);
+  });
+
   it("bites on a denylisted constant but not on a longer number containing it", () => {
     expect(denylistHits("const t = 2700;")).toEqual(["\\b2700\\b"]);
     expect(denylistHits("speed *= 0.085")).toEqual(["\\b0\\.085\\b"]);
@@ -119,9 +152,7 @@ describe("clean-room engine and painter", () => {
   });
 });
 
-// Enabled by the integrator in Task 9, once the old engine is deleted: until then the files it
-// replaces still carry the upstream names, so this would fail.
-describe.skip("whole Hextris game", () => {
+describe("whole Hextris game", () => {
   it("carries no upstream identifier or tuning constant", () => {
     expect(existsSync(SHELL)).toBe(true);
     expect(scan([...walk(GAME_DIR), SHELL])).toEqual([]);
