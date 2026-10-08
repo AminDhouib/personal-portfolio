@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isTextEntryTarget } from "../keyboard";
+import { isTextEntryTarget } from "../text-entry";
 
 // Dispatches a real keydown from `el` (attached to the document so it bubbles
 // and composes) and reports what the helper says about that event. The helper
