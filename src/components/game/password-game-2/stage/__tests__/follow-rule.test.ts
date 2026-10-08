@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { followRule } from "../follow-rule";
 
+const real = window.getComputedStyle.bind(window);
+
 afterEach(() => {
   vi.restoreAllMocks();
   document.body.innerHTML = "";
@@ -22,7 +24,6 @@ function setup(opts: { animating: boolean; cardTop: number; scrollTop: number })
   const scrollIntoView = vi.fn();
   card.scrollIntoView = scrollIntoView;
   card.getAnimations = (() => (opts.animating ? [{}] : [])) as unknown as Element["getAnimations"];
-  const real = window.getComputedStyle.bind(window);
   vi.spyOn(window, "getComputedStyle").mockImplementation((el: Element) => {
     const cs = real(el);
     return el === scroller ? ({ overflowY: "auto" } as CSSStyleDeclaration) : cs;
