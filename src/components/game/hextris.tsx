@@ -366,6 +366,8 @@ export function HextrisGame() {
     let shaking = false;
     // Whether this page has already decided on the Panic Clear tip (shown, or seen before).
     let panicTipDecided = false;
+    // The size the canvas backing store was last given, as width x height @ DPR, immersive.
+    let fittedTo = "";
     // The shake is the one effect that follows the OS reduced-motion preference.
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -544,6 +546,13 @@ export function HextrisGame() {
         height = Math.floor(Math.min(width * 0.7, window.innerHeight * 0.75));
       }
       const dpr = window.devicePixelRatio || 1;
+      // Assigning canvas.width reallocates and clears the backing store even when the number is
+      // unchanged (about 12 MB at 390 x 844 and DPR 3). The observers below often report the same
+      // size several times in a row, most of all around a phone's auto-fullscreen on the first
+      // tap, so an unchanged size is left alone.
+      const fit = `${width}x${height}@${dpr}${immersive ? " immersive" : ""}`;
+      if (fit === fittedTo) return;
+      fittedTo = fit;
       canvas.style.width = width + "px";
       canvas.style.height = height + "px";
       canvas.width = width * dpr;
