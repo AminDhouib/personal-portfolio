@@ -169,7 +169,9 @@ describe("GameShell phone sheet review fixes", () => {
     controllableMedia(false);
     const utils = render(<GameShell />);
     startRun(utils);
-    const status = utils.getByRole("status", { name: "" });
+    const status = utils
+      .getAllByRole("status")
+      .find((el) => el.getAttribute("data-testid") !== "pg2-rule-announcer")!;
     expect(status.textContent).toBe("");
     fireEvent.click(utils.getByRole("button", { name: /^exit/i }));
     expect(status.textContent).toMatch(/tap exit again/i);

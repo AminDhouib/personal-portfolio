@@ -53,6 +53,8 @@ type Phase = "start" | "running";
 
 /** Minimum gap between two key ticks, so fast typing is a patter and not a buzz. */
 const KEY_TICK_GAP_MS = 30;
+/** Minimum gap between two rule pass/fail cues. */
+const RULE_CUE_GAP_MS = 150;
 
 interface Toast {
   id: number;
@@ -120,6 +122,8 @@ export function GameShell() {
   // during render). A version counter bumps re-renders when the engine mutates it.
   const [game, setGame] = useState<GameState | null>(null);
   const [seed, setSeed] = useState(0);
+  // Bumped on every start so a restart with the same seed still remounts the rule list.
+  const [runId, setRunId] = useState(0);
   const [daily, setDaily] = useState(false);
   // Lazy initializers read browser APIs directly: this component only ever
   // renders on the client (ssr: false), so window/localStorage are present and
@@ -154,6 +158,7 @@ export function GameShell() {
   const reducedRef = useRef(false);
   const soundDebounceRef = useRef<Map<string, number>>(new Map());
   const lastTickRef = useRef(-Infinity);
+  const lastFlipCueRef = useRef(-Infinity);
   const ruleCountRef = useRef(0);
   const toastIdRef = useRef(0);
   const moodTimersRef = useRef<Map<string, number>>(new Map());
@@ -231,9 +236,15 @@ export function GameShell() {
     playCue("key-tick");
   }, []);
 
+  // One set of flips plays one cue (fail wins), and pass/fail share a short gate so a paste,
+  // an event or a rule that flips on every keystroke cannot stack buzzes on the key ticks.
   const onRuleFlips = useCallback((flips: RuleFlips) => {
+    const t = performance.now();
+    if (t - lastFlipCueRef.current < RULE_CUE_GAP_MS) return;
     if (flips.regressed.length > 0) playCue("rule-fail");
-    if (flips.recovered.length > 0) playCue("rule-pass");
+    else if (flips.recovered.length > 0) playCue("rule-pass");
+    else return;
+    lastFlipCueRef.current = t;
   }, []);
 
   const triggerFlash = useCallback((ms: number) => {
@@ -414,16 +425,26 @@ export function GameShell() {
   }, [phase, forceRender, playSound, playKeyTick, pushToast, enqueueCard, setMood, triggerFlash]);
 
   const start = useCallback((s: number, isDaily: boolean, forceEvent?: string) => {
-    unlockAudio(); // the Start tap is the gesture that lets the context run
     ruleCountRef.current = 0;
     const g = createRun({ seed: s, daily: isDaily, nowHHMM, forceEvent });
     gameRef.current = g;
     renderedVersionRef.current = g.version;
     setGame(g);
     setSeed(s);
+    setRunId((r) => r + 1);
     setDaily(isDaily);
     setPhase("running");
   }, []);
+
+  // The Start buttons are real gestures, so they unlock audio; the ?event= auto-start below
+  // is not and must not (a context created without a gesture stays suspended).
+  const startFromTap = useCallback(
+    (s: number, isDaily: boolean, forceEvent?: string) => {
+      unlockAudio();
+      start(s, isDaily, forceEvent);
+    },
+    [start],
+  );
 
   // Showcase/debug: ?event=<id> auto-starts a run with that single event forced.
   // The start is deferred to a timer (not run synchronously in the effect body, to
@@ -646,13 +667,14 @@ export function GameShell() {
       {phase === "start" ? (
         <div className="max-w-3xl">
           <div ref={panelRef} className="pg2-panel relative overflow-hidden">
-            <StartScreen urlSeed={urlSeed} forceEvent={urlEvent} onStart={start} />
+            <StartScreen urlSeed={urlSeed} forceEvent={urlEvent} onStart={startFromTap} />
           </div>
         </div>
       ) : g ? (
         <RunningView
           g={g}
           seed={seed}
+          runId={runId}
           daily={daily}
           soundOn={soundOn}
           moods={moods}
@@ -828,6 +850,7 @@ function StartScreen({
 function RunningView({
   g,
   seed,
+  runId,
   daily,
   soundOn,
   moods,
@@ -859,6 +882,7 @@ function RunningView({
   onExit: () => void;
   g: GameState;
   seed: number;
+  runId: number;
   daily: boolean;
   soundOn: boolean;
   moods: Record<string, string>;
@@ -1054,6 +1078,7 @@ function RunningView({
             Your password must satisfy
           </p>
           <RuleList
+            key={runId}
             rules={g.rules}
             password={password}
             state={g}
