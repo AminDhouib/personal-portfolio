@@ -58,14 +58,14 @@ describe("TodayStrip", () => {
     vi.restoreAllMocks();
   });
 
-  it("server-renders four placeholder tiles and a static reset line", () => {
+  it("server-renders five placeholder tiles and a static reset line", () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     const html = renderToString(<TodayStrip />);
-    expect(html.match(/data-state="idle"/g)).toHaveLength(4);
+    expect(html.match(/data-state="idle"/g)).toHaveLength(5);
     expect(html).toContain('data-state="loading"');
     expect(html).toContain("Resets at 00:00 UTC");
     expect(html).not.toContain("Resets in");
-    expect(html.split("\u2014").length - 1).toBe(12);
+    expect(html.split("\u2014").length - 1).toBe(15);
     for (const source of TODAY_SOURCES) {
       expect(html).toContain(`href="/games/${source.slug}"`);
     }
@@ -110,16 +110,17 @@ describe("TodayStrip", () => {
     expect(voltorb).toHaveTextContent("384");
   });
 
-  it("asks for the four public daily boards, from four URLs and never sends a player id", async () => {
+  it("asks for the five public daily boards, from five URLs and never sends a player id", async () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     render(<TodayStrip />);
     await settled();
-    expect(fn).toHaveBeenCalledTimes(4);
+    expect(fn).toHaveBeenCalledTimes(5);
     const urls = fn.mock.calls.map((call) => String(call[0])).sort();
     expect(urls).toEqual([
       "/api/arcade/scores?game=hextris&board=daily",
       "/api/arcade/scores?game=space-shooter&board=daily",
       "/api/arcade/scores?game=super-voltorb-flip&board=daily",
+      "/api/arcade/scores?game=tower-stacker&board=daily",
       "/api/password-game-2/leaderboard?daily=1",
     ]);
     for (const url of urls) expect(url).not.toContain("player");
@@ -202,7 +203,7 @@ describe("TodayStrip", () => {
     const { container } = render(<TodayStrip />);
     // Every tile body has the fixed-height class in every state (the real measurement is in
     // e2e/games-hub.spec.ts).
-    expect(container.querySelectorAll("[data-tile-body]")).toHaveLength(4);
+    expect(container.querySelectorAll("[data-tile-body]")).toHaveLength(5);
     for (const body of container.querySelectorAll("[data-tile-body]")) {
       expect(body.className).toContain("h-18");
     }
@@ -210,5 +211,14 @@ describe("TodayStrip", () => {
     for (const body of container.querySelectorAll("[data-tile-body]")) {
       expect(body.className).toContain("h-18");
     }
+  });
+
+  it("lets a lone last tile span the row at md and sits five across from xl", () => {
+    const html = renderToString(<TodayStrip />)
+      .replaceAll("&amp;", "&")
+      .replaceAll("&gt;", ">");
+    expect(html).toContain("md:[&>*:last-child:nth-child(odd)]:col-span-2");
+    expect(html).toContain("xl:grid-cols-5");
+    expect(html).toContain("xl:[&>*:last-child:nth-child(odd)]:col-span-1");
   });
 });

@@ -7,7 +7,7 @@ import { isRecord } from "./guards";
  * The visitor's own bests, read from this browser and shown as a display-only glance.
  * Everything here is forgeable by design (anyone can edit their own localStorage), so none
  * of it is ever sent anywhere, written, or used for a decision. The hub reads exactly these
- * five keys: never Password Game 2 storage, never `walletCoins`, never `arcade:player:v1`.
+ * six keys: never Password Game 2 storage, never `walletCoins`, never `arcade:player:v1`.
  * hub-stats.test.ts pins the allowlist.
  */
 export const HUB_STAT_KEYS = [
@@ -16,6 +16,7 @@ export const HUB_STAT_KEYS = [
   "hextris_highscores",
   "svf:progress",
   "typing-high-score",
+  "tower:stats",
 ] as const;
 
 type HubStatKey = (typeof HUB_STAT_KEYS)[number];
@@ -30,6 +31,8 @@ export interface DeviceStatsData {
   hextrisBest: number | null;
   voltorb: { level: number; coins: number } | null;
   typingBest: number | null;
+  towerDaily: number | null;
+  towerFree: number | null;
 }
 
 /** One chip of the "On this device" strip. `value` null means "nothing yet". */
@@ -120,7 +123,25 @@ export function parseVoltorbProgress(text: string | null): { level: number; coin
   };
 }
 
+/**
+ * Tower Stacker's best daily score and best free score from `tower:stats` (a versioned
+ * record, v 1). Read-only and forgiving: a foreign version or a bad field is just none.
+ * Mirrors tower-stacker/stats.ts without importing it (that module writes).
+ */
+export function parseTowerStats(
+  text: string | null,
+): { daily: number | null; free: number | null } | null {
+  const parsed = parseJson(text, "hub:tower");
+  if (!isRecord(parsed) || parsed.v !== 1) return null;
+  const free = isCount(parsed.bestFree) && parsed.bestFree > 0 ? parsed.bestFree : null;
+  const best = parsed.bestDaily;
+  const dailyScore = isRecord(best) ? best.score : null;
+  const daily = isCount(dailyScore) && dailyScore > 0 ? dailyScore : null;
+  return daily === null && free === null ? null : { daily, free };
+}
+
 export function buildDeviceStats(stored: RawStats): DeviceStatsData {
+  const tower = parseTowerStats(stored["tower:stats"]);
   const profile = parseOrbitalProfile(stored["orbital-dodge-profile"]);
   return {
     orbitalBest: parseScoreString(stored["space-shooter-hs"]),
@@ -129,6 +150,8 @@ export function buildDeviceStats(stored: RawStats): DeviceStatsData {
     hextrisBest: parseHextrisBest(stored.hextris_highscores),
     voltorb: parseVoltorbProgress(stored["svf:progress"]),
     typingBest: parseScoreString(stored["typing-high-score"]),
+    towerDaily: tower?.daily ?? null,
+    towerFree: tower?.free ?? null,
   };
 }
 
@@ -138,7 +161,9 @@ export function hasAnyStats(stats: DeviceStatsData): boolean {
     stats.orbitalRuns !== null ||
     stats.hextrisBest !== null ||
     stats.voltorb !== null ||
-    stats.typingBest !== null
+    stats.typingBest !== null ||
+    stats.towerDaily !== null ||
+    stats.towerFree !== null
   );
 }
 
@@ -154,7 +179,7 @@ function chip(slug: GameSlug, label: string, value: string | null, detail = ""):
   return { slug, title: GAMES_BY_SLUG[slug].title, label, value, detail };
 }
 
-/** The four chips, in display order. `null` stats (server, or not read yet) gives placeholders. */
+/** The five chips, in display order. `null` stats (server, or not read yet) gives placeholders. */
 export function statChips(stats: DeviceStatsData | null): StatChip[] {
   const runs = stats?.orbitalRuns ?? null;
   const orbitalDetail =
@@ -162,6 +187,17 @@ export function statChips(stats: DeviceStatsData | null): StatChip[] {
       ? ""
       : `${formatCount(runs)} ${runs === 1 ? "run" : "runs"}, ${stats?.orbitalAchievements ?? 0}/${ACHIEVEMENT_TOTAL} achievements`;
   const voltorb = stats?.voltorb ?? null;
+  const towerDaily = stats?.towerDaily ?? null;
+  const towerFree = stats?.towerFree ?? null;
+  const towerBest = Math.max(towerDaily ?? 0, towerFree ?? 0);
+  const towerDetail = [
+    towerDaily === null ? null : `Daily ${formatCount(towerDaily)}`,
+    towerFree === null
+      ? null
+      : `${towerDaily === null ? "Free" : "free"} ${formatCount(towerFree)}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
   return [
     chip("space-shooter", BEST_LABEL, bestValue(stats?.orbitalBest ?? null), orbitalDetail),
     chip("hextris", BEST_LABEL, bestValue(stats?.hextrisBest ?? null)),
@@ -174,6 +210,7 @@ export function statChips(stats: DeviceStatsData | null): StatChip[] {
         : `${formatCount(voltorb.coins)} ${voltorb.coins === 1 ? "coin" : "coins"}`,
     ),
     chip("typing-speed", BEST_LABEL, bestValue(stats?.typingBest ?? null)),
+    chip("tower-stacker", BEST_LABEL, towerBest > 0 ? formatCount(towerBest) : null, towerDetail),
   ];
 }
 
@@ -192,6 +229,7 @@ function readRawStats(): RawStats {
     hextris_highscores: read("hextris_highscores"),
     "svf:progress": read("svf:progress"),
     "typing-high-score": read("typing-high-score"),
+    "tower:stats": read("tower:stats"),
   };
 }
 

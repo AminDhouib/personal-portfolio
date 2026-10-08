@@ -37,24 +37,30 @@ describe("DeviceStats", () => {
     vi.restoreAllMocks();
   });
 
-  it("server-renders four placeholder chips and touches no storage", () => {
+  it("server-renders five placeholder chips and touches no storage", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem");
     const html = renderToString(<DeviceStats />);
     expect(html).toContain('data-state="pending"');
-    expect(html.match(/data-testid="stat-chip"/g)).toHaveLength(4);
-    expect(html.match(/None yet/g)).toHaveLength(4);
+    expect(html.match(/data-testid="stat-chip"/g)).toHaveLength(5);
+    expect(html.match(/None yet/g)).toHaveLength(5);
     expect(html).toContain(PRIVACY);
-    for (const slug of ["space-shooter", "hextris", "super-voltorb-flip", "typing-speed"]) {
+    for (const slug of [
+      "space-shooter",
+      "hextris",
+      "super-voltorb-flip",
+      "typing-speed",
+      "tower-stacker",
+    ]) {
       expect(html).toContain(`href="/games/${slug}"`);
     }
     expect(getItem).not.toHaveBeenCalled();
   });
 
-  it("shows the empty copy and four placeholders on a fresh device", () => {
+  it("shows the empty copy and five placeholders on a fresh device", () => {
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     expect(screen.getByTestId("hub-device-caption")).toHaveTextContent(EMPTY_COPY);
-    expect(chips()).toHaveLength(4);
+    expect(chips()).toHaveLength(5);
     for (const item of chips()) expect(item).toHaveTextContent("None yet");
   });
 
@@ -142,7 +148,16 @@ describe("DeviceStats", () => {
     expect(clear).not.toHaveBeenCalled();
   });
 
-  it("is an h2 followed by four game links of at least 44px, in order", () => {
+  it("keeps five chips without a lone one: spans on two columns, five across from lg", () => {
+    const html = renderToString(<DeviceStats />)
+      .replaceAll("&amp;", "&")
+      .replaceAll("&gt;", ">");
+    expect(html).toContain("[&>*:last-child:nth-child(odd)]:col-span-2");
+    expect(html).toContain("sm:[&>*:last-child:nth-child(odd)]:col-span-1");
+    expect(html).toContain("lg:grid-cols-5");
+  });
+
+  it("is an h2 followed by five game links of at least 44px, in order", () => {
     seed(SEEDED);
     render(<DeviceStats />);
     expect(screen.getByRole("heading", { level: 2, name: "On this device" })).toBeInTheDocument();
@@ -153,6 +168,7 @@ describe("DeviceStats", () => {
       "/games/hextris",
       "/games/super-voltorb-flip",
       "/games/typing-speed",
+      "/games/tower-stacker",
     ]);
     for (const link of links) {
       expect(link.className).toContain("min-h-11");

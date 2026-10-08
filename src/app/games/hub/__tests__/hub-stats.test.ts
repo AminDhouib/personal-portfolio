@@ -13,6 +13,7 @@ import {
   parseHextrisBest,
   parseOrbitalProfile,
   parseScoreString,
+  parseTowerStats,
   parseVoltorbProgress,
   readDeviceStatsSnapshot,
   statChips,
@@ -29,6 +30,7 @@ function raw(values: Partial<Record<Key, string>> = {}): RawStats {
     hextris_highscores: values.hextris_highscores ?? null,
     "svf:progress": values["svf:progress"] ?? null,
     "typing-high-score": values["typing-high-score"] ?? null,
+    "tower:stats": values["tower:stats"] ?? null,
   };
 }
 
@@ -39,6 +41,8 @@ const EMPTY = {
   hextrisBest: null,
   voltorb: null,
   typingBest: null,
+  towerDaily: null,
+  towerFree: null,
 };
 
 const SEEDED = raw({
@@ -57,13 +61,14 @@ function seed(values: Partial<Record<Key, string>>) {
 }
 
 describe("HUB_STAT_KEYS", () => {
-  it("is exactly the five keys the hub may read", () => {
+  it("is exactly the six keys the hub may read", () => {
     expect([...HUB_STAT_KEYS].sort()).toEqual(
       [
         "hextris_highscores",
         "orbital-dodge-profile",
         "space-shooter-hs",
         "svf:progress",
+        "tower:stats",
         "typing-high-score",
       ].sort(),
     );
@@ -229,6 +234,8 @@ describe("buildDeviceStats and hasAnyStats", () => {
       hextrisBest: 9100,
       voltorb: { level: 4, coins: 1200 },
       typingBest: 87,
+      towerDaily: null,
+      towerFree: null,
     });
     expect(hasAnyStats(stats)).toBe(true);
   });
@@ -253,13 +260,14 @@ describe("buildDeviceStats and hasAnyStats", () => {
 });
 
 describe("statChips", () => {
-  it("is four placeholder chips before the browser has been read", () => {
+  it("is five placeholder chips before the browser has been read", () => {
     const chips = statChips(null);
     expect(chips.map((chip) => chip.slug)).toEqual([
       "space-shooter",
       "hextris",
       "super-voltorb-flip",
       "typing-speed",
+      "tower-stacker",
     ]);
     for (const chip of chips) {
       expect(chip.value).toBeNull();
@@ -269,6 +277,7 @@ describe("statChips", () => {
       "Best on this device",
       "Best on this device",
       "Saved progress",
+      "Best on this device",
       "Best on this device",
     ]);
   });
@@ -301,6 +310,13 @@ describe("statChips", () => {
         title: "Typing Speed",
         label: "Best on this device",
         value: "87",
+        detail: "",
+      },
+      {
+        slug: "tower-stacker",
+        title: "Tower Stacker",
+        label: "Best on this device",
+        value: null,
         detail: "",
       },
     ]);
@@ -356,7 +372,7 @@ describe("readDeviceStatsSnapshot", () => {
     expect(second.orbitalBest).toBe(200);
   });
 
-  it("reads only the five hub keys and never writes", () => {
+  it("reads only the six hub keys and never writes", () => {
     seed({ "space-shooter-hs": "100" });
     localStorage.setItem("walletCoins", "999");
     localStorage.setItem("arcade:player:v1", "{}");
@@ -389,5 +405,43 @@ describe("subscribeToDeviceStats", () => {
     unsubscribe();
     window.dispatchEvent(new StorageEvent("storage", { key: "typing-high-score" }));
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("parseTowerStats", () => {
+  const stored = (over: Record<string, unknown>) => JSON.stringify({ v: 1, ...over });
+
+  it("reads the best daily score and the best free score", () => {
+    expect(
+      parseTowerStats(stored({ bestDaily: { day: "2026-10-15", score: 480 }, bestFree: 320 })),
+    ).toEqual({ daily: 480, free: 320 });
+  });
+
+  it("treats a zero or missing best as none, and nothing played as null", () => {
+    expect(parseTowerStats(stored({ bestDaily: null, bestFree: 0 }))).toBeNull();
+    expect(parseTowerStats(stored({ bestFree: 90 }))).toEqual({ daily: null, free: 90 });
+  });
+
+  it("rejects corrupt, foreign-version and out-of-range data", () => {
+    expect(parseTowerStats(null)).toBeNull();
+    expect(parseTowerStats("not json")).toBeNull();
+    expect(parseTowerStats("[]")).toBeNull();
+    expect(parseTowerStats(JSON.stringify({ v: 2, bestFree: 50 }))).toBeNull();
+    expect(parseTowerStats(stored({ bestFree: -5 }))).toBeNull();
+    expect(parseTowerStats(stored({ bestFree: 1.5 }))).toBeNull();
+    expect(parseTowerStats(stored({ bestFree: 99_999_999_999 }))).toBeNull();
+    expect(parseTowerStats(stored({ bestDaily: { score: "x" }, bestFree: 40 }))).toEqual({
+      daily: null,
+      free: 40,
+    });
+  });
+
+  it("feeds a chip with the better of the two and both in the detail", () => {
+    seed({
+      "tower:stats": stored({ bestDaily: { day: "2026-10-15", score: 480 }, bestFree: 320 }),
+    });
+    const chip = statChips(readDeviceStatsSnapshot()).find((c) => c.slug === "tower-stacker");
+    expect(chip?.value).toBe("480");
+    expect(chip?.detail).toBe("Daily 480, free 320");
   });
 });
