@@ -26,6 +26,7 @@ import type { TetrisData } from "../engine/events/tetris";
 import type { AutocorrectData } from "../engine/events/autocorrect";
 import { MISSILE_FALL_MS, type MissilesData } from "../engine/events/finale";
 import { hudSlots } from "./hud-slots";
+import { ART_SCALE, hitRadius } from "./art-scale";
 
 /** A rectangle in canvas-local CSS pixels. */
 export interface RectLike {
@@ -97,6 +98,25 @@ function withGlow(ctx: CanvasRenderingContext2D, color: string, blur: number, fn
   ctx.shadowBlur = blur;
   fn();
   ctx.restore();
+}
+
+/** The painter's ART_SCALE factor (1 for an id the table does not know). */
+function artScale(id: string): number {
+  return ART_SCALE[id] ?? 1;
+}
+
+/**
+ * Narrow `scale` so art reaching `extent` CSS px (at scale 1) from (cx, cy) stays on the
+ * stage card. Art anchored near an edge shrinks a little instead of drawing off the card.
+ */
+function fitScale(scale: number, cx: number, cy: number, extent: number, p: RectLike): number {
+  const room = Math.min(cx - p.x, p.x + p.w - cx, cy - p.y, p.y + p.h - cy);
+  return Math.max(0, Math.min(scale, room / extent));
+}
+
+/** Clamp v into [lo, hi] (lo wins when the range is empty). */
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
 }
 
 /** A rounded-rect path (no fill/stroke). */
@@ -260,14 +280,15 @@ const paintGerald: Painter = (ctx, inst, layout, _g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as GeraldData;
+  const S = artScale("gerald");
 
   if (inst.phase === "telegraph") {
     // Telegraph: bubbles rising in the box's bottom-left corner.
-    const bx = box.x + 26;
+    const bx = box.x + 26 * S;
     for (let i = 0; i < 5; i++) {
       const t = (tMs / 1400 + i * 0.37) % 1;
       const y = box.y + box.h - 8 - t * (box.h * 0.5);
-      bubble(ctx, bx + Math.sin(t * 6 + i) * 8, y, 2 + i * 0.6, (1 - t) * 0.8);
+      bubble(ctx, bx + Math.sin(t * 6 + i) * 8 * S, y, (2 + i * 0.6) * S, (1 - t) * 0.8);
     }
     return;
   }
@@ -296,10 +317,12 @@ const paintGerald: Painter = (ctx, inst, layout, _g, tMs) => {
   ctx.restore();
 
   const starved = d.hunger >= 100;
-  const swimW = box.w - 90;
-  const swX = box.x + 55 + (0.5 + 0.5 * Math.sin(tMs / 1600)) * Math.max(40, swimW);
+  // The fish reaches 27 px either side of its centre at scale 1; keep it in the water.
+  const margin = 30 * S;
+  const swimW = box.w - 2 * margin;
+  const swX = box.x + margin + (0.5 + 0.5 * Math.sin(tMs / 1600)) * Math.max(0, swimW);
   const swY = starved ? waterY + 12 : waterY + box.h * 0.28 + Math.sin(tMs / 700) * 6;
-  drawFish(ctx, swX, swY, 1, Math.cos(tMs / 1600) >= 0 ? 1 : -1, starved, d.murky);
+  drawFish(ctx, swX, swY, S, Math.cos(tMs / 1600) >= 0 ? 1 : -1, starved, d.murky);
 
   // Hunger gauge — always visible; loud (red, pulsing) once hunger reaches the
   // murky threshold, calm green below. The bar fills as Gerald starves; the
@@ -333,14 +356,15 @@ function drawFlame(
   h: number,
   t: number,
   hue: string,
+  w = 1, // width factor (ART_SCALE)
 ) {
   const flick = 1 + Math.sin(t) * 0.12;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.quadraticCurveTo(x - 9, y - h * 0.5, x - 3, y - h * 0.72 * flick);
-  ctx.quadraticCurveTo(x - 7, y - h * 0.55, x, y - h * flick);
-  ctx.quadraticCurveTo(x + 7, y - h * 0.55, x + 3, y - h * 0.72 * flick);
-  ctx.quadraticCurveTo(x + 9, y - h * 0.5, x, y);
+  ctx.quadraticCurveTo(x - 9 * w, y - h * 0.5, x - 3 * w, y - h * 0.72 * flick);
+  ctx.quadraticCurveTo(x - 7 * w, y - h * 0.55, x, y - h * flick);
+  ctx.quadraticCurveTo(x + 7 * w, y - h * 0.55, x + 3 * w, y - h * 0.72 * flick);
+  ctx.quadraticCurveTo(x + 9 * w, y - h * 0.5, x, y);
   ctx.closePath();
   ctx.fillStyle = hue;
   ctx.fill();
@@ -350,6 +374,7 @@ const paintCampfire: Painter = (ctx, inst, layout, _g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as CampfireData;
+  const S = artScale("campfire");
 
   if (inst.phase === "telegraph") {
     // Telegraph: drifting smoke wisps at the box bottom.
@@ -360,15 +385,15 @@ const paintCampfire: Painter = (ctx, inst, layout, _g, tMs) => {
       const t = (tMs / 2200 + i * 0.33) % 1;
       ctx.beginPath();
       const baseY = box.y + box.h - 6;
-      ctx.moveTo(sx + (i - 1) * 14, baseY);
+      ctx.moveTo(sx + (i - 1) * 14 * S, baseY);
       for (let s = 0; s <= 1; s += 0.2) {
         ctx.lineTo(
-          sx + (i - 1) * 14 + Math.sin(s * 7 + t * 6 + i) * 12 * s,
+          sx + (i - 1) * 14 * S + Math.sin(s * 7 + t * 6 + i) * 12 * S * s,
           baseY - s * box.h * 0.55 * (0.6 + t * 0.5),
         );
       }
       ctx.strokeStyle = `rgba(148,163,184,${(1 - t) * 0.35})`;
-      ctx.lineWidth = 3 + t * 5;
+      ctx.lineWidth = (3 + t * 5) * S;
       ctx.stroke();
     }
     ctx.restore();
@@ -384,28 +409,28 @@ const paintCampfire: Painter = (ctx, inst, layout, _g, tMs) => {
     ctx.save();
     ctx.translate(fx, fy);
     ctx.rotate(rot);
-    roundRect(ctx, -26, -5, 52, 10, 5);
+    roundRect(ctx, -26 * S, -5 * S, 52 * S, 10 * S, 5 * S);
     ctx.fill();
     ctx.restore();
   }
   ctx.restore();
 
   if (d.burning) {
-    const scale = 0.5 + (d.fuel / 100) * 0.9;
+    const scale = (0.5 + (d.fuel / 100) * 0.9) * S;
     withGlow(ctx, "#fb923c", 22, () => {
-      drawFlame(ctx, fx, fy - 2, 54 * scale, tMs / 120, "#f97316");
-      drawFlame(ctx, fx - 6, fy - 2, 38 * scale, tMs / 90 + 1, "#fbbf24");
-      drawFlame(ctx, fx + 6, fy - 2, 40 * scale, tMs / 100 + 2, "#f59e0b");
-      drawFlame(ctx, fx, fy - 2, 22 * scale, tMs / 70 + 3, "#fde68a");
+      drawFlame(ctx, fx, fy - 2, 54 * scale, tMs / 120, "#f97316", S);
+      drawFlame(ctx, fx - 6 * S, fy - 2, 38 * scale, tMs / 90 + 1, "#fbbf24", S);
+      drawFlame(ctx, fx + 6 * S, fy - 2, 40 * scale, tMs / 100 + 2, "#f59e0b", S);
+      drawFlame(ctx, fx, fy - 2, 22 * scale, tMs / 70 + 3, "#fde68a", S);
     });
     // embers rising
     for (let i = 0; i < 6; i++) {
       const t = (tMs / 1100 + i * 0.31) % 1;
       ctx.beginPath();
       ctx.arc(
-        fx + Math.sin(t * 8 + i) * 16,
+        fx + Math.sin(t * 8 + i) * 16 * S,
         fy - 10 - t * 70 * scale,
-        1.6 * (1 - t),
+        1.6 * S * (1 - t),
         0,
         Math.PI * 2,
       );
@@ -416,7 +441,7 @@ const paintCampfire: Painter = (ctx, inst, layout, _g, tMs) => {
     // Smoldering: low embers, no flame — the fire is dying.
     withGlow(ctx, "#7c2d12", 10, () => {
       ctx.beginPath();
-      ctx.ellipse(fx, fy - 2, 20, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(fx, fy - 2, 20 * S, 6 * S, 0, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(124,45,18,0.8)";
       ctx.fill();
     });
@@ -440,9 +465,10 @@ const paintCampfire: Painter = (ctx, inst, layout, _g, tMs) => {
 
 // --- garden -------------------------------------------------------------------
 
-function drawFlower(ctx: CanvasRenderingContext2D, x: number, y: number, t: number) {
+function drawFlower(ctx: CanvasRenderingContext2D, x: number, y: number, t: number, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(scale, scale);
   // stem
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -529,12 +555,13 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as GardenData;
+  const S = artScale("garden");
 
   if (inst.phase === "telegraph") {
     // Telegraph: vines creeping in from the box's left edge.
     ctx.save();
     ctx.strokeStyle = "rgba(22,163,74,0.75)";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * S;
     ctx.lineCap = "round";
     const grow = Math.min(1, inst.phaseElapsedMs / 6000);
     for (let i = 0; i < 3; i++) {
@@ -543,7 +570,7 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs) => {
       ctx.moveTo(box.x, baseY);
       const len = box.w * 0.4 * grow;
       for (let s = 0; s <= len; s += 10) {
-        ctx.lineTo(box.x + s, baseY + Math.sin(s / 20 + i + tMs / 900) * 8);
+        ctx.lineTo(box.x + s, baseY + Math.sin(s / 20 + i + tMs / 900) * 8 * S);
       }
       ctx.stroke();
     }
@@ -554,7 +581,7 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs) => {
   // Flowers along the box bottom (bloomed 0..3).
   const n = Math.max(0, Math.min(3, d.bloomed));
   for (let i = 0; i < n; i++) {
-    drawFlower(ctx, box.x + 40 + i * 46, box.y + box.h - 8, tMs / 700 + i);
+    drawFlower(ctx, box.x + (40 + i * 46) * S, box.y + box.h - 8, tMs / 700 + i, S);
   }
   // Honey meter — always visible; loud (red, pulsing) while the hive sits below
   // the rule threshold, calm amber above. During a raid the readout ticks toward
@@ -588,21 +615,23 @@ const paintGarden: Painter = (ctx, inst, layout, g, tMs) => {
     const bx = box.x + box.w * 0.5;
     const by = box.y + 30;
     const bearPulse = 0.3 + 0.15 * Math.sin(tMs / 300);
-    drawBear(ctx, bx, by, 0.8, bearPulse);
+    drawBear(ctx, bx, by, 0.8 * S, bearPulse);
     // The arc empties as the raid nears.
     const remain = Math.max(0, Math.min(1, (d.nextBearAtMs - g.elapsedMs) / GARDEN_TELEGRAPH_MS));
     ctx.save();
     ctx.strokeStyle = RED;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * S;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.arc(bx, by, 34, -Math.PI / 2, -Math.PI / 2 + remain * Math.PI * 2);
+    ctx.arc(bx, by, 34 * S, -Math.PI / 2, -Math.PI / 2 + remain * Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   } else if (d.bearState === "raiding") {
+    // The bear lumbers in from the box's left edge (its body reaches 40 px behind its centre).
+    const bs = 1.1 * S;
     const t = Math.min(1, inst.phaseElapsedMs / 800);
-    const bx = box.x - 40 + t * (box.w * 0.4 + 40);
-    drawBear(ctx, bx, box.y + box.h * 0.5 + Math.sin(tMs / 200) * 4, 1.1, 1);
+    const bx = box.x + 40 * bs + t * box.w * 0.4;
+    drawBear(ctx, bx, box.y + box.h * 0.5 + Math.sin(tMs / 200) * 4, bs, 1);
   }
 };
 
@@ -621,7 +650,8 @@ const paintInfection: Painter = (ctx, inst, layout, g, tMs) => {
       ctx.clip();
     }
     const cx = box.x + sweep * box.w;
-    const grad = ctx.createLinearGradient(cx - 60, 0, cx + 60, 0);
+    const band = 60 * artScale("infection");
+    const grad = ctx.createLinearGradient(cx - band, 0, cx + band, 0);
     grad.addColorStop(0, "rgba(34,197,94,0)");
     grad.addColorStop(0.5, "rgba(34,197,94,0.28)");
     grad.addColorStop(1, "rgba(34,197,94,0)");
@@ -632,6 +662,7 @@ const paintInfection: Painter = (ctx, inst, layout, g, tMs) => {
   }
 
   // Peak: pulsing spore glow over each infected/mutated cell, with drifting spores.
+  const S = artScale("infection");
   for (const cell of g.cells) {
     if (cell.status !== "infected" && cell.status !== "mutated") continue;
     const r = layout.cellRects.get(cell.id);
@@ -639,16 +670,22 @@ const paintInfection: Painter = (ctx, inst, layout, g, tMs) => {
     const cx = r.x + r.w / 2;
     const cy = r.y + r.h / 2;
     const pulse = 0.5 + 0.5 * Math.sin(tMs / 260 + cell.id);
-    withGlow(ctx, GREEN, 8 + pulse * 10, () => {
+    withGlow(ctx, GREEN, (8 + pulse * 10) * S, () => {
       ctx.beginPath();
-      ctx.arc(cx, cy, 3 + pulse * 2, 0, Math.PI * 2);
+      ctx.arc(cx, cy, (3 + pulse * 2) * S, 0, Math.PI * 2);
       ctx.fillStyle = cell.status === "mutated" ? "rgba(22,101,52,0.6)" : "rgba(34,197,94,0.5)";
       ctx.fill();
     });
     for (let i = 0; i < 3; i++) {
       const t = (tMs / 1300 + i * 0.33 + cell.id * 0.1) % 1;
       ctx.beginPath();
-      ctx.arc(cx + Math.sin(t * 7 + cell.id) * 10, cy - t * 18, 1.4 * (1 - t), 0, Math.PI * 2);
+      ctx.arc(
+        cx + Math.sin(t * 7 + cell.id) * 10 * S,
+        cy - t * 18 * S,
+        1.4 * S * (1 - t),
+        0,
+        Math.PI * 2,
+      );
       ctx.fillStyle = `rgba(74,222,128,${(1 - t) * 0.8})`;
       ctx.fill();
     }
@@ -663,44 +700,50 @@ const paintBlackHole: Painter = (ctx, inst, layout, g, tMs) => {
   if (!anchor) return;
   const cx = anchor.x + anchor.w / 2;
   const cy = anchor.y + anchor.h / 2;
+  const p = layout.panelRect;
 
   if (inst.phase === "telegraph") {
-    // Telegraph: space-distortion warp lines converging on the anchor.
+    // Telegraph: space-distortion warp lines converging on the anchor (86 px reach at 1x).
+    const S = fitScale(artScale("black-hole"), cx, cy, 86, p);
     ctx.save();
     ctx.strokeStyle = "rgba(167,139,250,0.55)";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.5 * S;
     for (let i = 0; i < 10; i++) {
       const ang = (i / 10) * Math.PI * 2 + tMs / 1400;
-      const r0 = 46 + ((tMs / 18 + i * 12) % 40);
+      const r0 = (46 + ((tMs / 18 + i * 12) % 40)) * S;
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
-      ctx.lineTo(cx + Math.cos(ang) * (r0 - 16), cy + Math.sin(ang) * (r0 - 16));
+      ctx.lineTo(cx + Math.cos(ang) * (r0 - 16 * S), cy + Math.sin(ang) * (r0 - 16 * S));
       ctx.stroke();
     }
     ctx.restore();
     return;
   }
 
+  // The swirl reaches the outermost captured glyph (34 px + 3 per capture, plus the glyph).
+  const S = fitScale(artScale("black-hole"), cx, cy, 44 + d.capturedIds.length * 3, p);
+
   // Peak: an accretion disk swirling into a dark core.
   ctx.save();
   ctx.translate(cx, cy);
-  withGlow(ctx, VIOLET, 26, () => {
+  withGlow(ctx, VIOLET, 26 * S, () => {
     for (let ring = 0; ring < 4; ring++) {
       ctx.beginPath();
       ctx.strokeStyle = `rgba(167,139,250,${0.5 - ring * 0.1})`;
-      ctx.lineWidth = 3 - ring * 0.5;
-      const rr = 14 + ring * 8;
+      ctx.lineWidth = (3 - ring * 0.5) * S;
+      const rr = (14 + ring * 8) * S;
       ctx.ellipse(0, 0, rr, rr * 0.5, tMs / 700 + ring, 0, Math.PI * 2);
       ctx.stroke();
     }
   });
   // dark core
-  const core = ctx.createRadialGradient(0, 0, 0, 0, 0, 16);
+  const coreR = 16 * S;
+  const core = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
   core.addColorStop(0, "#0b0714");
   core.addColorStop(0.7, "#1e1033");
   core.addColorStop(1, "rgba(30,16,51,0)");
   ctx.beginPath();
-  ctx.arc(0, 0, 16, 0, Math.PI * 2);
+  ctx.arc(0, 0, coreR, 0, Math.PI * 2);
   ctx.fillStyle = core;
   ctx.fill();
   ctx.restore();
@@ -710,9 +753,9 @@ const paintBlackHole: Painter = (ctx, inst, layout, g, tMs) => {
     const cell = g.cells.find((c) => c.id === id);
     const glyph = cell?.ch ?? "?";
     const ang = tMs / 500 + i * 1.3;
-    const rad = 34 + i * 3;
+    const rad = (34 + i * 3) * S;
     ctx.save();
-    ctx.font = "600 18px ui-monospace, monospace";
+    ctx.font = `600 ${Math.round(18 * S)}px ui-monospace, monospace`;
     ctx.fillStyle = "rgba(196,181,253,0.85)";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -720,18 +763,20 @@ const paintBlackHole: Painter = (ctx, inst, layout, g, tMs) => {
     ctx.restore();
   });
 
-  // The heavy-word label riding the swirl.
+  // The heavy-word label riding the swirl, kept on the card when the anchor is near an edge.
   ctx.save();
   ctx.font = "800 13px ui-sans-serif, system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const label = `COMPACTION — FEED IT: ${d.heavyWord}`;
   const lw = ctx.measureText(label).width + 16;
-  roundRect(ctx, cx - lw / 2, cy - 46, lw, 20, 6);
+  const lx = clamp(cx, p.x + lw / 2 + 4, p.x + p.w - lw / 2 - 4);
+  const ly = cy - 36 * S;
+  roundRect(ctx, lx - lw / 2, ly - 10, lw, 20, 6);
   ctx.fillStyle = "rgba(30,16,51,0.9)";
   ctx.fill();
   ctx.fillStyle = VIOLET;
-  ctx.fillText(label, cx, cy - 36);
+  ctx.fillText(label, lx, ly);
   ctx.restore();
 };
 
@@ -743,32 +788,40 @@ const paintParasite: Painter = (ctx, inst, layout, g, tMs, hits) => {
   // registered EVERY frame so a click always evicts, but the glyph only shows
   // inside the wiggle window — silent dramatic irony the rest of the time.
   const wiggling = inst.phase !== "telegraph" && inst.phaseElapsedMs % 6000 < 300;
+  const S = artScale("parasite");
   for (const id of d.parasiteIds) {
     const cell = g.cells.find((c) => c.id === id);
     if (!cell) continue;
     const r = layout.cellRects.get(id);
     if (!r) continue;
-    pushRect(hits, r.x - 2, r.y - 2, r.w + 4, r.h + 4, { kind: "parasite", id });
+    // The target is the cell plus 2 px a side, but never under 44 px across a narrow glyph.
+    const hw = Math.max(44, r.w + 4);
+    const hh = Math.max(44, r.h + 4);
+    pushRect(hits, r.x + r.w / 2 - hw / 2, r.y + r.h / 2 - hh / 2, hw, hh, {
+      kind: "parasite",
+      id,
+    });
     if (!wiggling) continue;
     // Reveal-window tell: a bright ring pulsing around the mimic, lighter than the
     // violet glyph glow so an attentive player can catch it against the force accent.
     const ringPulse = 0.5 + 0.5 * Math.sin(tMs / 110);
+    const pad = 3 * S;
     ctx.save();
-    ctx.lineWidth = 2;
-    withGlow(ctx, "#ddd6fe", 10, () => {
-      roundRect(ctx, r.x - 3, r.y - 3, r.w + 6, r.h + 6, 6);
+    ctx.lineWidth = 2 * S;
+    withGlow(ctx, "#ddd6fe", 10 * S, () => {
+      roundRect(ctx, r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, 6);
       ctx.strokeStyle = `rgba(221,214,254,${0.45 + 0.5 * ringPulse})`;
       ctx.stroke();
     });
     ctx.restore();
-    const wob = Math.sin(tMs / 40) * 3;
+    const wob = Math.sin(tMs / 40) * 3 * S;
     ctx.save();
     ctx.font = `600 ${Math.round(r.h * 0.8)}px ui-monospace, monospace`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    withGlow(ctx, VIOLET, 12, () => {
+    withGlow(ctx, VIOLET, 12 * S, () => {
       ctx.fillStyle = VIOLET;
-      ctx.fillText(cell.ch, r.x + r.w / 2 + wob, r.y + r.h / 2 + Math.cos(tMs / 40) * 2);
+      ctx.fillText(cell.ch, r.x + r.w / 2 + wob, r.y + r.h / 2 + Math.cos(tMs / 40) * 2 * S);
     });
     ctx.restore();
   }
@@ -778,6 +831,16 @@ const paintParasite: Painter = (ctx, inst, layout, g, tMs, hits) => {
 
 const COLS = 6;
 
+/** Formation column spacing: ART_SCALE-wide, narrowed so six columns fit the card. */
+function fleetSpacing(panel: RectLike): number {
+  return Math.min(46 * artScale("galaga"), (panel.w - 60) / COLS);
+}
+
+/** The fleet's scale: ART_SCALE, narrowed with the spacing so wings never overlap. */
+function fleetScale(panel: RectLike): number {
+  return Math.min(artScale("galaga"), fleetSpacing(panel) / 40);
+}
+
 function alienSlot(
   box: RectLike,
   panel: RectLike,
@@ -786,11 +849,12 @@ function alienSlot(
 ): { x: number; y: number } {
   const col = formationIndex % COLS;
   const row = Math.floor(formationIndex / COLS);
-  const spacing = Math.min(46, (panel.w - 60) / COLS);
-  const cx = box.x + box.w / 2 + (col - (COLS - 1) / 2) * spacing;
-  const targetY = 24 + row * 30;
-  // during assembly, slots slide down into place from above the panel
-  const y = targetY - (1 - assembled) * (120 + row * 20);
+  const s = fleetScale(panel);
+  const cx = box.x + box.w / 2 + (col - (COLS - 1) / 2) * fleetSpacing(panel);
+  const targetY = panel.y + (24 + row * 30) * s;
+  // during assembly, slots drop into place from the top edge of the card
+  const top = panel.y + 12 * s;
+  const y = top + assembled * (targetY - top);
   return { x: cx, y };
 }
 
@@ -800,9 +864,11 @@ function drawAlien(
   y: number,
   t: number,
   carrying: boolean,
+  scale: number,
 ) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(scale, scale);
   const wing = Math.sin(t) * 3;
   withGlow(ctx, RED, carrying ? 16 : 8, () => {
     ctx.fillStyle = carrying ? "#fca5a5" : RED;
@@ -836,6 +902,10 @@ const paintGalaga: Painter = (ctx, inst, layout, g, tMs, hits) => {
   const panel = layout.panelRect;
   if (!box) return;
   const d = inst.data as GalagaData;
+  const s = fleetScale(panel);
+  // A wingtip reaches 19 px from the body's centre; keep the whole ship on the card.
+  const minX = panel.x + 20 * s;
+  const maxX = panel.x + panel.w - 20 * s;
 
   // Assembly progress: telegraph slides the fleet in row by row.
   const assembled = inst.phase === "telegraph" ? Math.min(1, inst.phaseElapsedMs / 9000) : 1;
@@ -851,7 +921,7 @@ const paintGalaga: Painter = (ctx, inst, layout, g, tMs, hits) => {
       // box exactly when the engine grabs the glyph.
       const t = Math.min(1, (g.elapsedMs - a.diveStartedAtMs) / 2000);
       y = slot.y + t * (box.y + box.h * 0.6 - slot.y);
-      x = slot.x + Math.sin(t * 6) * 40;
+      x = clamp(slot.x + Math.sin(t * 6) * 40 * s, minX, maxX);
     } else if (a.state === "carrying") {
       // rising back to formation with a stolen glyph
       const t =
@@ -862,17 +932,17 @@ const paintGalaga: Painter = (ctx, inst, layout, g, tMs, hits) => {
         a.carriedCellId !== null ? g.cells.find((c) => c.id === a.carriedCellId) : undefined;
       if (cell) {
         ctx.save();
-        ctx.font = "600 16px ui-monospace, monospace";
+        ctx.font = `600 ${Math.round(16 * s)}px ui-monospace, monospace`;
         ctx.fillStyle = "#fecaca";
         ctx.textAlign = "center";
-        ctx.fillText(cell.ch, x, y + 20);
+        ctx.fillText(cell.ch, x, y + 20 * s);
         ctx.restore();
       }
     }
 
-    drawAlien(ctx, x, y, tMs / 140 + a.formationIndex, a.state === "carrying");
+    drawAlien(ctx, x, y, tMs / 140 + a.formationIndex, a.state === "carrying", s);
     if (a.state === "formation" || a.state === "diving") {
-      pushCircle(hits, x, y, 16, { kind: "alien", id: a.id });
+      pushCircle(hits, x, y, hitRadius(16, s), { kind: "alien", id: a.id });
     }
   }
 };
@@ -886,15 +956,16 @@ const paintSnake: Painter = (ctx, inst, layout, g, tMs) => {
 
   if (inst.phase === "telegraph") {
     // Telegraph: grass rustling along the box's bottom edge.
+    const S = artScale("snake");
     ctx.save();
     ctx.strokeStyle = "rgba(248,113,113,0.6)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * S;
     ctx.lineCap = "round";
     for (let x = box.x + 12; x < box.x + box.w - 12; x += 12) {
-      const sway = Math.sin(x / 18 + tMs / 300) * 5;
+      const sway = Math.sin(x / 18 + tMs / 300) * 5 * S;
       ctx.beginPath();
       ctx.moveTo(x, box.y + box.h - 4);
-      ctx.lineTo(x + sway, box.y + box.h - 16);
+      ctx.lineTo(x + sway, box.y + box.h - 16 * S);
       ctx.stroke();
     }
     ctx.restore();
@@ -902,17 +973,20 @@ const paintSnake: Painter = (ctx, inst, layout, g, tMs) => {
   }
 
   // Peak: a slithering snake whose body lumps grow with each swallowed letter.
+  const S = artScale("snake");
   const segs = 6 + d.swallowedIds.length;
   const midY = box.y + box.h * 0.68;
-  const headX = box.x + 40 + (0.5 + 0.5 * Math.sin(tMs / 1400)) * (box.w - 80);
+  const reach = 40 * S; // head plus tongue, kept off the box's sides
+  const headX = box.x + reach + (0.5 + 0.5 * Math.sin(tMs / 1400)) * (box.w - reach * 2);
   const dir = Math.cos(tMs / 1400) >= 0 ? -1 : 1; // body trails behind the head
   ctx.save();
   ctx.lineCap = "round";
   for (let i = segs - 1; i >= 0; i--) {
-    const x = headX + dir * i * 15;
-    const y = midY + Math.sin(i * 0.6 + tMs / 300) * 8;
+    // A long, well-fed body bunches up against the box's edge rather than leave it.
+    const x = clamp(headX + dir * i * 15 * S, box.x + 12 * S, box.x + box.w - 12 * S);
+    const y = midY + Math.sin(i * 0.6 + tMs / 300) * 8 * S;
     const swollen = i > 0 && i <= d.swallowedIds.length;
-    const rad = swollen ? 11 : 8;
+    const rad = (swollen ? 11 : 8) * S;
     withGlow(ctx, RED, i === 0 ? 12 : 4, () => {
       ctx.beginPath();
       ctx.arc(x, y, rad, 0, Math.PI * 2);
@@ -923,7 +997,7 @@ const paintSnake: Painter = (ctx, inst, layout, g, tMs) => {
       const cell = g.cells.find((c) => c.id === d.swallowedIds[i - 1]);
       if (cell) {
         ctx.fillStyle = "rgba(11,18,32,0.65)";
-        ctx.font = "600 11px ui-monospace, monospace";
+        ctx.font = `600 ${Math.round(11 * S)}px ui-monospace, monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(cell.ch, x, y);
@@ -933,33 +1007,35 @@ const paintSnake: Painter = (ctx, inst, layout, g, tMs) => {
       // eyes + flicking tongue
       ctx.fillStyle = "#0b1220";
       ctx.beginPath();
-      ctx.arc(x - dir * 3, y - 3, 1.6, 0, Math.PI * 2);
-      ctx.arc(x - dir * 3, y + 3, 1.6, 0, Math.PI * 2);
+      ctx.arc(x - dir * 3 * S, y - 3 * S, 1.6 * S, 0, Math.PI * 2);
+      ctx.arc(x - dir * 3 * S, y + 3 * S, 1.6 * S, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.4 * S;
       ctx.beginPath();
-      const tongue = 8 + Math.abs(Math.sin(tMs / 120)) * 6;
-      ctx.moveTo(x - dir * 10, y);
-      ctx.lineTo(x - dir * (10 + tongue), y);
+      const tongue = (8 + Math.abs(Math.sin(tMs / 120)) * 6) * S;
+      ctx.moveTo(x - dir * 10 * S, y);
+      ctx.lineTo(x - dir * (10 * S + tongue), y);
       ctx.stroke();
     }
   }
   ctx.restore();
 
   // The pellet it hunts (a glowing target glyph).
+  const pelletX = box.x + box.w - 30 * S;
+  const pelletY = box.y + box.h - 30 * S;
   ctx.save();
   withGlow(ctx, RED, 14, () => {
     ctx.beginPath();
-    ctx.arc(box.x + box.w - 30, box.y + box.h - 30, 10, 0, Math.PI * 2);
+    ctx.arc(pelletX, pelletY, 10 * S, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(248,113,113,0.25)";
     ctx.fill();
   });
   ctx.fillStyle = RED;
-  ctx.font = "700 15px ui-monospace, monospace";
+  ctx.font = `700 ${Math.round(15 * S)}px ui-monospace, monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(d.pelletChar, box.x + box.w - 30, box.y + box.h - 30);
+  ctx.fillText(d.pelletChar, pelletX, pelletY);
   ctx.restore();
 
   // The feed instruction, in the black-hole FEED IT: idiom.
@@ -1017,7 +1093,8 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
   const box = layout.boxRect;
   if (!box) return;
   const d = inst.data as TetrisData;
-  const s = 26;
+  const S = artScale("tetris");
+  const s = 26 * S;
 
   const colFor = (targetIndex: number) =>
     box.x + 24 + (((targetIndex % 22) + 0.5) / 22) * (box.w - 48);
@@ -1026,7 +1103,7 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
     // Telegraph: block shadows sliding across the strip above the box.
     for (let i = 0; i < 5; i++) {
       const x = box.x + 24 + ((tMs / 40 + i * 90) % (box.w - 48));
-      drawBlock(ctx, x, box.y - 22, s, "", true);
+      drawBlock(ctx, x, box.y - 22 * S, s, "", true);
     }
     return;
   }
@@ -1037,9 +1114,10 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
     // exactly when the engine wedges the garbage cell in.
     const t = Math.min(1, (g.elapsedMs - drop.startAtMs) / 2500);
     const x = colFor(drop.targetIndex);
-    const y = box.y - 24 + t * (box.h * 0.5 + 24);
+    const y = box.y - 24 * S + t * (box.h * 0.5 + 24 * S);
     drawBlock(ctx, x, box.y + box.h * 0.5, s, "", true); // landing-zone ghost
-    drawBlock(ctx, x, y, s, drop.char, false);
+    // A queued drop has not left yet; it used to be drawn far above the card, unseen.
+    if (t >= 0) drawBlock(ctx, x, y, s, drop.char, false);
   }
 
   // A one-time nudge above the first landed block, retired the moment the player
@@ -1054,7 +1132,8 @@ const paintTetris: Painter = (ctx, inst, layout, g, tMs) => {
       ctx.textBaseline = "middle";
       const label = "CLICK TO SHATTER";
       const lw = ctx.measureText(label).width + 14;
-      const lx = r.x + r.w / 2;
+      const p = layout.panelRect;
+      const lx = clamp(r.x + r.w / 2, p.x + lw / 2 + 4, p.x + p.w - lw / 2 - 4);
       const ly = r.y - 14;
       roundRect(ctx, lx - lw / 2, ly - 9, lw, 18, 5);
       ctx.fillStyle = "rgba(32,11,11,0.9)";
@@ -1079,13 +1158,16 @@ const paintChromeTelegraph: Painter = (ctx, inst, layout, g, tMs) => {
   ctx.fillStyle = AMBER;
   for (let y = 0; y < p.h; y += 4) ctx.fillRect(0, y, p.w, 1.5);
   ctx.globalAlpha = 0.5;
-  const scan = (tMs / 5) % (p.h + 40);
-  const grad = ctx.createLinearGradient(0, scan - 20, 0, scan + 20);
+  const half = 20 * artScale(inst.defId);
+  const scan = (tMs / 5) % p.h;
+  const grad = ctx.createLinearGradient(0, scan - half, 0, scan + half);
   grad.addColorStop(0, "rgba(251,191,36,0)");
   grad.addColorStop(0.5, "rgba(251,191,36,0.35)");
   grad.addColorStop(1, "rgba(251,191,36,0)");
   ctx.fillStyle = grad;
-  ctx.fillRect(0, scan - 20, p.w, 40);
+  // The band's rect is cut to the card; its soft edge still sweeps in and out.
+  const top = Math.max(0, scan - half);
+  ctx.fillRect(0, top, p.w, Math.min(p.h, scan + half) - top);
   ctx.restore();
 };
 
@@ -1105,13 +1187,15 @@ const paintAutocorrect: Painter = (ctx, inst, layout, g, tMs, hits) => {
   if (since < 0 || since >= AUTOCORRECT_FLASH_MS) return;
   const fade = 1 - since / AUTOCORRECT_FLASH_MS; // 1 -> 0 across the window
   const pulse = 0.5 + 0.5 * Math.sin(tMs / 90);
+  const S = artScale("autocorrect");
+  const pad = 2 * S;
   ctx.save();
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.5 * S;
   for (const id of d.lastRewriteCellIds) {
     const r = layout.cellRects.get(id);
     if (!r) continue;
     withGlow(ctx, AMBER, 12 * fade, () => {
-      roundRect(ctx, r.x - 2, r.y - 2, r.w + 4, r.h + 4, 5);
+      roundRect(ctx, r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, 5);
       ctx.strokeStyle = `rgba(251,191,36,${fade * (0.6 + 0.4 * pulse)})`;
       ctx.stroke();
     });
@@ -1139,11 +1223,16 @@ const paintFinaleMissiles: Painter = (ctx, _inst, layout, g, tMs, hits) => {
   const data = finale.data.missiles as MissilesData | undefined;
   if (!data) return;
 
+  const S = artScale("finale-missiles");
+  // Side margin: the widest piece (the landed ground flash) stays on the card.
+  const margin = 26 * S + 4;
+  const streak = 40 * S;
   for (const m of data.missiles) {
-    const x = 20 + m.x * (p.w - 40);
+    const x = margin + m.x * (p.w - margin * 2);
     if (m.state === "falling") {
       const t = Math.min(1, (finale.phaseElapsedMs - m.launchedAtMs) / MISSILE_FALL_MS);
-      const y = t * (p.h - 20);
+      // The streak trails the warhead, so the fall starts one streak below the top edge.
+      const y = streak + t * (p.h - 20 - streak);
       // A generous click target around the warhead so a falling missile is catchable.
       hits.push({
         shape: "circle",
@@ -1151,23 +1240,23 @@ const paintFinaleMissiles: Painter = (ctx, _inst, layout, g, tMs, hits) => {
         y,
         w: 0,
         h: 0,
-        r: 22,
+        r: hitRadius(22, S),
         target: { kind: "missile", id: m.id },
       });
       // streak
       ctx.save();
-      const grad = ctx.createLinearGradient(x, y - 40, x, y);
+      const grad = ctx.createLinearGradient(x, y - streak, x, y);
       grad.addColorStop(0, "rgba(248,113,113,0)");
       grad.addColorStop(1, "rgba(248,113,113,0.9)");
       ctx.strokeStyle = grad;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3 * S;
       ctx.beginPath();
-      ctx.moveTo(x, y - 40);
+      ctx.moveTo(x, y - streak);
       ctx.lineTo(x, y);
       ctx.stroke();
       withGlow(ctx, RED, 16, () => {
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 4 * S, 0, Math.PI * 2);
         ctx.fillStyle = "#fecaca";
         ctx.fill();
       });
@@ -1178,16 +1267,16 @@ const paintFinaleMissiles: Painter = (ctx, _inst, layout, g, tMs, hits) => {
       const y = (0.5 + m.x * 0.2) * (p.h - 20);
       withGlow(ctx, GREEN, 20, () => {
         ctx.beginPath();
-        ctx.arc(x, y, 6 + t * 22, 0, Math.PI * 2);
+        ctx.arc(x, y, (6 + t * 22) * S, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(74,222,128,${1 - t})`;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * S;
         ctx.stroke();
       });
     } else if (m.state === "landed") {
       // ground flash at the bottom
       withGlow(ctx, RED, 24, () => {
         ctx.beginPath();
-        ctx.ellipse(x, p.h - 10, 26, 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(x, p.h - 10 * S, 26 * S, 8 * S, 0, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(248,113,113,0.5)";
         ctx.fill();
       });
