@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { cameraTarget, stepCamera, type Camera } from "./camera";
 import { dropKey, isTextEntryTarget, shouldBlockScroll } from "./controls";
-import { freeSeed } from "./daily";
+import { utcDayKey } from "@/lib/arcade/boards";
+import { dailyTowerSeed, freeSeed } from "./daily";
 import { spawnDebris, stepDebris, type DebrisPiece } from "./debris";
 import {
   BASE_WIDTH,
@@ -20,6 +21,7 @@ import {
 import { createTowerAudio, readMuted, type TowerAudio } from "./audio";
 import { CornerTick, Hud, OverCard, type HudState } from "./hud";
 import { stageLayout, type StageLayout } from "./layout";
+import { ModeRow, type TowerMode } from "./mode-row";
 import { PULSE_MS, paintFrame } from "./painter";
 import { usePlaySheet } from "./play-sheet";
 import { CUES, perfectCue } from "./sound-cues";
@@ -99,6 +101,11 @@ export function Stage({ seedText }: { seedText?: string }) {
   const [mutedChoice, setMuted] = useState<boolean | null>(null);
   const muted = mutedChoice ?? storedMuted;
   const [showHint, setShowHint] = useState(() => !hintDismissed);
+  // A ?tower-seed= text preselects Free build; otherwise Today's tower is the default.
+  const [mode, setMode] = useState<TowerMode>(seedText ? "free" : "daily");
+  // The mode and UTC day the live run began with, taken at Start so a run that crosses
+  // midnight still knows which tower it was.
+  const [runInfo, setRunInfo] = useState<{ mode: TowerMode; dayKey: string } | null>(null);
   const [settled, setSettled] = useState(false);
 
   const runRef = useRef<TowerRun | null>(null);
@@ -218,8 +225,11 @@ export function Stage({ seedText }: { seedText?: string }) {
     if (!audioRef.current) audioRef.current = createTowerAudio();
     audioRef.current.unlock();
     setMuted(audioRef.current.isMuted());
-    const seed = seedText ? freeSeed(seedText) : randomSeed();
+    const dayKey = utcDayKey(new Date());
+    const seed =
+      mode === "daily" ? dailyTowerSeed(dayKey) : seedText ? freeSeed(seedText) : randomSeed();
     const run = newRun(seed, performance.now());
+    setRunInfo({ mode, dayKey });
     runRef.current = run;
     cameraRef.current = { x: 0, y: 0 };
     debrisRef.current = [];
@@ -235,7 +245,7 @@ export function Stage({ seedText }: { seedText?: string }) {
     timersRef.current.length = 0;
     setPhaseBoth("live");
     enterSheet();
-  }, [seedText, setPhaseBoth, enterSheet]);
+  }, [mode, seedText, setPhaseBoth, enterSheet]);
 
   const resume = useCallback(() => {
     const run = runRef.current;
@@ -382,6 +392,7 @@ export function Stage({ seedText }: { seedText?: string }) {
         }}
         data-testid="tower-stage"
         data-phase={phase}
+        data-mode={phase === "ready" ? mode : (runInfo?.mode ?? mode)}
         data-floors={hud.floors}
         data-score={hud.score}
         data-streak={hud.streak}
@@ -450,6 +461,7 @@ export function Stage({ seedText }: { seedText?: string }) {
                 Tap when the block is over the tower. Land it dead centre for a perfect.
               </p>
             )}
+            <ModeRow mode={mode} onChange={setMode} />
             <button
               ref={startRef}
               type="button"
