@@ -169,3 +169,56 @@ describe("rejecting image captcha", () => {
     expect(onWidgetText).toHaveBeenCalledWith("OK-BEEF");
   });
 });
+
+describe("captcha feedback", () => {
+  it("a selected tile is marked on and carries a check overlay", () => {
+    const { tile } = renderWidget();
+    expect(tile(0)!.className).not.toContain("pg2-captcha-on");
+    fireEvent.click(tile(0)!);
+    expect(tile(0)!.className).toContain("pg2-captcha-on");
+    expect(tile(0)!.querySelector(".pg2-captcha__check")).not.toBeNull();
+    fireEvent.click(tile(0)!);
+    expect(tile(0)!.className).not.toContain("pg2-captcha-on");
+    expect(tile(0)!.querySelector(".pg2-captcha__check")).toBeNull();
+  });
+
+  it("a wrong submission shakes the grid for one animation cycle and says so", () => {
+    const { container, verify, select } = renderWidget();
+    const grid = () => container.querySelector(".pg2-captcha__grid")!;
+    expect(grid().className).not.toContain("pg2-captcha-reject");
+    select([0, 1]);
+    fireEvent.click(verify());
+    expect(grid().className).toContain("pg2-captcha-reject");
+    const msg = container.querySelector(".pg2-captcha__msg")!;
+    expect(msg.getAttribute("role")).toBe("status");
+    for (const type of ["animationend", "webkitAnimationEnd"]) {
+      const ev = new Event(type, { bubbles: true });
+      Object.defineProperty(ev, "animationName", { value: "pg2-captcha-reject" });
+      fireEvent(grid(), ev);
+    }
+    expect(grid().className).not.toContain("pg2-captcha-reject");
+  });
+
+  it("the forced rejection shakes too, and the next grid starts clean", () => {
+    const { container, verify, select, stage } = renderWidget();
+    select(GRID1_TARGET);
+    fireEvent.click(verify());
+    expect(stage()).toBe("2");
+    expect(container.querySelector(".pg2-captcha__grid")!.className).toContain(
+      "pg2-captcha-reject",
+    );
+    expect(container.querySelectorAll(".pg2-captcha-on")).toHaveLength(0);
+  });
+
+  it("a correct submission on grid 2 shows the unchanged success path", () => {
+    const { container, verify, select } = renderWidget();
+    select(GRID1_TARGET);
+    fireEvent.click(verify());
+    select(GRID2_TARGET);
+    fireEvent.click(verify());
+    expect(container.querySelector(".pg2-captcha__done")!.textContent).toBe(
+      "Verification complete.",
+    );
+    expect(container.querySelector(".pg2-captcha__grid")).toBeNull();
+  });
+});
