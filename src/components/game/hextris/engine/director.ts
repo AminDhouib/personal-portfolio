@@ -35,7 +35,11 @@ export function comboWindowMs(level: number): number {
   return lerpByLevel(level, 2800, 1500);
 }
 
-/** Recomputes the level and reports a change of its whole part. */
+/**
+ * Recomputes the level and reports a change of its whole part. Spec section 11's "rounded
+ * level" is read as the floor: it is the number the HUD shows and the `level` the arcade
+ * submission carries, so the event never runs ahead of either.
+ */
 export function refreshLevel(state: RunState): void {
   const before = Math.floor(state.level);
   state.level = levelFor(state.cellsCleared, state.elapsedMs);

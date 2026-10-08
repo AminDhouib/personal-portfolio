@@ -215,6 +215,8 @@ describe("rush", () => {
     expect(dropOver(s, 100) / normal).toBeCloseTo(1, 2);
   });
 
+  // Decision (spec section 2.6 is silent): a pause ends the rush, and the player presses it
+  // again after resuming. The engine never hears a key lifted while paused.
   it("is released by a pause, so a key lifted while paused cannot stick it on", () => {
     const s = playing(42);
     setRush(s, true);

@@ -24,7 +24,7 @@ export function overflowSide(state: RunState, prefer = -1): number {
 }
 
 /** Ends the run if any stack is above the limit. Returns whether it did. */
-export function checkGameOver(state: RunState, prefer = -1): boolean {
+export function endIfOverflowing(state: RunState, prefer = -1): boolean {
   if (state.phase !== "playing") return state.phase === "over";
   const side = overflowSide(state, prefer);
   if (side < 0) return false;
@@ -56,6 +56,6 @@ export function tickBoundary(state: RunState): void {
     state.nextShrinkAtMs += SHRINK_EVERY_MS;
     state.boundaryWarned = false;
     emit(state, { type: "boundary-drop", limit: state.limitRows });
-    checkGameOver(state);
+    endIfOverflowing(state);
   }
 }
