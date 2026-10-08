@@ -33,7 +33,16 @@ const OFF = "border-[var(--border)] text-foreground/70 hover:border-accent-red/4
  * UTC day, the same for everyone); Free build is a random or `?tower-seed=` tower that
  * stays on this device. Selecting only chooses: Start begins the run.
  */
-export function ModeRow({ mode, onChange }: { mode: TowerMode; onChange: (m: TowerMode) => void }) {
+export function ModeRow({
+  mode,
+  seeded = false,
+  onChange,
+}: {
+  mode: TowerMode;
+  /** A `?tower-seed=` text picked the free tower, so it is fixed rather than random. */
+  seeded?: boolean;
+  onChange: (m: TowerMode) => void;
+}) {
   const dailyLine = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return (
     <div role="group" aria-label="Mode" className="flex w-full max-w-[19rem] gap-2">
@@ -46,7 +55,9 @@ export function ModeRow({ mode, onChange }: { mode: TowerMode; onChange: (m: Tow
         <span className="block text-xs font-bold tracking-[0.15em] uppercase">
           Today&apos;s tower
         </span>
-        <span className="text-foreground/60 mt-1 block text-[10px] leading-snug">{dailyLine}</span>
+        <span className="text-foreground/60 mt-1 block min-h-[2.5em] text-[10px] leading-tight">
+          {dailyLine}
+        </span>
       </button>
       <button
         type="button"
@@ -55,8 +66,8 @@ export function ModeRow({ mode, onChange }: { mode: TowerMode; onChange: (m: Tow
         className={`${BASE} ${mode === "free" ? ON : OFF}`}
       >
         <span className="block text-xs font-bold tracking-[0.15em] uppercase">Free build</span>
-        <span className="text-foreground/60 mt-1 block text-[10px] leading-snug">
-          Random, unranked
+        <span className="text-foreground/60 mt-1 block min-h-[2.5em] text-[10px] leading-tight">
+          {seeded ? "Fixed seed, unranked" : "Random, unranked"}
         </span>
       </button>
     </div>
