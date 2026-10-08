@@ -25,7 +25,7 @@ bonuses, boundary, sound and UI. Site-authored parts with no upstream counterpar
 the Web Audio sound synth (`hextris/sound-manager.ts`), the React shell and overlays, the
 tutorial, the leaderboard integration, immersive mode, bombs, the rainbow wildcard, the
 momentum and Panic Clear mechanics, the shrinking boundary, the clean sweep and chain
-bonuses, particles and `hextris/session.ts`.
+bonuses, particles, `hextris/session.ts` and the key router `hextris/input.ts`.
 
 ## Site modules the program imports
 
@@ -34,6 +34,7 @@ site modules that `hextris.tsx` imports:
 
 - `src/components/game/arcade-board-tabs.tsx`
 - `src/hooks/use-arcade-board.ts`
+- `src/components/game/text-entry.ts`
 - `src/lib/safe-json.ts`
 - `src/lib/safe-storage.ts`
 - `src/lib/report-game-error.ts`
