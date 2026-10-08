@@ -4,10 +4,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 import { safeLocalSet } from "@/lib/safe-storage";
-import { passageAt } from "./typing-speed/engine/text";
+import { configFor, parseMode, type ModeId } from "./typing-speed/engine/modes";
 import type { Op, TypingRun } from "./typing-speed/engine/types";
 import { isNewBest, liveWpm, runMetrics, streaks, type RunMetrics } from "./typing-speed/metrics";
+import { ModeBar } from "./typing-speed/mode-bar";
 import { ResultsCard } from "./typing-speed/results-card";
+import { loadStats, saveStats } from "./typing-speed/stats";
 import { TextView } from "./typing-speed/text-view";
 import { useTypingRun } from "./typing-speed/use-typing-run";
 
@@ -38,12 +40,10 @@ function readHighScore(): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function passageConfig(seed: number, n: number) {
-  return { kind: "text", text: passageAt(seed, n).text } as const;
-}
-
 export function TypingSpeedGame() {
-  const [seed] = useState(drawSeed);
+  const [initialStats] = useState(loadStats);
+  const [mode, setMode] = useState<ModeId>(initialStats.lastMode);
+  const [seed, setSeed] = useState(drawSeed);
   const [passageNo, setPassageNo] = useState(0);
   const [highScore, setHighScore] = useState(readHighScore);
   const [result, setResult] = useState<Result | null>(null);
@@ -99,19 +99,42 @@ export function TypingSpeedGame() {
     [highScore],
   );
 
-  const typing = useTypingRun(passageConfig(seed, 0), { inputRef, onFinish, onKey });
+  const typing = useTypingRun(configFor(mode, seed, passageNo), { inputRef, onFinish, onKey });
   const { run, reset, press } = typing;
 
-  const newRound = useCallback(
-    (n: number) => {
-      setPassageNo(n);
+  const timed = parseMode(mode) !== null;
+
+  const begin = useCallback(
+    (next: { mode: ModeId; seed: number; passageNo: number }) => {
+      setMode(next.mode);
+      setSeed(next.seed);
+      setPassageNo(next.passageNo);
       setResult(null);
       setBursts([]);
-      reset(passageConfig(seed, n));
-      // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
-      inputRef.current?.focus();
+      reset(configFor(next.mode, next.seed, next.passageNo));
     },
-    [seed, reset],
+    [reset],
+  );
+
+  // A timed run draws fresh words each time; a quote run replays the same passage.
+  const restart = useCallback(() => {
+    begin({ mode, seed: timed ? drawSeed() : seed, passageNo });
+    // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
+    inputRef.current?.focus();
+  }, [begin, mode, seed, passageNo, timed]);
+
+  const nextPassage = useCallback(() => {
+    begin({ mode, seed, passageNo: passageNo + 1 });
+    inputRef.current?.focus();
+  }, [begin, mode, seed, passageNo]);
+
+  const changeMode = useCallback(
+    (next: ModeId) => {
+      if (next === mode) return;
+      saveStats({ ...loadStats(), lastMode: next });
+      begin({ mode: next, seed: drawSeed(), passageNo: 0 });
+    },
+    [begin, mode],
   );
 
   // Any printable key starts the run, Enter focuses it, Escape restarts it.
@@ -121,9 +144,9 @@ export function TypingSpeedGame() {
       const inTextField = !!el?.closest("input, textarea, select, [contenteditable='true']");
       const inButton = !!el?.closest("button, a");
       if (e.key === "Escape") {
-        if (run.status === "running") {
+        if (run.status !== "ready") {
           e.preventDefault();
-          newRound(passageNo);
+          restart();
         }
         return;
       }
@@ -144,7 +167,7 @@ export function TypingSpeedGame() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [run, passageNo, newRound, press]);
+  }, [run, restart, press]);
 
   const metrics = runMetrics(run, typing.now);
   const { current: streak } = streaks(run);
@@ -155,10 +178,21 @@ export function TypingSpeedGame() {
   const typedChars =
     run.typed.slice(0, run.cursor).reduce((n, t) => n + t.length, 0) +
     (done ? 0 : (run.typed[run.cursor]?.length ?? 0));
-  const progress = done ? 100 : Math.min(100, (typedChars / Math.max(1, totalChars)) * 100);
+  const limit = run.config.kind === "time" ? run.config.seconds : null;
+  const timerText =
+    limit === null
+      ? (metrics.elapsedMs / 1000).toFixed(1)
+      : String(Math.max(0, Math.ceil(limit - metrics.elapsedMs / 1000)));
+  const progress = done
+    ? 100
+    : limit === null
+      ? Math.min(100, (typedChars / Math.max(1, totalChars)) * 100)
+      : Math.min(100, (metrics.elapsedMs / (limit * 1000)) * 100);
 
   return (
     <div className="space-y-5">
+      <ModeBar mode={mode} onChange={changeMode} />
+
       {/* Stats bar */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <motion.div
@@ -174,7 +208,7 @@ export function TypingSpeedGame() {
                 : "font-mono tabular-nums"
             }
           >
-            {(metrics.elapsedMs / 1000).toFixed(1)}s
+            <span data-testid="ts-timer">{timerText}</span>s
           </span>
         </motion.div>
         <div className="flex items-center gap-1.5 text-(--muted)">
@@ -278,6 +312,27 @@ export function TypingSpeedGame() {
         className="sr-only"
       />
 
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={restart}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+        >
+          <RotateCcw className="h-3 w-3" />
+          Restart
+        </button>
+        {playing && !timed && (
+          <button
+            type="button"
+            onClick={nextPassage}
+            className="inline-flex min-h-11 items-center gap-1.5 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Skip
+          </button>
+        )}
+      </div>
+
       {run.status === "ready" && (
         <div className="flex flex-wrap items-center gap-4">
           <button
@@ -297,21 +352,9 @@ export function TypingSpeedGame() {
           maxStreak={result.maxStreak}
           newBest={result.newBest}
           bulk={result.bulk}
-          onNext={() => newRound(passageNo + 1)}
-          onAgain={() => newRound(passageNo)}
+          onNext={timed ? null : nextPassage}
+          onAgain={restart}
         />
-      )}
-
-      {/* Skip button */}
-      {playing && (
-        <button
-          type="button"
-          onClick={() => newRound(passageNo + 1)}
-          className="inline-flex min-h-11 items-center gap-1.5 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
-        >
-          <RotateCcw className="h-3 w-3" />
-          Skip
-        </button>
       )}
     </div>
   );

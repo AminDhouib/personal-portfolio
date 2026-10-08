@@ -9,7 +9,8 @@ interface ResultsCardProps {
   newBest: boolean;
   /** The run took phone suggestions or autocorrect, so it can never count. */
   bulk: boolean;
-  onNext: () => void;
+  /** Null in timed modes, which have no next passage. */
+  onNext: (() => void) | null;
   onAgain: () => void;
 }
 
@@ -97,14 +98,16 @@ export function ResultsCard({
         </p>
       )}
       <div className="relative mt-4 flex flex-wrap justify-center gap-3">
-        <button
-          type="button"
-          onClick={onNext}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/15 px-5 py-2 font-sans text-sm font-semibold text-accent-green transition-colors hover:bg-accent-green/25"
-        >
-          <SkipForward className="h-3.5 w-3.5" />
-          Next passage
-        </button>
+        {onNext && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent-green/40 bg-accent-green/15 px-5 py-2 font-sans text-sm font-semibold text-accent-green transition-colors hover:bg-accent-green/25"
+          >
+            <SkipForward className="h-3.5 w-3.5" />
+            Next passage
+          </button>
+        )}
         <button
           type="button"
           onClick={onAgain}
