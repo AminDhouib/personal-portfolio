@@ -7,14 +7,15 @@ export const towerStackerContent: GameContent = {
   genre: ["Arcade", "Casual"],
   playMode: "SinglePlayer",
   intro:
-    "Tower Stacker is a free one-tap stacking game drawn like a blueprint. A crane swings a block above your tower, and you tap to let it fall. Any part that hangs over the edge is sliced off, so the next block is narrower. Land one almost dead centre and it keeps its full width. Miss the tower entirely and the run is over. The game was built for this site and runs on a canvas in your browser.",
+    "Tower Stacker is a free one-tap stacking game drawn like a blueprint. A crane swings a block above your tower, and you tap to let it fall. Any overhang is sliced off, so the next block is narrower, but a near-perfect landing keeps its full width. Miss the tower and the run is over. Each day has one shared tower, the same for everyone, and its scores are ranked. A free build is a random practice tower.",
   howToPlay: [
+    "Pick Today's tower, the shared daily one, or Free build for a random practice tower.",
     "Press Start to begin; the crane starts swinging at once.",
     "Watch the hanging block sweep left and right above the top floor.",
     "Tap, click, or press Space or Enter to drop it.",
     "Anything overhanging is trimmed away and falls off; the rest becomes the new top floor.",
     "Stack as many floors as you can before a block misses the tower completely.",
-    "Press Play again on the game-over card for a fresh tower.",
+    "On the game-over card, add a name and Submit a daily result to the board, or press Play again.",
   ],
   controls: [
     {
@@ -56,8 +57,16 @@ export const towerStackerContent: GameContent = {
       value: "One tap, click, Space or Enter",
     },
     {
-      label: "Progress",
-      value: "Not saved; every run starts fresh",
+      label: "Daily tower",
+      value: "One tower per UTC day, the same for everyone; it resets at 00:00 UTC",
+    },
+    {
+      label: "Leaderboard",
+      value: "Today's tower ranks daily, weekly and all time",
+    },
+    {
+      label: "Streak",
+      value: "Consecutive UTC days with a daily run, kept on this device",
     },
     {
       label: "Pausing",
@@ -73,27 +82,27 @@ export const towerStackerContent: GameContent = {
     {
       question: "Is Tower Stacker free to play?",
       answer:
-        "Yes. It runs in your browser with no download and no account, and nothing you do in it is sent anywhere.",
+        "Yes. It runs in your browser with no download and no account. Only a daily result you choose to submit is sent; free builds stay on your device.",
     },
     {
       question: "How does a run end in Tower Stacker?",
       answer:
-        "A run ends when a dropped block misses the tower so badly that almost nothing overlaps the floor below. There are no lives, so the first complete miss is the last.",
+        "A run ends when a dropped block misses the tower almost completely. There are no lives.",
     },
     {
       question: "What counts as a perfect drop?",
       answer:
-        "A drop that lands within a few pixels of dead centre keeps its whole width and extends your chain. Chained perfects score more each time, and every third one widens the tower again.",
+        "A drop within a few pixels of dead centre keeps its whole width and extends your chain. Chained perfects score more, and every third widens the tower again.",
     },
     {
       question: "Can I play Tower Stacker on my phone?",
       answer:
-        "Yes. Tap Start and the game opens full screen so the page cannot scroll under your thumb. Tap anywhere to drop, and use Exit to return to the page.",
+        "Yes. Tap Start and the game opens full screen. Tap anywhere to drop, and use Exit to return to the page.",
     },
     {
-      question: "Is this a copy of another stacking game?",
+      question: "Is there a daily challenge?",
       answer:
-        "No. The rules and code were written for this site, and an earlier embedded version was replaced by this one. Sound is synthesized in your browser.",
+        "Yes. Today's tower is the same for every player and changes at 00:00 UTC. Submit a result to rank on the daily, weekly and all-time boards. A run that crosses midnight cannot be submitted, because the board has moved on.",
     },
   ],
   credits: [
