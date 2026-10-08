@@ -66,6 +66,7 @@ import { PanelClose } from "./space-shooter/panel-close";
 import { CountUp } from "./space-shooter/count-up";
 import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/post-run";
 import { shareRun } from "./space-shooter/share";
+import { createCountdown } from "./space-shooter/countdown";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -307,6 +308,10 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   const [celebration, setCelebration] = useState<CelebrationKind>(null);
   // The best before this run, for the death card's score-vs-best bar.
   const [previousBest, setPreviousBest] = useState<number | null>(null);
+  // Fly Again's 3-2-1: the displayed step (null when not counting) and the
+  // timestamp state machine behind it.
+  const [countStep, setCountStep] = useState<number | null>(null);
+  const countdownRef = useRef(createCountdown());
   const [crashed, setCrashed] = useState(false);
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
   const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
@@ -663,6 +668,44 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
   }, [panelOpen]);
+  // Poll the countdown while it runs; one cue per step, then start the run.
+  const counting = countStep !== null;
+  useEffect(() => {
+    if (!counting) return;
+    const id = window.setInterval(() => {
+      const r = countdownRef.current.tick(performance.now());
+      if (r === "launch") {
+        setCountStep(null);
+        const g = gameRefs.current;
+        if (g.status === "armed") startRun(g);
+      } else if (r !== null) {
+        setCountStep((prev) => {
+          if (prev !== r) sounds.play("chime");
+          return r;
+        });
+      }
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [counting]);
+  // Opening a panel, leaving the armed screen (e.g. Play pressed) or pressing
+  // Escape cancels the countdown and leaves the armed screen as it was.
+  useEffect(() => {
+    if (!counting) return;
+    const cancel = () => {
+      countdownRef.current.cancel();
+      setCountStep(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancel();
+    };
+    window.addEventListener("keydown", onKey);
+    let id = 0;
+    if (panelOpen || ui.status !== "armed") id = window.setTimeout(cancel, 0);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(id);
+    };
+  }, [counting, panelOpen, ui.status]);
   // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
   const [devFps, setDevFps] = useState(60);
   useEffect(() => {
@@ -814,6 +857,16 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     setCelebration(null);
     setShowInstructions(true);
   }, []);
+
+  // "Fly again" button: reset, then count 3-2-1 and start the run on its own.
+  // Only this explicit tap starts the countdown; a paused run never resumes
+  // itself (DESIGN.md).
+  const flyAgain = useCallback(() => {
+    launch();
+    countdownRef.current.start(performance.now());
+    setCountStep(3);
+    sounds.play("chime");
+  }, [launch]);
 
   // (Game auto-starts because createRefs() initializes startedAt = now and
   // status = "playing"; no mount-effect needed, which keeps the
@@ -1471,6 +1524,23 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
               )}
             </AnimatePresence>
 
+            {countStep !== null && ui.status === "armed" && !panelOpen && (
+              <div
+                className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                role="status"
+                aria-live="assertive"
+              >
+                <motion.div
+                  key={countStep}
+                  initial={{ opacity: 0, scale: 1.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="font-display text-8xl font-black text-white tabular-nums drop-shadow-lg"
+                >
+                  {countStep}
+                </motion.div>
+              </div>
+            )}
             {ui.status === "playing" && <RunBanner startedAt={0} now={ui.seconds * 1000} />}
 
             {/* The run HUD shows only during a run, never behind a modal on the
@@ -2128,7 +2198,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={launch}
+                  onClick={flyAgain}
                   className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
                 >
                   <RotateCcw className="h-4 w-4" />
