@@ -756,9 +756,16 @@ export function GameShell() {
       </div>
 
       {/* Act title card overlay. */}
+      {/* Keyed by act so a queued card is a fresh element and its wipe plays from the start. */}
       {card ? (
         <div
-          className={sheet ? "pg2-titlecard pg2-titlecard--sheet" : "pg2-titlecard"}
+          key={titleCard ?? undefined}
+          data-act={titleCard ?? undefined}
+          className={
+            sheet
+              ? "pg2-titlecard pg2-titlecard-wipe pg2-titlecard--sheet"
+              : "pg2-titlecard pg2-titlecard-wipe"
+          }
           role="button"
           tabIndex={0}
           aria-label={`${card.kicker}: ${card.title}. Click to continue.`}
