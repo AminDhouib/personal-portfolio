@@ -7,6 +7,21 @@ import { SENTINEL as S } from "../engine/input";
 import { STATS_KEY, emptyStats } from "../stats";
 import { fakeVV, getInput, restoreViewport, stubViewportClass, typeInto } from "./phone-helpers";
 
+// Typing a whole 180-360 char passage through the game re-renders it per key and
+// overruns the default 5 s test timeout, so the typing tests play a short prefix of the
+// real day's text. The same-text test switches the cut off and checks the whole passage.
+const cut = vi.hoisted(() => ({ on: true }));
+vi.mock("../engine/daily", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../engine/daily")>();
+  return {
+    ...real,
+    dailyText: (day: string) => {
+      const full = real.dailyText(day);
+      return cut.on ? { ...full, text: full.text.slice(0, 40) } : full;
+    },
+  };
+});
+
 const DAY = "2026-10-08";
 const TEXT = dailyText(DAY).text;
 const L = TEXT.length;
@@ -39,6 +54,7 @@ function posts() {
 }
 
 beforeEach(() => {
+  cut.on = true;
   clock = 0;
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -69,11 +85,14 @@ afterEach(() => {
 
 describe("the Daily view", () => {
   it("shows today's text, the same for two sessions, and reads the board only then", async () => {
+    cut.on = false;
+    const full = dailyText(DAY).text;
+    expect(full.length).toBeGreaterThanOrEqual(180);
     const first = render(<TypingSpeedGame />);
     expect(fetchMock).not.toHaveBeenCalled(); // nothing is read on load
     openDaily();
     const text = screen.getByTestId("ts-target").querySelector("[data-ts-visual]")?.textContent;
-    expect(text).toBe(TEXT);
+    expect(text).toBe(full);
     await act(async () => {});
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("game=typing-speed");
@@ -82,7 +101,7 @@ describe("the Daily view", () => {
     render(<TypingSpeedGame />);
     openDaily();
     expect(screen.getByTestId("ts-target").querySelector("[data-ts-visual]")?.textContent).toBe(
-      TEXT,
+      full,
     );
   });
 
