@@ -162,6 +162,9 @@ function makeBus(): { ctx: FakeCtx; bus: AudioBus } {
 
 const EXPECTED_KEYS = [
   "telegraph-doom",
+  "telegraph-inhabitant",
+  "telegraph-force",
+  "telegraph-chrome",
   "inhabitant-arrive",
   "force-onset",
   "invasion-onset",
@@ -241,9 +244,9 @@ describe("playNoise", () => {
 });
 
 describe("MOTIFS registry", () => {
-  it("contains exactly the twenty named cues", () => {
+  it("contains exactly the twenty-three named cues", () => {
     expect(Object.keys(MOTIFS).sort()).toEqual([...EXPECTED_KEYS].sort());
-    expect(Object.keys(MOTIFS)).toHaveLength(20);
+    expect(Object.keys(MOTIFS)).toHaveLength(23);
   });
 
   it("every cue schedules at least one node without throwing", () => {
@@ -288,6 +291,29 @@ describe("core-play cues", () => {
     MOTIFS["rule-reveal"]!(reveal.bus);
     const [r0, r1] = reveal.ctx.oscillators[0]!.frequency.calls;
     expect(r1!.v).toBeGreaterThan(r0!.v);
+  });
+});
+
+describe("telegraph cues", () => {
+  const TELEGRAPH = [
+    "telegraph-doom",
+    "telegraph-inhabitant",
+    "telegraph-force",
+    "telegraph-chrome",
+  ];
+
+  it("each family winds up in its own voice and is over within 1.8 s", () => {
+    const voices = new Set<string>();
+    for (const name of TELEGRAPH) {
+      const { ctx, bus } = makeBus();
+      MOTIFS[name]!(bus);
+      expect(ctx.oscillators.length, name).toBeGreaterThan(0);
+      for (const o of ctx.oscillators) {
+        for (const stop of o.stops) expect(stop, name).toBeLessThanOrEqual(ctx.currentTime + 1.8);
+      }
+      voices.add(ctx.oscillators.map((o) => `${o.type}:${o.frequency.calls[0]!.v}`).join(","));
+    }
+    expect(voices.size).toBe(TELEGRAPH.length);
   });
 });
 

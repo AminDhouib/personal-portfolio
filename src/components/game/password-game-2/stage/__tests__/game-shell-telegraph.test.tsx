@@ -19,6 +19,13 @@ vi.mock("../../engine/engine", async (importOriginal) => {
   };
 });
 
+// Record every cue the shell asks for; the gates inside playCue are sound.test's business.
+const cues: string[] = [];
+vi.mock("../../sound/motifs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../sound/motifs")>();
+  return { ...actual, playCue: (name: string) => cues.push(name) };
+});
+
 import { GameShell } from "../game-shell";
 import { FAMILY_TINT } from "../telegraph";
 
@@ -51,6 +58,7 @@ function inject(inst: EventInstance) {
 describe("GameShell telegraph beat", () => {
   beforeEach(() => {
     live = null;
+    cues.length = 0;
     vi.useFakeTimers();
     vi.stubGlobal("requestAnimationFrame", () => 0);
     vi.stubGlobal("cancelAnimationFrame", () => {});
@@ -97,5 +105,20 @@ describe("GameShell telegraph beat", () => {
     expect(container.querySelector("[data-pg2-box]")!.contains(banner)).toBe(false);
     // The band reserves its height whether or not a banner is up, so nothing moves.
     expect((band as HTMLElement).style.height).toBe("48px");
+  });
+
+  it("plays the family's telegraph cue once when an event starts, not on every heartbeat", () => {
+    startRun();
+    inject(telegraphing("infection", "force"));
+    act(() => {
+      vi.advanceTimersByTime(1_000); // four more heartbeats
+    });
+    expect(cues.filter((c) => c.startsWith("telegraph-"))).toEqual(["telegraph-force"]);
+  });
+
+  it("leaves an invasion's cue to the engine, so its start is heard once", () => {
+    startRun();
+    inject(telegraphing("galaga", "invasion"));
+    expect(cues.filter((c) => c.startsWith("telegraph-"))).toEqual([]);
   });
 });
