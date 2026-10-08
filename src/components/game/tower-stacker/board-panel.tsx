@@ -67,8 +67,7 @@ export function BoardPanel({
   const [state, setState] = useState<SubmitState>("idle");
   const [rank, setRank] = useState<number | null>(null);
   const [shared, setShared] = useState<ShareOutcome | null>(null);
-  // False until the read for this card has started, so the first paint says Loading rather
-  // than claiming an empty board.
+  // False until the card's first read has settled, so no paint claims an empty board early.
   const [requested, setRequested] = useState(false);
   // The UTC day turned over while the card was open (seen at Submit time).
   const [lapsed, setLapsed] = useState(false);
@@ -78,8 +77,8 @@ export function BoardPanel({
 
   useEffect(() => {
     if (!daily) return;
-    void refresh();
-    setRequested(true);
+    // Marked once the first read has settled; until then the body says Loading.
+    void refresh().then(() => setRequested(true));
   }, [daily, refresh]);
 
   if (!daily) {
