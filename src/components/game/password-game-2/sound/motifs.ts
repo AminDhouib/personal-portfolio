@@ -69,6 +69,46 @@ function telegraphDoom(bus: AudioBus): void {
   osc.stop(t + 1.75);
 }
 
+// The other families wind up in their own voices (invasions keep the doom riser), so
+// a player who is not looking at the stage still hears what kind of thing is coming.
+
+// Inhabitant: three rising triangle notes, G4 B4 D5 -- a friendly knock at the door.
+function telegraphInhabitant(bus: AudioBus): void {
+  const { ctx } = bus;
+  const t = ctx.currentTime;
+  [392.0, 493.88, 587.33].forEach((freq, i) => {
+    toneAt(ctx, bus.sfx, { freq, at: t + i * 0.14, durMs: 160, peak: 0.12, type: "triangle" });
+  });
+}
+
+// Force: two low sines a beat apart, swelling and fading -- a pressure change.
+function telegraphForce(bus: AudioBus): void {
+  const { ctx } = bus;
+  const t = ctx.currentTime;
+  for (const freq of [110, 116.5]) {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.2, t + 0.7);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    osc.connect(gain);
+    gain.connect(bus.sfx);
+    osc.start(t);
+    osc.stop(t + 1.25);
+  }
+}
+
+// Chrome: three polite high blips -- a notification about to be very important.
+function telegraphChrome(bus: AudioBus): void {
+  const { ctx } = bus;
+  const t = ctx.currentTime;
+  for (let i = 0; i < 3; i++) {
+    toneAt(ctx, bus.sfx, { freq: 1174.66, at: t + i * 0.11, durMs: 60, peak: 0.09, attackMs: 3 });
+  }
+}
+
 // --- Family stingers --------------------------------------------------------
 
 // Warm major third: a friendly triangle dyad -- an inhabitant settling in.
@@ -366,6 +406,9 @@ function ruleFail(bus: AudioBus): void {
  */
 export const MOTIFS: Record<string, (bus: AudioBus) => void> = {
   "telegraph-doom": telegraphDoom,
+  "telegraph-inhabitant": telegraphInhabitant,
+  "telegraph-force": telegraphForce,
+  "telegraph-chrome": telegraphChrome,
   "inhabitant-arrive": inhabitantArrive,
   "force-onset": forceOnset,
   "invasion-onset": invasionOnset,

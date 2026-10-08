@@ -42,6 +42,7 @@ import { HudActions } from "./hud-actions";
 import { HUD_BOTTOM_H, HUD_TOP_H } from "./hud-slots";
 import { FAMILY_TINT, activeTelegraphs } from "./telegraph";
 import { TelegraphBanner } from "./telegraph-banner";
+import { useTelegraphCue } from "./use-telegraph-cue";
 import { useVisualViewport } from "./use-visual-viewport";
 import type { ViewportLayout } from "./viewport-layout";
 import "./pg2.css";
@@ -230,6 +231,9 @@ export function GameShell() {
     soundDebounceRef.current.set(key, t);
     playCue(key);
   }, []);
+
+  // Each event's telegraph is heard once, through the same gated, debounced path.
+  useTelegraphCue(game, playSound);
 
   // Core-play cues have their own channel: they must not be swallowed by the 150 ms
   // effect-flood debounce above. Only the key tick is rate limited.

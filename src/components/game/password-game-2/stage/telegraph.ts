@@ -68,3 +68,47 @@ export const FAMILY_TINT: Record<EventFamily, string> = {
   invasion: "#dc2626",
   chrome: "#d97706",
 };
+
+/** Each family's telegraph cue (a MOTIFS key). Invasions share the engine's doom riser. */
+const FAMILY_CUE: Record<EventFamily, string> = {
+  inhabitant: "telegraph-inhabitant",
+  force: "telegraph-force",
+  invasion: "telegraph-doom",
+  chrome: "telegraph-chrome",
+};
+
+const FAMILY_OF: ReadonlyMap<string, EventFamily> = new Map(
+  EVENT_DEFS.map((d) => [d.id, d.family]),
+);
+
+/** The cue an event's telegraph plays. */
+export function cueFor(defId: string): string {
+  const family = FAMILY_OF.get(defId);
+  return family ? FAMILY_CUE[family] : "telegraph-doom";
+}
+
+/**
+ * The events whose engine already emits a telegraph cue on the first telegraph tick. The
+ * stage stays quiet for these so the start of a telegraph is one cue, never two (the
+ * telegraph-cue test checks this list against the engine).
+ */
+export const ENGINE_EMITS_TELEGRAPH: ReadonlySet<string> = new Set(["galaga", "snake", "tetris"]);
+
+/**
+ * The cues to play for telegraphs that started since the last call: each instance is
+ * heard once (`seen` remembers it), the engine's own cues are left to the engine, and
+ * two events of one family starting together make one cue.
+ */
+export function takeTelegraphCues(
+  events: readonly EventInstance[],
+  seen: WeakSet<EventInstance>,
+): string[] {
+  const cues = new Set<string>();
+  for (const inst of events) {
+    if (inst.data === undefined || inst.phase !== "telegraph" || seen.has(inst)) continue;
+    seen.add(inst);
+    if (ENGINE_EMITS_TELEGRAPH.has(inst.defId)) continue;
+    cues.add(cueFor(inst.defId));
+  }
+  return [...cues];
+}
