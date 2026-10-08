@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { GameState } from "../engine/types";
 import { buildShareText, shareResult, type ShareOutcome } from "../stats/share";
+import { canShareFiles, renderShareCardBlob, shareCardImage } from "../stats/share-card";
 import { loadStats, streakAsOf } from "../stats/stats";
 
 /**
@@ -139,16 +140,27 @@ export function ReceiptCard({
 
   const share = async () => {
     // The streak is read at click time: the shell records the run in its own effect.
+    const streak = daily ? streakAsOf(loadStats(), dateStr) : 0;
     const text = buildShareText(
       {
         day: dateStr,
         ms: timeMs,
-        streak: daily ? streakAsOf(loadStats(), dateStr) : 0,
+        streak,
         daily,
         biggestCrisis: crisis.replace(/[^\x20-\x7e]/g, "'"),
       },
       `${location.origin}${location.pathname}`,
     );
+    // The PNG card only for the daily and only where files can be shared; any miss
+    // falls back to the text line.
+    if (daily && canShareFiles()) {
+      const blob = await renderShareCardBlob({ day: dateStr, ms: timeMs, streak });
+      const outcome = blob ? await shareCardImage(blob, text) : null;
+      if (outcome) {
+        setShareNote(outcome);
+        return;
+      }
+    }
     setShareNote(await shareResult(text));
   };
 

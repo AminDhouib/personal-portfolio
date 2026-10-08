@@ -765,7 +765,9 @@ The following Password Game 2 entries were verified against the current tree on 
 - **PG2's daily share is text first.** The receipt's Share button builds a spoiler-free, ASCII-only
   line (time, UTC day, a streak of two or more, the game URL; never the password, rule text or a
   seeded answer) and hands it to `navigator.share`, falling back to the clipboard; a dismissed
-  share sheet is a quiet no-op. A PNG share card is a separate, severable follow-up, not shipped.
+  share sheet is a quiet no-op. For the daily, where the browser can share files (`navigator.canShare({files})`), the same
+  button shares a 1200x630 PNG card drawn on a canvas (`stats/share-card.ts`, no dependency) with
+  the text line; any failure falls back to the text path.
 - **PG2's page names the game once, in a server-rendered h1 above the stage.** The h1, the intro
   and the credit ("An independent tribute to The Password Game by Neal Agarwal. Not affiliated
   with neal.fun.")
