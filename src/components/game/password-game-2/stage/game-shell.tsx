@@ -27,7 +27,7 @@ import { loadLiveFeeds } from "../feeds";
 import { cellsToPassword } from "../engine/cells";
 import { dailySeed } from "../engine/rng";
 import { EVENT_DEFS } from "../engine/events/index";
-import { getAudio, isEnabled, setEnabled } from "../sound/audio";
+import { isEnabled, setEnabled, unlockAudio } from "../sound/audio";
 import { playCue } from "../sound/motifs";
 import { CharStage } from "./char-stage";
 import { CanvasOverlay, type OverlayHandle } from "./canvas-overlay";
@@ -35,6 +35,7 @@ import { ChromeEvents } from "./chrome-events";
 import { FinaleStage } from "./finale-stage";
 import { ReceiptCard } from "./receipt-card";
 import { RuleList } from "./rule-list";
+import type { RuleFlips } from "./regression";
 import { Hud } from "./hud";
 import { HudActions } from "./hud-actions";
 import { HUD_BOTTOM_H, HUD_TOP_H } from "./hud-slots";
@@ -49,6 +50,9 @@ const EVENT_IDS: ReadonlySet<string> = new Set(EVENT_DEFS.map((d) => d.id));
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
 type Phase = "start" | "running";
+
+/** Minimum gap between two key ticks, so fast typing is a patter and not a buzz. */
+const KEY_TICK_GAP_MS = 30;
 
 interface Toast {
   id: number;
@@ -149,6 +153,8 @@ export function GameShell() {
   const shakeRef = useRef(0);
   const reducedRef = useRef(false);
   const soundDebounceRef = useRef<Map<string, number>>(new Map());
+  const lastTickRef = useRef(-Infinity);
+  const ruleCountRef = useRef(0);
   const toastIdRef = useRef(0);
   const moodTimersRef = useRef<Map<string, number>>(new Map());
   const toastTimersRef = useRef<Set<number>>(new Set());
@@ -214,6 +220,20 @@ export function GameShell() {
     if (t - last < 150) return; // survive effect floods emitting identical keys
     soundDebounceRef.current.set(key, t);
     playCue(key);
+  }, []);
+
+  // Core-play cues have their own channel: they must not be swallowed by the 150 ms
+  // effect-flood debounce above. Only the key tick is rate limited.
+  const playKeyTick = useCallback(() => {
+    const t = performance.now();
+    if (t - lastTickRef.current < KEY_TICK_GAP_MS) return;
+    lastTickRef.current = t;
+    playCue("key-tick");
+  }, []);
+
+  const onRuleFlips = useCallback((flips: RuleFlips) => {
+    if (flips.regressed.length > 0) playCue("rule-fail");
+    if (flips.recovered.length > 0) playCue("rule-pass");
   }, []);
 
   const triggerFlash = useCallback((ms: number) => {
@@ -375,7 +395,9 @@ export function GameShell() {
       const handled = [...k].length === 1 || named.includes(k);
       if (!handled) return;
       e.preventDefault();
+      unlockAudio(); // a keydown is a gesture too: covers a run started without a tap (?event=)
       applyKey(g, k);
+      playKeyTick();
       inputSeqRef.current += 1;
       forceRender();
     }
@@ -389,9 +411,11 @@ export function GameShell() {
       window.removeEventListener("keydown", onKeyDown);
       window.clearInterval(heartbeat);
     };
-  }, [phase, forceRender, playSound, pushToast, enqueueCard, setMood, triggerFlash]);
+  }, [phase, forceRender, playSound, playKeyTick, pushToast, enqueueCard, setMood, triggerFlash]);
 
   const start = useCallback((s: number, isDaily: boolean, forceEvent?: string) => {
+    unlockAudio(); // the Start tap is the gesture that lets the context run
+    ruleCountRef.current = 0;
     const g = createRun({ seed: s, daily: isDaily, nowHHMM, forceEvent });
     gameRef.current = g;
     renderedVersionRef.current = g.version;
@@ -416,7 +440,7 @@ export function GameShell() {
     setSoundOn((prev) => {
       const next = !prev;
       setEnabled(next);
-      if (next) getAudio(); // first-gesture AudioContext creation
+      if (next) unlockAudio(); // first-gesture AudioContext creation and resume
       return next;
     });
   }, []);
@@ -476,6 +500,7 @@ export function GameShell() {
     if (!panel) return;
     let consumed = false;
     const onPointerDown = (e: PointerEvent) => {
+      unlockAudio(); // fallback for a run that began without a tap (?event=)
       const overlay = overlayRef.current;
       const g = gameRef.current;
       if (!overlay || !g) return;
@@ -569,12 +594,15 @@ export function GameShell() {
     (e: FormEvent<HTMLInputElement>) => {
       const g = gameRef.current;
       const val = e.currentTarget.value;
-      if (g && val) for (const ch of val) applyKey(g, ch);
+      if (g && val) {
+        for (const ch of val) applyKey(g, ch);
+        playKeyTick();
+      }
       inputSeqRef.current += 1;
       e.currentTarget.value = "";
       forceRender();
     },
-    [forceRender],
+    [forceRender, playKeyTick],
   );
 
   const onSubmit = useCallback(() => {
@@ -583,6 +611,14 @@ export function GameShell() {
     requestSubmit(g);
     forceRender();
   }, [forceRender]);
+
+  // A new rule appearing in the list plays the reveal cue. Keyed on the rule count read at
+  // render (the engine reveals by growing g.rules), so it needs no hook into the tick loop.
+  const ruleCountForCue = game?.rules.length ?? 0;
+  useEffect(() => {
+    if (ruleCountForCue > ruleCountRef.current) playCue("rule-reveal");
+    ruleCountRef.current = ruleCountForCue;
+  }, [ruleCountForCue]);
 
   // --- render ---------------------------------------------------------------
 
@@ -636,6 +672,7 @@ export function GameShell() {
           onChip={applyChip}
           onWidgetText={onWidgetText}
           onRuleState={onRuleState}
+          onRuleFlips={onRuleFlips}
           onPlayAgain={playAgain}
           onPlayDaily={playDaily}
           sheet={sheet}
@@ -810,6 +847,7 @@ function RunningView({
   onChip,
   onWidgetText,
   onRuleState,
+  onRuleFlips,
   onPlayAgain,
   onPlayDaily,
   sheet,
@@ -840,6 +878,7 @@ function RunningView({
   onChip: (target: PointerTarget) => void;
   onWidgetText: (text: string) => void;
   onRuleState: (id: string, value: unknown) => void;
+  onRuleFlips: (flips: RuleFlips) => void;
   onPlayAgain: () => void;
   onPlayDaily: () => void;
 }) {
@@ -849,6 +888,14 @@ function RunningView({
   // the api's methods read g live, so a fixed identity stays correct.
   const api = useMemo(() => makeRuleApi(g, nowHHMM), [g]);
   const moodEntries = Object.entries(moods);
+
+  // Events that are running right now (past init, not finished): the likely culprits when a
+  // passing rule reopens. Memoized on a joined key so the list's memo survives the heartbeat.
+  const liveKey = g.events
+    .filter((e) => e.data !== undefined && e.phase !== "done")
+    .map((e) => e.defId)
+    .join(",");
+  const liveEvents = useMemo(() => (liveKey ? liveKey.split(",") : []), [liveKey]);
 
   // A 1s re-validation heartbeat for the rule list only. Some rules flip purely
   // from time (a coupled rule going red, the current-time clock) without bumping
@@ -1015,6 +1062,8 @@ function RunningView({
             onRuleState={onRuleState}
             version={g.version}
             validationTick={validationTick}
+            liveEvents={liveEvents}
+            onRuleFlips={onRuleFlips}
           />
 
           <div className="mt-6 flex justify-end">
