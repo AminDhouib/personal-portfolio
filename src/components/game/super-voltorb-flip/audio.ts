@@ -1,6 +1,6 @@
 import { CUES, type CueName } from "./sound-cues";
 import { musicTrackForLevel } from "./music";
-import { isTextEntryTarget } from "./keyboard";
+import { isTextEntryTarget } from "../text-entry";
 import {
   createMaster,
   scheduleCue,

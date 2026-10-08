@@ -43,7 +43,7 @@ import { loadProgress } from "./super-voltorb-flip/progress";
 import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
-import { isTextEntryTarget } from "./super-voltorb-flip/keyboard";
+import { isTextEntryTarget } from "./text-entry";
 import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
 import { afterPageLoad } from "./super-voltorb-flip/startup";
 import { isCursorKey, memoKeyFlag, moveCursor, type Cursor } from "./super-voltorb-flip/cursor";
