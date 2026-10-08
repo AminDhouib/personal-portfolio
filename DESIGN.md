@@ -412,6 +412,14 @@ current tree on 2026-07-07.
   page embed scrolled away), so a run never plays out unwatched; the player always resumes. The
   scene is always the dark space palette: the light-theme "inverted armed" menu backdrop was
   removed because it read as muddy grey, and its dormant `invertedArmed` flag has been deleted.
+- **Orbital Dodge opens busier than it ends (early boost).** `difficulty()` adds
+  `EARLY_BOOST` (0.35) fading linearly to zero by `EARLY_FADE_S` (45 s), so the ramp reads 0.60 at
+  0 s and is identical to the old curve from 45 s on; the cap and the mobile x0.88 are untouched.
+  Heavy asteroids unlock at 12 s (was 25) and the first wall arrives `FIRST_WALL_MS` (10 s) in
+  (was 20). The spawn interval still floors at 280 ms (about 3.6 spawns/s), inside
+  `checkSpaceShooter`'s budgets; `space-shooter/__tests__/plausibility.test.ts` pins that. Kill
+  sounds rise with the combo through `killPitch`, and the combo chip flashes on each new
+  `comboTier`; both are cosmetic and never feed scoring.
 - **Super Voltorb Flip waits for the player at the end of every round.** The order follows HGSS
   (`voltorb_flip.c`): a win plays the clear fanfare and then the payout over the still-hidden
   board, and only then reveals it; a quit pays out first too (when it banked coins); a loss goes

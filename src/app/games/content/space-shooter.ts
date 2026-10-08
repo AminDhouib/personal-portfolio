@@ -46,7 +46,7 @@ export const spaceShooterContent: GameContent = {
     "Cannons fire straight ahead, so slide under the rock you want to hit. Kills in a row build a combo: 1.5x at 3, 2x at 5, 3x at 10, 5x at 20 and 10x at 40.",
     "A combo resets after four seconds without a kill. The Combo Sustain upgrade adds a second per level.",
     "Skim past an asteroid without touching it for 15 bonus points.",
-    "From about 20 seconds in, walls of asteroids with a gap appear. Bullets do nothing to walls, so head for the gap early.",
+    "From about 10 seconds in, walls of asteroids with a gap appear. Bullets do nothing to walls, so head for the gap early.",
     "You start with 500 coins. Level 1 of any upgrade costs 100.",
   ],
   facts: [
