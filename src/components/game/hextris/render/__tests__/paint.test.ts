@@ -2,6 +2,13 @@ import { describe, it, expect } from "vitest";
 import { boardState } from "../../engine/__tests__/boards";
 import { rotate } from "../../engine/step";
 import type { RunState } from "../../engine/types";
+import {
+  COMBO_TEXT_FILL,
+  POPUP_MS,
+  TEXT_OUTLINE_PX,
+  TEXT_OUTLINE_STYLE,
+  type ShownPopup,
+} from "../juice";
 import { layout, ringRadius } from "../layout";
 import {
   COMBO_STROKE,
@@ -13,9 +20,15 @@ import {
 } from "../paint";
 import { makeFakeCtx2D, type FakeCtx2D, type Point } from "./fake-ctx";
 
-function painted(s: RunState, width = 1440, height = 900, nowMs = s.elapsedMs): FakeCtx2D {
+function painted(
+  s: RunState,
+  width = 1440,
+  height = 900,
+  nowMs = s.elapsedMs,
+  popups: readonly ShownPopup[] = [],
+): FakeCtx2D {
   const ctx = makeFakeCtx2D();
-  paint(ctx, s, layout(width, height, false), nowMs);
+  paint(ctx, s, layout(width, height, false), nowMs, popups);
   return ctx;
 }
 
@@ -74,6 +87,62 @@ describe("paint", () => {
     expect(sweep(2400)[0]).toBeCloseTo(Math.PI, 6);
     expect(sweep(3100)[0]).toBeCloseTo(Math.PI / 2, 6);
     expect(sweep(3800)).toEqual([]);
+  });
+
+  it("writes the combo level in the core, outlined, while the window is open", () => {
+    const s = boardState({});
+    const l = layout(1440, 900, false);
+    s.combo = 3;
+    s.lastClearAtMs = 1000;
+    s.comboUntilMs = 3800;
+    const texts = painted(s, 1440, 900, 2000).texts;
+    expect(texts.map((t) => [t.kind, t.text])).toEqual([
+      ["stroke", "x3"],
+      ["fill", "x3"],
+    ]);
+    const [outline, fill] = texts;
+    expect(outline).toMatchObject({ style: TEXT_OUTLINE_STYLE, lineWidth: TEXT_OUTLINE_PX });
+    expect(fill).toMatchObject({ style: COMBO_TEXT_FILL, x: l.cx, y: l.cy });
+    expect(painted(s, 1440, 900, 3800).texts).toEqual([]);
+    s.combo = 1;
+    expect(painted(s, 1440, 900, 2000).texts).toEqual([]);
+  });
+
+  it("writes each live popup as outlined +N over its cell, rising and fading out", () => {
+    const s = boardState({ 2: "a" });
+    const l = layout(1440, 900, false);
+    const popup: ShownPopup = {
+      text: "+18",
+      scale: 1,
+      fill: "#ffe680",
+      side: 2,
+      row: 0,
+      bornMs: 1000,
+    };
+    const at = (nowMs: number, popups: ShownPopup[] = [popup]) =>
+      painted(s, 1440, 900, nowMs, popups).texts.filter((t) => t.text.startsWith("+"));
+    const born = at(1000);
+    expect(born.map((t) => [t.kind, t.style])).toEqual([
+      ["stroke", TEXT_OUTLINE_STYLE],
+      ["fill", "#ffe680"],
+    ]);
+    expect(born[0]?.lineWidth).toBe(TEXT_OUTLINE_PX);
+    expect(born[1]?.alpha).toBe(1);
+    // Over the cell: side 2 points along UP + 2 steps, half a row out.
+    const angle = -Math.PI / 2 + (2 * Math.PI) / 3;
+    const d = l.apothem + 0.5 * l.rowHeight;
+    expect(born[1]?.x).toBeCloseTo(l.cx + Math.cos(angle) * d, 6);
+    expect(born[1]?.y).toBeCloseTo(l.cy + Math.sin(angle) * d, 6);
+    const later = at(1000 + POPUP_MS * 0.9);
+    const dist = (t: { x: number; y: number } | undefined) =>
+      Math.hypot((t?.x ?? 0) - l.cx, (t?.y ?? 0) - l.cy);
+    expect(dist(later[1])).toBeGreaterThan(dist(born[1]));
+    expect(later[1]?.alpha).toBeLessThan(0.5);
+    expect(at(1000 + POPUP_MS)).toEqual([]);
+    expect(at(999)).toEqual([]);
+    const sizeOf = (t: { font: string } | undefined) => Number(/(\d+)px/.exec(t?.font ?? "")?.[1]);
+    const big = at(1000, [{ ...popup, scale: 2 }]);
+    expect(sizeOf(big[1])).toBeGreaterThan(sizeOf(born[1]) * 1.8);
   });
 
   it("draws no combo ring before the first clear", () => {
