@@ -193,3 +193,12 @@ describe("Stage", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 });
+
+describe("held keys", () => {
+  it("a held Space (repeat keydown) does not drop again", () => {
+    const run = start();
+    clock = perfectDropTime(run, clock);
+    fireEvent.keyDown(window, { key: " ", repeat: true });
+    expect(stage().dataset.floors).toBe("0");
+  });
+});
