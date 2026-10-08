@@ -192,8 +192,9 @@ engine must expose matching actions.
    900 ms later in lane a+3. The colour and lane a are random. Left alone, they settle as a
    pair and a single that does not touch it. One clockwise rotation after the pair settles and
    before the third piece does puts the third beside the pair: a group of three, the run's first
-   match. The opening is the only exception to item 7, and the piece after it never has the
-   opening's colour.
+   match. The opening is the only exception to item 7. While any opening piece is still
+   falling, no other piece is dealt the opening's colour, so a later piece landing on the pair
+   cannot make that match without the turn.
 10. First minute: when the director picks a pattern in the first 60 s after GO, it uses
     `max(level, 4)` in place of the level, for both the pattern choice and the spawn interval,
     and the interval is at most 1100 ms per beat. Fall speed and the combo window use the real
