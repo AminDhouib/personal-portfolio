@@ -10,3 +10,17 @@ export function isWorldRecord(boards: readonly ArcadeBoardResult[] | undefined, 
   const allTime = boards?.find((b) => b.period === "all-time");
   return allTime !== undefined && allTime.improved && allTime.rank === 1 && score > 0;
 }
+
+/**
+ * What a just-finished run means for the player's stored best. `previousBest` is null when no
+ * best was stored yet (absent, not zero): that first scored run is a "first" flight rather than
+ * a personal best, since there is nothing to beat. Ties, lower scores and zero runs are nothing.
+ */
+export function personalBestKind(
+  final: number,
+  previousBest: number | null,
+): "first" | "best" | null {
+  if (final <= 0) return null;
+  if (previousBest === null) return "first";
+  return final > previousBest ? "best" : null;
+}

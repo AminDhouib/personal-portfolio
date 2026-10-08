@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ArcadeBoardResult } from "@/hooks/use-arcade-board";
-import { isWorldRecord } from "../celebration";
+import { isWorldRecord, personalBestKind } from "../celebration";
 
 const daily: ArcadeBoardResult = {
   period: "daily",
@@ -38,5 +38,21 @@ describe("isWorldRecord", () => {
     expect(isWorldRecord([daily], 500)).toBe(false);
     expect(isWorldRecord([], 500)).toBe(false);
     expect(isWorldRecord(undefined, 500)).toBe(false);
+  });
+});
+
+describe("personalBestKind", () => {
+  it("calls a first scored run a first flight, not a personal best", () => {
+    expect(personalBestKind(674, null)).toBe("first");
+  });
+
+  it("calls a beaten stored best a personal best", () => {
+    expect(personalBestKind(900, 674)).toBe("best");
+  });
+
+  it("is nothing for a tie, a lower score or a zero run", () => {
+    expect(personalBestKind(674, 674)).toBeNull();
+    expect(personalBestKind(10, 674)).toBeNull();
+    expect(personalBestKind(0, null)).toBeNull();
   });
 });
