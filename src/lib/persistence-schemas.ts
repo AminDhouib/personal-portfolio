@@ -34,7 +34,6 @@ export const gameLeaderboardRowSchema = z.object({
   region: z.string().optional(),
   createdAt: z.iso.datetime(),
 });
-export type GameLeaderboardRow = z.infer<typeof gameLeaderboardRowSchema>;
 
 /** On-disk shape of leaderboard.json: boards keyed by game slug. */
 export const gameLeaderboardFileSchema = z.object({

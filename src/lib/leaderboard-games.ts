@@ -20,5 +20,3 @@ import type { GameSlug } from "@/app/games/games-meta";
  * import from a server route.
  */
 export const LEADERBOARD_GAMES = ["tower-stacker"] as const satisfies readonly GameSlug[];
-
-export type LeaderboardGame = (typeof LEADERBOARD_GAMES)[number];
