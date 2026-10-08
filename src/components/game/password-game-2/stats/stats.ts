@@ -41,40 +41,46 @@ export function emptyStats(): Pg2Stats {
   };
 }
 
-export function loadStats(): Pg2Stats {
+let reportedCorrupt = false;
+
+/**
+ * The parsed stored value, or undefined when it is absent or storage is blocked. A corrupt
+ * value is reported at most once per page load, and only when a load asks for it (the
+ * save path stays quiet, and a valid newer-version value is expected, never reported).
+ */
+function readStored(reportCorrupt: boolean): unknown {
   let text: string | null;
   try {
     text = window.localStorage.getItem(STATS_KEY);
   } catch {
     // silent-ok: blocked storage (private mode, SecurityError) just means empty stats
-    return emptyStats();
+    return undefined;
   }
-  if (text === null) return emptyStats();
-  const result = statsSchema.safeParse(safeJsonParse<unknown>(text, "pg2:stats"));
-  return result.success ? result.data : emptyStats();
+  if (text === null) return undefined;
+  return safeJsonParse<unknown>(text, "pg2:stats", null, (_scope, err) => {
+    if (!reportCorrupt || reportedCorrupt) return;
+    reportedCorrupt = true;
+    if (typeof reportError === "function") reportError(err);
+  });
 }
 
 /**
- * True when the stored value is an object whose `v` is above this code's version: a
- * newer build wrote it (a rollback, an old tab). Saving over it would destroy it.
+ * True when the value is an object whose `v` is above this code's version: a newer build
+ * wrote it (a rollback, an old tab). Saving over it would destroy it.
  */
-function storedIsNewer(): boolean {
-  let text: string | null;
-  try {
-    text = window.localStorage.getItem(STATS_KEY);
-  } catch {
-    // silent-ok: blocked storage cannot hold a newer value, and the save will fail on its own
-    return false;
-  }
-  if (text === null) return false;
-  const value = safeJsonParse<unknown>(text, "pg2:stats");
+function isNewer(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const v = (value as { v?: unknown }).v;
   return typeof v === "number" && v > 1;
 }
 
+export function loadStats(): Pg2Stats {
+  const result = statsSchema.safeParse(readStored(true));
+  return result.success ? result.data : emptyStats();
+}
+
 export function saveStats(stats: Pg2Stats): void {
-  if (storedIsNewer()) return;
+  if (isNewer(readStored(false))) return;
   safeLocalSet(STATS_KEY, JSON.stringify(stats));
 }
 
@@ -99,10 +105,11 @@ export function recordRun(prev: Pg2Stats, run: RunRecord): Pg2Stats {
   const gap = prev.lastDailyDay === null ? null : dayDiff(prev.lastDailyDay, run.day);
   if (gap === null) next.streak = 1;
   else if (gap === 1) next.streak = prev.streak + 1;
-  else if (gap > 1) next.streak = 1;
-  // gap <= 0: a repeat of the same day (or a clock stepping back) keeps the streak.
+  else if (gap > 1 || gap < 0) next.streak = 1;
+  // gap === 0 is a repeat of the same day and keeps the streak. gap < 0 means the last
+  // daily is ahead of this run (a clock set forward once), so it resets to this run's day.
   next.bestStreak = Math.max(prev.bestStreak, next.streak);
-  if (gap === null || gap > 0) next.lastDailyDay = run.day;
+  if (gap !== 0) next.lastDailyDay = run.day;
 
   const entry = { day: run.day, ms: run.ms, seed: run.seed };
   const existing = prev.history.findIndex((h) => h.day === run.day);
@@ -111,7 +118,10 @@ export function recordRun(prev: Pg2Stats, run: RunRecord): Pg2Stats {
     if (run.ms < history[existing]!.ms) history[existing] = entry;
     next.history = history;
   } else {
-    next.history = [...prev.history, entry].slice(-HISTORY_MAX);
+    // In day order, so a back-dated entry never evicts newer days.
+    next.history = [...prev.history, entry]
+      .sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : 0))
+      .slice(-HISTORY_MAX);
   }
   return next;
 }
@@ -122,7 +132,9 @@ export function recordRun(prev: Pg2Stats, run: RunRecord): Pg2Stats {
  */
 export function streakAsOf(stats: Pg2Stats, todayUtc: string): number {
   if (stats.lastDailyDay === null) return 0;
-  return dayDiff(stats.lastDailyDay, todayUtc) <= 1 ? stats.streak : 0;
+  const gap = dayDiff(stats.lastDailyDay, todayUtc);
+  // A last day in the future (gap < 0) is not a live streak.
+  return gap >= 0 && gap <= 1 ? stats.streak : 0;
 }
 
 /** Whole minutes and seconds, "mm:ss". */

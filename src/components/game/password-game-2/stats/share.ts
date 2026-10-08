@@ -5,7 +5,6 @@ export type ShareInput = {
   ms: number;
   streak: number;
   daily: boolean;
-  biggestCrisis?: string;
 };
 
 export type ShareOutcome = "shared" | "copied" | "cancelled" | "unavailable";
@@ -20,7 +19,6 @@ export function buildShareText(run: ShareInput, url: string): string {
     ? `Password Game 2 daily ${run.day}: ${formatClock(run.ms)}`
     : `Password Game 2: ${formatClock(run.ms)}`;
   const lines = [head];
-  if (run.biggestCrisis) lines.push(`Biggest crisis: ${run.biggestCrisis}`);
   if (run.streak >= 2) lines.push(`${run.streak}-day streak`);
   lines.push(url);
   return lines.join("\n");

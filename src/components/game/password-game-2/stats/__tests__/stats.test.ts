@@ -102,3 +102,58 @@ describe("newer stored version", () => {
     expect(loadStats()).toEqual(s);
   });
 });
+
+describe("a backwards clock", () => {
+  it("resets the streak to the run day when the last daily is ahead", () => {
+    let s = recordRun(emptyStats(), { ms: 5, daily: true, day: "2026-10-19", seed: 1 });
+    s = recordRun(s, { ms: 5, daily: true, day: "2026-10-20", seed: 2 });
+    expect(s.streak).toBe(2);
+    s = recordRun(s, { ms: 5, daily: true, day: "2026-10-10", seed: 3 });
+    expect(s.streak).toBe(1);
+    expect(s.bestStreak).toBe(2);
+    expect(s.lastDailyDay).toBe("2026-10-10");
+    s = recordRun(s, { ms: 5, daily: true, day: "2026-10-11", seed: 4 });
+    expect(s.streak).toBe(2);
+  });
+
+  it("does not show a streak whose last day is in the future", () => {
+    const s = recordRun(emptyStats(), { ms: 5, daily: true, day: "2026-10-20", seed: 1 });
+    expect(streakAsOf(s, "2026-10-10")).toBe(0);
+  });
+});
+
+describe("history order", () => {
+  it("keeps days in order and never lets a back-dated entry evict newer days", () => {
+    let s = emptyStats();
+    for (let d = 10; d <= 23; d++) {
+      s = recordRun(s, { ms: 5, daily: true, day: `2026-10-${d}`, seed: d });
+    }
+    expect(s.history).toHaveLength(14);
+    s = recordRun(s, { ms: 5, daily: true, day: "2026-10-01", seed: 1 });
+    expect(s.history).toHaveLength(14);
+    const days = s.history.map((h) => h.day);
+    expect(days).toContain("2026-10-23");
+    expect(days).not.toContain("2026-10-01");
+    expect(days).toEqual([...days].sort());
+  });
+});
+
+describe("reporting a corrupt value", () => {
+  it("reports once per page load, and never reports a newer version", async () => {
+    vi.resetModules();
+    const fresh = await import("../stats");
+    const err = vi.fn();
+    vi.stubGlobal("reportError", err);
+    localStorage.setItem(fresh.STATS_KEY, "{not json");
+    fresh.loadStats();
+    fresh.loadStats();
+    fresh.saveStats(fresh.emptyStats());
+    expect(err).toHaveBeenCalledTimes(1);
+    err.mockClear();
+    localStorage.setItem(fresh.STATS_KEY, JSON.stringify({ v: 99 }));
+    fresh.loadStats();
+    fresh.saveStats(fresh.emptyStats());
+    expect(err).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
