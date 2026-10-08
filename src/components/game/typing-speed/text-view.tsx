@@ -24,7 +24,7 @@ function letterState(word: string, typed: string, j: number, committed: boolean)
 
 /**
  * The words of a run, one inline-block span per word so a word never breaks
- * mid-way. Only three lines show: when the caret reaches the third line, the
+ * mid-way unless it is wider than the box. Only three lines show: when the caret reaches the third line, the
  * first line's words leave the DOM (Monkeytype's approach), which keeps a
  * 120 s run small. Letters carry data-state; the caret sits on the next
  * letter, or on the space after a fully typed word. A screen reader gets the
@@ -35,6 +35,16 @@ export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
   // Words before `from` are out of the DOM; a new run starts again at zero.
   const [trim, setTrim] = useState<{ run: TypingRun; from: number }>({ run, from: 0 });
   const from = Math.min(trim.run === run ? trim.from : 0, run.cursor);
+
+  // Bumped when the box changes size, so line positions are measured again.
+  const [layout, setLayout] = useState(0);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setLayout((n) => n + 1));
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
 
   const cursor = run.cursor;
   useEffect(() => {
@@ -51,7 +61,7 @@ export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [run, cursor, from, trim]);
+  }, [run, cursor, from, trim, layout]);
 
   const playing = caret && run.status !== "done";
   const end = Math.min(run.words.length, run.cursor + LOOKAHEAD_WORDS);
@@ -63,7 +73,7 @@ export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
     const caretAt = playing && i === run.cursor ? typed.length : -1;
     return (
       <span key={i} data-ts-word={i}>
-        <span className="inline-block">
+        <span className="inline-block max-w-full break-words">
           {letters.map((ch, j) => {
             const state = letterState(word, typed, j, committed);
             const shown = state === "extra" ? (typed[j] ?? ch) : ch;
