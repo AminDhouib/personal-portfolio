@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToString } from "react-dom/server";
 import { BoardPanel, type FinishedRun } from "../board-panel";
 
 const fetchMock = vi.fn();
@@ -51,6 +52,9 @@ const posts = () =>
   fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === "POST");
 
 beforeEach(() => {
+  // RUN is a tower of 2026-10-15; Submit rechecks the UTC day, so hold the clock inside it.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-15T12:00:00Z"));
   window.localStorage.clear();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
@@ -58,6 +62,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   window.localStorage.clear();
@@ -69,7 +74,7 @@ describe("the daily board panel", () => {
       json({ entries: [entry(), entry({ rank: 2, handle: "Bo", score: 300 })], you: null }),
     );
     panel();
-    expect(screen.getByRole("heading", { name: /Today's tower board/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^Tower board$/ })).toBeTruthy();
     expect(screen.getAllByRole("button", { pressed: true }).map((b) => b.textContent)).toContain(
       "Today",
     );
@@ -85,7 +90,7 @@ describe("the daily board panel", () => {
   it("keeps the panel when the read fails, and says so in the body", async () => {
     fetchMock.mockResolvedValueOnce(json({}, 500));
     panel();
-    expect(screen.getByRole("heading", { name: /Today's tower board/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^Tower board$/ })).toBeTruthy();
     await waitFor(() => expect(screen.getByText("Could not load the board")).toBeTruthy());
     expect(screen.getByRole("button", { name: "All time" })).toBeTruthy();
   });
@@ -205,7 +210,7 @@ describe("posting a daily result", () => {
     fetchMock.mockResolvedValueOnce(json({ entries: [], you: null }));
     panel({ score: 0, floors: 0, perfects: 0, bestStreak: 0, seconds: 1 });
     expect(screen.queryByLabelText("Name for the board")).toBeNull();
-    expect(screen.getByRole("heading", { name: /Today's tower board/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^Tower board$/ })).toBeTruthy();
   });
 });
 
@@ -266,5 +271,110 @@ describe("sharing a daily result", () => {
     cleanup();
     panel({ mode: "free" });
     expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
+  });
+});
+
+describe("the first paint", () => {
+  it("says Loading, never an empty board, before the read starts", () => {
+    const html = renderToString(
+      <BoardPanel
+        run={RUN}
+        handle=""
+        streakDays={0}
+        onHandle={() => undefined}
+        onPlayDaily={() => undefined}
+      />,
+    );
+    expect(html).toContain("Loading");
+    expect(html).not.toContain("No scores yet");
+  });
+
+  it("keeps the list in a box five rows tall whatever it holds", async () => {
+    fetchMock.mockResolvedValue(json({ entries: [], you: null }));
+    panel();
+    await waitFor(() => expect(screen.getByText("No scores yet today")).toBeTruthy());
+    expect(screen.getByTestId("tower-board-list").className).toContain("min-h-[9.25rem]");
+  });
+
+  it("labels the board without calling the weekly and all-time tabs Today's", () => {
+    fetchMock.mockResolvedValue(json({ entries: [], you: null }));
+    panel();
+    expect(screen.getByRole("heading", { name: "Tower board" })).toBeTruthy();
+    expect(screen.queryByText(/Today's tower board/)).toBeNull();
+  });
+
+  it("sets the name field to 16 px on phones so iOS does not zoom on focus", () => {
+    fetchMock.mockResolvedValue(json({ entries: [], you: null }));
+    panel();
+    const cls = screen.getByLabelText("Name for the board").className;
+    expect(cls).toContain("text-base");
+    expect(cls).toContain("sm:text-sm");
+  });
+});
+
+describe("the live region", () => {
+  it("is one persistent status that carries the share and submit outcomes", async () => {
+    fetchMock.mockResolvedValueOnce(json({ entries: [], you: null }));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    panel();
+    const live = screen.getByRole("status");
+    expect(live.textContent).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(live.textContent).toContain("copied"));
+    fetchMock.mockResolvedValueOnce(json({ error: "implausible", reason: "x" }, 422));
+    fireEvent.change(screen.getByLabelText("Name for the board"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(live.textContent).toContain("not accepted"));
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    Reflect.deleteProperty(navigator, "share");
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+});
+
+describe("a card left open past midnight", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("recomputes the day at Submit: closed copy, no post, a way to the new tower", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T23:59:50Z"));
+    fetchMock.mockResolvedValue(json({ entries: [], you: null }));
+    const { onPlayDaily } = panel();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    vi.setSystemTime(new Date("2026-10-16T00:00:10Z"));
+    fireEvent.change(screen.getByLabelText("Name for the board"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() =>
+      expect(screen.getByText("Today's tower closed at 00:00 UTC. Play the new one.")).toBeTruthy(),
+    );
+    expect(posts()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+    expect(screen.queryByText("This run was not accepted.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Play the new tower" }));
+    expect(onPlayDaily).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a 422 after midnight as closed, not as a rejected run", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T23:59:59Z"));
+    fetchMock.mockResolvedValueOnce(json({ entries: [], you: null }));
+    panel();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fetchMock.mockImplementationOnce(async () => {
+      vi.setSystemTime(new Date("2026-10-16T00:00:01Z"));
+      return json({ error: "implausible", reason: "not today's tower" }, 422);
+    });
+    fireEvent.change(screen.getByLabelText("Name for the board"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() =>
+      expect(screen.getByText("Today's tower closed at 00:00 UTC. Play the new one.")).toBeTruthy(),
+    );
+    expect(screen.queryByText("This run was not accepted.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Play the new tower" })).toBeTruthy();
   });
 });

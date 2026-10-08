@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
 import { useArcadeBoard } from "@/hooks/use-arcade-board";
+import { utcDayKey } from "@/lib/arcade/boards";
 import { dayNumber } from "./daily";
 import { shareResult, shareText, type ShareOutcome } from "./share";
 import { HANDLE_MAX } from "./stats";
@@ -66,10 +67,19 @@ export function BoardPanel({
   const [state, setState] = useState<SubmitState>("idle");
   const [rank, setRank] = useState<number | null>(null);
   const [shared, setShared] = useState<ShareOutcome | null>(null);
+  // False until the read for this card has started, so the first paint says Loading rather
+  // than claiming an empty board.
+  const [requested, setRequested] = useState(false);
+  // The UTC day turned over while the card was open (seen at Submit time).
+  const [lapsed, setLapsed] = useState(false);
+  // One persistent live region: a conditionally mounted status can be skipped on insert.
+  const [notice, setNotice] = useState("");
   const daily = run.mode === "daily";
 
   useEffect(() => {
-    if (daily) void refresh();
+    if (!daily) return;
+    void refresh();
+    setRequested(true);
   }, [daily, refresh]);
 
   if (!daily) {
@@ -85,24 +95,36 @@ export function BoardPanel({
     );
   }
 
-  const canPost = !run.closed && run.floors > 0;
+  const closed = run.closed || lapsed;
+  const canPost = !closed && run.floors > 0;
   const locked = state === "sending" || state === "submitted" || state === "rejected";
 
+  function close() {
+    setLapsed(true);
+    setState("idle");
+    setNotice("Today's tower has closed.");
+  }
+
   async function share() {
-    setShared(
-      await shareResult(
-        shareText({
-          dayKey: run.dayKey,
-          floors: run.floors,
-          score: run.score,
-          bestStreak: run.bestStreak,
-        }),
-      ),
+    const outcome = await shareResult(
+      shareText({
+        dayKey: run.dayKey,
+        floors: run.floors,
+        score: run.score,
+        bestStreak: run.bestStreak,
+      }),
     );
+    setShared(outcome);
+    if (outcome === "copied") setNotice("Result copied.");
+    else if (outcome === "failed") setNotice("Could not copy the result.");
   }
 
   async function post() {
     if (locked) return;
+    if (utcDayKey(new Date()) !== run.dayKey) {
+      close();
+      return;
+    }
     const typed = name.trim().slice(0, HANDLE_MAX);
     onHandle(typed);
     setState("sending");
@@ -116,15 +138,25 @@ export function BoardPanel({
       seconds: run.seconds,
     });
     if (result.ok) {
-      setRank(result.boards?.find((b) => b.period === "daily")?.rank ?? null);
+      const dailyRank = result.boards?.find((b) => b.period === "daily")?.rank ?? null;
+      setRank(dailyRank);
       setState("submitted");
+      setNotice(dailyRank === null ? "Posted." : `Posted. Rank ${dailyRank} today.`);
       await refresh();
     } else if (result.rejected) {
-      setState("rejected");
+      // A 422 after the UTC day turned over is the tower closing, not a bad run.
+      if (utcDayKey(new Date()) !== run.dayKey) {
+        close();
+      } else {
+        setState("rejected");
+        setNotice("Run not accepted.");
+      }
     } else if (result.identityReset) {
       setState("identity");
+      setNotice("Player id reset, submit again.");
     } else {
       setState("failed");
+      setNotice("Board unreachable, try again.");
     }
   }
 
@@ -132,10 +164,13 @@ export function BoardPanel({
   const youShown = rows.some((e) => e.isYou);
 
   return (
-    <section aria-label="Today's tower board" data-testid="tower-board-panel" className="mb-4">
-      {run.closed && (
+    <section aria-label="Tower board" data-testid="tower-board-panel" className="mb-4">
+      <p role="status" className="sr-only">
+        {notice}
+      </p>
+      {closed && (
         <div className="mb-3">
-          <p role="status" className="text-foreground/80 mb-2 font-mono text-xs leading-relaxed">
+          <p className="text-foreground/80 mb-2 font-mono text-xs leading-relaxed">
             Today&apos;s tower closed at 00:00 UTC. Play the new one.
           </p>
           <button type="button" onClick={onPlayDaily} className={`${ACTION} w-full`}>
@@ -161,7 +196,7 @@ export function BoardPanel({
                 onChange={(event) => setName(event.target.value.slice(0, HANDLE_MAX))}
                 maxLength={HANDLE_MAX}
                 autoComplete="off"
-                className="text-foreground mt-1 min-h-11 min-w-0 border border-[var(--border)] bg-transparent px-2 font-mono text-sm tracking-normal normal-case outline-none focus:border-accent-red/60"
+                className="text-foreground mt-1 min-h-11 min-w-0 border border-[var(--border)] bg-transparent px-2 font-mono text-base tracking-normal normal-case outline-none focus:border-accent-red/60 sm:text-sm"
               />
             </label>
             <button type="submit" disabled={locked} className={ACTION}>
@@ -177,7 +212,7 @@ export function BoardPanel({
             </button>
           </div>
           {state === "submitted" && (
-            <p role="status" className="text-foreground/80 mt-2 font-mono text-xs">
+            <p className="text-foreground/80 mt-2 font-mono text-xs">
               Posted
               {rank !== null && (
                 <>
@@ -189,17 +224,15 @@ export function BoardPanel({
             </p>
           )}
           {state === "rejected" && (
-            <p role="alert" className="mt-2 font-mono text-xs text-accent-red">
-              This run was not accepted.
-            </p>
+            <p className="mt-2 font-mono text-xs text-accent-red">This run was not accepted.</p>
           )}
           {state === "identity" && (
-            <p role="alert" className="mt-2 font-mono text-xs text-accent-red">
+            <p className="mt-2 font-mono text-xs text-accent-red">
               Your player id was reset; submit again.
             </p>
           )}
           {state === "failed" && (
-            <p role="alert" className="mt-2 font-mono text-xs text-accent-red">
+            <p className="mt-2 font-mono text-xs text-accent-red">
               Could not reach the board. Try again in a moment.
             </p>
           )}
@@ -217,7 +250,7 @@ export function BoardPanel({
       )}
 
       <h2 className="text-foreground/70 mb-2 text-left font-mono text-[10px] tracking-[0.3em] uppercase">
-        Today&apos;s tower board
+        Tower board
       </h2>
       <ArcadeBoardTabs
         label="Leaderboard period"
@@ -227,30 +260,36 @@ export function BoardPanel({
         activeClassName={ACTIVE_TAB}
         inactiveClassName={INACTIVE_TAB}
       />
-      {rows.length === 0 ? (
-        <p className="text-foreground/50 border border-[var(--border)] px-3 py-3 text-center font-mono text-xs">
-          {loading ? "Loading" : readError ? "Could not load the board" : EMPTY_TEXT[period]}
-        </p>
-      ) : (
-        <ol className="divide-y divide-[var(--border)] border border-[var(--border)]">
-          {rows.map((entry) => (
-            <li
-              key={`${entry.rank}-${entry.name}-${entry.createdAt}`}
-              aria-current={entry.isYou ? "true" : undefined}
-              className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
-                entry.isYou ? "bg-accent-red/10 text-accent-red" : "text-foreground/80"
-              }`}
-            >
-              <span className="w-5 text-right tabular-nums">{entry.rank}</span>
-              <span className="min-w-0 flex-1 truncate text-left">{entry.name}</span>
-              {entry.blocks !== undefined && (
-                <span className="text-foreground/50 tabular-nums">{entry.blocks} fl</span>
-              )}
-              <span className="tabular-nums">{entry.score}</span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <div data-testid="tower-board-list" className="min-h-[9.25rem] border border-[var(--border)]">
+        {rows.length === 0 ? (
+          <p className="text-foreground/50 px-3 py-3 text-center font-mono text-xs">
+            {loading || !requested
+              ? "Loading"
+              : readError
+                ? "Could not load the board"
+                : EMPTY_TEXT[period]}
+          </p>
+        ) : (
+          <ol className="divide-y divide-[var(--border)]">
+            {rows.map((entry) => (
+              <li
+                key={`${entry.rank}-${entry.name}-${entry.createdAt}`}
+                aria-current={entry.isYou ? "true" : undefined}
+                className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
+                  entry.isYou ? "bg-accent-red/10 text-accent-red" : "text-foreground/80"
+                }`}
+              >
+                <span className="w-5 text-right tabular-nums">{entry.rank}</span>
+                <span className="min-w-0 flex-1 truncate text-left">{entry.name}</span>
+                {entry.blocks !== undefined && (
+                  <span className="text-foreground/50 tabular-nums">{entry.blocks} fl</span>
+                )}
+                <span className="tabular-nums">{entry.score}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
       {you && !youShown && (
         <p className="text-muted mt-2 text-left font-mono text-[10px]">
           Your best: #{you.rank} ({you.score})

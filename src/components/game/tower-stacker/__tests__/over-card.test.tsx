@@ -102,7 +102,7 @@ describe("a daily tower run", () => {
     expect(stage().dataset.phase).toBe("over");
     await waitFor(() => expect(gets()).toHaveLength(1));
     expect((gets()[0] as [string])[0]).toBe("/api/arcade/scores?game=tower-stacker&board=daily");
-    expect(screen.getByRole("heading", { name: /Today's tower board/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /^Tower board$/ })).toBeTruthy();
     expect(screen.getByLabelText("Name for the board")).toBeTruthy();
 
     const stored = JSON.parse(window.localStorage.getItem("tower:stats") ?? "null");
