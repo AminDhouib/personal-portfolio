@@ -4,8 +4,9 @@ Status: input to the clean-room rewrite (PR T5-3). Read with the T5-3 section of
 plan. This document describes what a player sees and the rules a referee would apply. It is the
 only description of the game the engine implementer may use.
 
-Amended for PR T5-4 (game feel): the countdown (3.7), hit-stop (3.8), the idle guard (6.9) and
-the opening (10.8, 10.9).
+Amended for PR T5-4 (game feel): the countdown (3.7), hit-stop (3.8), the idle guard (6.9),
+the fall speed and board scale (10.3, 10.11), the opening (10.8, 10.9) and the first minute
+(10.10).
 
 ## 1. Board model
 
@@ -165,7 +166,9 @@ engine must expose matching actions.
 1. Level is `min(35, 1 + 0.06 * cellsCleared + elapsedMs / 45000)`, where elapsed time counts
    unpaused play only. The level is a real number; sections below interpolate by it.
 2. Spawn interval eases from 1500 ms at level 1 to 480 ms at level 35.
-3. Fall speed rises from 2.6 rows per second at level 1 to 8.5 rows per second at level 35.
+3. Fall speed rises from 5.8 rows per second at level 1 to 12 rows per second at level 35.
+   (T5-4 raised it from 2.6 and 8.5: pieces fell at about 0.4 times the old game's on-screen
+   speed. See item 11 for the numbers.)
 4. Combo window shrinks from 2800 ms at level 1 to 1500 ms at level 35.
 5. The interpolation is linear in level unless the implementer's tests justify otherwise; the
    endpoints above are fixed.
@@ -191,6 +194,27 @@ engine must expose matching actions.
    before the third piece does puts the third beside the pair: a group of three, the run's first
    match. The opening is the only exception to item 7, and the piece after it never has the
    opening's colour.
+10. First minute: when the director picks a pattern in the first 60 s after GO, it uses
+    `max(level, 4)` in place of the level, for both the pattern choice and the spawn interval,
+    and the interval is at most 1100 ms per beat. Fall speed and the combo window use the real
+    level. At level 4 the open patterns put about 1.29 pieces on each beat, so pieces come about
+    every 855 ms, and the mean gap between spawns over the first 30 s is at most 1000 ms (about
+    880 ms; it was about 1500 ms).
+11. Board scale and on-screen speed: the painter fits the board so the start limit ring plus
+    one row (2.5 core rows + 12 + 1 = 15.5 rows from the centre to the middle of a side) fits
+    the shorter side of the canvas at its corners, less a margin. Pieces spawn 14 rows out, so
+    toward the shorter side a fresh piece can start partly beyond the edge (section 1.4). The
+    painter used to fit the spawn ring (17.5 rows), which made rows 1.13 times smaller.
+    Derived numbers at level 1, the start of a run, for checking in the browser:
+    - 390x844 (margin 5 percent of the short side): 9.8 px per row, so a piece moves about
+      57 px/s along its lane (was 8.7 px per row and 22.6 px/s).
+    - 1440x900: 22.6 px per row, about 131 px/s along the lane (was 20.0 px per row and
+      52 px/s).
+    - The on-screen speed rises 2.52 times. The T5-4 A/B measured 14 px/s at 390x844 before
+      the change (against 35 px/s in the old game), so the same measurement should now read
+      about 35 px/s.
+    - A level 1 piece takes about 2.4 s from spawn to the hexagon (14 rows at 5.8 rows per
+      second), and about 0.6 s with rush held.
 
 ## 11. Events
 
