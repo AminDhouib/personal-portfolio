@@ -451,9 +451,11 @@ current tree on 2026-07-07.
   `content/__tests__/hextris-credits.test.ts` pin all of it; do not delete the notices before
   the derived files are gone. The T5-3 clean-room engine removes the derived files and these
   notices with them.
-- **Tower Stacker is first-party; its rules are pinned.** The vendored `iamkun/tower_game`
-  bundle and its page are gone, so nothing under `public/` loads a third-party tag (pinned by
-  `no-third-party-tags.test.ts`). The numbers that define the game are pinned by
+- **Tower Stacker is first-party; its rules are pinned.** The upstream `iamkun/tower_game`
+  files under `public/tower_stacker/` (`game.html`, `dist/`, `assets/`, `LICENSE`) are still
+  tracked but unused; only the `index.html` that loaded a Google tag is gone, and
+  `no-third-party-tags.test.ts` pins that nothing served from `public/` loads one. The plan
+  removes the rest later. The numbers that define the game are pinned by
   `tower-stacker/__tests__/engine.test.ts` and `scoring.test.ts`: perfect within 8 units of
   centre, a trim needs 4 units of overlap or the run ends, every third perfect regrows 12
   (capped at the starting width), points are 10 per trim and 20 to 60 per perfect. There are no
@@ -912,6 +914,9 @@ trigger revisiting it.
 - **Untested single-file games** (audit ref P2-TEST-004) — resolved. Typing Speed is rebuilt on
   a tested engine (see the Typing Speed section) and Tower Stacker under `tower-stacker/` with
   tests.
+- **Tower Stacker sizes itself from `window.resize`, not a ResizeObserver** (T6 review item 8,
+  accepted): it reads the parent column width on mount and on resize, so a column that changes
+  width without a window resize (a sidebar toggle) keeps the old size until the next one.
 - **No browser-level smoke test runs in CI** (audit ref P2-TEST-005, deferred) — route tests
   exercise handlers in-process; nothing in CI loads a real page in a browser. The scoped design
   if revisited: a Playwright job hitting `/`, one game page, and `/api/health` against
