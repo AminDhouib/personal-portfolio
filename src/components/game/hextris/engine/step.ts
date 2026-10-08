@@ -1,4 +1,6 @@
 import { fallRowsPerSecond, refreshLevel, runDirector } from "./director";
+import { resolveClears } from "./match";
+import { expireCombo } from "./scoring";
 import { TICK_MS, emit, rotationOffset, sideFacingLane, wrapSide } from "./state";
 import type { EngineAction, Piece, RunState, TimedAction } from "./types";
 
@@ -87,6 +89,7 @@ function settle(state: RunState, piece: Piece): void {
   const row = stack.length;
   stack.push({ colour: piece.colour, special: piece.special });
   emit(state, { type: "settle", side, row, colour: piece.colour, special: piece.special });
+  resolveClears(state, side, row);
 }
 
 function movePieces(state: RunState): void {
@@ -112,6 +115,7 @@ function tick(state: RunState): void {
   runDirector(state);
   movePieces(state);
   if (state.phase !== "playing") return;
+  expireCombo(state);
   refreshLevel(state);
 }
 
