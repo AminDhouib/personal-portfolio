@@ -176,6 +176,9 @@ export function GameShell() {
   const ruleCountRef = useRef(0);
   const recordedRef = useRef<string | null>(null);
   const startDayRef = useRef("");
+  // Practice and shared-seed runs never count toward the device bests.
+  const countsRef = useRef(true);
+  const [startDay, setStartDay] = useState("");
   const toastIdRef = useRef(0);
   const moodTimersRef = useRef<Map<string, number>>(new Map());
   const toastTimersRef = useRef<Set<number>>(new Set());
@@ -449,9 +452,13 @@ export function GameShell() {
     };
   }, [phase, forceRender, playSound, playKeyTick, pushToast, enqueueCard, setMood, triggerFlash]);
 
-  const start = useCallback((s: number, isDaily: boolean, forceEvent?: string) => {
+  const start = useCallback((s: number, isDaily: boolean, forceEvent?: string, shared = false) => {
     ruleCountRef.current = 0;
     startDayRef.current = utcDay();
+    setStartDay(startDayRef.current);
+    // A forced ?event= is practice, and an explicit non-daily ?seed= is a shared challenge:
+    // neither is a personal best. The daily and a normal random run are.
+    countsRef.current = forceEvent === undefined && (isDaily || !shared);
     const g = createRun({ seed: s, daily: isDaily, nowHHMM, forceEvent });
     gameRef.current = g;
     renderedVersionRef.current = g.version;
@@ -465,9 +472,9 @@ export function GameShell() {
   // The Start buttons are real gestures, so they unlock audio; the ?event= auto-start below
   // is not and must not (a context created without a gesture stays suspended).
   const startFromTap = useCallback(
-    (s: number, isDaily: boolean, forceEvent?: string) => {
+    (s: number, isDaily: boolean, forceEvent?: string, shared?: boolean) => {
       unlockAudio();
-      start(s, isDaily, forceEvent);
+      start(s, isDaily, forceEvent, shared);
     },
     [start],
   );
@@ -686,6 +693,7 @@ export function GameShell() {
     const key = `${runId}:${g.seed}:${g.startedAtMs}`;
     if (recordedRef.current === key) return;
     recordedRef.current = key;
+    if (!countsRef.current) return;
     saveStats(
       recordRun(loadStats(), {
         ms: Math.round(g.elapsedMs),
@@ -732,6 +740,7 @@ export function GameShell() {
           seed={seed}
           runId={runId}
           daily={daily}
+          startDay={startDay}
           soundOn={soundOn}
           moods={moods}
           panelRef={panelRef}
@@ -819,7 +828,7 @@ function StartScreen({
 }: {
   urlSeed: number | null;
   forceEvent: string | null;
-  onStart: (seed: number, daily: boolean, forceEvent?: string) => void;
+  onStart: (seed: number, daily: boolean, forceEvent?: string, shared?: boolean) => void;
 }) {
   const force = forceEvent ?? undefined;
   // Client only (this shell renders with ssr: false), so storage is readable here.
@@ -894,7 +903,7 @@ function StartScreen({
           <button
             type="button"
             className="pg2-btn pg2-btn--ghost px-5 py-2.5 text-[15px]"
-            onClick={() => onStart(urlSeed, false, force)}
+            onClick={() => onStart(urlSeed, false, force, true)}
           >
             Start seed {urlSeed}
           </button>
@@ -926,6 +935,7 @@ function RunningView({
   seed,
   runId,
   daily,
+  startDay,
   soundOn,
   moods,
   panelRef,
@@ -958,6 +968,8 @@ function RunningView({
   seed: number;
   runId: number;
   daily: boolean;
+  /** The UTC day the run started, which is the day of its daily seed. */
+  startDay: string;
   soundOn: boolean;
   moods: Record<string, string>;
   panelRef: RefObject<HTMLDivElement | null>;
@@ -1096,6 +1108,7 @@ function RunningView({
               g={g}
               seed={seed}
               daily={daily}
+              startDay={startDay}
               onCopySeed={onCopySeed}
               onPlayAgain={onPlayAgain}
               onPlayDaily={onPlayDaily}

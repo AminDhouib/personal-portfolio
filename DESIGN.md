@@ -794,15 +794,25 @@ The following Password Game 2 entries were verified against the current tree on 
 - **PG2's bests and daily streak are per device, in `pg2:stats`, by design**
   (`src/components/game/password-game-2/stats/`). One versioned (`v: 1`) zod-parsed key, read
   tolerantly (missing, corrupt or wrong-version data is empty stats) and written through
-  `safeLocalSet`, the `svf:stats` precedent. No server table and no arcade-v2 backend: the PG2
-  leaderboard keeps its own route, and bests and streaks are display-only and forgeable, so
-  nothing gates on them. A streak day is a UTC day with a completed DAILY run (the daily seed is
-  UTC, so a streak day is a seed day); the day recorded is the UTC day the run STARTED, so a run
-  that crosses midnight UTC still counts for its own seed. `streakAsOf` shows a streak as live
-  through today and yesterday and as zero after a missed day, while the stored value only resets
-  when the next daily is recorded. The shell records a victory exactly once per run (a ref keyed
-  on run id, seed and start time). Day arithmetic is `Date.UTC` on the string day, so it is
-  timezone independent.
+  `safeLocalSet`, the `svf:stats` precedent. A stored `v` above 1 was written by a newer build
+  (a rollback, an old tab): it reads as empty and `saveStats` skips the write, so it is never
+  destroyed. A corrupt value is reported once per page load at most; the newer-version case is
+  expected and never reported. No server table and no arcade-v2 backend: the PG2 leaderboard
+  keeps its own route, and bests and streaks are display-only and forgeable, so nothing gates on
+  them.
+  A streak day is a UTC day with a completed DAILY run (the daily seed is UTC, so a streak day is
+  a seed day). The day recorded, shared and used for the streak is the UTC day the run STARTED,
+  so a run that crosses midnight UTC still counts for its own seed; the receipt's printed date
+  stays the day it renders. `streakAsOf` shows a streak as live through today and yesterday and
+  as zero after a missed day or a last day in the future, while the stored value only resets when
+  the next daily is recorded. A last daily AHEAD of a new run (a clock set forward once) resets
+  the streak to the run's day instead of freezing it. History keeps the last 14 daily days in day
+  order, so a back-dated entry never evicts newer days.
+  What counts: the daily (however it is reached) and normal random runs. A run with a forced
+  `?event=` is practice, and a run on an explicit non-daily `?seed=` is a shared challenge, not a
+  personal best; neither is recorded. The shell records a victory exactly once per run (a ref
+  keyed on run id and seed). Day arithmetic is `Date.UTC` on the string day, so it is timezone
+  independent.
 - **PG2's daily share is text first.** The receipt's Share button builds a spoiler-free, ASCII-only
   line (time, UTC day, a streak of two or more, the game URL; never the password, rule text or a
   seeded answer) and hands it to `navigator.share`, falling back to the clipboard; a dismissed

@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type { GameState } from "../../engine/types";
 
+const params = { q: "seed=7" };
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams("seed=7"),
+  useSearchParams: () => new URLSearchParams(params.q),
 }));
 
 const live: { g: GameState | null } = { g: null };
@@ -31,11 +32,27 @@ vi.mock("../../stats/stats", async (importOriginal) => {
 });
 
 import { GameShell } from "../game-shell";
+import { EVENT_DEFS } from "../../engine/events/index";
+
+const pump = () =>
+  act(() => {
+    vi.advanceTimersByTime(300);
+  });
+
+/** Turns the live run into a win and lets the shell heartbeat notice. */
+function win(ms = 90_000) {
+  const g = live.g!;
+  g.elapsedMs = ms;
+  g.outcome = "victory";
+  g.version += 1;
+  pump();
+}
 
 describe("GameShell records a finished run", () => {
   beforeEach(() => {
     localStorage.clear();
     saved.length = 0;
+    params.q = "seed=7";
     vi.useFakeTimers();
     vi.stubGlobal("requestAnimationFrame", () => 0);
     vi.stubGlobal("cancelAnimationFrame", () => {});
@@ -86,7 +103,7 @@ describe("GameShell records a finished run", () => {
 
   it("writes once when the run turns to victory, even across re-renders", () => {
     const { getByRole } = render(<GameShell />);
-    fireEvent.click(getByRole("button", { name: /start seed 7/i }));
+    fireEvent.click(getByRole("button", { name: /random seed/i }));
     const g = live.g!;
     expect(saved).toHaveLength(0);
 
@@ -109,7 +126,7 @@ describe("GameShell records a finished run", () => {
     const newer = JSON.stringify({ v: 99, bestMs: 1 });
     localStorage.setItem("pg2:stats", newer);
     const { getByRole } = render(<GameShell />);
-    fireEvent.click(getByRole("button", { name: /start seed 7/i }));
+    fireEvent.click(getByRole("button", { name: /random seed/i }));
     const g = live.g!;
     g.elapsedMs = 1000;
     g.outcome = "victory";
@@ -118,5 +135,58 @@ describe("GameShell records a finished run", () => {
       vi.advanceTimersByTime(300);
     });
     expect(localStorage.getItem("pg2:stats")).toBe(newer);
+  });
+
+  describe("which runs are recorded", () => {
+    it("records a random-seed run", () => {
+      const { getByRole } = render(<GameShell />);
+      fireEvent.click(getByRole("button", { name: /random seed/i }));
+      win();
+      expect(saved).toHaveLength(1);
+    });
+
+    it("records the daily", () => {
+      const { getByRole } = render(<GameShell />);
+      fireEvent.click(getByRole("button", { name: /start today/i }));
+      win();
+      expect(saved).toHaveLength(1);
+      expect((JSON.parse(saved[0]!) as { streak: number }).streak).toBe(1);
+    });
+
+    it("does not record a run on a shared ?seed=, but records Play again after it", () => {
+      const { getByRole } = render(<GameShell />);
+      fireEvent.click(getByRole("button", { name: /start seed 7/i }));
+      win();
+      expect(saved).toHaveLength(0);
+      fireEvent.click(getByRole("button", { name: /play again/i }));
+      win();
+      expect(saved).toHaveLength(1);
+    });
+
+    it("does not record an auto-started run with a forced ?event=", () => {
+      params.q = `seed=7&event=${EVENT_DEFS[0]!.id}`;
+      render(<GameShell />);
+      act(() => {
+        vi.advanceTimersByTime(10);
+      });
+      expect(live.g).not.toBeNull();
+      win();
+      expect(saved).toHaveLength(0);
+    });
+  });
+
+  it("shares the day the daily started, not the day the receipt renders", () => {
+    vi.setSystemTime(new Date("2026-10-08T23:50:00Z"));
+    const share = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { share });
+    const { getByRole } = render(<GameShell />);
+    fireEvent.click(getByRole("button", { name: /start today/i }));
+    vi.setSystemTime(new Date("2026-10-09T00:05:00Z"));
+    win(900_000);
+    expect(JSON.parse(saved[0]!).lastDailyDay).toBe("2026-10-08");
+    fireEvent.click(getByRole("button", { name: /share/i }));
+    const arg = (share.mock.calls[0] as unknown as [{ text: string }])[0];
+    expect(arg.text).toContain("2026-10-08");
+    expect(arg.text).not.toContain("2026-10-09");
   });
 });
