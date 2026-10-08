@@ -5,6 +5,7 @@ import { EVENT_DEFS } from "../../engine/events/index";
 import type { FinaleMissile, MissilesData } from "../../engine/events/finale";
 import type { GameState } from "../../engine/types";
 import { ART_SCALE } from "../art-scale";
+import { pickHit } from "../hit-test";
 import {
   FINALE_INST,
   PAINTERS,
@@ -16,15 +17,32 @@ import {
 type Matrix = [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
+/** The text state a real context saves and restores with the transform. */
+interface TextState {
+  font: string;
+  textAlign: string;
+  textBaseline: string;
+}
+
+/** A sans glyph averages about 0.6 em across; enough to bound a label's ink. */
+const EM_WIDTH = 0.6;
+
+function fontPx(font: string): number {
+  const px = /(\d+(?:\.\d+)?)px/.exec(font);
+  return px ? Number(px[1]) : 10;
+}
+
 /**
  * A recording 2D context that tracks the transform stack and logs every coordinate a
- * painter draws through (path points, arc and ellipse bounds, rects, text anchors) in
- * canvas space, so a test can bound the art without a real canvas.
+ * painter draws through (path points, arc and ellipse bounds, rects, and the box a
+ * fillText covers by its measured width) in canvas space, so a test can bound the art
+ * without a real canvas.
  */
 function recordingCtx() {
   const points: { x: number; y: number; op: string }[] = [];
   let m: Matrix = [...IDENTITY];
-  const stack: Matrix[] = [];
+  let text: TextState = { font: "10px sans-serif", textAlign: "start", textBaseline: "alphabetic" };
+  const stack: { m: Matrix; text: TextState }[] = [];
   const mark = (op: string, x: number, y: number) => {
     points.push({ op, x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] });
   };
@@ -35,9 +53,11 @@ function recordingCtx() {
     mark(op, x + rx, y + ry);
   };
   const ops: Record<string, (...a: number[]) => unknown> = {
-    save: () => stack.push([...m]),
+    save: () => stack.push({ m: [...m], text: { ...text } }),
     restore: () => {
-      m = stack.pop() ?? [...IDENTITY];
+      const top = stack.pop();
+      m = top?.m ?? [...IDENTITY];
+      if (top) text = top.text;
     },
     translate: (x, y) => {
       m = [m[0], m[1], m[2], m[3], m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
@@ -76,30 +96,62 @@ function recordingCtx() {
       mark("fillRect", x + w, y + h);
     },
   };
+  const measure = (s: string) => s.length * fontPx(text.font) * EM_WIDTH;
+  // The ink box of a fillText: its measured width placed by textAlign, its em height
+  // placed by textBaseline.
+  const fillText = (s: string, x: number, y: number, maxWidth?: number) => {
+    const size = fontPx(text.font);
+    const w = Math.min(measure(s), maxWidth ?? Infinity);
+    const align = text.textAlign;
+    const left = align === "center" ? x - w / 2 : align === "right" || align === "end" ? x - w : x;
+    const base = text.textBaseline;
+    const top =
+      base === "middle"
+        ? y - size / 2
+        : base === "top" || base === "hanging"
+          ? y
+          : base === "bottom" || base === "ideographic"
+            ? y - size
+            : y - size * 0.8;
+    mark("fillText", left, top);
+    mark("fillText", left + w, top);
+    mark("fillText", left, top + size);
+    mark("fillText", left + w, top + size);
+  };
   const target: Record<string, unknown> = {};
   const ctx = new Proxy(target, {
     get(t, p: string) {
-      if (p === "measureText") return (s: string) => ({ width: s.length * 8 });
+      if (p === "measureText") return (s: string) => ({ width: measure(s) });
       if (p === "createLinearGradient" || p === "createRadialGradient") {
         return () => ({ addColorStop: () => {} });
       }
-      if (p === "fillText") return (_s: string, x: number, y: number) => mark("fillText", x, y);
+      if (p === "fillText") return fillText;
+      if (p === "font" || p === "textAlign" || p === "textBaseline") return text[p];
       if (p in ops) return ops[p];
       if (p in t) return t[p];
       return () => undefined;
     },
     set(t, p: string, v) {
-      t[p] = v;
+      if (p === "font" || p === "textAlign" || p === "textBaseline") text[p] = String(v);
+      else t[p] = v;
       return true;
     },
   });
   return { ctx: ctx as unknown as CanvasRenderingContext2D, points };
 }
 
-/** Three stage shapes: a 390 phone, the same phone with the keyboard up, a desktop card. */
+/**
+ * The stage shapes: a 390 phone, the same phone with the keyboard up, a 360 phone (and its
+ * keyboard-up card), and a desktop card.
+ */
 const STAGES: Record<string, { panel: RectLike; box: RectLike }> = {
   phone: { panel: { x: 0, y: 0, w: 366, h: 400 }, box: { x: 21, y: 133, w: 324, h: 160 } },
   "phone-kb": { panel: { x: 0, y: 0, w: 366, h: 300 }, box: { x: 21, y: 120, w: 324, h: 96 } },
+  "phone-360": { panel: { x: 0, y: 0, w: 336, h: 400 }, box: { x: 21, y: 133, w: 294, h: 160 } },
+  "phone-360-kb": {
+    panel: { x: 0, y: 0, w: 336, h: 300 },
+    box: { x: 21, y: 120, w: 294, h: 96 },
+  },
   desktop: { panel: { x: 0, y: 0, w: 760, h: 440 }, box: { x: 25, y: 141, w: 710, h: 160 } },
 };
 
@@ -139,7 +191,8 @@ function eachSnapshot(id: string, visit: (g: GameState) => void) {
   }
 }
 
-const SLACK = 8;
+// No slack: every point of the art, text included, stays on the card.
+const SLACK = 0;
 
 function expectInside(
   points: { x: number; y: number; op: string }[],
@@ -158,12 +211,50 @@ function expectInside(
   }
 }
 
-function expectBigTargets(hits: HitRegion[], tag: string) {
+const inRect = (r: RectLike, x: number, y: number) =>
+  x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+
+/**
+ * Probes each target through pickHit as the shell does, rather than reading its declared
+ * size: a fine pointer hits its centre (and, for a glyph target, nothing past the glyph's
+ * own box), and a coarse tap anywhere 21 px out (a 44 px target) hits something, unless it
+ * lands on a neighbouring glyph, where a glyph target must give way to the caret.
+ */
+function expectBigTargets(hits: HitRegion[], layout: StageLayout, tag: string) {
+  const cells = [...layout.cellRects.values()];
+  const probes = [
+    [21, 0],
+    [-21, 0],
+    [0, 21],
+    [0, -21],
+    [15, 15],
+    [-15, 15],
+    [15, -15],
+    [-15, -15],
+  ] as const;
   for (const h of hits) {
-    if (h.shape === "circle") expect(h.r * 2, tag).toBeGreaterThanOrEqual(44);
-    else {
-      expect(h.w, tag).toBeGreaterThanOrEqual(44);
-      expect(h.h, tag).toBeGreaterThanOrEqual(44);
+    const cx = h.shape === "rect" ? h.x + h.w / 2 : h.x;
+    const cy = h.shape === "rect" ? h.y + h.h / 2 : h.y;
+    // A parasite is a glyph target: its own box is the laid-out cell, not the region.
+    const own =
+      h.target.kind === "parasite" ? layout.cellRects.get(Number(h.target.id)) : undefined;
+    expect(pickHit(hits, cx, cy, { coarse: false, cells }), `${tag} centre`).toEqual(h.target);
+    for (const [dx, dy] of probes) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (own && !inRect(own, x, y)) {
+        expect(
+          pickHit(hits, x, y, { coarse: false, cells }),
+          `${tag} fine (${dx}, ${dy})`,
+        ).not.toEqual(h.target);
+      }
+      const got = pickHit(hits, x, y, { coarse: true, cells });
+      const at = `${tag} coarse (${dx}, ${dy})`;
+      if (own && cells.some((c) => c !== own && inRect(c, x, y))) {
+        expect(got, at).not.toEqual(h.target);
+      } else {
+        expect(got, at).not.toBeNull();
+      }
     }
   }
 }
@@ -190,7 +281,7 @@ describe.each(EVENT_DEFS.map((d) => d.id))("%s art", (id) => {
           PAINTERS[id]!(ctx, inst, layout, g, tMs, hits);
           const tag = `${id} ${inst.phase} on ${name} at t=${tMs} (${g.elapsedMs}ms)`;
           expectInside(points, stage.panel, tag);
-          expectBigTargets(hits, tag);
+          expectBigTargets(hits, layout, tag);
           painted += 1;
         }
       }
@@ -229,10 +320,11 @@ describe("finale missiles art", () => {
         for (const tMs of [0, 200, 399]) {
           const { ctx, points } = recordingCtx();
           const hits: HitRegion[] = [];
-          PAINTERS["finale-missiles"]!(ctx, FINALE_INST, layoutFor(g, stage), g, tMs, hits);
+          const layout = layoutFor(g, stage);
+          PAINTERS["finale-missiles"]!(ctx, FINALE_INST, layout, g, tMs, hits);
           const tag = `finale-missiles on ${name} at ${phaseElapsedMs}ms`;
           expectInside(points, stage.panel, tag);
-          expectBigTargets(hits, tag);
+          expectBigTargets(hits, layout, tag);
         }
       }
     }
