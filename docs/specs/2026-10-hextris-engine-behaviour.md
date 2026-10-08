@@ -28,6 +28,8 @@ engine must expose matching actions.
 1. Left arrow or A rotates the hexagon one step counter-clockwise. Right arrow or D rotates it
    one step clockwise. Holding a rotation key repeats the rotation.
 2. Down arrow or S makes pieces fall four times faster while held, and stops on release.
+   Pause, window blur and game over also end the rush; after resuming, the player must press
+   rush again.
 3. Space or P toggles pause. F triggers Panic Clear when it is available (section 8).
 4. Any of Space, Enter, the arrows or A, S, D starts a run from the ready screen. Holding Space
    does not start and then pause.
@@ -65,7 +67,8 @@ engine must expose matching actions.
    its own side, and every cell within one row of it on the two adjacent sides. Cleared bomb
    neighbours score like any other cleared cell.
 6. All cells in the group and any bomb blast are removed in one step. Each cleared cell counts
-   once toward the score and toward the level (section 10).
+   once toward the score and toward the level (section 10). Cells removed by Panic Clear
+   (section 8) do not count toward cells cleared or the level.
 
 ## 5. Gravity and chains
 
@@ -115,7 +118,8 @@ engine must expose matching actions.
    clear. Momentum is capped at 100.
 3. At 100, the player can trigger Panic Clear (key, button or tap). It removes every settled cell
    on every side, scores per section 6.6, and resets momentum to 0. It does nothing below 100,
-   or when paused or over, or when there are no settled cells.
+   or when paused or over, or when there are no settled cells. The cells it removes do not
+   count toward cells cleared, the level or the arcade kills.
 4. Panic Clear does not change the combo level or its window.
 
 ## 9. Shrinking boundary and game over
@@ -170,7 +174,7 @@ React state. At minimum:
 - combo changed (level) and combo expired;
 - clean sweep, panic clear (cells, bonus);
 - momentum changed (value);
-- level changed (rounded level);
+- level changed (the floor of the level, an integer);
 - boundary warning, boundary dropped (new limit);
 - score changed.
 
