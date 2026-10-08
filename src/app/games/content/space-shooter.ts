@@ -13,7 +13,7 @@ export const spaceShooterContent: GameContent = {
     "Slide under asteroids so the automatic cannons break them for points and coins.",
     "Dodge everything you cannot shoot, because one hit ends the run unless a shield protects you.",
     "Fly into power-ups for a shield, triple shot, rapid fire, plasma, warp drive or a coin magnet.",
-    "When the run ends, enter a pilot name to submit your score, or fly again.",
+    "When the run ends, enter a pilot name to submit your score, share it, or fly again: Fly Again counts 3, 2, 1 and starts the next run by itself.",
     "After your first run, open the Shop and spend your coins.",
   ],
   controls: [

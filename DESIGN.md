@@ -439,6 +439,15 @@ current tree on 2026-07-07.
   `checkSpaceShooter`'s budgets; `space-shooter/__tests__/plausibility.test.ts` pins that. Kill
   sounds rise with the combo through `killPitch`, and the combo chip flashes on each new
   `comboTier`; both are cosmetic and never feed scoring.
+- **Orbital Dodge ends with a beat and restarts with a countdown.** A fatal hit freezes the
+  wreck for 90 ms, then runs it at 0.35x for 400 ms (`deathTimeScale` in `space-shooter/death.ts`);
+  only the wreck physics is scaled, so the staged bursts and `onDeath` keep their 2.2 s wall clock.
+  The death card counts score and coins up, shows a score-vs-best bar and the next unlock
+  (`post-run.ts`), and lists where the coins came from (pickups plus the Coin Boost bonus, which
+  is every term `onDeath` banks). Fly Again resets to armed (`resetToArmed`) and starts a 3 s
+  countdown (`countdown.ts`) that starts the run by itself; opening a panel, pressing Escape or
+  pressing Play cancels it. That auto-start follows only an explicit Fly Again tap: a paused run
+  still never resumes itself.
 - **Super Voltorb Flip waits for the player at the end of every round.** The order follows HGSS
   (`voltorb_flip.c`): a win plays the clear fanfare and then the payout over the still-hidden
   board, and only then reveals it; a quit pays out first too (when it banked coins); a loss goes
