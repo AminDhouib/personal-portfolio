@@ -373,6 +373,12 @@ export function HextrisGame() {
       }
       if (f.rotated) setShowTutorial(false);
       if (f.boundaryDropAt !== undefined) boundaryDropAt = f.boundaryDropAt;
+      // A new run or a drop ends the countdown here, before the phase change renders, so Play
+      // again cannot flash the last run's banner for a frame.
+      if (f.boundaryDropAt === null && countdown !== null) {
+        countdown = null;
+        setUiShrinkWarn(null);
+      }
       if (f.over) {
         if (isRecordableRun(f.over.score)) {
           highScores = recordHighScore(highScores, f.over.score);
@@ -818,7 +824,7 @@ export function HextrisGame() {
         </div>
       )}
 
-      {/* Shrink countdown banner — top-center, visible only during the 5s warning. */}
+      {/* Shrink countdown banner: top-center, visible only during the 10s warning. */}
       {uiShrinkWarn !== null && uiState === "playing" && (
         <div
           key={`shrink-${uiShrinkWarn}`}
@@ -839,8 +845,8 @@ export function HextrisGame() {
             className="text-center font-display font-black tracking-tight"
             style={{
               color: milestone.color,
-              // Combo bursts ("×N COMBO!") scale with N. Special events (CLEAN
-              // SWEEP, UNLOCKED announcements) render at fixed sizes — they
+              // Combo bursts ("xN COMBO!" or "xN CHAIN!") scale with N. CLEAN SWEEP,
+              // PANIC CLEAR and BOUNDARY TIGHTENS render at fixed sizes: they
               // have no N for the scaler to read.
               fontSize: (() => {
                 if (milestone.text.startsWith("CLEAN")) return "calc(2.5rem * 2.6)";
