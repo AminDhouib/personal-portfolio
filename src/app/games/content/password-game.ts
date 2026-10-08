@@ -81,6 +81,10 @@ export const passwordGameContent: GameContent = {
       value: "Per seed and daily; name only",
     },
     {
+      label: "Saved here",
+      value: "Best times and daily streak",
+    },
+    {
       label: "Best on",
       value: "Desktop, playable on phones",
     },
@@ -107,9 +111,9 @@ export const passwordGameContent: GameContent = {
         "Yes. On a phone the run opens in a full-screen play sheet that stays above the on-screen keyboard, so the password box and the rule you are working on stay in view. Tap the box to type, and the action buttons are large touch targets. A physical keyboard on desktop is still the fastest way to play.",
     },
     {
-      question: "How long does a run take?",
+      question: "Does the game save my progress?",
       answer:
-        "Longer than a quick puzzle. Events arrive on a schedule, and sooner once you have solved an act's rules. A reload ends the run.",
+        "Only your best times and daily streak, kept in this browser on this device. There is no account and nothing is uploaded. A run in progress is not saved: a reload ends it.",
     },
   ],
   links: [
