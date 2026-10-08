@@ -65,6 +65,7 @@ import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
 import { PanelClose } from "./space-shooter/panel-close";
 import { CountUp } from "./space-shooter/count-up";
 import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/post-run";
+import { shareRun } from "./space-shooter/share";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -2175,32 +2176,19 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                       const file = new File([blob], `orbital-dodge-${Date.now()}.png`, {
                         type: "image/png",
                       });
-                      const nav = navigator as Navigator & {
-                        canShare?: (d: { files: File[] }) => boolean;
-                        share?: (d: {
-                          files: File[];
-                          title?: string;
-                          text?: string;
-                        }) => Promise<void>;
-                      };
-                      if (nav.canShare?.({ files: [file] }) && nav.share) {
-                        try {
-                          await nav.share({
-                            title: "Orbital Dodge",
-                            text: `Score: ${ui.score}`,
-                            files: [file],
-                          });
-                          return;
-                        } catch {
-                          // silent-ok: Web Share API rejected (user cancelled or unsupported); falls through to direct download below
-                        }
-                      }
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = file.name;
-                      a.click();
-                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      await shareRun({
+                        score: ui.score,
+                        file,
+                        nav: navigator,
+                        download: () => {
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = file.name;
+                          a.click();
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        },
+                      });
                     })();
                   }}
                   className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-xs font-bold tracking-wider text-emerald-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
