@@ -215,9 +215,49 @@
   border-radius: 10px;
   background: #ffffff;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background 160ms ease;
+    border-color 700ms ease,
+    box-shadow 700ms ease,
+    background-color 700ms ease,
+    color 700ms ease;
+}
+/* Entrance: a new rule fades in and rises. Removed on animationend (see RuleList). */
+.pg2-rule-enter {
+  animation: pg2-rule-in 500ms ease-out both;
+}
+@keyframes pg2-rule-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Regression: a rule that was passing and now fails shakes once and says why. */
+.pg2-rule-shake {
+  animation: pg2-rule-shake 420ms ease-in-out;
+}
+@keyframes pg2-rule-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+.pg2-rule-reason {
+  color: var(--pg2-invasion);
 }
 .pg2-rule--active {
   border-color: #fca5a5;
@@ -239,6 +279,29 @@
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 13px;
+  position: relative;
+  transition:
+    background-color 700ms ease,
+    color 700ms ease;
+}
+/* The number and the check are stacked and cross-fade on [data-state]. */
+.pg2-badge__num,
+.pg2-badge__check {
+  transition: opacity 220ms ease;
+}
+.pg2-badge__check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+.pg2-badge[data-state="pass"] .pg2-badge__num {
+  opacity: 0;
+}
+.pg2-badge[data-state="pass"] .pg2-badge__check {
+  opacity: 1;
 }
 .pg2-badge--active {
   background: var(--pg2-invasion);
