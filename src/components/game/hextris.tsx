@@ -17,10 +17,12 @@ import { advance, applyAction } from "./hextris/engine/step";
 import type { EngineAction, RunState } from "./hextris/engine/types";
 import { layout, type Layout } from "./hextris/render/layout";
 import { paint } from "./hextris/render/paint";
+import { POPUP_MS, type ShownPopup } from "./hextris/render/juice";
 import {
   feedbackFor,
   musicTempo,
   playCue,
+  shakeAmplitude,
   shrinkCountdown,
   type FeedbackMemo,
   type HapticPattern,
@@ -345,6 +347,13 @@ export function HextrisGame() {
     // Run-clock time of the next boundary drop while its warning is up, and the second shown.
     let boundaryDropAt: number | null = null;
     let countdown: number | null = null;
+    // "+N" popups on the board, each kept for POPUP_MS of run time, and the clear shake.
+    let popups: ShownPopup[] = [];
+    let shakePeak = 0;
+    let shakeStartedAt = 0;
+    let shaking = false;
+    // The shake is the one effect that follows the OS reduced-motion preference.
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
     // Haptic feedback helper — no-op on desktop / unsupported devices.
     // We silently swallow failures since some browsers (iOS Safari) throw.
@@ -375,6 +384,14 @@ export function HextrisGame() {
       }
       if (f.rotated) setShowTutorial(false);
       if (f.countdown !== undefined) setUiCountdown(f.countdown);
+      const bornMs = run.elapsedMs + run.carryMs;
+      for (const popup of f.popups) popups.push({ ...popup, bornMs });
+      if (f.shake > 0 && !reducedMotion) {
+        const now = performance.now();
+        // A new clear shakes from whichever is stronger: its own peak or what is left of the last.
+        shakePeak = Math.max(f.shake, shakeAmplitude(shakePeak, now - shakeStartedAt));
+        shakeStartedAt = now;
+      }
       if (f.boundaryDropAt !== undefined) boundaryDropAt = f.boundaryDropAt;
       // A new run or a drop ends the countdown here, before the phase change renders, so Play
       // again cannot flash the last run's banner for a frame.
@@ -383,6 +400,8 @@ export function HextrisGame() {
         setUiShrinkWarn(null);
       }
       if (f.over) {
+        // The run clock stops at game over, so a popup would hang on the board.
+        popups = [];
         if (isRecordableRun(f.over.score)) {
           highScores = recordHighScore(highScores, f.over.score);
           safeLocalSet("hextris_highscores", JSON.stringify(highScores));
@@ -415,6 +434,20 @@ export function HextrisGame() {
       }
     }
 
+    // Offsets the canvas by the decaying shake, in a fresh random direction each frame.
+    function applyShake(now: number) {
+      const amp = shakeAmplitude(shakePeak, now - shakeStartedAt);
+      if (amp > 0) {
+        const dx = (Math.random() * 2 - 1) * amp;
+        const dy = (Math.random() * 2 - 1) * amp;
+        canvas!.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+        shaking = true;
+      } else if (shaking) {
+        canvas!.style.transform = "";
+        shaking = false;
+      }
+    }
+
     function act(action: EngineAction) {
       applyAction(run, action);
       flush();
@@ -422,6 +455,7 @@ export function HextrisGame() {
 
     function startRun() {
       run = newRun();
+      popups = [];
       sounds.resume(); // Audio contexts require a user gesture to start
       act("start");
     }
@@ -449,7 +483,11 @@ export function HextrisGame() {
         }
         flush();
         syncCountdown();
-        paint(ctx, run, view, run.elapsedMs + run.carryMs);
+        // Run time keeps moving through a hit-stop, so popups and easing play on while it holds.
+        const nowMs = run.elapsedMs + run.carryMs;
+        if (popups.length > 0) popups = popups.filter((p) => nowMs - p.bornMs < POPUP_MS);
+        applyShake(now);
+        paint(ctx, run, view, nowMs, popups);
       } catch (err) {
         cancelAnimationFrame(animRef.current);
         destroyedRef.current = true;

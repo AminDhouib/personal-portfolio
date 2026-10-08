@@ -1,10 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import type { EngineEvent } from "../engine/types";
+import { popupFor, shakeFor } from "../render/juice";
 import {
   COMBO_COLOURS,
   feedbackFor,
   musicTempo,
   playCue,
+  SHAKE_DECAY_MS,
+  shakeAmplitude,
   shrinkCountdown,
   type FeedbackMemo,
 } from "../feedback";
@@ -19,6 +22,18 @@ const clear = (combo: number, chain = false): EngineEvent => ({
   combo,
   chain,
   points: 9 * combo,
+});
+
+type ClearEvent = Extract<EngineEvent, { type: "clear" }>;
+const clearOf = (over: Partial<ClearEvent>): EngineEvent => ({
+  type: "clear",
+  cells: [{ side: 0, row: 0 }],
+  count: 3,
+  colour: 0,
+  combo: 1,
+  chain: false,
+  points: 9,
+  ...over,
 });
 
 const comboUp = (combo: number): EngineEvent => ({ type: "combo", cells: [], combo, points: 0 });
@@ -44,6 +59,8 @@ describe("feedbackFor", () => {
       expect(f.rotated).toBe(false);
       expect(f.boundaryDropAt).toBeUndefined();
       expect(f.countdown).toBeUndefined();
+      expect(f.shake).toBe(0);
+      expect(f.popups).toEqual([]);
     }
   });
 
@@ -74,6 +91,29 @@ describe("feedbackFor", () => {
     expect(go.countdown).toBeNull();
     expect(go.sounds).toEqual([{ cue: "go" }]);
     expect(go.phase).toBeNull();
+  });
+
+  it("shakes for the biggest clear in the batch and pops a +N for each scoring one", () => {
+    const small = clearOf({ cells: [{ side: 1, row: 0 }] });
+    const big = clearOf({
+      cells: [{ side: 4, row: 2 }],
+      count: 5,
+      combo: 2,
+      chain: true,
+      points: 50,
+    });
+    const f = feedbackFor([small, big], memo());
+    expect(f.shake).toBe(shakeFor(5, true));
+    expect(f.shake).toBeGreaterThan(shakeFor(3, false));
+    expect(f.popups).toEqual([popupFor(small), popupFor(big)]);
+    expect(f.popups.map((p) => p.text)).toEqual(["+9", "+50"]);
+  });
+
+  it("still shakes for an away clear but pops nothing for its zero points", () => {
+    const away = clearOf({ count: 4, points: 0 });
+    const f = feedbackFor([away], memo());
+    expect(f.shake).toBe(shakeFor(4, false));
+    expect(f.popups).toEqual([]);
   });
 
   it("maps pause and resume to the shell phase", () => {
@@ -230,6 +270,23 @@ describe("shrinkCountdown", () => {
     expect(shrinkCountdown(70_000, 69_999)).toBe(1);
     expect(shrinkCountdown(70_000, 70_000)).toBeNull();
     expect(shrinkCountdown(70_000, 71_000)).toBeNull();
+  });
+});
+
+describe("shakeAmplitude", () => {
+  it("starts at the peak and dies away to nothing within the decay", () => {
+    expect(shakeAmplitude(6, 0)).toBe(6);
+    const mid = shakeAmplitude(6, SHAKE_DECAY_MS / 2);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(3);
+    expect(shakeAmplitude(6, SHAKE_DECAY_MS)).toBe(0);
+    expect(shakeAmplitude(6, SHAKE_DECAY_MS * 4)).toBe(0);
+    expect(shakeAmplitude(0, 10)).toBe(0);
+  });
+
+  it("decays over 200 to 300 ms", () => {
+    expect(SHAKE_DECAY_MS).toBeGreaterThanOrEqual(200);
+    expect(SHAKE_DECAY_MS).toBeLessThanOrEqual(300);
   });
 });
 

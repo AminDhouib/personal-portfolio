@@ -1,4 +1,5 @@
 import type { EngineEvent } from "./engine/types";
+import { popupFor, shakeFor, type Popup } from "./render/juice";
 import type { HextrisSounds } from "./sound-manager";
 
 // The shell's reading of the engine's events (spec section 11): which sounds play, which
@@ -42,6 +43,10 @@ export interface Feedback {
   boundaryDropAt: number | null | undefined;
   /** The start countdown digit to show; null once GO is called, undefined if unchanged. */
   countdown: number | null | undefined;
+  /** Peak screen shake, in CSS pixels, for the biggest clear in the batch; 0 for none. */
+  shake: number;
+  /** A "+N" for each scoring clear or clean sweep, in event order. */
+  popups: Popup[];
 }
 
 /** What the mapping remembers between batches. */
@@ -77,6 +82,8 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
     rotated: false,
     boundaryDropAt: undefined,
     countdown: undefined,
+    shake: 0,
+    popups: [],
   };
   // A combo burst never replaces a clean sweep, Panic Clear or boundary burst from the same batch.
   let bigMilestone = false;
@@ -88,6 +95,8 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
   let chained = false;
 
   for (const event of events) {
+    const popup = popupFor(event);
+    if (popup) out.popups.push(popup);
     switch (event.type) {
       case "run-start":
         memo.combo = 1;
@@ -126,6 +135,7 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
         else out.haptics.push([20]);
         bombed = false;
         chained = event.chain;
+        out.shake = Math.max(out.shake, shakeFor(event.count, event.chain));
         break;
       case "combo":
         if (event.combo > memo.combo) {
@@ -194,6 +204,16 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
 export function shrinkCountdown(dropAtMs: number, elapsedMs: number): number | null {
   const left = dropAtMs - elapsedMs;
   return left > 0 ? Math.ceil(left / 1000) : null;
+}
+
+/** How long a clear's screen shake takes to die away. */
+export const SHAKE_DECAY_MS = 250;
+
+/** The shake offset `ageMs` after a clear peaked at `peak` CSS pixels: a quadratic ease to 0. */
+export function shakeAmplitude(peak: number, ageMs: number): number {
+  if (peak <= 0 || ageMs >= SHAKE_DECAY_MS) return 0;
+  const left = 1 - Math.max(0, ageMs) / SHAKE_DECAY_MS;
+  return peak * left * left;
 }
 
 /** Gameplay music speeds up with the level: 105 BPM plus two per level, to level 35. */
