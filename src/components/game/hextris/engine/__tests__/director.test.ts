@@ -7,6 +7,7 @@ import {
   makePiece,
   patternBeats,
   pickPattern,
+  refreshLevel,
   spawnIntervalMs,
   type PatternName,
 } from "../director";
@@ -51,6 +52,25 @@ describe("tuning curves", () => {
     expect(levelFor(0, 0)).toBe(1);
     expect(levelFor(100, 45_000)).toBeCloseTo(8, 9);
     expect(levelFor(10_000, 0)).toBe(35);
+  });
+});
+
+describe("refreshLevel", () => {
+  it("reports the whole level when it is crossed, not at the half (decision: floor)", () => {
+    const s = createRun({ seed: 1 });
+    // 0.06 per cell: 25 cells is level 2.5, 16 cells is level 1.96.
+    s.cellsCleared = 16;
+    refreshLevel(s);
+    expect(s.events).toEqual([]);
+    s.cellsCleared = 17;
+    refreshLevel(s);
+    expect(s.events).toEqual([{ type: "level", level: 2 }]);
+    s.cellsCleared = 25;
+    refreshLevel(s);
+    expect(s.events).toHaveLength(1);
+    s.cellsCleared = 34;
+    refreshLevel(s);
+    expect(s.events.at(-1)).toEqual({ type: "level", level: 3 });
   });
 });
 

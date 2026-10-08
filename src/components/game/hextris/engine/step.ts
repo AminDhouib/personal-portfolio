@@ -1,5 +1,5 @@
 import { fallRowsPerSecond, refreshLevel, runDirector } from "./director";
-import { armBoundary, checkGameOver, tickBoundary } from "./limit";
+import { armBoundary, endIfOverflowing, tickBoundary } from "./limit";
 import { resolveClears } from "./match";
 import { panic } from "./momentum";
 import { expireCombo } from "./scoring";
@@ -25,7 +25,7 @@ export function start(state: RunState): void {
   emit(state, { type: "run-start" });
 }
 
-export function togglePause(state: RunState): void {
+export function pauseOrResume(state: RunState): void {
   if (state.phase === "playing") {
     state.phase = "paused";
     // A rush key lifted while paused never reaches the engine, so a pause ends the rush.
@@ -79,7 +79,7 @@ export function applyAction(state: RunState, action: EngineAction): void {
       releaseRush(state);
       return;
     case "toggle-pause":
-      togglePause(state);
+      pauseOrResume(state);
       return;
     case "panic":
       panic(state);
@@ -95,7 +95,7 @@ function settle(state: RunState, piece: Piece): void {
   stack.push({ colour: piece.colour, special: piece.special });
   emit(state, { type: "settle", side, row, colour: piece.colour, special: piece.special });
   resolveClears(state, side, row);
-  checkGameOver(state, side);
+  endIfOverflowing(state, side);
 }
 
 function movePieces(state: RunState): void {
