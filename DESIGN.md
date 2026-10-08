@@ -587,13 +587,21 @@ The following Password Game 2 entries were verified against the current tree on 
   still pending (`playCue` needs a running context), rather than queued and burst out later.
 - **PG2's rule-card motion is a hand-rolled Web Animations FLIP, and it ignores reduced motion on
   purpose** (`stage/flip.ts`, `stage/use-flip.ts`, `.pg2-rule-*` in `pg2.css`). framer-motion is a
-  dependency but is not imported into PG2: the shell re-renders on a 250 ms heartbeat and a hook
-  keyed on rule-order changes stays quiet between reorders and is trivial to test. Games are exempt
+  dependency but is not imported into PG2: the shell re-renders on a 250 ms heartbeat, and a hook
+  that animates only on a rule-order change is trivial to test. `useFlip` reads layout offsets
+  (`offsetTop`, never a transformed rect) after every commit so they cannot go stale, animates only
+  when the order key changes, starts from the card's visual offset when a slide is still in flight,
+  and forgets the previous run's positions when `runId` changes. Games are exempt
   from `prefers-reduced-motion` (see above), so none of this branches on it, and PG2's existing
   reduced-motion block is left as it was. The entrance, reorder, colour blend and shake are
   separate properties on separate elements (the shake and entrance on the card button, the FLIP
   transform on its `li`) so a regression, which also moves the card to the top, plays both.
-  A rule that regresses shows a one-line reason naming the event that is live, or blaming the edit.
+  A rule that regresses shows a one-line reason: the live event's name, or the neutral "This rule
+  is no longer satisfied". The shake, the reason and the fail cue fire only after a player or engine
+  change (a password edit, widget input, or an event rewriting the password); a flip driven by the
+  clock alone just recolours, and a recovery always cues. The reason is announced by one persistent
+  polite region beside the rule list, prefixed "Rule N:" and cleared on recovery so the next
+  regression is read out again; the in-card reason text is `aria-hidden`.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to
