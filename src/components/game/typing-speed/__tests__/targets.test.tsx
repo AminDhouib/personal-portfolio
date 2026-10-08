@@ -63,3 +63,12 @@ describe("44 px targets", () => {
     expectTargets();
   });
 });
+
+describe("the stats bar on a phone", () => {
+  it("keeps the height of its wrapped form so the badges appearing never push the text down", () => {
+    render(<TypingSpeedGame />);
+    // Two wrapped rows (20 px each plus the 8 px row gap) is 48 px: reserve it below sm.
+    const bar = screen.getByTestId("ts-stats");
+    expect(bar).toHaveClass("min-h-12", "content-start", "sm:min-h-0");
+  });
+});
