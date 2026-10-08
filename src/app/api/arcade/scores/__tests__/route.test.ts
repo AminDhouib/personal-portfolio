@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { dailyText } from "@/components/game/typing-speed/engine/daily";
 import { makeJsonPostRequest, uniqueIp } from "@/test/api-route-helpers";
 import { createFakePool } from "@/test/fake-pg";
 
@@ -573,6 +574,44 @@ describe("POST /api/arcade/scores", () => {
       const { res, json } = await submit(tower(220, 20261014));
       expect(res.status).toBe(422);
       expect(json).toEqual({ error: "implausible", reason: "not today's tower" });
+      expect(emu.scores()).toHaveLength(0);
+    });
+  });
+
+  describe("Typing Speed daily text", () => {
+    const L = dailyText("2026-10-08").text.length;
+    const typing = (score: number, day: number, ms = L * 200, chars = L) => ({
+      game: "typing-speed",
+      score,
+      detail: { day, ms, chars, acc: 97 },
+    });
+
+    it("accepts a daily run and writes all three boards from the server clock", async () => {
+      vi.setSystemTime(new Date("2026-10-08T12:00:00.000Z"));
+      const { res, json } = await submit(typing(60, 20261008));
+      expect(res.status).toBe(200);
+      expect(json.ok).toBe(true);
+      expect(emu.scores().map((s) => s.board)).toEqual([
+        "all-time",
+        "weekly:2026-W41",
+        "daily:2026-10-08",
+      ]);
+    });
+
+    it("rejects a run faster than 300 WPM with 422 and writes nothing", async () => {
+      vi.setSystemTime(new Date("2026-10-08T12:00:00.000Z"));
+      const { res, json } = await submit(typing(300, 20261008, L * 40 - 1));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "run shorter than the text allows" });
+      expect(emu.scores()).toHaveLength(0);
+      expect(emu.players().size).toBe(0);
+    });
+
+    it("rejects yesterday's text with 422", async () => {
+      vi.setSystemTime(new Date("2026-10-08T12:00:00.000Z"));
+      const { res, json } = await submit(typing(60, 20261007));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "not today's text" });
       expect(emu.scores()).toHaveLength(0);
     });
   });

@@ -502,7 +502,12 @@ describe("useArcadeBoard", () => {
 
   describe("submitting a score", () => {
     async function mounted(
-      game: "space-shooter" | "hextris" | "super-voltorb-flip" | "tower-stacker" = "space-shooter",
+      game:
+        | "space-shooter"
+        | "hextris"
+        | "super-voltorb-flip"
+        | "tower-stacker"
+        | "typing-speed" = "space-shooter",
     ) {
       fetchMock.mockResolvedValueOnce(okResponse(board([]))); // the mount GET
       const hook = renderHook(() => useArcadeBoard(game));
@@ -658,6 +663,41 @@ describe("useArcadeBoard", () => {
         perfects: 5,
         streak: 5,
         seconds: 7,
+      });
+    });
+
+    it("sends Typing Speed's day, ms, chars and acc as its whole detail", async () => {
+      const { result } = await mounted("typing-speed");
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({
+          name: "Ada",
+          score: 60,
+          day: 20261008,
+          ms: 60_000,
+          chars: 300,
+          acc: 97,
+        });
+      });
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect(body.game).toBe("typing-speed");
+      expect(body.score).toBe(60);
+      expect(body.detail).toEqual({ day: 20261008, ms: 60_000, chars: 300, acc: 97 });
+    });
+
+    it("reads the run off a Typing Speed row", async () => {
+      fetchMock.mockResolvedValueOnce(
+        okResponse(
+          board([serverEntry({ detail: { day: 20261008, ms: 60_000, chars: 300, acc: 97 } })]),
+        ),
+      );
+      const { result } = renderHook(() => useArcadeBoard("typing-speed"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(1));
+      expect(result.current.entries[0]).toMatchObject({
+        day: 20261008,
+        ms: 60_000,
+        chars: 300,
+        acc: 97,
       });
     });
 
