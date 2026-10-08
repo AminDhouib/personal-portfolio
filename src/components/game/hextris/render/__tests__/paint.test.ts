@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { boardState } from "../../engine/__tests__/boards";
-import { SPAWN_ROWS } from "../../engine/state";
 import { rotate } from "../../engine/step";
 import type { RunState } from "../../engine/types";
 import { layout, ringRadius } from "../layout";
@@ -82,7 +81,7 @@ describe("paint", () => {
     expect(ctx.arcs.filter((a) => a.style === COMBO_STROKE)).toEqual([]);
   });
 
-  it("draws nothing outside the canvas, even with full stacks, spawning pieces and a turn", () => {
+  it("draws nothing outside the canvas, even with overflowing stacks and a turn", () => {
     for (const [width, height] of [
       [390, 844],
       [1440, 900],
@@ -90,8 +89,9 @@ describe("paint", () => {
     ] as const) {
       const tall = "abcd".repeat(4).slice(0, 13);
       const s = boardState({ 0: tall, 1: tall, 2: tall, 3: tall, 4: tall, 5: tall });
+      // Pieces just above the stacks; a fresh spawn may start beyond the edge (spec 1.4).
       for (let lane = 0; lane < 6; lane++) {
-        s.falling.push({ id: lane, lane, distance: SPAWN_ROWS, colour: 1, special: "none" });
+        s.falling.push({ id: lane, lane, distance: 13, colour: 1, special: "none" });
       }
       rotate(s, 1);
       for (const nowMs of [s.elapsedMs, s.elapsedMs + 40]) {

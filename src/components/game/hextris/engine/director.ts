@@ -28,7 +28,7 @@ export function spawnIntervalMs(level: number): number {
 }
 
 export function fallRowsPerSecond(level: number): number {
-  return lerpByLevel(level, 2.6, 8.5);
+  return lerpByLevel(level, 5.8, 12);
 }
 
 export function comboWindowMs(level: number): number {
