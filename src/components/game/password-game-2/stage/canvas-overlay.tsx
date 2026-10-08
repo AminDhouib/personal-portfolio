@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { GameState, PointerTarget } from "../engine/types";
 import { PAINTERS, FINALE_INST, type HitRegion, type RectLike, type StageLayout } from "./painters";
+import { pickHit } from "./hit-test";
 import {
   BURST,
   burstAt,
@@ -189,19 +190,9 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
         const rect = canvas.getBoundingClientRect();
         const x = clientX - rect.left;
         const y = clientY - rect.top;
-        // Last registered wins visually, so test newest-first.
-        const hits = hitsRef.current;
-        for (let i = hits.length - 1; i >= 0; i--) {
-          const h = hits[i]!;
-          if (h.shape === "rect") {
-            if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h.target;
-          } else {
-            const dx = x - h.x;
-            const dy = y - h.y;
-            if (dx * dx + dy * dy <= h.r * h.r) return h.target;
-          }
-        }
-        return null;
+        const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+        const cells = [...(layoutRef.current?.cellRects.values() ?? [])];
+        return pickHit(hitsRef.current, x, y, { coarse, cells });
       },
     }),
     [],
