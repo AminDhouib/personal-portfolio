@@ -15,6 +15,11 @@ export function clearPoints(cells: number, combo: number): number {
   return cells * cells * combo;
 }
 
+/** Each event gets its own positions, so a consumer that edits one cannot change another. */
+function copy(cells: Pos[]): Pos[] {
+  return cells.map((p) => ({ side: p.side, row: p.row }));
+}
+
 export function addScore(state: RunState, points: number): void {
   if (points <= 0) return;
   state.score += points;
@@ -47,15 +52,24 @@ export function scoreClear(
   const count = cells.length;
   const points = clearPoints(count, state.combo);
   state.cellsCleared += count;
-  emit(state, { type: "clear", cells, count, colour, combo: state.combo, chain, points });
-  if (chain) emit(state, { type: "chain", cells, combo: state.combo, points });
-  if (state.combo !== before) emit(state, { type: "combo", cells, combo: state.combo, points });
+  emit(state, {
+    type: "clear",
+    cells: copy(cells),
+    count,
+    colour,
+    combo: state.combo,
+    chain,
+    points,
+  });
+  if (chain) emit(state, { type: "chain", cells: copy(cells), combo: state.combo, points });
+  if (state.combo !== before)
+    emit(state, { type: "combo", cells: copy(cells), combo: state.combo, points });
   addScore(state, points);
   addMomentum(state, count, state.combo);
 
   if (boardEmpty && count >= CLEAN_SWEEP_MIN_CELLS) {
     const bonus = CLEAN_SWEEP_PER_COMBO * state.combo;
-    emit(state, { type: "clean-sweep", cells, combo: state.combo, points: bonus });
+    emit(state, { type: "clean-sweep", cells: copy(cells), combo: state.combo, points: bonus });
     addScore(state, bonus);
   }
 }
