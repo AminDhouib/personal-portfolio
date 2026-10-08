@@ -4,6 +4,9 @@ Status: input to the clean-room rewrite (PR T5-3). Read with the T5-3 section of
 plan. This document describes what a player sees and the rules a referee would apply. It is the
 only description of the game the engine implementer may use.
 
+Amended for PR T5-4 (game feel): the countdown (3.7), hit-stop (3.8), the idle guard (6.9) and
+the opening (10.8, 10.9).
+
 ## 1. Board model
 
 1. The board is a hexagon in the centre of the screen with six sides, numbered 0 to 5 going
@@ -37,6 +40,8 @@ engine must expose matching actions.
 6. Rotation and rush do nothing while paused or after game over.
 7. The engine takes these as abstract actions (rotate by one step either way, rush on, rush off,
    pause, panic). It does not read the keyboard.
+8. During the countdown (section 3.7) rotation and rush work and pause holds the countdown.
+   Panic Clear does nothing.
 
 ## 3. Falling and landing
 
@@ -51,6 +56,18 @@ engine must expose matching actions.
    while a clear animates; the animation is a painter concern and the simulation applies the
    clear immediately.
 6. A piece is never destroyed in flight.
+7. Countdown: starting a run does not start play at once. The run first counts down for 2400 ms,
+   showing 3, 2 and 1 for 800 ms each, then GO. Nothing spawns or falls before GO. The player
+   can rotate during the countdown to get ready, and a rush pressed then carries into play.
+   The run clock reads -2400 ms when the run starts and 0 at GO, so elapsed time (section 10.1),
+   the boundary timer (section 9.2) and the run's length in seconds all count from GO. A
+   rotation during the countdown starts the boundary timer at GO.
+8. Hit-stop: a big clear holds the action for a moment. After a clear of 4 or more cells,
+   falling pieces stop and nothing spawns for 60 ms; after a chain clear (section 6.4), for
+   90 ms. A hit-stop that starts during another lasts until whichever ends later. The run
+   clock, the combo window, the level and the boundary timer keep running, rotation still
+   works, and the painter keeps animating. A spawn that falls due during the hold comes out
+   when it ends. The hold is part of the simulation, so it is deterministic.
 
 ## 4. Matching and clearing
 
@@ -99,6 +116,13 @@ engine must expose matching actions.
    the combo level.
 7. Score is an integer and never decreases.
 8. Persistent storage keys for the high score list are unchanged.
+9. Idle guard: a clear scores only while the player is playing. Before the player's first
+   input of the run, and from 8 seconds of play after their last input, the player is away. A
+   clear while away still happens and counts toward cells cleared and the level, but it scores
+   0 points, does not count as a chain, does not change the combo level or restart its window,
+   adds no momentum and earns no clean-sweep bonus. Any input (a rotation, rush on or off,
+   pause, or a Panic Clear attempt) ends the away state at once. Starting the run is not an
+   input.
 
 ## 7. Specials
 
@@ -158,7 +182,15 @@ engine must expose matching actions.
    - zipper: pieces alternate between two opposite sides, six beats. Minimum level 5, weight 3.
 7. Piece colours are random, except that no pattern may emit more than two consecutive pieces
    of the same colour.
-8. The first piece of a run is always a single.
+8. A run opens with the opening (item 9), not with a picked pattern. The director picks its
+   first pattern 1000 ms after GO.
+9. Opening: within the first second after GO, three pieces of one colour arrive in three
+   different lanes. Two come together at GO, in adjacent lanes a and a+1; the third comes
+   900 ms later in lane a+3. The colour and lane a are random. Left alone, they settle as a
+   pair and a single that does not touch it. One clockwise rotation after the pair settles and
+   before the third piece does puts the third beside the pair: a group of three, the run's first
+   match. The opening is the only exception to item 7, and the piece after it never has the
+   opening's colour.
 
 ## 11. Events
 
@@ -166,6 +198,7 @@ The engine emits typed events as it steps. The shell maps them to sound, haptics
 React state. At minimum:
 
 - run started, run paused, run resumed, run ended (with score and cells cleared);
+- countdown (3, 2 or 1) and go (section 3.7);
 - piece spawned, piece settled (side, row, colour, special);
 - rotated (direction);
 - cells cleared (count, colour, combo level, whether chain);
