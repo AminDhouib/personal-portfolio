@@ -508,3 +508,45 @@ describe("combo tier flash", () => {
     expect(g.comboTierUpAt).toBe(123);
   });
 });
+
+describe("coin pickup popup", () => {
+  beforeEach(() => {
+    stubMatchMedia();
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("pops a coins-kind popup when a coin is collected at the ship", () => {
+    const g = createRefs();
+    let clock = 100_000;
+    const spy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    startVulnerableRun(g, clock);
+    g.coins.push({
+      id: 1,
+      x: g.shipX,
+      y: g.shipY,
+      z: g.shipZ,
+      rx: 0,
+      ry: 0,
+      rz: 0,
+      vx: 0,
+      vy: 0,
+      value: 3,
+    });
+    clock += 16;
+    runTick(
+      g,
+      0.016,
+      VIEWPORT,
+      () => {},
+      () => {},
+    );
+    spy.mockRestore();
+    expect(g.coins).toHaveLength(0);
+    expect(g.scorePopups.map((p) => p.kind)).toEqual(["coins"]);
+  });
+});

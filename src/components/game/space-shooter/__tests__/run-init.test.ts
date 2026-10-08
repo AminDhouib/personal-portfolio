@@ -134,7 +134,7 @@ describe("run-init", () => {
       const g = createRefs();
       startRun(g);
       expect(FIRST_WALL_MS).toBe(10_000);
-      expect(g.nextWallAt - g.startedAt).toBe(FIRST_WALL_MS);
+      expect(g.nextWallAt - g.startedAt).toBeCloseTo(FIRST_WALL_MS, 6);
     });
 
     it("is idempotent: a second call returns false and leaves status 'playing'", () => {

@@ -8,6 +8,7 @@ import {
   spawnObstacle,
   spawnPowerUp,
   spawnCoin,
+  spawnScorePopup,
   pickWallGapX,
   spawnWall,
 } from "../spawning";
@@ -302,6 +303,23 @@ describe("spawning", () => {
         expect(Number.isNaN(o.x)).toBe(false);
         expect([0, 1, 2]).toContain(o.shape);
       }
+    });
+  });
+
+  describe("spawnScorePopup", () => {
+    it("defaults to a points popup", () => {
+      vi.spyOn(performance, "now").mockReturnValue(0);
+      const g = baseRefs({ scorePopups: [] });
+      spawnScorePopup(g, 0, 0, 0, 3);
+      expect(g.scorePopups[0]?.kind).toBe("points");
+      expect(g.scorePopups[0]?.amount).toBe(3);
+    });
+
+    it("marks a coin pickup popup with kind coins", () => {
+      vi.spyOn(performance, "now").mockReturnValue(0);
+      const g = baseRefs({ scorePopups: [] });
+      spawnScorePopup(g, 0, 0, 0, 3, "coins");
+      expect(g.scorePopups[0]?.kind).toBe("coins");
     });
   });
 });

@@ -1359,6 +1359,7 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
   const glowTex = useMemo(() => glowTexture(), []);
   useEffect(() => () => geo.dispose(), [geo]);
   const refs = useRef<Map<number, THREE.Group>>(new Map());
+  const trailRefs = useRef<Map<number, THREE.Sprite>>(new Map());
 
   useFrame(() => {
     const g = gameRefs.current;
@@ -1368,6 +1369,19 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
       if (grp) {
         grp.position.set(c.x, c.y, c.z);
         grp.rotation.set(c.rx, c.ry, c.rz);
+      }
+      // Magnetised coins (non-zero lateral velocity) leave a short fading
+      // streak behind them, pointing back from the direction of travel.
+      const trail = trailRefs.current.get(c.id);
+      if (trail) {
+        const speed = Math.hypot(c.vx, c.vy);
+        trail.visible = speed > 0.6;
+        if (trail.visible) {
+          trail.position.set(c.x - c.vx * 0.06, c.y - c.vy * 0.06, c.z);
+          const len = Math.min(1.6, 0.5 + speed * 0.08);
+          trail.scale.set(len, len * 0.6, 1);
+          (trail.material as THREE.SpriteMaterial).opacity = Math.min(0.55, speed * 0.06);
+        }
       }
     }
   });
@@ -1396,6 +1410,25 @@ export function Coins({ gameRefs, tick }: { gameRefs: React.RefObject<GameRefs>;
             />
           </sprite>
         </group>
+      ))}
+      {list.map((c) => (
+        <sprite
+          key={`trail-${c.id}`}
+          visible={false}
+          ref={(el) => {
+            if (el) trailRefs.current.set(c.id, el);
+            else trailRefs.current.delete(c.id);
+          }}
+        >
+          <spriteMaterial
+            map={glowTex}
+            color="#fbbf24"
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            transparent
+            opacity={0}
+          />
+        </sprite>
       ))}
       <group visible={false}>
         <mesh>
@@ -1519,9 +1552,10 @@ export function Explosions({
 
 // Cache for canvas-rendered "+N" textures so each unique amount only creates
 // one texture even if popups spawn frequently.
-const SCORE_TEXTURE_CACHE = new Map<number, THREE.CanvasTexture>();
-function scoreTexture(amount: number): THREE.CanvasTexture {
-  const cached = SCORE_TEXTURE_CACHE.get(amount);
+const SCORE_TEXTURE_CACHE = new Map<string, THREE.CanvasTexture>();
+function scoreTexture(amount: number, kind: "points" | "coins"): THREE.CanvasTexture {
+  const key = `${kind}:${amount}`;
+  const cached = SCORE_TEXTURE_CACHE.get(key);
   if (cached) return cached;
   const c = document.createElement("canvas");
   c.width = 256;
@@ -1532,14 +1566,34 @@ function scoreTexture(amount: number): THREE.CanvasTexture {
   ctx.textBaseline = "middle";
   ctx.lineWidth = 8;
   ctx.strokeStyle = "rgba(0,0,0,0.85)";
-  ctx.fillStyle = "#fde047";
   const txt = `+${amount}`;
-  ctx.strokeText(txt, c.width / 2, c.height / 2);
-  ctx.fillText(txt, c.width / 2, c.height / 2);
+  if (kind === "coins") {
+    // Amber "+N" with a small coin disc to its left.
+    ctx.fillStyle = "#f59e0b";
+    const textW = ctx.measureText(txt).width;
+    const textX = c.width / 2 + 18;
+    ctx.strokeText(txt, textX, c.height / 2);
+    ctx.fillText(txt, textX, c.height / 2);
+    const cx = textX - textW / 2 - 26;
+    ctx.beginPath();
+    ctx.arc(cx, c.height / 2, 20, 0, Math.PI * 2);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#b45309";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, c.height / 2, 9, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = "#e0f2fe";
+    ctx.strokeText(txt, c.width / 2, c.height / 2);
+    ctx.fillText(txt, c.width / 2, c.height / 2);
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
-  SCORE_TEXTURE_CACHE.set(amount, tex);
+  SCORE_TEXTURE_CACHE.set(key, tex);
   return tex;
 }
 
@@ -1573,7 +1627,7 @@ export function ScorePopups({
   return (
     <group>
       {popups.map((p) => {
-        const tex = scoreTexture(p.amount);
+        const tex = scoreTexture(p.amount, p.kind);
         return (
           <sprite
             key={p.id}
