@@ -7,6 +7,7 @@ export function splitWords(text: string): string[] {
   return text.split(" ").filter((w) => w.length > 0);
 }
 
+// Not bounded on purpose: keys are one seed per mount, so growth is a few entries per session.
 const streams = new Map<number, string[]>();
 
 /**
@@ -28,6 +29,7 @@ export function wordAt(seed: number, i: number): string {
   return stream[i] ?? "the";
 }
 
+// Not bounded on purpose: one entry per seed and cycle, a few per session.
 const permutations = new Map<string, readonly Passage[]>();
 
 function permutation(seed: number, cycle: number): readonly Passage[] {
