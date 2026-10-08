@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LOOKAHEAD_WORDS } from "./engine/run";
 import type { TypingRun } from "./engine/types";
 import { nextTrim } from "./line-window";
@@ -36,15 +36,22 @@ export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
   const [trim, setTrim] = useState<{ run: TypingRun; from: number }>({ run, from: 0 });
   const from = Math.min(trim.run === run ? trim.from : 0, run.cursor);
 
-  useLayoutEffect(() => {
-    const els = rootRef.current?.querySelectorAll<HTMLElement>("[data-ts-word]");
-    if (!els || els.length === 0) return;
-    const tops = Array.from(els, (el) => el.offsetTop);
-    const drop = nextTrim(tops, run.cursor - from);
-    if (drop > 0 || trim.run !== run || trim.from !== from) {
-      setTrim({ run, from: from + drop });
-    }
-  });
+  const cursor = run.cursor;
+  useEffect(() => {
+    // Measured after paint, then applied in a frame callback: a line scroll is never urgent.
+    const id = requestAnimationFrame(() => {
+      const els = rootRef.current?.querySelectorAll<HTMLElement>("[data-ts-word]");
+      if (!els || els.length === 0) return;
+      const drop = nextTrim(
+        Array.from(els, (el) => el.offsetTop),
+        cursor - from,
+      );
+      if (drop > 0 || trim.run !== run || trim.from !== from) {
+        setTrim({ run, from: from + drop });
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [run, cursor, from, trim]);
 
   const playing = caret && run.status !== "done";
   const end = Math.min(run.words.length, run.cursor + LOOKAHEAD_WORDS);

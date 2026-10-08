@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyOp, createRun } from "../engine/run";
 import type { TypingRun } from "../engine/types";
@@ -33,6 +33,9 @@ function runAt(wordsDone: number): TypingRun {
   return run;
 }
 
+/** Lets the view's frame callback run. */
+const frame = () => act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+
 const rendered = () =>
   [...document.querySelectorAll("[data-ts-word]")].map((e) => e.getAttribute("data-ts-word"));
 
@@ -41,8 +44,9 @@ describe("TextView three-line window", () => {
     render(<TextView run={runAt(4)} caret />);
     expect(rendered()).toHaveLength(12);
   });
-  it("drops the first line's words when the cursor reaches the third line", () => {
+  it("drops the first line's words when the cursor reaches the third line", async () => {
     render(<TextView run={runAt(6)} caret />);
+    await frame();
     expect(rendered()).toEqual(["3", "4", "5", "6", "7", "8", "9", "10", "11"]);
   });
   it("keeps the full text for screen readers", () => {
