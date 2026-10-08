@@ -590,6 +590,28 @@ The following Password Game 2 entries were verified against the current tree on 
   reserved HUD bands (`hudSlots`), never over the password; the event action chips are DOM buttons
   (44px) in the top band. The old "best played on desktop" banner is gone on purpose. Exit needs a
   second tap. Games are exempt from reduced-motion, so the chip hop is not gated.
+- **Typing Speed plays in a phone sheet** (`typing-speed/play-sheet.tsx`, `sheet-layout.ts`,
+  `typing.css`). Below 1024px (`(max-width: 1023px)`, the PG2 breakpoint) a tap that starts typing
+  (Start, the text, Restart, Again) opens a fixed `z-80` sheet sized by `visualViewport`
+  (`--ts-vv-h`, `--ts-vv-top`) with `typing-lock` on `<html>` while it is open; Exit, finishing a
+  run and unmounting all release the lock. The sheet is the same wrapper element as the page's
+  text stack with a different class, so the text view never remounts when it opens; the page
+  chrome behind it is `inert`. It holds a one-row HUD (time, WPM, Restart, Exit), the three-line
+  text and, only while the keyboard is closed and the viewport is at least 560px, the live graph;
+  nothing in it animates a rise. `sheetLayout` steps the font from 22 to 18px below 420px so the
+  HUD plus three lines always fit. `/games/typing-speed` alone exports
+  `interactiveWidget: "resizes-visual"` through `generateViewport` in `[slug]/page.tsx`, so the
+  keyboard shrinks only the visual viewport there. The hidden input is always mounted (outside the
+  sheet's render), `fixed` at the top of the visible area, 16px so iOS does not zoom, and is
+  focused synchronously inside the tap; Exit and finish blur it, which closes the keyboard. If it
+  loses focus mid-run the sheet says "Tap the text to keep typing" and the clock keeps running
+  (pausing would let a player bank thinking time). Exit abandons the run. On finish the results
+  card is scrolled into view. The visual viewport hook (`src/hooks/use-visual-viewport.ts`, with
+  `viewport-layout.ts`) is shared with PG2; it moved out of PG2's stage folder in this change so
+  neither game imports the other.
+- **The Typing Speed stats bar reserves two rows below `sm`** (`min-h-12 content-start`). At 390px
+  the streak and best badges wrap the bar from one 20px row to two (48px); reserving the height
+  keeps the passage from jumping when they appear at the end of a run.
 - **PG2's consent wall fights back when you switch a toggle off, by design** (`stage/widgets/consent.tsx`,
   `applyConsentMove` in `engine/rules/act1.ts`). Turning a switch OFF flips its seeded neighbor —
   declining one thing brings back something you already declined. That is the intended friction, not

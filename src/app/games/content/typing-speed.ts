@@ -42,12 +42,13 @@ export const typingSpeedContent: GameContent = {
     },
     {
       input: "Phone",
-      action: "Tap Start typing to open the on-screen keyboard. Tap the passage to bring it back.",
+      action:
+        "Tap Start typing. The text stays above the keyboard; tap the text if the keyboard closes.",
     },
   ],
   strategy: [
     "Protect accuracy. Every wrong key stays in your accuracy figure even after you fix it, so slow down a little rather than correct a lot.",
-    "Punctuation and spaces count as characters in your WPM, so do not rush past commas and full stops.",
+    "Punctuation and spaces count toward WPM, so do not rush past commas and full stops.",
     "Watch the flame counter. It appears at 5 correct keystrokes in a row, and one wrong key resets it to zero.",
     "After a run, open the key map. Your most-missed keys are the ones to drill.",
   ],
@@ -74,7 +75,7 @@ export const typingSpeedContent: GameContent = {
     },
     {
       label: "Phones",
-      value: "Yes, with the on-screen keyboard",
+      value: "Yes, the text stays above the keyboard",
     },
   ],
   faq: [

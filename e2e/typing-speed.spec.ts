@@ -111,4 +111,78 @@ test.describe("Typing Speed", () => {
       await context.close();
     }
   });
+
+  test("phone sheet at 390px: Start opens it, the page locks, Exit gives it all back", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    await blockThirdParties(context, baseURL);
+    const page = await context.newPage();
+    try {
+      await page.goto(GAME_PATH);
+      const start = page.getByRole("button", { name: "Start typing" });
+      await expect(start).toBeVisible({ timeout: 20_000 });
+      const text = (await page.getByTestId("ts-target").locator(".sr-only").textContent()) ?? "";
+      await start.tap();
+
+      const sheet = page.getByTestId("ts-sheet");
+      await expect(sheet).toBeVisible();
+      await expect(page.locator("html")).toHaveClass(/typing-lock/);
+      await page.keyboard.type(text.slice(0, 10), { delay: 20 });
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      await sheet.getByRole("button", { name: "Exit" }).tap();
+      await expect(sheet).toHaveCount(0);
+      await expect(page.locator("html")).not.toHaveClass(/typing-lock/);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("the phone stats bar keeps its height when a run ends (390px)", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    await blockThirdParties(context, baseURL);
+    const page = await context.newPage();
+    try {
+      await page.goto(GAME_PATH);
+      await page.getByRole("button", { name: "Quote", exact: true }).tap();
+      const stats = page.getByTestId("ts-stats");
+      const before = (await stats.boundingBox())?.height ?? 0;
+      const passage = (await page.getByTestId("ts-target").locator(".sr-only").textContent()) ?? "";
+      await page.getByRole("button", { name: "Start typing" }).tap();
+      await page.keyboard.type(passage, { delay: 15 });
+      await expect(page.getByTestId("ts-net-wpm")).toBeVisible();
+      await expect(page.getByTestId("ts-sheet")).toHaveCount(0);
+      await expect(page.locator("html")).not.toHaveClass(/typing-lock/);
+      const after = (await stats.boundingBox())?.height ?? 0;
+      expect(after).toBe(before);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("no sheet and no scroll lock at 1440px", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(GAME_PATH);
+    await expect(page.getByTestId("ts-target")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Start typing" }).click();
+    await expect(page.getByTestId("ts-sheet")).toHaveCount(0);
+    await expect(page.locator("html")).not.toHaveClass(/typing-lock/);
+  });
 });
