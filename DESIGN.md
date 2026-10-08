@@ -268,13 +268,13 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
 - **Featured.** The `featured?: true` flag on `GameMeta` (set on `space-shooter` only; pinned by
   `games-meta.test.ts`) picks the featured game through `partitionGames`, never array position.
   `GAMES` order is the registry order and is unchanged.
-- **Today strip.** `TODAY_SOURCES` names four tiles: Password Game 2 (its daily board),
-  Orbital Dodge, Hextris and Super Voltorb Flip (the arcade daily boards). `useHubBoards` starts the four reads once
+- **Today strip.** `TODAY_SOURCES` names five tiles: Password Game 2 (its daily board),
+  Orbital Dodge, Hextris, Super Voltorb Flip and Tower Stacker (the arcade daily boards). `useHubBoards` starts the five reads once
   the strip is within 200px of the viewport (immediately if `IntersectionObserver` is missing),
   never polls, and aborts on unmount. `fetchHubBoard` has its own 5 s timeout, never reports, and
   turns every failure into the "Board unavailable right now" tile.
-- **On this device.** `hub-stats.ts` reads exactly five keys (`space-shooter-hs`,
-  `orbital-dodge-profile`, `hextris_highscores`, `svf:progress`, `typing-high-score`) through
+- **On this device.** `hub-stats.ts` reads exactly six keys (`space-shooter-hs`,
+  `orbital-dodge-profile`, `hextris_highscores`, `svf:progress`, `typing-high-score`, `tower:stats`) through
   guarded parsers, and never writes. `hub-stats.test.ts` pins the key list and the setItem
   absence.
 - **Stable height.** Each island renders the same height before data, while loading, empty,
@@ -902,13 +902,15 @@ The following Password Game 2 entries were verified against the current tree on 
   The tile says "(UTC)". On deploy day the seed moves for players outside UTC (their local date
   and the UTC date differ for part of each day), so that day's daily board mixes the old and new
   puzzles. No migration is needed; the board turns over at 00:00 UTC.
-- **Read cost of the hub.** One visit that reaches the strip issues three arcade reads and
+- **Read cost of the hub.** One visit that reaches the strip issues four arcade reads and
   one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
   who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an
   error; the Password Game 2 read has no rate limit. Both are cacheable for 10 s at the edge.
 - **The Voltorb tile reads the same public daily arcade board the other two do.** The Voltorb daily
   board is keyed by the UTC day on the server, the same day the game seeds from, so unlike Password
-  Game 2 the tile is exactly today's board. The strip is two columns at md and four from xl.
+  Game 2 the tile is exactly today's board. The strip is two columns at md and five from xl; a lone last tile
+  (or chip) spans the row below that, so no card is left alone. "On this device" reads a sixth
+  key, `tower:stats` (best daily and best free score), through `parseTowerStats`, read-only.
 - **The Daily board is one seeded board per UTC day, and the server regenerates it.** The seed is
   `svf-daily-v1-<YYYY-MM-DD>` (UTC, so it agrees with the arcade `daily:` board key) through the pg2
   `fnv1a` and `mulberry32`, then `pickBoardId(5)` and `generateLayout`. The `v1` is a version: change

@@ -272,7 +272,7 @@ test.describe("Today strip", () => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
-    await expect(page.getByTestId("today-tile")).toHaveCount(4);
+    await expect(page.getByTestId("today-tile")).toHaveCount(5);
     await expect(tile(page, "password-game")).toHaveAttribute("data-state", "ready");
     await expect(tile(page, "password-game")).toContainText("Daily run");
     await expect(tile(page, "password-game")).toContainText("Ada");
@@ -314,7 +314,7 @@ test.describe("Today strip", () => {
       storageState: seeded({ ...SEEDED, "arcade:player:v1": '{"id":"should-never-be-sent"}' }),
     });
 
-    test("asks for exactly four public reads and never passes a player id", async ({ page }) => {
+    test("asks for exactly five public reads and never passes a player id", async ({ page }) => {
       const requested = await mockBoards(page, "populated");
       await page.goto("/games");
       await settle(page);
@@ -323,6 +323,7 @@ test.describe("Today strip", () => {
           "/api/arcade/scores?game=hextris&board=daily",
           "/api/arcade/scores?game=space-shooter&board=daily",
           "/api/arcade/scores?game=super-voltorb-flip&board=daily",
+          "/api/arcade/scores?game=tower-stacker&board=daily",
           "/api/password-game-2/leaderboard?daily=1",
         ].sort(),
       );
@@ -347,7 +348,7 @@ test.describe("Today strip", () => {
       expect(top, "the strip must start below the 200px preload margin").toBeGreaterThan(650);
       expect(requested).toEqual([]);
       await settle(page);
-      expect(requested).toHaveLength(4);
+      expect(requested).toHaveLength(5);
     });
   });
 });
@@ -400,7 +401,7 @@ test.describe("On this device", () => {
     await page.goto("/games");
     await expect(page.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     await expect(page.getByTestId("hub-device-caption")).toHaveText(EMPTY_COPY);
-    await expect(page.getByTestId("stat-chip")).toHaveCount(4);
+    await expect(page.getByTestId("stat-chip")).toHaveCount(5);
   });
 
   test.describe("with corrupt stored values", () => {
@@ -578,7 +579,7 @@ test.describe("at phone width", () => {
     const heights = await page
       .locator('[data-testid="today-tile"] a, [data-testid="stat-chip"]')
       .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
-    expect(heights).toHaveLength(TODAY_SOURCES.length + 4);
+    expect(heights).toHaveLength(TODAY_SOURCES.length + 5);
     for (const value of heights) expect(value).toBeGreaterThanOrEqual(44);
   });
 });
@@ -586,11 +587,11 @@ test.describe("at phone width", () => {
 test.describe("at desktop width", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("lays the tiles out in four columns and the chips in four", async ({ page }) => {
+  test("lays the tiles and the chips out in five columns", async ({ page }) => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
-    expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(4);
-    expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(4);
+    expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(5);
+    expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(5);
   });
 });
