@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -23,5 +23,9 @@ describe("public/ ships no third-party analytics", () => {
       return BANNED.some((pattern) => pattern.test(text));
     });
     expect(offenders.map((path) => path.slice(PUBLIC_DIR.length))).toEqual([]);
+  });
+
+  it("no public/tower_stacker/ folder: the game is first-party", () => {
+    expect(existsSync(join(PUBLIC_DIR, "tower_stacker"))).toBe(false);
   });
 });
