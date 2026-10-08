@@ -576,6 +576,22 @@ The following Password Game 2 entries were verified against the current tree on 
   never advances on time; the same pull shortens the wait before submit opens. Measured for seed
   7 with the instant solver: act 1 158.8 s to 17.4 s, act 2 158.0 s to 33.8 s, finale 521.3 s to
   178.3 s.
+- **PG2's sound is on by default once the player taps Start** (`sound/audio.ts`). The stored
+  `pg2-sound` key reads as: absent = on, `"0"` = off, legacy `"1"` = on (the old default was off, so
+  only an explicit `"0"` is an opt-out worth keeping). Nothing plays before the first gesture:
+  `unlockAudio()` runs from the Start tap, the sound toggle, the first pointerdown and the first
+  keydown, creates the context, resumes it when the browser left it suspended, and opens the gate
+  `playCue` checks. Key ticks have their own 30 ms rate limit in the shell, separate from the 150 ms
+  effect-flood debounce, so fast typing is not swallowed.
+- **PG2's rule-card motion is a hand-rolled Web Animations FLIP, and it ignores reduced motion on
+  purpose** (`stage/flip.ts`, `stage/use-flip.ts`, `.pg2-rule-*` in `pg2.css`). framer-motion is a
+  dependency but is not imported into PG2: the shell re-renders on a 250 ms heartbeat and a hook
+  keyed on rule-order changes stays quiet between reorders and is trivial to test. Games are exempt
+  from `prefers-reduced-motion` (see above), so none of this branches on it, and PG2's existing
+  reduced-motion block is left as it was. The entrance, reorder, colour blend and shake are
+  separate properties on separate elements (the shake and entrance on the card button, the FLIP
+  transform on its `li`) so a regression, which also moves the card to the top, plays both.
+  A rule that regresses shows a one-line reason naming the event that is live, or blaming the edit.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to
