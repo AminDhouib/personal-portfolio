@@ -1,4 +1,7 @@
+import { useLayoutEffect, useRef, useState } from "react";
+import { LOOKAHEAD_WORDS } from "./engine/run";
 import type { TypingRun } from "./engine/types";
+import { nextTrim } from "./line-window";
 
 type LetterState = "correct" | "wrong" | "untyped" | "skipped" | "extra";
 
@@ -21,18 +24,38 @@ function letterState(word: string, typed: string, j: number, committed: boolean)
 
 /**
  * The words of a run, one inline-block span per word so a word never breaks
- * mid-way. Letters carry data-state; the caret sits on the next letter, or on
- * the space after a fully typed word. A screen reader gets the plain text.
+ * mid-way. Only three lines show: when the caret reaches the third line, the
+ * first line's words leave the DOM (Monkeytype's approach), which keeps a
+ * 120 s run small. Letters carry data-state; the caret sits on the next
+ * letter, or on the space after a fully typed word. A screen reader gets the
+ * plain full text.
  */
 export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Words before `from` are out of the DOM; a new run starts again at zero.
+  const [trim, setTrim] = useState<{ run: TypingRun; from: number }>({ run, from: 0 });
+  const from = Math.min(trim.run === run ? trim.from : 0, run.cursor);
+
+  useLayoutEffect(() => {
+    const els = rootRef.current?.querySelectorAll<HTMLElement>("[data-ts-word]");
+    if (!els || els.length === 0) return;
+    const tops = Array.from(els, (el) => el.offsetTop);
+    const drop = nextTrim(tops, run.cursor - from);
+    if (drop > 0 || trim.run !== run || trim.from !== from) {
+      setTrim({ run, from: from + drop });
+    }
+  });
+
   const playing = caret && run.status !== "done";
-  const nodes = run.words.map((word, i) => {
+  const end = Math.min(run.words.length, run.cursor + LOOKAHEAD_WORDS);
+  const nodes = run.words.slice(from, end).map((word, k) => {
+    const i = from + k;
     const typed = run.typed[i] ?? "";
     const committed = i < run.cursor;
     const letters = [...word, ...typed.slice(word.length)];
     const caretAt = playing && i === run.cursor ? typed.length : -1;
     return (
-      <span key={i}>
+      <span key={i} data-ts-word={i}>
         <span className="inline-block">
           {letters.map((ch, j) => {
             const state = letterState(word, typed, j, committed);
@@ -63,8 +86,8 @@ export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
     );
   });
   return (
-    <div data-testid="ts-target" className="relative tracking-wide">
-      <div data-ts-visual aria-hidden="true">
+    <div ref={rootRef} data-testid="ts-target" className="relative tracking-wide">
+      <div data-ts-visual aria-hidden="true" className="h-[4.875em] overflow-hidden">
         {nodes}
       </div>
       <span className="sr-only">{run.words.join(" ")}</span>
