@@ -545,6 +545,24 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   system with no detail the new check could verify, so mixing them would put unverifiable numbers
   next to verified ones. Nothing writes the table (a source guard test enforces it) and it is
   never dropped.
+- **An idle Hextris run scores 0, on purpose.** Before T5-4 a run left alone scored about 997:
+  pieces kept landing and matched by chance, and that score could be posted to the board. The
+  guard lives in the engine (spec section 6.9, `AFK_AFTER_MS` in `hextris/engine/scoring.ts`):
+  before the first input, and from 8 s after the last one, the player is away. An away clear
+  still removes its cells and counts toward the level, so the board does not jam, but it scores
+  0 and adds no combo, chain, momentum or clean-sweep bonus. Starting the run is not an input,
+  so a tab opened, started and abandoned scores nothing. Do not "fix" an idle 0. The shell's
+  only UI for it is a quiet "Away" line above the meter after 8 s of play, and
+  `content/__tests__/hextris-copy.test.ts` pins the About copy to the engine's numbers.
+- **The Hextris clear shake follows the OS reduced-motion preference, the one Hextris effect
+  that does.** It is an exception to "Reduced-motion is inverted between chrome and games": the
+  shake moves the whole board (a CSS translate on the canvas, eased to 0 over 250 ms), which is
+  the kind of motion the preference exists for, while the "+N" popups, the countdown and the
+  rest of the game's motion stay ungated. The shell reads `prefers-reduced-motion` once per
+  mount.
+- **The Hextris Panic Clear tip shows once per browser.** `hextris/tips.ts` stores
+  `{"v":1,"panicSeen":true}` under `hextris_tips` as the tip shows, so a reload never shows it
+  again. The games hub never reads that key; `HUB_STAT_KEYS` stays an allowlist of score keys.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
