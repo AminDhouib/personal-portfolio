@@ -35,7 +35,7 @@ export function comboColor(combo: number): string {
 
 export function unlockedVariants(seconds: number): ObstacleVariant[] {
   const list: ObstacleVariant[] = ["basic"];
-  if (seconds > 25) list.push("heavy");
+  if (seconds > 12) list.push("heavy");
   if (seconds > 50) list.push("speeder");
   if (seconds > 90) list.push("shooter");
   if (seconds > 130) list.push("zapper");

@@ -131,12 +131,13 @@ describe("difficulty helpers", () => {
   describe("unlockedVariants", () => {
     it("returns only 'basic' at t=0 and at the first threshold boundary", () => {
       expect(unlockedVariants(0)).toEqual(["basic"]);
-      // Thresholds use strict >, so exactly 25s has NOT unlocked heavy yet.
-      expect(unlockedVariants(25)).toEqual(["basic"]);
+      // Thresholds use strict >, so exactly 12s has NOT unlocked heavy yet.
+      expect(unlockedVariants(11)).toEqual(["basic"]);
+      expect(unlockedVariants(12)).toEqual(["basic"]);
     });
 
     it("adds variants as the exclusive-lower-bound thresholds are passed", () => {
-      expect(unlockedVariants(26)).toEqual(["basic", "heavy"]);
+      expect(unlockedVariants(13)).toEqual(["basic", "heavy"]);
       expect(unlockedVariants(51)).toEqual(["basic", "heavy", "speeder"]);
       expect(unlockedVariants(91)).toEqual(["basic", "heavy", "speeder", "shooter"]);
       expect(unlockedVariants(131)).toEqual(["basic", "heavy", "speeder", "shooter", "zapper"]);
