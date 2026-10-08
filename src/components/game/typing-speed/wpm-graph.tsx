@@ -3,6 +3,12 @@ import { graphPath, niceMax } from "./graph-path";
 
 const W = 600;
 
+const LEGEND = [
+  ["Net WPM", "h-0.5 w-4 rounded bg-accent-green"],
+  ["Raw WPM", "h-0.5 w-4 rounded bg-(--muted)"],
+  ["Errors", "h-3 w-0.5 rounded bg-red-400"],
+] as const;
+
 interface WpmGraphProps {
   points: SeriesPoint[];
   /** Live draws the net line only; full adds raw WPM and a mark per second with errors. */
@@ -20,11 +26,12 @@ export function WpmGraph({ points, variant }: WpmGraphProps) {
   const first = Math.round(net[0] ?? 0);
   const last = Math.round(net.at(-1) ?? 0);
   const peak = Math.round(Math.max(...net));
+  const errorCount = points.reduce((n, p) => n + p.errors, 0);
   const step = points.length > 1 ? W / (points.length - 1) : 0;
-  return (
+  const chart = (
     <svg
       role="img"
-      aria-label={`WPM over time: from ${first} to ${last}, peak ${peak}`}
+      aria-label={`WPM over time: from ${first} to ${last}, peak ${peak}${full ? `, ${errorCount} ${errorCount === 1 ? "error" : "errors"}` : ""}`}
       viewBox={`0 0 ${W} ${h}`}
       preserveAspectRatio="none"
       className={full ? "h-40 w-full" : "h-10 w-full"}
@@ -66,5 +73,22 @@ export function WpmGraph({ points, variant }: WpmGraphProps) {
           ) : null,
         )}
     </svg>
+  );
+  if (!full) return chart;
+  return (
+    <div>
+      {chart}
+      <ul
+        data-testid="ts-graph-legend"
+        className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-(--muted)"
+      >
+        {LEGEND.map(([label, swatch]) => (
+          <li key={label} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className={swatch} />
+            {label}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

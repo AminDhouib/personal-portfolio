@@ -17,8 +17,20 @@ describe("WpmGraph", () => {
     render(<WpmGraph points={points} variant="full" />);
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
-      "WPM over time: from 10 to 50, peak 53",
+      "WPM over time: from 10 to 50, peak 53, 3 errors",
     );
+  });
+  it("the full variant shows a legend for net, raw and errors", () => {
+    render(<WpmGraph points={points} variant="full" />);
+    const legend = screen.getByTestId("ts-graph-legend");
+    expect(legend).toHaveTextContent("Net WPM");
+    expect(legend).toHaveTextContent("Raw WPM");
+    expect(legend).toHaveTextContent("Errors");
+  });
+  it("the live variant has no legend and no error count", () => {
+    render(<WpmGraph points={points} variant="live" />);
+    expect(screen.queryByTestId("ts-graph-legend")).toBeNull();
+    expect(screen.getByRole("img").getAttribute("aria-label")).not.toMatch(/error/);
   });
   it("the live variant draws only the net line", () => {
     const { container } = render(<WpmGraph points={points} variant="live" />);
