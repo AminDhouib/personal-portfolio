@@ -394,7 +394,6 @@ export interface GameRefs {
   warpActiveLast: boolean;
   isMobile: boolean;
   warpIntensity: number;
-  invertedArmed: boolean;
   currentEnv: Environment;
   nextBiomeAt: number;
   nextWallAt: number;

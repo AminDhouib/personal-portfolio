@@ -606,8 +606,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     return navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches;
   }, []);
   // The scene is space: it renders the dark biome palette whatever the site
-  // theme is (gameRefs.invertedArmed stays false, so runTick never lerps to the
-  // light-grey Deep Space env).
+  // theme is.
 
   // sync sound manager with React state
   useEffect(() => {

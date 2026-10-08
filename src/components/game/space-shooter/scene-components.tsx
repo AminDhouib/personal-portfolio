@@ -1723,9 +1723,7 @@ export function SpeedLines({
   useFrame(() => {
     const g = gameRefs.current;
     if (!g) return;
-    // Dark-on-light (invertedArmed) needs higher opacity to register vs.
-    // light-on-dark which can stay subtle.
-    const opacityScale = g.invertedArmed ? 1.0 : 0.7;
+    const opacityScale = 0.7;
     for (let i = 0; i < g.speedLines.length; i++) {
       const m = refs.current[i];
       const l = g.speedLines[i];

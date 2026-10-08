@@ -111,10 +111,9 @@ export function runTick(
     sounds.biomeTransition();
     g.nextBiomeAt = pickNextBiomeDistance(g.distance);
   }
-  // Color target: inverted (light-mode armed) or the current biome.
-  // The lerp handles a smooth cross-fade when the player starts the run.
-  const useInverted = g.invertedArmed && g.status === "armed";
-  const tc = envColors(useInverted ? INVERTED_ARMED_ENV : g.currentEnv);
+  // Color target: the current biome. The lerp handles a smooth cross-fade
+  // when the player starts the run.
+  const tc = envColors(g.currentEnv);
   const colorLerp = Math.min(1, dt * 1.5);
   g.fogColor.lerp(tc.fog, colorLerp);
   g.ambientColor.lerp(tc.ambient, colorLerp);
