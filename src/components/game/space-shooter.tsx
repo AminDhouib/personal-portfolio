@@ -1128,9 +1128,9 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
         </Canvas>
 
         {/* ===== In-canvas HUD — lives inside the 3D viewport =====
-             Also renders on dead screen when the shop modal is open so the
-             Shop button in the death overlay can actually show the shop. */}
-        {(ui.status === "playing" || ui.status === "paused" || shopOpen) && (
+             Also renders on dead screen when the shop or trophies modal is open
+             so their buttons in the overlays can actually show the panel. */}
+        {(ui.status === "playing" || ui.status === "paused" || shopOpen || achievementsOpen) && (
           <>
             {/* Top-left: score + distance + kills — styled to match game aesthetic */}
             {/* Shop modal — only reachable for returning players */}
