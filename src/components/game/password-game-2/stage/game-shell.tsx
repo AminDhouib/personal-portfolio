@@ -44,8 +44,8 @@ import { FAMILY_TINT, activeTelegraphs } from "./telegraph";
 import { hitKindFor, hitLanded, hitSnapshot, shakeFor } from "./hit-fx";
 import { TelegraphBanner } from "./telegraph-banner";
 import { useTelegraphCue } from "./use-telegraph-cue";
-import { useVisualViewport } from "./use-visual-viewport";
-import type { ViewportLayout } from "./viewport-layout";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
+import type { ViewportLayout } from "@/hooks/viewport-layout";
 import "./pg2.css";
 
 /** Valid ?event= ids for the showcase URL param, resolved once from the manifest. */
