@@ -25,6 +25,7 @@ export function useFlip(
   containerRef: RefObject<HTMLElement | null>,
   orderKey: string,
   runId = 0,
+  slide = true,
 ): void {
   const prevTops = useRef<Map<string, number> | null>(null);
   const prevKey = useRef<string | null>(null);
@@ -57,7 +58,7 @@ export function useFlip(
     const reordered = prevKey.current !== null && prevKey.current !== orderKey;
     prevTops.current = next;
     prevKey.current = orderKey;
-    if (!prev || !reordered) return;
+    if (!prev || !reordered || !slide) return;
 
     // A card still mid-flight is painted ty away from its layout offset: restart from where
     // it visibly is, not from where it was laid out, or the second reorder snaps.

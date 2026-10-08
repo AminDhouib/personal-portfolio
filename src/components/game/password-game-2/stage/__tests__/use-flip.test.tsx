@@ -9,9 +9,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function Harness({ order, runId }: { order: string[]; runId?: number }) {
+function Harness({ order, runId, slide }: { order: string[]; runId?: number; slide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFlip(ref, order.join(","), runId);
+  useFlip(ref, order.join(","), runId, slide);
   return (
     <div ref={ref}>
       {order.map((id) => (
@@ -143,6 +143,20 @@ describe("useFlip", () => {
     tops.current = { a: 0, b: 60 };
     rerender(<Harness order={["a", "b"]} runId={2} />);
     expect(animate).toHaveBeenCalledTimes(2); // the new run animates from its own positions
+  });
+
+  it("does not slide a reorder when sliding is off (phone keyboard open), and slides when on", () => {
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as Element["animate"];
+    const tops = { current: { a: 0, b: 60 } as Record<string, number> };
+    mockLayout(tops);
+    const { rerender } = render(<Harness order={["a", "b"]} slide={false} />);
+    tops.current = { a: 60, b: 0 };
+    rerender(<Harness order={["b", "a"]} slide={false} />);
+    expect(animate).not.toHaveBeenCalled();
+    tops.current = { a: 0, b: 60 };
+    rerender(<Harness order={["a", "b"]} slide />);
+    expect(animate).toHaveBeenCalledTimes(2);
   });
 
   it("unmounting mid-animation is harmless", () => {

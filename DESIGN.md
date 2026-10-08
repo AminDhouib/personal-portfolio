@@ -591,7 +591,9 @@ The following Password Game 2 entries were verified against the current tree on 
   that animates only on a rule-order change is trivial to test. `useFlip` reads layout offsets
   (`offsetTop`, never a transformed rect) after every commit so they cannot go stale, animates only
   when the order key changes, starts from the card's visual offset when a slide is still in flight,
-  and forgets the previous run's positions when `runId` changes. Games are exempt
+  and forgets the previous run's positions when `runId` changes. With the phone keyboard open the
+  list does not slide (a ~150 px viewport has no room for it) and the active-rule follow is instant.
+  Games are exempt
   from `prefers-reduced-motion` (see above), so none of this branches on it, and PG2's existing
   reduced-motion block is left as it was. The entrance, reorder, colour blend and shake are
   separate properties on separate elements (the shake and entrance on the card button, the FLIP

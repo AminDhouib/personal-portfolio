@@ -20,15 +20,15 @@ function inFlight(el: HTMLElement): boolean {
 }
 
 /**
- * Smoothly scroll the active rule into view. While a FLIP or entrance animation is moving the
+ * Instantly scroll the active rule into view (instant scrolls cannot fight one another or
+ * the caret reveal). While a FLIP or entrance animation is moving the
  * card, its painted rect is off by the transform, so the target comes from layout offsets
- * (which ignore transforms) against every scrolling ancestor instead. `topInset` is room kept
- * clear at the top (a sticky card).
+ * (which ignore transforms) against every scrolling ancestor instead.
  */
-export function followRule(rule: HTMLElement, topInset = 0): void {
+export function followRule(rule: HTMLElement): void {
   if (!inFlight(rule)) {
     if (typeof rule.scrollIntoView === "function") {
-      rule.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      rule.scrollIntoView({ block: "nearest", behavior: "auto" });
     }
     return;
   }
@@ -41,9 +41,9 @@ export function followRule(rule: HTMLElement, topInset = 0): void {
     const top = layoutTop(rule) - layoutTop(n) - n.clientTop - consumed;
     const bottom = top + rule.offsetHeight;
     let target = n.scrollTop;
-    if (top - topInset < n.scrollTop) target = Math.max(0, top - topInset);
+    if (top < n.scrollTop) target = top;
     else if (bottom > n.scrollTop + n.clientHeight) target = bottom - n.clientHeight;
-    if (target !== n.scrollTop) n.scrollTo({ top: target, behavior: "smooth" });
+    if (target !== n.scrollTop) n.scrollTo({ top: target, behavior: "auto" });
     consumed += target;
   }
 }
