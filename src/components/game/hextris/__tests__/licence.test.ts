@@ -31,7 +31,7 @@ describe("Hextris GPL-3.0 notices", () => {
   it("lists every site module hextris.tsx imports in NOTICE.md", () => {
     const src = readFileSync(join(DIR, "hextris.tsx"), "utf8");
     const notice = readFileSync(join(DIR, "hextris", "NOTICE.md"), "utf8");
-    const specs = [...src.matchAll(/^import[^;]*?from\s+"([^"]+)";/gms)].map((m) => m[1] as string);
+    const specs = [...src.matchAll(/^import[^;]*?from\s+"([^"]+)";/gm)].map((m) => m[1] as string);
     const site = specs
       .filter((s) => s.startsWith("@/") || (s.startsWith("./") && !s.startsWith("./hextris/")))
       .map((s) => (s.startsWith("@/") ? `src/${s.slice(2)}` : `src/components/game/${s.slice(2)}`));
