@@ -263,3 +263,100 @@ describe("Typing Speed modes", () => {
     expect(screen.getByTestId("ts-net-wpm")).toBeInTheDocument();
   });
 });
+
+/** Types the first 40 characters of the current run, one correct keystroke each. */
+function typeAll(from = 0, step = 100): number {
+  const text = screen.getByTestId("ts-target").querySelector(".sr-only")!.textContent!;
+  let t = from;
+  for (const c of text.slice(0, 40)) {
+    typeKey(c, t);
+    t += step;
+  }
+  return t;
+}
+
+function finishTimed(seconds: number) {
+  clock = seconds * 1000;
+  act(() => {
+    vi.advanceTimersByTime(100);
+  });
+}
+
+describe("Typing Speed results and stats", () => {
+  function playWords15() {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    seedMode("words-15");
+    render(<TypingSpeedGame />);
+    typeAll();
+    finishTimed(15);
+  }
+
+  it("records a finished run once in typing:stats", () => {
+    playWords15();
+    const stored = JSON.parse(window.localStorage.getItem(STATS_KEY) ?? "{}");
+    expect(stored.runs).toBe(1);
+    expect(stored.bests["words-15"].wpm).toBeGreaterThan(0);
+    expect(Object.keys(stored.keys).length).toBeGreaterThan(0);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(JSON.parse(window.localStorage.getItem(STATS_KEY) ?? "{}").runs).toBe(1);
+  });
+
+  it("shows the counts, the full graph and the key map on the card", () => {
+    playWords15();
+    expect(screen.getByTestId("ts-net-wpm")).toBeInTheDocument();
+    expect(screen.getByTestId("ts-raw-wpm")).toBeInTheDocument();
+    expect(screen.getByTestId("ts-counts")).toHaveTextContent(/correct.*incorrect.*extra.*missed/i);
+    expect(document.querySelector("svg[role='img'][aria-label^='WPM over time']")).not.toBeNull();
+    expect(document.querySelector("[data-key='e']")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "All runs" })).toBeInTheDocument();
+  });
+
+  it("says New best for the mode only when beating a stored best", () => {
+    playWords15();
+    expect(screen.queryByText(/New best for 15s words/)).toBeNull();
+    cleanup();
+    const stored = JSON.parse(window.localStorage.getItem(STATS_KEY) ?? "{}");
+    stored.bests["words-15"].wpm = 1;
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(stored));
+    clock = 0;
+    render(<TypingSpeedGame />);
+    typeAll();
+    finishTimed(15);
+    expect(screen.getByText(/New best for 15s words/)).toBeInTheDocument();
+  });
+
+  it("does not claim a best on a tie", () => {
+    playWords15();
+    cleanup();
+    clock = 0;
+    render(<TypingSpeedGame />);
+    typeAll();
+    finishTimed(15);
+    expect(screen.queryByText(/New best for 15s words/)).toBeNull();
+  });
+
+  it("writes typing-high-score when any mode beats it", () => {
+    playWords15();
+    expect(Number(window.localStorage.getItem("typing-high-score"))).toBeGreaterThan(0);
+  });
+
+  it("Tab from the input focuses Restart, Enter restarts in the same mode, Escape restarts too", () => {
+    seedMode("words-60");
+    render(<TypingSpeedGame />);
+    typeKey("a", 0);
+    fireEvent.keyDown(getInput(), { key: "Tab" });
+    const restart = screen.getByRole("button", { name: "Restart" });
+    expect(document.activeElement).toBe(restart);
+    fireEvent.click(restart);
+    expect(document.querySelectorAll("[data-state='correct']")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "60 seconds" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    typeKey("a", 0);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(document.querySelectorAll("[data-state='correct']")).toHaveLength(0);
+  });
+});

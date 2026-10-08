@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { RotateCcw, SkipForward, Trophy } from "lucide-react";
-import type { RunMetrics } from "./metrics";
+import type { KeyStats, SeriesPoint } from "./engine/series";
+import { KeyMap } from "./key-map";
+import type { CharCounts, RunMetrics } from "./metrics";
+import { WpmGraph } from "./wpm-graph";
 
 interface ResultsCardProps {
   metrics: RunMetrics;
@@ -9,6 +12,12 @@ interface ResultsCardProps {
   newBest: boolean;
   /** The run took phone suggestions or autocorrect, so it can never count. */
   bulk: boolean;
+  counts: CharCounts;
+  series: SeriesPoint[];
+  runKeys: KeyStats;
+  allKeys: KeyStats;
+  /** Mode label when this run beat a stored best for it, else null. */
+  modeBest: string | null;
   /** Null in timed modes, which have no next passage. */
   onNext: (() => void) | null;
   onAgain: () => void;
@@ -23,6 +32,11 @@ export function ResultsCard({
   maxStreak,
   newBest,
   bulk,
+  counts,
+  series,
+  runKeys,
+  allKeys,
+  modeBest,
   onNext,
   onAgain,
 }: ResultsCardProps) {
@@ -90,6 +104,22 @@ export function ResultsCard({
       <div data-testid="ts-mistakes" className="relative mt-1 text-sm text-(--muted)">
         {metrics.mistakesTyped} {plural(metrics.mistakesTyped, "mistake", "mistakes")} typed,{" "}
         {metrics.mistakesLeft} left
+      </div>
+      {modeBest && (
+        <p className="relative mt-1 flex items-center justify-center gap-1 text-sm font-semibold text-accent-amber">
+          <Trophy className="h-3.5 w-3.5" />
+          New best for {modeBest}
+        </p>
+      )}
+      <div data-testid="ts-counts" className="relative mt-1 text-sm text-(--muted)">
+        {counts.correct} correct, {counts.incorrect} incorrect, {counts.extra} extra,{" "}
+        {counts.missed} missed
+      </div>
+      <div className="relative mt-4">
+        <WpmGraph points={series} variant="full" />
+      </div>
+      <div className="relative mt-4">
+        <KeyMap run={runKeys} all={allKeys} />
       </div>
       {bulk && (
         <p className="relative mt-2 text-xs text-accent-amber">

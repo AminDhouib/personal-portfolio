@@ -4,13 +4,21 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 import { safeLocalSet } from "@/lib/safe-storage";
-import { wpmSeries } from "./typing-speed/engine/series";
-import { configFor, parseMode, type ModeId } from "./typing-speed/engine/modes";
+import { keyStats, wpmSeries, type KeyStats, type SeriesPoint } from "./typing-speed/engine/series";
+import { configFor, modeLabel, parseMode, type ModeId } from "./typing-speed/engine/modes";
 import type { Op, TypingRun } from "./typing-speed/engine/types";
-import { isNewBest, liveWpm, runMetrics, streaks, type RunMetrics } from "./typing-speed/metrics";
+import {
+  charCounts,
+  isNewBest,
+  liveWpm,
+  runMetrics,
+  streaks,
+  type CharCounts,
+  type RunMetrics,
+} from "./typing-speed/metrics";
 import { ModeBar } from "./typing-speed/mode-bar";
 import { ResultsCard } from "./typing-speed/results-card";
-import { loadStats, saveStats } from "./typing-speed/stats";
+import { loadStats, recordRun, saveStats } from "./typing-speed/stats";
 import { TextView } from "./typing-speed/text-view";
 import { useTypingRun } from "./typing-speed/use-typing-run";
 import { WpmGraph } from "./typing-speed/wpm-graph";
@@ -28,6 +36,16 @@ interface Result {
   maxStreak: number;
   newBest: boolean;
   bulk: boolean;
+  counts: CharCounts;
+  series: SeriesPoint[];
+  runKeys: KeyStats;
+  allKeys: KeyStats;
+  /** Set when this run beat a stored best for its mode, e.g. "15s words". */
+  modeBest: string | null;
+}
+
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function drawSeed(): number {
@@ -54,6 +72,7 @@ export function TypingSpeedGame() {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const burstIdRef = useRef(0);
+  const restartRef = useRef<HTMLButtonElement>(null);
 
   const spawnBurst = useCallback(() => {
     const el = containerRef.current?.querySelector("[data-ts-caret]");
@@ -96,9 +115,32 @@ export function TypingSpeedGame() {
         setHighScore(metrics.netWpm);
         safeLocalSet(HIGH_SCORE_KEY, String(metrics.netWpm));
       }
-      setResult({ metrics, maxStreak: streaks(run).best, newBest, bulk });
+      const runKeys = keyStats(run);
+      const before = loadStats();
+      const prior = before.bests[mode];
+      const after = recordRun(before, {
+        mode,
+        netWpm: metrics.netWpm,
+        rawWpm: metrics.rawWpm,
+        accuracy: metrics.accuracy,
+        day: utcDay(),
+        keys: runKeys,
+        bulk: run.bulk,
+      });
+      saveStats(after);
+      setResult({
+        metrics,
+        maxStreak: streaks(run).best,
+        newBest,
+        bulk,
+        counts: charCounts(run),
+        series: wpmSeries(run),
+        runKeys,
+        allKeys: after.keys,
+        modeBest: !bulk && prior && metrics.netWpm > prior.wpm ? modeLabel(mode) : null,
+      });
     },
-    [highScore],
+    [highScore, mode],
   );
 
   const typing = useTypingRun(configFor(mode, seed, passageNo), { inputRef, onFinish, onKey });
@@ -145,6 +187,11 @@ export function TypingSpeedGame() {
       const el = e.target instanceof Element ? e.target : null;
       const inTextField = !!el?.closest("input, textarea, select, [contenteditable='true']");
       const inButton = !!el?.closest("button, a");
+      if (e.key === "Tab" && !e.shiftKey && inTextField && run.status !== "done") {
+        e.preventDefault();
+        restartRef.current?.focus();
+        return;
+      }
       if (e.key === "Escape") {
         if (run.status !== "ready") {
           e.preventDefault();
@@ -325,6 +372,7 @@ export function TypingSpeedGame() {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
+          ref={restartRef}
           onClick={restart}
           className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
         >
@@ -362,6 +410,11 @@ export function TypingSpeedGame() {
           maxStreak={result.maxStreak}
           newBest={result.newBest}
           bulk={result.bulk}
+          counts={result.counts}
+          series={result.series}
+          runKeys={result.runKeys}
+          allKeys={result.allKeys}
+          modeBest={result.modeBest}
           onNext={timed ? null : nextPassage}
           onAgain={restart}
         />
