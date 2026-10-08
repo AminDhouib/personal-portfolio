@@ -236,3 +236,34 @@ describe("audio lifetime", () => {
     expect(closes).toHaveLength(1);
   });
 });
+
+describe("settle timer", () => {
+  it("a quick restart cancels the pending settle, so the next game over still animates", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const miss = () => {
+        let mirror = newRun(freeSeed("e2e"), clock);
+        let t = timeAtOffset(mirror, clock, 205);
+        mirror = advance(mirror, t);
+        dropAt(t);
+        t = timeAtOffset(mirror, t, 205);
+        dropAt(t);
+      };
+      render(<Stage seedText="e2e" />);
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      miss();
+      expect(stage().dataset.phase).toBe("over");
+      fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+      miss();
+      expect(stage().dataset.phase).toBe("over");
+      // The first game over's settle timer must not have fired into this run: the
+      // frame loop is still wanted until this one settles.
+      expect(frames.size).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -230,6 +230,8 @@ export function Stage({ seedText }: { seedText?: string }) {
     setMilestone(null);
     setCallout(null);
     setSettled(false);
+    for (const id of timersRef.current) window.clearTimeout(id);
+    timersRef.current.length = 0;
     setPhaseBoth("live");
     enterSheet();
   }, [seedText, setPhaseBoth, enterSheet]);
