@@ -181,11 +181,14 @@ describe("recordRun", () => {
     expect(s).toMatchObject({ streakDays: 1, lastDailyDay: "2026-10-15" });
   });
 
-  it("a clock that moved backwards does not pull the streak back", () => {
+  it("a last day ahead of the run (a clock that was wrong) restarts the streak on the run's day", () => {
     let s = recordRun(EMPTY_STATS, { mode: "daily", score: 10, day: "2026-10-16" });
     s = recordRun(s, { mode: "daily", score: 10, day: "2026-10-15" });
-    expect(s).toMatchObject({ streakDays: 1, lastDailyDay: "2026-10-16" });
+    expect(s).toMatchObject({ streakDays: 1, lastDailyDay: "2026-10-15", bestStreakDays: 1 });
     expect(s.runs).toBe(2);
+    // The next day then counts again instead of freezing behind the old future date.
+    s = recordRun(s, { mode: "daily", score: 10, day: "2026-10-16" });
+    expect(s).toMatchObject({ streakDays: 2, lastDailyDay: "2026-10-16" });
   });
 });
 
