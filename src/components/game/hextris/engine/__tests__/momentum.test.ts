@@ -27,9 +27,9 @@ describe("momentum", () => {
 });
 
 describe("panic", () => {
-  // Decision (spec 4.6 and 6.6 are silent): panic cells count toward cellsCleared, so they
-  // raise the level and the arcade `kills`, as the plan's Task 5 asks. Counting them keeps the
-  // arcade check's "score needs kills" rule true for a panic-only score.
+  // Spec 4.6 counts only group clears (bomb blasts included) toward the cleared total; spec 6.6
+  // and 8 make Panic Clear a separate 30-per-cell bonus. So panic cells raise neither
+  // cellsCleared, the level, nor the arcade `kills`.
   it("at 100 clears every settled cell for 30 each and resets momentum", () => {
     const s = boardState({ 0: "ab", 3: "cd", 5: "a" });
     s.momentum = 100;
@@ -40,7 +40,7 @@ describe("panic", () => {
     expect(panic(s)).toBe(true);
     expect(sidesOf(s).join("")).toBe("");
     expect(s.score).toBe(50 + 5 * 30);
-    expect(s.cellsCleared).toBe(12);
+    expect(s.cellsCleared).toBe(7);
     expect(s.momentum).toBe(0);
     expect(s.combo).toBe(3);
     expect(s.comboUntilMs).toBe(2000);
@@ -48,13 +48,15 @@ describe("panic", () => {
     expect(ofType(s.events, "momentum").at(-1)?.value).toBe(0);
   });
 
-  it("counts toward the level like any other cleared cell", () => {
+  it("does not count toward the cleared total or the level", () => {
     const s = boardState({ 0: "abcdabcdab", 1: "cdabcdabcd" });
     s.momentum = 100;
-    panic(s);
+    s.cellsCleared = 40;
+    expect(panic(s)).toBe(true);
     refreshLevel(s);
-    expect(s.cellsCleared).toBe(20);
-    expect(s.level).toBeCloseTo(1 + 0.06 * 20, 9);
+    expect(s.cellsCleared).toBe(40);
+    expect(s.level).toBeCloseTo(1 + 0.06 * 40, 9);
+    expect(s.score).toBe(20 * 30);
   });
 
   it("is refused below 100", () => {
