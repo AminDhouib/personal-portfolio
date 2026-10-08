@@ -58,10 +58,10 @@ export const GAMES: GameMeta[] = [
   {
     slug: "tower-stacker",
     title: "Tower Stacker",
-    tagline: "Time the drop, keep the tower steady",
+    tagline: "Time the drop, keep the tower wide",
     description:
-      "Classic crane stacker. A block swings overhead on a rope — tap to drop it onto the tower. Land it clean for a perfect; a miss costs one of your three lives. How tall can you build?",
-    controls: "Click or tap anywhere to drop the block.",
+      "A blueprint-style stacker. A crane swings a block overhead; tap to drop it and the overhang is sliced away. Land dead centre to keep your width. One full miss ends the run. How tall can you build?",
+    controls: "Click, tap, Space or Enter to drop the block.",
     accent: "#f87171",
     accentTailwind: "accent-red",
     hidden: true,

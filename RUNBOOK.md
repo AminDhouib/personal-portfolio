@@ -443,9 +443,14 @@ silently stop it from winning. To emulate the preference in a browser for testin
   click the stage canvas at the chip's visual position (top-right column over the password box,
   38px row stride). The stage canvas also overlays the password box, so a click aimed at the
   text lands on the canvas.
-- **Tower Stacker is not a React game**: a static build in an iframe
-  (`/tower_stacker/game.html`) — start/drop live inside the frame; the game-over overlay and
-  leaderboard form are parent-page React.
+- **Tower Stacker is a canvas game with DOM test seams**: read `data-phase`, `data-floors`,
+  `data-score` and `data-streak` on `[data-testid="tower-stage"]` (phases: ready, live,
+  paused, over) and click `[data-testid="tower-hit-layer"]` or press Space to drop. It pauses
+  by itself when the tab is hidden, the window blurs, or under 35% of the stage is visible, and
+  it never auto-resumes: a headless walk that scrolls the stage away must click Paused to
+  continue. `?tower-seed=abc` makes a run reproducible. With a coarse pointer Start opens a
+  fixed full-screen sheet (`[data-testid="tower-sheet"]`) with an Exit button. It makes no
+  network requests.
 - **Hextris starts from a canvas click** ("Click to start" — no DOM button), and empty-corner
   canvas readbacks can look frozen; sample the centre band.
 
