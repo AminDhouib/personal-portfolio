@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { createRun, nextRandom, SIDES } from "../state";
+import { mulberry32 } from "@/components/game/password-game-2/engine/rng";
+import { createRun, drainEvents, nextRandom, SIDES } from "../state";
 
 describe("createRun", () => {
   it("starts empty, ready, at level 1 with the full boundary", () => {
@@ -30,6 +31,12 @@ describe("createRun", () => {
 });
 
 describe("nextRandom", () => {
+  it("is exactly the mulberry32 stream for the seed", () => {
+    const s = createRun({ seed: 2024 });
+    const reference = mulberry32(2024);
+    for (let i = 0; i < 50; i++) expect(nextRandom(s)).toBe(reference());
+  });
+
   it("is deterministic per seed and advances the stored state", () => {
     const a = createRun({ seed: 99 });
     const b = createRun({ seed: 99 });
@@ -46,5 +53,26 @@ describe("nextRandom", () => {
 
   it("gives different streams for different seeds", () => {
     expect(nextRandom(createRun({ seed: 1 }))).not.toBe(nextRandom(createRun({ seed: 2 })));
+  });
+});
+
+describe("drainEvents", () => {
+  it("hands over the queued events and leaves the queue empty", () => {
+    const s = createRun({ seed: 1 });
+    s.events.push({ type: "run-start" }, { type: "pause" });
+    expect(drainEvents(s)).toEqual([{ type: "run-start" }, { type: "pause" }]);
+    expect(s.events).toEqual([]);
+    expect(drainEvents(s)).toEqual([]);
+  });
+});
+
+describe("a new run", () => {
+  it("starts with a fresh best combo, so specials are locked again", () => {
+    const old = createRun({ seed: 1 });
+    old.bestCombo = 9;
+    old.sides[0]?.push({ colour: 1, special: "bomb" });
+    const fresh = createRun({ seed: 1 });
+    expect(fresh.bestCombo).toBe(1);
+    expect(fresh.sides[0]).toEqual([]);
   });
 });

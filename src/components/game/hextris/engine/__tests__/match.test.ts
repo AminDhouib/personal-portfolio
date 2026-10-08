@@ -87,6 +87,31 @@ describe("resolveClears", () => {
     ]);
   });
 
+  it("clears several groups left by one drop in separate passes, side 0 first", () => {
+    // The a-group at row 1 clears; the drop then leaves a b-group on sides 5 and 0 and a
+    // c-group on sides 2 and 3, which must clear one per pass in scan order.
+    const s = boardState({ 0: "bab", 1: "da", 2: "cac", 3: "dc", 5: "db" });
+    resolveClears(s, 1, 1);
+    expect(sidesOf(s)).toEqual(["", "d", "", "d", "", "d"]);
+    const clears = ofType(s.events, "clear");
+    expect(clears.map((c) => [c.colour, c.count, c.combo, c.chain, c.points])).toEqual([
+      [0, 3, 1, false, 9],
+      [1, 3, 3, true, 27],
+      [2, 3, 5, true, 45],
+    ]);
+    expect(sorted(clears[1]?.cells ?? [])).toEqual([
+      { side: 0, row: 0 },
+      { side: 0, row: 1 },
+      { side: 5, row: 1 },
+    ]);
+    expect(sorted(clears[2]?.cells ?? [])).toEqual([
+      { side: 2, row: 0 },
+      { side: 2, row: 1 },
+      { side: 3, row: 1 },
+    ]);
+    expect(s.score).toBe(81);
+  });
+
   it("lets a rainbow join a group of any colour", () => {
     for (const colour of ["a", "b", "c", "d"]) {
       const s = boardState({ 0: `${colour}*${colour}` });
@@ -116,6 +141,20 @@ describe("resolveClears", () => {
     expect(s.score).toBe(64);
     expect(ofType(s.events, "bomb")).toEqual([{ type: "bomb", side: 0, row: 2 }]);
     expect(ofType(s.events, "clear")[0]?.count).toBe(8);
+  });
+
+  it("blasts across the wrap from side 0 onto side 5", () => {
+    const s = boardState({ 0: "Aaa", 5: "bcd" });
+    resolveClears(s, 0, 2);
+    expect(sidesOf(s)).toEqual(["", "", "", "", "", "d"]);
+    expect(s.cellsCleared).toBe(5);
+  });
+
+  it("blasts across the wrap from side 5 onto side 0", () => {
+    const s = boardState({ 5: "Bbb", 0: "cdca", 4: "dcd" });
+    resolveClears(s, 5, 2);
+    expect(sidesOf(s)).toEqual(["ca", "", "", "", "d", ""]);
+    expect(s.cellsCleared).toBe(7);
   });
 
   it("reports the cleared positions and points on the clear event", () => {
