@@ -9,9 +9,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function Harness({ order }: { order: string[] }) {
+function Harness({ order, runId }: { order: string[]; runId?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFlip(ref, order.join(","));
+  useFlip(ref, order.join(","), runId);
   return (
     <div ref={ref}>
       {order.map((id) => (
@@ -128,6 +128,21 @@ describe("useFlip", () => {
     // a was laid out at 60 and painted at 35; it now belongs at 0, so it starts 35px below.
     expect(first).toContain("translateY(35px)");
     expect(first).not.toContain("translateY(60px)");
+  });
+
+  it("a new runId forgets the old run's positions", () => {
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as Element["animate"];
+    const tops = { current: { a: 0, b: 60 } as Record<string, number> };
+    mockLayout(tops);
+    const { rerender } = render(<Harness order={["a", "b"]} runId={1} />);
+    // The new run reuses the ids but lays them out differently and orders them differently.
+    tops.current = { a: 60, b: 0 };
+    rerender(<Harness order={["b", "a"]} runId={2} />);
+    expect(animate).not.toHaveBeenCalled();
+    tops.current = { a: 0, b: 60 };
+    rerender(<Harness order={["a", "b"]} runId={2} />);
+    expect(animate).toHaveBeenCalledTimes(2); // the new run animates from its own positions
   });
 
   it("unmounting mid-animation is harmless", () => {

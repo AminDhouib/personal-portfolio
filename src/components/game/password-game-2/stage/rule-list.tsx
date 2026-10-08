@@ -540,7 +540,7 @@ export const RuleList = memo(function RuleList({
     ? [firstFailing, ...evaluated.filter((e) => e !== firstFailing)]
     : evaluated;
 
-  useFlip(listRef, ordered.map((e) => e.rule.id).join(","));
+  useFlip(listRef, ordered.map((e) => e.rule.id).join(","), runId);
 
   return (
     <>
