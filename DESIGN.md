@@ -593,7 +593,8 @@ The following Password Game 2 entries were verified against the current tree on 
   when the order key changes, starts from the card's visual offset when a slide is still in flight,
   and forgets the previous run's positions when `runId` changes. With the phone keyboard open the
   list does not slide (a ~150 px viewport has no room for it) and the active rule is followed exactly as in
-  T3-2 (`scrollIntoView({ block: "nearest" })` on its `li`), now from a layout effect.
+  T3-2 (`scrollIntoView({ block: "nearest" })` on its `li`), now from a layout effect. Entrances there fade
+  without the 12 px rise, which would otherwise leave the followed rule's bottom below the fold for ~400 ms.
   Games are exempt
   from `prefers-reduced-motion` (see above), so none of this branches on it, and PG2's existing
   reduced-motion block is left as it was. The entrance, reorder, colour blend and shake are

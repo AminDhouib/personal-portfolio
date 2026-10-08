@@ -18,6 +18,7 @@ interface Opts {
   passing?: Record<string, boolean>;
   liveEvents?: readonly string[];
   runId?: number;
+  slide?: boolean;
   onRuleFlips?: (flips: { regressed: string[]; recovered: string[] }) => void;
 }
 
@@ -44,6 +45,7 @@ function listFor(ids: string[], opts: Opts = {}) {
       version={0}
       validationTick={0}
       runId={opts.runId}
+      slide={opts.slide}
     />
   );
 }
@@ -97,6 +99,18 @@ describe("RuleList motion", () => {
   it("the badge reports a failing rule as fail", () => {
     renderRuleList(["r1"], { passing: { r1: false } });
     expect(card("r1").querySelector("[data-badge]")!.getAttribute("data-state")).toBe("fail");
+  });
+});
+
+describe("RuleList entrance with the keyboard open", () => {
+  it("fades in without the rise, and the fade end still settles the entrance", () => {
+    const { rerender } = renderRuleList(["r1"], { passing: { r1: false }, slide: false });
+    expect(card("r1").className).toContain("pg2-rule-enter--fade");
+    endAnimation(card("r1"), "pg2-rule-fade");
+    expect(card("r1").className).not.toContain("pg2-rule-enter");
+    rerender(listFor(["r1", "r2"], { passing: { r1: false, r2: false }, slide: true }));
+    expect(card("r2").className).toContain("pg2-rule-enter");
+    expect(card("r2").className).not.toContain("pg2-rule-enter--fade");
   });
 });
 
