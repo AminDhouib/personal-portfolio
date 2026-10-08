@@ -84,7 +84,7 @@ export function charCounts(run: TypingRun): CharCounts {
   return out;
 }
 
-function netCharCount(run: TypingRun): number {
+export function netCharCount(run: TypingRun): number {
   let n = 0;
   const upTo = Math.min(run.cursor, run.typed.length - 1);
   for (let i = 0; i <= upTo; i++) {
