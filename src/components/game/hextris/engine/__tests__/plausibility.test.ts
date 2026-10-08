@@ -131,8 +131,8 @@ describe("seeded runs stay plausible for the arcade board", () => {
       }
     }
     // Pinned per seed set, so a change that stops panics firing fails here instead of passing on
-    // no cases. Some random-rotator seeds die before any clear and never qualify.
-    expect(panics).toEqual({ random: 6, greedy: 10 });
+    // no cases. A seed whose run ends before it qualifies never panics.
+    expect(panics).toEqual({ random: 10, greedy: 9 });
   }, 30_000);
 
   it("only ever has momentum once a group of at least 3 has cleared", () => {

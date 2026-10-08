@@ -74,9 +74,15 @@ describe("advance", () => {
   });
 
   it("runs the same ticks for many odd frames as for one call of the same total", () => {
-    const frames = playing(3);
+    // No spawns, so an idle run lives the whole 100 s and only the clock is measured.
+    const quiet = () => {
+      const s = playing(3);
+      s.nextSpawnAtMs = 1e12;
+      return s;
+    };
+    const frames = quiet();
     for (let i = 0; i < 6000; i++) advance(frames, 16.7);
-    const once = playing(3);
+    const once = quiet();
     advance(once, 100_200);
     expect(frames.ticks).toBe(12_024);
     expect(frames).toEqual(once);
@@ -234,16 +240,17 @@ describe("landing", () => {
 
   it("stacks a second piece on top of the first in the same side", () => {
     const s = playing(32);
-    for (let i = 0; i < 2000 && settles(s).length < 2; i++) {
-      advance(s, 50);
-      // Keep every landing on side 0 by turning side 0 toward the lowest piece.
-      const low = [...s.falling].sort((p, q) => p.distance - q.distance)[0];
-      if (low) s.facing = wrapSide(low.lane);
-    }
+    s.nextSpawnAtMs = 1e12;
+    s.falling.push(
+      { id: 1, lane: 2, distance: 4, colour: 0, special: "none" },
+      { id: 2, lane: 2, distance: 2, colour: 1, special: "none" },
+    );
+    for (let i = 0; i < 2000 && settles(s).length < 2; i++) advance(s, 50);
+    const side = wrapSide(2 - s.facing);
     const rows = settles(s).map((e) => [e.side, e.row]);
-    expect(rows.slice(0, 2)).toEqual([
-      [0, 0],
-      [0, 1],
+    expect(rows).toEqual([
+      [side, 0],
+      [side, 1],
     ]);
   });
 });

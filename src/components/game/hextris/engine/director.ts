@@ -105,10 +105,13 @@ export function patternBeats(state: RunState, name: PatternName): number[][] {
   }
 }
 
-/** Deals a piece's colour and special. No colour comes up three times running. */
-export function makePiece(state: RunState, lane: number): Piece {
-  let colour = randomBelow(state, COLOURS);
-  if (state.colourRun >= 2 && colour === state.lastColour) {
+/**
+ * Deals a piece's colour and special. No colour comes up three times running, except in the
+ * opening, which passes its colour in.
+ */
+export function makePiece(state: RunState, lane: number, dealt?: Colour): Piece {
+  let colour: number = dealt ?? randomBelow(state, COLOURS);
+  if (dealt === undefined && state.colourRun >= 2 && colour === state.lastColour) {
     colour = (colour + 1 + randomBelow(state, COLOURS - 1)) % COLOURS;
   }
   state.colourRun = colour === state.lastColour ? state.colourRun + 1 : 1;
@@ -124,13 +127,34 @@ export function makePiece(state: RunState, lane: number): Piece {
   return { id, lane, distance: SPAWN_ROWS, colour: colour as Colour, special };
 }
 
+// The opening (spec section 10.9): a pair at GO, then the third piece this much later, and the
+// first picked pattern after OPENING_MS.
+const OPENING_THIRD_MS = 900;
+const OPENING_MS = 1000;
+
+/**
+ * Queues the opening: one colour, lanes a and a+1 at once and lane a+3 later, so the third
+ * piece lands beside the pair after one clockwise turn.
+ */
+function scheduleOpening(state: RunState, now: number): void {
+  const colour = randomBelow(state, COLOURS) as Colour;
+  const lane = randomBelow(state, SIDES);
+  state.queue.push(
+    { atMs: now, lane, colour },
+    { atMs: now, lane: wrapSide(lane + 1), colour },
+    { atMs: now + OPENING_THIRD_MS, lane: wrapSide(lane + 3), colour },
+  );
+  state.nextSpawnAtMs = now + OPENING_MS;
+}
+
 /** Schedules the next pattern when the last one is done, then releases every due spawn. */
 export function runDirector(state: RunState): void {
   const now = state.elapsedMs;
-  if (state.queue.length === 0 && now >= state.nextSpawnAtMs) {
+  if (state.nextPieceId === 1 && state.queue.length === 0 && now >= state.nextSpawnAtMs) {
+    scheduleOpening(state, now);
+  } else if (state.queue.length === 0 && now >= state.nextSpawnAtMs) {
     const interval = spawnIntervalMs(state.level);
-    // The first piece of a run is always a single (spec section 10.8).
-    const pattern = state.nextPieceId === 1 ? SINGLE : pickPattern(state, state.level);
+    const pattern = pickPattern(state, state.level);
     const beats = patternBeats(state, pattern.name);
     beats.forEach((lanes, beat) => {
       for (const lane of lanes) state.queue.push({ atMs: now + beat * interval, lane });
@@ -140,7 +164,7 @@ export function runDirector(state: RunState): void {
   while (state.queue.length > 0 && (state.queue[0]?.atMs ?? Infinity) <= now) {
     const due = state.queue.shift();
     if (!due) break;
-    const piece = makePiece(state, due.lane);
+    const piece = makePiece(state, due.lane, due.colour);
     state.falling.push(piece);
     emit(state, {
       type: "spawn",

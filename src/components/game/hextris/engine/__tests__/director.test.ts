@@ -11,9 +11,9 @@ import {
   spawnIntervalMs,
   type PatternName,
 } from "../director";
-import { advance } from "../step";
-import { COLOURS, TICK_MS, createRun } from "../state";
-import type { EngineEvent } from "../types";
+import { advance, rotate } from "../step";
+import { COLOURS, TICK_MS, createRun, drainEvents, wrapSide } from "../state";
+import type { EngineEvent, RunState } from "../types";
 import { startedRun } from "./boards";
 
 function levels(): number[] {
@@ -199,35 +199,94 @@ describe("makePiece", () => {
   });
 });
 
-describe("spawning", () => {
-  it("opens a run with a single piece at the outer edge", () => {
-    const s = startedRun(21);
-    advance(s, 100);
-    const spawns = s.events.filter((e): e is Extract<EngineEvent, { type: "spawn" }> => {
-      return e.type === "spawn";
-    });
-    expect(spawns).toHaveLength(1);
-    expect(s.falling).toHaveLength(1);
+type Spawn = Extract<EngineEvent, { type: "spawn" }>;
+
+/** Every spawn with the run time it came out at, ticking from GO for `ms`. */
+function timedSpawns(s: RunState, ms: number): { at: number; spawn: Spawn }[] {
+  const out: { at: number; spawn: Spawn }[] = [];
+  for (let t = 0; t < ms; t += TICK_MS) {
+    advance(s, TICK_MS);
+    for (const e of drainEvents(s)) if (e.type === "spawn") out.push({ at: s.elapsedMs, spawn: e });
+  }
+  return out;
+}
+
+describe("the opening (spec section 10.9)", () => {
+  const SEEDS = Array.from({ length: 20 }, (_, i) => 300 + i * 17);
+
+  it("deals one colour to lanes a and a+1 at GO and to lane a+3 900 ms later", () => {
+    const colours = new Set<number>();
+    const lanes = new Set<number>();
+    for (const seed of SEEDS) {
+      const early = timedSpawns(startedRun(seed), 1000);
+      expect(early, `seed ${seed}`).toHaveLength(3);
+      const [p, q, r] = early;
+      const a = p!.spawn.lane;
+      expect(q!.spawn.lane).toBe(wrapSide(a + 1));
+      expect(r!.spawn.lane).toBe(wrapSide(a + 3));
+      expect(p!.at).toBeLessThanOrEqual(TICK_MS);
+      expect(q!.at).toBe(p!.at);
+      expect(r!.at - p!.at).toBeCloseTo(900, 6);
+      for (const { spawn } of early) {
+        expect(spawn.colour).toBe(p!.spawn.colour);
+        expect(spawn.special).toBe("none");
+      }
+      colours.add(p!.spawn.colour);
+      lanes.add(a);
+    }
+    // The colour and the lanes are random, not fixed.
+    expect(colours.size).toBeGreaterThan(1);
+    expect(lanes.size).toBeGreaterThan(2);
   });
 
-  it("opens with a single even when the level would allow bigger patterns", () => {
-    // Without the first-piece rule, several of these seeds would open with a multi-piece pattern.
-    let wouldBeMulti = 0;
-    for (let seed = 1; seed <= 12; seed++) {
-      if (pickPattern(createRun({ seed }), 20).name !== "single") wouldBeMulti++;
+  it("opens the same way whatever the level", () => {
+    for (const seed of SEEDS.slice(0, 5)) {
       const s = startedRun(seed);
       s.level = 20;
-      advance(s, TICK_MS);
-      expect(s.events.filter((e) => e.type === "spawn")).toHaveLength(1);
+      expect(timedSpawns(s, 1000)).toHaveLength(3);
     }
-    expect(wouldBeMulti).toBeGreaterThan(3);
   });
 
-  it("keeps spawning on the beat for the current level", () => {
+  it("never gives the next piece the opening's colour", () => {
+    for (const seed of SEEDS) {
+      const spawns = timedSpawns(startedRun(seed), 3000);
+      expect(spawns.length).toBeGreaterThan(3);
+      expect(spawns[3]?.spawn.colour).not.toBe(spawns[0]?.spawn.colour);
+    }
+  });
+
+  it("is one clockwise turn from a first match, and no match without it", () => {
+    function playOpening(seed: number, turn: 0 | 1 | -1): EngineEvent[] {
+      const s = startedRun(seed);
+      const events: EngineEvent[] = [];
+      const inFlight = (id: number) => s.falling.some((p) => p.id === id);
+      let turned = false;
+      // The opening is pieces 1 to 3. Play until the third lands, turning once when the pair has.
+      for (let i = 0; i < 2000 && (s.nextPieceId <= 3 || inFlight(3)); i++) {
+        advance(s, TICK_MS);
+        events.push(...drainEvents(s));
+        if (!turned && s.nextPieceId > 2 && !inFlight(1) && !inFlight(2)) {
+          turned = true;
+          if (turn !== 0) rotate(s, turn);
+        }
+      }
+      return events;
+    }
+    for (const seed of SEEDS) {
+      const clears = (turn: 0 | 1 | -1) =>
+        playOpening(seed, turn).filter((e) => e.type === "clear").length;
+      expect(clears(0), `seed ${seed} untouched`).toBe(0);
+      expect(clears(-1), `seed ${seed} counter-clockwise`).toBe(0);
+      expect(clears(1), `seed ${seed} clockwise`).toBe(1);
+    }
+  });
+});
+
+describe("spawning", () => {
+  it("keeps spawning on the beat for the current level after the opening", () => {
     const s = startedRun(22);
-    advance(s, 1500 * 4 + 50);
-    const spawns = s.events.filter((e) => e.type === "spawn");
-    // Level stays near 1 for six seconds, so roughly one beat per 1.5 s.
+    const spawns = timedSpawns(s, 1000 + 1500 * 4 + 50).filter((x) => x.at > 1000);
+    // Level stays near 1 for seven seconds, so roughly one beat per 1.5 s.
     expect(spawns.length).toBeGreaterThanOrEqual(4);
     expect(spawns.length).toBeLessThanOrEqual(6);
   });

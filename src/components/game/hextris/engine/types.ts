@@ -33,6 +33,8 @@ export interface Piece {
 export interface QueuedSpawn {
   atMs: number;
   lane: number;
+  /** Set only for the opening, whose colours are fixed in advance (spec section 10.9). */
+  colour?: Colour;
 }
 
 /** The abstract player actions (spec section 2.7). The engine never reads the keyboard. */
