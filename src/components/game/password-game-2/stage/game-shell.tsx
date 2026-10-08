@@ -40,6 +40,8 @@ import type { RuleFlips } from "./regression";
 import { Hud } from "./hud";
 import { HudActions } from "./hud-actions";
 import { HUD_BOTTOM_H, HUD_TOP_H } from "./hud-slots";
+import { FAMILY_TINT, activeTelegraphs } from "./telegraph";
+import { TelegraphBanner } from "./telegraph-banner";
 import { useVisualViewport } from "./use-visual-viewport";
 import type { ViewportLayout } from "./viewport-layout";
 import "./pg2.css";
@@ -995,9 +997,20 @@ function RunningView({
     }
   });
 
+  // The event winding up soonest tints the card edge in its family colour (pg2.css).
+  const telegraph = activeTelegraphs(g.events)[0];
+
   const play = (
     <div className={playClass}>
-      <div ref={panelRef} data-testid="pg2-stage-card" className={cardClass}>
+      <div
+        ref={panelRef}
+        data-testid="pg2-stage-card"
+        data-telegraph={telegraph?.family}
+        className={cardClass}
+        style={
+          telegraph ? ({ "--pg2-tg": FAMILY_TINT[telegraph.family] } as CSSProperties) : undefined
+        }
+      >
         <Hud
           elapsedMs={g.elapsedMs}
           act={g.act}
@@ -1052,7 +1065,11 @@ function RunningView({
                 onBoxClick={onBoxClick}
                 onBoxPointerDown={focusInput}
               />
-              <div style={{ height: HUD_BOTTOM_H }} data-pg2-hud-bottom aria-hidden="true" />
+              {/* The bottom band: the FUEL meter paints on its left, and the telegraph
+                  banner overlays it, so a warning never moves the box or the rules. */}
+              <div className="relative" style={{ height: HUD_BOTTOM_H }} data-pg2-hud-bottom>
+                <TelegraphBanner g={g} />
+              </div>
 
               {/* Visually-hidden input: summons the mobile soft keyboard. Desktop
                   keydown preventDefault stops it from ever receiving those chars. */}
