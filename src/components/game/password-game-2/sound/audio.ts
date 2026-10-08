@@ -183,12 +183,14 @@ export function unlockAudio(): void {
   const b = getAudio();
   const ctx = b?.ctx;
   if (!ctx || ctx.state !== "suspended" || !ctx.resume) return;
+  void resumeQuietly(ctx);
+}
+
+async function resumeQuietly(ctx: AudioContextLike): Promise<void> {
   try {
-    void ctx.resume().catch(() => {
-      // silent-ok: a refused resume leaves the game silent, which is the safe outcome.
-    });
+    await ctx.resume?.();
   } catch {
-    // silent-ok: a synchronous resume failure is handled the same way.
+    // silent-ok: a refused or failed resume leaves the game silent, the safe outcome.
   }
 }
 
