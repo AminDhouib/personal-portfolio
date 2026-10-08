@@ -94,6 +94,12 @@ export function TypingSpeedGame() {
   const phone = usePhone();
   // The sheet opens on a tap that starts typing and closes on Exit and on finish.
   const [sheetOn, setSheetOn] = useState(false);
+  // Leaving the phone width closes it for good, so coming back never reopens it on a stale run.
+  const [wasPhone, setWasPhone] = useState(phone);
+  if (phone !== wasPhone) {
+    setWasPhone(phone);
+    if (!phone) setSheetOn(false);
+  }
   const sheet = phone && sheetOn;
   const sheetRef = useRef(false);
   const scrollToResults = useRef(false);
@@ -247,7 +253,7 @@ export function TypingSpeedGame() {
       // Tab and Escape belong to the game only from its own input or from outside any field.
       const ownInput = !!el && el === inputRef.current;
       const inButton = !!el?.closest("button, a");
-      if (e.key === "Tab" && !e.shiftKey && ownInput && run.status !== "done") {
+      if (e.key === "Tab" && !e.shiftKey && ownInput && run.status !== "done" && !sheet) {
         e.preventDefault();
         restartRef.current?.focus();
         return;
@@ -277,7 +283,7 @@ export function TypingSpeedGame() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [run, restart, press]);
+  }, [run, restart, press, sheet]);
 
   const metrics = runMetrics(run, typing.now);
   const { current: streak } = streaks(run);
@@ -397,6 +403,7 @@ export function TypingSpeedGame() {
 
       <PlaySheet
         active={sheet}
+        compact={layout.compact}
         viewport={viewport}
         hud={<SheetHud time={timerText} wpm={liveNet} onRestart={restart} onExit={exitSheet} />}
       >
@@ -415,7 +422,9 @@ export function TypingSpeedGame() {
           transition={{ duration: 0.3 }}
           className={
             sheet
-              ? "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-3 font-serif leading-relaxed"
+              ? layout.compact
+                ? "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-1.5 font-serif leading-relaxed"
+                : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-3 font-serif leading-relaxed"
               : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
           }
           onClick={() => !done && startTyping()}
@@ -508,12 +517,14 @@ export function TypingSpeedGame() {
             >
               Start typing
             </button>
-            <p className="text-sm text-(--muted)">Click the text or press any key to start.</p>
+            <p className="text-sm text-(--muted)">
+              {phone ? "Tap the text to start." : "Click the text or press any key to start."}
+            </p>
           </div>
         )}
 
         {done && result && (
-          <div ref={resultsRef}>
+          <div ref={resultsRef} className="scroll-mt-20">
             <ResultsCard
               metrics={result.metrics}
               maxStreak={result.maxStreak}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HUD_PX, PADDING_PX, sheetLayout } from "../sheet-layout";
+import { HUD_PX, contentPx, sheetLayout } from "../sheet-layout";
 
 describe("sheetLayout", () => {
   it("shows the graph only on a tall sheet with the keyboard closed", () => {
@@ -9,21 +9,27 @@ describe("sheetLayout", () => {
     expect(sheetLayout({ vvHeight: 844, keyboardOpen: true }).showGraph).toBe(false);
   });
 
-  it("steps the font down from 22 to 18 px below 420 px", () => {
+  it("steps the font down 22, 18, 14 px as the sheet gets shorter", () => {
     expect(sheetLayout({ vvHeight: 420, keyboardOpen: true }).fontPx).toBe(22);
     expect(sheetLayout({ vvHeight: 419, keyboardOpen: true }).fontPx).toBe(18);
+    expect(sheetLayout({ vvHeight: 230, keyboardOpen: true }).fontPx).toBe(18);
+    expect(sheetLayout({ vvHeight: 229, keyboardOpen: true }).fontPx).toBe(14);
   });
 
-  it("derives the line height from the font", () => {
-    expect(sheetLayout({ vvHeight: 844, keyboardOpen: false }).lineHeightPx).toBe(36);
-    expect(sheetLayout({ vvHeight: 300, keyboardOpen: true }).lineHeightPx).toBe(30);
+  it("goes compact only on the shortest sheets", () => {
+    expect(sheetLayout({ vvHeight: 230, keyboardOpen: true }).compact).toBe(false);
+    expect(sheetLayout({ vvHeight: 229, keyboardOpen: true }).compact).toBe(true);
   });
 
-  it("fits the HUD and three text lines at every height from 280 to 900", () => {
-    for (let vvHeight = 280; vvHeight <= 900; vvHeight++) {
+  it("uses the rendered HUD height: pt-1 plus a 44 px button", () => {
+    expect(HUD_PX).toBe(48);
+  });
+
+  it("fits the HUD and the whole three-line text box from 160 px (landscape, keyboard up) to 900", () => {
+    for (let vvHeight = 160; vvHeight <= 900; vvHeight++) {
       for (const keyboardOpen of [false, true]) {
-        const { lineHeightPx } = sheetLayout({ vvHeight, keyboardOpen });
-        expect(HUD_PX + 3 * lineHeightPx + PADDING_PX).toBeLessThanOrEqual(vvHeight);
+        const layout = sheetLayout({ vvHeight, keyboardOpen });
+        expect(contentPx(layout)).toBeLessThanOrEqual(vvHeight);
       }
     }
   });

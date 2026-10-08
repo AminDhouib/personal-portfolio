@@ -119,6 +119,95 @@ describe("the phone play sheet", () => {
     expect(screen.queryByTestId("ts-live-slot")).toBeNull();
   });
 
+  it("makes the game's own page chrome inert while the sheet is up, on every way out", () => {
+    const setPhone = stubViewportClass(true);
+    fakeVV(844);
+    render(<TypingSpeedGame />);
+    const inertCount = () => document.querySelectorAll("[inert]").length;
+    expect(inertCount()).toBe(0);
+    start();
+    expect(inertCount()).toBe(2);
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    expect(inertCount()).toBe(0);
+    start();
+    expect(inertCount()).toBe(2);
+    for (const ch of "ab cd") typeInto(getInput(), getInput().value + ch);
+    expect(inertCount()).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: /again/i }));
+    expect(inertCount()).toBe(2);
+    setPhone(false);
+    expect(inertCount()).toBe(0);
+  });
+
+  it("does not reopen on a finished run when the width goes back under 1024 px", () => {
+    const setPhone = stubViewportClass(true);
+    fakeVV(844);
+    render(<TypingSpeedGame />);
+    start();
+    setPhone(false);
+    expect(screen.queryByTestId("ts-sheet")).toBeNull();
+    for (const ch of "ab cd") typeInto(getInput(), getInput().value + ch);
+    expect(screen.getByTestId("ts-net-wpm")).toBeInTheDocument();
+    setPhone(true);
+    expect(screen.queryByTestId("ts-sheet")).toBeNull();
+    expect(document.documentElement).not.toHaveClass("typing-lock");
+  });
+
+  it("keeps the hidden input at the top of the visible area as the viewport scrolls", () => {
+    stubViewportClass(true);
+    const vv = fakeVV(844);
+    render(<TypingSpeedGame />);
+    start();
+    act(() => {
+      vv.height = 450;
+      vv.offsetTop = 120;
+      vv.dispatchEvent(new Event("scroll"));
+    });
+    expect(getInput().style.top).toBe("120px");
+    expect(screen.getByTestId("ts-sheet").style.getPropertyValue("--ts-vv-top")).toBe("120px");
+  });
+
+  it("scrolls the results clear of the fixed navbar", () => {
+    stubViewportClass(true);
+    fakeVV(844);
+    render(<TypingSpeedGame />);
+    start();
+    for (const ch of "ab cd") typeInto(getInput(), getInput().value + ch);
+    expect(screen.getByTestId("ts-net-wpm").closest(".scroll-mt-20")).not.toBeNull();
+  });
+
+  it("keeps the keyboard up when a HUD button is pressed", () => {
+    stubViewportClass(true);
+    fakeVV(844);
+    render(<TypingSpeedGame />);
+    start();
+    const down = new Event("pointerdown", { bubbles: true, cancelable: true });
+    within(screen.getByTestId("ts-sheet"))
+      .getByRole("button", { name: "Restart" })
+      .dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+  });
+
+  it("tells a phone player to tap, and a desktop player to click or press a key", () => {
+    stubViewportClass(true);
+    fakeVV(844);
+    const { unmount } = render(<TypingSpeedGame />);
+    expect(screen.getByText("Tap the text to start.")).toBeInTheDocument();
+    unmount();
+    stubViewportClass(false);
+    render(<TypingSpeedGame />);
+    expect(screen.getByText(/press any key to start/)).toBeInTheDocument();
+  });
+
+  it("squeezes the text to 14 px on a landscape phone with the keyboard up", () => {
+    stubViewportClass(true);
+    const vv = fakeVV(390, 844);
+    render(<TypingSpeedGame />);
+    start();
+    resizeVV(vv, 200);
+    expect(screen.getByTestId("ts-target").parentElement!.style.fontSize).toBe("14px");
+  });
+
   it("Restart in the sheet starts over and keeps the input focused", () => {
     stubViewportClass(true);
     fakeVV(844);
