@@ -685,7 +685,7 @@ export function HextrisGame() {
       )}
 
       {/* HUD — top-left chip. `key` pulse forces a brief scale animation on score change. */}
-      <div className="absolute top-3 left-3 flex max-w-[calc(100%-140px)] flex-wrap items-center gap-2">
+      <div className="absolute top-3 left-3 flex max-w-[calc(100%-172px)] flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-xs text-white/60 backdrop-blur">
           <span className="text-accent-pink/90">SCORE</span>
           <span
@@ -720,7 +720,7 @@ export function HextrisGame() {
             <button
               type="button"
               onClick={() => panicRef.current()}
-              className="hextris-score-pulse pointer-events-auto flex w-full items-center justify-center gap-2 rounded-lg border-2 border-accent-purple bg-gradient-to-r from-accent-purple/40 via-accent-pink/40 to-accent-purple/40 px-4 py-3 font-mono text-sm text-white shadow-lg shadow-accent-purple/50 transition-all hover:brightness-110 active:scale-95"
+              className="hextris-score-pulse pointer-events-auto flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border-2 border-accent-purple bg-gradient-to-r from-accent-purple/40 via-accent-pink/40 to-accent-purple/40 px-4 py-3 font-mono text-sm text-white shadow-lg shadow-accent-purple/50 transition-all hover:brightness-110 active:scale-95"
               title="Purge the board (F)"
               aria-label="Panic Clear"
             >
@@ -754,7 +754,7 @@ export function HextrisGame() {
           <button
             type="button"
             onClick={() => pauseRef.current()}
-            className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
             aria-label={uiState === "paused" ? "Resume" : "Pause"}
             title={uiState === "paused" ? "Resume" : "Pause"}
           >
@@ -768,7 +768,7 @@ export function HextrisGame() {
         <button
           type="button"
           onClick={() => setSoundEnabled((v) => !v)}
-          className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
           aria-label={soundEnabled ? "Mute" : "Unmute"}
           title={soundEnabled ? "Mute" : "Unmute"}
         >
@@ -779,7 +779,7 @@ export function HextrisGame() {
           onClick={() => {
             void toggleFullscreen();
           }}
-          className="flex items-center justify-center rounded-md border border-white/10 bg-black/40 px-2 py-1.5 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/60 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
           aria-label={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
           title={isFullscreen || mobileImmersive ? "Exit fullscreen" : "Enter fullscreen"}
         >
@@ -884,7 +884,7 @@ export function HextrisGame() {
       {uiShrinkWarn !== null && uiState === "playing" && (
         <div
           key={`shrink-${uiShrinkWarn}`}
-          className="hextris-combo-pop absolute top-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-md border border-accent-red/60 bg-accent-red/15 px-3 py-1.5 font-mono text-xs text-accent-red backdrop-blur"
+          className="hextris-combo-pop absolute top-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-md border border-accent-red/60 bg-accent-red/15 px-3 py-1.5 font-mono text-xs text-accent-red backdrop-blur"
         >
           <span className="font-bold tracking-wider uppercase">Boundary shrinks</span>
           <span className="text-sm font-bold text-white tabular-nums">{uiShrinkWarn}s</span>
@@ -1003,7 +1003,7 @@ export function HextrisGame() {
                 }}
                 placeholder="Your name"
                 maxLength={12}
-                className="flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-sm text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none"
+                className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:text-sm"
               />
               <button
                 type="button"
@@ -1016,7 +1016,7 @@ export function HextrisGame() {
                   submitState === "rejected" ||
                   !playerName.trim()
                 }
-                className="rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-h-11 rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {submitState === "submitting"
                   ? "..."
