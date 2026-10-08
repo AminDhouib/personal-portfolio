@@ -78,4 +78,38 @@ describe("shareRun", () => {
     });
     expect(out).toEqual({ shared: false, copied: true, downloaded: true });
   });
+
+  it("does nothing more when the user dismisses the native share sheet", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const download = vi.fn();
+    const out = await shareRun({
+      score: 5,
+      file,
+      nav: {
+        canShare: () => true,
+        share: vi.fn().mockRejectedValue(new DOMException("dismissed", "AbortError")),
+        clipboard: { writeText },
+      },
+      download,
+    });
+    expect(out).toEqual({ shared: false, copied: false, downloaded: false });
+    expect(writeText).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("still falls through for a non-abort DOMException from the native share", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const download = vi.fn();
+    const out = await shareRun({
+      score: 5,
+      file,
+      nav: {
+        canShare: () => true,
+        share: vi.fn().mockRejectedValue(new DOMException("nope", "NotAllowedError")),
+        clipboard: { writeText },
+      },
+      download,
+    });
+    expect(out).toEqual({ shared: false, copied: true, downloaded: true });
+  });
 });

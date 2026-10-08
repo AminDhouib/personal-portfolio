@@ -11,8 +11,9 @@ interface ShareNav {
 }
 
 /**
- * Native file share when available; otherwise (or if the share is cancelled)
- * copy the text to the clipboard and download the image.
+ * Native file share when available; otherwise (or if the share fails for a
+ * reason other than the user dismissing it) copy the text to the clipboard and
+ * download the image. A dismissed share sheet does nothing further.
  */
 export async function shareRun(input: {
   score: number;
@@ -26,8 +27,12 @@ export async function shareRun(input: {
     try {
       await nav.share({ title: "Orbital Dodge", text, files: [file] });
       return { shared: true, copied: false, downloaded: false };
-    } catch {
-      // silent-ok: Web Share API rejected (user cancelled or unsupported); falls through to copy and download below
+    } catch (e) {
+      // The user dismissed the share sheet: they chose not to share, so no copy and no download.
+      if (e instanceof DOMException && e.name === "AbortError") {
+        return { shared: false, copied: false, downloaded: false };
+      }
+      // silent-ok: Web Share API rejected (unsupported or blocked); falls through to copy and download below
     }
   }
   let copied = false;
