@@ -57,6 +57,8 @@ export function HextrisGame() {
   const [uiScore, setUiScore] = useState(0);
   const [uiMomentum, setUiMomentum] = useState(0);
   const [uiShrinkWarn, setUiShrinkWarn] = useState<number | null>(null);
+  // The 3, 2, 1 before GO; null once play starts.
+  const [uiCountdown, setUiCountdown] = useState<number | null>(null);
   const [uiHigh, setUiHigh] = useState(0);
   const [uiCombo, setUiCombo] = useState(1);
   // The finished run, for the game-over card and the arcade submission.
@@ -372,6 +374,7 @@ export function HextrisGame() {
         setMilestone({ id: milestoneId, ...f.milestone });
       }
       if (f.rotated) setShowTutorial(false);
+      if (f.countdown !== undefined) setUiCountdown(f.countdown);
       if (f.boundaryDropAt !== undefined) boundaryDropAt = f.boundaryDropAt;
       // A new run or a drop ends the countdown here, before the phase change renders, so Play
       // again cannot flash the last run's banner for a frame.
@@ -822,6 +825,19 @@ export function HextrisGame() {
             {!isTouchDevice && (
               <div className="mt-3 font-mono text-[10px] text-white/40">or press Space</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Start countdown: each number pops in over the board until GO. */}
+      {uiCountdown !== null && uiState === "playing" && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <div
+            key={uiCountdown}
+            className="hextris-combo-pop font-display text-8xl font-black text-white tabular-nums"
+            style={{ textShadow: "0 0 4px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 0, 0, 0.85)" }}
+          >
+            {uiCountdown}
           </div>
         </div>
       )}
