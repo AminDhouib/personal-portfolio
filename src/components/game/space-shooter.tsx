@@ -21,7 +21,6 @@ import {
   ShoppingCart,
   Magnet,
   Coins as CoinsIcon,
-  X as XIcon,
   Share2,
 } from "lucide-react";
 import {
@@ -63,6 +62,7 @@ import {
   tryDash,
 } from "./space-shooter/types";
 import { isWorldRecord } from "./space-shooter/celebration";
+import { PanelClose } from "./space-shooter/panel-close";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
@@ -105,12 +105,16 @@ function SettingsToggle({
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-10 rounded-full transition ${checked ? "bg-emerald-500" : "bg-slate-600"}`}
+        className="flex h-11 w-14 shrink-0 items-center justify-center"
         aria-pressed={checked}
       >
         <span
-          className={`block h-5 w-5 rounded-full bg-white transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}
-        />
+          className={`relative block h-6 w-10 rounded-full transition ${checked ? "bg-emerald-500" : "bg-slate-600"}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0 block h-5 w-5 rounded-full bg-white transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}
+          />
+        </span>
       </button>
     </label>
   );
@@ -1174,13 +1178,7 @@ export function SpaceShooterGame() {
                           {profile.walletCoins}
                         </div>
                       </div>
-                      <button
-                        onClick={() => setShopOpen(false)}
-                        className="rounded-lg border border-white/20 bg-white/10 p-1.5 text-white transition-colors hover:bg-white/20"
-                        aria-label="Close shop"
-                      >
-                        <XIcon className="h-4 w-4" />
-                      </button>
+                      <PanelClose label="Close shop" onClose={() => setShopOpen(false)} />
                     </div>
                     <div className="mx-auto flex w-full max-w-3xl items-center gap-1 overflow-x-auto">
                       {(["upgrades", "consumables", "ships", "cosmetics"] as const).map((t) => (
@@ -1188,7 +1186,7 @@ export function SpaceShooterGame() {
                           key={t}
                           type="button"
                           onClick={() => setShopTab(t)}
-                          className={`rounded border px-3 py-1.5 text-xs font-semibold tracking-wide uppercase ${
+                          className={`min-h-11 rounded border px-3 py-1.5 text-xs font-semibold tracking-wide uppercase ${
                             shopTab === t
                               ? "border-accent-blue/60 bg-accent-blue/25 text-white"
                               : "border-white/10 bg-white/5 text-slate-400 hover:text-white"
@@ -1300,7 +1298,7 @@ export function SpaceShooterGame() {
                                     refreshProfile();
                                   }
                                 }}
-                                className={`rounded px-3 py-1.5 text-xs font-bold tracking-wide uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
+                                className={`min-h-11 rounded px-3 py-1.5 text-xs font-bold tracking-wide uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
                               >
                                 Buy · {c.cost}
                               </button>
@@ -1344,7 +1342,7 @@ export function SpaceShooterGame() {
                                         saveProfile(p);
                                         refreshProfile();
                                       }}
-                                      className={`rounded px-3 py-1 text-xs font-bold uppercase ${equipped ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300" : "border border-accent-blue/40 bg-accent-blue/20 text-accent-blue"}`}
+                                      className={`min-h-11 rounded px-3 py-1 text-xs font-bold uppercase ${equipped ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300" : "border border-accent-blue/40 bg-accent-blue/20 text-accent-blue"}`}
                                     >
                                       {equipped ? "Equipped" : "Equip"}
                                     </button>
@@ -1365,7 +1363,7 @@ export function SpaceShooterGame() {
                                           refreshProfile();
                                         }
                                       }}
-                                      className={`rounded px-3 py-1 text-xs font-bold uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
+                                      className={`min-h-11 rounded px-3 py-1 text-xs font-bold uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
                                     >
                                       Unlock · {s.unlockCost}
                                     </button>
@@ -1426,7 +1424,7 @@ export function SpaceShooterGame() {
                                     saveProfile(p);
                                     refreshProfile();
                                   }}
-                                  className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${equipped ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300" : "border border-accent-blue/40 bg-accent-blue/20 text-accent-blue"}`}
+                                  className={`min-h-11 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${equipped ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300" : "border border-accent-blue/40 bg-accent-blue/20 text-accent-blue"}`}
                                 >
                                   {equipped ? "Equipped" : "Equip"}
                                 </button>
@@ -1446,7 +1444,7 @@ export function SpaceShooterGame() {
                                       refreshProfile();
                                     }
                                   }}
-                                  className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
+                                  className={`min-h-11 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
                                 >
                                   Buy · {c.cost}
                                 </button>
@@ -1479,13 +1477,7 @@ export function SpaceShooterGame() {
                         {profile.unlockedAchievements.length} / {ACHIEVEMENTS.length}
                       </div>
                     </div>
-                    <button
-                      onClick={() => setAchievementsOpen(false)}
-                      className="rounded-lg border border-white/20 bg-white/10 p-1.5 text-white transition-colors hover:bg-white/20"
-                      aria-label="Close trophies"
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </button>
+                    <PanelClose label="Close trophies" onClose={() => setAchievementsOpen(false)} />
                   </div>
                   <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4">
                     <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1769,14 +1761,7 @@ export function SpaceShooterGame() {
             >
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-base font-bold text-white">Settings</h3>
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(false)}
-                  className="text-slate-400 hover:text-white"
-                  aria-label="Close settings"
-                >
-                  <XIcon className="h-4 w-4" />
-                </button>
+                <PanelClose label="Close settings" onClose={() => setSettingsOpen(false)} />
               </div>
               <div className="space-y-3">
                 <SettingsToggle
@@ -2058,7 +2043,7 @@ export function SpaceShooterGame() {
                   onChange={(e) => setName(e.target.value.slice(0, 12))}
                   placeholder="Pilot name"
                   maxLength={12}
-                  className="flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-accent-blue focus:outline-none"
+                  className="min-h-11 flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-base text-white placeholder-white/40 focus:border-accent-blue focus:outline-none sm:text-sm"
                 />
                 <motion.button
                   whileHover={{ scale: 1.04 }}
@@ -2067,7 +2052,7 @@ export function SpaceShooterGame() {
                     void submit();
                   }}
                   disabled={submitted || submitting || rejected}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" />
                   {submitted
