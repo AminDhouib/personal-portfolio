@@ -66,7 +66,7 @@ import { PanelClose } from "./space-shooter/panel-close";
 import { CountUp } from "./space-shooter/count-up";
 import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/post-run";
 import { shareRun } from "./space-shooter/share";
-import { createCountdown } from "./space-shooter/countdown";
+import { useCountdown } from "./space-shooter/use-countdown";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
@@ -310,8 +310,16 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   const [previousBest, setPreviousBest] = useState<number | null>(null);
   // Fly Again's 3-2-1: the displayed step (null when not counting) and the
   // timestamp state machine behind it.
-  const [countStep, setCountStep] = useState<number | null>(null);
-  const countdownRef = useRef(createCountdown());
+  const chimeCue = useCallback(() => sounds.play("chime"), []);
+  const launchRun = useCallback(() => {
+    const g = gameRefs.current;
+    if (g.status === "armed") startRun(g);
+  }, []);
+  const {
+    step: countStep,
+    begin: beginCountdown,
+    cancel: cancelCountdown,
+  } = useCountdown(chimeCue, launchRun);
   const [crashed, setCrashed] = useState(false);
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
   const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
@@ -668,44 +676,22 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
   }, [panelOpen]);
-  // Poll the countdown while it runs; one cue per step, then start the run.
   const counting = countStep !== null;
-  useEffect(() => {
-    if (!counting) return;
-    const id = window.setInterval(() => {
-      const r = countdownRef.current.tick(performance.now());
-      if (r === "launch") {
-        setCountStep(null);
-        const g = gameRefs.current;
-        if (g.status === "armed") startRun(g);
-      } else if (r !== null) {
-        setCountStep((prev) => {
-          if (prev !== r) sounds.play("chime");
-          return r;
-        });
-      }
-    }, 80);
-    return () => window.clearInterval(id);
-  }, [counting]);
   // Opening a panel, leaving the armed screen (e.g. Play pressed) or pressing
   // Escape cancels the countdown and leaves the armed screen as it was.
   useEffect(() => {
     if (!counting) return;
-    const cancel = () => {
-      countdownRef.current.cancel();
-      setCountStep(null);
-    };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cancel();
+      if (e.key === "Escape") cancelCountdown();
     };
     window.addEventListener("keydown", onKey);
     let id = 0;
-    if (panelOpen || ui.status !== "armed") id = window.setTimeout(cancel, 0);
+    if (panelOpen || ui.status !== "armed") id = window.setTimeout(cancelCountdown, 0);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.clearTimeout(id);
     };
-  }, [counting, panelOpen, ui.status]);
+  }, [counting, panelOpen, ui.status, cancelCountdown]);
   // Dev-only FPS overlay: sample raf-delta each frame, keep a smoothed value
   const [devFps, setDevFps] = useState(60);
   useEffect(() => {
@@ -863,10 +849,8 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   // itself (DESIGN.md).
   const flyAgain = useCallback(() => {
     launch();
-    countdownRef.current.start(performance.now());
-    setCountStep(3);
-    sounds.play("chime");
-  }, [launch]);
+    beginCountdown();
+  }, [launch, beginCountdown]);
 
   // (Game auto-starts because createRefs() initializes startedAt = now and
   // status = "playing"; no mount-effect needed, which keeps the
