@@ -376,7 +376,7 @@ current tree on 2026-07-07.
   lives in a slot under the board, never over it (the revealed board is worth reading). While a
   round is live the slot shows a one-line hint plus the Quit button, so it keeps its height and
   the page never jumps.
-  The wait ignores keys whose target is a text field (`keyboard.ts` `isTextEntryTarget`), so the AI
+  The wait ignores keys whose target is a text field (`game/text-entry.ts` `isTextEntryTarget`), so the AI
   chat can be typed in while a banner is up. The banner wording lives in `round-result-copy.ts`
   (original text; paraphrase, never Nintendo's strings) and keeps the reserved height, 72px below
   sm and 60px from sm, which `round-result.test.tsx` pins.
@@ -789,9 +789,6 @@ existing enums for that category live rather than inventing a parallel one.
 Every deferral below was a deliberate scope decision, not an oversight. Each lists what would
 trigger revisiting it.
 
-- **Orbital Dodge has its own inline text-field exemption** (`space-shooter.tsx`, the keydown
-  guard) next to Super Voltorb Flip's `super-voltorb-flip/keyboard.ts` `isTextEntryTarget`. Make
-  the Voltorb helper the shared one when Orbital Dodge is next touched (T5).
 - **CopilotKit run failures never reach Sentry** — CLOSED 2026-07-31. The runtime emitted
   chat-run errors as `RUN_ERROR` events inside the SSE stream (plus the browser console) and
   swallowed them server-side, so the multi-day dead-chat outage fixed by the per-request
