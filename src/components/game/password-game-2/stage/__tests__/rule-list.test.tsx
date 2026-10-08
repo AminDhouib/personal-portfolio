@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { RuleList } from "../rule-list";
+import type { ColorMatch } from "../../engine/rules/act2";
 import type { GameState, Pg2Rule, RuleApi } from "../../engine/types";
 
 const STATE = {} as GameState;
@@ -16,6 +17,7 @@ interface Opts {
   password?: string;
   passing?: Record<string, boolean>;
   liveEvents?: readonly string[];
+  runId?: number;
   onRuleFlips?: (flips: { regressed: string[]; recovered: string[] }) => void;
 }
 
@@ -41,6 +43,7 @@ function listFor(ids: string[], opts: Opts = {}) {
       liveEvents={opts.liveEvents ?? []}
       version={0}
       validationTick={0}
+      runId={opts.runId}
     />
   );
 }
@@ -170,5 +173,94 @@ describe("RuleList regressions", () => {
     endAnimation(card("r1"), "pg2-rule-shake");
     expect(card("r1").className).not.toContain("pg2-rule-shake");
     expect(card("r1").className).not.toContain("pg2-rule-enter");
+  });
+});
+
+describe("RuleList widget input, recoveries and restarts", () => {
+  const announcer = () => document.querySelector("[data-testid='pg2-rule-announcer']")!;
+  const reasonIn = (id: string) => item(id).querySelector(".pg2-rule-reason");
+
+  const PUZZLE: ColorMatch = {
+    name: "crimson",
+    hex: "#dc143c",
+    options: [
+      { name: "teal", hex: "#008080" },
+      { name: "crimson", hex: "#dc143c" },
+    ],
+  };
+
+  /** One color-widget rule whose pass state the test flips from outside; the widget is open. */
+  function widgetList(flag: { passed: boolean }, onRuleFlips?: (f: unknown) => void) {
+    const rule: Pg2Rule = {
+      id: "w1",
+      act: "act2",
+      description: "Widget rule.",
+      payload: { color: PUZZLE },
+      validate: () => ({ passed: flag.passed }),
+    };
+    return (
+      <RuleList
+        rules={[rule]}
+        password=""
+        state={STATE}
+        api={API}
+        onWidgetText={vi.fn()}
+        onRuleState={() => {}}
+        onRuleFlips={onRuleFlips}
+        liveEvents={[]}
+        version={0}
+        validationTick={0}
+      />
+    );
+  }
+
+  it("a widget pass cues even though the password text did not change", () => {
+    const flag = { passed: false };
+    const onRuleFlips = vi.fn();
+    const { getByLabelText } = render(widgetList(flag, onRuleFlips));
+    flag.passed = true;
+    fireEvent.click(getByLabelText("crimson"));
+    expect(onRuleFlips).toHaveBeenCalledWith({ regressed: [], recovered: ["w1"] });
+  });
+
+  it("a widget-driven regression shakes and gives a reason", () => {
+    const flag = { passed: true };
+    const { getByLabelText } = render(widgetList(flag));
+    fireEvent.click(card("w1")); // expand the passing card so its widget shows
+    flag.passed = false;
+    fireEvent.click(getByLabelText("crimson"));
+    expect(card("w1").className).toContain("pg2-rule-shake");
+    expect(reasonIn("w1")!.textContent).toBe("This rule is no longer satisfied");
+  });
+
+  it("a pure heartbeat flip still only recolours, while its recovery still cues", () => {
+    const onRuleFlips = vi.fn();
+    const { rerender } = renderRuleList(["r1"], { passing: { r1: true }, onRuleFlips });
+    rerender(listFor(["r1"], { passing: { r1: false }, onRuleFlips }));
+    expect(onRuleFlips).not.toHaveBeenCalled();
+    rerender(listFor(["r1"], { passing: { r1: true }, onRuleFlips }));
+    expect(onRuleFlips).toHaveBeenCalledWith({ regressed: [], recovered: ["r1"] });
+  });
+
+  it("announces which rule regressed, and says it again for the next regression", () => {
+    const { rerender } = renderRuleList(["r1", "r2"], { passing: { r1: true, r2: true } });
+    rerender(listFor(["r1", "r2"], { passing: { r1: true, r2: false }, password: "a" }));
+    expect(announcer().textContent).toBe("Rule 2: This rule is no longer satisfied");
+    rerender(listFor(["r1", "r2"], { passing: { r1: true, r2: true }, password: "" }));
+    expect(announcer().textContent).toBe("");
+    rerender(listFor(["r1", "r2"], { passing: { r1: true, r2: false }, password: "b" }));
+    expect(announcer().textContent).toBe("Rule 2: This rule is no longer satisfied");
+  });
+
+  it("a new runId with the same rule ids starts the cards fresh", () => {
+    const { rerender } = renderRuleList(["r1"], { passing: { r1: true }, runId: 1 });
+    endAnimation(card("r1"), "pg2-rule-in");
+    expect(card("r1").className).not.toContain("pg2-rule-enter");
+    rerender(listFor(["r1"], { passing: { r1: false }, password: "a", runId: 1 }));
+    expect(card("r1").className).toContain("pg2-rule-shake");
+    rerender(listFor(["r1"], { passing: { r1: true }, password: "", runId: 2 }));
+    expect(card("r1").className).not.toContain("pg2-rule-shake");
+    expect(card("r1").className).toContain("pg2-rule-enter");
+    expect(announcer().textContent).toBe("");
   });
 });

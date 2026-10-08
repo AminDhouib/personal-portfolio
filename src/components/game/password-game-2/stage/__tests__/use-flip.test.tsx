@@ -80,17 +80,54 @@ describe("useFlip", () => {
     expect(animate).toHaveBeenCalledTimes(2);
   });
 
-  it("does not measure or animate when the order key is unchanged", () => {
+  it("does not animate when the order key is unchanged", () => {
     const animate = vi.fn();
     Element.prototype.animate = animate as unknown as Element["animate"];
     const tops = { current: { a: 0, b: 60 } as Record<string, number> };
     mockLayout(tops);
     const { rerender } = render(<Harness order={["a", "b"]} />);
-    const offset = vi.spyOn(HTMLElement.prototype, "offsetTop", "get");
-    offset.mockClear();
+    tops.current = { a: 0, b: 90 };
     rerender(<Harness order={["a", "b"]} />);
     expect(animate).not.toHaveBeenCalled();
-    expect(offset).not.toHaveBeenCalled();
+  });
+
+  it("a height change between two reorders does not leave stale offsets", () => {
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as Element["animate"];
+    const tops = { current: { a: 0, b: 60 } as Record<string, number> };
+    mockLayout(tops);
+    const { rerender } = render(<Harness order={["a", "b"]} />);
+    // Card a grows (a wrapped message, an expanded widget) without any reorder.
+    tops.current = { a: 0, b: 100 };
+    rerender(<Harness order={["a", "b"]} />);
+    animate.mockClear();
+    tops.current = { a: 40, b: 0 };
+    rerender(<Harness order={["b", "a"]} />);
+    const byTransform = animate.mock.calls.map((c) => (c[0] as Keyframe[])[0]!.transform).sort();
+    expect(byTransform).toEqual(["translateY(-40px)", "translateY(100px)"].sort());
+  });
+
+  it("a second reorder mid-flight starts from where the card visibly is", () => {
+    const cancel = vi.fn();
+    const animate = vi.fn(() => ({ playState: "running", cancel }));
+    Element.prototype.animate = animate as unknown as Element["animate"];
+    const tops = { current: { a: 0, b: 60 } as Record<string, number> };
+    mockLayout(tops);
+    const { rerender } = render(<Harness order={["a", "b"]} />);
+    tops.current = { a: 60, b: 0 };
+    rerender(<Harness order={["b", "a"]} />); // first reorder: a starts 60px above its slot
+    animate.mockClear();
+    // Mid-flight, a is painted 25px above its layout slot.
+    vi.spyOn(window, "getComputedStyle").mockImplementation(
+      () => ({ transform: "matrix(1, 0, 0, 1, 0, -25)" }) as unknown as CSSStyleDeclaration,
+    );
+    tops.current = { a: 0, b: 60 };
+    rerender(<Harness order={["a", "b"]} />);
+    expect(cancel).toHaveBeenCalled();
+    const first = animate.mock.calls.map((c) => ((c as unknown[])[0] as Keyframe[])[0]!.transform);
+    // a was laid out at 60 and painted at 35; it now belongs at 0, so it starts 35px below.
+    expect(first).toContain("translateY(35px)");
+    expect(first).not.toContain("translateY(60px)");
   });
 
   it("unmounting mid-animation is harmless", () => {
