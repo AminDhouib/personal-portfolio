@@ -229,3 +229,20 @@ describe("Hextris canvas sizing", () => {
     expect(setWidth).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("Hextris away hint", () => {
+  const AWAY = "Away: clears score 0 until you move";
+
+  it("shows quietly once play has gone 8 s without input, and goes on the next input", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    // The 2.4 s countdown, then not quite 8 s of play.
+    runFrames(Math.ceil((2400 + 7900) / 16));
+    expect(screen.queryByText(AWAY)).toBeNull();
+    runFrames(20);
+    expect(screen.getByText(AWAY)).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    runFrames(1);
+    expect(screen.queryByText(AWAY)).toBeNull();
+  });
+});
