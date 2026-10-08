@@ -10,6 +10,7 @@ import {
   Hand,
   Pause,
   Play,
+  X,
 } from "lucide-react";
 import { HextrisSounds } from "./hextris/sound-manager";
 import { createRun, drainEvents } from "./hextris/engine/state";
@@ -854,15 +855,22 @@ export function HextrisGame() {
           on-canvas tutorial card and in the start menu. */}
 
       {/* Unified tutorial overlay — device-aware, icon-based. Shows DURING
-          the first ~6s of gameplay (the first block is a freebie anyway). */}
+          the countdown and the first seconds of play. Taps pass through to the
+          board (the first rotation also hides it); only the close control takes
+          pointer events. */}
       {showTutorial && uiState === "playing" && (
-        <button
-          type="button"
-          onClick={dismissTutorial}
-          className="hextris-tutorial-fade absolute inset-0 z-10 flex items-end justify-center px-4 pb-20 sm:pb-24"
-          aria-label="Dismiss tutorial"
-        >
-          <div className="pointer-events-none flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-black/75 px-5 py-4 shadow-2xl backdrop-blur-md">
+        <div className="hextris-tutorial-fade pointer-events-none absolute inset-0 z-10 flex items-end justify-center px-4 pb-20 sm:pb-24">
+          <div className="relative flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-black/75 px-5 py-4 shadow-2xl backdrop-blur-md">
+            <button
+              type="button"
+              onClick={dismissTutorial}
+              className="pointer-events-auto absolute -top-5 -right-5 flex h-11 w-11 items-center justify-center"
+              aria-label="Dismiss tutorial"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/90 text-white/70">
+                <X className="h-3.5 w-3.5" />
+              </span>
+            </button>
             {isTouchDevice ? (
               <div className="flex items-center gap-4 text-white">
                 <div className="flex flex-col items-center gap-1.5">
@@ -900,7 +908,7 @@ export function HextrisGame() {
               Match 3+ blocks to score
             </span>
           </div>
-        </button>
+        </div>
       )}
 
       {/* Pause overlay — React card with clickable Resume (mobile-friendly) */}

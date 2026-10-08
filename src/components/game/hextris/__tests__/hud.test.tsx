@@ -246,3 +246,37 @@ describe("Hextris away hint", () => {
     expect(screen.queryByText(AWAY)).toBeNull();
   });
 });
+
+describe("Hextris tutorial overlay", () => {
+  function tutorialClose() {
+    return screen.queryByRole("button", { name: "Dismiss tutorial" });
+  }
+
+  it("lets a tap on the board through during the countdown, which rotates and hides it", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    const close = tutorialClose();
+    if (!close) throw new Error("no tutorial");
+    // jsdom does no hit testing, so pin the layering: the board-sized layer takes no pointer
+    // events, and only the close control (a 44 px target, not the whole board) does.
+    const classes = close.className.split(/\s+/);
+    expect(classes).not.toContain("inset-0");
+    expect(classes).toEqual(expect.arrayContaining(["pointer-events-auto", "h-11", "w-11"]));
+    const layer = close.closest(".inset-0");
+    expect(layer?.className.split(/\s+/)).toContain("pointer-events-none");
+    const canvas = container.querySelector("canvas");
+    if (!canvas) throw new Error("no canvas");
+    fireEvent.click(canvas);
+    runFrames(1);
+    expect(tutorialClose()).toBeNull();
+  });
+
+  it("still closes from its close control", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    const close = tutorialClose();
+    if (!close) throw new Error("no tutorial");
+    fireEvent.click(close);
+    expect(tutorialClose()).toBeNull();
+  });
+});
