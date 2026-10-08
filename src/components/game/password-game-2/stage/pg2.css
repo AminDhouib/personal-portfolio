@@ -848,6 +848,27 @@
   pointer-events: auto;
 }
 
+/* Autocorrect tell: a caption while the demon winds up, so the first rewrite is never a
+   surprise. Pointer-transparent like the rest of the layer. */
+.pg2-chrome__tell {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border: 1px solid var(--pg2-chrome);
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: pg2-hint-pulse 1.2s ease-in-out infinite;
+}
+.pg2-chrome[data-autocorrect="armed"] {
+  box-shadow: inset 0 0 0 2px var(--pg2-chrome);
+}
+
 /* Cookie-consent hydra: stacked corporate dialogs, bottom-center. */
 .pg2-cookie-stack {
   position: absolute;

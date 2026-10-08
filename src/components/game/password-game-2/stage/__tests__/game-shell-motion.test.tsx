@@ -175,4 +175,11 @@ describe("GameShell motion and sound wiring", () => {
     ) as HTMLElement;
     expect(within(card).getByText("Your last edit broke this rule")).toBeTruthy();
   });
+
+  it("the chrome event layer lives inside the stage card, so its modal cannot leave it", () => {
+    const { getByTestId, container } = startRun();
+    expect(getByTestId("pg2-stage-card").contains(container.querySelector(".pg2-chrome"))).toBe(
+      true,
+    );
+  });
 });

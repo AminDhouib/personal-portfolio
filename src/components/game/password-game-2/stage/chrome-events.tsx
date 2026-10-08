@@ -19,6 +19,12 @@ function activeInst<S>(g: GameState, defId: string): EventInstance<S> | null {
   return inst as EventInstance<S>;
 }
 
+/** The autocorrect demon is winding up: initialised, still in its telegraph. */
+function isArmed(g: GameState, defId: string): boolean {
+  const inst = g.events.find((e) => e.defId === defId);
+  return !!inst && inst.data !== undefined && inst.phase === "telegraph";
+}
+
 function GearIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -44,9 +50,11 @@ export function ChromeEvents({ g, onPointer }: ChromeEventsProps) {
   const cookie = activeInst<CookieBannerData>(g, "cookie-banner");
   const autocorrect = activeInst<AutocorrectData>(g, "autocorrect");
   const loading = activeInst<LoadingBarData>(g, "loading-bar");
+  const armed = isArmed(g, "autocorrect");
 
   return (
-    <div className="pg2-chrome" aria-live="polite">
+    <div className="pg2-chrome" aria-live="polite" data-autocorrect={armed ? "armed" : undefined}>
+      {armed ? <p className="pg2-chrome__tell">Autocorrect is warming up</p> : null}
       {cookie ? (
         <CookieBanners data={cookie.data} elapsedMs={g.elapsedMs} onPointer={onPointer} />
       ) : null}
@@ -136,7 +144,11 @@ function AutocorrectPanel({
         <GearIcon />
       </button>
       {data.settingsOpen ? (
-        <div className="pg2-settings" role="dialog" aria-label="Text Assistance settings">
+        <div
+          className="pg2-settings max-h-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] overflow-y-auto"
+          role="dialog"
+          aria-label="Text Assistance settings"
+        >
           <div className="pg2-settings__head">
             <span className="pg2-settings__crumb">Preferences / Text Assistance</span>
             <h3 className="pg2-settings__title">Helpful Corrections</h3>
