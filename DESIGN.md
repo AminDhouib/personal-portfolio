@@ -791,6 +791,22 @@ The following Password Game 2 entries were verified against the current tree on 
   page. Every hint sits in a closed `<details>` (never `open`), summaries are spoiler-free titles,
   and no hint names a seeded value (the tests ban digit runs of 4 or more), so they hold for every
   run.
+- **PG2's bests and daily streak are per device, in `pg2:stats`, by design**
+  (`src/components/game/password-game-2/stats/`). One versioned (`v: 1`) zod-parsed key, read
+  tolerantly (missing, corrupt or wrong-version data is empty stats) and written through
+  `safeLocalSet`, the `svf:stats` precedent. No server table and no arcade-v2 backend: the PG2
+  leaderboard keeps its own route, and bests and streaks are display-only and forgeable, so
+  nothing gates on them. A streak day is a UTC day with a completed DAILY run (the daily seed is
+  UTC, so a streak day is a seed day); the day recorded is the UTC day the run STARTED, so a run
+  that crosses midnight UTC still counts for its own seed. `streakAsOf` shows a streak as live
+  through today and yesterday and as zero after a missed day, while the stored value only resets
+  when the next daily is recorded. The shell records a victory exactly once per run (a ref keyed
+  on run id, seed and start time). Day arithmetic is `Date.UTC` on the string day, so it is
+  timezone independent.
+- **PG2's daily share is text first.** The receipt's Share button builds a spoiler-free, ASCII-only
+  line (time, UTC day, a streak of two or more, the game URL; never the password, rule text or a
+  seeded answer) and hands it to `navigator.share`, falling back to the clipboard; a dismissed
+  share sheet is a quiet no-op. A PNG share card is a separate, severable follow-up, not shipped.
 - **PG2's page names the game once, in a server-rendered h1 above the stage.** The h1, the intro
   and the credit ("An independent tribute to The Password Game by Neal Agarwal. Not affiliated
   with neal.fun.")
