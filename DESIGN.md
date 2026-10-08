@@ -46,12 +46,12 @@ behind it. `tower-stacker.tsx` is a thin entry that forwards `?tower-seed=`. Its
 come from `password-game-2/engine/rng` (the one cross-game import; the audio and control
 helpers are copies, as games do not import each other's modules).
 
-`src/env.ts` is the sole `process.env` gateway for everything except five narrow exceptions:
-four allowlisted files (`next.config.ts`, `src/instrumentation.ts`,
+`src/env.ts` is the sole `process.env` gateway for everything except five allowlisted files
+(`next.config.ts`, `playwright.config.ts` for its `E2E_*` variables, `src/instrumentation.ts`,
 `src/instrumentation-client.ts`, and `src/components/game/space-shooter.tsx` for `NODE_ENV`-gated
 dev-only affordances: an FPS overlay and a boss-cycle hotkey, not a schema-covered integration
-var), and one line of `src/components/game/hextris.tsx` that reads `NODE_ENV` through a justified
-`eslint-disable-next-line` for its dev-only `?seed=` replay seam. Everywhere else,
+var), plus one line of `src/components/game/hextris.tsx` that reads `NODE_ENV` through a
+justified `eslint-disable-next-line` for its dev-only `?seed=` replay seam. Everywhere else,
 `no-restricted-properties` bans reading `process.env` directly.
 
 ## Conventions in force
