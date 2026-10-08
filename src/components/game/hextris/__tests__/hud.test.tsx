@@ -199,3 +199,33 @@ describe("Hextris Panic Clear tip", () => {
     expect(screen.queryByText(TIP)).toBeNull();
   });
 });
+
+describe("Hextris canvas sizing", () => {
+  it("reallocates the canvas backing store only when its size changes", () => {
+    let size = { width: 390, height: 600 };
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+      () =>
+        ({
+          ...size,
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          right: size.width,
+          bottom: size.height,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    );
+    const setWidth = vi.spyOn(HTMLCanvasElement.prototype, "width", "set");
+    render(<HextrisGame />);
+    expect(setWidth).toHaveBeenCalledTimes(1);
+    // The same size reported again, as resize, orientation and fullscreen callbacks do.
+    for (let i = 0; i < 3; i++) window.dispatchEvent(new Event("resize"));
+    runFrames(1);
+    expect(setWidth).toHaveBeenCalledTimes(1);
+    size = { width: 360, height: 600 };
+    window.dispatchEvent(new Event("resize"));
+    runFrames(1);
+    expect(setWidth).toHaveBeenCalledTimes(2);
+  });
+});
