@@ -46,8 +46,7 @@ describe("Typing Speed copy describes the engine", () => {
     expect(faq).toMatch(/00:00 to 24:00 UTC/);
     expect(faq).toMatch(/cannot be posted/);
     expect(faq).not.toMatch(/no leaderboard/i);
-    // eslint-disable-next-line no-control-regex
-    expect(all).not.toMatch(/[^\x00-\x7f]/);
+    expect([...all].every((ch) => (ch.codePointAt(0) ?? 0) < 128)).toBe(true);
   });
   it("describes the phone sheet: text above the keyboard, tap the text to come back", () => {
     const phone = typingSpeedContent.controls.find((c) => c.input === "Phone");
