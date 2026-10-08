@@ -1,0 +1,6 @@
+/* Phone play sheet. The page behind it must not scroll or rubber-band while the sheet is up.
+   z-index ladder on a phone: sheet 80 (Hextris and Password Game 2 use the same slot). */
+html.typing-lock {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
