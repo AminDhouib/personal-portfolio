@@ -147,7 +147,6 @@ export function ReceiptCard({
         ms: timeMs,
         streak,
         daily,
-        biggestCrisis: crisis.replace(/[^\x20-\x7e]/g, "'"),
       },
       `${location.origin}${location.pathname}`,
     );

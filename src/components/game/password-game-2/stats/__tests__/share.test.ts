@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildShareText, shareResult } from "../share";
 
-const base = { day: "2026-10-08", ms: 754_000, streak: 3, daily: true, biggestCrisis: "Garden" };
+const base = { day: "2026-10-08", ms: 754_000, streak: 3, daily: true };
 
 describe("buildShareText", () => {
   it("builds a spoiler-free line without the password or rule text", () => {
@@ -12,6 +12,7 @@ describe("buildShareText", () => {
     expect(t).toContain("3-day streak");
     expect(t).toContain("https://example.test/games/password-game");
     expect(t).not.toMatch(/[^\x20-\x7e\n]/); // ASCII only
+    expect(t).not.toMatch(/crisis/i);
   });
 
   it("omits the streak line below two days and the day for non-daily runs", () => {
