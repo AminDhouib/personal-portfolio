@@ -28,3 +28,22 @@ export function shouldCaptureTouch(
 export function keyboardStep(dtSeconds: number): number {
   return KEYBOARD_STEP_60HZ * Math.max(0, Math.min(dtSeconds, MAX_FRAME_SECONDS)) * 60;
 }
+
+const STEERING_KEYS = ["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"];
+
+// What the window keydown handler does with a (lower-cased) key before the
+// game reads it: `ignore` means the key belongs to a text field and the
+// handler returns; `preventDefault` claims the steering keys and Space while a
+// run is live and on screen so the page does not scroll under the player.
+// Space still activates a focused control (e.g. the Pause button).
+export function orbitalKeyDecision(input: {
+  key: string;
+  textEntry: boolean;
+  onControl: boolean;
+  runLive: boolean;
+  inView: boolean;
+}): { ignore: boolean; preventDefault: boolean } {
+  if (input.textEntry) return { ignore: true, preventDefault: false };
+  const claimed = STEERING_KEYS.includes(input.key) || (input.key === " " && !input.onControl);
+  return { ignore: false, preventDefault: input.runLive && input.inView && claimed };
+}

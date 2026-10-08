@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { keyboardStep, shouldCaptureTouch } from "../input";
+import { keyboardStep, orbitalKeyDecision, shouldCaptureTouch } from "../input";
 import type { GameStatus } from "../types";
 
 const STATUSES: GameStatus[] = ["armed", "playing", "paused", "dying", "dead"];
@@ -66,5 +66,42 @@ describe("keyboardStep", () => {
   it("caps a hitch at the 0.05 s step", () => {
     expect(keyboardStep(1)).toBeCloseTo(keyboardStep(0.05), 10);
     expect(keyboardStep(1)).toBeCloseTo(0.42, 5);
+  });
+});
+
+describe("orbitalKeyDecision", () => {
+  const base = { textEntry: false, onControl: false, runLive: true, inView: true };
+
+  it("leaves keys typed into a text field alone", () => {
+    expect(orbitalKeyDecision({ ...base, key: "a", textEntry: true })).toEqual({
+      ignore: true,
+      preventDefault: false,
+    });
+  });
+
+  it.each(["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d", " "])(
+    "claims %j while a run is live and in view",
+    (key) => expect(orbitalKeyDecision({ ...base, key }).preventDefault).toBe(true),
+  );
+
+  it("lets Space activate a focused control but still claims steering keys", () => {
+    expect(orbitalKeyDecision({ ...base, key: " ", onControl: true }).preventDefault).toBe(false);
+    expect(orbitalKeyDecision({ ...base, key: "arrowleft", onControl: true }).preventDefault).toBe(
+      true,
+    );
+  });
+
+  it("claims nothing when the run is not live or not in view", () => {
+    expect(orbitalKeyDecision({ ...base, key: " ", runLive: false }).preventDefault).toBe(false);
+    expect(orbitalKeyDecision({ ...base, key: "arrowdown", inView: false }).preventDefault).toBe(
+      false,
+    );
+  });
+
+  it("does not claim unrelated keys", () => {
+    expect(orbitalKeyDecision({ ...base, key: "x" })).toEqual({
+      ignore: false,
+      preventDefault: false,
+    });
   });
 });
