@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { wpmSeries } from "./typing-speed/engine/series";
 import { configFor, parseMode, type ModeId } from "./typing-speed/engine/modes";
 import type { Op, TypingRun } from "./typing-speed/engine/types";
 import { isNewBest, liveWpm, runMetrics, streaks, type RunMetrics } from "./typing-speed/metrics";
@@ -12,6 +13,7 @@ import { ResultsCard } from "./typing-speed/results-card";
 import { loadStats, saveStats } from "./typing-speed/stats";
 import { TextView } from "./typing-speed/text-view";
 import { useTypingRun } from "./typing-speed/use-typing-run";
+import { WpmGraph } from "./typing-speed/wpm-graph";
 
 const HIGH_SCORE_KEY = "typing-high-score";
 
@@ -183,6 +185,12 @@ export function TypingSpeedGame() {
     limit === null
       ? (metrics.elapsedMs / 1000).toFixed(1)
       : String(Math.max(0, Math.ceil(limit - metrics.elapsedMs / 1000)));
+  // The run mutates in place; the sparkline refreshes once per whole second, not per tick.
+  const wholeSeconds = Math.floor(metrics.elapsedMs / 1000);
+  const liveSeries = useMemo(
+    () => (playing ? wpmSeries(run).slice(0, wholeSeconds + 1) : []),
+    [run, playing, wholeSeconds],
+  );
   const progress = done
     ? 100
     : limit === null
@@ -264,6 +272,8 @@ export function TypingSpeedGame() {
           transition={{ type: "spring", stiffness: 200, damping: 25 }}
         />
       </div>
+
+      {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
 
       {/* Passage */}
       <motion.div
