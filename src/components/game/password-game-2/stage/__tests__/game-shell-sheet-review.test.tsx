@@ -147,7 +147,27 @@ describe("GameShell phone sheet review fixes", () => {
     act(() => {
       vi.advanceTimersByTime(300);
     });
-    expect(seen).toContain(next);
+    expect(seen).toContain(next.closest("li") ?? next);
+  });
+
+  it("the keyboard-mode follow targets the card's li, not its transformed button", () => {
+    controllableMedia(false);
+    const vv = fakeVV(844);
+    const calls: Array<[Element, unknown]> = [];
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+      calls.push([this, arg]);
+    };
+    const utils = render(<GameShell />);
+    startRun(utils);
+    act(() => {
+      vv.height = 300;
+      vv.dispatchEvent(new Event("resize"));
+    });
+    const button = utils.container.querySelector(".pg2-rule--active")!;
+    const li = button.closest("li")!;
+    const followed = calls.filter(([el]) => el === li || el === button);
+    expect(followed.map(([el]) => el)).toEqual([li]);
+    expect(followed[0]![1]).toEqual({ block: "nearest" });
   });
 
   it("keyboard mode compacts the HUD: the seed chip steps aside, the 44px controls stay", () => {

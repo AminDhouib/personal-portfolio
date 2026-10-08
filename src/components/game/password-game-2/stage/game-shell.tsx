@@ -36,7 +36,6 @@ import { ChromeEvents } from "./chrome-events";
 import { FinaleStage } from "./finale-stage";
 import { ReceiptCard } from "./receipt-card";
 import { RuleList } from "./rule-list";
-import { followRule } from "./follow-rule";
 import type { RuleFlips } from "./regression";
 import { Hud } from "./hud";
 import { HudActions } from "./hud-actions";
@@ -985,8 +984,10 @@ function RunningView({
     if (rule !== followedRuleRef.current) {
       followedRuleRef.current = rule;
       // A layout effect, so the follow starts before the frame paints and the new rule is
-      // never painted out of view first. Smooth, and transform-safe while the card animates.
-      if (rule instanceof HTMLElement) followRule(rule);
+      // never painted out of view first. Follow the card's li, not its button: the entrance
+      // transform sits on the button, and no li is transformed while the keyboard is open
+      // (reorders do not slide then), so the li's rect is its layout box.
+      reveal(rule?.closest("li") ?? rule);
     }
     if (inputSeqRef.current !== followedInputRef.current) {
       followedInputRef.current = inputSeqRef.current;
