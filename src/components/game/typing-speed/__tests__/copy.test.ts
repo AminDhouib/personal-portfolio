@@ -32,6 +32,6 @@ describe("Typing Speed copy describes the engine", () => {
   it("the game page controls match the new flow", () => {
     const meta = GAMES.find((g) => g.slug === "typing-speed");
     expect(meta?.controls).toMatch(/passage/);
-    expect(meta?.description).not.toMatch(/2014/);
+    expect(meta?.description).not.toContain(String.fromCharCode(0x2014));
   });
 });
