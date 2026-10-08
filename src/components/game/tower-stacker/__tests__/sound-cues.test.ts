@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { CUES, perfectCue } from "../sound-cues";
+import { CUES, perfectCue, type Cue } from "../sound-cues";
 
 describe("CUES", () => {
   it("pins each fixed cue's pitches and length", () => {
     const summary = Object.fromEntries(
-      Object.entries(CUES).map(([name, cue]) => [
+      Object.entries<Cue>(CUES).map(([name, cue]) => [
         name,
         {
           ms: cue.ms,

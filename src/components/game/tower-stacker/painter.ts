@@ -18,8 +18,8 @@ import type { StageLayout } from "./layout";
 import { GRID_PX, PALETTE } from "./palette";
 
 export interface CanvasLike {
-  fillStyle: string;
-  strokeStyle: string;
+  fillStyle: string | CanvasGradient | CanvasPattern;
+  strokeStyle: string | CanvasGradient | CanvasPattern;
   lineWidth: number;
   font: string;
   globalAlpha: number;
