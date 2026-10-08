@@ -44,11 +44,12 @@ const EMPTY_HUD: HudState = {
   width: BASE_WIDTH,
 };
 
-/** The first-run hint stays until the first landing; kept in memory for this page load. */
+/** The stored mute choice never changes under us, so there is nothing to subscribe to. */
 function noopSubscribe(): () => void {
   return () => undefined;
 }
 
+/** The first-run hint stays until the first landing; kept in memory for this page load. */
 let hintDismissed = false;
 
 function randomSeed(): number {
