@@ -133,6 +133,35 @@ export interface RunRecord {
   bulk: number;
 }
 
+/** The UTC day before `dayKey` ("2026-10-09" -> "2026-10-08"). */
+function previousDay(dayKey: string): string {
+  const date = new Date(`${dayKey}T00:00:00Z`);
+  return new Date(date.getTime() - 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Folds a finished daily attempt into the streak (the reserved `daily` fields). A repeat of
+ * the same day changes nothing, the next UTC day extends it, and a gap, or a last day ahead
+ * of this one (a wrong clock once), restarts it at one.
+ */
+export function recordDay(stats: Stats, today: string): Stats {
+  const last = stats.daily.lastDay;
+  if (last === today) return stats;
+  const next = structuredClone(stats);
+  const d = next.daily;
+  d.streak = last === previousDay(today) ? Math.min(COUNT_CAP, d.streak + 1) : 1;
+  d.bestStreak = Math.max(d.bestStreak, d.streak);
+  d.lastDay = today;
+  d.days = Math.min(COUNT_CAP, d.days + 1);
+  return next;
+}
+
+/** The streak as it stands today: it lapses once a whole UTC day passes with no daily attempt. */
+export function streakAsOf(stats: Stats, today: string): number {
+  const { lastDay, streak } = stats.daily;
+  return lastDay === today || lastDay === previousDay(today) ? streak : 0;
+}
+
 /**
  * Folds one finished run in. A bulk run counts as played and as the last mode
  * and nothing else, so bests and key totals stay honest.
