@@ -286,6 +286,32 @@ that fits the ten clues and the flipped tiles, so the odds are exact, not sample
 - **Regenerate on change.** `ACCEPT_RATE` is seeded, 400k samples per board. If `hgss.ts` ever
   changes, regenerate it (the recipe is the comment above it in `solver-prior.ts`).
 
+## Typing Speed
+
+`typing-speed.tsx` is the shell; the engine is under `typing-speed/` (`engine/` is pure and
+tested, `use-typing-run.ts` wires it to a hidden input, `corpus/` holds the passages, the common
+words and the source list). Every passage is a verbatim excerpt of a Project Gutenberg book,
+normalized to ASCII, and the root `NOTICE` credits the 18 works. Do not paraphrase or "fix" a
+passage; the corpus test pins the counts and lengths.
+
+- **The engine is word-based and its WPM is net WPM.** Space commits a word, and a wrong letter
+  stays inside its own word (up to `MAX_EXTRA` extra letters) instead of derailing the rest of the
+  line. Net WPM counts the correct words with their spaces plus the correct prefix of the
+  unfinished last word, over 5 per minute; raw WPM counts every character and space keystroke the
+  same way. Accuracy is correct keystrokes over all character and space keystrokes, so a corrected
+  slip still costs. The result card shows mistakes typed and mistakes left separately on purpose.
+  The clock starts on the first character keystroke, not on the Start button. Backspace may return
+  into the previous word only when that word was wrong.
+- **The hidden input is a sentinel plus the current word.** Its value is always the sentinel plus
+  the typed word, so a mobile keyboard has something to delete into, and `diffInput` turns each
+  input event into ops. The value is rewritten only when it differs from that expectation;
+  rewriting on every event breaks IME composition and the caret. Paste, drop and yank are refused
+  in `beforeinput`.
+- **Bulk runs never count.** A multi-letter or replacement insert (suggestion tap, autocorrect) is
+  marked `bulk`. The run still plays and still shows its figures, but it cannot set a best, a
+  ghost or a board entry, and the card says why.
+- **`typing-high-score` keeps its format** (a decimal integer string): the games hub reads it.
+
 ## Intentional-design register
 
 Things that look like bugs or oversights but are deliberate. Each was verified against the
@@ -871,10 +897,10 @@ trigger revisiting it.
   single well-tested module can currently offset an untested one; the ratchet only guards the
   aggregate. (The companion scope debt NF(P7)-c is resolved: pass-2 set coverage `include` to all
   of `src/`, so untested files now count in the denominator instead of being invisible.)
-- **`tower-stacker.tsx` and `typing-speed.tsx` have zero tests** (audit ref P2-TEST-004,
-  deferred) — both are single-file games whose pure math (block overlap/trim, WPM/accuracy)
-  would extract cheaply under the extract-before-edit doctrine. Trigger: any gameplay edit to
-  either file.
+- **`tower-stacker.tsx` has zero tests** (audit ref P2-TEST-004, deferred), a single-file game
+  whose pure math (block overlap/trim) would extract cheaply under the extract-before-edit
+  doctrine. Trigger: any gameplay edit to it. Typing Speed has since been rebuilt on a tested
+  engine (see the Typing Speed section).
 - **No browser-level smoke test runs in CI** (audit ref P2-TEST-005, deferred) — route tests
   exercise handlers in-process; nothing in CI loads a real page in a browser. The scoped design
   if revisited: a Playwright job hitting `/`, one game page, and `/api/health` against
