@@ -173,12 +173,12 @@ describe("rejecting image captcha", () => {
 describe("captcha feedback", () => {
   it("a selected tile is marked on and carries a check overlay", () => {
     const { tile } = renderWidget();
-    expect(tile(0)!.className).not.toContain("pg2-captcha-on");
+    expect(tile(0)!.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(tile(0)!);
-    expect(tile(0)!.className).toContain("pg2-captcha-on");
+    expect(tile(0)!.getAttribute("aria-pressed")).toBe("true");
     expect(tile(0)!.querySelector(".pg2-captcha__check")).not.toBeNull();
     fireEvent.click(tile(0)!);
-    expect(tile(0)!.className).not.toContain("pg2-captcha-on");
+    expect(tile(0)!.getAttribute("aria-pressed")).toBe("false");
     expect(tile(0)!.querySelector(".pg2-captcha__check")).toBeNull();
   });
 
@@ -207,7 +207,7 @@ describe("captcha feedback", () => {
     expect(container.querySelector(".pg2-captcha__grid")!.className).toContain(
       "pg2-captcha-reject",
     );
-    expect(container.querySelectorAll(".pg2-captcha-on")).toHaveLength(0);
+    expect(container.querySelectorAll("[aria-pressed=true]")).toHaveLength(0);
   });
 
   it("a correct submission on grid 2 shows the unchanged success path", () => {

@@ -376,11 +376,7 @@ function RuleCard({
               {ev.rule.description}
             </p>
             {reason && !passed ? (
-              <span
-                role="status"
-                aria-live="polite"
-                className="pg2-rule-reason mt-1 block text-xs font-semibold"
-              >
+              <span aria-hidden="true" className="pg2-rule-reason mt-1 block text-xs font-semibold">
                 {reason}
               </span>
             ) : null}
@@ -431,27 +427,49 @@ export const RuleList = memo(function RuleList({
     shaking: ReadonlySet<string>;
     reasons: Readonly<Record<string, string>>;
     flips: RuleFlips | null;
-  }>({ pass: passNow, shaking: new Set(), reasons: {}, flips: null });
+    pw: string;
+    latest: string;
+  }>({ pass: passNow, shaking: new Set(), reasons: {}, flips: null, pw: password, latest: "" });
   const [entered, setEntered] = useState<ReadonlySet<string>>(new Set());
   const listRef = useRef<HTMLOListElement>(null);
 
   const passChanged =
     Object.keys(passNow).length !== Object.keys(motion.pass).length ||
     Object.keys(passNow).some((id) => passNow[id] !== motion.pass[id]);
-  if (passChanged) {
+  if (passChanged || password !== motion.pw) {
+    // Only a change to the password text (a keystroke, a widget, an event rewriting it)
+    // earns the shake, the reason and the cue. A rule that flips on the clock alone, or from
+    // a coupled rule, just recolours.
+    const edited = password !== motion.pw;
     const flips = diffRuleStates(motion.pass, passNow);
-    const hasFlips = flips.regressed.length > 0 || flips.recovered.length > 0;
+    const hasFlips = edited && (flips.regressed.length > 0 || flips.recovered.length > 0);
     const shaking = new Set(motion.shaking);
     const reasons = { ...motion.reasons };
-    for (const id of flips.regressed) {
-      shaking.add(id);
-      reasons[id] = explainRegression({ ruleId: id, liveEvents: liveEvents ?? [] });
+    let latest = motion.latest;
+    if (edited) {
+      for (const id of flips.regressed) {
+        shaking.add(id);
+        reasons[id] = explainRegression({ ruleId: id, liveEvents: liveEvents ?? [] });
+        latest = reasons[id];
+      }
+      if (flips.regressed.length > 0) {
+        // The shake replaces the entrance on this card; it must not replay afterwards.
+        setEntered((prev) => new Set([...prev, ...flips.regressed]));
+      }
     }
     for (const id of flips.recovered) {
       shaking.delete(id);
       delete reasons[id];
     }
-    setMotion({ pass: passNow, shaking, reasons, flips: hasFlips ? flips : motion.flips });
+    if (Object.keys(reasons).length === 0) latest = "";
+    setMotion({
+      pass: passNow,
+      shaking,
+      reasons,
+      flips: hasFlips ? flips : motion.flips,
+      pw: password,
+      latest,
+    });
   }
 
   const lastFlips = motion.flips;
@@ -479,25 +497,32 @@ export const RuleList = memo(function RuleList({
   useFlip(listRef, ordered.map((e) => e.rule.id).join(","));
 
   return (
-    <ol ref={listRef} className="flex flex-col gap-2">
-      {ordered.map((ev) => {
-        const isActive = ev === firstFailing;
-        const variant = ev.result.passed ? "pass" : isActive ? "active" : "idle";
-        const live = ev.rule.id === "current-time" ? api.nowHHMM() : null;
-        return (
-          <RuleCard
-            key={ev.rule.id}
-            ev={ev}
-            variant={variant}
-            live={live}
-            widget={widget}
-            entering={!entered.has(ev.rule.id)}
-            shaking={motion.shaking.has(ev.rule.id)}
-            reason={motion.reasons[ev.rule.id] ?? null}
-            onMotionEnd={onMotionEnd}
-          />
-        );
-      })}
-    </ol>
+    <>
+      {/* One persistent polite region, outside every card button and empty at mount, so the
+          reason is announced as a change. The reason inside the card is visual only. */}
+      <div role="status" aria-live="polite" data-testid="pg2-rule-announcer" className="sr-only">
+        {motion.latest}
+      </div>
+      <ol ref={listRef} className="flex flex-col gap-2">
+        {ordered.map((ev) => {
+          const isActive = ev === firstFailing;
+          const variant = ev.result.passed ? "pass" : isActive ? "active" : "idle";
+          const live = ev.rule.id === "current-time" ? api.nowHHMM() : null;
+          return (
+            <RuleCard
+              key={ev.rule.id}
+              ev={ev}
+              variant={variant}
+              live={live}
+              widget={widget}
+              entering={!entered.has(ev.rule.id) && !motion.shaking.has(ev.rule.id)}
+              shaking={motion.shaking.has(ev.rule.id)}
+              reason={motion.reasons[ev.rule.id] ?? null}
+              onMotionEnd={onMotionEnd}
+            />
+          );
+        })}
+      </ol>
+    </>
   );
 });

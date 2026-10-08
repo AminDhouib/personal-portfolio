@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { RuleList } from "../rule-list";
 import type { GameState, Pg2Rule, RuleApi } from "../../engine/types";
 
@@ -13,6 +13,7 @@ const API: RuleApi = {
 };
 
 interface Opts {
+  password?: string;
   passing?: Record<string, boolean>;
   liveEvents?: readonly string[];
   onRuleFlips?: (flips: { regressed: string[]; recovered: string[] }) => void;
@@ -31,7 +32,7 @@ function listFor(ids: string[], opts: Opts = {}) {
   return (
     <RuleList
       rules={rulesFor(ids, opts.passing ?? {})}
-      password=""
+      password={opts.password ?? ""}
       state={STATE}
       api={API}
       onWidgetText={vi.fn()}
@@ -97,48 +98,77 @@ describe("RuleList motion", () => {
 });
 
 describe("RuleList regressions", () => {
-  it("a rule that regresses shakes and shows why; recovery clears the reason", () => {
+  const reasonIn = (id: string) => item(id).querySelector(".pg2-rule-reason");
+  const announcer = () => document.querySelector("[data-testid='pg2-rule-announcer']")!;
+
+  it("a rule that regresses after an edit shakes and shows why; recovery clears it all", () => {
     const { rerender } = renderRuleList(["r1"], { passing: { r1: true } });
-    rerender(listFor(["r1"], { passing: { r1: false }, liveEvents: ["infection"] }));
+    rerender(listFor(["r1"], { passing: { r1: false }, liveEvents: ["infection"], password: "a" }));
     expect(card("r1").className).toContain("pg2-rule-shake");
-    expect(within(card("r1")).getByText(/Reopened while the infection is active/)).toBeTruthy();
-    rerender(listFor(["r1"], { passing: { r1: true } }));
+    expect(reasonIn("r1")!.textContent).toBe("Reopened while the infection is active");
+    expect(announcer().textContent).toContain("Reopened while the infection is active");
+    rerender(listFor(["r1"], { passing: { r1: true }, password: "" }));
     expect(card("r1").className).not.toContain("pg2-rule-shake");
-    expect(within(card("r1")).queryByText(/Reopened/)).toBeNull();
+    expect(reasonIn("r1")).toBeNull();
+    expect(announcer().textContent).toBe("");
   });
 
-  it("the reason is announced politely", () => {
+  it("the live region is one polite node outside every card, empty at mount", () => {
     const { rerender } = renderRuleList(["r1"], { passing: { r1: true } });
-    rerender(listFor(["r1"], { passing: { r1: false } }));
-    const reason = within(card("r1")).getByText("Your last edit broke this rule");
-    expect(reason.getAttribute("role")).toBe("status");
-    expect(reason.getAttribute("aria-live")).toBe("polite");
+    expect(announcer().textContent).toBe("");
+    expect(announcer().getAttribute("aria-live")).toBe("polite");
+    expect(announcer().closest("button")).toBeNull();
+    rerender(listFor(["r1"], { passing: { r1: false }, password: "a" }));
+    expect(announcer().textContent).toContain("This rule is no longer satisfied");
+    expect(document.querySelectorAll("[role='status']")).toHaveLength(1);
+    expect(reasonIn("r1")!.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("a flip with no player edit (the clock, a coupled rule) only recolours", () => {
+    const onRuleFlips = vi.fn();
+    const { rerender } = renderRuleList(["r1"], { passing: { r1: true }, onRuleFlips });
+    rerender(listFor(["r1"], { passing: { r1: false }, onRuleFlips }));
+    expect(card("r1").className).not.toContain("pg2-rule-shake");
+    expect(reasonIn("r1")).toBeNull();
+    expect(announcer().textContent).toBe("");
+    expect(onRuleFlips).not.toHaveBeenCalled();
   });
 
   it("a rule that was never passing neither shakes nor explains itself", () => {
     const { rerender } = renderRuleList(["r1"], { passing: { r1: false } });
-    rerender(listFor(["r1"], { passing: { r1: false } }));
+    rerender(listFor(["r1"], { passing: { r1: false }, password: "a" }));
     expect(card("r1").className).not.toContain("pg2-rule-shake");
-    expect(within(card("r1")).queryByRole("status")).toBeNull();
+    expect(reasonIn("r1")).toBeNull();
   });
 
   it("a freshly revealed failing rule is not a regression", () => {
     const { rerender } = renderRuleList(["r1"], { passing: { r1: true } });
-    rerender(listFor(["r1", "r2"], { passing: { r1: true, r2: false } }));
+    rerender(listFor(["r1", "r2"], { passing: { r1: true, r2: false }, password: "a" }));
     expect(card("r2").className).not.toContain("pg2-rule-shake");
   });
 
-  it("reports flips to the shell once per change, not once per render", () => {
+  it("reports edit-driven flips once per change, not once per render", () => {
     const onRuleFlips = vi.fn();
     const { rerender } = renderRuleList(["r1"], { passing: { r1: true }, onRuleFlips });
     expect(onRuleFlips).not.toHaveBeenCalled();
-    rerender(listFor(["r1"], { passing: { r1: false }, onRuleFlips }));
+    rerender(listFor(["r1"], { passing: { r1: false }, onRuleFlips, password: "a" }));
     expect(onRuleFlips).toHaveBeenCalledTimes(1);
     expect(onRuleFlips).toHaveBeenLastCalledWith({ regressed: ["r1"], recovered: [] });
-    rerender(listFor(["r1"], { passing: { r1: false }, onRuleFlips }));
+    rerender(listFor(["r1"], { passing: { r1: false }, onRuleFlips, password: "a" }));
     expect(onRuleFlips).toHaveBeenCalledTimes(1);
-    rerender(listFor(["r1"], { passing: { r1: true }, onRuleFlips }));
+    rerender(listFor(["r1"], { passing: { r1: true }, onRuleFlips, password: "" }));
     expect(onRuleFlips).toHaveBeenCalledTimes(2);
     expect(onRuleFlips).toHaveBeenLastCalledWith({ regressed: [], recovered: ["r1"] });
+  });
+
+  it("a regression during the entrance does not replay the entrance afterwards", () => {
+    const { rerender } = renderRuleList(["r1"], { passing: { r1: true } });
+    expect(card("r1").className).toContain("pg2-rule-enter");
+    rerender(listFor(["r1"], { passing: { r1: false }, password: "a" }));
+    expect(card("r1").className).toContain("pg2-rule-shake");
+    expect(card("r1").className).not.toContain("pg2-rule-enter");
+    endAnimation(card("r1"), "pg2-rule-shake");
+    expect(card("r1").className).not.toContain("pg2-rule-shake");
+    expect(card("r1").className).not.toContain("pg2-rule-enter");
   });
 });

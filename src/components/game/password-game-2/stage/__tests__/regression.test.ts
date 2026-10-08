@@ -34,9 +34,9 @@ describe("explainRegression", () => {
     );
   });
 
-  it("blames the edit when no event is live", () => {
+  it("stays neutral when no event is live", () => {
     expect(explainRegression({ ruleId: "digit-sum", liveEvents: [] })).toBe(
-      "Your last edit broke this rule",
+      "This rule is no longer satisfied",
     );
   });
 

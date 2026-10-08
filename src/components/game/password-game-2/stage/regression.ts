@@ -42,5 +42,5 @@ export function explainRegression(o: { ruleId: string; liveEvents: readonly stri
   }
   const live = o.liveEvents[0];
   if (live !== undefined) return `Reopened while the ${EVENT_LABELS[live] ?? live} is active`;
-  return "Your last edit broke this rule";
+  return "This rule is no longer satisfied";
 }

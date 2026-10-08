@@ -198,9 +198,7 @@ export function CaptchaWidget({
                   toggle(i);
                 }
               }}
-              className={`pg2-captcha__tile ${
-                isSelected ? "pg2-captcha__tile--selected pg2-captcha-on" : ""
-              }`}
+              className={`pg2-captcha__tile ${isSelected ? "pg2-captcha__tile--selected" : ""}`}
             >
               <TileArt kind={tile.kind} />
               {isSelected ? (
