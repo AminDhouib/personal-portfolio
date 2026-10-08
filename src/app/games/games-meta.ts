@@ -71,9 +71,9 @@ export const GAMES: GameMeta[] = [
     title: "Typing Speed",
     tagline: "Race the clock through flowing sentences",
     description:
-      "Passages from classic books, honest net and raw WPM, and animated feedback with streak bursts. Built to feel punchy: every correct letter has a little pop.",
+      "Timed tests of 15 to 120 seconds or a single classic-book quote, honest net and raw WPM, a live speed graph, and a map of the keys you miss. Every correct letter has a little pop.",
     controls:
-      "Click Start or press any key, then type the passage. The clock starts on your first key.",
+      "Pick a mode, then press any key and type the passage. The clock starts on your first key. Tab then Enter restarts.",
     accent: "#60a5fa",
     accentTailwind: "accent-blue",
   },
