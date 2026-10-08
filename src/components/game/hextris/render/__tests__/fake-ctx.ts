@@ -18,13 +18,30 @@ export interface ArcCall {
   end: number;
 }
 
+export interface TextCall {
+  kind: "fill" | "stroke";
+  text: string;
+  x: number;
+  y: number;
+  font: string;
+  style: string;
+  lineWidth: number;
+  alpha: number;
+}
+
 export interface FakeCtx2D {
   fillStyle: string;
   strokeStyle: string;
   lineWidth: number;
+  font: string;
+  textAlign: CanvasTextAlign;
+  textBaseline: CanvasTextBaseline;
+  lineJoin: CanvasLineJoin;
+  globalAlpha: number;
   fills: PathCall[];
   strokes: PathCall[];
   arcs: ArcCall[];
+  texts: TextCall[];
   cleared: number;
   /** Every coordinate any drawing call touched, arcs as their bounding box corners. */
   touched: Point[];
@@ -36,6 +53,8 @@ export interface FakeCtx2D {
   arc(x: number, y: number, r: number, start: number, end: number): void;
   fill(): void;
   stroke(): void;
+  fillText(text: string, x: number, y: number): void;
+  strokeText(text: string, x: number, y: number): void;
 }
 
 export function makeFakeCtx2D(): FakeCtx2D {
@@ -45,9 +64,15 @@ export function makeFakeCtx2D(): FakeCtx2D {
     fillStyle: "",
     strokeStyle: "",
     lineWidth: 1,
+    font: "",
+    textAlign: "start",
+    textBaseline: "alphabetic",
+    lineJoin: "miter",
+    globalAlpha: 1,
     fills: [],
     strokes: [],
     arcs: [],
+    texts: [],
     cleared: 0,
     touched: [],
     clearRect() {
@@ -78,6 +103,18 @@ export function makeFakeCtx2D(): FakeCtx2D {
       ctx.strokes.push({ style: ctx.strokeStyle, points: [...path] });
       for (const a of pathArcs) ctx.arcs.push({ style: ctx.strokeStyle, ...a });
     },
+    fillText(text, x, y) {
+      ctx.texts.push({ kind: "fill", text, x, y, ...textState(ctx.fillStyle) });
+    },
+    strokeText(text, x, y) {
+      ctx.texts.push({ kind: "stroke", text, x, y, ...textState(ctx.strokeStyle) });
+    },
   };
+  const textState = (style: string) => ({
+    font: ctx.font,
+    style,
+    lineWidth: ctx.lineWidth,
+    alpha: ctx.globalAlpha,
+  });
   return ctx;
 }
