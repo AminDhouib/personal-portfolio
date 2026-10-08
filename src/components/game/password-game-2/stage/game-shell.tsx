@@ -35,6 +35,8 @@ import { CanvasOverlay, type OverlayHandle } from "./canvas-overlay";
 import { ChromeEvents } from "./chrome-events";
 import { FinaleStage } from "./finale-stage";
 import { ReceiptCard } from "./receipt-card";
+import { StatsPanel } from "./stats-panel";
+import { loadStats, recordRun, saveStats, streakAsOf } from "../stats/stats";
 import { RuleList } from "./rule-list";
 import type { RuleFlips } from "./regression";
 import { Hud } from "./hud";
@@ -55,6 +57,8 @@ const EVENT_IDS: ReadonlySet<string> = new Set(EVENT_DEFS.map((d) => d.id));
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
 type Phase = "start" | "running";
+
+const utcDay = (): string => new Date().toISOString().slice(0, 10);
 
 /** Minimum gap between two key ticks, so fast typing is a patter and not a buzz. */
 const KEY_TICK_GAP_MS = 30;
@@ -170,6 +174,8 @@ export function GameShell() {
   const lastFailCueRef = useRef(-Infinity);
   const lastPassCueRef = useRef(-Infinity);
   const ruleCountRef = useRef(0);
+  const recordedRef = useRef<string | null>(null);
+  const startDayRef = useRef("");
   const toastIdRef = useRef(0);
   const moodTimersRef = useRef<Map<string, number>>(new Map());
   const toastTimersRef = useRef<Set<number>>(new Set());
@@ -445,6 +451,7 @@ export function GameShell() {
 
   const start = useCallback((s: number, isDaily: boolean, forceEvent?: string) => {
     ruleCountRef.current = 0;
+    startDayRef.current = utcDay();
     const g = createRun({ seed: s, daily: isDaily, nowHHMM, forceEvent });
     gameRef.current = g;
     renderedVersionRef.current = g.version;
@@ -669,6 +676,26 @@ export function GameShell() {
     ruleCountRef.current = ruleCountForCue;
   }, [ruleCountForCue]);
 
+  // Record a finished run exactly once. The ref guard keys on the run, so heartbeat
+  // re-renders and a layout switch never write twice. The day is the UTC day the run
+  // started, which is the day of its daily seed.
+  const outcomeNow = game?.outcome ?? "playing";
+  useEffect(() => {
+    const g = gameRef.current;
+    if (outcomeNow !== "victory" || !g) return;
+    const key = `${runId}:${g.seed}:${g.startedAtMs}`;
+    if (recordedRef.current === key) return;
+    recordedRef.current = key;
+    saveStats(
+      recordRun(loadStats(), {
+        ms: Math.round(g.elapsedMs),
+        daily: g.daily,
+        day: startDayRef.current,
+        seed: g.seed,
+      }),
+    );
+  }, [outcomeNow, runId]);
+
   // --- render ---------------------------------------------------------------
 
   // The engine store is rendered from state (same mutable object the loop ticks);
@@ -795,6 +822,10 @@ function StartScreen({
   onStart: (seed: number, daily: boolean, forceEvent?: string) => void;
 }) {
   const force = forceEvent ?? undefined;
+  // Client only (this shell renders with ssr: false), so storage is readable here.
+  const [stats] = useState(() => loadStats());
+  const today = utcDay();
+  const streak = streakAsOf(stats, today);
   return (
     <div className="p-6 sm:p-8">
       <div className="flex items-center justify-between">
@@ -847,6 +878,11 @@ function StartScreen({
         >
           Start today&apos;s daily
         </button>
+        {streak > 0 ? (
+          <span className="rounded-full border border-[color:var(--pg2-line)] px-2.5 py-1 text-xs font-semibold text-[color:var(--pg2-muted)]">
+            Daily streak: {streak}
+          </span>
+        ) : null}
         <button
           type="button"
           className="pg2-btn pg2-btn--ghost px-5 py-2.5 text-[15px]"
@@ -864,6 +900,8 @@ function StartScreen({
           </button>
         ) : null}
       </div>
+
+      <StatsPanel stats={stats} today={today} />
 
       {urlSeed !== null ? (
         <p className="mt-3 text-xs text-[color:var(--pg2-muted)]">
