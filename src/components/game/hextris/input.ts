@@ -1,4 +1,7 @@
-export type HexRunPhase = "ready" | "playing" | "paused" | "over";
+import type { Phase } from "./engine/types";
+
+// The engine phase the router reads; the countdown routes like play (spec section 3.7).
+export type HexRunPhase = Phase;
 
 export type HexKeyAction =
   "start" | "rotate-cw" | "rotate-ccw" | "rush" | "toggle-pause" | "panic" | "none";
