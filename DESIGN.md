@@ -657,18 +657,25 @@ The following Password Game 2 entries were verified against the current tree on 
   WeakSet of instances keeps the 250 ms heartbeat from replaying it. galaga, snake and tetris
   already emit `telegraph-doom` from the engine on their first telegraph tick, so the stage skips
   them (`ENGINE_EMITS_TELEGRAPH`, checked against the engine by its test) and every telegraph
-  start is exactly one cue. Known and accepted: the autocorrect tell pill and the banner can say
-  similar things at once.
+  start is exactly one cue. The edge tint's pulse and the banner's ring are not in the
+  reduced-motion block, so they run under reduced motion too: an opacity and colour pulse at about
+  0.9 Hz (1.1 s), with nothing moving across the screen, exempt as game state the player needs.
+  Known and accepted: the autocorrect tell pill and the banner can say similar things at once.
 - **PG2's event art is drawn larger through one table, and narrows rather than leave the card**
   (`stage/art-scale.ts`, `stage/painters.ts`). `ART_SCALE` holds each painter's factor (1.4 or
   more) and painters multiply sprite sizes, strokes and offsets by it. Art anchored near an edge
   (the black hole on an end glyph, the galaga fleet on a 390 px phone) narrows through `fitScale`
   or its column spacing to stay inside the stage card, so on a phone some of it draws at less than
-  its table factor. Hit circles never go below a 22 px radius (`hitRadius`) and a parasite's
-  target is at least 44 x 44 around its glyph, so a tap on a neighbouring glyph close to a
-  parasite evicts the parasite (accepted: that is what the player wants there). The art test
-  paints real forced runs on phone, phone-keyboard and desktop stage shapes and checks every drawn
-  point stays on the card.
+  its table factor. The black hole's telegraph keeps its stroked warp lines a pixel inside the
+  card. The galaga fleet's top row sits a ship's reach (wing, glow or 22 px target) under the
+  measured HUD band (`hudRect`, from `data-pg2-hud`), so no ship covers the timer or steals a tap
+  from copy, mute or exit, and its sway, dive and carry are clamped by the same reach. Hit circles
+  never go below a 22 px radius (`hitRadius`). A parasite's target follows the pointer
+  (`stage/hit-test.ts`): a fine pointer gets the glyph's own box; a coarse one keeps a 44 x 44
+  floor, but a tap inside a neighbouring glyph's box goes to the caret, and where regions overlap
+  the nearest centre wins. The art test paints real forced runs on 390 and 360 px phone cards
+  (keyboard down and up) and a desktop card, and checks every drawn point, text by its measured
+  width, stays on the card with no slack; it probes every target through `pickHit`.
 - **PG2's hit-stop freezes the painters' clock, never the game** (`stage/hit-fx.ts`,
   `stage/canvas-overlay.tsx`). A press that lands on an alien, a parasite or a finale missile (the
   engine changed `version` or a hit counter) bursts seeded sparks from the target's centre, holds
@@ -677,7 +684,9 @@ The following Password Game 2 entries were verified against the current tree on 
   shake uses the same `--pg2-shake-*` variables as the engine's trauma shake and does not branch
   on reduced motion; PG2's existing reduced-motion CSS still pins the card's transform, for both
   shakes alike. The act title card wipes in and out with a `clip-path` across its 2.2 s, keyed by
-  act so a queued card wipes again; that rule sits after the reduced-motion block on purpose.
+  act so a queued card wipes again. That rule sits after the reduced-motion block on purpose, so
+  it overrides the block's `animation: none` on `.pg2-titlecard`: the wipe is the card's own 2.2 s
+  timing, not a flourish. A restart drops the last run's sparks.
 - **PG2's chess widget accepts and plays a WRONG move** — the SAN is written to the password and
   the board keeps the position for retry; the rule simply stays unsatisfied. Rejection-on-entry
   would leak which move is best. The best-move/accept list shipping to the client is inherent to

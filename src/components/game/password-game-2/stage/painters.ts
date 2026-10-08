@@ -708,8 +708,11 @@ const paintBlackHole: Painter = (ctx, inst, layout, g, tMs) => {
   const p = layout.panelRect;
 
   if (inst.phase === "telegraph") {
-    // Telegraph: space-distortion warp lines converging on the anchor (86 px reach at 1x).
-    const S = fitScale(artScale("black-hole"), cx, cy, 86, p);
+    // Telegraph: space-distortion warp lines converging on the anchor (86 px reach at 1x,
+    // plus half the 1.5 px stroke), kept a pixel inside the card so a line's anti-aliased
+    // end is not clipped at the edge.
+    const inner = { x: p.x + 1, y: p.y + 1, w: p.w - 2, h: p.h - 2 };
+    const S = fitScale(artScale("black-hole"), cx, cy, 86.75, inner);
     ctx.save();
     ctx.strokeStyle = "rgba(167,139,250,0.55)";
     ctx.lineWidth = 1.5 * S;

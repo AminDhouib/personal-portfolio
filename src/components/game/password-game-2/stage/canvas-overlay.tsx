@@ -51,6 +51,7 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
   const clockRef = useRef(newPaintClock());
   const burstsRef = useRef<Burst[]>([]);
   const burstSeedRef = useRef(0);
+  const runRef = useRef<GameState | null>(null);
 
   // Invalidate the cached layout on any panel resize; the next paint re-measures.
   useEffect(() => {
@@ -142,6 +143,12 @@ export const CanvasOverlay = forwardRef<OverlayHandle>(function CanvasOverlay(_p
         const clock = clockRef.current;
         const dt = stepPaintClock(clock, tMs);
         const paintMs = clock.paintMs;
+
+        // A restart hands over a fresh GameState: the last run's sparks go with it.
+        if (runRef.current !== g) {
+          runRef.current = g;
+          burstsRef.current = [];
+        }
 
         for (const inst of g.events) {
           if (inst.data === undefined || inst.phase === "done") continue;

@@ -123,6 +123,15 @@ describe("CanvasOverlay hit feedback", () => {
     expect(seen.at(-1)).toBeGreaterThan(1_016);
   });
 
+  it("drops the last run's sparks when a new run starts", () => {
+    const overlay = mount();
+    overlay.paint(game, 1_000);
+    overlay.onHit({ kind: "alien", id: 3 }, 0, 0);
+    arcs.length = 0;
+    overlay.paint({ ...game } as GameState, 1_016);
+    expect(arcs).toHaveLength(0);
+  });
+
   it("a press on a non-target gives no sparks and no stop", () => {
     const overlay = mount();
     overlay.paint(game, 1_000);

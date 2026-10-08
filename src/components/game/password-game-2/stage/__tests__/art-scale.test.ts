@@ -23,6 +23,7 @@ interface TextState {
   textAlign: string;
   textBaseline: string;
   shadowBlur: number;
+  lineWidth: number;
 }
 
 /** A sans glyph averages about 0.6 em across; enough to bound a label's ink. */
@@ -37,9 +38,10 @@ function fontPx(font: string): number {
  * A recording 2D context that tracks the transform stack and logs every coordinate a
  * painter draws through (path points, arc and ellipse bounds, rects, and the box a
  * fillText covers by its measured width) in canvas space, so a test can bound the art
- * without a real canvas. With `glow`, each point also reaches out by the live shadowBlur.
+ * without a real canvas. With `glow`, each point also reaches out by the live shadowBlur;
+ * with `ink`, by half the live lineWidth and a pixel of anti-aliasing, as a stroke does.
  */
-function recordingCtx({ glow = false } = {}) {
+function recordingCtx({ glow = false, ink = false } = {}) {
   const points: { x: number; y: number; op: string }[] = [];
   let m: Matrix = [...IDENTITY];
   let text: TextState = {
@@ -47,12 +49,13 @@ function recordingCtx({ glow = false } = {}) {
     textAlign: "start",
     textBaseline: "alphabetic",
     shadowBlur: 0,
+    lineWidth: 1,
   };
   const stack: { m: Matrix; text: TextState }[] = [];
   const mark = (op: string, x: number, y: number) => {
     const cx = m[0] * x + m[2] * y + m[4];
     const cy = m[1] * x + m[3] * y + m[5];
-    const b = glow ? text.shadowBlur : 0;
+    const b = (glow ? text.shadowBlur : 0) + (ink ? text.lineWidth / 2 + 1 : 0);
     for (const [dx, dy] of [
       [-b, -b],
       [b, b],
@@ -140,7 +143,13 @@ function recordingCtx({ glow = false } = {}) {
         return () => ({ addColorStop: () => {} });
       }
       if (p === "fillText") return fillText;
-      if (p === "font" || p === "textAlign" || p === "textBaseline" || p === "shadowBlur") {
+      if (
+        p === "font" ||
+        p === "textAlign" ||
+        p === "textBaseline" ||
+        p === "shadowBlur" ||
+        p === "lineWidth"
+      ) {
         return text[p];
       }
       if (p in ops) return ops[p];
@@ -149,7 +158,7 @@ function recordingCtx({ glow = false } = {}) {
     },
     set(t, p: string, v) {
       if (p === "font" || p === "textAlign" || p === "textBaseline") text[p] = String(v);
-      else if (p === "shadowBlur") text.shadowBlur = Number(v);
+      else if (p === "shadowBlur" || p === "lineWidth") text[p] = Number(v);
       else t[p] = v;
       return true;
     },
@@ -421,4 +430,32 @@ describe("galaga fleet", () => {
       }
     },
   );
+});
+
+describe("black hole telegraph", () => {
+  it("keeps its warp lines' ink on the card around the first glyph of a desktop card", () => {
+    const stage = STAGES.desktop!;
+    const g = createRun({ seed: 3, daily: false });
+    for (const k of "Password123") applyKey(g, k);
+    const layout = layoutFor(g, stage);
+    const inst = {
+      defId: "black-hole",
+      phase: "telegraph",
+      phaseElapsedMs: 0,
+      data: {
+        anchorIndex: 0,
+        capturedIds: [],
+        nextPullAtMs: 0,
+        heavyWord: "",
+        collapsingSinceMs: null,
+        compactedGarbage: false,
+      },
+    } as unknown as EventInstance;
+    // The lines turn once in 2 * PI * 1400 ms and run inward every 720 ms.
+    for (let tMs = 0; tMs <= 2 * Math.PI * 1400; tMs += 20) {
+      const { ctx, points } = recordingCtx({ ink: true });
+      PAINTERS["black-hole"]!(ctx, inst, layout, g, tMs, []);
+      expectInside(points, stage.panel, `black-hole telegraph at t=${tMs}`);
+    }
+  });
 });
