@@ -40,4 +40,18 @@ describe("Orbital early boost vs the board's plausibility bounds", () => {
     // The kill count itself is inside the 6s + 20 budget with room to spare.
     expect(kills).toBeLessThan(6 * (seconds + 2) + 20);
   });
+
+  it("keeps the boost modest: first-45 s spawns are above the old curve but at most 25% over", () => {
+    // The 280 ms floor holds the late game whatever the boost is, so pin the
+    // boost itself against the pre-boost curve over the window it acts on.
+    const oldInterval = (t: number) => Math.max(280, 900 - (0.25 + Math.sqrt(t) * 0.22) * 280);
+    let boosted = 0;
+    let old = 0;
+    for (let t = 0; t < 45; t += 0.25) {
+      boosted += spawnsPerSecond(t) * 0.25;
+      old += (1000 / oldInterval(t)) * 0.25;
+    }
+    expect(boosted).toBeGreaterThan(old);
+    expect(boosted / old).toBeLessThanOrEqual(1.25);
+  });
 });
