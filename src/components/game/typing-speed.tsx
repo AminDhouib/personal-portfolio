@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-react";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { keyStats, wpmSeries, type KeyStats, type SeriesPoint } from "./typing-speed/engine/series";
 import { configFor, modeLabel, parseMode, type ModeId } from "./typing-speed/engine/modes";
@@ -17,13 +18,18 @@ import {
 } from "./typing-speed/metrics";
 import { isTextEntryTarget } from "./text-entry";
 import { ModeBar } from "./typing-speed/mode-bar";
+import { PlaySheet, SheetHud } from "./typing-speed/play-sheet";
 import { ResultsCard } from "./typing-speed/results-card";
+import { sheetLayout } from "./typing-speed/sheet-layout";
 import { loadStats, recordRun, saveStats } from "./typing-speed/stats";
 import { TextView } from "./typing-speed/text-view";
 import { useTypingRun } from "./typing-speed/use-typing-run";
 import { WpmGraph } from "./typing-speed/wpm-graph";
+import "./typing-speed/typing.css";
 
 const HIGH_SCORE_KEY = "typing-high-score";
+/** Below this width a run plays in the phone sheet (the Password Game 2 breakpoint). */
+const PHONE_QUERY = "(max-width: 1023px)";
 
 interface Burst {
   id: number;
@@ -59,6 +65,18 @@ function readHighScore(): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function usePhone(): boolean {
+  const [phone, setPhone] = useState(() => window.matchMedia?.(PHONE_QUERY).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(PHONE_QUERY);
+    if (!mq) return;
+    const update = () => setPhone(mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return phone;
+}
+
 export function TypingSpeedGame() {
   const [initialStats] = useState(loadStats);
   const [mode, setMode] = useState<ModeId>(initialStats.lastMode);
@@ -72,6 +90,28 @@ export function TypingSpeedGame() {
   const containerRef = useRef<HTMLDivElement>(null);
   const burstIdRef = useRef(0);
   const restartRef = useRef<HTMLButtonElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const phone = usePhone();
+  // The sheet opens on a tap that starts typing and closes on Exit and on finish.
+  const [sheetOn, setSheetOn] = useState(false);
+  const sheet = phone && sheetOn;
+  const sheetRef = useRef(false);
+  const scrollToResults = useRef(false);
+  const [focused, setFocused] = useState(false);
+  const viewport = useVisualViewport(sheet);
+
+  useEffect(() => {
+    sheetRef.current = sheet;
+  }, [sheet]);
+
+  // The sheet owns the screen: lock the page scroll while it is up, whatever closes it
+  // (Exit, finish, a switch to desktop, or the game unmounting).
+  useEffect(() => {
+    if (!sheet) return;
+    const root = document.documentElement;
+    root.classList.add("typing-lock");
+    return () => root.classList.remove("typing-lock");
+  }, [sheet]);
 
   const spawnBurst = useCallback(() => {
     const el = containerRef.current?.querySelector("[data-ts-caret]");
@@ -107,6 +147,12 @@ export function TypingSpeedGame() {
 
   const onFinish = useCallback(
     (run: TypingRun) => {
+      if (sheetRef.current) {
+        // Close the keyboard with the sheet and bring the results into view.
+        setSheetOn(false);
+        inputRef.current?.blur();
+        scrollToResults.current = true;
+      }
       const metrics = runMetrics(run);
       const bulk = run.bulk > 0;
       if (!bulk && metrics.netWpm > highScore) {
@@ -162,12 +208,27 @@ export function TypingSpeedGame() {
     begin({ mode, seed: timed ? drawSeed() : seed, passageNo });
     // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
     inputRef.current?.focus();
-  }, [begin, mode, seed, passageNo, timed]);
+    if (phone) setSheetOn(true);
+  }, [begin, mode, seed, passageNo, timed, phone]);
 
   const nextPassage = useCallback(() => {
     begin({ mode, seed, passageNo: passageNo + 1 });
     inputRef.current?.focus();
-  }, [begin, mode, seed, passageNo]);
+    if (phone) setSheetOn(true);
+  }, [begin, mode, seed, passageNo, phone]);
+
+  // Focus first, inside the tap, so the keyboard comes up; the sheet follows it.
+  const startTyping = useCallback(() => {
+    inputRef.current?.focus();
+    if (phone) setSheetOn(true);
+  }, [phone]);
+
+  // Exit abandons the run: the keyboard closes and the page is back as it was.
+  const exitSheet = useCallback(() => {
+    setSheetOn(false);
+    inputRef.current?.blur();
+    begin({ mode, seed: timed ? drawSeed() : seed, passageNo });
+  }, [begin, mode, seed, passageNo, timed]);
 
   const changeMode = useCallback(
     (next: ModeId) => {
@@ -244,119 +305,152 @@ export function TypingSpeedGame() {
       ? Math.min(100, (typedChars / Math.max(1, totalChars)) * 100)
       : Math.min(100, (metrics.elapsedMs / (limit * 1000)) * 100);
 
+  // A run that ended in the sheet leaves the results below the fold: bring them up.
+  useEffect(() => {
+    if (!done || !result || !scrollToResults.current) return;
+    scrollToResults.current = false;
+    resultsRef.current?.scrollIntoView?.({ block: "start", behavior: "instant" });
+  }, [done, result]);
+
+  const layout = sheetLayout({ vvHeight: viewport.height, keyboardOpen: viewport.keyboardOpen });
+
   return (
     <div className="space-y-5">
-      <ModeBar mode={mode} onChange={changeMode} />
+      <div inert={sheet} className="space-y-5">
+        <ModeBar mode={mode} onChange={changeMode} />
 
-      {/* Stats bar */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-        <motion.div
-          animate={{ scale: playing ? [1, 1.05, 1] : 1 }}
-          transition={{ duration: 0.3 }}
-          className="flex items-center gap-1.5 text-(--muted)"
-        >
-          <Timer className="h-3.5 w-3.5" />
-          <span
-            className={
-              playing
-                ? "font-mono font-semibold text-accent-blue tabular-nums"
-                : "font-mono tabular-nums"
-            }
+        {/* Stats bar */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <motion.div
+            animate={{ scale: playing ? [1, 1.05, 1] : 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center gap-1.5 text-(--muted)"
           >
-            <span data-testid="ts-timer">{timerText}</span>s
-          </span>
-        </motion.div>
-        <div className="flex items-center gap-1.5 text-(--muted)">
-          <Target className="h-3.5 w-3.5" />
-          <motion.span
-            key={liveNet}
-            initial={{ scale: 1.2, color: "#22c55e" }}
-            animate={{ scale: 1 }}
-            className={
-              playing || done
-                ? "font-mono font-semibold text-accent-green tabular-nums"
-                : "font-mono tabular-nums"
-            }
-          >
-            {liveNet} WPM
-          </motion.span>
-        </div>
-        <div className="flex items-center gap-1.5 font-mono text-(--muted) tabular-nums">
-          <Percent className="h-3.5 w-3.5" />
-          {metrics.accuracy}% acc
-        </div>
-        <AnimatePresence>
-          {streak >= 5 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.7, y: -6 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-              className="flex items-center gap-1.5 font-mono font-semibold text-accent-amber"
+            <Timer className="h-3.5 w-3.5" />
+            <span
+              className={
+                playing
+                  ? "font-mono font-semibold text-accent-blue tabular-nums"
+                  : "font-mono tabular-nums"
+              }
             >
-              <motion.span
-                animate={{ rotate: [0, -12, 12, 0] }}
-                transition={{ duration: 0.4, repeat: Infinity, repeatDelay: 0.6 }}
+              <span data-testid="ts-timer">{timerText}</span>s
+            </span>
+          </motion.div>
+          <div className="flex items-center gap-1.5 text-(--muted)">
+            <Target className="h-3.5 w-3.5" />
+            <motion.span
+              key={liveNet}
+              initial={{ scale: 1.2, color: "#22c55e" }}
+              animate={{ scale: 1 }}
+              className={
+                playing || done
+                  ? "font-mono font-semibold text-accent-green tabular-nums"
+                  : "font-mono tabular-nums"
+              }
+            >
+              {liveNet} WPM
+            </motion.span>
+          </div>
+          <div className="flex items-center gap-1.5 font-mono text-(--muted) tabular-nums">
+            <Percent className="h-3.5 w-3.5" />
+            {metrics.accuracy}% acc
+          </div>
+          <AnimatePresence>
+            {streak >= 5 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.7, y: -6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                className="flex items-center gap-1.5 font-mono font-semibold text-accent-amber"
               >
-                <Flame className="h-3.5 w-3.5" />
-              </motion.span>
-              {streak}x
-            </motion.div>
+                <motion.span
+                  animate={{ rotate: [0, -12, 12, 0] }}
+                  transition={{ duration: 0.4, repeat: Infinity, repeatDelay: 0.6 }}
+                >
+                  <Flame className="h-3.5 w-3.5" />
+                </motion.span>
+                {streak}x
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {highScore > 0 && (
+            <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
+              <Trophy className="h-3.5 w-3.5 text-accent-amber" />
+              <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
+            </div>
           )}
-        </AnimatePresence>
-        {highScore > 0 && (
-          <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
-            <Trophy className="h-3.5 w-3.5 text-accent-amber" />
-            <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-1 w-full overflow-hidden rounded-full bg-(--border)/40">
+          <motion.div
+            className="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-green to-accent-amber"
+            animate={{ width: `${progress}%` }}
+            transition={{ type: "spring", stiffness: 200, damping: 25 }}
+          />
+        </div>
+      </div>
+
+      <PlaySheet
+        active={sheet}
+        viewport={viewport}
+        hud={<SheetHud time={timerText} wpm={liveNet} onRestart={restart} onExit={exitSheet} />}
+      >
+        {/* The sparkline's slot is always there so it appearing does not shift the page. */}
+        {(!sheet || layout.showGraph) && (
+          <div className="h-10" data-testid="ts-live-slot">
+            {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
           </div>
         )}
-      </div>
 
-      {/* Progress bar */}
-      <div className="h-1 w-full overflow-hidden rounded-full bg-(--border)/40">
+        {/* Passage */}
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-green to-accent-amber"
-          animate={{ width: `${progress}%` }}
-          transition={{ type: "spring", stiffness: 200, damping: 25 }}
-        />
-      </div>
+          ref={containerRef}
+          key={shake}
+          animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+          transition={{ duration: 0.3 }}
+          className={
+            sheet
+              ? "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-3 font-serif leading-relaxed"
+              : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
+          }
+          onClick={() => !done && startTyping()}
+          style={{
+            background: "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
+            ...(sheet ? { fontSize: layout.fontPx } : {}),
+          }}
+        >
+          <TextView run={run} caret />
 
-      {/* The sparkline's slot is always there so it appearing does not shift the page. */}
-      <div className="h-10" data-testid="ts-live-slot">
-        {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
-      </div>
-
-      {/* Passage */}
-      <motion.div
-        ref={containerRef}
-        key={shake}
-        animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
-        transition={{ duration: 0.3 }}
-        className="relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
-        onClick={() => !done && inputRef.current?.focus()}
-        style={{
-          background: "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
-        }}
-      >
-        <TextView run={run} caret />
-
-        {/* Combo bursts */}
-        <AnimatePresence>
-          {bursts.map((b) => (
-            <motion.div
-              key={b.id}
-              initial={{ opacity: 1, scale: 0.4 }}
-              animate={{ opacity: 0, scale: 2 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.7, ease: "easeOut" }}
-              className="pointer-events-none absolute flex items-center justify-center"
-              style={{ left: b.x - 24, top: b.y - 24, width: 48, height: 48 }}
+          {sheet && !focused && (
+            <div
+              data-testid="ts-refocus"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-(--card)/80 font-sans text-sm font-semibold text-accent-amber"
             >
-              <div className="h-12 w-12 rounded-full bg-accent-amber/40 blur-md" />
-              <Zap className="absolute h-6 w-6 text-accent-amber" />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </motion.div>
+              Tap the text to keep typing
+            </div>
+          )}
+
+          {/* Combo bursts */}
+          <AnimatePresence>
+            {bursts.map((b) => (
+              <motion.div
+                key={b.id}
+                initial={{ opacity: 1, scale: 0.4 }}
+                animate={{ opacity: 0, scale: 2 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.7, ease: "easeOut" }}
+                className="pointer-events-none absolute flex items-center justify-center"
+                style={{ left: b.x - 24, top: b.y - 24, width: 48, height: 48 }}
+              >
+                <div className="h-12 w-12 rounded-full bg-accent-amber/40 blur-md" />
+                <Zap className="absolute h-6 w-6 text-accent-amber" />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      </PlaySheet>
 
       {/* Hidden input: always SENTINEL + the current word, see engine/input.ts */}
       <input
@@ -369,58 +463,64 @@ export function TypingSpeedGame() {
         autoCapitalize="none"
         spellCheck={false}
         defaultValue=" "
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         className="sr-only"
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          ref={restartRef}
-          onClick={restart}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
-        >
-          <RotateCcw className="h-3 w-3" />
-          Restart
-        </button>
-        {playing && !timed && (
+      <div inert={sheet} className="space-y-5">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={nextPassage}
-            className="inline-flex min-h-11 items-center gap-1.5 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+            ref={restartRef}
+            onClick={restart}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
           >
             <RotateCcw className="h-3 w-3" />
-            Skip
+            Restart
           </button>
+          {playing && !timed && (
+            <button
+              type="button"
+              onClick={nextPassage}
+              className="inline-flex min-h-11 items-center gap-1.5 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Skip
+            </button>
+          )}
+        </div>
+
+        {run.status === "ready" && (
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={startTyping}
+              className="min-h-11 rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
+            >
+              Start typing
+            </button>
+            <p className="text-sm text-(--muted)">Click the text or press any key to start.</p>
+          </div>
+        )}
+
+        {done && result && (
+          <div ref={resultsRef}>
+            <ResultsCard
+              metrics={result.metrics}
+              maxStreak={result.maxStreak}
+              bulk={result.bulk}
+              counts={result.counts}
+              series={result.series}
+              runKeys={result.runKeys}
+              allKeys={result.allKeys}
+              modeBest={result.modeBest}
+              onNext={timed ? null : nextPassage}
+              onAgain={restart}
+            />
+          </div>
         )}
       </div>
-
-      {run.status === "ready" && (
-        <div className="flex flex-wrap items-center gap-4">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.focus()}
-            className="min-h-11 rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
-          >
-            Start typing
-          </button>
-          <p className="text-sm text-(--muted)">Click the text or press any key to start.</p>
-        </div>
-      )}
-
-      {done && result && (
-        <ResultsCard
-          metrics={result.metrics}
-          maxStreak={result.maxStreak}
-          bulk={result.bulk}
-          counts={result.counts}
-          series={result.series}
-          runKeys={result.runKeys}
-          allKeys={result.allKeys}
-          modeBest={result.modeBest}
-          onNext={timed ? null : nextPassage}
-          onAgain={restart}
-        />
-      )}
     </div>
   );
 }
