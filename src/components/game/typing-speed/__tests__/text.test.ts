@@ -24,6 +24,9 @@ describe("passageAt", () => {
     const seen = new Set(Array.from({ length: PASSAGES.length }, (_, i) => passageAt(9, i).id));
     expect(seen.size).toBe(PASSAGES.length);
   });
+  it("pins the shuffle for seed 9 (a golden value; changing it reorders every daily)", () => {
+    expect(passageAt(9, 0).id).toBe("eliot-1");
+  });
 });
 
 describe("splitWords", () => {
