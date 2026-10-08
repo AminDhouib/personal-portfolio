@@ -596,10 +596,10 @@ The following Password Game 2 entries were verified against the current tree on 
   (`--ts-vv-h`, `--ts-vv-top`) with `typing-lock` on `<html>` while it is open; Exit, finishing a
   run and unmounting all release the lock. The sheet is the same wrapper element as the page's
   text stack with a different class, so the text view never remounts when it opens; the page
-  chrome behind it is `inert`. It holds a one-row HUD (time, WPM, Restart, Exit), the three-line
+  chrome behind it is `inert` (the game's own wrappers only; the navbar and footer are not, and sit hidden behind the sheet). It holds a one-row HUD (time, WPM, Restart, Exit), the three-line
   text and, only while the keyboard is closed and the viewport is at least 560px, the live graph;
   nothing in it animates a rise. `sheetLayout` steps the font from 22 to 18px below 420px so the
-  HUD plus three lines always fit. `/games/typing-speed` alone exports
+  HUD plus three lines always fit, and below 230px (a phone in landscape with the keyboard up) it goes to 14px with tighter padding. `/games/typing-speed` alone exports
   `interactiveWidget: "resizes-visual"` through `generateViewport` in `[slug]/page.tsx`, so the
   keyboard shrinks only the visual viewport there. The hidden input is always mounted (outside the
   sheet's render), `fixed` at the top of the visible area, 16px so iOS does not zoom, and is
@@ -608,7 +608,7 @@ The following Password Game 2 entries were verified against the current tree on 
   (pausing would let a player bank thinking time). Exit abandons the run. On finish the results
   card is scrolled into view. The visual viewport hook (`src/hooks/use-visual-viewport.ts`, with
   `viewport-layout.ts`) is shared with PG2; it moved out of PG2's stage folder in this change so
-  neither game imports the other.
+  neither game imports the other. The sheet has no Skip button on purpose: a Quote passage ends by finishing it or by switching mode. Tablets of 1024px and up get no sheet, so the software keyboard can cover the passage there.
 - **The Typing Speed stats bar reserves two rows below `sm`** (`min-h-12 content-start`). At 390px
   the streak and best badges wrap the bar from one 20px row to two (48px); reserving the height
   keeps the passage from jumping when they appear at the end of a run.

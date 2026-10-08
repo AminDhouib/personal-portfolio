@@ -1,9 +1,11 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { RotateCcw, X } from "lucide-react";
 import type { ViewportLayout } from "@/hooks/viewport-layout";
 
 const SHEET_CLASS =
   "fixed inset-x-0 z-80 flex flex-col gap-2 overflow-y-auto overscroll-contain bg-(--background) px-3 pb-3";
+const SHEET_COMPACT_CLASS =
+  "fixed inset-x-0 z-80 flex flex-col gap-1 overflow-y-auto overscroll-contain bg-(--background) px-3 pb-1";
 const HUD_BUTTON =
   "inline-flex h-11 min-h-11 w-11 min-w-11 touch-manipulation items-center justify-center rounded-lg font-sans text-(--muted) transition-colors hover:text-(--foreground)";
 
@@ -15,11 +17,14 @@ const HUD_BUTTON =
  */
 export function PlaySheet({
   active,
+  compact,
   viewport,
   hud,
   children,
 }: {
   active: boolean;
+  /** The shortest sheets (landscape with the keyboard up) squeeze their gaps. */
+  compact: boolean;
   viewport: ViewportLayout;
   hud: ReactNode;
   children: ReactNode;
@@ -35,7 +40,7 @@ export function PlaySheet({
   return (
     <div
       data-testid={active ? "ts-sheet" : undefined}
-      className={active ? SHEET_CLASS : "space-y-5"}
+      className={active ? (compact ? SHEET_COMPACT_CLASS : SHEET_CLASS) : "space-y-5"}
       style={style}
     >
       {active ? hud : null}
@@ -43,6 +48,9 @@ export function PlaySheet({
     </div>
   );
 }
+
+// A press must not move focus off the hidden input, or the keyboard flickers shut and open.
+const keepKeyboard = (e: PointerEvent<HTMLElement>) => e.preventDefault();
 
 /** Time, live WPM, Restart and Exit in one row; every control is a 44 px target. */
 export function SheetHud({
@@ -63,10 +71,22 @@ export function SheetHud({
         {wpm} WPM
       </span>
       <div className="ml-auto flex items-center gap-1">
-        <button type="button" aria-label="Restart" onClick={onRestart} className={HUD_BUTTON}>
+        <button
+          type="button"
+          aria-label="Restart"
+          onPointerDown={keepKeyboard}
+          onClick={onRestart}
+          className={HUD_BUTTON}
+        >
           <RotateCcw className="h-4 w-4" />
         </button>
-        <button type="button" aria-label="Exit" onClick={onExit} className={HUD_BUTTON}>
+        <button
+          type="button"
+          aria-label="Exit"
+          onPointerDown={keepKeyboard}
+          onClick={onExit}
+          className={HUD_BUTTON}
+        >
           <X className="h-5 w-5" />
         </button>
       </div>
