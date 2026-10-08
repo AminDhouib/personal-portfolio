@@ -141,7 +141,34 @@ describe("Typing Speed on the engine", () => {
     typeKey("c", 360);
     typeKey("d", 480);
     expect(window.localStorage.getItem("typing-high-score")).toBe("125");
-    expect(screen.getByText("New best!")).toBeInTheDocument();
+  });
+
+  function playQuoteWith(globalBest: number, modeBest: number) {
+    window.localStorage.setItem("typing-high-score", String(globalBest));
+    window.localStorage.setItem(
+      STATS_KEY,
+      JSON.stringify({
+        ...emptyStats(),
+        lastMode: "quote",
+        bests: { quote: { wpm: modeBest, raw: modeBest, acc: 100, day: "2026-10-01" } },
+      }),
+    );
+    render(<TypingSpeedGame />);
+    typeKey("a", 0);
+    typeKey("b", 120);
+    typeKey(" ", 240);
+    typeKey("c", 360);
+    typeKey("d", 480);
+  }
+
+  it("says New best when the run beats the mode best even if not the global best", () => {
+    playQuoteWith(500, 1);
+    expect(screen.getByText(/New best for Quote/)).toBeInTheDocument();
+  });
+
+  it("does not say New best when only the global best was beaten", () => {
+    playQuoteWith(1, 500);
+    expect(screen.queryByText(/New best/)).toBeNull();
   });
 
   it("keeps a higher stored best", () => {
@@ -166,7 +193,7 @@ describe("Typing Speed on the engine", () => {
     typeKey("d", 360);
     expect(window.localStorage.getItem("typing-high-score")).toBe("50");
     expect(screen.getByText(/keyboard suggestions/i)).toBeInTheDocument();
-    expect(screen.queryByText("New best!")).toBeNull();
+    expect(screen.queryByText(/New best/)).toBeNull();
   });
 
   it("any printable key with focus on the body starts the run and counts as the first key", () => {

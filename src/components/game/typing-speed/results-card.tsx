@@ -9,7 +9,6 @@ import { WpmGraph } from "./wpm-graph";
 interface ResultsCardProps {
   metrics: RunMetrics;
   maxStreak: number;
-  newBest: boolean;
   /** The run took phone suggestions or autocorrect, so it can never count. */
   bulk: boolean;
   counts: CharCounts;
@@ -30,7 +29,6 @@ function plural(n: number, one: string, many: string): string {
 export function ResultsCard({
   metrics,
   maxStreak,
-  newBest,
   bulk,
   counts,
   series,
@@ -89,17 +87,6 @@ export function ResultsCard({
         <span data-testid="ts-accuracy">{metrics.accuracy}% accuracy</span>
         {" | "}
         {(metrics.elapsedMs / 1000).toFixed(1)}s{" | "}best streak {maxStreak}
-        {newBest && (
-          <motion.span
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="ml-2 inline-flex items-center gap-1 font-semibold text-accent-amber"
-          >
-            <Trophy className="h-3.5 w-3.5" />
-            New best!
-          </motion.span>
-        )}
       </div>
       <div data-testid="ts-mistakes" className="relative mt-1 text-sm text-(--muted)">
         {metrics.mistakesTyped} {plural(metrics.mistakesTyped, "mistake", "mistakes")} typed,{" "}
