@@ -224,6 +224,19 @@
 .pg2-rule-enter {
   animation: pg2-rule-in 500ms ease-out both;
 }
+/* With the phone keyboard open the card only fades in: a 12px rise would leave the bottom of
+   the freshly followed rule below the fold while it settles. */
+.pg2-rule-enter--fade {
+  animation-name: pg2-rule-fade;
+}
+@keyframes pg2-rule-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 @keyframes pg2-rule-in {
   from {
     opacity: 0;

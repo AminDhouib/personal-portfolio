@@ -321,6 +321,7 @@ function RuleCard({
   live,
   widget,
   entering,
+  rise,
   shaking,
   reason,
   onMotionEnd,
@@ -330,6 +331,7 @@ function RuleCard({
   live: string | null;
   widget: WidgetChannel;
   entering: boolean;
+  rise: boolean;
   shaking: boolean;
   reason: string | null;
   onMotionEnd(id: string, animationName: string): void;
@@ -350,7 +352,7 @@ function RuleCard({
         aria-label={`Rule ${ev.badge}: ${ev.rule.description}${passed ? " (satisfied)" : ""}`}
         className={`pg2-rule w-full px-4 py-3 text-left ${
           variant === "active" ? "pg2-rule--active" : variant === "pass" ? "pg2-rule--pass" : ""
-        } ${passed ? "cursor-pointer" : "cursor-default"} ${entering ? "pg2-rule-enter" : ""} ${
+        } ${passed ? "cursor-pointer" : "cursor-default"} ${entering ? "pg2-rule-enter" : ""} ${entering && !rise ? "pg2-rule-enter--fade" : ""} ${
           shaking ? "pg2-rule-shake" : ""
         }`}
       >
@@ -527,7 +529,7 @@ export const RuleList = memo(function RuleList({
   }, [lastFlips, onRuleFlips]);
 
   const onMotionEnd = (id: string, animationName: string) => {
-    if (animationName === "pg2-rule-in") {
+    if (animationName === "pg2-rule-in" || animationName === "pg2-rule-fade") {
       setEntered((prev) => new Set(prev).add(id));
     } else if (animationName === "pg2-rule-shake") {
       setMotion((prev) => {
@@ -565,6 +567,7 @@ export const RuleList = memo(function RuleList({
               live={live}
               widget={widget}
               entering={!entered.has(ev.rule.id) && !motion.shaking.has(ev.rule.id)}
+              rise={slide}
               shaking={motion.shaking.has(ev.rule.id)}
               reason={motion.reasons[ev.rule.id] ?? null}
               onMotionEnd={onMotionEnd}
