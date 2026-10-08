@@ -88,7 +88,7 @@ test("today's tower ends on the over card with the board panel and three tabs", 
     await expect(stage).toHaveAttribute("data-phase", "over", { timeout: 20_000 });
 
     const panel = page.getByTestId("tower-board-panel");
-    await expect(panel.getByRole("heading", { name: "Today's tower board" })).toBeVisible();
+    await expect(panel.getByRole("heading", { name: "Tower board" })).toBeVisible();
     await expect(panel.getByRole("button", { name: "Today" })).toBeVisible();
     await expect(panel.getByRole("button", { name: "This week" })).toBeVisible();
     await expect(panel.getByRole("button", { name: "All time" })).toBeVisible();
