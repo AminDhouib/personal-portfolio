@@ -43,6 +43,7 @@ describe("feedbackFor", () => {
       expect(f.milestone).toBeNull();
       expect(f.rotated).toBe(false);
       expect(f.boundaryDropAt).toBeUndefined();
+      expect(f.countdown).toBeUndefined();
     }
   });
 
@@ -56,6 +57,23 @@ describe("feedbackFor", () => {
     expect(f.momentum).toBe(0);
     expect(f.boundaryDropAt).toBeNull();
     expect(m.combo).toBe(1);
+  });
+
+  it("calls the first count of the countdown with the run start", () => {
+    const f = feedbackFor([{ type: "run-start" }, { type: "countdown", count: 3 }], memo());
+    expect(f.phase).toBe("playing");
+    expect(f.countdown).toBe(3);
+    expect(f.sounds).toEqual([{ cue: "countdown" }]);
+  });
+
+  it("shows each count with a tick, and clears the digits with the go cue", () => {
+    const two = feedbackFor([{ type: "countdown", count: 2 }], memo());
+    expect(two.countdown).toBe(2);
+    expect(two.sounds).toEqual([{ cue: "countdown" }]);
+    const go = feedbackFor([{ type: "go" }], memo());
+    expect(go.countdown).toBeNull();
+    expect(go.sounds).toEqual([{ cue: "go" }]);
+    expect(go.phase).toBeNull();
   });
 
   it("maps pause and resume to the shell phase", () => {
@@ -233,6 +251,8 @@ describe("playCue", () => {
       combo: vi.fn(),
       cleanSweep: vi.fn(),
       boundaryShrink: vi.fn(),
+      countdown: vi.fn(),
+      go: vi.fn(),
     };
     playCue(player, { cue: "rotate" });
     playCue(player, { cue: "settle" });
@@ -240,11 +260,15 @@ describe("playCue", () => {
     playCue(player, { cue: "combo", combo: 4 });
     playCue(player, { cue: "clean-sweep" });
     playCue(player, { cue: "boundary-shrink" });
+    playCue(player, { cue: "countdown" });
+    playCue(player, { cue: "go" });
     expect(player.rotate).toHaveBeenCalledOnce();
     expect(player.settle).toHaveBeenCalledOnce();
     expect(player.match).toHaveBeenCalledWith(3);
     expect(player.combo).toHaveBeenCalledWith(4);
     expect(player.cleanSweep).toHaveBeenCalledOnce();
     expect(player.boundaryShrink).toHaveBeenCalledOnce();
+    expect(player.countdown).toHaveBeenCalledOnce();
+    expect(player.go).toHaveBeenCalledOnce();
   });
 });

@@ -158,6 +158,16 @@ export class HextrisSounds {
     });
   }
 
+  // The start countdown: one short tick per number, then a brighter two-note GO.
+  countdown() {
+    this.playTone(523.25, 110, "square", 0.1);
+  }
+
+  go() {
+    this.playTone(784, 120, "triangle", 0.2);
+    this.playTone(1046.5, 240, "triangle", 0.16);
+  }
+
   // Short descending two-note warning for the boundary shrink; a hazard, not
   // a loss, so it must not sound like gameOver().
   boundaryShrink() {

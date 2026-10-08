@@ -11,7 +11,9 @@ export type SoundCue =
   | { cue: "match"; combo: number }
   | { cue: "combo"; combo: number }
   | { cue: "clean-sweep" }
-  | { cue: "boundary-shrink" };
+  | { cue: "boundary-shrink" }
+  | { cue: "countdown" }
+  | { cue: "go" };
 
 export type HapticPattern = number | number[];
 
@@ -38,6 +40,8 @@ export interface Feedback {
   rotated: boolean;
   /** Run-clock time of the next boundary drop once warned; null to end the countdown. */
   boundaryDropAt: number | null | undefined;
+  /** The start countdown digit to show; null once GO is called, undefined if unchanged. */
+  countdown: number | null | undefined;
 }
 
 /** What the mapping remembers between batches. */
@@ -72,6 +76,7 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
     milestone: null,
     rotated: false,
     boundaryDropAt: undefined,
+    countdown: undefined,
   };
   // A combo burst never replaces a clean sweep, Panic Clear or boundary burst from the same batch.
   let bigMilestone = false;
@@ -168,7 +173,13 @@ export function feedbackFor(events: readonly EngineEvent[], memo: FeedbackMemo):
         break;
       // A chain is read from its clear's `chain` flag; the music follows the level once a second.
       case "countdown":
+        out.countdown = event.count;
+        out.sounds.push({ cue: "countdown" });
+        break;
       case "go":
+        out.countdown = null;
+        out.sounds.push({ cue: "go" });
+        break;
       case "chain":
       case "spawn":
       case "gravity":
@@ -192,7 +203,7 @@ export function musicTempo(level: number): number {
 
 type CuePlayer = Pick<
   HextrisSounds,
-  "rotate" | "settle" | "match" | "combo" | "cleanSweep" | "boundaryShrink"
+  "rotate" | "settle" | "match" | "combo" | "cleanSweep" | "boundaryShrink" | "countdown" | "go"
 >;
 
 export function playCue(player: CuePlayer, cue: SoundCue): void {
@@ -214,6 +225,12 @@ export function playCue(player: CuePlayer, cue: SoundCue): void {
       return;
     case "boundary-shrink":
       player.boundaryShrink();
+      return;
+    case "countdown":
+      player.countdown();
+      return;
+    case "go":
+      player.go();
       return;
   }
 }
