@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { CalendarDays } from "lucide-react";
 import { DURATIONS, modeId, parseMode, type ModeId } from "./engine/modes";
 import type { Content, Seconds } from "./engine/types";
 
@@ -17,11 +19,13 @@ function Choice({
   pressed,
   label,
   name,
+  icon,
   onClick,
 }: {
   pressed: boolean;
   label: string;
   name?: string;
+  icon?: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -30,8 +34,9 @@ function Choice({
       aria-pressed={pressed}
       aria-label={name}
       onClick={onClick}
-      className={[BUTTON, pressed ? ON : OFF].join(" ")}
+      className={[BUTTON, pressed ? ON : OFF, ...(icon ? ["gap-1.5"] : [])].join(" ")}
     >
+      {icon}
       {label}
     </button>
   );
@@ -66,6 +71,12 @@ export function ModeBar({ mode, onChange }: { mode: ModeId; onChange: (mode: Mod
         ))}
       </div>
       <Choice label="Quote" pressed={mode === "quote"} onClick={() => onChange("quote")} />
+      <Choice
+        label="Daily"
+        icon={<CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />}
+        pressed={mode === "daily"}
+        onClick={() => onChange("daily")}
+      />
     </div>
   );
 }

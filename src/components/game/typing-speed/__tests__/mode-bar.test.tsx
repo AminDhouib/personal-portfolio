@@ -10,12 +10,12 @@ function bar(mode: Parameters<typeof ModeBar>[0]["mode"], onChange = vi.fn()) {
 }
 
 describe("ModeBar", () => {
-  it("offers content, durations and the single quote", () => {
+  it("offers content, durations, the single quote and the daily", () => {
     const { group } = bar("words-30");
     const names = within(group)
       .getAllByRole("button")
       .map((b) => b.textContent);
-    expect(names).toEqual(["Words", "Quotes", "15", "30", "60", "120", "Quote"]);
+    expect(names).toEqual(["Words", "Quotes", "15", "30", "60", "120", "Quote", "Daily"]);
   });
   it("marks the buttons that match the current mode as pressed", () => {
     const { group } = bar("quotes-60");
@@ -30,6 +30,20 @@ describe("ModeBar", () => {
       .getAllByRole("button", { pressed: true })
       .map((b) => b.textContent);
     expect(pressed).toEqual(["Quote"]);
+  });
+  it("marks only Daily as pressed in the daily mode, and picks it", () => {
+    const { group, onChange } = bar("daily");
+    const pressed = within(group)
+      .getAllByRole("button", { pressed: true })
+      .map((b) => b.textContent);
+    expect(pressed).toEqual(["Daily"]);
+    fireEvent.click(screen.getByRole("button", { name: "Daily" }));
+    expect(onChange).toHaveBeenCalledWith("daily");
+  });
+  it("leaves the daily for a timed mode at 30 seconds", () => {
+    const { onChange } = bar("daily");
+    fireEvent.click(screen.getByRole("button", { name: "Words" }));
+    expect(onChange).toHaveBeenLastCalledWith("words-30");
   });
   it("changes the duration and keeps the content", () => {
     const { onChange } = bar("words-30");

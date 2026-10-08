@@ -116,6 +116,16 @@ describe("zero-WPM runs", () => {
   });
 });
 
+describe("daily mode and the last mode", () => {
+  it("counts a daily run and its best but never makes daily the last mode", () => {
+    const before = recordRun(emptyStats(), run({ mode: "quote" }));
+    const after = recordRun(before, run({ mode: "daily", netWpm: 80 }));
+    expect(after.runs).toBe(2);
+    expect(after.lastMode).toBe("quote");
+    expect(after.bests.daily?.wpm).toBe(80);
+  });
+});
+
 describe("daily streak (UTC days)", () => {
   it("starts at one, ignores a repeat of the same day and extends on the next day", () => {
     let s = recordDay(emptyStats(), "2026-10-08");

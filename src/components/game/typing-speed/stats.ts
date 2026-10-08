@@ -169,7 +169,8 @@ export function streakAsOf(stats: Stats, today: string): number {
 export function recordRun(stats: Stats, r: RunRecord): Stats {
   const next = structuredClone(stats);
   next.runs = Math.min(COUNT_CAP, next.runs + 1);
-  next.lastMode = r.mode;
+  // The page never opens on the Daily view: it is a date-bound mode, not a preference.
+  if (r.mode !== "daily") next.lastMode = r.mode;
   if (r.bulk > 0) return next;
   const best = next.bests[r.mode];
   // A zero-WPM run is played, but it is not a best to beat.

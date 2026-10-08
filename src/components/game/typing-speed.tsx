@@ -6,7 +6,23 @@ import { RotateCcw, Trophy, Timer, Target, Flame, Zap, Percent } from "lucide-re
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { keyStats, wpmSeries, type KeyStats, type SeriesPoint } from "./typing-speed/engine/series";
-import { configFor, modeLabel, parseMode, type ModeId } from "./typing-speed/engine/modes";
+import { dailyScore, dailyText } from "./typing-speed/engine/daily";
+import {
+  DEFAULT_MODE,
+  configFor,
+  modeLabel,
+  parseMode,
+  type ModeId,
+} from "./typing-speed/engine/modes";
+import { DailyPanel } from "./typing-speed/daily-panel";
+import {
+  loadDaily,
+  markPosted,
+  recordAttempt,
+  saveDaily,
+  setHandle,
+  type DailyRecord,
+} from "./typing-speed/daily-store";
 import type { Op, TypingRun } from "./typing-speed/engine/types";
 import {
   charCounts,
@@ -21,7 +37,7 @@ import { ModeBar } from "./typing-speed/mode-bar";
 import { PlaySheet, SheetHud } from "./typing-speed/play-sheet";
 import { ResultsCard } from "./typing-speed/results-card";
 import { sheetLayout } from "./typing-speed/sheet-layout";
-import { loadStats, recordRun, saveStats } from "./typing-speed/stats";
+import { loadStats, recordDay, recordRun, saveStats, streakAsOf } from "./typing-speed/stats";
 import { TextView } from "./typing-speed/text-view";
 import { useTypingRun } from "./typing-speed/use-typing-run";
 import { WpmGraph } from "./typing-speed/wpm-graph";
@@ -47,6 +63,16 @@ interface Result {
   allKeys: KeyStats;
   /** Set when this run beat a stored best for its mode, e.g. "15s words". */
   modeBest: string | null;
+}
+
+/** The Daily view: its day is fixed when the view opens, so a run and its Post agree on the text. */
+interface DailyState {
+  day: string;
+  rec: DailyRecord;
+  /** The streak as it stands today. */
+  streak: number;
+  /** The latest attempt used phone suggestions or autocorrect. */
+  lastBulk: boolean;
 }
 
 function utcDay(): string {
@@ -79,7 +105,10 @@ function usePhone(): boolean {
 
 export function TypingSpeedGame() {
   const [initialStats] = useState(loadStats);
-  const [mode, setMode] = useState<ModeId>(initialStats.lastMode);
+  const [mode, setMode] = useState<ModeId>(
+    initialStats.lastMode === "daily" ? DEFAULT_MODE : initialStats.lastMode,
+  );
+  const [daily, setDaily] = useState<DailyState | null>(null);
   const [seed, setSeed] = useState(drawSeed);
   const [passageNo, setPassageNo] = useState(0);
   const [highScore, setHighScore] = useState(readHighScore);
@@ -168,7 +197,7 @@ export function TypingSpeedGame() {
       const runKeys = keyStats(run);
       const before = loadStats();
       const prior = before.bests[mode];
-      const after = recordRun(before, {
+      let after = recordRun(before, {
         mode,
         netWpm: metrics.netWpm,
         rawWpm: metrics.rawWpm,
@@ -177,6 +206,21 @@ export function TypingSpeedGame() {
         keys: runKeys,
         bulk: run.bulk,
       });
+      if (mode === "daily" && daily) {
+        // Whole milliseconds and net characters: exactly what Post sends and the server checks.
+        const ms = Math.round(metrics.elapsedMs);
+        const chars = metrics.netChars;
+        const rec = recordAttempt(loadDaily(daily.day), {
+          wpm: ms > 0 ? dailyScore(chars, ms) : 0,
+          ms,
+          chars,
+          acc: metrics.accuracy,
+          bulk,
+        });
+        saveDaily(rec);
+        after = recordDay(after, daily.day);
+        setDaily({ ...daily, rec, streak: streakAsOf(after, daily.day), lastBulk: bulk });
+      }
       saveStats(after);
       setResult({
         metrics,
@@ -189,33 +233,37 @@ export function TypingSpeedGame() {
         modeBest: !bulk && prior && metrics.netWpm > prior.wpm ? modeLabel(mode) : null,
       });
     },
-    [highScore, mode],
+    [highScore, mode, daily],
   );
 
-  const typing = useTypingRun(configFor(mode, seed, passageNo), { inputRef, onFinish, onKey });
+  const typing = useTypingRun(configFor(mode, seed, passageNo, daily?.day), {
+    inputRef,
+    onFinish,
+    onKey,
+  });
   const { run, reset, press } = typing;
 
   const timed = parseMode(mode) !== null;
 
   const begin = useCallback(
-    (next: { mode: ModeId; seed: number; passageNo: number }) => {
+    (next: { mode: ModeId; seed: number; passageNo: number; day?: string }) => {
       setMode(next.mode);
       setSeed(next.seed);
       setPassageNo(next.passageNo);
       setResult(null);
       setBursts([]);
-      reset(configFor(next.mode, next.seed, next.passageNo));
+      reset(configFor(next.mode, next.seed, next.passageNo, next.day));
     },
     [reset],
   );
 
   // A timed run draws fresh words each time; a quote run replays the same passage.
   const restart = useCallback(() => {
-    begin({ mode, seed: timed ? drawSeed() : seed, passageNo });
+    begin({ mode, seed: timed ? drawSeed() : seed, passageNo, day: daily?.day });
     // Synchronous, inside the click gesture, so mobile Safari raises the keyboard.
     inputRef.current?.focus();
     if (phone) setSheetOn(true);
-  }, [begin, mode, seed, passageNo, timed, phone]);
+  }, [begin, mode, seed, passageNo, timed, phone, daily]);
 
   const nextPassage = useCallback(() => {
     begin({ mode, seed, passageNo: passageNo + 1 });
@@ -233,16 +281,44 @@ export function TypingSpeedGame() {
   const exitSheet = useCallback(() => {
     setSheetOn(false);
     inputRef.current?.blur();
-    begin({ mode, seed: timed ? drawSeed() : seed, passageNo });
-  }, [begin, mode, seed, passageNo, timed]);
+    begin({ mode, seed: timed ? drawSeed() : seed, passageNo, day: daily?.day });
+  }, [begin, mode, seed, passageNo, timed, daily]);
+
+  // Opens the Daily view on the current UTC day: the day is fixed here, so a run, its record
+  // and its Post agree on the text even if midnight passes while the page is open.
+  const enterDaily = useCallback(() => {
+    const day = utcDay();
+    setDaily({
+      day,
+      rec: loadDaily(day),
+      streak: streakAsOf(loadStats(), day),
+      lastBulk: false,
+    });
+    begin({ mode: "daily", seed: 0, passageNo: 0, day });
+  }, [begin]);
 
   const changeMode = useCallback(
     (next: ModeId) => {
-      if (next === mode) return;
+      // Picking Daily again only matters once the UTC day has turned over.
+      if (next === mode && !(next === "daily" && daily?.day !== utcDay())) return;
+      if (next === "daily") {
+        enterDaily();
+        return;
+      }
       saveStats({ ...loadStats(), lastMode: next });
       begin({ mode: next, seed: drawSeed(), passageNo: 0 });
     },
-    [begin, mode],
+    [begin, mode, daily, enterDaily],
+  );
+
+  const onPosted = useCallback(
+    (wpm: number, handle: string) => {
+      if (!daily) return;
+      const rec = setHandle(markPosted(loadDaily(daily.day), wpm), handle);
+      saveDaily(rec);
+      setDaily((d) => (d ? { ...d, rec } : d));
+    },
+    [daily],
   );
 
   // Any printable key starts the run, Enter focuses it, Escape restarts it.
@@ -496,7 +572,7 @@ export function TypingSpeedGame() {
             <RotateCcw className="h-3 w-3" />
             Restart
           </button>
-          {playing && !timed && (
+          {playing && !timed && mode !== "daily" && (
             <button
               type="button"
               onClick={nextPassage}
@@ -534,10 +610,23 @@ export function TypingSpeedGame() {
               runKeys={result.runKeys}
               allKeys={result.allKeys}
               modeBest={result.modeBest}
-              onNext={timed ? null : nextPassage}
+              onNext={timed || mode === "daily" ? null : nextPassage}
               onAgain={restart}
             />
           </div>
+        )}
+
+        {mode === "daily" && daily && (
+          <DailyPanel
+            key={daily.day}
+            day={daily.day}
+            sourceId={dailyText(daily.day).sourceId}
+            record={daily.rec}
+            streak={daily.streak}
+            lastBulk={daily.lastBulk}
+            onPosted={onPosted}
+            onNewDay={enterDaily}
+          />
         )}
       </div>
     </div>
