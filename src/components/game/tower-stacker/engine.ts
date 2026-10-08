@@ -4,7 +4,9 @@
 import { mulberry32, subSeed } from "../password-game-2/engine/rng";
 import { LAND_POINTS, perfectPoints } from "./scoring";
 
+export const WORLD_WIDTH = 600;
 export const BASE_WIDTH = 240;
+export const BLOCK_HEIGHT = 40;
 /** The crane sweeps the block's left edge this far either side of the top slab's. */
 export const CRANE_REACH = 210;
 /** A landing within this many units of the top slab is perfect. */
