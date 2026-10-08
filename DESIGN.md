@@ -143,9 +143,10 @@ style suggestions.
 
 ## Arcade backend
 
-Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2); the legacy
-`leaderboard_entries` table and `/api/leaderboard` keep serving Tower Stacker until T6. Code:
-`src/lib/arcade/`, route `src/app/api/arcade/scores/route.ts`.
+Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2), Super Voltorb
+Flip's Daily board (T2e) and Tower Stacker's daily tower (T6-3); the legacy `leaderboard_entries`
+table is frozen history behind a read-only `/api/leaderboard`. Code: `src/lib/arcade/`, route
+`src/app/api/arcade/scores/route.ts`.
 
 - **Tables.** `arcade_players` (id, token_hash, handle) and `arcade_scores` with primary key
   `(game, board, player_id)`: exactly one best row per player per board. `score` is BIGINT and
@@ -183,11 +184,19 @@ Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2)
   nothing falls back to "Pilot", so all such rows merge into one "Pilot" player. Real arcade
   handles are not unique, so a returning player who picks an old name appears next to the old
   row, not in place of it.
-- **The legacy route is frozen for the two moved games.** `LEADERBOARD_GAMES`
-  (`src/lib/leaderboard-games.ts`) is `["tower-stacker"]`, so `POST /api/leaderboard` answers 400
-  for `space-shooter` and `hextris` (a deliberate, pinned change). The legacy GET is unchanged
-  and still serves stored rows. T6 moves Tower Stacker and retires the route and the table;
-  the hook is already gone, as Tower Stacker no longer posts scores.
+- **The legacy route is read-only: no writer, never dropped.** Tower Stacker was the last game
+  posting to `leaderboard_entries`; T6-3 moved it to the arcade, so `POST /api/leaderboard` is
+  gone (the route exports GET only, pinned in `api/leaderboard/__tests__/route.test.ts`) and
+  `lib/__tests__/legacy-table-frozen.test.ts` fails if any non-test source writes, deletes from,
+  alters or drops the table. The GET still serves stored rows of every legacy game (Orbital Dodge,
+  Hextris, the classic Tower Stacker). The table stays for fresh volumes (`db/init.sql`) and for
+  the import's read; nothing imports the old Tower Stacker rows (different scoring system, no
+  detail the new check could verify, and `legacy-import` only knows `LEGACY_ARCADE_GAME_SLUGS`).
+- **Tower Stacker's arcade entry is the daily tower.** Detail `{ day, blocks, perfects, streak,
+seconds }`. `checkTowerStacker` requires today's UTC day by the server clock (no grace across
+  midnight), consistent counts, at most `maxBlocksFor(seconds)` floors (one per 400 ms of
+  active play, plus slack) and a score inside `scoreRange(blocks, perfects, streak)` and a
+  multiple of 10. Ceilings on client numbers, not anti-cheat, like every check here.
 - **Browser identity.** `src/lib/arcade/identity.ts` keeps `{ playerId, token }` in
   `localStorage` under `arcade:player:v1`. A read never creates one (so first-time visitors stay
   cacheable); the first submit does, with an in-memory copy that wins over storage for the page
@@ -499,9 +508,9 @@ current tree on 2026-07-07.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
   blocks-cleared in the `kills` column and writes a `level` the UI never surfaces; player-name
   inputs cap at 12 characters (`maxLength` plus a slice in the handler). Only worth revisiting
-  if the raw columns are ever exposed publicly. Since T1b-2 this describes only the legacy
-  table's remaining writer (Tower Stacker); Hextris's arcade rows keep blocks-cleared in
-  `detail.kills`, which its plausibility check relies on.
+  if the raw columns are ever exposed publicly. Since T6-3 nothing writes the legacy table any
+  more; Hextris's arcade rows keep blocks-cleared in `detail.kills`, which its plausibility
+  check relies on.
 - **`maxDuration` is deliberately absent from the LLM route** (`src/app/api/copilotkit/route.ts`).
   It's a Vercel-only directive and a documented no-op on this self-hosted deployment — the
   code's own comment calls it out as the same class of theater `env.ts`'s honesty pass removed
