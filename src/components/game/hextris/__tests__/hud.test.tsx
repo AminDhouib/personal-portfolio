@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EngineEvent } from "../engine/types";
+import { TIPS_KEY } from "../tips";
 
 // The shell's controls must be thumb-sized on a phone (44 px, h-11) and the name field 16 px so
 // iOS does not zoom on focus. The real engine runs; events the test needs sooner than play would
@@ -53,6 +54,7 @@ beforeEach(() => {
   nextFrame = 1;
   clock = 1000;
   injected.length = 0;
+  window.localStorage.clear();
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
     value: () => fakeCanvasContext(),
     configurable: true,
@@ -93,6 +95,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", realGetContext);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -138,5 +141,61 @@ describe("Hextris HUD sizing", () => {
     expect(classes).not.toContain("text-sm");
     const submit = screen.getByRole("button", { name: "Submit" });
     expect(submit.className.split(/\s+/)).toContain("min-h-11");
+  });
+});
+
+describe("Hextris Panic Clear tip", () => {
+  const TIP = "Press F or tap to clear the board";
+
+  function fillMeter() {
+    injected.push({ type: "momentum", value: 100 });
+    runFrames(1);
+  }
+
+  function spendMeter() {
+    injected.push({ type: "momentum", value: 0 });
+    runFrames(1);
+  }
+
+  it("shows above Panic Clear the first time the meter fills, and goes once it is used", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    expect(screen.queryByText(TIP)).toBeNull();
+    fillMeter();
+    expect(screen.getByRole("status")).toHaveTextContent(TIP);
+    expect(window.localStorage.getItem(TIPS_KEY)).toBe('{"v":1,"panicSeen":true}');
+    spendMeter();
+    expect(screen.queryByText(TIP)).toBeNull();
+    // Never twice on one page, even if the stored flag could not be written.
+    window.localStorage.clear();
+    fillMeter();
+    expect(screen.getByRole("button", { name: "Panic Clear" })).toBeInTheDocument();
+    expect(screen.queryByText(TIP)).toBeNull();
+  });
+
+  it("goes by itself after 6 s", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    fillMeter();
+    expect(screen.getByText(TIP)).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(5900);
+    });
+    expect(screen.getByText(TIP)).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(screen.queryByText(TIP)).toBeNull();
+    expect(screen.getByRole("button", { name: "Panic Clear" })).toBeInTheDocument();
+  });
+
+  it("never shows again once seen (a reload)", () => {
+    window.localStorage.setItem(TIPS_KEY, '{"v":1,"panicSeen":true}');
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    fillMeter();
+    expect(screen.getByRole("button", { name: "Panic Clear" })).toBeInTheDocument();
+    expect(screen.queryByText(TIP)).toBeNull();
   });
 });

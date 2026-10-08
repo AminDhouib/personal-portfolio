@@ -29,6 +29,7 @@ import {
 } from "./hextris/feedback";
 import { arcadeSubmission, isRecordableRun, recordHighScore, runSeed } from "./hextris/session";
 import { hextrisKeyAction } from "./hextris/input";
+import { markPanicTipSeen, readTips } from "./hextris/tips";
 import { isTextEntryTarget } from "./text-entry";
 import { safeJsonParse } from "@/lib/safe-json";
 import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
@@ -38,6 +39,9 @@ import { useArcadeBoard } from "@/hooks/use-arcade-board";
 
 // The longest real-time gap one frame feeds the engine, so a stalled tab does not jump the run.
 const MAX_FRAME_MS = 100;
+
+// How long the one-time Panic Clear tip stays up if the player does not use it.
+const PANIC_TIP_MS = 6000;
 
 /** A run's unpaused play time as m:ss. */
 function formatRunTime(elapsedMs: number): string {
@@ -87,6 +91,8 @@ export function HextrisGame() {
   // Fallback "fixed inset-0" fullscreen for mobile where the native API is flaky (iOS Safari).
   const [mobileImmersive, setMobileImmersive] = useState(false);
   const [showTutorial, setShowTutorial] = useState(true);
+  // The one-time Panic Clear tip, shown above the button the first time the meter fills.
+  const [panicTip, setPanicTip] = useState(false);
   // Combo milestone text (e.g., "×5 COMBO!") displayed briefly on crossing thresholds
   const [milestone, setMilestone] = useState<{ id: number; text: string; color: string } | null>(
     null,
@@ -271,6 +277,12 @@ export function HextrisGame() {
     return () => window.clearTimeout(t);
   }, [uiState]);
 
+  useEffect(() => {
+    if (!panicTip) return;
+    const t = window.setTimeout(() => setPanicTip(false), PANIC_TIP_MS);
+    return () => window.clearTimeout(t);
+  }, [panicTip]);
+
   // Auto-clear combo milestone overlay after its animation
   useEffect(() => {
     if (!milestone) return;
@@ -352,6 +364,8 @@ export function HextrisGame() {
     let shakePeak = 0;
     let shakeStartedAt = 0;
     let shaking = false;
+    // Whether this page has already decided on the Panic Clear tip (shown, or seen before).
+    let panicTipDecided = false;
     // The shake is the one effect that follows the OS reduced-motion preference.
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -377,7 +391,20 @@ export function HextrisGame() {
       if (f.score !== null) setUiScore(f.score);
       if (f.scorePulse) setScorePulse((p) => p + 1);
       if (f.combo !== null) setUiCombo(f.combo);
-      if (f.momentum !== null) setUiMomentum(f.momentum);
+      if (f.momentum !== null) {
+        setUiMomentum(f.momentum);
+        if (f.momentum < 100) {
+          // Panic Clear spent the meter (or a new run reset it): the tip has done its job.
+          setPanicTip(false);
+        } else if (!panicTipDecided) {
+          panicTipDecided = true;
+          // Marked seen as it shows, so a reload mid-tip does not show it again.
+          if (!readTips().panicSeen) {
+            markPanicTipSeen();
+            setPanicTip(true);
+          }
+        }
+      }
       if (f.milestone) {
         milestoneId += 1;
         setMilestone({ id: milestoneId, ...f.milestone });
@@ -716,6 +743,14 @@ export function HextrisGame() {
           tappable button (thumb-friendly on mobile). */}
       {uiState === "playing" && (
         <div className="pointer-events-none absolute bottom-6 left-1/2 flex w-[min(80%,320px)] -translate-x-1/2 flex-col items-center gap-1.5">
+          {uiMomentum >= 100 && panicTip && (
+            <div
+              role="status"
+              className="hextris-combo-pop absolute bottom-full mb-2 rounded-md border border-accent-purple/50 bg-black/80 px-3 py-1.5 font-mono text-xs whitespace-nowrap text-white backdrop-blur"
+            >
+              Press F or tap to clear the board
+            </div>
+          )}
           {uiMomentum >= 100 ? (
             <button
               type="button"
