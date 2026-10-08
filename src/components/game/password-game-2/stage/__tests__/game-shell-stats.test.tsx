@@ -104,4 +104,19 @@ describe("GameShell records a finished run", () => {
     expect(written.runs).toBe(1);
     expect(written.bestMs).toBe(654_321);
   });
+
+  it("leaves a newer build stored stats untouched when a run is won", () => {
+    const newer = JSON.stringify({ v: 99, bestMs: 1 });
+    localStorage.setItem("pg2:stats", newer);
+    const { getByRole } = render(<GameShell />);
+    fireEvent.click(getByRole("button", { name: /start seed 7/i }));
+    const g = live.g!;
+    g.elapsedMs = 1000;
+    g.outcome = "victory";
+    g.version += 1;
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(localStorage.getItem("pg2:stats")).toBe(newer);
+  });
 });
