@@ -337,3 +337,83 @@ test("the sitemap and llms.txt cover every public game and no hidden one; hidden
       .toHaveAttribute("content", /noindex/);
   }
 });
+
+test("the Password Game 2 page server-renders a visible h1, intro and the original's credit above the game", async ({
+  browser,
+  baseURL,
+}) => {
+  // JavaScript off: the game is client-only, so this is all a crawler reads.
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  await blockThirdParties(context, baseURL);
+  const page = await context.newPage();
+
+  try {
+    await page.goto("/games/password-game", { waitUntil: "domcontentloaded" });
+
+    const h1 = page.locator("h1");
+    await expect(h1).toHaveCount(1);
+    await expect(h1).toContainText("Password Game 2");
+    await expect(h1).toBeVisible();
+
+    await expect(page.getByTestId("pg2-page-intro")).toBeVisible();
+    const credit = page.getByTestId("pg2-credit").getByRole("link", { name: "Neal Agarwal" });
+    await expect(credit).toHaveAttribute("href", "https://neal.fun/password-game/");
+    await expect(credit).toHaveAttribute("rel", /noopener/);
+
+    const hintsLink = page.getByRole("link", {
+      name: /Rules and hints \(spoilers behind a click\)/,
+    });
+    await expect(hintsLink).toHaveAttribute("href", "/games/password-game/hints");
+
+    const nodes = await jsonLdNodes(page);
+    expect(nodesOf(nodes, videoGameSchema)).toHaveLength(1);
+    expect(nodesOf(nodes, faqPageSchema)).toHaveLength(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("the Password Game 2 hints page is indexable, spoiler-guarded and has its own share image", async ({
+  page,
+  request,
+}) => {
+  const path = "/games/password-game/hints";
+  const res = await page.goto(path, { waitUntil: "domcontentloaded" });
+  expect(res?.status()).toBe(200);
+
+  await expect(page.locator("h1")).toHaveCount(1);
+
+  // Nothing is revealed on load: every rule and event section starts closed.
+  const sections = page.locator("details[data-rule], details[data-event]");
+  expect(await sections.count()).toBeGreaterThan(19);
+  const open = await sections.evaluateAll((els) => els.filter((el) => el.hasAttribute("open")));
+  expect(open).toHaveLength(0);
+
+  // Opening one reveals its hints.
+  const first = page.locator("details[data-rule]").first();
+  await first.locator("summary").click();
+  await expect(first.locator("li").first()).toBeVisible();
+
+  const nodes = await jsonLdNodes(page);
+  const [faq] = nodesOf(nodes, faqPageSchema);
+  expect(faq?.mainEntity).toHaveLength(3);
+  const [crumbs] = nodesOf(nodes, breadcrumbSchema);
+  expect(crumbs?.itemListElement.map((c) => c.name)).toEqual([
+    "Home",
+    "Games",
+    "Password Game 2",
+    "Hints",
+  ]);
+
+  // Next appends a ?<hash> to file-based image URLs, so match the path by substring.
+  const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
+  expect(ogImage).toContain(`${path}/opengraph-image`);
+  if (ogImage) {
+    const image = await request.get(pathOf(ogImage));
+    expect(image.status(), ogImage).toBe(200);
+    expect(image.headers()["content-type"], ogImage).toContain("image/png");
+  }
+
+  expect((await sitemapUrls(request)).map(pathOf)).toContain(path);
+  expect(await (await request.get("/llms.txt")).text()).toContain(`${path})`);
+});

@@ -9,6 +9,10 @@ import {
   SOLVER_DESCRIPTION,
   SOLVER_PATH,
 } from "@/app/games/super-voltorb-flip/solver/solver-content";
+import {
+  PG2_HINTS_DESCRIPTION,
+  PG2_HINTS_PATH,
+} from "@/app/games/password-game/hints/hints-content";
 import { GET } from "../route";
 
 // Runs against the real checked-in content (content/blog, src/data): the
@@ -70,6 +74,15 @@ describe("GET /llms.txt", () => {
     const at = lines.indexOf(solver);
     expect(at).toBeGreaterThan(0);
     expect(lines[at - 1]).toContain("(https://amindhou.com/games/super-voltorb-flip)");
+  });
+
+  it("lists the Password Game 2 hints page right after the game", async () => {
+    const body = await GET().text();
+    const hints = `- [Password Game 2 rules and hints](https://amindhou.com${PG2_HINTS_PATH}): ${PG2_HINTS_DESCRIPTION}`;
+    const lines = body.split("\n");
+    const at = lines.indexOf(hints);
+    expect(at).toBeGreaterThan(0);
+    expect(lines[at - 1]).toContain("(https://amindhou.com/games/password-game)");
   });
 
   it("never lists a hidden game", async () => {

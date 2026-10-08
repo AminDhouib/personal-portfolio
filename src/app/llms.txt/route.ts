@@ -5,6 +5,10 @@ import {
   SOLVER_DESCRIPTION,
   SOLVER_PATH,
 } from "@/app/games/super-voltorb-flip/solver/solver-content";
+import {
+  PG2_HINTS_DESCRIPTION,
+  PG2_HINTS_PATH,
+} from "@/app/games/password-game/hints/hints-content";
 import { BOOKING_URL, socialLinks } from "@/data/nav";
 import { faqs } from "@/data/faq";
 import { SITE_ORIGIN, profile } from "@/data/profile";
@@ -79,6 +83,9 @@ export function GET(): Response {
       `- ${link(g.title, `/games/${g.slug}`)}: ${GAME_CONTENT[g.slug].seoDescription}`,
       ...(g.slug === "super-voltorb-flip"
         ? [`- ${link("Voltorb Flip solver", SOLVER_PATH)}: ${SOLVER_DESCRIPTION}`]
+        : []),
+      ...(g.slug === "password-game"
+        ? [`- ${link("Password Game 2 rules and hints", PG2_HINTS_PATH)}: ${PG2_HINTS_DESCRIPTION}`]
         : []),
     ]),
     "",
