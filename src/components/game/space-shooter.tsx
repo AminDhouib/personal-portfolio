@@ -63,6 +63,7 @@ import {
 } from "./space-shooter/types";
 import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
 import { PanelClose } from "./space-shooter/panel-close";
+import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
@@ -289,7 +290,7 @@ function detectGyroSupported() {
   return hasOrientation && isMobile;
 }
 
-export function SpaceShooterGame() {
+export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVariant } = {}) {
   const gameRefs = useRef<GameRefs>(createRefs());
   const containerRef = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
@@ -1114,6 +1115,8 @@ export function SpaceShooterGame() {
     };
   }, []);
 
+  const layout = canvasLayout(variant, isFullscreen);
+
   return (
     <div>
       {/* 3D Canvas — responsive across mobile / 16:9 / 21:9 with a cap so
@@ -1126,18 +1129,14 @@ export function SpaceShooterGame() {
         ref={containerRef}
         className={`relative mx-auto overflow-hidden rounded-xl border border-(--border) ${
           ui.status === "playing" || ui.status === "paused" ? "touch-none" : "touch-auto"
-        } ${
-          isFullscreen
-            ? "fixed inset-0 z-50 h-screen w-screen rounded-none border-0"
-            : "aspect-3/4 w-full sm:aspect-auto sm:h-115"
-        }`}
+        } ${layout.sizeClass}`}
         style={{
           background: env.bg,
           cursor: ui.status === "playing" ? "none" : "default",
           // Cap so 16:1 monitors letterbox at ~21:9, AND cap mobile portrait
           // height so the canvas doesn't dominate the viewport on tall phones.
           maxWidth: isFullscreen ? "100vw" : "min(100%, calc(100vh * 21 / 9))",
-          maxHeight: isFullscreen ? "100vh" : "70vh",
+          maxHeight: layout.maxHeight,
         }}
       >
         <Canvas
