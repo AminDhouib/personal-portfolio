@@ -11,10 +11,10 @@ export const PG2_HINTS_PATH = "/games/password-game/hints";
 
 export const PG2_HINTS_TITLE = "Password Game 2 Hints and Rules, Spoilers Hidden";
 export const PG2_HINTS_DESCRIPTION =
-  "Stuck on The Password Game 2? Every rule and event has three hints, from a nudge to the full answer. Each stays closed until you open it.";
+  "Stuck on The Password Game 2? Every rule has three hints, from a nudge to the full answer, and every event has a tip. All stay closed until opened.";
 
 export const PG2_HINTS_INTRO =
-  "Every rule and event in The Password Game 2 has its own entry below. Nothing is revealed until you open it: rules give three hints from a small nudge to the full approach, and events say what they are and how to survive them. Hints never name a seeded value, so they hold for every run.";
+  "Every rule and event in The Password Game 2 has its own entry below. The hints and answers stay hidden until you open an entry: rules give three hints from a small nudge to the full approach, and events say what they are and how to survive them. Hints never name a seeded value, so they hold for every run. Rule numbers follow the core rules, and an event can add a rule that shifts the numbers on your card.";
 
 export interface RuleHint {
   /** Visible while the entry is closed, so it must not give the answer away. */
@@ -129,7 +129,7 @@ export const RULE_HINTS: Record<string, RuleHint> = {
   "country-name": {
     title: "Where in the world",
     hints: [
-      "Look at the card for a picture or name.",
+      "Look at the card for the country name.",
       "The card names a country. You have to type that country.",
       "Spell the country's full name. Capitals do not matter. If the live feed is unreachable the rule passes for free.",
     ],
@@ -220,7 +220,7 @@ export const EVENT_HINTS: Record<string, EventHint> = {
   },
   tetris: {
     title: "Junk blocks",
-    tip: "Ten junk blocks drop into your password. Unlike other intruders they count toward your length and digit sum. Click a junk block to shatter it, or delete it with Backspace. At submit none may remain.",
+    tip: "Ten junk blocks drop into your password. Unlike other intruders they count toward your length. Click a junk block to shatter it, or delete it with Backspace. At submit none may remain.",
   },
   "cookie-banner": {
     title: "The cookie banner",
