@@ -8,6 +8,8 @@ import { describe, it, expect } from "vitest";
 // spec without reading the upstream source; this fails if any file under hextris/ or the shell
 // component carries an upstream identifier or tuning constant. Modelled on
 // super-voltorb-flip/__tests__/assets-guard.test.ts. This file is excluded from its own scan.
+// The plan's `wavegen`, `doesBlockCollide` and `angularVelocityConst` were dropped from the list
+// because they match nothing in the upstream source; every remaining entry hits the pre-T5-3 shell.
 
 const ROOT = process.cwd();
 const GAME_DIR = join(ROOT, "src", "components", "game", "hextris");
@@ -23,7 +25,7 @@ const DENYLIST: readonly RegExp[] = [
   /\bnextGen\b/,
   /\blastGen\b/,
   /\bdistFromHex\b/,
-  /\bmainHex\b/,
+  /\bmainhex\b/i,
   /\bfadeUpAndOut\b/,
   /\bcalcSide\b/,
   /\bdrawTimer\b/,
@@ -88,8 +90,9 @@ describe("provenance matcher", () => {
     expect(denylistHits("let wgSpeed = 1; hexRotate(1);")).toHaveLength(2);
   });
 
-  it("matches the upstream casing of the board object", () => {
-    expect(denylistHits("mainHex.sides")).toEqual(["\\bmainHex\\b"]);
+  it("matches the board object in either casing", () => {
+    expect(denylistHits("mainHex.sides")).toEqual(["\\bmainhex\\b"]);
+    expect(denylistHits("MainHex.sides")).toEqual(["\\bmainhex\\b"]);
   });
 
   it("bites on each of the upstream's most used identifiers", () => {
