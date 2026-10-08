@@ -503,6 +503,27 @@ current tree on 2026-07-07.
   it. The shell reads `NODE_ENV` once, through a justified `eslint-disable-next-line`, for the
   dev-only `?seed=<uint32>` replay seam (spec section 12.3); production always draws a fresh
   seed.
+- **The daily tower is the only ranked Tower Stacker mode.** The arcade registry takes one
+  detail schema per slug and a board only means something if every score on it was earned on the
+  same tower, so only `dailyTowerSeed(today)` runs can be submitted. Free build (a random or
+  `?tower-seed=` tower) is unranked on purpose: it keeps a local best in `tower:stats` and its
+  over card offers a route to the daily tower instead of a form. Do not add a second ranked mode
+  without a second slug or a detail field the check can verify.
+- **Tower Stacker's check bounds the score by the landings, not by replaying the run.**
+  `checkTowerStacker` cannot see the drops, so it brackets the score: `scoreRange(blocks,
+perfects, streak)` gives the lowest and highest total any run with those counts could earn, and
+  the claim must sit inside it and be a multiple of 10. The floor count is capped at
+  `maxBlocksFor(seconds)`, one landing per 400 ms of active play plus slack, because a crane
+  cycle cannot be driven faster. These are ceilings on honest-client numbers, forgeable like
+  every other check in this file. The day must equal the server's UTC day with no grace across
+  midnight, so a run that crosses midnight is refused at the card (it shows a closed message and
+  no Submit) as well as by the server.
+- **The legacy Tower Stacker scores stay where they are.** The old `leaderboard_entries` rows for
+  `tower-stacker` are read-only history served by `GET /api/leaderboard`. They are not imported
+  into the arcade tables: they were scored by the retired embedded game, a different scoring
+  system with no detail the new check could verify, so mixing them would put unverifiable numbers
+  next to verified ones. Nothing writes the table (a source guard test enforces it) and it is
+  never dropped.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
