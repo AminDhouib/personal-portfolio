@@ -37,6 +37,7 @@ describe("ReceiptCard date", () => {
         g={g}
         seed={7}
         daily
+        startDay="2026-10-09"
         onCopySeed={() => {}}
         onPlayAgain={() => {}}
         onPlayDaily={() => {}}
@@ -70,6 +71,7 @@ describe("ReceiptCard share", () => {
         g={g}
         seed={7}
         daily
+        startDay="2026-10-09"
         onCopySeed={() => {}}
         onPlayAgain={() => {}}
         onPlayDaily={() => {}}
@@ -100,6 +102,7 @@ describe("ReceiptCard share", () => {
         g={g}
         seed={7}
         daily
+        startDay="2026-10-09"
         onCopySeed={() => {}}
         onPlayAgain={() => {}}
         onPlayDaily={() => {}}

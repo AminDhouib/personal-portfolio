@@ -20,6 +20,8 @@ interface ReceiptCardProps {
   g: GameState;
   seed: number;
   daily: boolean;
+  /** The UTC day the run started: the day shared and used for the streak. */
+  startDay: string;
   onCopySeed: () => void;
   onPlayAgain: () => void;
   onPlayDaily: () => void;
@@ -62,6 +64,7 @@ export function ReceiptCard({
   g,
   seed,
   daily,
+  startDay,
   onCopySeed,
   onPlayAgain,
   onPlayDaily,
@@ -140,10 +143,10 @@ export function ReceiptCard({
 
   const share = async () => {
     // The streak is read at click time: the shell records the run in its own effect.
-    const streak = daily ? streakAsOf(loadStats(), dateStr) : 0;
+    const streak = daily ? streakAsOf(loadStats(), startDay) : 0;
     const text = buildShareText(
       {
-        day: dateStr,
+        day: startDay,
         ms: timeMs,
         streak,
         daily,
@@ -153,7 +156,7 @@ export function ReceiptCard({
     // The PNG card only for the daily and only where files can be shared; any miss
     // falls back to the text line.
     if (daily && canShareFiles()) {
-      const blob = await renderShareCardBlob({ day: dateStr, ms: timeMs, streak });
+      const blob = await renderShareCardBlob({ day: startDay, ms: timeMs, streak });
       const outcome = blob ? await shareCardImage(blob, text) : null;
       if (outcome) {
         setShareNote(outcome);
