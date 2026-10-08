@@ -443,15 +443,43 @@
 .pg2-captcha__tile--selected {
   box-shadow: inset 0 0 0 3px #2563eb;
 }
-.pg2-captcha__tile--selected::after {
-  content: "";
+.pg2-captcha__tile {
+  transition: transform 120ms ease;
+}
+.pg2-captcha__tile:active {
+  transform: scale(0.94);
+}
+.pg2-captcha__tile--selected {
+  box-shadow: inset 0 0 0 4px #2563eb;
+}
+.pg2-captcha__check {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #2563eb;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.5));
+}
+.pg2-captcha-reject {
+  animation: pg2-captcha-reject 380ms ease-in-out;
+}
+@keyframes pg2-captcha-reject {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
 }
 .pg2-captcha__art {
   display: block;

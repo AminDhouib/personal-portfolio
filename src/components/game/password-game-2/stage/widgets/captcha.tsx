@@ -107,6 +107,7 @@ export function CaptchaWidget({
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [solved, setSolved] = useState(false);
+  const [rejecting, setRejecting] = useState(false); // grid shake, one animation cycle
 
   const grid = challenge.grids[stage] ?? [];
   const target = challenge.target;
@@ -136,6 +137,7 @@ export function CaptchaWidget({
     if (solved) return;
     if (!selectionIsCorrect()) {
       setMessage(REJECT_MESSAGE); // wrong set — rejected, stage unchanged
+      setRejecting(true);
       return;
     }
     if (stage === 0) {
@@ -143,6 +145,7 @@ export function CaptchaWidget({
       setStage(1);
       setSelected(new Set());
       setMessage(REJECT_MESSAGE);
+      setRejecting(true);
       widget.onRuleState(ruleId, { stage: 2 });
       return;
     }
@@ -166,7 +169,14 @@ export function CaptchaWidget({
   return (
     <div className="pg2-captcha" data-stage={stage + 1}>
       <p className="pg2-captcha__prompt">Select all tiles containing {KIND_LABEL[target]}</p>
-      <div className="pg2-captcha__grid" role="group" aria-label="Verification tiles">
+      <div
+        className={`pg2-captcha__grid ${rejecting ? "pg2-captcha-reject" : ""}`}
+        role="group"
+        aria-label="Verification tiles"
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget) setRejecting(false);
+        }}
+      >
         {grid.map((tile, i) => {
           const isSelected = selected.has(i);
           return (
@@ -188,9 +198,24 @@ export function CaptchaWidget({
                   toggle(i);
                 }
               }}
-              className={`pg2-captcha__tile ${isSelected ? "pg2-captcha__tile--selected" : ""}`}
+              className={`pg2-captcha__tile ${
+                isSelected ? "pg2-captcha__tile--selected pg2-captcha-on" : ""
+              }`}
             >
               <TileArt kind={tile.kind} />
+              {isSelected ? (
+                <svg viewBox="0 0 24 24" className="pg2-captcha__check" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" fill="#2563eb" />
+                  <path
+                    d="M7 12.5l3.2 3.2L17 9"
+                    stroke="#fff"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
+              ) : null}
             </div>
           );
         })}
