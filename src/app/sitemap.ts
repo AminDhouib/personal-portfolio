@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAllBlogPosts } from "@/lib/blog";
 import { projects } from "@/data/projects";
 import { GAMES } from "@/app/games/games-meta";
+import { PG2_HINTS_PATH } from "@/app/games/password-game/hints/hints-content";
 import { SOLVER_PATH } from "@/app/games/super-voltorb-flip/solver/solver-content";
 
 /** A post's front-matter date, or undefined when it is missing or unparseable. */
@@ -63,6 +64,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
     {
       url: `${baseUrl}${SOLVER_PATH}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}${PG2_HINTS_PATH}`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.5,

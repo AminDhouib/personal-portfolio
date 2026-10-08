@@ -3,6 +3,7 @@ import { getAllBlogPosts } from "@/lib/blog";
 import { projects } from "@/data/projects";
 import { GAMES } from "@/app/games/games-meta";
 import { SOLVER_PATH } from "@/app/games/super-voltorb-flip/solver/solver-content";
+import { PG2_HINTS_PATH } from "@/app/games/password-game/hints/hints-content";
 import sitemap from "../sitemap";
 
 describe("sitemap", () => {
@@ -44,5 +45,9 @@ describe("sitemap", () => {
 
   it("lists the Voltorb Flip solver page", () => {
     expect(urls).toContain(`https://amindhou.com${SOLVER_PATH}`);
+  });
+
+  it("lists the Password Game 2 hints page", () => {
+    expect(urls).toContain(`https://amindhou.com${PG2_HINTS_PATH}`);
   });
 });
