@@ -320,7 +320,10 @@ export function TypingSpeedGame() {
         <ModeBar mode={mode} onChange={changeMode} />
 
         {/* Stats bar */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <div
+          data-testid="ts-stats"
+          className="flex min-h-12 flex-wrap content-start items-center gap-x-5 gap-y-2 text-sm sm:min-h-0"
+        >
           <motion.div
             animate={{ scale: playing ? [1, 1.05, 1] : 1 }}
             transition={{ duration: 0.3 }}
