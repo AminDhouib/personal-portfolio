@@ -72,7 +72,9 @@ engine must expose matching actions.
 1. After cells are removed, every cell above a gap in its side drops down to close it. Cells do
    not change side.
 2. After gravity, the board is checked again for new groups of three or more. If any form,
-   they clear in the same way, one group per pass, until none remain. This is a chain.
+   they clear in the same way, one group per pass, until none remain. This is a chain. When
+   one pass leaves several separate groups, they clear in successive passes, side 0 upward,
+   lowest row first.
 3. Each pass of a chain is a separate clear for scoring and the combo window.
 
 ## 6. Scoring (kept rules, the leaderboard depends on these)
@@ -83,7 +85,9 @@ engine must expose matching actions.
 3. The combo window is the time after a clear during which the next clear counts as a
    continuation. A clear inside the window raises the combo level by 1. A clear outside the
    window sets the level back to 1 before scoring. The window length is set by the level
-   (section 10) and is restarted by every clear.
+   (section 10) and is restarted by every clear. On each clear, first update the combo level
+   (inside the window +1, a chain +2, outside the window reset to 1), then score with the
+   updated level.
 4. Chain bonus: a clear that happens within 400 ms of the previous clear raises the combo level
    by 2 instead of 1, and shows a "CHAIN!" label. Gravity chains (section 5) always qualify.
 5. Clean sweep: if a clear removes the last remaining cells so that the board is empty, and the
