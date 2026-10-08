@@ -3,8 +3,8 @@ import { blockThirdParties } from "./helpers";
 
 // Typing Speed against the production build: a full passage typed with real key events ends on
 // the results card with honest figures, paste is refused, and the phone layout neither overflows
-// nor shrinks the Start button below a 44px touch target. Typing Speed has no leaderboard and
-// no network call of its own; third-party hosts are blocked per test.
+// nor shrinks the Start button below a 44px touch target. Only the Daily view talks to the
+// network (the arcade board, stubbed here); third-party hosts are blocked per test.
 
 const GAME_PATH = "/games/typing-speed";
 
@@ -175,6 +175,49 @@ test.describe("Typing Speed", () => {
     } finally {
       await context.close();
     }
+  });
+
+  test("Daily: one stubbed Post carries the run, and nothing posts by itself", async ({ page }) => {
+    const posts: { game: string; score: number; detail: Record<string, number> }[] = [];
+    await page.route("**/api/arcade/scores**", async (route) => {
+      const request = route.request();
+      if (request.method() === "POST") {
+        posts.push(JSON.parse(request.postData() ?? "{}"));
+        await route.fulfill({
+          json: {
+            ok: true,
+            boards: [{ period: "daily", board: "today", rank: 1, best: 1, improved: true }],
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        json: { game: "typing-speed", board: "daily", entries: [], you: null },
+      });
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(GAME_PATH);
+    await expect(page.getByTestId("ts-target")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Daily", exact: true }).click();
+    await expect(page.getByTestId("ts-daily-panel")).toBeVisible();
+    const passage = (await page.getByTestId("ts-target").locator(".sr-only").textContent()) ?? "";
+    expect(passage.length).toBeGreaterThan(100);
+
+    await page.getByTestId("ts-target").click();
+    // 45 ms a key is about 267 WPM, under the 300 WPM ceiling the server enforces.
+    await page.keyboard.type(passage, { delay: 45 });
+    await expect(page.getByTestId("ts-net-wpm")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("1-day streak")).toBeVisible();
+    expect(posts).toHaveLength(0);
+
+    await page.getByLabel("Name for the board").fill("E2E");
+    await page.getByRole("button", { name: "Post", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Posted", exact: true })).toBeDisabled();
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.game).toBe("typing-speed");
+    expect(Object.keys(posts[0]?.detail ?? {}).sort()).toEqual(["acc", "chars", "day", "ms"]);
+    expect(posts[0]?.score).toBeGreaterThan(0);
+    expect(posts[0]?.score).toBeLessThanOrEqual(300);
   });
 
   test("no sheet and no scroll lock at 1440px", async ({ page }) => {

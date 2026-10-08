@@ -34,6 +34,21 @@ describe("Typing Speed copy describes the engine", () => {
     expect(meta?.controls).toMatch(/passage/);
     expect(meta?.description).not.toContain(String.fromCharCode(0x2014));
   });
+  it("describes the daily text and its board, in plain ASCII, and no longer says none", () => {
+    expect(typingSpeedContent.intro).toMatch(/Daily/);
+    expect(typingSpeedContent.howToPlay.join(" ")).toMatch(/Post/);
+    const board = typingSpeedContent.facts.find((f) => f.label === "Leaderboard");
+    expect(board?.value).toMatch(/daily text/i);
+    expect(board?.value).toMatch(/UTC/);
+    const questions = typingSpeedContent.faq.map((f) => f.question);
+    expect(questions).toContain("What is the daily text?");
+    const faq = typingSpeedContent.faq.map((f) => f.answer).join(" ");
+    expect(faq).toMatch(/00:00 to 24:00 UTC/);
+    expect(faq).toMatch(/cannot be posted/);
+    expect(faq).not.toMatch(/no leaderboard/i);
+    // eslint-disable-next-line no-control-regex
+    expect(all).not.toMatch(/[^\x00-\x7f]/);
+  });
   it("describes the phone sheet: text above the keyboard, tap the text to come back", () => {
     const phone = typingSpeedContent.controls.find((c) => c.input === "Phone");
     expect(phone?.action).toMatch(/above the keyboard/);

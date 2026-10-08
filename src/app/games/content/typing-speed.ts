@@ -7,13 +7,14 @@ export const typingSpeedContent: GameContent = {
   genre: ["Typing", "Skill"],
   playMode: "SinglePlayer",
   intro:
-    "Typing Speed is a free typing speed test that runs in your browser. Pick a timed test of 15, 30, 60 or 120 seconds with common words or classic-book quotes, or type a single quote at your own pace. The clock starts on your first keystroke. A live graph tracks your speed as you go, and the result card adds a map of the keys you miss most. Your best net WPM for each mode is saved on your device.",
+    "Typing Speed is a free typing speed test that runs in your browser. Pick a timed test of 15, 30, 60 or 120 seconds with common words or classic-book quotes, or type a single quote at your own pace. Daily gives everyone the same passage for the whole UTC day, with a leaderboard. The clock starts on your first keystroke, and the result card adds a graph and a map of the keys you miss most. Your best net WPM for each mode is saved on your device.",
   howToPlay: [
     "Choose Words or Quotes and a length in the mode bar, or pick Quote for one passage.",
     "Click the text or press any key, then type. Space moves to the next word.",
     "A wrong letter turns red but stays inside its own word, so one slip never ruins the rest of the line. Backspace fixes it.",
     "In a timed mode the round ends when the countdown hits zero. In Quote mode, finish the last word.",
     "Check your net WPM, raw WPM, accuracy, graph and key map, then press Tab and Enter to go again.",
+    "Pick Daily for today's shared text. Try as often as you like, then press Post to put your best on the board.",
   ],
   controls: [
     {
@@ -25,12 +26,8 @@ export const typingSpeedContent: GameContent = {
       action: "Clears the word you are typing.",
     },
     {
-      input: "Enter",
-      action: "Focuses the typing area from the start screen.",
-    },
-    {
-      input: "Tab then Enter",
-      action: "Tab moves focus to Restart and Enter restarts in the same mode.",
+      input: "Enter, or Tab then Enter",
+      action: "Enter focuses the typing area. Tab then Enter restarts in the same mode.",
     },
     {
       input: "Escape",
@@ -49,7 +46,6 @@ export const typingSpeedContent: GameContent = {
   strategy: [
     "Protect accuracy. Every wrong key stays in your accuracy figure even after you fix it, so slow down a little rather than correct a lot.",
     "Punctuation and spaces count toward WPM, so do not rush past commas and full stops.",
-    "Watch the flame counter. It appears at 5 correct keystrokes in a row, and one wrong key resets it to zero.",
     "After a run, open the key map. Your most-missed keys are the ones to drill.",
   ],
   facts: [
@@ -71,7 +67,7 @@ export const typingSpeedContent: GameContent = {
     },
     {
       label: "Leaderboard",
-      value: "None",
+      value: "Daily text, by net WPM (UTC)",
     },
     {
       label: "Phones",
@@ -82,27 +78,27 @@ export const typingSpeedContent: GameContent = {
     {
       question: "How is WPM calculated in this typing test?",
       answer:
-        "Net WPM, the headline figure, counts the characters of the words you typed correctly, each with its following space, divided by 5 and by the minutes you took. Raw WPM counts every character you typed, right or wrong, the same way.",
+        "Net WPM, the headline figure, counts the characters of your correctly typed words and their spaces, divided by 5 and by the minutes taken. Raw WPM counts every character typed, right or wrong, the same way.",
     },
     {
       question: "How is typing accuracy calculated?",
       answer:
-        "Accuracy is your correct keystrokes divided by all character and space keystrokes. Backspaces are not counted, and correcting a mistake does not remove it from the total, so a fixed slip still costs you.",
+        "Accuracy is your correct keystrokes divided by all character and space keystrokes. Backspaces are not counted, and a fixed slip still costs you.",
     },
     {
       question: "Can I paste text into the typing test?",
       answer:
-        "No. Paste, drag and drop are blocked, so every result comes from real keystrokes. If your phone keyboard inserts a whole word at once through suggestions or autocorrect, the run still plays but is marked as such and never counts as a best.",
-    },
-    {
-      question: "Which test length should I pick?",
-      answer:
-        "Start with 30 seconds for a fair read of your speed. Use 15 to warm up, 60 or 120 to see how well you hold pace, and Quote for real prose.",
+        "No. Paste and drop are blocked, so every result comes from real keystrokes. A phone keyboard that inserts whole words through suggestions or autocorrect still plays, but the run never counts as a best.",
     },
     {
       question: "Does the typing game save my score?",
       answer:
-        "It saves your best net WPM for each mode, plus which keys you miss, in your browser on that device. There is no leaderboard and no account, and clearing your browser data removes it.",
+        "It saves your best net WPM for each mode, plus which keys you miss, in your browser. Only the Daily text has a leaderboard, and a result reaches it only when you press Post. There is no account.",
+    },
+    {
+      question: "What is the daily text?",
+      answer:
+        "One passage for everyone from 00:00 to 24:00 UTC, when the text and the board turn over. Try as often as you like and post your best. A run ending after midnight cannot be posted, and neither can one typed with phone suggestions or autocorrect.",
     },
   ],
   credits: [
