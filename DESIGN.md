@@ -311,12 +311,12 @@ passage; the corpus test pins the counts and lengths.
   marked `bulk`. The run still plays and still shows its figures, but it cannot set a best, a
   ghost or a board entry, and the card says why.
 - **`typing-high-score` keeps its format** (a decimal integer string): the games hub reads it.
-- **Nine modes, one config.** `engine/modes.ts` maps a mode id (`words-15` ... `quote-120`,
+- **Nine modes, one config.** `engine/modes.ts` maps a mode id (`words-15` ... `quotes-120`,
   `quote`) to a `RunConfig`. A timed run draws a fresh seed per round; the clock is a countdown
   and the run ends from `tick`, not from the last word.
 - **`typing:stats` v1 reserves `daily`, `rain` and `prefs`.** Later PRs (daily challenge, word
-  rain, preferences) fill them without a version bump, so the schema accepts them as optional
-  now. The loader rejects a newer stored version instead of overwriting it. A bulk run counts only
+  rain, preferences) fill them without a version bump, so the schema reads each with a `.catch` fallback to its
+  empty default. The loader rejects a newer stored version instead of overwriting it. A bulk run counts only
   toward `runs` and `lastMode`, never a best or the key counts.
 - **The text is a three-line stream.** `text-view.tsx` renders words from a trim index to
   `cursor + LOOKAHEAD_WORDS` and measures each word's `offsetTop` in a frame callback; once the
