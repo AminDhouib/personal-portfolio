@@ -239,3 +239,32 @@ describe("a free build", () => {
     expect(onPlayDaily).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("sharing a daily result", () => {
+  it("copies the result line and says so", async () => {
+    fetchMock.mockResolvedValue(json({ entries: [], you: null }));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    panel();
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(writeText).toHaveBeenCalledWith(
+      "Tower Stacker, 2026-10-15: 7 floors, 220 points, best streak 5. https://amindhou.com/games/tower-stacker",
+    );
+    Reflect.deleteProperty(navigator, "share");
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("is not offered for a free build or an empty tower", async () => {
+    fetchMock.mockResolvedValue(json({ entries: [], you: null }));
+    panel({ floors: 0, score: 0 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
+    cleanup();
+    panel({ mode: "free" });
+    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
+  });
+});

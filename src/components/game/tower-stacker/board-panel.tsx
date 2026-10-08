@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
 import { useArcadeBoard } from "@/hooks/use-arcade-board";
 import { dayNumber } from "./daily";
+import { shareResult, shareText, type ShareOutcome } from "./share";
 import { HANDLE_MAX } from "./stats";
 import type { TowerMode } from "./mode-row";
 
@@ -64,6 +65,7 @@ export function BoardPanel({
   const [name, setName] = useState(handle);
   const [state, setState] = useState<SubmitState>("idle");
   const [rank, setRank] = useState<number | null>(null);
+  const [shared, setShared] = useState<ShareOutcome | null>(null);
   const daily = run.mode === "daily";
 
   useEffect(() => {
@@ -85,6 +87,19 @@ export function BoardPanel({
 
   const canPost = !run.closed && run.floors > 0;
   const locked = state === "sending" || state === "submitted" || state === "rejected";
+
+  async function share() {
+    setShared(
+      await shareResult(
+        shareText({
+          dayKey: run.dayKey,
+          floors: run.floors,
+          score: run.score,
+          bestStreak: run.bestStreak,
+        }),
+      ),
+    );
+  }
 
   async function post() {
     if (locked) return;
@@ -189,6 +204,11 @@ export function BoardPanel({
             </p>
           )}
         </form>
+      )}
+      {run.floors > 0 && (
+        <button type="button" onClick={() => void share()} className={`${ACTION} mb-3 w-full`}>
+          {shared === "copied" ? "Copied" : shared === "failed" ? "Could not copy" : "Share"}
+        </button>
       )}
       {streakDays > 0 && (
         <p className="text-muted mb-2 font-mono text-[10px] tracking-[0.2em] uppercase">
