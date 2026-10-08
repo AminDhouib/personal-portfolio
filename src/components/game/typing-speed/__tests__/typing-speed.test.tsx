@@ -1,7 +1,9 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TypingSpeedGame } from "../../typing-speed";
 import { SENTINEL as S } from "../engine/input";
+import type { ModeId } from "../engine/modes";
+import { STATS_KEY, emptyStats } from "../stats";
 
 vi.mock("../engine/text", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../engine/text")>()),
@@ -35,10 +37,16 @@ function backspace(at: number) {
   setValue(input, input.value.slice(0, -1), "deleteContentBackward");
 }
 
+/** The mode the game opens in: it remembers the last one played. */
+function seedMode(mode: ModeId) {
+  window.localStorage.setItem(STATS_KEY, JSON.stringify({ ...emptyStats(), lastMode: mode }));
+}
+
 beforeEach(() => {
   clock = 0;
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   window.localStorage.clear();
+  seedMode("quote");
 });
 
 afterEach(() => {
@@ -194,5 +202,64 @@ describe("Typing Speed on the engine", () => {
     render(<TypingSpeedGame />);
     expect(() => fireEvent.keyDown(window, { key: "Enter" })).not.toThrow();
     expect(() => fireEvent.keyDown(document, { key: "x" })).not.toThrow();
+  });
+});
+
+describe("Typing Speed modes", () => {
+  it("opens in the remembered mode", () => {
+    seedMode("quotes-60");
+    render(<TypingSpeedGame />);
+    const bar = screen.getByRole("group", { name: "Mode" });
+    expect(within(bar).getByRole("button", { name: "Quotes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(bar).getByRole("button", { name: "60 seconds" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("ts-timer")).toHaveTextContent("60");
+  });
+
+  it("defaults to 30 s words and remembers a change", () => {
+    window.localStorage.clear();
+    render(<TypingSpeedGame />);
+    expect(screen.getByRole("button", { name: "30 seconds" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "15 seconds" }));
+    const stored = JSON.parse(window.localStorage.getItem(STATS_KEY) ?? "{}");
+    expect(stored.lastMode).toBe("words-15");
+  });
+
+  it("changing the mode mid-run restarts the round", () => {
+    render(<TypingSpeedGame />);
+    typeKey("a", 0);
+    expect(document.querySelectorAll("[data-state='correct']")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "60 seconds" }));
+    expect(document.querySelectorAll("[data-state='correct']")).toHaveLength(0);
+    expect(screen.getByTestId("ts-timer")).toHaveTextContent("60");
+    expect(getInput().value).toBe(S);
+  });
+
+  it("a timed run counts down from its first key and ends at zero with the results card", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    seedMode("words-30");
+    render(<TypingSpeedGame />);
+    expect(screen.getByTestId("ts-timer")).toHaveTextContent("30");
+    typeKey("a", 0);
+    expect(screen.getByTestId("ts-timer")).toHaveTextContent("30");
+    clock = 1000;
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(screen.getByTestId("ts-timer")).toHaveTextContent("29");
+    clock = 30_000;
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(screen.getByTestId("ts-timer")).toHaveTextContent("0");
+    expect(screen.getByTestId("ts-net-wpm")).toBeInTheDocument();
   });
 });
