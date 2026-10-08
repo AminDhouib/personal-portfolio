@@ -1,12 +1,4 @@
-import { streakAsOf, type Pg2Stats } from "../stats/stats";
-
-/** Whole minutes and seconds, "mm:ss". */
-export function formatClock(ms: number): string {
-  const total = Math.floor(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+import { formatClock, streakAsOf, type Pg2Stats } from "../stats/stats";
 
 /** Personal bests and the daily streak, from the device's own `pg2:stats`. */
 export function StatsPanel({ stats, today }: { stats: Pg2Stats; today: string }) {

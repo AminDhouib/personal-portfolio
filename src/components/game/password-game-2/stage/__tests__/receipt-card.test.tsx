@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { createRun } from "../../engine/engine";
 import { ReceiptCard } from "../receipt-card";
 
@@ -45,5 +45,42 @@ describe("ReceiptCard date", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("2026-10-09");
     expect(text).not.toContain("2026-10-08");
+  });
+});
+
+describe("ReceiptCard share", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 503 })),
+    );
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("offers a 44px Share button that hands an ASCII, spoiler-free line to navigator.share", async () => {
+    const share = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { share });
+    const g = createRun({ seed: 7, daily: true, nowHHMM: () => "12:00" });
+    g.stats.biggestCrisis = "gerald";
+    const { getByRole } = render(
+      <ReceiptCard
+        g={g}
+        seed={7}
+        daily
+        onCopySeed={() => {}}
+        onPlayAgain={() => {}}
+        onPlayDaily={() => {}}
+      />,
+    );
+    const btn = getByRole("button", { name: /share/i });
+    expect(btn.className).toContain("min-h-11");
+    fireEvent.click(btn);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const arg = (share.mock.calls[0] as unknown as [{ text: string }])[0];
+    expect(arg.text).toContain("Password Game 2");
+    expect(arg.text).not.toMatch(/[^\x20-\x7e\n]/);
   });
 });

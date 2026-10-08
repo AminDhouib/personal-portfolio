@@ -104,3 +104,11 @@ export function streakAsOf(stats: Pg2Stats, todayUtc: string): number {
   if (stats.lastDailyDay === null) return 0;
   return dayDiff(stats.lastDailyDay, todayUtc) <= 1 ? stats.streak : 0;
 }
+
+/** Whole minutes and seconds, "mm:ss". */
+export function formatClock(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
