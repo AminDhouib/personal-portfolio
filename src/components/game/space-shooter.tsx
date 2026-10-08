@@ -41,6 +41,7 @@ import {
   CosmeticPreview,
 } from "./space-shooter/shop-previews";
 import { PostFx } from "./post-fx";
+import { RunBanner } from "./space-shooter/run-banner";
 import {
   ACHIEVEMENTS,
   checkAchievements,
@@ -1507,6 +1508,8 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {ui.status === "playing" && <RunBanner startedAt={0} now={ui.seconds * 1000} />}
 
             {/* The run HUD shows only during a run, never behind a modal on the
                 armed or dead screen. */}
