@@ -87,6 +87,7 @@ describe("runMetrics", () => {
     const w0 = run.words[0]!;
     const w1 = run.words[1]!;
     typeAt(run, `${w0} ${w1.slice(0, 2)}`, 100);
+    expect(runMetrics(run, 5_000).netChars).toBe(w0.length + 1 + 2); // the correct prefix counts
     applyOp(run, { kind: "char", ch: "~" }, 14_000); // wrong, then the clock runs out
     const m = runMetrics(run, 20_000);
     expect(m.elapsedMs).toBe(15_000);
