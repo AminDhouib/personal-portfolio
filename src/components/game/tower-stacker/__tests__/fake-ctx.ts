@@ -83,6 +83,8 @@ export interface FakeCtx {
   sampleRate: number;
   state: string;
   resumed: number;
+  closed: number;
+  close(): Promise<void>;
   destination: Disconnectable;
   oscillators: FakeSource[];
   noiseSources: FakeSource[];
@@ -131,6 +133,11 @@ export function makeFakeCtx(): FakeCtx {
     sampleRate: 8000,
     state: "running",
     resumed: 0,
+    closed: 0,
+    close() {
+      ctx.closed++;
+      return Promise.resolve();
+    },
     destination: node({}),
     oscillators: [],
     noiseSources: [],

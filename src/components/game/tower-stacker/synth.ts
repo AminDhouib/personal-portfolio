@@ -67,6 +67,7 @@ export interface CtxLike {
   readonly destination: NodeLike;
   readonly state?: string;
   resume?(): Promise<void>;
+  close?(): Promise<void>;
   createGain(): GainLike;
   createOscillator(): OscillatorLike;
   createBiquadFilter(): FilterLike;
