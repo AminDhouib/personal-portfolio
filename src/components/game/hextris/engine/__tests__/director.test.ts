@@ -5,11 +5,13 @@ import {
   fallRowsPerSecond,
   levelFor,
   makePiece,
+  patternBeats,
   pickPattern,
   spawnIntervalMs,
+  type PatternName,
 } from "../director";
 import { advance, start } from "../step";
-import { COLOURS, createRun } from "../state";
+import { COLOURS, TICK_MS, createRun } from "../state";
 import type { EngineEvent } from "../types";
 
 function levels(): number[] {
@@ -71,6 +73,86 @@ describe("pickPattern", () => {
   });
 });
 
+describe("pattern shapes", () => {
+  const s = createRun({ seed: 5 });
+  const many = (name: PatternName) => Array.from({ length: 200 }, () => patternBeats(s, name));
+  const gap = (a: number | undefined, b: number | undefined) =>
+    ((((b ?? 0) - (a ?? 0)) % 6) + 6) % 6;
+
+  it("single: one lane on one beat", () => {
+    for (const beats of many("single")) expect(beats.map((b) => b.length)).toEqual([1]);
+  });
+
+  it("opposite pair: two lanes three apart on one beat", () => {
+    for (const beats of many("opposite")) {
+      expect(beats).toHaveLength(1);
+      expect(gap(beats[0]?.[0], beats[0]?.[1])).toBe(3);
+    }
+  });
+
+  it("triple fan: lanes 0, 2, 4 or 1, 3, 5 on one beat, both seen", () => {
+    const seen = new Set<string>();
+    for (const beats of many("fan")) {
+      expect(beats).toHaveLength(1);
+      const lanes = [...(beats[0] ?? [])].sort().join();
+      expect(["0,2,4", "1,3,5"]).toContain(lanes);
+      seen.add(lanes);
+    }
+    expect(seen.size).toBe(2);
+  });
+
+  it("ring of six: every lane on one beat", () => {
+    for (const beats of many("ring")) {
+      expect(beats).toHaveLength(1);
+      expect([...(beats[0] ?? [])].sort()).toEqual([0, 1, 2, 3, 4, 5]);
+    }
+  });
+
+  it("sweep: six beats stepping one lane at a time, in both directions", () => {
+    const dirs = new Set<number>();
+    for (const beats of many("sweep")) {
+      expect(beats.map((b) => b.length)).toEqual([1, 1, 1, 1, 1, 1]);
+      const lanes = beats.map((b) => b[0]);
+      const step = gap(lanes[0], lanes[1]);
+      expect([1, 5]).toContain(step);
+      for (let i = 1; i < 6; i++) expect(gap(lanes[i - 1], lanes[i])).toBe(step);
+      dirs.add(step);
+    }
+    expect(dirs.size).toBe(2);
+  });
+
+  it("zipper: six beats alternating between two opposite lanes", () => {
+    for (const beats of many("zipper")) {
+      expect(beats.map((b) => b.length)).toEqual([1, 1, 1, 1, 1, 1]);
+      const lanes = beats.map((b) => b[0]);
+      const [a, b] = lanes;
+      expect(gap(a, b)).toBe(3);
+      expect(lanes).toEqual([a, b, a, b, a, b]);
+    }
+  });
+
+  it("picks patterns in proportion to their weights once all are open", () => {
+    expect(Object.fromEntries(PATTERNS.map((p) => [p.name, p.weight]))).toEqual({
+      single: 10,
+      opposite: 4,
+      fan: 3,
+      ring: 1,
+      sweep: 2,
+      zipper: 3,
+    });
+    const draws = 23_000;
+    const counts = new Map<string, number>();
+    for (let i = 0; i < draws; i++) {
+      const name = pickPattern(s, 35).name;
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    for (const p of PATTERNS) {
+      const expected = (draws * p.weight) / 23;
+      expect(Math.abs((counts.get(p.name) ?? 0) - expected)).toBeLessThan(expected * 0.15);
+    }
+  });
+});
+
 describe("makePiece", () => {
   it("never deals the same colour three times in a row", () => {
     const s = createRun({ seed: 11 });
@@ -106,6 +188,20 @@ describe("spawning", () => {
     });
     expect(spawns).toHaveLength(1);
     expect(s.falling).toHaveLength(1);
+  });
+
+  it("opens with a single even when the level would allow bigger patterns", () => {
+    // Without the first-piece rule, several of these seeds would open with a multi-piece pattern.
+    let wouldBeMulti = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      if (pickPattern(createRun({ seed }), 20).name !== "single") wouldBeMulti++;
+      const s = createRun({ seed });
+      start(s);
+      s.level = 20;
+      advance(s, TICK_MS);
+      expect(s.events.filter((e) => e.type === "spawn")).toHaveLength(1);
+    }
+    expect(wouldBeMulti).toBeGreaterThan(3);
   });
 
   it("keeps spawning on the beat for the current level", () => {

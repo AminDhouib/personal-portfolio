@@ -51,6 +51,28 @@ describe("combo", () => {
     expect(ofType(s.events, "chain")).toHaveLength(1);
   });
 
+  it("gives only +1 just past the chain window", () => {
+    const s = boardState({});
+    clearThree(s);
+    s.elapsedMs += CHAIN_WINDOW_MS + 1;
+    clearThree(s);
+    expect(s.combo).toBe(2);
+    expect(ofType(s.events, "clear").at(-1)?.chain).toBe(false);
+    expect(ofType(s.events, "chain")).toEqual([]);
+  });
+
+  it("sizes the window by the level at the time of the clear", () => {
+    const s = boardState({});
+    s.level = 35;
+    clearThree(s);
+    expect(s.comboUntilMs).toBe(s.elapsedMs + 1500);
+    s.level = 18;
+    s.elapsedMs += 1000;
+    clearThree(s);
+    expect(s.comboUntilMs - s.elapsedMs).toBeGreaterThan(1500);
+    expect(s.comboUntilMs - s.elapsedMs).toBeLessThan(2800);
+  });
+
   it("restarts the window on every clear and reports combo changes", () => {
     const s = boardState({});
     clearThree(s);

@@ -75,7 +75,7 @@ export function pickPattern(state: RunState, level: number): Pattern {
 }
 
 /** The lanes a pattern fills on each of its beats. */
-function patternBeats(state: RunState, name: PatternName): number[][] {
+export function patternBeats(state: RunState, name: PatternName): number[][] {
   switch (name) {
     case "single":
       return [[randomBelow(state, SIDES)]];
