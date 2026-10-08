@@ -57,7 +57,6 @@ import {
   ARENA_W,
   ARENA_H,
   POWERUP_DURATION_MS,
-  ENVIRONMENTS,
   envForTime,
   POWERUP_DEFS,
   tryDash,
@@ -72,14 +71,8 @@ import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
 import { useArcadeBoard } from "@/hooks/use-arcade-board";
 import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
-import { buildBossSchedule, BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
-import {
-  pickNextBiomeDistance,
-  createRefs,
-  startRun,
-  pauseRun,
-  resumeRun,
-} from "./space-shooter/run-init";
+import { BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
+import { createRefs, startRun, pauseRun, resumeRun, resetToArmed } from "./space-shooter/run-init";
 import { Scene } from "./space-shooter/scene-components";
 import { keyboardStep, orbitalKeyDecision, shouldCaptureTouch } from "./space-shooter/input";
 import { isTextEntryTarget } from "./text-entry";
@@ -785,66 +778,11 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   // /key press starts a fresh run.
   const launch = useCallback(() => {
     const g = gameRefs.current;
-    g.status = "armed";
-    g.score = 0;
-    g.kills = 0;
-    g.distance = 0;
-    g.combo = 1;
-    g.comboLastAt = 0;
-    g.comboPeak = 1;
-    g.comboTier = 0;
-    g.comboTierUpAt = 0;
-    g.obstacles.length = 0;
-    g.bullets.length = 0;
-    g.explosions.length = 0;
-    g.speedLines.length = 0;
-    g.powerUps.length = 0;
-    g.coins.length = 0;
-    g.coinsThisRun = 0;
-    g.boss = null;
-    g.bossProjectiles.length = 0;
-    g.bossSchedule = buildBossSchedule();
-    g.bossScheduleIdx = 0;
-    g.bossesDefeatedThisRun = 0;
-    g.damageTakenThisRun = 0;
-    g.normalSpawningPausedUntil = 0;
-    g.activePowerUps.length = 0;
-    g.debris.length = 0;
-    g.scorePopups.length = 0;
-    g.shieldActiveLast = false;
-    g.warpActiveLast = false;
-    g.warpIntensity = 0;
-    g.currentEnv = ENVIRONMENTS[0];
-    g.nextBiomeAt = pickNextBiomeDistance(0);
+    resetToArmed(g);
     sounds.stopWarpLoop();
     // Stop the leaderboard track playing on the death overlay; gameplay
     // music will start on the next first-input via startRun().
     sounds.stopMusic(0.4);
-    g.targetX = 0;
-    g.targetY = 0;
-    g.shipX = 0;
-    g.shipY = 0;
-    g.shipZ = 2;
-    g.shipRotZ = 0;
-    g.lastBullet = 0;
-    g.lastSpawn = 0;
-    g.lastPowerUpSpawn = 0;
-    g.nextWallAt = 0;
-    g.lastUiSync = 0;
-    g.invulnUntil = 0;
-    g.startedAt = 0;
-    g.pausedAt = 0;
-    g.dyingAt = 0;
-    g.deathFxStage = 0;
-    g.shakeTrauma = 0;
-    g.shipFallSpeed = 0;
-    g.deathVelX = 0;
-    g.deathVelY = 0;
-    g.deathVelZ = 0;
-    g.deathAngVel = 0;
-    g.cameraTargetX = 0;
-    g.cameraTargetY = 0;
-    g.cameraTargetZ = 5;
     setUi(createInitialUiState());
     setSubmitted(false);
     setRejected(false);

@@ -6,6 +6,7 @@ import {
   pauseRun,
   resumeRun,
   FIRST_WALL_MS,
+  resetToArmed,
 } from "../run-init";
 import { spawnBoss } from "../boss-behaviors";
 import { ENVIRONMENTS, START_INVULN_MS } from "../types";
@@ -240,6 +241,130 @@ describe("run-init", () => {
       const g = createRefs(); // armed
       expect(pauseRun(g)).toBe(false);
       expect(g.status).toBe("armed");
+    });
+  });
+
+  describe("resetToArmed", () => {
+    it("returns a dirty finished run to the armed baseline", () => {
+      const g = createRefs();
+      startRun(g);
+      g.status = "dead";
+      g.score = 900;
+      g.kills = 12;
+      g.distance = 400;
+      g.combo = 7;
+      g.comboLastAt = 5;
+      g.comboPeak = 9;
+      g.comboTier = 2;
+      g.comboTierUpAt = 77;
+      g.coinsThisRun = 30;
+      g.bossesDefeatedThisRun = 2;
+      g.damageTakenThisRun = 1;
+      g.bossScheduleIdx = 3;
+      g.normalSpawningPausedUntil = 9;
+      g.warpIntensity = 1;
+      g.shieldActiveLast = true;
+      g.warpActiveLast = true;
+      g.shipX = 3;
+      g.shipY = -2;
+      g.shipZ = 9;
+      g.shipRotZ = 1;
+      g.targetX = 4;
+      g.targetY = 4;
+      g.deathVelX = 1;
+      g.deathVelY = 2;
+      g.deathVelZ = 3;
+      g.deathAngVel = 4;
+      g.shipFallSpeed = 5;
+      g.cameraTargetX = 1;
+      g.cameraTargetY = 1;
+      g.cameraTargetZ = 3.6;
+      g.shakeTrauma = 1;
+      g.dyingAt = 10;
+      g.deathFxStage = 2;
+      g.startedAt = 10;
+      g.pausedAt = 4;
+      g.invulnUntil = 99;
+      g.nextWallAt = 99;
+      g.lastBullet = 5;
+      g.lastSpawn = 5;
+      g.lastPowerUpSpawn = 5;
+      g.lastUiSync = 5;
+      g.obstacles.push({} as never);
+      g.bullets.push({} as never);
+      g.explosions.push({} as never);
+      g.speedLines.push({} as never);
+      g.powerUps.push({} as never);
+      g.coins.push({} as never);
+      g.bossProjectiles.push({} as never);
+      g.activePowerUps.push({} as never);
+      g.debris.push({} as never);
+      g.scorePopups.push({} as never);
+      g.boss = {} as never;
+      const schedule = g.bossSchedule;
+
+      resetToArmed(g);
+
+      expect(g.status).toBe("armed");
+      for (const k of [
+        "score",
+        "kills",
+        "distance",
+        "coinsThisRun",
+        "bossesDefeatedThisRun",
+        "damageTakenThisRun",
+        "normalSpawningPausedUntil",
+        "bossScheduleIdx",
+      ] as const) {
+        expect(g[k]).toBe(0);
+      }
+      expect(g.combo).toBe(1);
+      expect(g.comboPeak).toBe(1);
+      expect(g.comboTier).toBe(0);
+      expect(g.comboTierUpAt).toBe(0);
+      for (const k of [
+        "obstacles",
+        "bullets",
+        "explosions",
+        "speedLines",
+        "powerUps",
+        "coins",
+        "bossProjectiles",
+        "activePowerUps",
+        "debris",
+        "scorePopups",
+      ] as const) {
+        expect(g[k]).toHaveLength(0);
+      }
+      expect(g.boss).toBeNull();
+      expect(g.bossSchedule).not.toBe(schedule);
+      expect(g.currentEnv).toBe(ENVIRONMENTS[0]);
+      expect(g.nextBiomeAt).toBeGreaterThanOrEqual(700);
+      expect([g.shipX, g.shipY, g.targetX, g.targetY, g.shipRotZ]).toEqual([0, 0, 0, 0, 0]);
+      expect(g.shipZ).toBe(2);
+      expect([g.deathVelX, g.deathVelY, g.deathVelZ, g.deathAngVel, g.shipFallSpeed]).toEqual([
+        0, 0, 0, 0, 0,
+      ]);
+      expect([g.cameraTargetX, g.cameraTargetY, g.cameraTargetZ]).toEqual([0, 0, 5]);
+      for (const k of [
+        "startedAt",
+        "dyingAt",
+        "deathFxStage",
+        "shakeTrauma",
+        "invulnUntil",
+        "nextWallAt",
+        "pausedAt",
+        "warpIntensity",
+        "lastBullet",
+        "lastSpawn",
+        "lastPowerUpSpawn",
+        "lastUiSync",
+        "comboLastAt",
+      ] as const) {
+        expect(g[k]).toBe(0);
+      }
+      expect(g.shieldActiveLast).toBe(false);
+      expect(g.warpActiveLast).toBe(false);
     });
   });
 });

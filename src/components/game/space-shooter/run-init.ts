@@ -130,6 +130,67 @@ export function createRefs(): GameRefs {
   };
 }
 
+// Returns a finished (or dirty) run to the armed baseline. Pure state reset:
+// the caller owns sounds and React state. The next first input starts a run.
+export function resetToArmed(g: GameRefs): void {
+  g.status = "armed";
+  g.score = 0;
+  g.kills = 0;
+  g.distance = 0;
+  g.combo = 1;
+  g.comboLastAt = 0;
+  g.comboPeak = 1;
+  g.comboTier = 0;
+  g.comboTierUpAt = 0;
+  g.obstacles.length = 0;
+  g.bullets.length = 0;
+  g.explosions.length = 0;
+  g.speedLines.length = 0;
+  g.powerUps.length = 0;
+  g.coins.length = 0;
+  g.coinsThisRun = 0;
+  g.boss = null;
+  g.bossProjectiles.length = 0;
+  g.bossSchedule = buildBossSchedule();
+  g.bossScheduleIdx = 0;
+  g.bossesDefeatedThisRun = 0;
+  g.damageTakenThisRun = 0;
+  g.normalSpawningPausedUntil = 0;
+  g.activePowerUps.length = 0;
+  g.debris.length = 0;
+  g.scorePopups.length = 0;
+  g.shieldActiveLast = false;
+  g.warpActiveLast = false;
+  g.warpIntensity = 0;
+  g.currentEnv = ENVIRONMENTS[0];
+  g.nextBiomeAt = pickNextBiomeDistance(0);
+  g.targetX = 0;
+  g.targetY = 0;
+  g.shipX = 0;
+  g.shipY = 0;
+  g.shipZ = 2;
+  g.shipRotZ = 0;
+  g.lastBullet = 0;
+  g.lastSpawn = 0;
+  g.lastPowerUpSpawn = 0;
+  g.nextWallAt = 0;
+  g.lastUiSync = 0;
+  g.invulnUntil = 0;
+  g.startedAt = 0;
+  g.pausedAt = 0;
+  g.dyingAt = 0;
+  g.deathFxStage = 0;
+  g.shakeTrauma = 0;
+  g.shipFallSpeed = 0;
+  g.deathVelX = 0;
+  g.deathVelY = 0;
+  g.deathVelZ = 0;
+  g.deathAngVel = 0;
+  g.cameraTargetX = 0;
+  g.cameraTargetY = 0;
+  g.cameraTargetZ = 5;
+}
+
 // Called when the player's first input is detected. Idempotent -- only
 // transitions `armed` -> `playing`.
 export function startRun(g: GameRefs): boolean {
