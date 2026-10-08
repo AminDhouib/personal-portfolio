@@ -5,9 +5,8 @@ import type { EngineEvent } from "../engine/types";
 
 export { hitStopMs } from "../engine/scoring";
 
-/** Peak screen-shake offset, in CSS pixels, and how long a shake lasts. */
+/** Peak screen-shake offset, in CSS pixels. How fast a shake dies away is the shell's choice. */
 export const SHAKE_MAX_PX = 8;
-export const SHAKE_MS = 180;
 
 /**
  * Screen shake for a clear, as a peak offset in CSS pixels: none below 3 cells, then growing with
