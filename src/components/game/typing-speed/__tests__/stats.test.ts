@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { STATS_KEY, emptyStats, loadStats, recordRun, saveStats } from "../stats";
+import {
+  STATS_KEY,
+  emptyStats,
+  loadStats,
+  recordDay,
+  recordRun,
+  saveStats,
+  streakAsOf,
+} from "../stats";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => localStorage.clear());
@@ -105,6 +113,48 @@ describe("zero-WPM runs", () => {
     const next = recordRun(emptyStats(), run({ netWpm: 0, rawWpm: 0, accuracy: 0 }));
     expect(next.runs).toBe(1);
     expect(next.bests["words-30"]).toBeUndefined();
+  });
+});
+
+describe("daily streak (UTC days)", () => {
+  it("starts at one, ignores a repeat of the same day and extends on the next day", () => {
+    let s = recordDay(emptyStats(), "2026-10-08");
+    expect(s.daily).toEqual({ streak: 1, bestStreak: 1, lastDay: "2026-10-08", days: 1 });
+    s = recordDay(s, "2026-10-08");
+    expect(s.daily).toEqual({ streak: 1, bestStreak: 1, lastDay: "2026-10-08", days: 1 });
+    s = recordDay(s, "2026-10-09");
+    expect(s.daily).toEqual({ streak: 2, bestStreak: 2, lastDay: "2026-10-09", days: 2 });
+  });
+
+  it("restarts at one after a gap and keeps the best streak", () => {
+    let s = recordDay(recordDay(emptyStats(), "2026-10-08"), "2026-10-09");
+    s = recordDay(s, "2026-10-12");
+    expect(s.daily).toEqual({ streak: 1, bestStreak: 2, lastDay: "2026-10-12", days: 3 });
+  });
+
+  it("restarts on the run day when the last day is ahead (a wrong clock once)", () => {
+    const s = recordDay(recordDay(emptyStats(), "2026-10-20"), "2026-10-08");
+    expect(s.daily.streak).toBe(1);
+    expect(s.daily.lastDay).toBe("2026-10-08");
+  });
+
+  it("rolls across a month and a year end", () => {
+    expect(recordDay(recordDay(emptyStats(), "2026-12-31"), "2027-01-01").daily.streak).toBe(2);
+    expect(recordDay(recordDay(emptyStats(), "2028-02-28"), "2028-02-29").daily.streak).toBe(2);
+  });
+
+  it("streakAsOf lapses once a whole UTC day passes", () => {
+    const s = recordDay(recordDay(emptyStats(), "2026-10-08"), "2026-10-09");
+    expect(streakAsOf(s, "2026-10-09")).toBe(2);
+    expect(streakAsOf(s, "2026-10-10")).toBe(2); // yesterday's still counts until today ends
+    expect(streakAsOf(s, "2026-10-11")).toBe(0);
+    expect(streakAsOf(emptyStats(), "2026-10-11")).toBe(0);
+  });
+
+  it("does not mutate its input", () => {
+    const s = emptyStats();
+    recordDay(s, "2026-10-08");
+    expect(s.daily.streak).toBe(0);
   });
 });
 
