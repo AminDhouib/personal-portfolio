@@ -98,9 +98,16 @@ export const hextrisContent: GameContent = {
   ],
   credits: [
     {
-      label: "Inspired by",
-      detail: "Inspired by the open-source Hextris (hextris.io).",
-      href: "https://hextris.io",
+      label: "Based on",
+      detail:
+        "Based on Hextris by Logan Engstrom, Garrett Finucane, Noah Moroze and Michael Yang, licensed GPL-3.0.",
+      href: "https://github.com/Hextris/hextris",
+    },
+    {
+      label: "Licence",
+      detail:
+        "This modified Hextris is licensed GPL-3.0 and comes with no warranty. Source code for this version.",
+      href: "https://github.com/AminDhouib/personal-portfolio/tree/main/src/components/game/hextris",
     },
   ],
 };
