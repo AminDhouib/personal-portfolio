@@ -472,11 +472,11 @@ current tree on 2026-07-07.
   disclaimer in the About credits and in the How to play modal.
   `__tests__/assets-guard.test.ts` fails on any image under the game's public folder, any
   reference to a sprites or upstream path, and any asset-prep script that targets them.
-- **Tower Stacker is first-party; its rules are pinned.** The upstream `iamkun/tower_game`
-  files under `public/tower_stacker/` (`game.html`, `dist/`, `assets/`, `LICENSE`) are still
-  tracked but unused; only the `index.html` that loaded a Google tag is gone, and
-  `no-third-party-tags.test.ts` pins that nothing served from `public/` loads one. The plan
-  removes the rest later. The numbers that define the game are pinned by
+- **Tower Stacker is first-party; its rules are pinned.** No third-party code or asset ships in
+  the game: the vendored upstream bundle is deleted, `no-third-party-tags.test.ts` pins that
+  there is no such folder under `public/`, and `assets-guard.test.ts` allows no audio outside
+  Voltorb's music folder (so there is no NOTICE entry; the credits say "Original game built for
+  this site"). The numbers that define the game are pinned by
   `tower-stacker/__tests__/engine.test.ts` and `scoring.test.ts`: perfect within 8 units of
   centre, a trim needs 4 units of overlap or the run ends, every third perfect regrows 12
   (capped at the starting width), points are 10 per trim and 20 to 60 per perfect. There are no
