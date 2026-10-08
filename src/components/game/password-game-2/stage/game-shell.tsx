@@ -943,18 +943,27 @@ function RunningView({
   // On a phone the run plays in a fixed sheet that is exactly the visible area. While
   // the form is being filled in the sheet itself never scrolls (the rule region does);
   // the finale and the receipt are taller than a phone, so there the sheet scrolls.
+  // With the keyboard open the sheet is the ONLY scroller (the stage card sticks to its top,
+  // the rule region grows and does not scroll), so the follow never fights a nested scroller.
+  const kb = sheet && viewport.keyboardOpen;
   const playClass = sheet
     ? inPlay
-      ? "pg2-play flex h-full flex-col gap-3 px-3 pt-3 pb-2"
+      ? kb
+        ? "pg2-play flex min-h-full flex-col gap-3 px-3 pt-3 pb-2"
+        : "pg2-play flex h-full flex-col gap-3 px-3 pt-3 pb-2"
       : "pg2-play mx-auto max-w-3xl px-3 py-3"
     : inPlay
       ? "pg2-play lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,26rem)] lg:items-start lg:gap-6"
       : "pg2-play mx-auto max-w-3xl";
   const cardClass = sheet
-    ? "pg2-panel relative flex-none touch-pan-y overflow-hidden"
+    ? kb
+      ? "pg2-panel sticky top-0 z-10 flex-none touch-pan-y overflow-hidden"
+      : "pg2-panel relative flex-none touch-pan-y overflow-hidden"
     : "pg2-panel relative overflow-hidden lg:sticky lg:top-24";
   const rulesClass = sheet
-    ? "min-h-32 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain"
+    ? kb
+      ? "min-w-0 flex-none touch-pan-y"
+      : "min-h-32 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain"
     : "mt-6 min-w-0 lg:-m-1 lg:mt-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:p-1";
 
   // Focus inside the pointerdown itself: iOS only summons the keyboard from a gesture.
@@ -981,12 +990,16 @@ function RunningView({
         el.scrollIntoView({ block: "nearest" });
       }
     };
-    const rule = panelRef.current?.parentElement?.querySelector(".pg2-rule--active") ?? null;
+    const play = panelRef.current?.parentElement;
+    // The sticky card covers the top of the sheet: leave that much room above the rule.
+    const inset = (panelRef.current?.offsetHeight ?? 0) + 8;
+    play?.style.setProperty("--pg2-card-h", `${inset}px`);
+    const rule = play?.querySelector(".pg2-rule--active") ?? null;
     if (rule !== followedRuleRef.current) {
       followedRuleRef.current = rule;
       // A layout effect, so the follow starts before the frame paints and the new rule is
       // never painted out of view first. Smooth, and transform-safe while the card animates.
-      if (rule instanceof HTMLElement) followRule(rule);
+      if (rule instanceof HTMLElement) followRule(rule, inset);
     }
     if (inputSeqRef.current !== followedInputRef.current) {
       followedInputRef.current = inputSeqRef.current;

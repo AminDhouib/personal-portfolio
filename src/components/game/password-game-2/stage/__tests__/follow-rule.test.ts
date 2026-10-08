@@ -96,6 +96,12 @@ describe("followRule", () => {
     expect(sheetTo).toHaveBeenCalledWith({ top: 78, behavior: "smooth" });
   });
 
+  it("keeps a sticky card's height clear above the rule", () => {
+    const { card, scrollTo } = setup({ animating: true, cardTop: 200, scrollTop: 250 });
+    followRule(card, 80);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: "smooth" }); // 200 - 80
+  });
+
   it("does not scroll when the rule already sits inside the scroller", () => {
     const { card, scrollTo } = setup({ animating: true, cardTop: 50, scrollTop: 0 });
     followRule(card);
