@@ -6,6 +6,7 @@ import {
   elapsedSeconds,
   comboMultiplier,
   comboColor,
+  comboTier,
   unlockedVariants,
 } from "../difficulty";
 import type { GameRefs } from "../types";
@@ -102,6 +103,29 @@ describe("difficulty helpers", () => {
     for (const [combo, mult] of cases) {
       it(`combo ${combo} -> x${mult}`, () => {
         expect(comboMultiplier(combo)).toBe(mult);
+      });
+    }
+  });
+
+  describe("comboTier", () => {
+    // Same thresholds as comboMultiplier, as a 0..5 index.
+    const cases: Array<[number, number]> = [
+      [1, 0],
+      [2, 0],
+      [3, 1],
+      [4, 1],
+      [5, 2],
+      [9, 2],
+      [10, 3],
+      [19, 3],
+      [20, 4],
+      [39, 4],
+      [40, 5],
+      [99, 5],
+    ];
+    for (const [combo, tier] of cases) {
+      it(`combo ${combo} -> tier ${tier}`, () => {
+        expect(comboTier(combo)).toBe(tier);
       });
     }
   });

@@ -21,7 +21,7 @@ import {
   envColors,
   activatePowerUp,
 } from "./types";
-import { difficulty, elapsedSeconds, comboMultiplier } from "./difficulty";
+import { difficulty, elapsedSeconds, comboMultiplier, comboTier } from "./difficulty";
 import { sounds } from "./sound-manager";
 import {
   spawnIntervalMs,
@@ -322,6 +322,7 @@ export function runTick(
   const effectiveComboWindow = g.comboWindowMs > 0 ? g.comboWindowMs : COMBO_WINDOW_MS;
   if (g.combo > 1 && now - g.comboLastAt > effectiveComboWindow) {
     g.combo = 1;
+    g.comboTier = 0;
   }
 
   // Shield edge detection — play sound when activating or expiring
@@ -775,6 +776,9 @@ export function runTick(
             g.combo = Math.min(g.combo + 1, 99);
             g.comboLastAt = now;
             if (g.combo > g.comboPeak) g.comboPeak = g.combo;
+            const tier = comboTier(g.combo);
+            if (tier > g.comboTier) g.comboTierUpAt = now;
+            g.comboTier = tier;
             const comboMul = comboMultiplier(g.combo);
             const points = Math.round(basePoints * comboMul);
             g.score += points;

@@ -136,6 +136,7 @@ interface UiState {
   distance: number;
   combo: number;
   comboPeak: number;
+  comboFlash: boolean;
   coinsThisRun: number;
   active: { type: PowerUpType; remainingMs: number }[];
   objectCounts: {
@@ -185,6 +186,9 @@ function buildConfetti(count: number, dist: number) {
   });
 }
 
+// How long the combo chip stays enlarged and glowing after a new tier.
+const COMBO_FLASH_MS = 300;
+
 function createInitialUiState(): UiState {
   return {
     status: "armed",
@@ -194,6 +198,7 @@ function createInitialUiState(): UiState {
     distance: 0,
     combo: 1,
     comboPeak: 1,
+    comboFlash: false,
     coinsThisRun: 0,
     active: [],
     objectCounts: { obstacles: 0, bossProjectiles: 0, explosions: 0 },
@@ -230,6 +235,7 @@ function createUiStateFromGame(g: GameRefs, now: number): UiState {
     distance: Math.floor(g.distance),
     combo: g.combo,
     comboPeak: g.comboPeak,
+    comboFlash: g.comboTierUpAt > 0 && now - g.comboTierUpAt < COMBO_FLASH_MS,
     coinsThisRun: g.coinsThisRun,
     active: g.activePowerUps.map((p) => ({
       type: p.type,
@@ -786,6 +792,8 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     g.combo = 1;
     g.comboLastAt = 0;
     g.comboPeak = 1;
+    g.comboTier = 0;
+    g.comboTierUpAt = 0;
     g.obstacles.length = 0;
     g.bullets.length = 0;
     g.explosions.length = 0;
@@ -1515,10 +1523,13 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                     <motion.span
                       key={ui.combo}
                       initial={{ scale: 0.7, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
+                      animate={{ scale: ui.comboFlash ? 1.5 : 1, opacity: 1 }}
                       transition={{ type: "spring", stiffness: 500, damping: 20 }}
                       className="font-mono font-bold tabular-nums"
-                      style={{ color: comboColor(ui.combo) }}
+                      style={{
+                        color: comboColor(ui.combo),
+                        textShadow: ui.comboFlash ? `0 0 10px ${comboColor(ui.combo)}` : "none",
+                      }}
                     >
                       {"\u00d7"}
                       {ui.combo}
