@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Derived from Hextris, Copyright (C) 2018 Logan Engstrom and the Hextris
+// contributors (Garrett Finucane, Noah Moroze, Michael Yang),
+// https://github.com/Hextris/hextris, licensed under the GNU GPL v3.
+// Modified by Amin Dhouib, 2026: ported to TypeScript and React, with new
+// blocks, scoring bonuses, boundary, sound and UI. See ./COPYING
+// and ./NOTICE.md.
 // ═══════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════
