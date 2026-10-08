@@ -144,7 +144,7 @@ style suggestions.
 ## Arcade backend
 
 Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2), Super Voltorb
-Flip's Daily board (T2e) and Tower Stacker's daily tower (T6-3); the legacy `leaderboard_entries`
+Flip's Daily board (T2e), Tower Stacker's daily tower (T6-3) and Typing Speed's daily text (T4-4); the legacy `leaderboard_entries`
 table is frozen history behind a read-only `/api/leaderboard`. Code: `src/lib/arcade/`, route
 `src/app/api/arcade/scores/route.ts`.
 
@@ -197,6 +197,13 @@ seconds }`. `checkTowerStacker` requires today's UTC day by the server clock (no
   midnight), consistent counts, at most `maxBlocksFor(seconds)` floors (one per 400 ms of
   active play, plus slack) and a score inside `scoreRange(blocks, perfects, streak)` and a
   multiple of 10. Ceilings on client numbers, not anti-cheat, like every check here.
+- **Typing Speed's arcade entry is the daily text.** Detail `{ day, ms, chars, acc }` (whole
+  milliseconds, net characters, accuracy percent), score = integer net WPM. `checkTypingDailyAt`
+  requires today's UTC day by the server clock (no grace across midnight), regenerates that day's
+  text with `dailyText`, then `checkTypingDaily` rejects a run under 40 ms per text character (the
+  300 WPM ceiling), more characters than the text has, and a score that is not
+  `round(chars * 12000 / ms)`. The pure module `typing-speed/engine/daily.ts` is shared by the
+  game and the server (node-tested). Ceilings on client numbers, not anti-cheat.
 - **Browser identity.** `src/lib/arcade/identity.ts` keeps `{ playerId, token }` in
   `localStorage` under `arcade:player:v1`. A read never creates one (so first-time visitors stay
   cacheable); the first submit does, with an in-memory copy that wins over storage for the page
@@ -518,6 +525,20 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   every other check in this file. The day must equal the server's UTC day with no grace across
   midnight, so a run that crosses midnight is refused at the card (it shows a closed message and
   no Submit) as well as by the server.
+- **Typing Speed's board takes the daily text only, posted by hand.** The registry takes one
+  detail schema per slug and a board means something only if every score came from the same text,
+  so the timed modes and Quote stay local (`typing:stats`). Attempts on the daily are unlimited and
+  kept in `typing:daily` (versioned, one UTC day, the handle survives the day); nothing posts
+  automatically, the player presses Post for the best attempt. The WPM ceiling is 300 with no
+  grace across midnight: a Post rechecks the UTC day and a run that crossed midnight shows a
+  closed message and a button for the new text instead of Post (the Tower Stacker pattern). A run
+  typed with phone suggestions or autocorrect (`bulk`) counts as an attempt and shows locally but
+  can never become the best or be posted, and both the results card and the Daily panel say so.
+  The score is computed from the rounded integer milliseconds the server will see, so the
+  client's WPM and the server's recomputation agree to the digit. The Daily view is never the
+  mode the page opens in (`recordRun` leaves `lastMode` alone for it), and its board is read only
+  while the view is open. The streak is kept in the reserved `typing:stats` `daily` fields by UTC
+  day (`recordDay`, `streakAsOf`), and any finished daily attempt keeps it.
 - **The legacy Tower Stacker scores stay where they are.** The old `leaderboard_entries` rows for
   `tower-stacker` are read-only history served by `GET /api/leaderboard`. They are not imported
   into the arcade tables: they were scored by the retired embedded game, a different scoring
