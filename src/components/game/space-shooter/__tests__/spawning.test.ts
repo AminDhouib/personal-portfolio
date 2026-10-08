@@ -63,9 +63,9 @@ describe("spawning", () => {
   });
 
   describe("spawnIntervalMs", () => {
-    it("at t=0 (difficulty 0.25) is 900 - 0.25*280 = 830", () => {
+    it("at t=0 (difficulty 0.6 with the early boost) is 900 - 0.6*280 = 732", () => {
       vi.spyOn(performance, "now").mockReturnValue(0);
-      expect(spawnIntervalMs(baseRefs())).toBeCloseTo(830, 10);
+      expect(spawnIntervalMs(baseRefs())).toBeCloseTo(732, 10);
     });
 
     it("is floored at 280 for high difficulty", () => {
@@ -76,15 +76,15 @@ describe("spawning", () => {
   });
 
   describe("fireIntervalMs", () => {
-    it("base 220 at t=0 -> 220 - 0.25*30 = 212.5 when not rapid", () => {
+    it("base 220 at t=0 -> 220 - 0.6*30 = 202 when not rapid", () => {
       vi.spyOn(performance, "now").mockReturnValue(0);
-      expect(fireIntervalMs(baseRefs())).toBeCloseTo(212.5, 10);
+      expect(fireIntervalMs(baseRefs())).toBeCloseTo(202, 10);
     });
 
-    it("rapid power-up lowers the base to 95 -> 87.5 at t=0", () => {
+    it("rapid power-up lowers the base to 95 -> 77 at t=0", () => {
       vi.spyOn(performance, "now").mockReturnValue(0);
       const g = baseRefs({ activePowerUps: [{ type: "rapid", expiresAt: 1_000_000 }] });
-      expect(fireIntervalMs(g)).toBeCloseTo(87.5, 10);
+      expect(fireIntervalMs(g)).toBeCloseTo(77, 10);
     });
 
     it("is floored at 70 (rapid + high difficulty)", () => {
@@ -164,8 +164,8 @@ describe("spawning", () => {
       // basic size: 0.55 + 0*0.45 = 0.55, hp 1
       expect(o.size).toBeCloseTo(0.55, 10);
       expect(o.hp).toBe(1);
-      // vz is the obstacle's forward speed (baseSpeed = 9 + difficulty*4 at t=0 = 10)
-      expect(o.vz).toBeCloseTo(9 + 0.25 * 4, 5);
+      // vz is the obstacle's forward speed (baseSpeed = 9 + difficulty*4 at t=0 = 11.4)
+      expect(o.vz).toBeCloseTo(9 + 0.6 * 4, 5);
       expect(o.brushed).toBe(false);
       expect(o.closestApproach).toBe(Infinity);
       expect([0, 1, 2]).toContain(o.shape);
