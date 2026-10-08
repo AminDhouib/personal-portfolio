@@ -1995,7 +1995,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                   Ship destroyed
                 </div>
                 <div className="mt-1 font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
-                  <CountUp target={ui.score} />
+                  <CountUp target={ui.score} reducedMotion={prefs.reducedMotion} />
                 </div>
                 {celebration === "world" && (
                   <motion.div
@@ -2057,7 +2057,8 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
                     transition={{ delay: 0.4 }}
                     className="mt-2 flex items-center justify-center gap-1.5 font-mono text-sm text-accent-amber"
                   >
-                    <CoinsIcon className="h-4 w-4" />+<CountUp target={ui.coinsThisRun} /> coins
+                    <CoinsIcon className="h-4 w-4" />+
+                    <CountUp target={ui.coinsThisRun} reducedMotion={prefs.reducedMotion} /> coins
                   </motion.div>
                 )}
                 {ui.coinsThisRun > 0 && (

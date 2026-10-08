@@ -22,4 +22,10 @@ describe("CountUp", () => {
     render(<CountUp target={0} durationMs={900} />);
     expect(screen.getByTestId("count-up").textContent).toBe("0");
   });
+
+  it("renders the final value at once when reduced motion is on", () => {
+    vi.useFakeTimers();
+    render(<CountUp target={4200} durationMs={900} reducedMotion />);
+    expect(screen.getByTestId("count-up").textContent).toBe("4200");
+  });
 });
