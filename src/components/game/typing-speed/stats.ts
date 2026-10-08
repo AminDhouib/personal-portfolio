@@ -1,0 +1,150 @@
+import { z } from "zod";
+import { safeJsonParse } from "@/lib/safe-json";
+import { safeLocalSet } from "@/lib/safe-storage";
+import { DEFAULT_MODE, isModeId, type ModeId } from "./engine/modes";
+import { mergeKeyStats, type KeyStats } from "./engine/series";
+
+// Local statistics: their own key, never uploaded, display-only (forgeable, so
+// nothing reads them to gate anything). The daily and rain fields exist from
+// the first version (zero) so the Daily (T4-4) and Word Rain (T4-6) PRs never
+// change the shape; see DESIGN.md's Typing Speed section.
+export const STATS_KEY = "typing:stats";
+
+const COUNT_CAP = 999_999_999;
+
+export interface Best {
+  wpm: number;
+  raw: number;
+  acc: number;
+  day: string;
+}
+
+export interface Stats {
+  v: 1;
+  runs: number;
+  lastMode: ModeId;
+  bests: Partial<Record<ModeId, Best>>;
+  keys: KeyStats;
+  daily: { streak: number; bestStreak: number; lastDay: string | null; days: number };
+  rain: { best: number; bestWave: number };
+  prefs: { ghost: boolean };
+}
+
+export function emptyStats(): Stats {
+  return {
+    v: 1,
+    runs: 0,
+    lastMode: DEFAULT_MODE,
+    bests: {},
+    keys: {},
+    daily: { streak: 0, bestStreak: 0, lastDay: null, days: 0 },
+    rain: { best: 0, bestWave: 0 },
+    prefs: { ghost: true },
+  };
+}
+
+const count = z.number().int().min(0).max(COUNT_CAP);
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const bestSchema = z.object({ wpm: count, raw: count, acc: count.max(100), day });
+const keySchema = z.object({ hits: count, misses: count });
+
+const statsSchema = z.object({
+  v: z.literal(1),
+  runs: count,
+  lastMode: z.unknown(),
+  bests: z.record(z.string(), z.unknown()),
+  keys: z.record(z.string(), z.unknown()),
+  daily: z
+    .object({ streak: count, bestStreak: count, lastDay: day.nullable(), days: count })
+    .catch(emptyStats().daily),
+  rain: z.object({ best: count, bestWave: count }).catch(emptyStats().rain),
+  prefs: z.object({ ghost: z.boolean() }).catch(emptyStats().prefs),
+});
+
+export function parseStats(raw: unknown): Stats {
+  const result = statsSchema.safeParse(raw);
+  if (!result.success) return emptyStats();
+  const d = result.data;
+  const bests: Stats["bests"] = {};
+  for (const [mode, value] of Object.entries(d.bests)) {
+    const parsed = bestSchema.safeParse(value);
+    if (isModeId(mode) && parsed.success) bests[mode] = parsed.data;
+  }
+  const keys: KeyStats = {};
+  for (const [ch, value] of Object.entries(d.keys)) {
+    const parsed = keySchema.safeParse(value);
+    if ([...ch].length === 1 && parsed.success) keys[ch] = parsed.data;
+  }
+  return {
+    v: 1,
+    runs: d.runs,
+    lastMode: isModeId(d.lastMode) ? d.lastMode : DEFAULT_MODE,
+    bests,
+    keys,
+    daily: d.daily,
+    rain: d.rain,
+    prefs: d.prefs,
+  };
+}
+
+export function loadStats(): Stats {
+  let text: string | null;
+  try {
+    text = window.localStorage.getItem(STATS_KEY);
+  } catch {
+    // silent-ok: blocked storage (private mode, SecurityError) just means empty statistics
+    return emptyStats();
+  }
+  if (text === null) return emptyStats();
+  return parseStats(safeJsonParse<unknown>(text, "typing:stats"));
+}
+
+/** True when the stored value was written by a newer build; saving over it would downgrade it. */
+function storedVersionIsNewer(): boolean {
+  let text: string | null;
+  try {
+    text = window.localStorage.getItem(STATS_KEY);
+  } catch {
+    // silent-ok: blocked storage cannot hold a newer value, and the save will fail on its own
+    return false;
+  }
+  if (text === null) return false;
+  const value = safeJsonParse(text, "typing-stats");
+  if (typeof value !== "object" || value === null) return false;
+  const v = (value as { v?: unknown }).v;
+  return typeof v === "number" && v > 1;
+}
+
+export function saveStats(stats: Stats): void {
+  if (storedVersionIsNewer()) return;
+  safeLocalSet(STATS_KEY, JSON.stringify(stats));
+}
+
+export interface RunRecord {
+  mode: ModeId;
+  netWpm: number;
+  rawWpm: number;
+  accuracy: number;
+  /** UTC day, YYYY-MM-DD. */
+  day: string;
+  keys: KeyStats;
+  /** Input events that inserted several letters at once; such a run never counts. */
+  bulk: number;
+}
+
+/**
+ * Folds one finished run in. A bulk run counts as played and as the last mode
+ * and nothing else, so bests and key totals stay honest.
+ */
+export function recordRun(stats: Stats, r: RunRecord): Stats {
+  const next = structuredClone(stats);
+  next.runs = Math.min(COUNT_CAP, next.runs + 1);
+  next.lastMode = r.mode;
+  if (r.bulk > 0) return next;
+  const best = next.bests[r.mode];
+  if (!best || r.netWpm > best.wpm) {
+    next.bests[r.mode] = { wpm: r.netWpm, raw: r.rawWpm, acc: r.accuracy, day: r.day };
+  }
+  next.keys = mergeKeyStats(next.keys, r.keys);
+  return next;
+}
