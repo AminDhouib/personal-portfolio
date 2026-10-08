@@ -772,12 +772,16 @@ The following Password Game 2 entries were verified against the current tree on 
   personal best; neither is recorded. The shell records a victory exactly once per run (a ref
   keyed on run id and seed). Day arithmetic is `Date.UTC` on the string day, so it is timezone
   independent.
-- **PG2's daily share is text first.** The receipt's Share button builds a spoiler-free, ASCII-only
-  line (time, UTC day, a streak of two or more, the game URL; never the password, rule text or a
-  seeded answer) and hands it to `navigator.share`, falling back to the clipboard; a dismissed
-  share sheet is a quiet no-op. For the daily, where the browser can share files (`navigator.canShare({files})`), the same
-  button shares a 1200x630 PNG card drawn on a canvas (`stats/share-card.ts`, no dependency) with
-  the text line; any failure falls back to the text path.
+- **PG2's daily share is text first.** The receipt's Share button builds a spoiler-free,
+  ASCII-only line (time, the run's start day for a daily, a streak of two or more, the game URL;
+  never the password, rule text, a seeded answer or the biggest crisis) and hands it to
+  `navigator.share`, falling back to the clipboard; a dismissed share sheet is a quiet no-op. For
+  the daily, where the browser can share files (`navigator.canShare({files})`), the same button
+  also shares a 1200x630 PNG card drawn on a canvas (`stats/share-card.ts`, no dependency). The
+  card is rendered when the receipt mounts, not on the tap: the click handler is synchronous, so
+  `navigator.share` and the clipboard write run inside the user activation (iOS Safari drops it
+  across an await). If the PNG is not ready yet, or its render fails, the tap shares the text
+  only. A tap while a share is in flight is ignored.
 - **PG2's page names the game once, in a server-rendered h1 above the stage.** The h1, the intro
   and the credit ("An independent tribute to The Password Game by Neal Agarwal. Not affiliated
   with neal.fun.")

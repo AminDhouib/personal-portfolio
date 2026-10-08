@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { createRun } from "../../engine/engine";
 import { ReceiptCard } from "../receipt-card";
 
@@ -86,18 +86,9 @@ describe("ReceiptCard share", () => {
     expect(arg.text).not.toMatch(/[^\x20-\x7e\n]/);
   });
 
-  it("shares the PNG card with the text when the browser can share files", async () => {
-    const share = vi.fn(async () => {});
-    vi.stubGlobal("navigator", { share, canShare: () => true });
-    const fakeCtx = new Proxy({}, { get: () => () => ({ width: 10 }), set: () => true });
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-      (() => fakeCtx) as unknown as HTMLCanvasElement["getContext"],
-    );
-    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb) =>
-      cb(new Blob(["png"], { type: "image/png" })),
-    );
+  function mountDaily() {
     const g = createRun({ seed: 7, daily: true, nowHHMM: () => "12:00" });
-    const { getByRole } = render(
+    return render(
       <ReceiptCard
         g={g}
         seed={7}
@@ -108,12 +99,82 @@ describe("ReceiptCard share", () => {
         onPlayDaily={() => {}}
       />,
     );
+  }
+
+  function fakeCanvas(toBlob: (cb: BlobCallback) => void) {
+    const fakeCtx = new Proxy({}, { get: () => () => ({ width: 10 }), set: () => true });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      (() => fakeCtx) as unknown as HTMLCanvasElement["getContext"],
+    );
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, "toBlob")
+      .mockImplementation((cb) => toBlob(cb));
+    return spy;
+  }
+
+  it("pre-renders the PNG so the click calls navigator.share synchronously with the file", async () => {
+    const share = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { share, canShare: () => true });
+    const toBlob = fakeCanvas((cb) => cb(new Blob(["png"], { type: "image/png" })));
+    const { getByRole } = mountDaily();
+    await waitFor(() => expect(toBlob).toHaveBeenCalled());
+    await act(async () => {});
     fireEvent.click(getByRole("button", { name: /share/i }));
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    // No await between the click and the assertion: the call is inside the gesture.
+    expect(share).toHaveBeenCalledTimes(1);
     const arg = (share.mock.calls[0] as unknown as [{ files: File[]; text: string }])[0];
     expect(arg.files).toHaveLength(1);
     expect(arg.files[0]!.type).toBe("image/png");
     expect(arg.text).toContain("Password Game 2");
     vi.restoreAllMocks();
+  });
+
+  it("shares the text synchronously when the PNG is not ready yet", async () => {
+    const share = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { share, canShare: () => true });
+    const toBlob = fakeCanvas(() => {});
+    const { getByRole } = mountDaily();
+    await waitFor(() => expect(toBlob).toHaveBeenCalled());
+    fireEvent.click(getByRole("button", { name: /share/i }));
+    expect(share).toHaveBeenCalledTimes(1);
+    const arg = (share.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    expect(arg["files"]).toBeUndefined();
+    expect(String(arg["text"])).toContain("Password Game 2");
+    vi.restoreAllMocks();
+  });
+
+  it("survives a canvas that throws and still shares the text", async () => {
+    const share = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { share, canShare: () => true });
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockImplementation(() => {
+        throw new Error("no canvas");
+      });
+    const { getByRole } = mountDaily();
+    await waitFor(() => expect(getContext).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.click(getByRole("button", { name: /share/i }));
+    expect(share).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
+
+  it("ignores a second tap while a share is in flight", async () => {
+    const share = vi.fn(() => new Promise<void>(() => {}));
+    vi.stubGlobal("navigator", { share });
+    const { getByRole } = mountDaily();
+    const btn = getByRole("button", { name: /share/i });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(share).toHaveBeenCalledTimes(1);
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("writes to the clipboard inside the click when there is no share sheet", () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const { getByRole } = mountDaily();
+    fireEvent.click(getByRole("button", { name: /share/i }));
+    expect(writeText).toHaveBeenCalledTimes(1);
   });
 });

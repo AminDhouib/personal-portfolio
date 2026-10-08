@@ -48,15 +48,20 @@ export function canShareFiles(): boolean {
   }
 }
 
-/** Renders the card to a PNG blob, or null when there is no canvas to draw on. */
-export function renderShareCardBlob(run: ShareCardInput): Promise<Blob | null> {
-  const canvas = document.createElement("canvas");
-  canvas.width = CARD_W;
-  canvas.height = CARD_H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return Promise.resolve(null);
-  drawShareCard(ctx, run);
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+/** Renders the card to a PNG blob, or null when there is no canvas or drawing fails. */
+export async function renderShareCardBlob(run: ShareCardInput): Promise<Blob | null> {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = CARD_W;
+    canvas.height = CARD_H;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    drawShareCard(ctx, run);
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  } catch {
+    // silent-ok: a canvas that fails just means the share goes out as the text line
+    return null;
+  }
 }
 
 /** Shares the card with the text line. A dismissed sheet is "cancelled"; any failure is null. */

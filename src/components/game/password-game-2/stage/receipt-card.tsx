@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameState } from "../engine/types";
 import { buildShareText, shareResult, type ShareOutcome } from "../stats/share";
 import { canShareFiles, renderShareCardBlob, shareCardImage } from "../stats/share-card";
@@ -75,6 +75,11 @@ export function ReceiptCard({
   const [posted, setPosted] = useState<{ name: string; timeMs: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [shareNote, setShareNote] = useState<ShareOutcome | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const sharingRef = useRef(false);
+  // The daily's PNG card, rendered ahead of the tap: the click must call navigator.share
+  // synchronously (iOS Safari drops the gesture across an await).
+  const [cardBlob, setCardBlob] = useState<Blob | null>(null);
 
   const stats = g.stats;
   const timeMs = Math.round(g.elapsedMs);
@@ -141,29 +146,48 @@ export function ReceiptCard({
     }
   };
 
-  const share = async () => {
+  useEffect(() => {
+    if (!daily || !canShareFiles()) return;
+    let cancelled = false;
+    // After the shell's own effect has recorded the run, so the card carries the settled streak.
+    const t = window.setTimeout(() => {
+      const streak = streakAsOf(loadStats(), startDay);
+      void renderShareCardBlob({ day: startDay, ms: timeMs, streak }).then((blob) => {
+        if (!cancelled) setCardBlob(blob);
+      });
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [daily, startDay, timeMs]);
+
+  // Not async on purpose: every navigator call below happens before the first await, so
+  // it is inside the click's user activation. A PNG that is not ready yet shares text only.
+  const share = () => {
+    if (sharingRef.current) return;
+    sharingRef.current = true;
+    setSharing(true);
     // The streak is read at click time: the shell records the run in its own effect.
-    const streak = daily ? streakAsOf(loadStats(), startDay) : 0;
     const text = buildShareText(
       {
         day: startDay,
         ms: timeMs,
-        streak,
+        streak: daily ? streakAsOf(loadStats(), startDay) : 0,
         daily,
       },
       `${location.origin}${location.pathname}`,
     );
-    // The PNG card only for the daily and only where files can be shared; any miss
-    // falls back to the text line.
-    if (daily && canShareFiles()) {
-      const blob = await renderShareCardBlob({ day: startDay, ms: timeMs, streak });
-      const outcome = blob ? await shareCardImage(blob, text) : null;
-      if (outcome) {
-        setShareNote(outcome);
-        return;
-      }
-    }
-    setShareNote(await shareResult(text));
+    const outcome = cardBlob
+      ? shareCardImage(cardBlob, text).then((o) => o ?? shareResult(text))
+      : shareResult(text);
+    outcome
+      .then(setShareNote)
+      .catch(() => setShareNote("unavailable"))
+      .finally(() => {
+        sharingRef.current = false;
+        setSharing(false);
+      });
   };
 
   const isMine = (e: BoardEntry): boolean =>
@@ -315,7 +339,8 @@ export function ReceiptCard({
           <button
             type="button"
             className="pg2-btn pg2-btn--ghost min-h-11 px-4 py-2 text-sm"
-            onClick={() => void share()}
+            disabled={sharing}
+            onClick={share}
           >
             Share result
           </button>
