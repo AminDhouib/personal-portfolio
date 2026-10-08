@@ -21,7 +21,7 @@ import {
   envColors,
   activatePowerUp,
 } from "./types";
-import { difficulty, elapsedSeconds, comboMultiplier, comboTier } from "./difficulty";
+import { difficulty, elapsedSeconds, comboMultiplier, comboTier, killPitch } from "./difficulty";
 import { sounds } from "./sound-manager";
 import {
   spawnIntervalMs,
@@ -787,7 +787,7 @@ export function runTick(
             const coinValue = Math.max(1, 1 + Math.floor(g.combo / 5) + g.coinValueBonus);
             spawnCoin(g, o.x, o.y, o.z, coinValue);
             spawnScorePopup(g, o.x, o.y, o.z, points);
-            sounds.play("boom");
+            sounds.play("boom", { pitch: killPitch(g.combo) });
             break;
           }
         }

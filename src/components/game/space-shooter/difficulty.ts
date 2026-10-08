@@ -36,6 +36,11 @@ export function comboTier(combo: number): number {
   return 5;
 }
 
+// Boom pitch multiplier for a kill at this combo: 1.0 at combo 1 up to 1.7 at 21+.
+export function killPitch(combo: number): number {
+  return 1 + 0.035 * Math.min(combo - 1, 20);
+}
+
 export function comboColor(combo: number): string {
   if (combo >= 40) return "#f472b6";
   if (combo >= 20) return "#fb923c";
