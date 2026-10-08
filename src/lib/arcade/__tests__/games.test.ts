@@ -330,6 +330,18 @@ describe("tower-stacker (daily tower)", () => {
     }
   });
 
+  it("caps a run at two hours and the floors that cadence allows", () => {
+    // maxBlocksFor(7200) = floor(7201 * 1000 / 400) + 2 = 18004: one floor per 400 ms plus slack.
+    const cap = detail({ blocks: 18_004, perfects: 0, streak: 0, seconds: 7_200 });
+    expect(check(180_040, cap).ok).toBe(true);
+    const invalid = { ok: false, kind: "detail", reason: "invalid detail" };
+    expect(check(180_040, { ...cap, seconds: 7_201 })).toEqual(invalid);
+    expect(check(180_050, { ...cap, blocks: 18_005 })).toEqual(invalid);
+    expect(
+      check(0, detail({ perfects: 18_005, streak: 0, blocks: 18_004, seconds: 7_200 })),
+    ).toEqual(invalid);
+  });
+
   it("rejects counts that contradict each other", () => {
     for (const d of [
       detail({ perfects: 8 }), // more perfects than floors

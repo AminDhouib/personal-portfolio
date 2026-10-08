@@ -77,12 +77,16 @@ const voltorbDailyDetailSchema = z.strictObject({
 
 // Tower Stacker's daily tower: the UTC day (YYYYMMDD), floors landed, perfects, the
 // longest perfect streak and whole seconds of active play. checkTowerStacker decides.
+// A run is capped at two hours of active play. The floor ceiling follows from the engine's
+// fastest cadence (one block per CYCLE_MS, see maxBlocksFor), so the three counts share it.
+const TOWER_MAX_SECONDS = 7_200;
+const TOWER_MAX_BLOCKS = maxBlocksFor(TOWER_MAX_SECONDS);
 const towerDetailSchema = z.strictObject({
   day: z.number().int().min(20_000_101).max(99_991_231),
-  blocks: z.number().int().min(0).max(99_999),
-  perfects: z.number().int().min(0).max(99_999),
-  streak: z.number().int().min(0).max(99_999),
-  seconds: z.number().int().min(0).max(86_399),
+  blocks: z.number().int().min(0).max(TOWER_MAX_BLOCKS),
+  perfects: z.number().int().min(0).max(TOWER_MAX_BLOCKS),
+  streak: z.number().int().min(0).max(TOWER_MAX_BLOCKS),
+  seconds: z.number().int().min(0).max(TOWER_MAX_SECONDS),
 });
 
 type SpaceShooterDetail = z.infer<typeof spaceShooterDetailSchema>;
