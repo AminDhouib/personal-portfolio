@@ -1809,3 +1809,105 @@ html.pg2-lock {
 .pg2-titlecard--sheet {
   z-index: 90;
 }
+
+/* ---- Telegraph beat ----------------------------------------------------- */
+
+/* While an event winds up, the stage card's edge glows in the family colour (set as
+   --pg2-tg on the card) and a banner in the bottom HUD band names the threat with a
+   countdown. Both are overlays: nothing in the layout moves when they come and go. The
+   tint sits above the canvas (25) and below the HUD (30); the banner shares the HUD's
+   layer. */
+.pg2-panel[data-telegraph]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 26;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px var(--pg2-tg),
+    inset 0 0 36px -10px var(--pg2-tg);
+  animation: pg2-tint-pulse 1.1s ease-in-out infinite;
+}
+
+.pg2-telegraph {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  translate: 0 -50%;
+  padding: 4px 5px 4px 10px;
+  border: 1px solid var(--pg2-tg);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--pg2-ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 14px;
+  pointer-events: none;
+  animation:
+    pg2-telegraph-in 220ms ease-out both,
+    pg2-telegraph-ring 1.1s ease-in-out 220ms infinite;
+}
+/* The campfire's FUEL meter owns the band's left column while the fire is lit. */
+.pg2-telegraph--beside-meter {
+  left: 144px;
+}
+.pg2-telegraph__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--pg2-tg);
+}
+.pg2-telegraph__label {
+  min-width: 0;
+}
+.pg2-telegraph__count {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--pg2-tg);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pg2-tg) 16%, #ffffff);
+  color: var(--pg2-ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pg2-tint-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pg2-telegraph-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pg2-telegraph-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--pg2-tg) 22%, transparent);
+  }
+}
