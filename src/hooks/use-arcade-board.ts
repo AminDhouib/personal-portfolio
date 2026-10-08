@@ -19,6 +19,9 @@ export interface ArcadeBoardEntry {
   distance?: number;
   day?: number;
   flips?: number;
+  blocks?: number;
+  perfects?: number;
+  streak?: number;
   createdAt: string;
   /** Set only when the server said so; Hextris falls back to its old heuristic otherwise. */
   isYou?: boolean;
@@ -74,6 +77,7 @@ const DETAIL_KEYS: { [G in ArcadeGameSlug]: readonly (keyof ArcadeDetail<G> & st
   "space-shooter": ["seconds", "kills", "distance"],
   hextris: ["seconds", "kills", "level"],
   "super-voltorb-flip": ["day", "flips"],
+  "tower-stacker": ["day", "blocks", "perfects", "streak", "seconds"],
 };
 
 // Mirrors ARCADE_SCORE_CAP in src/lib/arcade/games.ts. That module imports zod and the
@@ -112,6 +116,9 @@ function toEntry(x: unknown): ArcadeBoardEntry | null {
   const distance = finite(detail.distance);
   const day = finite(detail.day);
   const flips = finite(detail.flips);
+  const blocks = finite(detail.blocks);
+  const perfects = finite(detail.perfects);
+  const streak = finite(detail.streak);
   return {
     rank,
     name: handle,
@@ -122,6 +129,9 @@ function toEntry(x: unknown): ArcadeBoardEntry | null {
     ...(distance !== undefined && { distance }),
     ...(day !== undefined && { day }),
     ...(flips !== undefined && { flips }),
+    ...(blocks !== undefined && { blocks }),
+    ...(perfects !== undefined && { perfects }),
+    ...(streak !== undefined && { streak }),
     createdAt: achievedAt,
     ...(typeof isYou === "boolean" && { isYou }),
   };
