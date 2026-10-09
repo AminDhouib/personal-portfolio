@@ -61,6 +61,9 @@ export function Report({
           <h2 id="failover-report-title" className="font-display text-2xl font-black">
             {T.run_over}
           </h2>
+          {hud.mode === "sandbox" && (
+            <p className="font-mono text-xs tracking-wider text-[#f59e0b]">{T.sandbox_mode}</p>
+          )}
           <p className="text-sm text-[#a1a1aa]">{OVER_TEXT[hud.over]}</p>
           <p className="mt-1 font-mono text-sm">{fmt(T.survived, { time: clock(hud.time) })}</p>
           {hud.mode === "survival" && (
@@ -68,7 +71,7 @@ export function Report({
               {fmt(T.final_score, { score: hud.score.toLocaleString("en-US") })}
             </p>
           )}
-          {best.runs > 0 && (
+          {hud.mode === "survival" && best.runs > 0 && (
             <p className="text-xs text-[#a1a1aa]">
               {fmt(T.best_line, {
                 time: clock(best.bestSeconds),

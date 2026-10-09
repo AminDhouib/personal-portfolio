@@ -35,8 +35,12 @@ export function StatusBar({ hud }: { hud: HudState }) {
       <Readout label={T.load_rps} value={hud.rps.toFixed(1)} />
       <Readout label={T.elapsed_time} value={clock(hud.time)} />
       <Readout label={T.goodput_label} value={hud.goodput === null ? "-" : percent(hud.goodput)} />
-      {hud.mode === "survival" && (
+      {hud.mode === "survival" ? (
         <Readout label={T.total_score} value={hud.score.toLocaleString("en-US")} />
+      ) : (
+        <dd className="self-center rounded border border-[#f59e0b]/60 px-1.5 font-mono text-[10px] tracking-wider text-[#f59e0b]">
+          {T.sandbox}
+        </dd>
       )}
       {hud.power && (
         <Readout

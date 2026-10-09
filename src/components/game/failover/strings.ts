@@ -110,8 +110,11 @@ export const T = {
   metrics_locked: "Place a Monitoring service to unlock live metrics.",
   metrics_locked_teach: "You can't fix what you can't see.",
   mitigation: "DDoS mitigation", // ours
+  mode: "Mode", // ours
   monitor_short: "Monitor",
   net_profit: "Net Profit",
+  new_sandbox_run: "Start a Sandbox run", // ours
+  new_survival_run: "Start a Survival run", // ours
   no_money: "Not enough money", // ours
   nosql_short: "NoSQL",
   not_allowed: "Not allowed", // ours
@@ -157,6 +160,10 @@ export const T = {
   rps_surge_warning: "RPS SURGE! Traffic x{multiplier}",
   run_is_over: "The run is over", // ours
   run_over: "Run over", // ours
+  sandbox: "SANDBOX",
+  sandbox_mode: "Sandbox Mode",
+  sandbox_note:
+    "Sandbox: a large budget, no failure and no score, and nothing is recorded. Switching starts a new run.", // ours
   scheduler_short: "Cron",
   search_short: "Search",
   select: "Select",
@@ -173,6 +180,7 @@ export const T = {
   speed_n: "Speed {n}x", // ours
   storage_short: "Storage",
   stream_short: "Stream",
+  survival_mode: "Survival", // ours
   survived: "Survived {time}", // ours
   tier_of: "Tier {tier} of {max}", // ours
   tile_taken: "That tile is taken", // ours

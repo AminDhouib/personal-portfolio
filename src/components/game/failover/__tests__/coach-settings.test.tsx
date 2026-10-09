@@ -76,7 +76,7 @@ describe("Coach", () => {
 });
 
 describe("Settings", () => {
-  function mountSettings(onReplayCoach = vi.fn(), onClose = vi.fn()) {
+  function mountSettings(onReplayCoach = vi.fn(), onClose = vi.fn(), onStartMode = vi.fn()) {
     const h = makeController();
     const bridge = createHudBridge();
     function Host() {
@@ -86,14 +86,27 @@ describe("Settings", () => {
           hud={hud}
           controller={h.controller}
           onReplayCoach={onReplayCoach}
+          onStartMode={onStartMode}
           onClose={onClose}
         />
       ) : null;
     }
     render(<Host />);
     act(() => bridge.connect(h.controller));
-    return { h, onReplayCoach, onClose };
+    return { h, onReplayCoach, onClose, onStartMode };
   }
+
+  it("names the mode and offers the other one as a new run", () => {
+    const { h, onStartMode } = mountSettings();
+    // The harness plays Sandbox.
+    expect(screen.getByText("Mode: Sandbox Mode")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start a Survival run" }));
+    expect(onStartMode).toHaveBeenCalledWith("survival");
+    act(() => h.controller.restart(undefined, "survival"));
+    expect(screen.getByText("Mode: Survival")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start a Sandbox run" }));
+    expect(onStartMode).toHaveBeenLastCalledWith("sandbox");
+  });
 
   it("switches the sound cues on and off", () => {
     const { h } = mountSettings();
