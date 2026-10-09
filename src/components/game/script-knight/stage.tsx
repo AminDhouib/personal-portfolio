@@ -32,6 +32,7 @@ import { getGradeLetter } from "./engine/scoring";
 import { configForRef, createRun } from "./engine/run";
 import { TOWER_IDS, type TowerId, TOWERS } from "./engine/towers";
 import { LevelPanel } from "./level-panel";
+import { botPlayed, type Played } from "./played";
 import { buildFrames } from "./playback";
 import {
   FLOORS_PER_TOWER,
@@ -142,6 +143,8 @@ export function Stage({
   const [epicRuns, setEpicRuns] = useState<FloorRun[] | null>(null);
   const [notice, setNotice] = useState<string | null>(begin.notice);
   const [muted, setMuted] = useState(false);
+  // Watch the bot: the reference bot's run on the floor in view. Local, never scored or posted.
+  const [bot, setBot] = useState<Played | null>(null);
   // Today's floor: the UTC day is fixed when the player opens the tab, so a run that crosses
   // midnight is still judged on the floor it began on (and cannot be posted).
   const [daily, setDaily] = useState(begin.daily);
@@ -221,7 +224,11 @@ export function Stage({
               floorRun.ref.epic === useEpic)
         ? floorRun
         : null;
-  const frames = shown?.frames ?? idleFrames;
+  const floorRef: LevelRef = daily
+    ? { kind: "daily", day: dayKey }
+    : { kind: "tower", tower, level, epic: useEpic };
+  const botShown = bot && JSON.stringify(bot.ref) === JSON.stringify(floorRef) ? bot : null;
+  const frames = botShown?.frames ?? shown?.frames ?? idleFrames;
   const playback = usePlayback(frames);
 
   useEffect(() => {
@@ -437,6 +444,7 @@ export function Stage({
     audioRef.current?.unlock();
     setRunning(true);
     setNotice(null);
+    setBot(null);
     setFloorRun(null);
     setEpicRuns(null);
     try {
@@ -498,7 +506,7 @@ export function Stage({
   // The clue is for a floor that was lost, not for code that did not run or was stopped.
   const clueShown = failedShown && shown.outcome === null;
   const reason = shown ? (shown.outcome?.text ?? shown.end) : null;
-  const showResult = shown !== null && playback.atEnd && !running;
+  const showResult = shown !== null && playback.atEnd && !running && !botShown;
   const epicSummary = useEpic && epicRuns ? summarizeEpic(epicRuns) : null;
   const reached = towerProgress.reached;
   const dailyResult =
@@ -512,7 +520,7 @@ export function Stage({
         <FloorView
           frame={frame}
           label={daily ? "Today's floor" : floorLabel(tower, level, useEpic)}
-          ghost={ghostRun ? ghostKnightAt(ghostRun, frame.turn) : null}
+          ghost={ghostRun && !botShown ? ghostKnightAt(ghostRun, frame.turn) : null}
         />
         <p className="font-mono text-xs text-(--muted)" aria-live="polite">
           {frame.status ? `Health ${frame.status.health}, score ${frame.status.score}` : ""}
@@ -523,7 +531,11 @@ export function Stage({
           muted={muted}
           onToggleMute={toggleMute}
         />
-        <EventLog frames={frames} index={playback.index} thoughts={shown?.thoughts ?? []} />
+        <EventLog
+          frames={frames}
+          index={playback.index}
+          thoughts={botShown ? [] : (shown?.thoughts ?? [])}
+        />
         {handPad}
       </div>
       <div className="space-y-3">
@@ -649,7 +661,24 @@ export function Stage({
           <button type="button" onClick={resetCode} disabled={running} className={BUTTON}>
             Reset to starter
           </button>
+          <button
+            type="button"
+            onClick={() => setBot(botPlayed(floorRef))}
+            disabled={running}
+            className={BUTTON}
+          >
+            Watch the bot
+          </button>
         </div>
+        {botShown ? (
+          <p role="status" className="text-sm text-(--muted)">
+            Watching the reference bot on this floor. This run is local: it is not scored, saved or
+            posted.{" "}
+            <button type="button" onClick={() => setBot(null)} className={`underline ${TOUCH}`}>
+              Stop watching
+            </button>
+          </p>
+        ) : null}
         {notice ? (
           <p role="alert" className="text-sm text-accent-red">
             {notice}
