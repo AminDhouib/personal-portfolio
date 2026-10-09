@@ -776,6 +776,54 @@ describe("useArcadeBoard", () => {
       expect(result.current.readError).toBeNull(); // a submit failure is the caller's, not a read error
     });
 
+    it("a 503 busy is a busy answer with the server's wait, not a rejection", async () => {
+      const { result } = await mounted();
+      const busy = () =>
+        new Response(JSON.stringify({ error: "busy", reason: "the verifier is busy" }), {
+          status: 503,
+          headers: { "Retry-After": "3" },
+        });
+      fetchMock.mockResolvedValueOnce(busy());
+      let submitResult: unknown;
+      await act(async () => {
+        submitResult = await result.current.submit({
+          name: "Ada",
+          score: 5,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+        });
+      });
+      expect(submitResult).toEqual({ ok: false, busy: true, retryAfterMs: 3000 });
+    });
+
+    it("a 503 with no usable Retry-After waits two seconds, and never more than a minute", async () => {
+      const { result } = await mounted();
+      const send = async () => {
+        let out: unknown;
+        await act(async () => {
+          out = await result.current.submit({
+            name: "Ada",
+            score: 5,
+            seconds: 1,
+            kills: 1,
+            distance: 1,
+          });
+        });
+        return out;
+      };
+      fetchMock.mockResolvedValueOnce(okResponse({ error: "busy" }, 503));
+      expect(await send()).toEqual({ ok: false, busy: true, retryAfterMs: 2000 });
+      fetchMock.mockResolvedValueOnce(
+        new Response("{}", { status: 503, headers: { "Retry-After": "9999" } }),
+      );
+      expect(await send()).toEqual({ ok: false, busy: true, retryAfterMs: 60_000 });
+      fetchMock.mockResolvedValueOnce(
+        new Response("{}", { status: 503, headers: { "Retry-After": "soon" } }),
+      );
+      expect(await send()).toEqual({ ok: false, busy: true, retryAfterMs: 2000 });
+    });
+
     it("a 403 identity error resets the identity once and does not retry on its own", async () => {
       const { result } = await mounted();
       fetchMock.mockResolvedValueOnce(okResponse({ error: "identity" }, 403));
