@@ -3,10 +3,11 @@
 // are flat comma-separated numbers: the tick as a delta from the previous action
 // (so the digits are bounded by the run length, not 700 x 5), the op, then the
 // op's arguments, with a placement written as grid cells rather than world units.
-// 700 of the longest actions come to about 10,000 characters.
+// 700 of the longest actions, with the tick deltas spread to maximise digits, come to
+// 9,921 characters at most (pinned in proof.test.ts); the cap is 12,000.
 
-import type { LoggedAction } from "./action-log";
-import { CONFIG } from "./config";
+import { MAX_LOGGED_ACTIONS, type LoggedAction } from "./action-log";
+import { CONFIG, SERVICE_TYPES } from "./config";
 
 /** Arguments after the op, per op: place(type, cx, cz), link and unlink(from, to), the single-id ops, auto-repair(on), retire. */
 const ARITY: Readonly<Record<number, number>> = {
@@ -59,7 +60,8 @@ function cellOf(world: number): number {
 }
 
 /** Read a proof string back into a log, or null if it is not one. Strict: no spaces, signs, fractions or exponents. */
-export function parseProof(proof: string): LoggedAction[] | null {
+export function parseProof(proof: unknown): LoggedAction[] | null {
+  if (typeof proof !== "string") return null;
   if (proof === "") return [];
   const tokens = proof.split(",");
   const log: LoggedAction[] = [];
@@ -77,12 +79,14 @@ export function parseProof(proof: string): LoggedAction[] | null {
       if (arg === null) return null;
       args.push(arg);
     }
+    // Checked inside the loop so a long garbage proof stops here, not after parsing it all.
+    if (log.length >= MAX_LOGGED_ACTIONS) return null;
     tick += delta;
     if (!Number.isSafeInteger(tick)) return null;
     if (op === 0) {
       const [type, cx, cz] = args;
       if (type === undefined || cx === undefined || cz === undefined) return null;
-      if (cx > 2 * HALF || cz > 2 * HALF) return null;
+      if (type >= SERVICE_TYPES.length || cx > 2 * HALF || cz > 2 * HALF) return null;
       log.push([tick, 0, type, (cx - HALF) * TILE, (cz - HALF) * TILE]);
     } else {
       log.push([tick, op, ...args]);

@@ -2,7 +2,7 @@
 // again through the same dispatch() and step() the live game used and report how
 // it ended. The server accepts a score only if this reproduces it.
 
-import { decodeAction, dispatch, type Action } from "./action-log";
+import { decodeAction, dispatch, MAX_LOGGED_ACTIONS, type Action } from "./action-log";
 import { TICK } from "./config";
 import { stateHash } from "./hash";
 import { scoreOf } from "./score";
@@ -37,7 +37,7 @@ export interface AsyncReplayOptions {
   yieldFn: () => Promise<void>;
 }
 
-export type ReplayErrorCode = "tick-order" | "tick-range" | "unknown-op" | "bad-args";
+export type ReplayErrorCode = "tick-order" | "tick-range" | "unknown-op" | "bad-args" | "too-many";
 
 /** A proof the sim refuses to play, with the first thing wrong with it. */
 export class ReplayError extends Error {
@@ -65,6 +65,8 @@ interface Planned {
 // half-played bad proof would leave it dirty for the next run.
 function plan(opts: ReplayOptions): Planned[] {
   if (!Number.isSafeInteger(opts.ticks) || opts.ticks < 0) throw new ReplayError("tick-range", -1);
+
+  if (opts.log.length > MAX_LOGGED_ACTIONS) throw new ReplayError("too-many", MAX_LOGGED_ACTIONS);
 
   const out: Planned[] = [];
   let previous = 0;
