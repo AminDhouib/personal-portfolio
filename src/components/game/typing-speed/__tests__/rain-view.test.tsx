@@ -1,8 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SENTINEL } from "../engine/input";
+import { TypingSpeedGame } from "../../typing-speed";
+import type { RainState } from "../engine/rain";
 import { RainGame } from "../rain-view";
+import { STATS_KEY, emptyStats, loadStats } from "../stats";
 import { fakeVV, restoreViewport } from "./phone-helpers";
+
+vi.mock("../engine/text", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../engine/text")>()),
+  passageAt: () => ({ id: "t-1", source: "austen-pp", text: "ab cd" }),
+}));
 
 let clock = 0;
 let nextId = 0;
@@ -22,7 +30,7 @@ function frames(n: number) {
 }
 
 function input(): HTMLInputElement {
-  return screen.getByLabelText("Typing area") as HTMLInputElement;
+  return screen.getByLabelText("Word Rain typing area") as HTMLInputElement;
 }
 
 function setValue(value: string, inputType = "insertText") {
@@ -245,5 +253,121 @@ describe("Word Rain view", () => {
     fireEvent.click(within(hud).getByRole("button", { name: "Exit" }));
     expect(screen.queryByTestId("ts-sheet")).toBeNull();
     expect(document.documentElement).not.toHaveClass("typing-lock");
+  });
+});
+
+describe("Word Rain game over", () => {
+  /** Clears one word, then lets the rest fall. */
+  function playOut(over: (state: RainState, bulk: number) => number | null, bulkWord = false) {
+    render(<RainGame header={null} phone={false} nextSeed={() => 11} onOver={over} />);
+    start();
+    frames(2);
+    const text = words()[0]!.textContent!;
+    if (bulkWord) setValue(SENTINEL + text);
+    else typeText(text);
+    frames(400);
+    return text;
+  }
+
+  it("shows the letters, words, wave, WPM and accuracy of the run", () => {
+    const text = playOut(() => null);
+    expect(screen.getByTestId("ts-rain-over")).toBeInTheDocument();
+    expect(screen.getByTestId("ts-rain-result-score")).toHaveTextContent(String(text.length));
+    expect(screen.getByTestId("ts-rain-result-words")).toHaveTextContent("1");
+    expect(screen.getByTestId("ts-rain-result-wave")).toHaveTextContent("1");
+    expect(screen.getByTestId("ts-rain-result-wpm").textContent).toMatch(/^\d+$/);
+    expect(screen.getByTestId("ts-rain-result-acc")).toHaveTextContent("100%");
+  });
+
+  it("hands the finished run to onOver once, and says New best only for a higher score", () => {
+    const over = vi.fn(() => 1);
+    const text = playOut(over);
+    expect(over).toHaveBeenCalledTimes(1);
+    expect(over).toHaveBeenCalledWith(expect.objectContaining({ score: text.length }), 0);
+    expect(screen.getByTestId("ts-rain-new-best")).toHaveTextContent("New best");
+  });
+
+  it("is no new best on the first run, a tie, or a lower score", () => {
+    for (const prior of [null, "tie", 99] as const) {
+      playOut((r) => (prior === "tie" ? r.score : prior));
+      expect(screen.queryByTestId("ts-rain-new-best")).toBeNull();
+      cleanup();
+      pending.clear();
+    }
+  });
+
+  it("a run typed with suggestions never sets a best, and says so", () => {
+    playOut(() => 0, true);
+    expect(screen.queryByTestId("ts-rain-new-best")).toBeNull();
+    expect(screen.getByTestId("ts-rain-over")).toHaveTextContent("cannot set a best");
+  });
+
+  it("Play again is a 44 px target and Enter plays again", () => {
+    playOut(() => null);
+    const again = screen.getByRole("button", { name: "Play again" });
+    expect(again).toHaveClass("min-h-11", "min-w-11", "touch-manipulation");
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(screen.queryByTestId("ts-rain-over")).toBeNull();
+    expect(screen.getByLabelText("Lives: 3")).toBeInTheDocument();
+  });
+});
+
+describe("Word Rain in the game", () => {
+  beforeEach(() => {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify({ ...emptyStats(), lastMode: "quote" }));
+  });
+
+  it("opens from the mode bar, with no ghost toggle, ghost chip or timed stats", () => {
+    render(<TypingSpeedGame />);
+    expect(screen.getByRole("button", { name: "Ghost" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Rain" }));
+    expect(screen.getByTestId("ts-rain-area")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rain", pressed: true })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ghost" })).toBeNull();
+    expect(screen.queryByTestId("ts-ghost-chip")).toBeNull();
+    expect(screen.queryByTestId("ts-stats")).toBeNull();
+    expect(screen.queryByTestId("ts-target")).toBeNull();
+    expect(loadStats().lastMode).toBe("rain");
+  });
+
+  it("opens in Word Rain when it was the last mode, and a typed key starts the run", () => {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify({ ...emptyStats(), lastMode: "rain" }));
+    render(<TypingSpeedGame />);
+    expect(screen.getByTestId("ts-rain-area")).toBeInTheDocument();
+    // The timed modes' own input is parked, hidden, while Word Rain has the page.
+    expect(screen.getByLabelText("Typing area")).toHaveAttribute("hidden");
+  });
+
+  it("goes back to the timed modes and still types", () => {
+    render(<TypingSpeedGame />);
+    fireEvent.click(screen.getByRole("button", { name: "Rain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quote" }));
+    expect(screen.queryByTestId("ts-rain-area")).toBeNull();
+    expect(screen.getByTestId("ts-target")).toBeInTheDocument();
+    const classic = screen.getByLabelText("Typing area") as HTMLInputElement;
+    expect(classic).not.toHaveAttribute("hidden");
+    act(() => {
+      valueSetter.call(classic, SENTINEL + "a");
+      classic.dispatchEvent(new InputEvent("input", { inputType: "insertText", bubbles: true }));
+    });
+    expect(screen.getByTestId("ts-target").querySelector("[data-state='correct']")).not.toBeNull();
+  });
+
+  it("records the local best on game over, touching nothing else and posting nothing", () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    window.localStorage.setItem(STATS_KEY, JSON.stringify({ ...emptyStats(), lastMode: "rain" }));
+    render(<TypingSpeedGame />);
+    start();
+    frames(2);
+    const text = words()[0]!.textContent!;
+    typeText(text);
+    frames(400);
+    const stats = loadStats();
+    expect(stats.rain).toEqual({ best: text.length, bestWave: 1 });
+    expect(stats.bests).toEqual({});
+    expect(stats.runs).toBe(0);
+    expect(window.localStorage.getItem("typing-high-score")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

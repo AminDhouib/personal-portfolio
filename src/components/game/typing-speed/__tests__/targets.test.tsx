@@ -64,6 +64,17 @@ describe("44 px targets", () => {
   });
 });
 
+describe("44 px targets in Word Rain", () => {
+  it("at rest and in the sheet", () => {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify({ ...emptyStats(), lastMode: "rain" }));
+    render(<TypingSpeedGame />);
+    expectTargets();
+    fireEvent.click(screen.getByTestId("ts-rain-area"));
+    expect(screen.getByTestId("ts-sheet")).toBeInTheDocument();
+    expectTargets();
+  });
+});
+
 describe("the stats bar on a phone", () => {
   it("keeps the height of its wrapped form so the badges appearing never push the text down", () => {
     render(<TypingSpeedGame />);

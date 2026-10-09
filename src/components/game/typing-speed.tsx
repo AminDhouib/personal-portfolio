@@ -7,6 +7,7 @@ import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { keyStats, wpmSeries, type KeyStats, type SeriesPoint } from "./typing-speed/engine/series";
 import { dailyScore, dailyText } from "./typing-speed/engine/daily";
+import type { RainState } from "./typing-speed/engine/rain";
 import {
   ghostCharsAt,
   ghostPosition,
@@ -44,9 +45,17 @@ import {
 import { isTextEntryTarget } from "./text-entry";
 import { ModeBar } from "./typing-speed/mode-bar";
 import { PlaySheet, SheetHud } from "./typing-speed/play-sheet";
+import { RainGame } from "./typing-speed/rain-view";
 import { ResultsCard } from "./typing-speed/results-card";
 import { sheetLayout } from "./typing-speed/sheet-layout";
-import { loadStats, recordDay, recordRun, saveStats, streakAsOf } from "./typing-speed/stats";
+import {
+  loadStats,
+  recordDay,
+  recordRain,
+  recordRun,
+  saveStats,
+  streakAsOf,
+} from "./typing-speed/stats";
 import { TextView } from "./typing-speed/text-view";
 import { useTypingRun } from "./typing-speed/use-typing-run";
 import { WpmGraph } from "./typing-speed/wpm-graph";
@@ -119,6 +128,8 @@ export function TypingSpeedGame() {
     initialStats.lastMode === "daily" ? DEFAULT_MODE : initialStats.lastMode,
   );
   const [daily, setDaily] = useState<DailyState | null>(null);
+  // Word Rain plays in its own component; this says whether its phone sheet is up.
+  const [rainSheet, setRainSheet] = useState(false);
   const [ghosts, setGhosts] = useState(() => loadGhosts(utcDay()));
   const [ghostOn, setGhostOn] = useState(initialStats.prefs.ghost);
   const [seed, setSeed] = useState(drawSeed);
@@ -274,6 +285,14 @@ export function TypingSpeedGame() {
   const { run, reset, press } = typing;
 
   const timed = parseMode(mode) !== null;
+  const rain = mode === "rain";
+
+  // Keeps the local best; the answer is the best from before the run, for "New best".
+  const onRainOver = useCallback((r: RainState, bulk: number) => {
+    const before = loadStats();
+    saveStats(recordRain(before, { score: r.score, wave: r.wave, bulk: bulk > 0 }));
+    return before.rain.best > 0 ? before.rain.best : null;
+  }, []);
 
   const begin = useCallback(
     (next: { mode: ModeId; seed: number; passageNo: number; day?: string }) => {
@@ -360,6 +379,8 @@ export function TypingSpeedGame() {
 
   // Any printable key starts the run, Enter focuses it, Escape restarts it.
   useEffect(() => {
+    // Word Rain handles its own keys.
+    if (rain) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const el = e.target instanceof Element ? e.target : null;
       const inTextField = isTextEntryTarget(e);
@@ -396,7 +417,7 @@ export function TypingSpeedGame() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [run, restart, press, sheet]);
+  }, [run, restart, press, sheet, rain]);
 
   const metrics = runMetrics(run, typing.now);
   const { current: streak } = streaks(run);
@@ -448,161 +469,178 @@ export function TypingSpeedGame() {
 
   return (
     <div className="space-y-5">
-      <div inert={sheet} className="space-y-5">
-        <ModeBar mode={mode} onChange={changeMode} ghost={{ on: ghostOn, onToggle: toggleGhost }} />
+      <div inert={sheet || rainSheet} className="space-y-5">
+        <ModeBar
+          mode={mode}
+          onChange={changeMode}
+          ghost={rain ? undefined : { on: ghostOn, onToggle: toggleGhost }}
+        />
 
         {/* Stats bar */}
-        <div
-          data-testid="ts-stats"
-          className="flex min-h-12 flex-wrap content-start items-center gap-x-5 gap-y-2 text-sm sm:min-h-0"
-        >
-          <motion.div
-            animate={{ scale: playing ? [1, 1.05, 1] : 1 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-1.5 text-(--muted)"
-          >
-            <Timer className="h-3.5 w-3.5" />
-            <span
-              className={
-                playing
-                  ? "font-mono font-semibold text-accent-blue tabular-nums"
-                  : "font-mono tabular-nums"
-              }
-            >
-              <span data-testid="ts-timer">{timerText}</span>s
-            </span>
-          </motion.div>
-          <div className="flex items-center gap-1.5 text-(--muted)">
-            <Target className="h-3.5 w-3.5" />
-            <motion.span
-              key={liveNet}
-              initial={{ scale: 1.2, color: "#22c55e" }}
-              animate={{ scale: 1 }}
-              className={
-                playing || done
-                  ? "font-mono font-semibold text-accent-green tabular-nums"
-                  : "font-mono tabular-nums"
-              }
-            >
-              {liveNet} WPM
-            </motion.span>
-          </div>
-          <div className="flex items-center gap-1.5 font-mono text-(--muted) tabular-nums">
-            <Percent className="h-3.5 w-3.5" />
-            {metrics.accuracy}% acc
-          </div>
-          <AnimatePresence>
-            {streak >= 5 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.7, y: -6 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                className="flex items-center gap-1.5 font-mono font-semibold text-accent-amber"
-              >
-                <motion.span
-                  animate={{ rotate: [0, -12, 12, 0] }}
-                  transition={{ duration: 0.4, repeat: Infinity, repeatDelay: 0.6 }}
-                >
-                  <Flame className="h-3.5 w-3.5" />
-                </motion.span>
-                {streak}x
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {highScore > 0 && (
-            <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
-              <Trophy className="h-3.5 w-3.5 text-accent-amber" />
-              <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
-            </div>
-          )}
-        </div>
-
-        {/* Progress bar */}
-        <div className="h-1 w-full overflow-hidden rounded-full bg-(--border)/40">
-          <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-green to-accent-amber"
-            animate={{ width: `${progress}%` }}
-            transition={{ type: "spring", stiffness: 200, damping: 25 }}
-          />
-        </div>
-      </div>
-
-      <PlaySheet
-        active={sheet}
-        compact={layout.compact}
-        viewport={viewport}
-        hud={
-          <SheetHud
-            time={timerText}
-            wpm={liveNet}
-            pace={paceChip}
-            onRestart={restart}
-            onExit={exitSheet}
-          />
-        }
-      >
-        {/* The sparkline's slot is always there so it appearing does not shift the page. */}
-        {(!sheet || layout.showGraph) && (
+        {!rain && (
           <div
-            className={["relative h-10", !sheet && paceChip ? "pl-24" : ""]
-              .filter(Boolean)
-              .join(" ")}
-            data-testid="ts-live-slot"
+            data-testid="ts-stats"
+            className="flex min-h-12 flex-wrap content-start items-center gap-x-5 gap-y-2 text-sm sm:min-h-0"
           >
-            {!sheet && paceChip}
-            {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
+            <motion.div
+              animate={{ scale: playing ? [1, 1.05, 1] : 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-1.5 text-(--muted)"
+            >
+              <Timer className="h-3.5 w-3.5" />
+              <span
+                className={
+                  playing
+                    ? "font-mono font-semibold text-accent-blue tabular-nums"
+                    : "font-mono tabular-nums"
+                }
+              >
+                <span data-testid="ts-timer">{timerText}</span>s
+              </span>
+            </motion.div>
+            <div className="flex items-center gap-1.5 text-(--muted)">
+              <Target className="h-3.5 w-3.5" />
+              <motion.span
+                key={liveNet}
+                initial={{ scale: 1.2, color: "#22c55e" }}
+                animate={{ scale: 1 }}
+                className={
+                  playing || done
+                    ? "font-mono font-semibold text-accent-green tabular-nums"
+                    : "font-mono tabular-nums"
+                }
+              >
+                {liveNet} WPM
+              </motion.span>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono text-(--muted) tabular-nums">
+              <Percent className="h-3.5 w-3.5" />
+              {metrics.accuracy}% acc
+            </div>
+            <AnimatePresence>
+              {streak >= 5 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.7, y: -6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  className="flex items-center gap-1.5 font-mono font-semibold text-accent-amber"
+                >
+                  <motion.span
+                    animate={{ rotate: [0, -12, 12, 0] }}
+                    transition={{ duration: 0.4, repeat: Infinity, repeatDelay: 0.6 }}
+                  >
+                    <Flame className="h-3.5 w-3.5" />
+                  </motion.span>
+                  {streak}x
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {highScore > 0 && (
+              <div className="ml-auto flex items-center gap-1.5 text-(--muted)">
+                <Trophy className="h-3.5 w-3.5 text-accent-amber" />
+                <span className="font-mono text-accent-amber tabular-nums">{highScore} best</span>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Passage */}
-        <motion.div
-          ref={containerRef}
-          key={shake}
-          animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
-          transition={{ duration: 0.3 }}
-          className={
-            sheet
-              ? layout.compact
-                ? "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-1.5 font-serif leading-relaxed"
-                : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-3 font-serif leading-relaxed"
-              : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
-          }
-          onClick={() => !done && startTyping()}
-          style={{
-            background: "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
-            ...(sheet ? { fontSize: layout.fontPx } : {}),
-          }}
-        >
-          <TextView run={run} caret ghost={ghostSpot} />
+        {/* Progress bar */}
+        {!rain && (
+          <div className="h-1 w-full overflow-hidden rounded-full bg-(--border)/40">
+            <motion.div
+              className="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-green to-accent-amber"
+              animate={{ width: `${progress}%` }}
+              transition={{ type: "spring", stiffness: 200, damping: 25 }}
+            />
+          </div>
+        )}
+      </div>
 
-          {sheet && !focused && (
+      {rain ? (
+        <RainGame
+          phone={phone}
+          nextSeed={drawSeed}
+          onSheetChange={setRainSheet}
+          onOver={onRainOver}
+        />
+      ) : (
+        <PlaySheet
+          active={sheet}
+          compact={layout.compact}
+          viewport={viewport}
+          hud={
+            <SheetHud
+              time={timerText}
+              wpm={liveNet}
+              pace={paceChip}
+              onRestart={restart}
+              onExit={exitSheet}
+            />
+          }
+        >
+          {/* The sparkline's slot is always there so it appearing does not shift the page. */}
+          {(!sheet || layout.showGraph) && (
             <div
-              data-testid="ts-refocus"
-              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-(--card)/80 font-sans text-sm font-semibold text-accent-amber"
+              className={["relative h-10", !sheet && paceChip ? "pl-24" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              data-testid="ts-live-slot"
             >
-              Tap the text to keep typing
+              {!sheet && paceChip}
+              {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
             </div>
           )}
 
-          {/* Combo bursts */}
-          <AnimatePresence>
-            {bursts.map((b) => (
-              <motion.div
-                key={b.id}
-                initial={{ opacity: 1, scale: 0.4 }}
-                animate={{ opacity: 0, scale: 2 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.7, ease: "easeOut" }}
-                className="pointer-events-none absolute flex items-center justify-center"
-                style={{ left: b.x - 24, top: b.y - 24, width: 48, height: 48 }}
+          {/* Passage */}
+          <motion.div
+            ref={containerRef}
+            key={shake}
+            animate={shake > 0 ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+            transition={{ duration: 0.3 }}
+            className={
+              sheet
+                ? layout.compact
+                  ? "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-1.5 font-serif leading-relaxed"
+                  : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-3 font-serif leading-relaxed"
+                : "relative cursor-text overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-6 font-serif text-lg leading-relaxed sm:p-8 sm:text-2xl"
+            }
+            onClick={() => !done && startTyping()}
+            style={{
+              background: "linear-gradient(135deg, rgba(99,102,241,0.04), rgba(34,197,94,0.04))",
+              ...(sheet ? { fontSize: layout.fontPx } : {}),
+            }}
+          >
+            <TextView run={run} caret ghost={ghostSpot} />
+
+            {sheet && !focused && (
+              <div
+                data-testid="ts-refocus"
+                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-(--card)/80 font-sans text-sm font-semibold text-accent-amber"
               >
-                <div className="h-12 w-12 rounded-full bg-accent-amber/40 blur-md" />
-                <Zap className="absolute h-6 w-6 text-accent-amber" />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
-      </PlaySheet>
+                Tap the text to keep typing
+              </div>
+            )}
+
+            {/* Combo bursts */}
+            <AnimatePresence>
+              {bursts.map((b) => (
+                <motion.div
+                  key={b.id}
+                  initial={{ opacity: 1, scale: 0.4 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
+                  className="pointer-events-none absolute flex items-center justify-center"
+                  style={{ left: b.x - 24, top: b.y - 24, width: 48, height: 48 }}
+                >
+                  <div className="h-12 w-12 rounded-full bg-accent-amber/40 blur-md" />
+                  <Zap className="absolute h-6 w-6 text-accent-amber" />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        </PlaySheet>
+      )}
 
       {/* Hidden input: always SENTINEL + the current word, see engine/input.ts */}
       <input
@@ -617,6 +655,7 @@ export function TypingSpeedGame() {
         autoCapitalize="none"
         spellCheck={false}
         defaultValue=" "
+        hidden={rain}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         // Fixed at the top of the visible area so focusing it never scrolls the page; 16 px so
@@ -625,75 +664,77 @@ export function TypingSpeedGame() {
         style={{ top: viewport.top }}
       />
 
-      <div inert={sheet} className="space-y-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            ref={restartRef}
-            onClick={restart}
-            className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Restart
-          </button>
-          {playing && !timed && mode !== "daily" && (
+      {!rain && (
+        <div inert={sheet} className="space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={nextPassage}
-              className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-1.5 px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+              ref={restartRef}
+              onClick={restart}
+              className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-1.5 rounded-lg px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
             >
               <RotateCcw className="h-3 w-3" />
-              Skip
+              Restart
             </button>
+            {playing && !timed && mode !== "daily" && (
+              <button
+                type="button"
+                onClick={nextPassage}
+                className="inline-flex min-h-11 min-w-11 touch-manipulation items-center gap-1.5 px-2 font-sans text-xs text-(--muted) transition-colors hover:text-(--foreground)"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Skip
+              </button>
+            )}
+          </div>
+
+          {run.status === "ready" && (
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={startTyping}
+                className="min-h-11 min-w-11 touch-manipulation rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
+              >
+                Start typing
+              </button>
+              <p className="text-sm text-(--muted)">
+                {phone ? "Tap the text to start." : "Click the text or press any key to start."}
+              </p>
+            </div>
+          )}
+
+          {done && result && (
+            <div ref={resultsRef} className="scroll-mt-20">
+              <ResultsCard
+                metrics={result.metrics}
+                maxStreak={result.maxStreak}
+                bulk={result.bulk}
+                counts={result.counts}
+                series={result.series}
+                runKeys={result.runKeys}
+                allKeys={result.allKeys}
+                modeBest={result.modeBest}
+                ghost={result.ghost}
+                onNext={timed || mode === "daily" ? null : nextPassage}
+                onAgain={restart}
+              />
+            </div>
+          )}
+
+          {mode === "daily" && daily && (
+            <DailyPanel
+              key={daily.day}
+              day={daily.day}
+              sourceId={dailyText(daily.day).sourceId}
+              record={daily.rec}
+              streak={daily.streak}
+              lastBulk={daily.lastBulk}
+              onPosted={onPosted}
+              onNewDay={enterDaily}
+            />
           )}
         </div>
-
-        {run.status === "ready" && (
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              onClick={startTyping}
-              className="min-h-11 min-w-11 touch-manipulation rounded-xl bg-gradient-to-br from-accent-blue to-accent-green px-7 py-3 font-sans text-sm font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/20"
-            >
-              Start typing
-            </button>
-            <p className="text-sm text-(--muted)">
-              {phone ? "Tap the text to start." : "Click the text or press any key to start."}
-            </p>
-          </div>
-        )}
-
-        {done && result && (
-          <div ref={resultsRef} className="scroll-mt-20">
-            <ResultsCard
-              metrics={result.metrics}
-              maxStreak={result.maxStreak}
-              bulk={result.bulk}
-              counts={result.counts}
-              series={result.series}
-              runKeys={result.runKeys}
-              allKeys={result.allKeys}
-              modeBest={result.modeBest}
-              ghost={result.ghost}
-              onNext={timed || mode === "daily" ? null : nextPassage}
-              onAgain={restart}
-            />
-          </div>
-        )}
-
-        {mode === "daily" && daily && (
-          <DailyPanel
-            key={daily.day}
-            day={daily.day}
-            sourceId={dailyText(daily.day).sourceId}
-            record={daily.rec}
-            streak={daily.streak}
-            lastBulk={daily.lastBulk}
-            onPosted={onPosted}
-            onNewDay={enterDaily}
-          />
-        )}
-      </div>
+      )}
     </div>
   );
 }
