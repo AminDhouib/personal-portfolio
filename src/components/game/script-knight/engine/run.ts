@@ -143,6 +143,7 @@ class RunImpl implements Run {
     try {
       return this.playTurn(facade);
     } catch (error) {
+      // silent-ok: recorded as the run failure and handed back to the caller as a typed result
       return this.fail(error);
     }
   }
@@ -202,6 +203,7 @@ class RunImpl implements Run {
         }
       }
     } catch (error) {
+      // silent-ok: recorded as the run failure and handed back to the caller as a typed result
       return this.fail(error);
     }
     return this.endTurn();
