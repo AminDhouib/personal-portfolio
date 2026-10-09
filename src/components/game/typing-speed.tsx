@@ -237,12 +237,12 @@ export function TypingSpeedGame() {
       // The ghost raced is the one this run started against; a faster run then replaces it.
       const ghostDay = mode === "daily" ? daily?.day : undefined;
       const raced = ghostOn && !bulk ? ghostFor(ghosts, mode, ghostDay) : null;
-      const offered = offerGhost(ghosts, mode, run, ghostDay);
-      const saved = offered !== ghosts;
-      if (saved) {
-        saveGhosts(offered);
-        setGhosts(offered);
-      }
+      // The offer is made against what storage holds now, not the page-load copy, so a
+      // second tab's better ghost (or another mode's) is never overwritten.
+      const current = loadGhosts(utcDay());
+      const offered = offerGhost(current, mode, run, ghostDay);
+      const saved = offered !== current && saveGhosts(offered);
+      if (saved) setGhosts(offered);
       const series = wpmSeries(run);
       setResult({
         metrics,
