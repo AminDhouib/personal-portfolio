@@ -17,6 +17,7 @@ let clock = 0;
 
 /** A ghost at four characters a second (10 s of samples), or at a crawl. */
 const FAST = Array.from({ length: 41 }, (_, i) => i);
+const SLOW = [0, 1];
 
 function seed(ghosts: GhostStore["ghosts"], prefs = emptyStats().prefs) {
   window.localStorage.setItem(GHOSTS_KEY, JSON.stringify({ v: 1, ghosts }));
@@ -104,5 +105,47 @@ describe("the results overlay", () => {
     // The ghost is still kept, so switching the toggle back on has something to race.
     const stored = JSON.parse(window.localStorage.getItem(GHOSTS_KEY) as string);
     expect(stored.ghosts.quote.wpm).toBeGreaterThan(100);
+  });
+});
+
+describe("what reaches storage", () => {
+  const FASTER = { wpm: 300, samples: [0, 100] };
+
+  it("compares against the stored ghost, not the one read at mount, and keeps other modes", () => {
+    seed({ quote: { wpm: 10, samples: SLOW } });
+    render(<TypingSpeedGame />);
+    // Another tab saves a better quote ghost and a words-30 one after this page loaded.
+    window.localStorage.setItem(
+      GHOSTS_KEY,
+      JSON.stringify({ v: 1, ghosts: { quote: FASTER, "words-30": { wpm: 55, samples: [0, 9] } } }),
+    );
+    playAll(100); // 126 WPM: beats the stale 10, loses to the stored 300
+    const stored = JSON.parse(window.localStorage.getItem(GHOSTS_KEY) as string);
+    expect(stored.ghosts.quote).toEqual(FASTER);
+    expect(stored.ghosts["words-30"].wpm).toBe(55);
+    expect(screen.queryByTestId("ts-ghost-saved")).toBeNull();
+  });
+
+  it("does not claim a save when the write fails", () => {
+    seed({ quote: { wpm: 10, samples: SLOW } });
+    render(<TypingSpeedGame />);
+    const real = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, k, v) {
+      if (k === GHOSTS_KEY) throw new DOMException("full", "QuotaExceededError");
+      real.call(this, k, v);
+    });
+    playAll(100);
+    expect(screen.getByTestId("ts-net-wpm")).toBeInTheDocument();
+    expect(screen.queryByTestId("ts-ghost-saved")).toBeNull();
+  });
+
+  it("does not claim a save when a newer version owns the key", () => {
+    seed({ quote: { wpm: 10, samples: SLOW } });
+    render(<TypingSpeedGame />);
+    const newer = JSON.stringify({ v: 2, ghosts: { quote: FASTER } });
+    window.localStorage.setItem(GHOSTS_KEY, newer);
+    playAll(100);
+    expect(window.localStorage.getItem(GHOSTS_KEY)).toBe(newer);
+    expect(screen.queryByTestId("ts-ghost-saved")).toBeNull();
   });
 });

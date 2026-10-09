@@ -86,9 +86,10 @@ function storedVersionIsNewer(): boolean {
   return typeof v === "number" && v > 1;
 }
 
-export function saveGhosts(store: GhostStore): void {
-  if (storedVersionIsNewer()) return;
-  safeLocalSet(GHOSTS_KEY, JSON.stringify(store));
+/** True only when the ghosts reached storage; a newer build's value or a failed write is false. */
+export function saveGhosts(store: GhostStore): boolean {
+  if (storedVersionIsNewer()) return false;
+  return safeLocalSet(GHOSTS_KEY, JSON.stringify(store));
 }
 
 /** The ghost to race in a mode; the daily one only on its own day. */

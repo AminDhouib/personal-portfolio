@@ -132,8 +132,16 @@ describe("saveGhosts", () => {
   it("leaves a newer stored version alone", () => {
     const newer = { v: 2, ghosts: { "words-15": { wpm: 99, samples: [0, 9] } }, extra: true };
     write(newer);
-    saveGhosts(store({ quote: { wpm: 10, samples: [0, 1] } }));
+    expect(saveGhosts(store({ quote: { wpm: 10, samples: [0, 1] } }))).toBe(false);
     expect(JSON.parse(localStorage.getItem(GHOSTS_KEY) as string)).toEqual(newer);
+  });
+
+  it("reports whether the write landed", () => {
+    expect(saveGhosts(store({ quote: { wpm: 10, samples: [0, 1] } }))).toBe(true);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    expect(saveGhosts(store())).toBe(false);
   });
 });
 
