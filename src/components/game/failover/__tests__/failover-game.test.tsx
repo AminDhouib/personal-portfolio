@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FailoverGame } from "../../failover";
@@ -8,11 +9,21 @@ import { S, resetSim } from "../sim/state";
 // The mounted game with the WebGL scene stubbed out: the toolbar drives the
 // controller, keys reach it only from the board, and unmounting releases it.
 
-const scenes = vi.hoisted(() => ({ made: 0, disposed: 0, broken: false }));
+const scenes = vi.hoisted(() => ({
+  made: 0,
+  disposed: 0,
+  broken: false,
+  canvases: [] as HTMLCanvasElement[],
+  lost: new Set<HTMLCanvasElement>(),
+}));
 
+// Like the real scene, a disposed scene forces its context lost, and a new
+// renderer on that canvas cannot start (three throws reading "precision").
 vi.mock("../scene/scene", () => ({
-  createFailoverScene: (): FailoverScene => {
+  createFailoverScene: (canvas: HTMLCanvasElement): FailoverScene => {
+    if (scenes.lost.has(canvas)) throw new Error("the canvas has a lost context");
     scenes.made++;
+    scenes.canvases.push(canvas);
     return {
       render: () => {
         if (scenes.broken) throw new Error("boom");
@@ -24,6 +35,7 @@ vi.mock("../scene/scene", () => ({
       pick: () => null,
       dispose: () => {
         scenes.disposed++;
+        scenes.lost.add(canvas);
       },
     };
   },
@@ -38,6 +50,8 @@ beforeEach(() => {
   scenes.made = 0;
   scenes.disposed = 0;
   scenes.broken = false;
+  scenes.canvases = [];
+  scenes.lost.clear();
   window.localStorage.clear();
   vi.stubGlobal("ResizeObserver", NoopObserver);
   vi.stubGlobal("IntersectionObserver", NoopObserver);
@@ -173,6 +187,22 @@ describe("FailoverGame", () => {
     expect(screen.getByText("Game Error")).toBeInTheDocument();
     expect(screen.getByText("This game hit an error and stopped.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+  });
+
+  it("gives each mount its own canvas, so a StrictMode remount gets a live context", () => {
+    render(
+      <StrictMode>
+        <FailoverGame />
+      </StrictMode>,
+    );
+    expect(scenes.made).toBe(2);
+    const [first, second] = scenes.canvases as [HTMLCanvasElement, HTMLCanvasElement];
+    expect(first).not.toBe(second);
+    expect(scenes.lost.has(first)).toBe(true);
+    expect(first.isConnected).toBe(false);
+    expect(second.isConnected).toBe(true);
+    expect(scenes.lost.has(second)).toBe(false);
+    expect(screen.getByRole("button", { name: "Select (1)" })).toBeInTheDocument();
   });
 
   it("releases the scene on unmount", () => {
