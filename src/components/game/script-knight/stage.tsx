@@ -458,7 +458,13 @@ export function Stage({
     finishFloor(handShown);
   }, [finishFloor, hand.playing, handShown]);
 
-  const restartHand = hand.restart;
+  // A hand run starting over is a run starting: like a code Run, it takes the day's best as it
+  // stands now for the ghost (not sooner, so a new best never races itself).
+  const handRestart = hand.restart;
+  const restartHand = useCallback(() => {
+    if (daily) setGhostLog(ghostFor(statsRef.current, dayKey));
+    handRestart();
+  }, [daily, dayKey, handRestart]);
   const chooseMode = useCallback(
     (next: PlayMode) => {
       if (next === mode) return;
@@ -606,7 +612,7 @@ export function Stage({
             canUndo={hand.turns > 0 && hand.status !== "passed"}
             onAct={hand.act}
             onUndo={hand.undo}
-            onRestart={hand.restart}
+            onRestart={restartHand}
             keyboard={handLive}
           />
         ) : (
@@ -802,7 +808,7 @@ export function Stage({
             clue={clueShown ? info.clue : null}
             hasNextFloor={!daily && shown.result.passed && !useEpic && level < FLOORS_PER_TOWER}
             onNext={() => goTo(tower, level + 1, useEpic)}
-            onRetry={handMode ? hand.restart : () => setFloorRun(null)}
+            onRetry={handMode ? restartHand : () => setFloorRun(null)}
           />
         ) : null}
         {showResult && shown?.result.passed && shown.result.score ? (

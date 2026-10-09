@@ -314,6 +314,59 @@ describe("Stage, Today's floor by hand", () => {
     Reflect.deleteProperty(navigator, "clipboard");
   });
 
+  /** The ghost's x on screen, or null when none is drawn. */
+  const ghostX = () => {
+    const el = document.querySelector("[data-ghost]") as SVGElement | null;
+    const match = /translate\((-?[\d.]+)px/.exec(el?.style.transform ?? "");
+    return match ? Number(match[1]) : null;
+  };
+  /** Plays the first eight turns of the clear again (five shots, three steps). */
+  function playOpening() {
+    click("Shoot");
+    for (let i = 0; i < 5; i += 1) click("Shoot forward");
+    click("Walk");
+    for (let i = 0; i < 3; i += 1) click("Walk forward");
+  }
+  const stored = () => JSON.parse(localStorage.getItem("knight:stats") ?? "{}");
+
+  it("draws a new best as the ghost once the hand run starts over", () => {
+    // The stored best is one wasted shot: it never leaves the start.
+    localStorage.setItem(
+      "knight:stats",
+      JSON.stringify({ v: 1, ghost: { day: DAY, log: "1:h0", score: 5 } }),
+    );
+    render(<Stage runner={noSandbox} />);
+    clearTodayByHand();
+    expect(stored().ghost).toEqual({ day: DAY, log: LOG, score: 118 });
+    click("Start over");
+    const start = ghostX();
+    expect(start).not.toBeNull();
+    playOpening();
+    // Eight turns in, the new best has walked three spaces; the old one would still be at the start.
+    expect(ghostX()).toBeGreaterThan(start ?? 0);
+  });
+
+  it("keeps the stored best as the ghost when a worse hand run finishes and starts over", () => {
+    localStorage.setItem(
+      "knight:stats",
+      JSON.stringify({ v: 1, ghost: { day: DAY, log: LOG, score: 118 } }),
+    );
+    render(<Stage runner={noSandbox} />);
+    click("Today's floor");
+    // One idle-ish turn first, so the clear takes a turn longer and scores less.
+    click("Rest");
+    for (const [action, times] of MOVES) {
+      click(action);
+      for (let i = 0; i < times; i += 1) click(`${action} forward`);
+    }
+    expect(screen.getByText("Floor passed")).toBeTruthy();
+    expect(stored().ghost).toEqual({ day: DAY, log: LOG, score: 118 });
+    click("Start over");
+    const start = ghostX();
+    playOpening();
+    expect(ghostX()).toBeGreaterThan(start ?? 0);
+  });
+
   it("updates the daily stats on a hand clear", () => {
     render(<Stage runner={noSandbox} />);
     clearTodayByHand();
