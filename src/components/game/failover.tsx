@@ -228,15 +228,21 @@ function StatusLine({ hud, controller }: { hud: HudState; controller: FailoverCo
 
 export function FailoverGame() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<FailoverController | null>(null);
   const bridge = useMemo(() => createHudBridge(), []);
   const hud = useSyncExternalStore(bridge.subscribe, bridge.get, SERVER_HUD);
 
   useEffect(() => {
     const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
+    const host = hostRef.current;
+    if (!container || !host) return;
+
+    // Each mount gets its own canvas: dispose() forces the WebGL context lost, and a
+    // canvas React kept across a StrictMode remount would hand the new renderer a dead one.
+    const canvas = document.createElement("canvas");
+    canvas.className = "block h-full w-full";
+    host.appendChild(canvas);
 
     const controller = new FailoverController();
     controllerRef.current = controller;
@@ -263,16 +269,17 @@ export function FailoverGame() {
       e.preventDefault();
       controller.zoom(e.deltaY < 0 ? 1.1 : 1 / 1.1);
     };
-    canvas.addEventListener("wheel", onWheel, { passive: false });
+    host.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      canvas.removeEventListener("wheel", onWheel);
+      host.removeEventListener("wheel", onWheel);
       document.removeEventListener("visibilitychange", onVisibility);
       seen.disconnect();
       resize.disconnect();
       bridge.connect(null);
       controller.dispose();
       controllerRef.current = null;
+      canvas.remove();
     };
   }, [bridge]);
 
@@ -280,7 +287,7 @@ export function FailoverGame() {
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const press = useRef<{ x: number; y: number; dragged: boolean; multi: boolean } | null>(null);
 
-  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const controller = controllerRef.current;
     if (!controller) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -293,7 +300,7 @@ export function FailoverGame() {
     }
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const controller = controllerRef.current;
     if (!controller) return;
     const prev = pointers.current.get(e.pointerId);
@@ -322,7 +329,7 @@ export function FailoverGame() {
     if (p.dragged) controller.dragBy(e.clientX - prev.x, e.clientY - prev.y);
   };
 
-  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const controller = controllerRef.current;
     if (!controller) return;
     pointers.current.delete(e.pointerId);
@@ -364,9 +371,9 @@ export function FailoverGame() {
       className="relative h-[min(72vh,640px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-(--border) bg-[#050505] outline-none focus-visible:ring-2 focus-visible:ring-[#06b6d4]"
       style={{ overscrollBehavior: "none" }}
     >
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 h-full w-full touch-none"
+      <div
+        ref={hostRef}
+        className="absolute inset-0 touch-none"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
