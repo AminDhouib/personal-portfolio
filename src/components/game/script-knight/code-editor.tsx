@@ -29,6 +29,7 @@ import { tags } from "@lezer/highlight";
 import { useEffect, useRef, useState } from "react";
 
 import type { EditorProps } from "./textarea-editor";
+import { SURFACE_COLORS } from "./surface";
 import { findSyntaxError } from "./syntax-check";
 import type { SyntaxIssue } from "./syntax-line";
 
@@ -87,50 +88,77 @@ const syntaxField = StateField.define<SyntaxState>({
     }),
 });
 
+/** Every colour the editor draws, so a test can hold them to 4.5:1 on the game surface. */
+export const CODE_COLORS = {
+  background: SURFACE_COLORS.background,
+  text: SURFACE_COLORS.text,
+  lineNumbers: SURFACE_COLORS.muted,
+  caret: "#4ade80",
+  keyword: "#c4b5fd",
+  string: "#86efac",
+  number: "#fcd34d",
+  comment: "#8b949e",
+  functionName: "#7dd3fc",
+  definition: "#fda4af",
+  property: "#e5e7eb",
+  punctuation: "#a1a1aa",
+  error: "#f87171",
+} as const;
+
 const highlightStyle = HighlightStyle.define([
-  { tag: [tags.keyword, tags.controlKeyword, tags.definitionKeyword], color: "#c4b5fd" },
-  { tag: [tags.string, tags.special(tags.string)], color: "#86efac" },
-  { tag: [tags.number, tags.bool, tags.null], color: "#fcd34d" },
+  {
+    tag: [tags.keyword, tags.controlKeyword, tags.definitionKeyword],
+    color: CODE_COLORS.keyword,
+  },
+  { tag: [tags.string, tags.special(tags.string)], color: CODE_COLORS.string },
+  { tag: [tags.number, tags.bool, tags.null], color: CODE_COLORS.number },
   {
     tag: [tags.comment, tags.lineComment, tags.blockComment],
-    color: "#8b949e",
+    color: CODE_COLORS.comment,
     fontStyle: "italic",
   },
-  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#7dd3fc" },
-  { tag: [tags.definition(tags.variableName), tags.className], color: "#fda4af" },
-  { tag: tags.propertyName, color: "#e5e7eb" },
-  { tag: [tags.operator, tags.punctuation], color: "#9ca3af" },
+  {
+    tag: [tags.function(tags.variableName), tags.function(tags.propertyName)],
+    color: CODE_COLORS.functionName,
+  },
+  { tag: [tags.definition(tags.variableName), tags.className], color: CODE_COLORS.definition },
+  { tag: tags.propertyName, color: CODE_COLORS.property },
+  { tag: [tags.operator, tags.punctuation], color: CODE_COLORS.punctuation },
 ]);
 
+// The same fixed dark surface as the textarea and the rest of the game (surface.ts), in both site
+// themes, so the editor never inherits the page's light tokens.
 const theme = EditorView.theme(
   {
     "&": {
-      backgroundColor: "rgb(0 0 0 / 0.5)",
-      color: "var(--foreground)",
+      backgroundColor: CODE_COLORS.background,
+      color: CODE_COLORS.text,
       fontSize: "13px",
-      border: "1px solid var(--border)",
+      border: `1px solid ${SURFACE_COLORS.border}`,
       borderRadius: "0.5rem",
     },
-    "&.cm-focused": { outline: "none", borderColor: "#4ade80" },
+    "&.cm-focused": { outline: "none", borderColor: CODE_COLORS.caret },
     ".cm-scroller": {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       lineHeight: "20px",
       minHeight: "280px",
       maxHeight: "60vh",
     },
-    ".cm-content": { caretColor: "#4ade80", padding: "12px 0" },
-    ".cm-cursor": { borderLeftColor: "#4ade80" },
+    ".cm-content": { caretColor: CODE_COLORS.caret, padding: "12px 0" },
+    ".cm-cursor": { borderLeftColor: CODE_COLORS.caret },
     ".cm-gutters": {
       backgroundColor: "transparent",
-      color: "var(--muted)",
+      color: CODE_COLORS.lineNumbers,
       border: "none",
     },
     ".cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground":
       { backgroundColor: "rgb(74 222 128 / 0.25)" },
-    ".cm-activeLine": { backgroundColor: "rgb(255 255 255 / 0.04)" },
-    ".cm-syntax-line": { textDecoration: "underline wavy #f87171", textUnderlineOffset: "3px" },
+    ".cm-syntax-line": {
+      textDecoration: `underline wavy ${CODE_COLORS.error}`,
+      textUnderlineOffset: "3px",
+    },
     ".cm-syntax-mark, .cm-syntax-spacer": {
-      color: "#f87171",
+      color: CODE_COLORS.error,
       fontWeight: "700",
       paddingLeft: "4px",
     },
