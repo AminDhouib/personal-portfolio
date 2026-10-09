@@ -55,6 +55,8 @@ beforeEach(() => {
   scenes.canvases = [];
   scenes.lost.clear();
   window.localStorage.clear();
+  // A returning player: the first-run coach (its own tests below) is done.
+  window.localStorage.setItem("failover:coach", '{"v":1,"done":true}');
   vi.stubGlobal("ResizeObserver", NoopObserver);
   vi.stubGlobal("IntersectionObserver", NoopObserver);
   vi.stubGlobal("requestAnimationFrame", () => 1);
@@ -81,7 +83,8 @@ describe("FailoverGame", () => {
     );
     expect(screen.getByText("$500")).toBeInTheDocument();
     expect(screen.getByText("REPUTATION").nextElementSibling).toHaveTextContent("100%");
-    expect(screen.getByRole("button", { name: "Sound on" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Welcome, Architect!" })).toBeNull();
   });
 
   it("arms tools from the toolbar and services from the build palette", () => {
@@ -133,6 +136,7 @@ describe("FailoverGame", () => {
 
   it("turns sound on and remembers it", () => {
     mount();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("button", { name: "Sound on" }));
     expect(screen.getByRole("button", { name: "Sound off" })).toHaveAttribute(
       "aria-pressed",
@@ -202,6 +206,55 @@ describe("FailoverGame", () => {
     expect(screen.getByRole("dialog", { name: "Run over" })).toHaveTextContent(
       "Best on this device: 0:02",
     );
+  });
+
+  it("starts a first run paused under the coach, and a skip keeps it away", () => {
+    window.localStorage.removeItem("failover:coach");
+    mount();
+    expect(screen.getByRole("region", { name: "Welcome, Architect!" })).toHaveTextContent(
+      "Step 1 of 5",
+    );
+    expect(screen.getByRole("button", { name: "Resume (Space)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Skip Tutorial" }));
+    expect(screen.queryByRole("region", { name: "Welcome, Architect!" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Pause (Space)" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("failover:coach")).toBe('{"v":1,"done":true}');
+  });
+
+  it("finishes the coach when the player starts the clock, and Settings brings it back", () => {
+    window.localStorage.removeItem("failover:coach");
+    const frames: ((t: number) => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => frames.push(cb));
+    mount();
+    act(() => frames.shift()?.(1000));
+    act(() => {
+      for (const [type, x] of [
+        ["waf", -28],
+        ["compute", -16],
+        ["db", -4],
+      ] as const) {
+        expect(dispatch({ op: 0, type, x, z: 0 }).ok).toBe(true);
+      }
+      expect(dispatch({ op: 1, from: "internet", to: "svc_1" }).ok).toBe(true);
+    });
+    // The next frame drains the placement events, and those redraw the HUD at once.
+    act(() => frames.shift()?.(1016));
+    expect(screen.getByRole("region", { name: "Welcome, Architect!" })).toHaveTextContent(
+      "Step 5 of 5",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Resume (Space)" }));
+    expect(screen.queryByRole("region", { name: "Welcome, Architect!" })).toBeNull();
+    expect(window.localStorage.getItem("failover:coach")).toBe('{"v":1,"done":true}');
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: /Show the tour again/ }));
+    expect(screen.queryByRole("region", { name: "Settings" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Welcome, Architect!" })).toHaveTextContent(
+      "Step 1 of 5",
+    );
+    expect(screen.getByRole("button", { name: "Resume (Space)" })).toBeInTheDocument();
+    expect(S.services).toHaveLength(0);
+    expect(window.localStorage.getItem("failover:coach")).toBe('{"v":1,"done":false}');
   });
 
   it("shows the crash card when the loop stops on an error", () => {

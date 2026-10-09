@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FailoverController } from "./failover/controller";
+import { loadCoachDone, saveCoachDone } from "./failover/prefs";
 import { loadStats, recordRun, saveStats } from "./failover/stats";
 import { T } from "./failover/strings";
 import { FailureBadges } from "./failover/ui/failure-badges";
+import { Coach } from "./failover/ui/coach";
 import { StatusBar } from "./failover/ui/hud";
 import { Inspector } from "./failover/ui/inspector";
 import { alertText } from "./failover/ui/messages";
 import { MetricsPanel } from "./failover/ui/metrics-panel";
 import { Report } from "./failover/ui/report";
+import { Settings } from "./failover/ui/settings";
 import { Toast } from "./failover/ui/toast";
 import { ToolSheet } from "./failover/ui/tool-sheet";
 import { Controls, Tools } from "./failover/ui/toolbar";
@@ -36,6 +39,10 @@ export function FailoverGame() {
   const coarse = useCoarsePointer();
   const [best, setBest] = useState(loadStats);
   const [metricsOpen, setMetricsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // A first run (no failover:coach yet) starts paused under the coach.
+  const [coaching, setCoaching] = useState(() => !loadCoachDone());
+  const startPaused = useRef(coaching);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -49,6 +56,7 @@ export function FailoverGame() {
     host.appendChild(canvas);
 
     const controller = new FailoverController({
+      startPaused: startPaused.current,
       // The device record: a survival run's time and score, once per run.
       onRunEnd: (run) => {
         if (run.mode !== "survival") return;
@@ -171,6 +179,26 @@ export function FailoverGame() {
     if (controllerRef.current?.key(e.key)) e.preventDefault();
   };
 
+  const finishCoach = useCallback(
+    (skipped: boolean) => {
+      saveCoachDone(true);
+      setCoaching(false);
+      // A skip should not leave a new player looking at a stopped clock.
+      if (skipped) bridge.controller()?.setPaused(false);
+    },
+    [bridge],
+  );
+
+  const replayCoach = () => {
+    const controller = bridge.controller();
+    if (!controller) return;
+    saveCoachDone(false);
+    setSettingsOpen(false);
+    controller.restart();
+    controller.setPaused(true);
+    setCoaching(true);
+  };
+
   const controller = hud ? bridge.controller() : null;
   return (
     <div
@@ -200,6 +228,7 @@ export function FailoverGame() {
               <StatusBar hud={hud} />
               <Tools hud={hud} controller={controller} />
               <Toast text={hud.toast ?? (hud.alert ? alertText(hud.alert) : null)} />
+              {coaching && !hud.over && <Coach hud={hud} onDone={finishCoach} />}
             </div>
             <div className="flex flex-col items-end gap-1.5">
               <Controls
@@ -207,7 +236,17 @@ export function FailoverGame() {
                 controller={controller}
                 metricsOpen={metricsOpen}
                 onToggleMetrics={() => setMetricsOpen((open) => !open)}
+                settingsOpen={settingsOpen}
+                onToggleSettings={() => setSettingsOpen((open) => !open)}
               />
+              {settingsOpen && (
+                <Settings
+                  hud={hud}
+                  controller={controller}
+                  onReplayCoach={replayCoach}
+                  onClose={() => setSettingsOpen(false)}
+                />
+              )}
               {metricsOpen && <MetricsPanel hud={hud} onClose={() => setMetricsOpen(false)} />}
               {!coarse && <Inspector hud={hud} controller={controller} />}
             </div>

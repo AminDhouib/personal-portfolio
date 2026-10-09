@@ -11,9 +11,8 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  SlidersHorizontal,
   Trash2,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 import type { FailoverController, HudState, Speed } from "../controller";
@@ -89,17 +88,21 @@ export function Tools({ hud, controller }: { hud: HudState; controller: Failover
   );
 }
 
-/** Pause and the three speeds, the camera turns and view, the metrics panel, and sound. */
+/** Pause and the three speeds, the camera turns and view, the metrics panel, and Settings. */
 export function Controls({
   hud,
   controller,
   metricsOpen,
   onToggleMetrics,
+  settingsOpen,
+  onToggleSettings,
 }: {
   hud: HudState;
   controller: FailoverController;
   metricsOpen: boolean;
   onToggleMetrics: () => void;
+  settingsOpen: boolean;
+  onToggleSettings: () => void;
 }) {
   return (
     <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
@@ -135,16 +138,8 @@ export function Controls({
       <ToolButton label={T.metrics} pressed={metricsOpen} onClick={onToggleMetrics}>
         <Activity className="h-4 w-4" aria-hidden />
       </ToolButton>
-      <ToolButton
-        label={hud.soundOn ? T.sound_off : T.sound_on}
-        pressed={hud.soundOn}
-        onClick={() => controller.setSoundOn(!hud.soundOn)}
-      >
-        {hud.soundOn ? (
-          <Volume2 className="h-4 w-4" aria-hidden />
-        ) : (
-          <VolumeX className="h-4 w-4" aria-hidden />
-        )}
+      <ToolButton label={T.settings} pressed={settingsOpen} onClick={onToggleSettings}>
+        <SlidersHorizontal className="h-4 w-4" aria-hidden />
       </ToolButton>
     </div>
   );

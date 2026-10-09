@@ -38,6 +38,7 @@ export const T = {
   cat_ops: "Ops",
   cdn_short: "CDN",
   close: "Close", // ours
+  coach_step: "Step {n} of {total}", // ours
   compute_short: "Compute",
   confirm: "Confirm", // ours
   container_short: "Cluster",
@@ -76,8 +77,14 @@ export const T = {
   fw: "FW",
   game_error: "Game Error", // ours
   game_error_text: "This game hit an error and stopped.", // ours
+  gfx_auto: "Auto", // ours
+  gfx_high: "High", // ours
+  gfx_low: "Low", // ours
+  gfx_now_high: "Drawing at full detail.", // ours
+  gfx_now_low: "Drawing at reduced detail (30 fps, fewer requests shown).", // ours
   goodput_label: "GOODPUT (30s)",
   gpu_short: "GPU",
+  graphics: "Graphics", // ours
   hardware: "Hardware", // ours
   hp_display: "{hp}% HP",
   income: "Income", // ours
@@ -125,12 +132,15 @@ export const T = {
   power_short: "Substation",
   pubsub_short: "Pub/Sub",
   queue: "Queue",
+  reduced_motion_note:
+    "Reduced motion: like the site's other games, Failover keeps its motion when your system asks for less. The moving traffic is the game.", // ours
   region_outage_restored: "Region restored - traffic is spreading back across both regions",
   region_outage_warning: "REGION OUTAGE! The {type} stack went dark - {count} services offline",
   reload: "Reload", // ours
   repair: "Repair",
   repair_for: "Repair {cost}", // ours
   repair_need_money: "Need ${cost} for repair",
+  replay_coach: "Show the tour again (starts a new run)", // ours
   replica_short: "Replica",
   report_late: "{n} late",
   report_none: "none",
@@ -149,8 +159,11 @@ export const T = {
   serverless_short: "Serverless",
   service: "Service",
   service_outage_warning: "{type} OUTAGE! Service offline for 30s",
+  settings: "Settings", // ours
+  skip_tutorial: "Skip Tutorial",
   soft_bad_answer: "Bad answer",
   soft_slow: "Slow",
+  sound: "Sound",
   sound_off: "Sound off", // ours
   sound_on: "Sound on", // ours
   speed_n: "Speed {n}x", // ours
@@ -167,6 +180,32 @@ export const T = {
   traffic_surging: "{name} traffic surge incoming!",
   turn_left: "Turn left", // ours
   turn_right: "Turn right", // ours
+  tut_connect_fw_hint:
+    "All traffic enters through the Internet node. Without this connection, no traffic will reach your infrastructure.",
+  tut_connect_fw_text:
+    "Great! Now connect the Internet to your Firewall. Select the Link tool, click on Internet first, then click on the Firewall.",
+  tut_connect_fw_title: "Connect to Internet",
+  tut_place_compute_hint:
+    "You can upgrade Compute later to handle more traffic (Tier 1 -> 2 -> 3). Heavy requests like UPLOAD and SEARCH take longer to process.",
+  tut_place_compute_text:
+    "Compute processes all requests. It routes traffic to the correct destination: Storage for STATIC/UPLOAD, Database for READ/WRITE/SEARCH.",
+  tut_place_compute_title: "Deploy Compute Server",
+  tut_place_db_hint:
+    "READ = data fetch (40% cache). WRITE = database updates (never cached). SEARCH = complex queries (15% cache, heavy).",
+  tut_place_db_text:
+    "SQL Database handles READ, WRITE, and SEARCH traffic. APIs need database storage.",
+  tut_place_db_title: "Deploy SQL Database",
+  tut_place_fw_hint:
+    "Place it near the Internet node, the cyan ball on the left, for an easy link.",
+  tut_place_fw_text:
+    "The Firewall is your first line of defense. It blocks MALICIOUS traffic (red) that can destroy your reputation. Pick FW in the Front Door tab, then click a tile to place it.",
+  tut_place_fw_title: "Deploy Firewall",
+  tut_ready_hint:
+    "Monitor the colored rings around services - green is good, red means overload. Upgrade or add more services as needed!",
+  tut_ready_text:
+    "Your basic infrastructure is complete! Press the Play button to start the simulation. Watch as traffic flows through your system!",
+  tut_ready_title: "Infrastructure Ready!",
+  tut_welcome_title: "Welcome, Architect!",
   upgrade_for: "Upgrade {cost}", // ours
   upkeep_label: "Upkeep",
   upkeep_toggle: "Upkeep",
