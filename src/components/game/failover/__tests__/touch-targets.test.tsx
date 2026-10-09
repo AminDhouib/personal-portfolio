@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { FailoverGame } from "../../failover";
 import { FailoverController } from "../controller";
 import type { FailoverScene, PickResult } from "../scene/scene";
@@ -62,6 +62,12 @@ function stubPointer(coarse: boolean) {
     removeEventListener: () => undefined,
   }));
 }
+
+// The save menu imports the save code (and zod) on open; fetch it once up front, so the
+// menu test waits on the menu and not on the first transform under a loaded machine.
+beforeAll(async () => {
+  await import("../persist/save");
+}, 30_000);
 
 beforeEach(() => {
   scene.pick = null;
