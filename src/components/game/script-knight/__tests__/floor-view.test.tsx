@@ -113,12 +113,14 @@ describe("FloorView", () => {
         },
       };
       const { container } = render(<FloorView frame={frame} label="x" />);
-      return container
-        .querySelector('[data-unit-id="0"] [data-facing]')
-        ?.getAttribute("data-facing");
+      const glyph = container.querySelector('[data-unit-id="0"] [data-facing]');
+      expect(glyph?.getAttribute("data-facing")).toBe(dir);
+      return glyph?.firstElementChild?.getAttribute("transform");
     };
-    expect(facing("east")).toBe("east");
-    expect(facing("west")).toBe("west");
+    expect(facing("east")).toBe("rotate(0 5 5)");
+    expect(facing("south")).toBe("rotate(90 5 5)");
+    expect(facing("west")).toBe("rotate(180 5 5)");
+    expect(facing("north")).toBe("rotate(270 5 5)");
   });
 
   it("summarises the floor for assistive technology", () => {

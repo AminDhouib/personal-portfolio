@@ -1,5 +1,6 @@
 import type { RunResult } from "./engine/run";
 import { getGradeLetter } from "./engine/scoring";
+import { GAME_SURFACE, TOUCH } from "./surface";
 
 export interface ResultCardProps {
   result: RunResult;
@@ -26,7 +27,7 @@ export function ResultCard({
     return (
       <section
         aria-label="Result"
-        className="rounded-lg border border-[#4ade80]/50 bg-[#4ade80]/5 p-3 text-sm"
+        className={`rounded-lg border border-[#4ade80]/50 p-3 text-sm ${GAME_SURFACE}`}
       >
         <h3 className="text-base font-semibold text-[#4ade80]">Floor passed</h3>
         <p className="mt-1 text-(--foreground)">
@@ -39,7 +40,7 @@ export function ResultCard({
             <button
               type="button"
               onClick={onNext}
-              className="rounded-md bg-[#4ade80] px-3 py-1.5 text-sm font-medium text-black"
+              className={`rounded-md bg-[#4ade80] px-3 py-1.5 text-sm font-medium text-black ${TOUCH}`}
             >
               Next floor
             </button>
@@ -47,7 +48,7 @@ export function ResultCard({
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--foreground)"
+            className={`rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--foreground) ${TOUCH}`}
           >
             Improve this score
           </button>
@@ -58,7 +59,7 @@ export function ResultCard({
   return (
     <section
       aria-label="Result"
-      className="rounded-lg border border-red-400/50 bg-red-400/5 p-3 text-sm"
+      className={`rounded-lg border border-red-400/50 p-3 text-sm ${GAME_SURFACE}`}
     >
       <h3 className="text-base font-semibold text-red-300">Floor not passed</h3>
       {reason ? <p className="mt-1 text-(--foreground)">{reason}</p> : null}

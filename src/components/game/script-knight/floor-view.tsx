@@ -1,6 +1,7 @@
 import { Chain, Glyph, glyphColor, glyphKind } from "./glyphs";
 import type { FloorFrame, FrameUnit } from "./view-model";
 import type { Frame } from "./playback";
+import { GAME_SURFACE } from "./surface";
 
 const CELL = 10;
 const FACING_DEGREES: Record<FrameUnit["facing"], number> = {
@@ -109,7 +110,7 @@ export function FloorView({ frame, label }: { frame: Frame; label: string }) {
       role="img"
       aria-label={summarise(label, floor)}
       viewBox={`0 0 ${width} ${height}`}
-      className="h-auto w-full rounded-lg bg-black/40"
+      className={`h-auto w-full rounded-lg ${GAME_SURFACE}`}
       preserveAspectRatio="xMidYMid meet"
     >
       <rect
