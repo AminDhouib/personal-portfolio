@@ -53,8 +53,36 @@ export const T = {
   container_short: "Cluster",
   copy_by_hand: "The link is selected; copy it by hand.", // ours
   cost_spike_warning: "CLOUD COST SPIKE! Upkeep doubled for 30s",
-  db_short: "SQL DB",
+  daily_board: "Daily board", // ours
+  daily_busy: "The board is busy, try again in a moment", // ours
+  daily_closed: "Today's incident closed at 00:00 UTC. Start the new one.", // ours
+  daily_copied: "Result copied.", // ours
+  daily_copy_failed: "Could not copy the result.", // ours
+  daily_empty_daily: "No scores yet today", // ours
+  daily_empty_weekly: "No scores yet this week", // ours
+  daily_empty_all: "No scores yet", // ours
+  daily_identity: "Your player id was reset; submit again.", // ours
+  daily_load_failed: "Could not load the board", // ours
+  daily_loading: "Loading", // ours
+  daily_name: "Name for the board", // ours
+  daily_periods: "Leaderboard period", // ours
+  daily_posted: "Posted. Rank {rank} today.", // ours
+  daily_posted_plain: "Posted.", // ours
+  daily_rejected: "This run could not be verified", // ours
+  daily_replace: "Start today's incident? This run ends.", // ours
+  daily_replace_yes: "Start", // ours
+  daily_retry: "Retry", // ours
+  daily_saved: "Saved", // ours
+  daily_sending: "Sending", // ours
   daily_share: "Failover daily {day}: {time}, {score}. amindhou.com/games/failover", // ours
+  daily_share_button: "Share", // ours
+  daily_start: "Daily", // ours
+  daily_start_tip: "Play today's Daily Incident", // ours
+  daily_submit: "Submit", // ours
+  daily_too_many: "Too many actions to rank", // ours
+  daily_unreachable: "Could not reach the board. Try again in a moment.", // ours
+  daily_your_best: "Your best: #{rank} ({score})", // ours
+  db_short: "SQL DB",
   ddos_incoming: "DDoS INCOMING",
   delete: "Delete", // ours
   delete_confirm: "Delete the save?", // ours

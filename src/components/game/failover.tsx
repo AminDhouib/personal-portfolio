@@ -6,6 +6,7 @@ import { loadCoachDone, saveCoachDone } from "./failover/prefs";
 import { loadStats, recordRun, saveStats } from "./failover/stats";
 import { T } from "./failover/strings";
 import { Coach } from "./failover/ui/coach";
+import { DailyStart } from "./failover/ui/daily-start";
 import { ConfirmPair } from "./failover/ui/confirm-pair";
 import { FailureBadges } from "./failover/ui/failure-badges";
 import { StatusBar } from "./failover/ui/hud";
@@ -243,6 +244,14 @@ export function FailoverGame() {
               <div className="flex flex-col items-start gap-1.5">
                 <StatusBar hud={hud} />
                 <Tools hud={hud} controller={controller} />
+                <DailyStart
+                  hud={hud}
+                  controller={controller}
+                  onStarted={() => {
+                    setCoaching(false);
+                    containerRef.current?.focus({ preventScroll: true });
+                  }}
+                />
                 <Toast text={hud.toast ?? (hud.alert ? alertText(hud.alert) : null)} />
                 {coaching && !hud.over && <Coach hud={hud} onDone={finishCoach} />}
               </div>
