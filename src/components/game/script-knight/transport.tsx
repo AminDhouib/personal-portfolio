@@ -7,8 +7,9 @@ const BUTTON = `rounded-md border border-(--border) px-2.5 py-1 text-xs text-(--
 export interface TransportProps {
   playback: Playback;
   frameCount: number;
-  muted: boolean;
-  onToggleMute: () => void;
+  /** The sound toggle is left out when there is no sound to toggle (the replay viewer). */
+  muted?: boolean;
+  onToggleMute?: () => void;
 }
 
 /** Play, pause, step, scrub and speed for a replay, plus the sound toggle. */
@@ -57,9 +58,11 @@ export function Transport({ playback, frameCount, muted, onToggleMute }: Transpo
           ))}
         </select>
       </label>
-      <button type="button" className={BUTTON} aria-pressed={muted} onClick={onToggleMute}>
-        {muted ? "Sound off" : "Sound on"}
-      </button>
+      {onToggleMute ? (
+        <button type="button" className={BUTTON} aria-pressed={muted} onClick={onToggleMute}>
+          {muted ? "Sound off" : "Sound on"}
+        </button>
+      ) : null}
       <input
         type="range"
         aria-label="Scrub the replay"
