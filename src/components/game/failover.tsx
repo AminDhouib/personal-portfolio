@@ -15,6 +15,7 @@ import { MetricsPanel } from "./failover/ui/metrics-panel";
 import { Report } from "./failover/ui/report";
 import { SaveMenu } from "./failover/ui/save-menu";
 import { Settings } from "./failover/ui/settings";
+import { ImportDialog, readArchLink, ShareDialog } from "./failover/ui/share-dialog";
 import { TOUCH } from "./failover/ui/surface";
 import { Toast } from "./failover/ui/toast";
 import { ToolSheet } from "./failover/ui/tool-sheet";
@@ -45,7 +46,9 @@ export function FailoverGame() {
   const [best, setBest] = useState(loadStats);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [menu, setMenu] = useState<"save" | null>(null);
+  const [menu, setMenu] = useState<"save" | "share" | null>(null);
+  // A shared ?arch= link opened on the page: described, then built only when asked.
+  const [incoming, setIncoming] = useState(readArchLink);
   // A first run (no failover:coach yet) starts paused under the coach.
   const [coaching, setCoaching] = useState(() => !loadCoachDone());
   const startPaused = useRef(coaching);
@@ -267,6 +270,10 @@ export function FailoverGame() {
                       setSettingsOpen(false);
                       setMenu("save");
                     }}
+                    onOpenShare={() => {
+                      setSettingsOpen(false);
+                      setMenu("share");
+                    }}
                     onClose={() => setSettingsOpen(false)}
                   />
                 )}
@@ -292,6 +299,14 @@ export function FailoverGame() {
         )}
         {menu === "save" && hud && controller && (
           <SaveMenu hud={hud} controller={controller} onClose={() => setMenu(null)} />
+        )}
+        {menu === "share" && <ShareDialog onClose={() => setMenu(null)} />}
+        {incoming && controller && (
+          <ImportDialog
+            arch={incoming.arch}
+            controller={controller}
+            onClose={() => setIncoming(null)}
+          />
         )}
         {hud?.crashed && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">
