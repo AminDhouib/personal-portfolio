@@ -387,6 +387,8 @@ export function createFailoverScene(canvas: HTMLCanvasElement, tier: PerfTier): 
     },
     capture() {
       if (canvas.width <= 0 || canvas.height <= 0) return null;
+      // A lost context draws nothing: a blank board under the card's band is worse than no card.
+      if (renderer.getContext().isContextLost()) return null;
       // The card shows the build, not a placement in progress; the next frame puts the ghost back.
       for (const view of ghostViews.values()) view.group.visible = false;
       renderer.render(scene, camera);
