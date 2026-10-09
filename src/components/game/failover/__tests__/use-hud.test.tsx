@@ -2,7 +2,7 @@ import { Profiler } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { dispatch } from "../sim/action-log";
-import { S, resetSim } from "../sim/state";
+import { S, emit, resetSim } from "../sim/state";
 import { createHudBridge, useHud, type HudBridge } from "../ui/use-hud";
 import { makeController } from "./ui-harness";
 
@@ -90,6 +90,60 @@ describe("useHud", () => {
     act(() => h.place("waf", -28, 0));
     expect(h.seen.renders - before).toBe(1);
     expect(h.bridge.get()?.milestones.waf).toBe(true);
+    h.controller.dispose();
+  });
+
+  it("shows a link made outside the pointer path (a replay, a blueprint) on the next frame", () => {
+    const h = mount("sandbox");
+    act(() => h.place("waf", -28, 0));
+    act(() => h.frame(300));
+    const before = h.seen.renders;
+    act(() => {
+      expect(dispatch({ op: 1, from: "internet", to: "svc_1" }).ok).toBe(true);
+      h.frame(16);
+    });
+    expect(h.seen.renders - before).toBe(1);
+    expect(h.bridge.get()?.milestones.wafLinked).toBe(true);
+    h.controller.dispose();
+  });
+
+  it("shows a warning (an incident or an alert) on the next frame", () => {
+    const h = mount("sandbox");
+    act(() => h.frame(300));
+    const before = h.seen.renders;
+    act(() => {
+      emit({ kind: "warning", key: "ddos_incoming", level: "danger" });
+      h.frame(16);
+    });
+    expect(h.seen.renders - before).toBe(1);
+    expect(h.bridge.get()?.alert).toMatchObject({ key: "ddos_incoming", level: "danger" });
+    h.controller.dispose();
+  });
+
+  it("holds a storm of 500 request failures in a second to the 4 Hz budget", () => {
+    const h = mount("sandbox");
+    act(() => h.place("compute", -16, 0));
+    act(() => h.frame(300));
+    const before = h.seen.renders;
+    let sent = 0;
+    for (let frame = 0; frame < 60; frame++) {
+      act(() => {
+        const due = Math.round(((frame + 1) * 500) / 60);
+        for (; sent < due; sent++) {
+          emit({
+            kind: "request-failed",
+            id: sent,
+            reason: "fail_queue_full",
+            serviceId: "svc_1",
+            breach: false,
+          });
+        }
+        h.frame(1000 / 60);
+      });
+    }
+    expect(sent).toBe(500);
+    expect(h.seen.renders - before).toBeLessThanOrEqual(4);
+    expect(h.bridge.get()?.badges).toHaveLength(1);
     h.controller.dispose();
   });
 });
