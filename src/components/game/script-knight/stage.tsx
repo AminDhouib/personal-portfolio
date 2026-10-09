@@ -26,6 +26,7 @@ import { dailyFloor } from "./daily";
 import { EventLog } from "./event-log";
 import { FloorView } from "./floor-view";
 import { getLevel } from "./engine/core/level";
+import type { LevelRef } from "./engine/level-ref";
 import { getGradeLetter } from "./engine/scoring";
 import { configForRef, createRun } from "./engine/run";
 import { TOWER_IDS, type TowerId, TOWERS } from "./engine/towers";
@@ -51,6 +52,7 @@ import {
 } from "./run-floor";
 import { runInSandbox } from "./sandbox/run-client";
 import { CUES, cueFor, endCue } from "./sound-cues";
+import { resolveStart } from "./start-at";
 import { STARTER } from "./starter";
 import {
   activeStreak,
@@ -81,6 +83,8 @@ export interface StageProps {
   editor?: ComponentType<EditorProps>;
   /** The daily board and submit panel; a test or a later PR can swap it. */
   boardPanel?: ComponentType<DailyBoardProps>;
+  /** Where to open: a floor from a replay link (clamped to what the player has reached). */
+  start?: LevelRef;
   /** T7-7: the hand-play pad. */
   handPad?: ReactNode;
 }
@@ -121,21 +125,23 @@ export function Stage({
   runner = runInSandbox,
   editor: Editor = EditorHost,
   boardPanel: BoardPanel = DailyBoardPanel,
+  start,
   handPad,
 }: StageProps) {
   const [progress, setProgress] = useState<Progress>(() => loadProgress());
   const [codes, setCodes] = useState<CodeStore>(() => loadCode());
-  const [tower, setTower] = useState<TowerId>(() => progress.at.tower);
-  const [level, setLevel] = useState(() => progress.at.level);
-  const [epic, setEpic] = useState(() => progress.at.epic);
+  const [begin] = useState(() => resolveStart(start, progress));
+  const [tower, setTower] = useState<TowerId>(() => begin.at.tower);
+  const [level, setLevel] = useState(() => begin.at.level);
+  const [epic, setEpic] = useState(() => begin.at.epic);
   const [running, setRunning] = useState(false);
   const [floorRun, setFloorRun] = useState<FloorRun | null>(null);
   const [epicRuns, setEpicRuns] = useState<FloorRun[] | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(begin.notice);
   const [muted, setMuted] = useState(false);
   // Today's floor: the UTC day is fixed when the player opens the tab, so a run that crosses
   // midnight is still judged on the floor it began on (and cannot be posted).
-  const [daily, setDaily] = useState(false);
+  const [daily, setDaily] = useState(begin.daily);
   const [dayKey, setDayKey] = useState(() => utcDayKey(new Date()));
   const [stats, setStats] = useState<KnightStats>(() => loadStats());
   // The latest stats for callbacks that must not save from inside a state updater.
@@ -153,7 +159,7 @@ export function Stage({
     tower,
     level,
     epic,
-    daily: null,
+    daily: begin.daily ? dayKey : null,
   });
   const wasPlayingRef = useRef(false);
   // Where the code editor's own parse found a syntax error, so a Run can name the line.
