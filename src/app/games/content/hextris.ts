@@ -7,7 +7,7 @@ export const hextrisContent: GameContent = {
   genre: ["Puzzle", "Arcade"],
   playMode: "SinglePlayer",
   intro:
-    "Hextris is a fast hexagon puzzle game that runs in your browser. Colored blocks fall toward a central hexagon from six directions. You rotate the hexagon to catch each block on the side you want, then match three or more of the same color to clear them. Clears build combos and a momentum meter, and the play area slowly tightens, so every minute you last is harder than the one before.",
+    "Hextris is a fast hexagon puzzle game that runs in your browser. Colored blocks fall toward a central hexagon from six directions. You rotate the hexagon to catch each block on the side you want, then match three or more of the same color to clear them. Clears build combos and a momentum meter, and the play area slowly tightens.",
   howToPlay: [
     "Click, tap or press Space, Enter, an arrow key or A, S, D to start. A 3, 2, 1 countdown follows, and you can already rotate during it.",
     "Rotate the hexagon with the arrow keys or A and D, or tap the left or right half of the screen.",
@@ -15,6 +15,7 @@ export const hextrisContent: GameContent = {
     "Match three or more connected blocks of one color to clear them and score.",
     "Clear again quickly to raise your combo multiplier.",
     "Keep every side below the outer ring, because one overfull side ends the run.",
+    "After a run, Space, Enter, R or a tap on the board plays again once your score has shown for 1.2 seconds. Share sends your score with a link.",
   ],
   controls: [
     {
@@ -44,7 +45,7 @@ export const hextrisContent: GameContent = {
   ],
   strategy: [
     "Matches are connected groups, and they can cross into a neighboring side. Stack the same color next to itself to let groups join.",
-    "Each clear scores the number of blocks squared, times your combo. Five blocks at 2x is 50 points, so bigger groups pay far more than several small ones.",
+    "Each clear scores the number of blocks squared, times your combo. Five blocks at 2x is 50 points, so bigger groups pay far more.",
     "Bombs appear once you have reached a 3x combo, and rainbow blocks at 5x. A rainbow matches any color, and a bomb in a match also clears the blocks near it: two rows either way on its own side and one row either way on each neighboring side.",
     "The momentum meter fills as you clear. At 100 percent, Panic Clear removes every block for 30 points each, so save it for a crisis.",
     "Clears score only while you are playing. Before your first input, or after 8 seconds without one, a clear still happens but scores nothing until you move again.",
@@ -84,7 +85,7 @@ export const hextrisContent: GameContent = {
     {
       question: "How do you play Hextris on a phone?",
       answer:
-        "Tap the left half of the screen to rotate left and the right half to rotate right. On touch devices the game goes fullscreen when a run starts, and the fullscreen button exits it.",
+        "Tap the left half of the screen to rotate left and the right half to rotate right. On touch devices the game goes fullscreen when a run starts.",
     },
     {
       question: "How does scoring work in Hextris?",

@@ -584,6 +584,15 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
 - **The Hextris Panic Clear tip shows once per browser.** `hextris/tips.ts` stores
   `{"v":1,"panicSeen":true}` under `hextris_tips` as the tip shows, so a reload never shows it
   again. The games hub never reads that key; `HUB_STAT_KEYS` stays an allowlist of score keys.
+- **Hextris restarts with one key or tap, but only 1.2 s after game over.** Before T5-5 a run
+  could only be restarted with the sheet's "Play again" button, so the player saw the score
+  first. The lockout keeps that aim: Space, Enter or R (`hextris/input.ts`, phase `over`) or a
+  tap on the board start the next run, through the countdown, only `RESTART_LOCKOUT_MS`
+  (`hextris/game-over.ts`) after the end. The router still swallows those keys during the
+  lockout, so a held Space does not scroll the page. A tap on the sheet never restarts, and "Play
+  again" works at once. `content/__tests__/hextris-copy.test.ts` pins the About copy's "1.2
+  seconds" to the constant. Do not shorten the lockout to "fix" a key press that seems to do
+  nothing.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
