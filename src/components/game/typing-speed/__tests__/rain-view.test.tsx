@@ -197,6 +197,18 @@ describe("Word Rain view", () => {
     expect(Number(words()[0]!.dataset.y) - Number(before)).toBeLessThan(0.01);
   });
 
+  it("moves the words at most 50 ms of fall in one frame, however long the frame took", () => {
+    renderRain();
+    start();
+    frames(2);
+    const before = Number(words()[0]!.dataset.y);
+    frame(5000); // a stalled main thread, with no pause in between
+    const step = Number(words()[0]!.dataset.y) - before;
+    expect(step).toBeGreaterThan(0);
+    expect(step).toBeLessThanOrEqual(0.08 * 0.05 + 1e-4);
+    expect(screen.getByLabelText("Lives: 3")).toBeInTheDocument();
+  });
+
   it("pauses when the input loses focus and says how to carry on", () => {
     renderRain();
     start();
