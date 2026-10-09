@@ -1,4 +1,5 @@
 import type { ServiceType } from "../sim/config";
+import type { LinkRefusal } from "../sim/topology";
 import type { KeyCommand } from "./keys";
 
 // The pointer and keyboard model, as a pure state machine:
@@ -56,8 +57,8 @@ export type Intent =
 
 /** What the machine needs to know about the board, asked, never stored. */
 export interface MachineContext {
-  /** May `from` link to `to` right now? */
-  canLink(from: string, to: string): boolean;
+  /** Why `from` may not link to `to` right now, or null when it may. */
+  linkRefusal(from: string, to: string): LinkRefusal | "missing" | null;
   /** A node's display name. */
   label(id: string): string;
 }
@@ -105,6 +106,30 @@ function tapCell(s: MachineState, x: number, z: number, pointer: Pointer): Machi
   }
 }
 
+/**
+ * A refused link, in words. A repeat of a link that is already there must not read as
+ * "No route": the T8-2 walk took that for a missed click on the first, working, link.
+ */
+function linkRefusalText(
+  refusal: LinkRefusal | "missing",
+  from: string,
+  to: string,
+  ctx: MachineContext,
+): string {
+  const a = ctx.label(from);
+  const b = ctx.label(to);
+  switch (refusal) {
+    case "exists":
+      return `${a} already sends to ${b}`;
+    case "reverse":
+      return `${b} already sends to ${a}; a link runs one way`;
+    case "self":
+    case "missing":
+    case "invalid":
+      return `No route from ${a} to ${b}`;
+  }
+}
+
 function tapNode(s: MachineState, id: string, pointer: Pointer, ctx: MachineContext) {
   const { tool, gesturing } = s;
   switch (tool.kind) {
@@ -121,11 +146,11 @@ function tapNode(s: MachineState, id: string, pointer: Pointer, ctx: MachineCont
     case "link": {
       if (s.mode !== "linkFrom") return out({ mode: "linkFrom", tool, from: id, gesturing });
       if (s.from === id) return out(idle(tool, gesturing));
-      if (ctx.canLink(s.from, id)) {
+      const refusal = ctx.linkRefusal(s.from, id);
+      if (refusal === null) {
         return out(idle(tool, gesturing), { kind: "link", from: s.from, to: id });
       }
-      const message = `No route from ${ctx.label(s.from)} to ${ctx.label(id)}`;
-      return out(s, { kind: "toast", message });
+      return out(s, { kind: "toast", message: linkRefusalText(refusal, s.from, id, ctx) });
     }
   }
 }

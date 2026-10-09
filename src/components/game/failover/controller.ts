@@ -33,7 +33,7 @@ import { CONFIG } from "./sim/config";
 import { snapshot } from "./sim/snapshot";
 import { drainEvents, resetSim, S } from "./sim/state";
 import { step } from "./sim/tick";
-import { linkTargets } from "./sim/topology";
+import { linkRefusalOf } from "./sim/topology";
 import type { GameMode, GameOverReason, SimEvent } from "./sim/types";
 
 // Owns one run: the sim, the fixed-step loop, the scene and the sound. React
@@ -333,7 +333,7 @@ export class FailoverController {
 
   private feed(event: Parameters<typeof next>[1]): boolean {
     const out = next(this.machine, event, {
-      canLink: (from, to) => linkTargets(from).has(to),
+      linkRefusal: linkRefusalOf,
       label: nodeLabel,
     });
     this.machine = out.state;
@@ -343,9 +343,10 @@ export class FailoverController {
     return out.consumed;
   }
 
-  private act(action: Action): void {
+  private act(action: Action): boolean {
     const result = dispatch(action);
     if (!result.ok) this.showToast(REFUSALS[result.reason] ?? "Not allowed");
+    return result.ok;
   }
 
   private apply(intent: Intent): void {
@@ -356,7 +357,9 @@ export class FailoverController {
         this.act({ op: 0, type: intent.service, x: intent.x, z: intent.z });
         return;
       case "link":
-        this.act({ op: 1, from: intent.from, to: intent.to });
+        if (this.act({ op: 1, from: intent.from, to: intent.to })) {
+          this.showToast(`Linked ${nodeLabel(intent.from)} to ${nodeLabel(intent.to)}`);
+        }
         return;
       case "demolish":
         if (this.selected === intent.id) this.selected = null;

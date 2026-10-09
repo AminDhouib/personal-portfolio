@@ -104,6 +104,13 @@ function linkRefusal(from: Node, to: Node): LinkRefusal | null {
   return null;
 }
 
+/** Why the node `fromId` may not link to `toId` now (the rule createConnection applies), or null. */
+export function linkRefusalOf(fromId: string, toId: string): LinkRefusal | "missing" | null {
+  const from = nodeById(fromId);
+  const to = nodeById(toId);
+  return from && to ? linkRefusal(from, to) : "missing";
+}
+
 /** The ids of every service on the board that `sourceId` could link to now. */
 export function linkTargets(sourceId: string): Set<string> {
   const from = nodeById(sourceId);

@@ -301,6 +301,30 @@ describe("input to sim", () => {
     controller.dispose();
   });
 
+  it("confirms a link, and a repeat says it is there (the walk read that as a missed click)", () => {
+    const { controller, view } = setup();
+    controller.setTool({ kind: "place", service: "alb" });
+    view.setPick({ cell: { x: -28, z: 0 }, node: null });
+    controller.tap(0, 0, "mouse");
+    controller.cancelPending();
+
+    const linkInternetToAlb = () => {
+      controller.setTool({ kind: "link" });
+      view.setPick({ cell: { x: -40, z: 0 }, node: "internet" });
+      controller.tap(0, 0, "mouse");
+      view.setPick({ cell: { x: -28, z: 0 }, node: "svc_1" });
+      controller.tap(0, 0, "mouse");
+    };
+    linkInternetToAlb();
+    expect(S.connections).toEqual([{ from: "internet", to: "svc_1" }]);
+    expect(controller.getHud().toast).toBe("Linked Internet to Load Balancer");
+
+    linkInternetToAlb();
+    expect(S.connections).toHaveLength(1);
+    expect(controller.getHud().toast).toBe("Internet already sends to Load Balancer");
+    controller.dispose();
+  });
+
   it("turns a refusal from the sim into a toast", () => {
     const { controller, view } = setup();
     controller.setTool({ kind: "place", service: "waf" });
