@@ -58,30 +58,49 @@ describe("the CodeMirror chunk stays lazy", () => {
     expect(offenders).toEqual([]);
   });
 
+  /** Where a relative or @/ specifier points, with any extension dropped; null for a package. */
+  function resolveSpec(file: string, spec: string): string | null {
+    if (!spec.startsWith(".") && !spec.startsWith("@/")) return null;
+    const base = spec.startsWith(".")
+      ? path.resolve(path.dirname(file), spec)
+      : path.resolve(SRC, spec.slice(2));
+    return base.replace(/\.(?:tsx?|jsx?|mjs)$/, "");
+  }
+  const isLazyModule = (base: string | null): boolean =>
+    base === path.join(KNIGHT, "code-editor") || base === path.join(KNIGHT, "syntax-check");
+
   it("nothing imports the lazy modules statically except the lazy chunk itself", () => {
     const offenders: string[] = [];
     for (const file of files) {
       if (LAZY.has(file)) continue;
       for (const spec of importsOf(file).statics) {
-        if (!spec.startsWith(".") && !spec.startsWith("@/")) continue;
-        const base = spec.startsWith(".")
-          ? path.resolve(path.dirname(file), spec)
-          : path.resolve(SRC, spec.slice(2));
-        if (
-          base === path.join(KNIGHT, "code-editor") ||
-          base === path.join(KNIGHT, "syntax-check")
-        ) {
-          offenders.push(`${rel(file)} -> ${spec}`);
-        }
+        if (isLazyModule(resolveSpec(file, spec))) offenders.push(`${rel(file)} -> ${spec}`);
       }
     }
     expect(offenders).toEqual([]);
   });
 
+  it("only editor-host.tsx imports the code editor dynamically, whatever the extension", () => {
+    const host = path.join(KNIGHT, "editor-host.tsx");
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (file === host) continue;
+      for (const spec of importsOf(file).dynamics) {
+        if (isLazyModule(resolveSpec(file, spec))) offenders.push(`${rel(file)} -> ${spec}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    expect(importsOf(host).dynamics).toEqual(["./code-editor"]);
+  });
+
   it("the editor host reaches the code editor only through import()", () => {
     const host = importsOf(path.join(KNIGHT, "editor-host.tsx"));
     expect(host.dynamics).toEqual(["./code-editor"]);
-    expect(host.statics.filter((spec) => spec.includes("code-editor"))).toEqual([]);
+    expect(
+      host.statics.filter((spec) =>
+        isLazyModule(resolveSpec(path.join(KNIGHT, "editor-host.tsx"), spec)),
+      ),
+    ).toEqual([]);
   });
 
   it("the stage and its other modules do not touch the lazy chunk", () => {
