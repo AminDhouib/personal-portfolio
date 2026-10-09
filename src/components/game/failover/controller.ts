@@ -59,6 +59,8 @@ export interface HudState {
   toast: string | null;
   soundOn: boolean;
   tier: PerfTier;
+  /** The frame loop threw and stopped; the game shows its crash card. */
+  crashed: boolean;
 }
 
 export interface ControllerOptions {
@@ -114,6 +116,7 @@ export class FailoverController {
   private visible = true;
   private onScreen = true;
   private disposed = false;
+  private crashed = false;
 
   private machine: MachineState = initialMachine();
   private camera: CameraState = initialCamera();
@@ -203,7 +206,7 @@ export class FailoverController {
   }
 
   private canRun(): boolean {
-    return this.running && this.visible && this.onScreen && !this.disposed;
+    return this.running && this.visible && this.onScreen && !this.disposed && !this.crashed;
   }
 
   private requestFrame(): void {
@@ -253,6 +256,8 @@ export class FailoverController {
       const crash = gameCrashToReport("failover", err);
       if (crash) reportError(crash);
       this.running = false;
+      this.crashed = true;
+      this.emit();
       return;
     }
     this.requestFrame();
@@ -310,6 +315,7 @@ export class FailoverController {
       toast: this.toast ? this.toast.text : null,
       soundOn: this.audio.isOn(),
       tier: this.governor.tier,
+      crashed: this.crashed,
     };
   }
 

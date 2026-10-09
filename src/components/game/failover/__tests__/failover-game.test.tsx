@@ -8,13 +8,15 @@ import { S, resetSim } from "../sim/state";
 // The mounted game with the WebGL scene stubbed out: the toolbar drives the
 // controller, keys reach it only from the board, and unmounting releases it.
 
-const scenes = vi.hoisted(() => ({ made: 0, disposed: 0 }));
+const scenes = vi.hoisted(() => ({ made: 0, disposed: 0, broken: false }));
 
 vi.mock("../scene/scene", () => ({
   createFailoverScene: (): FailoverScene => {
     scenes.made++;
     return {
-      render: () => undefined,
+      render: () => {
+        if (scenes.broken) throw new Error("boom");
+      },
       resize: () => undefined,
       setCamera: () => undefined,
       setOverlay: () => undefined,
@@ -35,6 +37,7 @@ class NoopObserver {
 beforeEach(() => {
   scenes.made = 0;
   scenes.disposed = 0;
+  scenes.broken = false;
   window.localStorage.clear();
   vi.stubGlobal("ResizeObserver", NoopObserver);
   vi.stubGlobal("IntersectionObserver", NoopObserver);
@@ -155,6 +158,21 @@ describe("FailoverGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     expect(screen.queryByText("Run over")).toBeNull();
     expect(S.over).toBeNull();
+  });
+
+  it("shows the crash card when the loop stops on an error", () => {
+    vi.stubGlobal("reportError", () => undefined);
+    const frames: ((t: number) => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => frames.push(cb));
+    mount();
+    expect(screen.queryByText("Game Error")).toBeNull();
+    scenes.broken = true;
+    act(() => {
+      frames.shift()?.(1000);
+    });
+    expect(screen.getByText("Game Error")).toBeInTheDocument();
+    expect(screen.getByText("This game hit an error and stopped.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
   });
 
   it("releases the scene on unmount", () => {

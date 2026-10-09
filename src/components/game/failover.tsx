@@ -396,6 +396,23 @@ export function FailoverGame() {
           </button>
         </div>
       )}
+      {hud?.crashed && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-6 text-center text-white shadow-2xl">
+            <div className="mb-2 font-mono text-[11px] tracking-widest text-[#06b6d4] uppercase">
+              Game Error
+            </div>
+            <div className="mt-2 text-sm text-white/70">This game hit an error and stopped.</div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 w-full rounded-lg border border-[#06b6d4]/40 bg-[#06b6d4]/10 py-2.5 text-sm font-medium text-[#06b6d4] transition-colors hover:bg-[#06b6d4]/20"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
