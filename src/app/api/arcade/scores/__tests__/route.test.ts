@@ -741,7 +741,7 @@ describe("POST /api/arcade/scores", () => {
       const day = await submit(failover({ detail: { ...failover().detail, day: 20261014 } }));
       expect(day.res.status).toBe(422);
       expect(day.json.reason).toBe("not today's run");
-      const high = await submit(failover({ score: 300_000 }));
+      const high = await submit(failover({ score: 1_000_001 }));
       expect(high.res.status).toBe(422);
       expect(high.json.reason).toBe("score too high for the run");
       expect(emu.scores()).toHaveLength(0);

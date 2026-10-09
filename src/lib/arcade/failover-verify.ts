@@ -47,8 +47,8 @@ export const MAX_WAITING = 2;
 /** Ticks played between looks at the event loop. */
 export const YIELD_EVERY_TICKS = 500;
 
-/** The most a 900 s run can plausibly score: ten a second plus the points banked. */
-export const MAX_PLAUSIBLE_SCORE = 10 * 900 + 200_000;
+/** The replay decides; this only bounds garbage. A scripted data-import build scored 224,349 on 2026-10-09. */
+export const MAX_PLAUSIBLE_SCORE = 1_000_000;
 
 /** The Sentry scope of every SHADOW report; the rollout is judged on this staying empty. */
 export const SHADOW_SCOPE = "arcade:failover-verify.shadow";

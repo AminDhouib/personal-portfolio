@@ -91,7 +91,7 @@ describe("failover plausibility, the part that needs no replay", () => {
   });
 
   it("rejects a score no 900 s run can reach, and accepts the ceiling itself", () => {
-    expect(MAX_PLAUSIBLE_SCORE).toBe(10 * 900 + 200_000);
+    expect(MAX_PLAUSIBLE_SCORE).toBe(1_000_000);
     expect(check(detail(), MAX_PLAUSIBLE_SCORE).ok).toBe(true);
     expect(check(detail(), MAX_PLAUSIBLE_SCORE + 1)).toEqual({
       ok: false,
