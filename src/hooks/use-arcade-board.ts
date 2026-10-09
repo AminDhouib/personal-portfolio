@@ -70,6 +70,10 @@ export interface ArcadeSubmitResult {
   rejected?: boolean;
   /** The stored identity was refused and replaced; submitting again will work. */
   identityReset?: boolean;
+  /** The server's verifier was busy (503); the same run can be sent again after the wait. */
+  busy?: boolean;
+  /** How long the server asked callers to wait, in ms (Retry-After, clamped); set with `busy`. */
+  retryAfterMs?: number;
 }
 
 export interface UseArcadeBoardOptions {
@@ -104,6 +108,15 @@ const PERIODS: readonly BoardPeriod[] = ["daily", "weekly", "all-time"];
 const REQUEST_TIMEOUT_MS = 8000;
 // A submit with a proof waits for the server to replay it, which can take up to its 8 s budget.
 const PROOF_SUBMIT_TIMEOUT_MS = 12_000;
+// A busy answer's wait when Retry-After is missing or unreadable, and the most it may ask for.
+const DEFAULT_RETRY_MS = 2000;
+const MAX_RETRY_MS = 60_000;
+
+function retryAfterMs(res: Response): number {
+  const seconds = Number(res.headers.get("Retry-After"));
+  if (!Number.isFinite(seconds) || seconds <= 0) return DEFAULT_RETRY_MS;
+  return Math.min(Math.ceil(seconds * 1000), MAX_RETRY_MS);
+}
 
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
@@ -322,6 +335,9 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
           ),
         });
         const data = await readJsonBody(res);
+        if (res.status === 503) {
+          return { ok: false, busy: true, retryAfterMs: retryAfterMs(res) };
+        }
         if (res.status === 422) {
           return { ok: false, rejected: true };
         }
