@@ -464,6 +464,22 @@ editor, the daily board and the hand pad are added without rewriting it.
   be posted. The daily code lives in `knight:code.daily` and starts from the tower's code each
   day; a cleared daily updates `knight:stats` (best, runs, streak) and nothing in the tower
   progress.
+- **Replay links, the ghost, Watch the bot and share (T7-6).** A replay link is a URL fragment,
+  `#replay=1.d.<yyyymmdd>.<log>` or `#replay=1.t.<np|pk>.<level>.<0|1>.<log>`, so it is never sent
+  to a server and needs no route; the log is the action-log codec's own body (`replay-link.ts`
+  parses strictly under 600 characters and returns null for anything else). The entry reads the
+  fragment (and `hashchange`) and mounts `ReplayViewer` above the stage, which replays the log with
+  the pure engine on the main thread (`played.ts`), no worker. A link that does not parse, does not
+  play on its floor or leaves actions over reads "This replay link is damaged". "Play this floor"
+  remounts the stage on that floor through the `start` prop, clamped by `start-at.ts` to what the
+  player has reached (the notice says so); a link to a daily of another day still plays but "Play
+  today's floor" opens today's. The ghost is `knight:stats.ghost` (`{day, log, score}`, your best
+  daily clear of that day, replaced by a strictly higher score or a new day): the stage reads it
+  when a run starts and the floor view draws it as a translucent knight matched by turn. It is
+  drawn only; no run, score or proof sees it. Watch the bot replays the reference bot on the floor
+  in view, local and unranked: it writes no progress or stats, shows no result card or board, and
+  posts nothing. Share builds "Script Knight, 2026-10-15: 112 points in 23 turns (par 98)" plus the
+  link and uses `navigator.share`, then the clipboard (`share.ts`, after Tower Stacker's).
 - **The editor is a textarea first and CodeMirror 6 on a desktop pointer.** `editor-host.tsx` (the
   stage's default `editor`) always paints the textarea, then on `(pointer: fine)` loads
   `code-editor.tsx` with a dynamic `import()` after mount and swaps it in with the same text,
@@ -1247,6 +1263,11 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   code or a person produced it, and code can hard-code a move list for a visible floor, so the
   two are not separable. The board shows a "by hand" badge on `hand: 1` rows and ranks them with
   everyone else; nothing gates on the tag. T7-5 only carries it (always 0 until hand mode, T7-7).
+
+- **A Script Knight replay link proves nothing.** It carries a log anyone can write, the viewer
+  plays it for fun, and nothing about a link is ranked, stored or posted; the daily board still
+  takes only a verified submission from a real run. The ghost's `score` is stored beside its log
+  only so a later clear can be compared with it without replaying; it is never shown or sent.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
