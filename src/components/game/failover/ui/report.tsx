@@ -4,6 +4,7 @@ import type { HudState } from "../controller";
 import type { FailoverStats } from "../stats";
 import { T, fmt } from "../strings";
 import { clock, money, percent } from "./format";
+import { DailyPanel } from "./daily-panel";
 import { badgeText } from "./messages";
 import { TOUCH } from "./surface";
 
@@ -80,6 +81,8 @@ export function Report({
             </p>
           )}
         </header>
+
+        {hud.daily?.result && <DailyPanel result={hud.daily.result} />}
 
         <section aria-labelledby="failover-report-what" className="text-xs">
           <h3 id="failover-report-what" className="mb-1 text-sm font-semibold">
