@@ -31,7 +31,7 @@ import {
 } from "./hextris/feedback";
 import { arcadeSubmission, isRecordableRun, recordHighScore, runSeed } from "./hextris/session";
 import { hextrisKeyAction } from "./hextris/input";
-import { NO_FIT, boardFit } from "./hextris/game-over";
+import { NO_FIT, boardFit, countUpValue, gameOverView } from "./hextris/game-over";
 import { markPanicTipSeen, readTips } from "./hextris/tips";
 import { isTextEntryTarget } from "./text-entry";
 import { safeJsonParse } from "@/lib/safe-json";
@@ -45,6 +45,24 @@ const MAX_FRAME_MS = 100;
 
 // How long the one-time Panic Clear tip stays up if the player does not use it.
 const PANIC_TIP_MS = 6000;
+
+/** The final score, counted up from 0 when the game-over sheet opens (COUNT_UP_MS). */
+function ScoreCountUp({ score }: { score: number }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    let frame = 0;
+    let startedAt: number | null = null;
+    const tick = (now: number) => {
+      startedAt ??= now;
+      const value = countUpValue(score, now - startedAt);
+      setShown(value);
+      if (value < score) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [score]);
+  return <span data-testid="final-score">{shown}</span>;
+}
 
 /** A run's unpaused play time as m:ss. */
 function formatRunTime(elapsedMs: number): string {
@@ -82,6 +100,8 @@ export function HextrisGame() {
   // The game-over sheet, and whether the player has collapsed it to a strip to see the board.
   const sheetRef = useRef<HTMLElement>(null);
   const [sheetHidden, setSheetHidden] = useState(false);
+  // The run beat a stored best (never on the first run ever: there was nothing to beat).
+  const [uiNewBest, setUiNewBest] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -481,6 +501,16 @@ export function HextrisGame() {
       if (f.over) {
         // The run clock stops at game over, so a popup would hang on the board.
         popups = [];
+        // Read the best before this run is recorded into the list.
+        const ending = gameOverView({
+          score: f.over.score,
+          previousBest: highScores[0] ?? null,
+          side: f.over.side,
+          nowMs: 0,
+          overAtMs: 0,
+        });
+        setUiNewBest(ending.isNewBest);
+        if (ending.isNewBest) sounds.newBest();
         if (isRecordableRun(f.over.score)) {
           highScores = recordHighScore(highScores, f.over.score);
           safeLocalSet("hextris_highscores", JSON.stringify(highScores));
@@ -1059,11 +1089,16 @@ export function HextrisGame() {
         >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-[11px] tracking-widest text-accent-pink uppercase">
+              <div className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-accent-pink uppercase">
                 Game Over
+                {uiNewBest && (
+                  <span className="hextris-combo-pop rounded border border-accent-amber/50 bg-accent-amber/15 px-1.5 py-0.5 font-bold text-accent-amber">
+                    NEW BEST
+                  </span>
+                )}
               </div>
               <div className="font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
-                {uiRun.score}
+                <ScoreCountUp score={uiRun.score} />
               </div>
             </div>
             {sheetHidden && (
