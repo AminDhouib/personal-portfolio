@@ -223,6 +223,21 @@ describe("Word Rain view", () => {
     expect(screen.queryByTestId("ts-sheet")).toBeNull();
   });
 
+  it("the key that resumes a paused run counts as typed, and the key that starts a fresh one is not a miss", () => {
+    renderRain();
+    // Nothing is falling before the first frame, so a starting key has nothing to miss.
+    fireEvent.keyDown(window, { key: "z" });
+    expect(input()).toHaveFocus();
+    expect(screen.getByTestId("ts-rain-area")).toHaveAttribute("data-missed", "0");
+    frames(2);
+    const text = words()[0]!.textContent!;
+    act(() => input().blur());
+    fireEvent.keyDown(window, { key: text[0]! });
+    expect(input()).toHaveFocus();
+    expect(screen.getByTestId("ts-rain-echo")).toHaveTextContent(text[0]!);
+    expect(input().value).toBe(SENTINEL + text[0]!);
+  });
+
   it("pauses when the input loses focus and says how to carry on", () => {
     renderRain();
     start();
