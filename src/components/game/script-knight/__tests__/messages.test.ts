@@ -90,6 +90,21 @@ describe("describeOutcome", () => {
     );
   });
 
+  it("shows an async playTurn as the sandbox words it, on its turn", () => {
+    expect(
+      describeOutcome({
+        kind: "player-error",
+        log: "1:w-",
+        t: 2,
+        message: "playTurn must not be async: return after choosing one action.",
+        line: null,
+      }),
+    ).toEqual({
+      text: "Turn 2: playTurn must not be async: return after choosing one action.",
+      retry: false,
+    });
+  });
+
   it("explains a sandbox that never booted, with a retry", () => {
     const boot: RunOutcome = { kind: "timeout", log: "1:", phase: "boot", t: 1 };
     expect(describeOutcome(boot)).toEqual({ text: "The sandbox could not start.", retry: true });
