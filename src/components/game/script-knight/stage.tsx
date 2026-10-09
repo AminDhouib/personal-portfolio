@@ -25,6 +25,7 @@ import { DailyBoardPanel, type DailyBoardProps } from "./board-panel";
 import { dailyFloor } from "./daily";
 import { EventLog } from "./event-log";
 import { FloorView } from "./floor-view";
+import { ghostFrames, ghostKnightAt } from "./ghost";
 import { getLevel } from "./engine/core/level";
 import type { LevelRef } from "./engine/level-ref";
 import { getGradeLetter } from "./engine/scoring";
@@ -56,6 +57,7 @@ import { resolveStart } from "./start-at";
 import { STARTER } from "./starter";
 import {
   activeStreak,
+  ghostFor,
   type KnightStats,
   loadStats,
   recordDaily,
@@ -146,6 +148,11 @@ export function Stage({
   const [stats, setStats] = useState<KnightStats>(() => loadStats());
   // The latest stats for callbacks that must not save from inside a state updater.
   const statsRef = useRef(stats);
+  // The day's best log from before this attempt, drawn as a ghost. It is read when a run starts,
+  // so a clear that becomes the new best does not race itself.
+  const [ghostLog, setGhostLog] = useState<string | null>(() =>
+    begin.daily ? ghostFor(stats, dayKey) : null,
+  );
 
   const cancelRef = useRef<(() => void) | null>(null);
   const audioRef = useRef<KnightAudio | null>(null);
@@ -194,6 +201,10 @@ export function Stage({
     [dailyInfo, tower, level, useEpic],
   );
   const info = useMemo(() => getLevel(config), [config]);
+  const ghostRun = useMemo(
+    () => (daily && ghostLog !== null ? ghostFrames(config, ghostLog) : null),
+    [daily, ghostLog, config],
+  );
   const idleFrames = useMemo(() => buildFrames(config, createRun(config).initial, []), [config]);
 
   // What the replay shows: the last run on this floor, or the bare floor before any run.
@@ -316,8 +327,10 @@ export function Stage({
   const enterDaily = useCallback(() => {
     invalidateRun();
     setRunning(false);
+    const today = utcDayKey(new Date());
     setDaily(true);
-    setDayKey(utcDayKey(new Date()));
+    setDayKey(today);
+    setGhostLog(ghostFor(statsRef.current, today));
     setFloorRun(null);
     setEpicRuns(null);
     setNotice(null);
@@ -339,6 +352,7 @@ export function Stage({
         const next = recordDaily(statsRef.current, {
           score: done.result.score.total,
           day: done.ref.day,
+          log: done.log,
         });
         statsRef.current = next;
         setStats(next);
@@ -418,6 +432,7 @@ export function Stage({
       daily: daily ? dayKey : null,
     };
     tokenRef.current = token;
+    if (daily) setGhostLog(ghostFor(statsRef.current, dayKey));
     audioRef.current?.unlock();
     setRunning(true);
     setNotice(null);
@@ -496,6 +511,7 @@ export function Stage({
         <FloorView
           frame={frame}
           label={daily ? "Today's floor" : floorLabel(tower, level, useEpic)}
+          ghost={ghostRun ? ghostKnightAt(ghostRun, frame.turn) : null}
         />
         <p className="font-mono text-xs text-(--muted)" aria-live="polite">
           {frame.status ? `Health ${frame.status.health}, score ${frame.status.score}` : ""}
