@@ -1,9 +1,10 @@
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 
-// Failover's two device preferences, each under its own key: whether sound is
-// on (off until the player turns it on) and the graphics tier override. Both
-// are versioned JSON so a later shape can be told apart from this one.
+// Failover's device preferences, each under its own key: whether sound is on
+// (off until the player turns it on), the graphics tier override, and whether
+// the first-run coach is done. All are versioned JSON so a later shape can be
+// told apart from this one.
 
 export const AUDIO_KEY = "failover:audio";
 // Only the game's own chunk carries this string: scripts/check-bundle-budget.mjs
@@ -69,4 +70,22 @@ export function loadGfxPref(): GfxPref {
 export function saveGfxPref(tier: GfxPref): void {
   if (newerVersionStored(GFX_KEY)) return;
   safeLocalSet(GFX_KEY, JSON.stringify({ v: 1, tier }));
+}
+
+export const COACH_KEY = "failover:coach";
+
+/** True once the player finished or dismissed the first-run coach. */
+export function parseCoachDone(raw: unknown): boolean {
+  const done = v1(raw)?.done;
+  return typeof done === "boolean" ? done : false;
+}
+
+export function loadCoachDone(): boolean {
+  return parseCoachDone(read(COACH_KEY, "failover:coach"));
+}
+
+/** Mark the coach seen (true) or ask for it again (false, the Settings replay). */
+export function saveCoachDone(done: boolean): void {
+  if (newerVersionStored(COACH_KEY)) return;
+  safeLocalSet(COACH_KEY, JSON.stringify({ v: 1, done }));
 }
