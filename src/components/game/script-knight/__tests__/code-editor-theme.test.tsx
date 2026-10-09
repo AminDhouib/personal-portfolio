@@ -1,6 +1,7 @@
+import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { CODE_COLORS } from "../code-editor";
+import { CODE_COLORS, CodeEditor } from "../code-editor";
 import { GAME_SURFACE, SURFACE_COLORS } from "../surface";
 
 function luminance(hex: string): number {
@@ -35,5 +36,23 @@ describe("the CodeMirror theme", () => {
         `${name} ${colour} on ${SURFACE_COLORS.background}`,
       ).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe("the CodeMirror focus indicator", () => {
+  it("is a 2px outline that reaches 3:1 against the surface", () => {
+    expect(CODE_COLORS.focus).toBeDefined();
+    expect(contrast(CODE_COLORS.focus, SURFACE_COLORS.background)).toBeGreaterThanOrEqual(3);
+    const { unmount } = render(
+      <CodeEditor value="" onChange={() => {}} onRun={() => {}} disabled={false} />,
+    );
+    const css = Array.from(document.querySelectorAll("style"))
+      .map((style) => style.textContent ?? "")
+      .join("\n");
+    unmount();
+    const rules = [...css.replace(/\s+/g, " ").matchAll(/\.cm-focused\s*\{([^}]*)\}/g)].map(
+      (m) => m[1],
+    );
+    expect(rules.join(" ")).toContain(`outline: 2px solid ${CODE_COLORS.focus}`);
   });
 });

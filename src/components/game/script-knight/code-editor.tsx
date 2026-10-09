@@ -94,6 +94,8 @@ export const CODE_COLORS = {
   text: SURFACE_COLORS.text,
   lineNumbers: SURFACE_COLORS.muted,
   caret: "#4ade80",
+  /** The 2px focus outline, the same green the textarea turns its border. */
+  focus: "#4ade80",
   keyword: "#c4b5fd",
   string: "#86efac",
   number: "#fcd34d",
@@ -137,7 +139,11 @@ const theme = EditorView.theme(
       border: `1px solid ${SURFACE_COLORS.border}`,
       borderRadius: "0.5rem",
     },
-    "&.cm-focused": { outline: "none", borderColor: CODE_COLORS.caret },
+    "&.cm-focused": {
+      outline: `2px solid ${CODE_COLORS.focus}`,
+      outlineOffset: "1px",
+      borderColor: CODE_COLORS.focus,
+    },
     ".cm-scroller": {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       lineHeight: "20px",
