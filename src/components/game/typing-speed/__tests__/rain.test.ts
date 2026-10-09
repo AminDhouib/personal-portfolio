@@ -20,6 +20,22 @@ describe("rain", () => {
     }
     expect(a).toEqual(b);
   });
+  it("takes its spawns from the seed", () => {
+    const first = (seed: number) => {
+      const r = createRain(seed);
+      tickRain(r, 1);
+      return r.words[0]!;
+    };
+    expect(first(5)).toMatchObject({ text: "hard" });
+    expect(first(5).x).toBeCloseTo(0.5909, 4);
+    expect(first(6)).toMatchObject({ text: "few" });
+    const run = (seed: number) => {
+      const r = createRain(seed);
+      for (let i = 0; i < 100; i++) tickRain(r, 50);
+      return r.words.map((w) => `${w.text}@${w.x.toFixed(3)}`);
+    };
+    expect(run(5)).not.toEqual(run(6));
+  });
   it("spawns on the wave interval", () => {
     const r = createRain(1);
     const { spawnMs } = waveParams(1);
