@@ -133,7 +133,7 @@ describe("Hextris HUD sizing", () => {
   it("sets the name field at 16 px on phones and its row at 44 px", () => {
     const { container } = render(<HextrisGame />);
     startRun(container);
-    injected.push({ type: "game-over", side: 0, score: 0, cellsCleared: 0 });
+    injected.push({ type: "game-over", side: 0, score: 120, cellsCleared: 12 });
     runFrames(1);
     const name = screen.getByPlaceholderText("Your name");
     const classes = name.className.split(/\s+/);
@@ -278,5 +278,23 @@ describe("Hextris tutorial overlay", () => {
     if (!close) throw new Error("no tutorial");
     fireEvent.click(close);
     expect(tutorialClose()).toBeNull();
+  });
+});
+
+describe("Hextris game-over card at 0", () => {
+  it("offers no submit for a score of 0 and never posts it", () => {
+    // A name is already saved, as it would be for a returning player.
+    window.localStorage.setItem("hextris_name", "Idle");
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    injected.push({ type: "game-over", side: 0, score: 0, cellsCleared: 3 });
+    runFrames(1);
+    expect(screen.getByText("No score to post")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Your name")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+    const posts = vi
+      .mocked(fetch)
+      .mock.calls.filter(([, init]) => (init?.method ?? "GET").toUpperCase() === "POST");
+    expect(posts).toHaveLength(0);
   });
 });
