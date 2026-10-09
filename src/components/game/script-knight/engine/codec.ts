@@ -42,15 +42,40 @@ const ACTION_OF: Record<string, ActionName> = {
 };
 const DIRECTIONS: readonly Direction[] = ["forward", "right", "backward", "left"];
 
+/**
+ * Why a value is not a turn action the log can carry, or null when it is one. The input may come
+ * from an untrusted request, so nothing is assumed about its shape.
+ */
+export function invalidActionReason(action: unknown): string | null {
+  if (action === null) {
+    return null;
+  }
+  if (typeof action !== "object" || Array.isArray(action)) {
+    return "an action is an object or null";
+  }
+  const { name, direction } = action as { name?: unknown; direction?: unknown };
+  if (typeof name !== "string" || !Object.hasOwn(LETTER_OF, name)) {
+    return `'${String(name)}' is not one of the eight actions`;
+  }
+  if (direction !== null && !DIRECTIONS.includes(direction as Direction)) {
+    return `'${String(direction)}' is not a direction: use forward, right, backward or left, or null`;
+  }
+  if (name === "rest" && direction !== null) {
+    return "rest takes no direction";
+  }
+  return null;
+}
+
 export function encodeAction(action: TurnAction): string {
+  const reason = invalidActionReason(action);
+  if (reason !== null) {
+    throw new Error(reason);
+  }
   if (action === null) {
     return ".-";
   }
   const letter = LETTER_OF[action.name];
   if (action.name === "rest") {
-    if (action.direction !== null) {
-      throw new Error("rest takes no direction");
-    }
     return `${letter}-`;
   }
   return `${letter}${action.direction === null ? "-" : DIRECTIONS.indexOf(action.direction)}`;

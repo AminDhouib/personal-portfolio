@@ -26,6 +26,34 @@ const LETTERS: Record<ActionName, string> = {
 };
 const DIRECTIONS: Direction[] = ["forward", "right", "backward", "left"];
 
+describe("encodeAction input checks", () => {
+  const bad: unknown[] = [
+    { name: "walk", direction: "north" },
+    { name: "undefined", direction: null },
+    { name: "think", direction: null },
+    { name: "constructor", direction: null },
+    { name: "rest", direction: "left" },
+    { name: "walk", direction: undefined },
+    { name: "walk" },
+    "walk",
+    42,
+    undefined,
+    [],
+  ];
+  it.each(bad.map((value) => [JSON.stringify(value) ?? "undefined", value] as const))(
+    "throws for %s instead of writing a log decodeLog would reject",
+    (_label, value) => {
+      expect(() => encodeAction(value as TurnAction)).toThrow();
+    },
+  );
+
+  it("still encodes every valid action", () => {
+    expect(encodeAction({ name: "detonate", direction: "left" })).toBe("d3");
+    expect(encodeAction({ name: "walk", direction: null })).toBe("w-");
+    expect(encodeAction(null)).toBe(".-");
+  });
+});
+
 describe("action-log codec", () => {
   it("pins the version and the token cap", () => {
     expect(LOG_VERSION).toBe("1");
