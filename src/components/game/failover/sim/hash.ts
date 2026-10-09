@@ -29,9 +29,14 @@ export function stateHash(): number {
       s.processing.length,
       s.smoothedLoad,
       s.asgEnabled ? 1 + s.instances : 0,
+      s.batch.length,
+      s.pending.length,
+      s.modelLoading ? 1 : 0,
+      s.badAnswers,
     );
   }
   // Wiring in the order it was made: a replay that links differently plays differently.
+  parts.push(S.inference.expired);
   for (const c of S.connections) parts.push(`${c.from}>${c.to}`);
   for (const key of Object.keys(S.failures).sort()) {
     parts.push(key, S.failures[key as keyof typeof S.failures]);

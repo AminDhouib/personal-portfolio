@@ -3,6 +3,7 @@
 // directly from Service.update and has no handler registry entry.
 
 import { removeRequest } from "./actions";
+import { recordOutcome } from "./metrics";
 import type { Service } from "./service";
 import { emit, S } from "./state";
 
@@ -29,6 +30,10 @@ export function tickDLQ(dlq: Service, dt: number): void {
     // dead-letter queue and no attack traffic grow a DDoS line, and hid the
     // DLQ's real running cost.
     S.finances.expenses.dlq += cost;
+    // Neither success nor failure, but the event was parked instead of served and
+    // someone was waiting for it: a metric blind to the DLQ would reward hiding an
+    // outage rather than fixing it.
+    recordOutcome("unanswered");
     removeRequest(req);
     emit({ kind: "request-recovered", id: req.id, dlqId: dlq.id });
   }

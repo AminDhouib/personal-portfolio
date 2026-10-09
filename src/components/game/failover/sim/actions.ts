@@ -5,6 +5,7 @@ import { hasTrippedDownstream } from "./circuit-breaker";
 import { CONFIG, TRAFFIC_TYPES } from "./config";
 import { parkInDLQ } from "./dlq-park";
 import { FAIL_REASONS, SOFT_BADGES, type FailReason } from "./failure-reasons";
+import { recordOutcome, recordServiceError, recordServiceSuccess } from "./metrics";
 import type { Request } from "./request";
 import type { Service } from "./service";
 import { emit, S } from "./state";
@@ -125,7 +126,17 @@ export function updateScore(
  */
 export function finishRequest(req: Request, service?: Service): void {
   S.requestsProcessed++;
+  if (service) S.completedByService[service.type] = (S.completedByService[service.type] ?? 0) + 1;
+  // Game-time latency: the request's own age, in ms. Callers without a service skip
+  // the per-node attribution.
+  if (service) recordServiceSuccess(service, req.age * 1000);
   updateScore(req, "COMPLETED");
+  // Rolling goodput: an answer nobody was waiting for any more is not a win. Recorded
+  // after updateScore, which owns both verdicts. pastSlo, NOT wasLate: wasLate is the
+  // priced flag and survival-only on purpose (reputation and the SLOW badge read it
+  // back), while goodput only REPORTS, so it takes the mode-independent observation,
+  // exactly like lateCompletions does for the debrief.
+  recordOutcome(req.pastSlo ? "late" : "onTime");
   // After scoring, which owns the verdict: the badge only reads the flag it set.
   if (req.wasLate && service) {
     emit({ kind: "service-badge", serviceId: service.id, key: SOFT_BADGES.SLOW });
@@ -144,6 +155,15 @@ export function failRequest(req: Request, reason: FailReason | null = null): voi
     S.failuresByReason[reason] = (S.failuresByReason[reason] ?? 0) + 1;
   }
   req.failed = true;
+  // A drop is demand the board failed to answer, so it belongs in the goodput
+  // denominator: otherwise a board that drops everything and serves three requests
+  // quickly would read 100%.
+  recordOutcome("failed");
+  // Attribute the failure to the service the request was headed to or sitting on.
+  // Entry-routing failures with no target stay unattributed by design. The circuit
+  // breaker is deliberately NOT fed from here: most failures are routing verdicts that
+  // say nothing about a node's health.
+  if (req.target) recordServiceError(req.target);
   const breach = req.type === TRAFFIC_TYPES.MALICIOUS;
   updateScore(req, breach ? "MALICIOUS_PASSED" : "FAILED");
   // A MALICIOUS request that gets here got through, whatever routing verdict
@@ -188,6 +208,7 @@ export function failOrPark(req: Request, service: Service, reason: FailReason | 
  */
 export function notifySilentFail(req: Request, service: Service): void {
   req.failed = true;
+  recordServiceError(service);
   S.reputation -= service.config.dissatisfaction ?? 0;
   service.dissatisfactionCount++;
   removeRequest(req);
@@ -202,6 +223,10 @@ export function notifySilentFail(req: Request, service: Service): void {
 export function throttleRequest(req: Request): void {
   req.throttled = true;
   updateScore(req, "THROTTLED");
+  // Not a failure, but still a customer who got no answer, and goodput's whole job is
+  // to count those. Without this an API Gateway turned the headline number green by
+  // making demand disappear: nine served and ninety shed read 100%.
+  recordOutcome("unanswered");
   emit({ kind: "request-throttled", id: req.id, serviceId: req.target ? req.target.id : null });
   req.removeAtTick = S.tick + FAIL_LINGER_TICKS;
 }

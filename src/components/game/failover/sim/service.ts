@@ -4,15 +4,18 @@ import {
   flashMoney,
   notifySilentFail,
 } from "./actions";
+import { updateAutoscaling, upkeepInstanceFactor } from "./autoscaling";
 import { recordBreakerFailure, recordBreakerSuccess, updateBreaker } from "./circuit-breaker";
 import { CONFIG, type Destination, type ServiceConfig, type ServiceType } from "./config";
 import { tickDLQ } from "./dlq";
 import { exp } from "./dmath";
 import { chargeServerlessInvocation, getUpkeepMultiplier } from "./economy";
 import { FAIL_REASONS } from "./failure-reasons";
+import { startModelLoad, tickGpu } from "./gpu";
 import { dispatch } from "./handlers";
 import { screen as authScreen } from "./handlers/auth";
 import { screen } from "./handlers/waf";
+import { tickInfgw } from "./infgw";
 import type { Request } from "./request";
 import { retryRequest } from "./retry";
 import { rand } from "./rng";
@@ -20,7 +23,7 @@ import { isRoutable } from "./routing";
 import { tickScheduler } from "./scheduler";
 import { emit, S } from "./state";
 import { tickStream } from "./stream";
-import type { BreakerState, Job, Vec2 } from "./types";
+import type { BreakerState, Job, PendingEntry, Vec2 } from "./types";
 
 /** Service types with upgrade tiers the player can buy. */
 const UPGRADABLE: readonly ServiceType[] = [
@@ -31,6 +34,7 @@ const UPGRADABLE: readonly ServiceType[] = [
   "nosql",
   "search",
   "replica",
+  "gpu",
 ];
 
 /** Types whose per-job time scales with the traffic class's processing weight. */
@@ -67,10 +71,17 @@ export class Service {
   /** 1 normally; below 1 while a capacity-drop event is on. */
   tempCapacityReduction = 1;
 
-  /** Auto-scaling fleet: ready instances, and the instances still booting. */
+  /** Auto-scaling fleet: ready instances, and the ticks each instance still booting has left. */
   asgEnabled = false;
   instances = 1;
   warming: number[] = [];
+  /** Ticks the load has held past a scale-out or scale-in threshold. */
+  asgAbove = 0;
+  asgBelow = 0;
+  /** Ticks left before another scaling action. */
+  asgCooldown = 0;
+  /** Game time of the last scaling action (display only). */
+  lastScaleAt = 0;
 
   /** API gateway: requests seen this second, against config.rateLimit. */
   rateCounter = 0;
@@ -105,11 +116,33 @@ export class Service {
   /** Notification: overload drops, accrued as dissatisfaction instead of failures. */
   dissatisfactionCount = 0;
 
+  /**
+   * GPU Cluster: the batch being filled or run, its phase and timers. The batch is
+   * off-pipeline backlog like a stream's partitions, so it is folded into totalLoad
+   * and into every orphan set. See gpu.ts.
+   */
+  batch: Request[] = [];
+  batchState: "filling" | "running" = "filling";
+  batchWindowTimer = 0;
+  batchRunTimer = 0;
+  batchRunTimeMs = 0;
+  /** Answers that completed and paid but were bad (a soft badge, never a failure). */
+  badAnswers = 0;
+  /** The model is (re)loading: not routable, everything held. A dedicated flag, never isDisabled. */
+  modelLoading = false;
+  modelLoadTimer = 0;
+
+  /** Inference Gateway: the deadline queue, and how many entries it expired. See infgw.ts. */
+  pending: PendingEntry[] = [];
+  expiredCount = 0;
+
   constructor(type: ServiceType, position: Vec2) {
     this.id = `svc_${S.nextServiceId++}`;
     this.type = type;
     this.config = CONFIG.services[type];
     this.position = { x: position.x, z: position.z };
+    // A fresh GPU cold-starts: the model load begins the moment it is placed.
+    if (type === "gpu") startModelLoad(this);
   }
 
   /** Buy the next tier. Returns false when the service cannot be upgraded or the money is short. */
@@ -135,6 +168,19 @@ export class Service {
     }
     if (this.type === "apigw" && next.rateLimit) {
       this.config = { ...this.config, rateLimit: next.rateLimit };
+    }
+    // GPU tiers are MODEL SIZE: bigger batches, lower bad-answer risk, a longer model
+    // load. The upgrade RE-TRIGGERS that load, so an upgrade mid-surge is a
+    // self-inflicted outage. The bounded intake follows the batch size.
+    if (this.type === "gpu") {
+      this.config = {
+        ...this.config,
+        batchSize: next.batchSize,
+        qualityRisk: next.qualityRisk,
+        loadTimeSec: next.loadTimeSec,
+        maxQueueSize: next.batchSize,
+      };
+      startModelLoad(this);
     }
     emit({ kind: "service-upgraded", id: this.id, tier: this.tier });
     return true;
@@ -173,10 +219,16 @@ export class Service {
   get totalLoad(): number {
     // A stream keeps its backlog in partitions, not in processing or queue, so
     // fold the partition depth in: a badly backed-up stream must not read as idle.
+    // The GPU's batch and the Inference Gateway's deadline array are the same kind of
+    // off-pipeline backlog and get the same treatment.
     let partitionDepth = 0;
     for (const p of this.partitions) partitionDepth += p.length;
     return (
-      (this.processing.length + this.queue.length + partitionDepth) /
+      (this.processing.length +
+        this.queue.length +
+        partitionDepth +
+        this.batch.length +
+        this.pending.length) /
       (this.config.capacity * this.instances * 2)
     );
   }
@@ -250,6 +302,10 @@ export class Service {
       }
     }
 
+    // Grow or shrink the fleet before capacity is read this step. The type and
+    // enabled gate live inside; the engine counts ticks, so it takes no dt.
+    updateAutoscaling(this);
+
     // Only the open to half-open cooldown needs a clock; the gate lives inside.
     updateBreaker(this, dt);
 
@@ -259,6 +315,10 @@ export class Service {
     if (this.type === "dlq") tickDLQ(this, dt);
     else if (this.type === "scheduler") tickScheduler(this, dt);
     else if (this.type === "stream") tickStream(this, dt);
+    // The AI Wave: the GPU batch engine and the gateway's sweep-then-dispatch deadline
+    // queue get the same tick-node treatment.
+    else if (this.type === "gpu") tickGpu(this, dt);
+    else if (this.type === "infgw") tickInfgw(this, dt);
 
     if (S.upkeepEnabled) {
       // Every instance is billed, warming ones included: clouds charge from
@@ -381,6 +441,11 @@ export class Service {
     // heads), so it must not feed the pipeline or records would be pulled out of
     // order behind its partition model.
     if (this.type === "stream") return;
+    // GPU and Inference Gateway are tick-nodes the same way: tickGpu batches straight
+    // out of this.queue and tickInfgw owns its deadline array. Feeding this.processing
+    // would run their requests through the per-job pipeline behind the batch and
+    // deadline model's back.
+    if (this.type === "gpu" || this.type === "infgw") return;
 
     const effectiveCapacity = this.getEffectiveCapacity();
     while (this.processing.length < effectiveCapacity && this.queue.length > 0) {
@@ -395,12 +460,4 @@ export class Service {
       this.processing.push({ req, timer: 0 });
     }
   }
-}
-
-// Plain per-instance billing: one instance costs the base upkeep, each further
-// instance (ready or booting) costs the same again.
-function upkeepInstanceFactor(service: Service): number {
-  const extra = service.instances + service.warming.length - 1;
-  if (extra <= 0) return 1;
-  return 1 + extra * CONFIG.autoscaling.instanceUpkeepFactor;
 }

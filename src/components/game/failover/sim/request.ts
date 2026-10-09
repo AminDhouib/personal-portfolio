@@ -41,6 +41,8 @@ export class Request {
 
   /** INFERENCE only: scales the GPU batch time. 70% short (0.6-1.0), 30% long (1.8-3.0). */
   genLength = 1;
+  /** INFERENCE at a GPU: game time the request landed in the intake queue, stamped once. */
+  gpuArrivedAt: number | null = null;
 
   target: Service | null = null;
   origin: Vec2;

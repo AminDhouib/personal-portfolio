@@ -25,6 +25,7 @@ import { FAIL_REASONS } from "./failure-reasons";
 import type { Request } from "./request";
 import { isRoutable } from "./routing";
 import type { Service } from "./service";
+import { recordServiceError } from "./metrics";
 import { emit, S } from "./state";
 
 /**
@@ -62,6 +63,11 @@ export function retryRequest(req: Request, service: Service): boolean {
 
   const peer = findRetryPeer(service);
   if (!peer) return false;
+
+  // failRequest would have charged the node the error on the non-retry path, so doing
+  // it here keeps the error rate identical whichever path the request takes. The
+  // breaker event is recorded by the caller, which fires it on both paths.
+  recordServiceError(service);
 
   req.retries++;
   req.retryTarget = peer;

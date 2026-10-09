@@ -6,9 +6,11 @@ import { removeRequest } from "./actions";
 import { CONFIG, TICK } from "./config";
 import { log, pow } from "./dmath";
 import { getAutoRepairUpkeep, processAutoRepair } from "./economy";
+import { metricsTick } from "./metrics";
 import { emit, S } from "./state";
 import { spawnRequest } from "./traffic";
 import {
+  updateInferenceStaging,
   updateMaliciousSpike,
   updateRandomEvents,
   updateRegionOutage,
@@ -72,6 +74,8 @@ function stepOnce(): void {
   }
 
   updateMaliciousSpike();
+  // Stage the survival INFERENCE base share (0 to 3% to 10%).
+  updateInferenceStaging();
   updateTrafficShift(dt);
   updateRandomEvents(dt);
   processAutoRepair(dt);
@@ -84,6 +88,10 @@ function stepOnce(): void {
   }
 
   S.reputation = Math.min(100, S.reputation);
+
+  // Last, so a sample sees the step's outcome. Pure bookkeeping: nothing in the sim
+  // reads it back, so it cannot change how a run plays.
+  metricsTick();
 
   if (S.gameMode === "survival" && (S.reputation <= 0 || S.money <= MONEY_FLOOR)) {
     const reason = S.reputation <= 0 ? "reputation" : "money";

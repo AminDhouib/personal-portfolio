@@ -19,7 +19,8 @@ const SCRIPT = [...BOARD_S, ...MID_RUN_S];
 // sim change (the coordinator re-pins at the end of T8-1b once every mechanic has
 // landed; a mechanic added to the sim shifts both numbers). First recorded while
 // the T8-1b mechanics were still arriving, so expect this pin to move once.
-const GOLDEN_HASH = 1246757318;
+// Re-recorded in T8-1b A2 for the same stateHash additions (was 1246757318; the score did not move).
+const GOLDEN_HASH = 464767114;
 const GOLDEN_SCORE = 26175;
 
 describe("golden run", () => {

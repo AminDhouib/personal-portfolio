@@ -17,8 +17,9 @@
 // works whether or not the player bought a Monitoring node.
 
 import { CONFIG } from "./config";
+import { fireAlert } from "./metrics";
 import type { Service } from "./service";
-import { emit, S } from "./state";
+import { S } from "./state";
 
 /**
  * Whether a service is wired to a downstream that is ONLINE but skipped purely
@@ -50,12 +51,7 @@ function trip(service: Service): void {
   service.breakerProbes = 0;
   service.breakerEvents = [];
   S.resilience.trips++;
-  emit({
-    kind: "warning",
-    key: "alert_breaker_open",
-    level: "danger",
-    params: { type: service.type },
-  });
+  fireAlert(service, "breaker_open", "alert_breaker_open", "danger");
 }
 
 function close(service: Service): void {
@@ -63,12 +59,7 @@ function close(service: Service): void {
   service.breakerOpenSince = 0;
   service.breakerProbes = 0;
   service.breakerEvents = [];
-  emit({
-    kind: "warning",
-    key: "alert_breaker_closed",
-    level: "info",
-    params: { type: service.type },
-  });
+  fireAlert(service, "breaker_closed", "alert_breaker_closed", "info");
 }
 
 // One recorded job outcome. A failure comes from the load/health failure roll

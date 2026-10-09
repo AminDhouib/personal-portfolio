@@ -4,6 +4,7 @@
 // through dispatch(), so the live game and the server's re-simulation refuse and
 // accept exactly the same things (money, placement and edge rules are all state).
 
+import { canAutoscale, toggleAutoscaling } from "./autoscaling";
 import { CONFIG, SERVICE_TYPES, type ServiceType } from "./config";
 import { setAutoRepair } from "./economy";
 import { emit, S } from "./state";
@@ -152,18 +153,13 @@ function upgrade(id: string): ActionResult {
   return refuse(S.money < next.cost ? "money" : "not-upgradable");
 }
 
-// Compute and the container cluster run an auto-scaling group. Autoscaling itself
-// is ported separately; until it lands the toggle flips the flag and, when it goes
-// off, collapses the fleet to one instance (cancelling any boot), as upstream does.
+// Compute and the container cluster run an auto-scaling group. Turning it off
+// collapses the fleet to one instance and cancels any boot (see autoscaling.ts).
 function toggleAsg(id: string): ActionResult {
   const svc = findService(id);
   if (!svc) return refuse("missing");
-  if (svc.type !== "compute" && svc.type !== "container") return refuse("not-scalable");
-  svc.asgEnabled = !svc.asgEnabled;
-  if (!svc.asgEnabled) {
-    svc.instances = 1;
-    svc.warming = [];
-  }
+  if (!canAutoscale(svc)) return refuse("not-scalable");
+  toggleAutoscaling(svc);
   return { ok: true };
 }
 
