@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FailoverGame } from "../../failover";
+import { FailoverController } from "../controller";
 import type { FailoverScene } from "../scene/scene";
 import { S, resetSim } from "../sim/state";
 
@@ -118,6 +119,29 @@ describe("FailoverGame", () => {
       "true",
     );
     expect(window.localStorage.getItem("failover:audio")).toBe('{"v":1,"on":true}');
+  });
+
+  it("unlocks audio on the first pointerdown, once, so a stored 'on' preference plays", () => {
+    const unlock = vi.spyOn(FailoverController.prototype, "unlockAudio");
+    mount();
+    expect(unlock).not.toHaveBeenCalled();
+    const board = screen.getByLabelText(/Failover game board/);
+    const canvas = board.querySelector("canvas") as HTMLCanvasElement;
+    fireEvent.pointerDown(canvas, { pointerId: 1 });
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Pause (Space)" }), { pointerId: 2 });
+    fireEvent.keyDown(board, { key: "q" });
+    expect(unlock).toHaveBeenCalledTimes(1);
+    unlock.mockRestore();
+  });
+
+  it("unlocks audio on the first keydown when the keyboard comes first", () => {
+    const unlock = vi.spyOn(FailoverController.prototype, "unlockAudio");
+    mount();
+    const board = screen.getByLabelText(/Failover game board/);
+    fireEvent.keyDown(board, { key: "e" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Pause (Space)" }), { key: "Enter" });
+    expect(unlock).toHaveBeenCalledTimes(1);
+    unlock.mockRestore();
   });
 
   it("shows the end of a run and starts a new one", () => {

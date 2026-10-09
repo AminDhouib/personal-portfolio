@@ -336,6 +336,16 @@ export function FailoverGame() {
     }
   };
 
+  // The first press or key anywhere on the board is the user gesture the browser needs
+  // before an AudioContext can play; a stored "sound on" choice is silent until then.
+  const unlockedFor = useRef<FailoverController | null>(null);
+  const unlockAudio = () => {
+    const controller = controllerRef.current;
+    if (!controller || unlockedFor.current === controller) return;
+    unlockedFor.current = controller;
+    controller.unlockAudio();
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     // Keys typed into the toolbar's select or buttons are theirs.
     if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -347,6 +357,8 @@ export function FailoverGame() {
     <div
       ref={containerRef}
       tabIndex={0}
+      onPointerDownCapture={unlockAudio}
+      onKeyDownCapture={unlockAudio}
       onKeyDown={onKeyDown}
       aria-label="Failover game board. Keys: 1 select, 2 link, 3 demolish, WASD pan, Q and E turn, Space pause."
       className="relative h-[min(72vh,640px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-(--border) bg-[#050505] outline-none focus-visible:ring-2 focus-visible:ring-[#06b6d4]"
