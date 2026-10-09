@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FailoverGame } from "../../failover";
 import { FailoverController } from "../controller";
@@ -134,6 +134,20 @@ describe("Failover touch targets", () => {
     fireEvent.click(screen.getByRole("button", { name: "Metrics" }));
     expect(screen.getByRole("region", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getAllByRole("radio")).toHaveLength(3);
+    sweep();
+  });
+
+  it("sizes the save menu, reached from Settings, and its delete check", async () => {
+    render(<FailoverGame />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save or load" }));
+    expect(screen.queryByRole("region", { name: "Settings" })).toBeNull();
+    const save = await screen.findByRole("button", { name: "Save" });
+    await waitFor(() => expect(save).toBeEnabled());
+    sweep();
+    fireEvent.click(save);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.getByRole("button", { name: "Delete the save" })).toBeInTheDocument();
     sweep();
   });
 

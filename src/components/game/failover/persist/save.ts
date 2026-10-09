@@ -85,6 +85,47 @@ export function readSave(): SaveV1 | null {
   return parseSave(safeJsonParse<unknown>(text, "failover:save"));
 }
 
+/** The slot as the save menu shows it. */
+export type Slot =
+  | { kind: "empty" }
+  | { kind: "save"; save: SaveV1 }
+  /** A newer build wrote it: shown as such, never loaded, overwritten or deleted. */
+  | { kind: "newer" }
+  | { kind: "unreadable" };
+
+/** What the slot holds. Blocked storage reads as empty. */
+export function readSlot(): Slot {
+  let text: string | null;
+  try {
+    text = window.localStorage.getItem(SAVE_KEY);
+  } catch {
+    // silent-ok: blocked storage (private mode, SecurityError) just means no save
+    return { kind: "empty" };
+  }
+  if (text === null) return { kind: "empty" };
+  const value = safeJsonParse<unknown>(text, "failover:save");
+  if (typeof value === "object" && value !== null) {
+    const v = (value as { v?: unknown }).v;
+    if (typeof v === "number" && v > 1) return { kind: "newer" };
+  }
+  const save = parseSave(value);
+  return save ? { kind: "save", save } : { kind: "unreadable" };
+}
+
+export type DeleteResult = "deleted" | "newer" | "failed";
+
+/** Empty the slot. A value from a newer build is left alone. */
+export function deleteSave(): DeleteResult {
+  if (slotIsNewer()) return "newer";
+  try {
+    window.localStorage.removeItem(SAVE_KEY);
+    return "deleted";
+  } catch {
+    // silent-ok: blocked storage; the menu says the delete failed
+    return "failed";
+  }
+}
+
 export type LoadResult =
   { ok: true; result: ReplayResult } | { ok: false; reason: ReplayErrorCode | "invalid" };
 

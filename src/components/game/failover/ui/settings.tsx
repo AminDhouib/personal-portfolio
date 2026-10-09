@@ -25,12 +25,14 @@ export function Settings({
   controller,
   onReplayCoach,
   onStartMode,
+  onOpenSave,
   onClose,
 }: {
   hud: HudState;
   controller: FailoverController;
   onReplayCoach: () => void;
   onStartMode: (mode: GameMode) => void;
+  onOpenSave: () => void;
   onClose: () => void;
 }) {
   const other: GameMode = hud.mode === "sandbox" ? "survival" : "sandbox";
@@ -105,6 +107,10 @@ export function Settings({
         </div>
         <p className="text-[#a1a1aa]">{hud.tier === "high" ? T.gfx_now_high : T.gfx_now_low}</p>
       </fieldset>
+
+      <button type="button" onClick={onOpenSave} className={`${BUTTON} ${BUTTON_IDLE} self-start`}>
+        {T.save_or_load}
+      </button>
 
       <button
         type="button"

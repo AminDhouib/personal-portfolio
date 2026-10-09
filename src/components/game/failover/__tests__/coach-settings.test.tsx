@@ -76,7 +76,12 @@ describe("Coach", () => {
 });
 
 describe("Settings", () => {
-  function mountSettings(onReplayCoach = vi.fn(), onClose = vi.fn(), onStartMode = vi.fn()) {
+  function mountSettings(
+    onReplayCoach = vi.fn(),
+    onClose = vi.fn(),
+    onStartMode = vi.fn(),
+    onOpenSave = vi.fn(),
+  ) {
     const h = makeController();
     const bridge = createHudBridge();
     function Host() {
@@ -87,13 +92,14 @@ describe("Settings", () => {
           controller={h.controller}
           onReplayCoach={onReplayCoach}
           onStartMode={onStartMode}
+          onOpenSave={onOpenSave}
           onClose={onClose}
         />
       ) : null;
     }
     render(<Host />);
     act(() => bridge.connect(h.controller));
-    return { h, onReplayCoach, onClose, onStartMode };
+    return { h, onReplayCoach, onClose, onStartMode, onOpenSave };
   }
 
   it("names the mode and offers the other one as a new run", () => {
@@ -132,7 +138,9 @@ describe("Settings", () => {
   });
 
   it("offers the coach again, says why motion stays, and closes", () => {
-    const { onReplayCoach, onClose } = mountSettings();
+    const { onReplayCoach, onClose, onOpenSave } = mountSettings();
+    fireEvent.click(screen.getByRole("button", { name: "Save or load" }));
+    expect(onOpenSave).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: /Show the tour again/ }));
     expect(onReplayCoach).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/keeps its motion when your system asks for less/)).toBeInTheDocument();
