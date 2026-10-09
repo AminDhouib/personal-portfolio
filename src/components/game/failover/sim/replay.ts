@@ -13,6 +13,8 @@ import type { GameMode, GameOverReason } from "./types";
 export interface ReplayOptions {
   seed: string;
   mode: GameMode;
+  /** Starting money; leave unset for the mode default (a daily always does). */
+  budget?: number;
   /** The proof: `[tick, op, ...args]` entries, in tick order. */
   log: ReadonlyArray<readonly number[]>;
   /** How many ticks the run claims to have lasted at most (the cap, or where it ended). */
@@ -92,7 +94,11 @@ interface Run {
 
 function begin(opts: ReplayOptions): Run {
   const actions = plan(opts);
-  resetSim({ seed: opts.seed, mode: opts.mode });
+  resetSim({
+    seed: opts.seed,
+    mode: opts.mode,
+    ...(opts.budget === undefined ? {} : { budget: opts.budget }),
+  });
   let next = 0;
 
   return {

@@ -255,4 +255,12 @@ describe("replayAsync", () => {
       ),
     ).rejects.toThrow();
   });
+
+  it("starts from the budget it is given, else the mode default", () => {
+    const def = replay({ seed: SEED, mode: "survival", log: [], ticks: 0 });
+    expect(def.endedAtTick).toBe(0);
+    expect(S.money).toBe(500);
+    replay({ seed: SEED, mode: "survival", budget: 12345, log: [], ticks: 0 });
+    expect(S.money).toBe(12345);
+  });
 });
