@@ -56,7 +56,7 @@ upstream runs (36 bot runs and 216 seeded fuzz runs, bind, detonate and idle inc
 `upstream-parity.test.ts` replays, comparing result, per-turn events and warrior status, and the final
 map; regenerate with the script named in that test's header. The server will re-simulate daily runs with
 this same engine (planned for T7-5); player code never runs on the server and nothing server-side may import
-`script-knight/sandbox/` (T7-2 adds the guard).
+`script-knight/sandbox/` (`src/__tests__/no-player-code-on-server.test.ts` is the guard).
 
 `src/env.ts` is the sole `process.env` gateway for everything except five allowlisted files
 (`next.config.ts`, `playwright.config.ts` for its `E2E_*` variables, `src/instrumentation.ts`,
@@ -1103,6 +1103,33 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   Beyond that one case, `step` and `endTurn` are atomic: any other exception inside the engine ends
   the run as `engine-error` (a typed `StepResult` failure), and the half-played turn is not
   counted or returned.
+
+- **Player code runs only in a per-run Web Worker.** Script Knight evaluates the visitor's own
+  JavaScript with `new Function` (`sandbox/compile.ts`, the one call, with its one
+  `eslint-disable-next-line no-new-func` and reason), and only inside a fresh Web Worker that the
+  page terminates after the run. Never on the main thread, never on the server (the guard test
+  fails the build if `src/app/`, `src/lib/`, `src/hooks/` or `engine/` imports `sandbox/`). The
+  threat model is the visitor's own code in the visitor's own browser: the worker protects the
+  page from its mistakes (loops, crashes, stray globals) and keeps pasted code away from the page,
+  its storage and the network. Score integrity does not depend on it, because the page re-simulates
+  the run from the action tokens the worker posts and the server does the same. `lockDown` runs
+  before any player code and removes `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`,
+  `WebTransport`, `importScripts`, `indexedDB`, `caches`, `BroadcastChannel`, `Worker`,
+  `SharedWorker`, `postMessage`, `onmessage`, the listener APIs, `close`, the timers,
+  `queueMicrotask`, `requestAnimationFrame`, `navigator`, `location`, `performance` and `crypto`
+  from the scope and its whole prototype chain (`REMOVED_GLOBALS` is pinned by a test); the
+  worker captured its own `postMessage` first, so the player cannot post or forge a message. A name
+  that cannot be removed stops the run as a crash instead of running the code. **Nothing is
+  frozen**, on purpose: a player can pollute prototypes inside its own worker, which can only
+  change what its own senses return, and freezing intrinsics would break ordinary code through the
+  override mistake for no integrity gain. The page enforces three deadlines from outside
+  (`run-client.ts`), since synchronous code cannot be interrupted from inside: 1,000 ms to
+  `ready`, 250 ms between messages, 5,000 ms overall, then `worker.terminate()`. The facade caps
+  1,000 ability calls and 10 think lines per turn. Anything the worker posts that does not fit
+  `parseFromWorker`, or arrives out of turn order, ends the run as a crash. There is **no
+  main-thread fallback**: without Workers the player is told so and can still play by hand. A
+  dynamic `import()` of a remote module is outside this model (the code is the visitor's own and
+  the worker has no page access), and is not blocked.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
