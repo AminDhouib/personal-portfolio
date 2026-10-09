@@ -1,31 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import {
-  Check,
-  Eye,
-  Link2,
-  MousePointer2,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-  Trash2,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
-import { FailoverController, type HudState, type Speed } from "./failover/controller";
-import type { Tool } from "./failover/input/machine";
-import { CONFIG, SERVICE_TYPES, type ServiceType } from "./failover/sim/config";
+import { useEffect, useMemo, useRef } from "react";
+import { FailoverController, type HudState } from "./failover/controller";
 import { T, fmt } from "./failover/strings";
+import { clock } from "./failover/ui/format";
+import { StatusBar } from "./failover/ui/hud";
+import { Toast } from "./failover/ui/toast";
+import { ToolSheet } from "./failover/ui/tool-sheet";
+import { Controls, Tools } from "./failover/ui/toolbar";
+import { useCoarsePointer } from "./failover/ui/use-coarse-pointer";
 import { createHudBridge, useHud } from "./failover/ui/use-hud";
 
 /**
  * Failover: build a cloud that survives the traffic. The sim, the scene and
- * the controller live in `./failover/`; this entry mounts the canvas, wires
- * pointer and keyboard input to the controller and draws a minimal toolbar.
- * It is only ever loaded through the poster's dynamic import.
+ * the controller live in `./failover/`, the HUD pieces in `./failover/ui/`;
+ * this entry mounts the canvas, wires pointer and keyboard input to the
+ * controller and lays the HUD over the board. It is only ever loaded through
+ * the poster's dynamic import.
  */
 
 /** Movement under this many pixels between press and release is a tap, not a drag. */
@@ -37,168 +28,20 @@ const OVER_TEXT: Record<NonNullable<HudState["over"]>, string> = {
   retired: T.over_retired,
 };
 
-function clock(seconds: number): string {
-  const s = Math.floor(seconds);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-function ToolButton({
-  label,
-  pressed,
-  onClick,
-  children,
-}: {
-  label: string;
-  pressed?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
+/** The picked node and its upgrade, until the inspector lands. */
+function Selection({ hud, controller }: { hud: HudState; controller: FailoverController }) {
+  if (!hud.selected) return null;
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      title={label}
-      onClick={onClick}
-      className={`inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-md border px-2 text-xs transition-colors ${
-        pressed
-          ? "border-[#06b6d4] bg-[#06b6d4]/15 text-[#06b6d4]"
-          : "border-[#27272a] bg-[#0b0b0d]/90 text-[#d4d4d8] hover:border-[#52525b]"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Toolbar({ hud, controller }: { hud: HudState; controller: FailoverController }) {
-  const tool = hud.tool;
-  const placing = tool.kind === "place" ? tool.service : "";
-  const setTool = (next: Tool) => controller.setTool(next);
-  return (
-    <div className="pointer-events-auto flex flex-wrap items-center gap-1.5">
-      <label className="sr-only" htmlFor="failover-build">
-        {T.build_a_service}
-      </label>
-      <select
-        id="failover-build"
-        value={placing}
-        onChange={(e) => {
-          const service = e.target.value as ServiceType;
-          if (service) setTool({ kind: "place", service });
-        }}
-        className="h-9 rounded-md border border-[#27272a] bg-[#0b0b0d]/90 px-2 text-xs text-[#d4d4d8]"
+    <span className="pointer-events-auto inline-flex items-center gap-2 rounded-md bg-[#0b0b0d]/85 px-3 py-1.5 font-mono text-xs text-[#d4d4d8]">
+      {hud.selected.name} T{hud.selected.tier}, {Math.round(hud.selected.health)}%
+      <button
+        type="button"
+        onClick={() => controller.upgradeSelected()}
+        className="rounded border border-[#27272a] px-1.5 py-0.5 hover:border-[#52525b]"
       >
-        <option value="">{T.build_menu}</option>
-        {SERVICE_TYPES.map((type) => (
-          <option key={type} value={type}>
-            {CONFIG.services[type].name} (${CONFIG.services[type].cost})
-          </option>
-        ))}
-      </select>
-      <ToolButton
-        label={`${T.select} (1)`}
-        pressed={tool.kind === "select"}
-        onClick={() => setTool({ kind: "select" })}
-      >
-        <MousePointer2 className="h-4 w-4" aria-hidden />
-      </ToolButton>
-      <ToolButton
-        label={`${T.link} (2)`}
-        pressed={tool.kind === "link"}
-        onClick={() => setTool({ kind: "link" })}
-      >
-        <Link2 className="h-4 w-4" aria-hidden />
-      </ToolButton>
-      <ToolButton
-        label={`${T.demolish} (3)`}
-        pressed={tool.kind === "demolish"}
-        onClick={() => setTool({ kind: "demolish" })}
-      >
-        <Trash2 className="h-4 w-4" aria-hidden />
-      </ToolButton>
-      {hud.confirming && (
-        <>
-          <ToolButton label={T.confirm} onClick={() => controller.confirm()}>
-            <Check className="h-4 w-4" aria-hidden />
-          </ToolButton>
-          <ToolButton label={T.cancel} onClick={() => controller.cancelPending()}>
-            <X className="h-4 w-4" aria-hidden />
-          </ToolButton>
-        </>
-      )}
-      <span className="mx-1 h-6 w-px bg-[#27272a]" aria-hidden />
-      <ToolButton
-        label={`${hud.paused ? T.resume : T.pause} (Space)`}
-        onClick={() => controller.togglePause()}
-      >
-        {hud.paused ? (
-          <Play className="h-4 w-4" aria-hidden />
-        ) : (
-          <Pause className="h-4 w-4" aria-hidden />
-        )}
-      </ToolButton>
-      {([1, 2, 3] as Speed[]).map((speed) => (
-        <ToolButton
-          key={speed}
-          label={fmt(T.speed_n, { n: speed })}
-          pressed={!hud.paused && hud.speed === speed}
-          onClick={() => controller.setSpeed(speed)}
-        >
-          {speed}x
-        </ToolButton>
-      ))}
-      <ToolButton label={`${T.turn_left} (Q)`} onClick={() => controller.orbitView(-1)}>
-        <RotateCcw className="h-4 w-4" aria-hidden />
-      </ToolButton>
-      <ToolButton label={`${T.turn_right} (E)`} onClick={() => controller.orbitView(1)}>
-        <RotateCw className="h-4 w-4" aria-hidden />
-      </ToolButton>
-      <ToolButton label={`${T.top_down} (T)`} onClick={() => controller.toggleTopDown()}>
-        <Eye className="h-4 w-4" aria-hidden />
-      </ToolButton>
-      <ToolButton
-        label={hud.soundOn ? T.sound_off : T.sound_on}
-        pressed={hud.soundOn}
-        onClick={() => controller.setSoundOn(!hud.soundOn)}
-      >
-        {hud.soundOn ? (
-          <Volume2 className="h-4 w-4" aria-hidden />
-        ) : (
-          <VolumeX className="h-4 w-4" aria-hidden />
-        )}
-      </ToolButton>
-    </div>
-  );
-}
-
-function StatusLine({ hud, controller }: { hud: HudState; controller: FailoverController }) {
-  return (
-    <div className="pointer-events-auto flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[#0b0b0d]/85 px-3 py-1.5 font-mono text-xs text-[#d4d4d8]">
-      <span>${Math.floor(hud.money).toLocaleString("en-US")}</span>
-      <span>
-        {T.rep_short} {Math.max(0, Math.round(hud.reputation))}%
-      </span>
-      <span>{clock(hud.time)}</span>
-      <span>
-        {hud.rps.toFixed(1)} {T.reqs_per_second}
-      </span>
-      {hud.selected && (
-        <span className="inline-flex items-center gap-2">
-          {hud.selected.name} T{hud.selected.tier}, {Math.round(hud.selected.health)}%
-          <button
-            type="button"
-            onClick={() => controller.upgradeSelected()}
-            className="rounded border border-[#27272a] px-1.5 py-0.5 hover:border-[#52525b]"
-          >
-            {T.upgrade}
-          </button>
-        </span>
-      )}
-      <span role="status" aria-live="polite" className="text-[#f59e0b]">
-        {hud.toast ?? ""}
-      </span>
-    </div>
+        {T.upgrade}
+      </button>
+    </span>
   );
 }
 
@@ -208,6 +51,7 @@ export function FailoverGame() {
   const controllerRef = useRef<FailoverController | null>(null);
   const bridge = useMemo(() => createHudBridge(), []);
   const hud = useHud(bridge);
+  const coarse = useCoarsePointer();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -330,7 +174,7 @@ export function FailoverGame() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Keys typed into the toolbar's select or buttons are theirs.
+    // Keys typed into the toolbar's buttons and tabs are theirs.
     if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey) return;
     if (controllerRef.current?.key(e.key)) e.preventDefault();
   };
@@ -357,10 +201,20 @@ export function FailoverGame() {
         onContextMenu={(e) => e.preventDefault()}
       />
       {hud && controller && (
-        <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-col items-start gap-1.5">
-          <Toolbar hud={hud} controller={controller} />
-          <StatusLine hud={hud} controller={controller} />
-        </div>
+        <>
+          <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-1.5">
+            <div className="flex flex-col items-start gap-1.5">
+              <StatusBar hud={hud} />
+              <Tools hud={hud} controller={controller} />
+              <Selection hud={hud} controller={controller} />
+              <Toast text={hud.toast} />
+            </div>
+            <Controls hud={hud} controller={controller} />
+          </div>
+          <div className="pointer-events-none absolute inset-x-2 bottom-2 flex justify-center">
+            <ToolSheet hud={hud} controller={controller} coarse={coarse} />
+          </div>
+        </>
       )}
       {hud?.over && controller && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#050505]/75 text-center text-[#ededed]">
