@@ -104,6 +104,7 @@ export function createState(opts: ResetOptions): SimState {
     upkeepEnabled: sandbox ? CONFIG.sandbox.upkeepEnabled : true,
     autoRepairEnabled: false,
     sandboxBudget: sandbox ? budget : CONFIG.sandbox.defaultBudget,
+    startBudget: budget,
     trafficDistribution: sandbox ? sandboxMix() : { ...CONFIG.survival.trafficDistribution },
 
     maliciousSpikeTicks: 0,

@@ -86,13 +86,13 @@ export function buildShareUrl(base: string): ShareUrlResult {
 }
 
 export interface RebuildResult {
-  /** The sandbox budget the new board started with. */
+  /** The money the new board started with: the link budget, raised to the build cost if that is higher. */
   budget: number;
   placed: number;
   /** Services dispatch refused (a taken tile, off the board, a GPU without power) or the decoder dropped. */
   skipped: number;
   linked: number;
-  /** Edges dispatch refused (the reverse-edge guard, a skipped end). */
+  /** Edges dispatch refused: the reverse-edge guard, a skipped end, or a repeat of an edge already made (duplicate Internet indices survive decoding, as upstream, and count here). */
   unlinked: number;
 }
 
@@ -101,12 +101,17 @@ export interface RebuildResult {
  * therefore in the action log, so a save of it replays to the same board. The budget is the
  * blueprint's, raised to the build's own cost so a cheap budget still places everything
  * (money then bottoms out at zero instead of the shared build being cut short).
+ *
+ * DEVIATION from upstream, which grants the build's cost and settles to the link's budget
+ * afterwards: here the starting money is the raised figure (S.startBudget, what a save replays
+ * from), while S.sandboxBudget stays the link's own `b`, so re-sharing emits it unchanged.
  */
 export function rebuildBlueprint(arch: Arch, seed: string): RebuildResult {
   let total = 0;
   for (const service of arch.services) if (service) total += CONFIG.services[service.type].cost;
   const budget = Math.min(MAX_BLUEPRINT_BUDGET, Math.ceil(Math.max(arch.budget, total)));
   resetSim({ seed, mode: "sandbox", budget });
+  S.sandboxBudget = arch.budget;
 
   const ids = arch.services.map((service) => {
     if (!service) return null;

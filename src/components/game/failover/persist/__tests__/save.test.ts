@@ -211,6 +211,28 @@ describe("loadSave", () => {
     expect(S.services.map((s) => s.type)).toEqual(["waf"]);
   });
 
+  it("reports a run that ended before the saved tick as ok, with where it ended", async () => {
+    resetSim({ seed: "save-short", mode: "sandbox" });
+    step(10);
+    dispatch({ op: 8 });
+    const save: SaveV1 = {
+      v: 1,
+      savedAt: NOW,
+      mode: "sandbox",
+      seed: "save-short",
+      tick: 100,
+      log: "10,8",
+    };
+    resetSim({ seed: "elsewhere" });
+    const loaded = await loadSave(save);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.result.endReason).toBe("retired");
+    expect(loaded.result.endedAtTick).toBe(10);
+    expect(S.tick).toBe(10);
+    expect(S.over).toEqual({ reason: "retired", atTick: 10 });
+  });
+
   it("yields to the event loop while it replays", async () => {
     play("save-y", "survival", BOARD_S, 1200);
     const save = capture();

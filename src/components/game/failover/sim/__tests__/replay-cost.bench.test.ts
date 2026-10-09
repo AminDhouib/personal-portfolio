@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
+import { stateHash } from "../hash";
 import { dispatch, MAX_LOGGED_ACTIONS, type Action, type LoggedAction } from "../action-log";
 import type { ServiceType } from "../config";
+import { captureSave, loadSave } from "../../persist/save";
+import { MAX_SAVE_BUDGET, MAX_SAVE_TICKS } from "../../persist/save-schema";
 import { replayAsync } from "../replay";
 import { resetSim, S } from "../state";
 import { step } from "../tick";
@@ -73,8 +76,12 @@ function copyLog(): LoggedAction[] {
 }
 
 /** Play the run live: build the board, then issue actions up to the cap across the 15 minutes. */
-function recordRun(): LoggedAction[] {
-  resetSim({ seed: SEED, mode: "survival", budget: BUDGET });
+function recordRun(
+  mode: "survival" | "sandbox" = "survival",
+  runTicks = TICKS,
+  budget = BUDGET,
+): LoggedAction[] {
+  resetSim({ seed: SEED, mode, budget });
   const { places, links } = board();
   for (const p of places) dispatch({ op: 0, type: p.type, x: p.x, z: p.z });
   for (const [from, to] of links) dispatch({ op: 1, from: idOf(from), to: idOf(to) });
@@ -90,7 +97,7 @@ function recordRun(): LoggedAction[] {
 
   const computes = places.flatMap((p, i) => (p.type === "compute" ? [i + 1] : []));
   let tick = 0;
-  while (tick < TICKS && !S.over) {
+  while (tick < runTicks && !S.over) {
     step(24);
     tick += 24;
     if (S.log.length < MAX_LOGGED_ACTIONS) {
@@ -103,12 +110,15 @@ function recordRun(): LoggedAction[] {
       if (action) dispatch(action);
       // Refusals are not logged, so a pair of auto-repair flips (always accepted, net
       // no change) is what carries the log to the cap across the run.
-      if ((tick / 24) % 2 === 0) {
+      if ((tick / 24) % 2 === 0 && S.log.length + 2 <= MAX_LOGGED_ACTIONS) {
         dispatch({ op: 7, on: true });
         dispatch({ op: 7, on: false });
       }
     }
   }
+  // Land exactly on the cap, however many of the attempts above were accepted.
+  while (S.log.length < MAX_LOGGED_ACTIONS && !S.over)
+    dispatch({ op: 7, on: S.log.length % 2 === 0 });
   return copyLog();
 }
 
@@ -182,5 +192,31 @@ describe("replay cost (go / no-go spike)", () => {
       expect(small.maxChunkMs).toBeLessThan(TARGET_CHUNK_MS * MARGIN);
     },
     TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "loads a save at the 36,000 tick, 700 action cap within budget",
+    async () => {
+      // Sandbox cannot be lost, so the run reaches the cap; its budget must fit a save.
+      recordRun("sandbox", MAX_SAVE_TICKS, MAX_SAVE_BUDGET);
+      expect(S.tick).toBe(MAX_SAVE_TICKS);
+      expect(S.log.length).toBe(MAX_LOGGED_ACTIONS);
+      const saved = captureSave(0);
+      if (!saved.ok) throw new Error(`capture failed: ${saved.reason}`);
+      const liveHash = stateHash();
+
+      resetSim({ seed: "elsewhere" });
+      const start = performance.now();
+      const loaded = await loadSave(saved.save);
+      const wallMs = performance.now() - start;
+      console.info(`save load at the cap: ${MAX_SAVE_TICKS} ticks, ${wallMs.toFixed(0)} ms wall`);
+
+      expect(loaded.ok).toBe(true);
+      expect(S.tick).toBe(MAX_SAVE_TICKS);
+      expect(stateHash()).toBe(liveHash);
+      // Twice the 15 minute replay budget for twice the ticks, with the same 4x margin.
+      expect(wallMs).toBeLessThan(2 * TARGET_TOTAL_MS * MARGIN);
+    },
+    2 * TEST_TIMEOUT_MS,
   );
 });

@@ -229,6 +229,8 @@ export interface SimState {
   upkeepEnabled: boolean;
   autoRepairEnabled: boolean;
   sandboxBudget: number;
+  /** The money the run started with: what a replay must reset to. Unlike sandboxBudget, which is what a share link carries, it is never edited after reset. */
+  startBudget: number;
   trafficDistribution: TrafficMix;
 
   /** Ticks into the malicious-spike cycle; the cycle is counted in whole ticks. */

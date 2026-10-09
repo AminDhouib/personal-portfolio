@@ -464,6 +464,20 @@ describe("rebuild security (allowlist and guards)", () => {
     rebuildBlueprint(small, "s");
     expect(S.services).toHaveLength(2);
     expect(S.money).toBe(0);
+    // The link's own budget survives, so re-sharing emits it unchanged (as upstream does).
+    expect(S.sandboxBudget).toBe(10);
+    expect(captureBlueprint().b).toBe(10);
+    expect(S.startBudget).toBe(cost);
+  });
+
+  it("counts a repeated Internet edge as unlinked", () => {
+    const arch = decodeArchParam(
+      payload({ v: 1, b: 1000, t: ["waf"], p: [0, 0], c: [], i: [0, 0, 0] }),
+    );
+    expect(arch?.internet).toEqual([0, 0, 0]);
+    if (!arch) throw new Error("decode failed");
+    expect(rebuildBlueprint(arch, "s")).toMatchObject({ linked: 1, unlinked: 2 });
+    expect(S.internetNode.connections).toHaveLength(1);
   });
 
   it("survives two services claiming the same tile (placement refuses the second)", () => {
