@@ -116,7 +116,10 @@ export interface ControllerOptions {
 /** The HUD refreshes this often (ms) unless something discrete happens first. */
 const HUD_INTERVAL_MS = 250;
 
-/** Sim events the HUD shows at once rather than on its next 4 Hz refresh. */
+/**
+ * Sim events the HUD shows at once rather than on its next 4 Hz refresh.
+ * request-failed and service-badge stay on the refresh: under load they fire many times a tick.
+ */
 const DISCRETE: ReadonlySet<SimEvent["kind"]> = new Set<SimEvent["kind"]>([
   "service-placed",
   "service-removed",
@@ -126,6 +129,7 @@ const DISCRETE: ReadonlySet<SimEvent["kind"]> = new Set<SimEvent["kind"]>([
   "link-removed",
   "event-start",
   "event-end",
+  "warning",
   "game-over",
 ]);
 const TOAST_MS = 2600;
