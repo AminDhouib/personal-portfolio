@@ -138,11 +138,14 @@ export class Detonate extends Action {
       description: "detonates a bomb {direction} launching a deadly explosion",
       params: { direction },
     });
+    // Every space is read before the first bomb falls: a chained explosion can remove the
+    // detonating unit itself, and a removed unit has no position to read spaces from.
     const targetSpace = this.unit.getSpaceAt(direction);
-    this.bomb(targetSpace, this.targetPower);
-    SURROUNDING_OFFSETS.map(([forward, right]) =>
+    const surroundingSpaces = SURROUNDING_OFFSETS.map(([forward, right]) =>
       this.unit.getSpaceAt(direction, forward, right),
-    ).forEach((surroundingSpace) => {
+    );
+    this.bomb(targetSpace, this.targetPower);
+    surroundingSpaces.forEach((surroundingSpace) => {
       this.bomb(surroundingSpace, this.surroundingPower);
     });
   }
