@@ -364,13 +364,13 @@ export function Stage({
   const runOne = useCallback(
     async (token: RunToken) => {
       const handle = daily
-        ? startDailyRun(dayKey, code, runner)
+        ? startDailyRun(dayKey, code, knownRunner)
         : startFloorRun({ kind: "tower", tower, level, epic: useEpic }, code, knownRunner);
       cancelRef.current = handle.cancel;
       const done = await handle.done;
       if (isLive(token)) finishFloor(done);
     },
-    [code, daily, dayKey, finishFloor, isLive, knownRunner, level, runner, tower, useEpic],
+    [code, daily, dayKey, finishFloor, isLive, knownRunner, level, tower, useEpic],
   );
 
   const runEpic = useCallback(

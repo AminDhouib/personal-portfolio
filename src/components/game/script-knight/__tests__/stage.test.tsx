@@ -417,6 +417,42 @@ describe("Stage, Today's floor", () => {
     expect(localStorage.getItem(PROGRESS_KEY)).toBeNull();
   });
 
+  it("names the editor's line for a syntax error in the daily floor", async () => {
+    function FindingEditor({ onSyntaxError }: EditorProps) {
+      useEffect(() => {
+        onSyntaxError?.({ line: 4, column: 2, from: 40, to: 41 });
+      }, [onSyntaxError]);
+      return <textarea aria-label="Your Player code (JavaScript)" readOnly />;
+    }
+    const runner: Runner = () => ({
+      done: Promise.resolve<RunOutcome>({
+        kind: "compile-error",
+        error: { kind: "syntax", message: "Unexpected token '}'", line: null },
+      }),
+      cancel: () => {},
+    });
+    render(<Stage runner={runner} editor={FindingEditor} />);
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText("Line 4: Unexpected token '}'")).toBeTruthy();
+  });
+
+  it("refuses an oversize paste in the daily floor too and keeps the day's code", async () => {
+    const { container } = render(<Stage runner={dailyRunner()} editor={CodeEditor} />);
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    const view = EditorView.findFromDOM(
+      container.querySelector(".cm-editor") as HTMLElement,
+    ) as EditorView;
+    const before = view.state.doc.toString();
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, to: before.length, insert: "x".repeat(CODE_MAX_CHARS + 1) },
+      });
+    });
+    expect(view.state.doc.toString()).toBe(before);
+    expect(screen.getByText(TOO_LONG_MESSAGE)).toBeTruthy();
+  });
+
   it("posts the log as the proof and numbers only as the detail", async () => {
     render(<Stage runner={dailyRunner()} />);
     fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
