@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HextrisSounds } from "../sound-manager";
 import type { EngineEvent } from "../engine/types";
@@ -238,5 +238,62 @@ describe("Hextris one-tap restart", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     runFrames(1);
     expect(sheet()).toBeNull();
+  });
+});
+
+describe("Hextris share", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, "share");
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("copies the score line and the link without a share sheet, and says Copied", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    const button = screen.getByRole("button", { name: "Share" });
+    expect(button.className).toContain("min-h-11");
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByText("Copied")).toBeInTheDocument());
+    expect(writeText).toHaveBeenCalledWith(
+      "I scored 120 in Hextris https://amindhou.com/games/hextris",
+    );
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it("opens the share sheet when there is one, with no toast", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledWith({
+      title: "Hextris",
+      text: "I scored 120 in Hextris",
+      url: "https://amindhou.com/games/hextris",
+    });
+    expect(screen.queryByText("Copied")).toBeNull();
+  });
+
+  it("says so when nothing can copy", async () => {
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(screen.getByText("Could not copy")).toBeInTheDocument());
+  });
+
+  it("is not offered for a run that scored 0", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(0);
+    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
   });
 });
