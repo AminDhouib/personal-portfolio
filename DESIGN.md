@@ -51,8 +51,10 @@ no React, DOM, storage or clock, and no hidden randomness, so a run is fully det
 level and its action log (`codec.ts`, `"1:"` plus two characters per turn). `run.ts` steps it
 (`beginTurn` / `endTurn`, or `step(action)` for replays, hand play and the server). Its `LICENSE`
 ships beside it and every ported file names the upstream file it came from
-(`__tests__/licence.test.ts` pins both). `__tests__/fixtures/upstream-runs.json` holds 36
-upstream runs that `upstream-parity.test.ts` replays. The server will re-simulate daily runs with
+(`__tests__/licence.test.ts` pins both). `__tests__/fixtures/upstream-runs.json` holds 252
+upstream runs (36 bot runs and 216 seeded fuzz runs, bind, detonate and idle included) that
+`upstream-parity.test.ts` replays, comparing result, per-turn events and warrior status, and the final
+map; regenerate with the script named in that test's header. The server will re-simulate daily runs with
 this same engine (planned for T7-5); player code never runs on the server and nothing server-side may import
 `script-knight/sandbox/` (T7-2 adds the guard).
 
