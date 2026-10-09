@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
+import { ACTION_LOG_RE } from "./engine/codec";
 import { storedVersionIsNewer } from "./stored-version";
 
 // Local daily statistics. Their own key, never uploaded, display-only (DESIGN.md: forgeable, so
@@ -24,6 +25,12 @@ export type KnightStats = {
   bestStreakDays: number;
   /** The handle last used on the board (sanitized on the server; capped at 12 here). */
   handle: string;
+  /**
+   * Your best log for one UTC day, replayed as a translucent knight in a new run that day. It
+   * never affects a run, a score or a proof. `score` is the log's score, so a later run can be
+   * compared with it.
+   */
+  ghost: { day: string; log: string; score: number } | null;
 };
 
 export const EMPTY_STATS: KnightStats = {
@@ -34,6 +41,7 @@ export const EMPTY_STATS: KnightStats = {
   streakDays: 0,
   bestStreakDays: 0,
   handle: "",
+  ghost: null,
 };
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,6 +51,15 @@ const count = z
   .finite()
   .transform((n) => Math.min(COUNT_CAP, Math.max(0, Math.floor(n))))
   .catch(0);
+
+const ghostSchema = z
+  .object({
+    day: z.string().regex(DAY_PATTERN),
+    log: z.string().regex(ACTION_LOG_RE),
+    score: z.number().finite().min(0).transform(Math.floor),
+  })
+  .nullable()
+  .catch(null);
 
 const statsSchema = z.object({
   v: z.literal(1),
@@ -61,6 +78,7 @@ const statsSchema = z.object({
     .string()
     .transform((text) => text.slice(0, HANDLE_MAX))
     .catch(""),
+  ghost: ghostSchema,
 });
 
 export function parseStats(raw: unknown): KnightStats {
@@ -97,6 +115,8 @@ function previousDay(dayKey: string): string {
 
 export type DailyClear = {
   score: number;
+  /** The action log of the clear; kept as the ghost when it is the day's best. */
+  log?: string;
   /** The UTC day the floor was cleared on, "YYYY-MM-DD". */
   day: string;
 };
@@ -112,6 +132,12 @@ export function recordDaily(stats: KnightStats, clear: DailyClear): KnightStats 
   next.runs = Math.min(COUNT_CAP, next.runs + 1);
   if (next.bestDaily === null || score > next.bestDaily.score) {
     next.bestDaily = { day: clear.day, score };
+  }
+  if (clear.log !== undefined && ACTION_LOG_RE.test(clear.log)) {
+    const held = next.ghost;
+    if (held === null || held.day !== clear.day || score > held.score) {
+      next.ghost = { day: clear.day, log: clear.log, score };
+    }
   }
   const last = next.lastDailyDay;
   if (last === clear.day) return next;
@@ -133,4 +159,9 @@ export function activeStreak(stats: KnightStats, today: string): number {
 export function setHandle(stats: KnightStats, handle: string): KnightStats {
   const next = handle.slice(0, HANDLE_MAX);
   return stats.handle === next ? stats : { ...stats, handle: next };
+}
+
+/** The ghost's log for `day`, or null: a ghost belongs to the day it was set. */
+export function ghostFor(stats: KnightStats, day: string): string | null {
+  return stats.ghost?.day === day ? stats.ghost.log : null;
 }
