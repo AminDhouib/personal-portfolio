@@ -149,37 +149,87 @@ describe("Word Rain view", () => {
     expect(screen.getByTestId("ts-rain-echo")).toHaveTextContent(text.slice(0, 1));
   });
 
-  it("holds the buffer while an IME composes, then clears the composed word exactly once", () => {
-    renderRain();
-    start();
-    frames(2);
-    const text = words()[0]!.textContent!;
+  describe("with an IME composing", () => {
+    const compose = (type: "compositionstart" | "compositionend", data = "") =>
+      act(() => {
+        input().dispatchEvent(new CompositionEvent(type, { bubbles: true, data }));
+      });
+    const composing = (value: string) => setValue(SENTINEL + value, "insertCompositionText");
     const score = () => screen.getByTestId("ts-rain-score");
-    act(() => {
-      input().dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
-    });
-    // The composing text is the keyboard's to rewrite: nothing is scored and the value is left alone.
-    for (let i = 1; i <= text.length; i++) {
-      setValue(SENTINEL + text.slice(0, i), "insertCompositionText");
-      expect(input().value).toBe(SENTINEL + text.slice(0, i));
+    const missed = () => screen.getByTestId("ts-rain-area");
+
+    function live() {
+      renderRain();
+      start();
+      frames(2);
+      return words()[0]!.textContent!;
     }
-    expect(score()).toHaveTextContent("0");
-    expect(words().some((w) => w.textContent === text)).toBe(true);
-    expect(screen.getByTestId("ts-rain-area")).toHaveAttribute("data-missed", "0");
-    // Enter commits a composition; it is not the Rain Enter that clears the buffer.
-    fireEvent.keyDown(input(), { key: "Enter", isComposing: true });
-    expect(input().value).toBe(SENTINEL + text);
-    act(() => {
-      input().dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: text }));
+
+    it("scores a word composed letter by letter live, without bulk or a value write", () => {
+      const text = live();
+      compose("compositionstart");
+      for (let i = 1; i < text.length; i++) {
+        composing(text.slice(0, i));
+        expect(screen.getByTestId("ts-rain-echo")).toHaveTextContent(text.slice(0, i));
+        expect(input().value).toBe(SENTINEL + text.slice(0, i));
+      }
+      composing(text);
+      // Cleared the moment its last letter landed; the keyboard's own value is left as it is.
+      expect(score()).toHaveTextContent(String(text.length));
+      expect(words().find((w) => w.textContent === text)).toBeUndefined();
+      expect(screen.getByTestId("ts-rain-echo").textContent).toBe("");
+      expect(input().value).toBe(SENTINEL + text);
+      compose("compositionend", text);
+      expect(input().value).toBe(SENTINEL);
+      expect(missed()).toHaveAttribute("data-missed", "0");
+      frames(500);
+      expect(screen.getByTestId("ts-rain-over")).toBeInTheDocument();
+      expect(screen.queryByText(/keyboard suggestions/)).toBeNull();
     });
-    expect(score()).toHaveTextContent(String(text.length));
-    expect(words().find((w) => w.textContent === text)).toBeUndefined();
-    expect(input().value).toBe(SENTINEL);
-    expect(screen.getByTestId("ts-rain-area")).toHaveAttribute("data-missed", "0");
-    // A late input event for the same text (some browsers fire it after compositionend) is inert.
-    setValue(SENTINEL, "insertCompositionText");
-    expect(score()).toHaveTextContent(String(text.length));
-    expect(screen.getByTestId("ts-rain-area")).toHaveAttribute("data-missed", "0");
+
+    it("does not score the leftover text again when the word cleared mid-composition", () => {
+      const text = live();
+      compose("compositionstart");
+      composing(text);
+      expect(score()).toHaveTextContent(String(text.length));
+      composing(text + " ");
+      compose("compositionend", text + " ");
+      expect(score()).toHaveTextContent(String(text.length));
+      expect(missed()).toHaveAttribute("data-missed", "0");
+      expect(input().value).toBe(SENTINEL);
+      expect(screen.getByTestId("ts-rain-echo").textContent).toBe("");
+    });
+
+    it("applies a remainder that arrives only with compositionend", () => {
+      const text = live();
+      compose("compositionstart");
+      composing(text.slice(0, 1));
+      act(() => {
+        valueSetter.call(input(), SENTINEL + text);
+      });
+      compose("compositionend", text);
+      expect(score()).toHaveTextContent(String(text.length));
+      expect(input().value).toBe(SENTINEL);
+    });
+
+    it("counts a step that inserts a whole word at once as bulk", () => {
+      const text = live();
+      compose("compositionstart");
+      composing(text);
+      expect(score()).toHaveTextContent(String(text.length));
+      compose("compositionend", text);
+      frames(500);
+      expect(screen.getByText(/keyboard suggestions/)).toBeInTheDocument();
+    });
+
+    it("keeps the buffer on Enter, and leaves it to compositionend", () => {
+      const text = live();
+      compose("compositionstart");
+      composing(text.slice(0, 1));
+      fireEvent.keyDown(input(), { key: "Enter", isComposing: true });
+      expect(screen.getByTestId("ts-rain-echo")).toHaveTextContent(text.slice(0, 1));
+      expect(input().value).toBe(SENTINEL + text.slice(0, 1));
+    });
   });
 
   it("Space clears the buffer", () => {

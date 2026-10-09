@@ -70,6 +70,9 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
       invalidRef.current = bad;
       setBuffer(next);
       setInvalid(bad);
+      // While composing the keyboard owns the value (writing it makes some keyboards re-insert
+      // text), so it is left alone and re-synced at compositionend.
+      if (composingRef.current) return;
       const el = inputRef.current;
       const value = SENTINEL + next;
       if (el && el.value !== value) {
@@ -166,8 +169,8 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
   );
 
   // The hidden input holds SENTINEL plus the buffer, so Backspace on an empty buffer still fires.
-  // While an IME composes, the value is the keyboard's: clearing it mid-composition makes some
-  // keyboards re-insert the old text, so nothing is scored or rewritten until compositionend.
+  // While an IME composes, letters score live from the diff against the last value seen, but the
+  // value itself is never written; compositionend settles any remainder and re-syncs the value.
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -179,9 +182,10 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
         return;
       }
       applyOps(diff.ops, diff.bulk);
+      // The value was not rewritten while composing, so it is what the next diff starts from.
+      if (composingRef.current) lastValue.current = el.value;
     };
     const onInput = (e: Event) => {
-      if (composingRef.current || (e as InputEvent).isComposing) return;
       settle((e as InputEvent).inputType || "insertText");
     };
     const onCompositionStart = () => {
