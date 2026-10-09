@@ -1059,12 +1059,20 @@ The following Password Game 2 entries were verified against the current tree on 
   `That turn is over`. The sandbox in T7-2 wraps the same facade with its per-turn caps.
 - **Script Knight events carry unit ids.** Upstream identifies a unit by name only, so two Sludges
   are indistinguishable between events. Each `FloorSpace.unit` and `TurnEvent.actor` gains an `id`
-  (the unit's index in `floor.units`; the warrior is 0), and each run owns its own `Logger` instead
-  of upstream's module singleton, so two runs stepped alternately do not mix their logs. The
-  parity test strips the ids before comparing against upstream's final maps. Two other small
-  differences are deliberate: `think` formats with a guarded `JSON.stringify` instead of
-  `util.format` (no `node:util`), and a run that uses all 200 turns ends as `out-of-turns`
-  (upstream fails it silently).
+  (the unit's index in `floor.units`; the warrior is 0). The parity test strips the ids before
+  comparing against upstream's final maps.
+- **Each Script Knight run owns its own Logger.** Upstream keeps one module-level singleton, so two
+  runs stepped alternately would mix their logs and a second run would inherit the first's turns.
+  The port holds the `Logger` in the `Level` and `Floor`, and `deviations.test.ts` steps two runs
+  alternately to pin it.
+- **`think` formats with a guarded `JSON.stringify`, not `util.format`.** The engine must stay free
+  of `node:util` (it runs in the browser and in the sandbox). Strings print as they are, primitives
+  by `String`, an `Error` by its message, anything else as JSON, with a placeholder for a cyclic or
+  throwing value, joined by spaces and cut at 200 characters. Upstream's `%o` placeholder test was
+  changed on purpose: `%o` is now printed literally.
+- **A Script Knight run that uses all 200 turns ends as `out-of-turns`.** Upstream fails it
+  silently, so a caller could not tell running out of time from dying. `RunStatus` has the extra
+  member; scoring treats it as not passed, exactly as upstream does.
 - **Detonating a ticking captive does not crash Script Knight.** Upstream throws `Captive has no
 position` there: `Detonate` damages the captive (which removes it), then its chained `Ticking`
   asks the removed unit for its neighbours. On Powder Keep levels 6 and 7 epic that corrupted the
