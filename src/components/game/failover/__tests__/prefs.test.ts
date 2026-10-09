@@ -50,6 +50,7 @@ describe("failover:audio", () => {
       expect(parseAudioOn(raw)).toBe(false);
     }
     expect(parseAudioOn({ v: 1, on: true })).toBe(true);
+    expect(parseAudioOn({ v: 1, on: true, extra: 1 })).toBe(true);
   });
 
   it("survives corrupt JSON and blocked storage", () => {
@@ -107,6 +108,7 @@ describe("failover:gfx", () => {
     ]) {
       expect(parseGfxPref(raw)).toBe("auto");
     }
+    expect(parseGfxPref({ v: 1, tier: "low", extra: 1 })).toBe("low");
   });
 
   it("never touches the audio key", () => {
