@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ARCADE_GAME_SLUGS,
+  ARCADE_VERIFY_BUDGET_MS,
   ARCADE_GAMES,
   LEGACY_ARCADE_GAME_SLUGS,
   validateArcadeSubmission,
@@ -22,6 +23,15 @@ describe("failover in the arcade registry", () => {
   it("is an arcade slug, and not a legacy one", () => {
     expect([...ARCADE_GAME_SLUGS]).toContain("failover");
     expect([...LEGACY_ARCADE_GAME_SLUGS]).not.toContain("failover");
+  });
+
+  it("gets 8000 ms to verify, and every other game keeps the default", () => {
+    // Worst case 605 ms on a fast desktop; 8000 covers a host about 4 times slower with 2 waiting.
+    expect(ARCADE_GAMES.failover.verifyBudgetMs).toBe(8_000);
+    for (const [slug, entry] of Object.entries(ARCADE_GAMES)) {
+      if (slug !== "failover") expect("verifyBudgetMs" in entry).toBe(false);
+    }
+    expect(ARCADE_VERIFY_BUDGET_MS).toBe(2_000);
   });
 
   it("requires a proof and verifies it with the replay verifier", () => {

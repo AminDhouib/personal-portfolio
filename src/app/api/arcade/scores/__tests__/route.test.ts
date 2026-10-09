@@ -835,9 +835,11 @@ describe("submit contract (pins before the proof seam)", () => {
     const { ARCADE_GAMES } = await import("@/lib/arcade/games");
     for (const [slug, entry] of Object.entries(ARCADE_GAMES)) {
       expect(Object.keys(entry), slug).toEqual(
-        slug === "script-knight" || slug === "failover"
-          ? ["detailSchema", "requiresProof", "verify"]
-          : ["detailSchema"],
+        slug === "failover"
+          ? ["detailSchema", "requiresProof", "verify", "verifyBudgetMs"]
+          : slug === "script-knight"
+            ? ["detailSchema", "requiresProof", "verify"]
+            : ["detailSchema"],
       );
     }
   });
@@ -1018,6 +1020,42 @@ describe("proof seam", () => {
   it("keeps the budget at 2,000 ms", async () => {
     const { ARCADE_VERIFY_BUDGET_MS } = await import("@/lib/arcade/games");
     expect(ARCADE_VERIFY_BUDGET_MS).toBe(2_000);
+  });
+
+  it("gives a game its own budget when its entry names one, counted from the request", async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    const verify = vi.fn<Verify>(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      return { ok: true };
+    });
+    await install({ requiresProof: true, verify, verifyBudgetMs: 8_000 });
+    const pending = submit({ proof: MARK });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const { res } = await pending;
+    expect(res.status).toBe(200);
+    expect(verify.mock.calls[0]?.[0].deadline).toBe(NOW.getTime() + 8_000);
+  });
+
+  it("still fails closed at the named budget, not before and not after", async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    await install({
+      requiresProof: true,
+      verify: () => new Promise<never>(() => {}),
+      verifyBudgetMs: 8_000,
+    });
+    let settled = false;
+    const pending = submit({ proof: MARK }).then((out) => {
+      settled = true;
+      return out;
+    });
+    await vi.advanceTimersByTimeAsync(7_999);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await pending).res.status).toBe(422);
   });
 
   it("does not leave a timer behind after a fast verifier", async () => {
