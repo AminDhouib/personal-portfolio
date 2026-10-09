@@ -219,6 +219,23 @@ describe("step", () => {
     expect(stepOk(run, { name: "walk", direction: null }).t).toBe(1);
   });
 
+  it("rejects what is not one of the eight actions, senses included", () => {
+    const run = createRun(tower(1));
+    for (const name of ["think", "feel", "health", "constructor", "__proto__", "nope"]) {
+      const stepped = run.step({ name: name as never, direction: null });
+      expect(stepped).toMatchObject({ ok: false, reason: { kind: "invalid-action" } });
+    }
+    expect(run.turnCount).toBe(0);
+    expect(run.status).toBe("playing");
+  });
+
+  it("rejects a direction on rest instead of dropping it", () => {
+    const run = createRun(tower(2, true));
+    const stepped = run.step({ name: "rest", direction: "left" });
+    expect(stepped).toMatchObject({ ok: false, reason: { kind: "invalid-action" } });
+    expect(run.turnCount).toBe(0);
+  });
+
   it("returns a typed failure for a direction that is not one, and stays playable", () => {
     const run = createRun(tower(1));
     const stepped = run.step({ name: "walk", direction: "north" as never });

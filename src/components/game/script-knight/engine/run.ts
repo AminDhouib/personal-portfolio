@@ -1,11 +1,10 @@
-import type { ActionName, TurnAction } from "./codec";
+import { type ActionName, invalidActionReason, type TurnAction } from "./codec";
 import { type Level, loadLevel, MAX_TURNS } from "./core/level";
 import { getLevelConfig, type LevelConfig } from "./core/level-config";
 import type { TurnEvent } from "./core/logger";
 import { createFacade, type TurnFacade, type WarriorTurn } from "./facade";
 import type { TowerLevelRef } from "./level-ref";
 import { getLevelScore, type LevelScore } from "./scoring";
-import { verifyRelativeDirection } from "./spatial";
 import { isTowerId, TOWERS } from "./towers";
 
 export type { WarriorTurn } from "./facade";
@@ -185,18 +184,12 @@ class RunImpl implements Run {
     }
     // Check everything that could fail before the turn begins, so a refused action leaves the
     // run exactly as it was.
-    if (action) {
-      if (!this.level.floor.warrior?.abilities.has(action.name)) {
-        return { ok: false, reason: { kind: "ungranted-action", action: action.name } };
-      }
-      if (action.direction !== null) {
-        try {
-          verifyRelativeDirection(action.direction);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { ok: false, reason: { kind: "invalid-action", message } };
-        }
-      }
+    const invalid = invalidActionReason(action);
+    if (invalid !== null) {
+      return { ok: false, reason: { kind: "invalid-action", message: invalid } };
+    }
+    if (action && !this.level.floor.warrior?.abilities.has(action.name)) {
+      return { ok: false, reason: { kind: "ungranted-action", action: action.name } };
     }
     const turn = this.beginTurn();
     try {
