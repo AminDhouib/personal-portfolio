@@ -680,16 +680,178 @@ describe("submit contract (pins before the proof seam)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("treats a proof key as unknown today", async () => {
-    const res = await post(body({ proof: "abc" }));
-    expect(res.status).toBe(400);
-  });
-
   it("registers no verifier and no proof requirement for any game yet", async () => {
     const { ARCADE_GAMES } = await import("@/lib/arcade/games");
     for (const entry of Object.values(ARCADE_GAMES)) {
       expect(Object.keys(entry)).toEqual(["detailSchema"]);
     }
+  });
+});
+
+// The proof seam: an optional proof string and a per-game async verifier. No game registers one
+// yet, so each test installs a fake on the (per-test fresh) registry.
+describe("proof seam", () => {
+  const MARK = "PROOFMARK";
+
+  beforeEach(async () => {
+    // The log mock is shared by every test in the file: count only this test's reports.
+    (await reported()).mockClear();
+  });
+  type Entry = import("@/lib/arcade/games").ArcadeGameEntry;
+  type Verify = NonNullable<Entry["verify"]>;
+
+  async function install(
+    patch: Partial<Entry>,
+    game: "space-shooter" | "hextris" = "space-shooter",
+  ) {
+    const { ARCADE_GAMES } = await import("@/lib/arcade/games");
+    Object.assign(ARCADE_GAMES[game] as Entry, patch);
+  }
+
+  function allParams(): string {
+    return JSON.stringify(emu.fake.queries.map((q) => q.params));
+  }
+
+  it("ignores a proof for a game without a verifier, and never stores it", async () => {
+    const { res } = await submit({ proof: MARK });
+    expect(res.status).toBe(200);
+    expect(allParams()).not.toContain(MARK);
+    expect(JSON.stringify(emu.scores())).not.toContain(MARK);
+  });
+
+  it("accepts a proof of exactly 12,000 characters and refuses 12,001 with 400", async () => {
+    expect((await submit({ proof: "p".repeat(12_000) })).res.status).toBe(200);
+    const { res } = await submit({ proof: "p".repeat(12_001), score: 4300 });
+    expect(res.status).toBe(400);
+  });
+
+  it("still refuses a non-string proof and any other unknown key", async () => {
+    expect((await submit({ proof: 5 })).res.status).toBe(400);
+    expect((await submit({ proofs: "x" })).res.status).toBe(400);
+  });
+
+  it("answers 400 when a game requires a proof and none came, without verifying", async () => {
+    const verify = vi.fn<Verify>(async () => ({ ok: true }));
+    await install({ requiresProof: true, verify });
+    const { res, json } = await submit();
+    expect(res.status).toBe(400);
+    expect(json).toEqual({ error: "proof required" });
+    expect(verify).not.toHaveBeenCalled();
+    expect(emu.scores()).toHaveLength(0);
+  });
+
+  it("verifies after the plausibility check, with the validated input and a deadline", async () => {
+    const verify = vi.fn<Verify>(async () => ({ ok: true }));
+    await install({ requiresProof: true, verify });
+    const { ARCADE_VERIFY_BUDGET_MS } = await import("@/lib/arcade/games");
+    const { res } = await submit({ proof: MARK });
+    expect(res.status).toBe(200);
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(verify).toHaveBeenCalledWith({
+      score: 4200,
+      detail: SS_DETAIL,
+      proof: MARK,
+      now: NOW,
+      deadline: NOW.getTime() + ARCADE_VERIFY_BUDGET_MS,
+    });
+    expect(allParams()).not.toContain(MARK);
+  });
+
+  it("passes proof as null to a verifier on a game that does not require one", async () => {
+    const verify = vi.fn<Verify>(async () => ({ ok: true }));
+    await install({ verify });
+    await submit();
+    expect(verify.mock.calls[0]?.[0].proof).toBeNull();
+  });
+
+  it("does not run the verifier when the sync check fails", async () => {
+    const verify = vi.fn<Verify>(async () => ({ ok: true }));
+    await install({ verify });
+    const implausible = await submit({
+      score: 1_000_000,
+      detail: { seconds: 10, kills: 0, distance: 0 },
+    });
+    expect(implausible.res.status).toBe(422);
+    expect(implausible.json.reason).toBe("score too high for the run");
+    const malformed = await submit({ detail: { seconds: 60 } });
+    expect(malformed.res.status).toBe(400);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("turns a reject verdict into 422 with the sync check's error shape, writing nothing", async () => {
+    await install({ verify: async () => ({ ok: false, reason: "replay does not match" }) });
+    const { res, json } = await submit({ proof: MARK });
+    expect(res.status).toBe(422);
+    expect(json).toEqual({ error: "implausible", reason: "replay does not match" });
+    expect(emu.scores()).toHaveLength(0);
+    expect(emu.players().size).toBe(0);
+    expect(await reported()).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "throws",
+      async () => {
+        throw new Error("verifier bug");
+      },
+    ],
+    ["rejects", () => Promise.reject(new Error("verifier bug"))],
+    ["answers nonsense", async () => "fine" as never],
+  ] satisfies [string, Verify][])(
+    "fails closed with 422, reports once and never answers 500 when the verifier %s",
+    async (_name, verify) => {
+      await install({ verify });
+      const { res, json } = await submit({ proof: MARK });
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "could not verify the run" });
+      expect(await reported()).toHaveBeenCalledTimes(1);
+      expect(await reported()).toHaveBeenCalledWith("api:arcade-scores.verify", expect.any(Error));
+      expect(emu.scores()).toHaveLength(0);
+    },
+  );
+
+  it("fails closed when a verifier returns after its deadline", async () => {
+    const { ARCADE_VERIFY_BUDGET_MS } = await import("@/lib/arcade/games");
+    await install({
+      verify: async () => {
+        // A verifier that ignored its deadline and ran long.
+        vi.setSystemTime(NOW.getTime() + ARCADE_VERIFY_BUDGET_MS + 1);
+        return { ok: true };
+      },
+    });
+    const { res, json } = await submit({ proof: MARK });
+    expect(res.status).toBe(422);
+    expect(json).toEqual({ error: "implausible", reason: "could not verify the run" });
+    expect(await reported()).toHaveBeenCalledTimes(1);
+    expect(emu.scores()).toHaveLength(0);
+  });
+
+  it("fails closed when a verifier never settles, at the budget", async () => {
+    const { ARCADE_VERIFY_BUDGET_MS } = await import("@/lib/arcade/games");
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    await install({ verify: () => new Promise<never>(() => {}) });
+    const pending = submit({ proof: MARK });
+    await vi.advanceTimersByTimeAsync(ARCADE_VERIFY_BUDGET_MS);
+    const { res, json } = await pending;
+    expect(res.status).toBe(422);
+    expect(json).toEqual({ error: "implausible", reason: "could not verify the run" });
+    expect(await reported()).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the budget at 2,000 ms", async () => {
+    const { ARCADE_VERIFY_BUDGET_MS } = await import("@/lib/arcade/games");
+    expect(ARCADE_VERIFY_BUDGET_MS).toBe(2_000);
+  });
+
+  it("does not leave a timer behind after a fast verifier", async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    await install({ verify: async () => ({ ok: true }) });
+    await submit();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
