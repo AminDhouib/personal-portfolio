@@ -20,3 +20,9 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # @types/node must match the Node major we run (Dockerfile and .nvmrc, 22).
+      # Types for a newer major describe APIs the runtime does not have.
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
