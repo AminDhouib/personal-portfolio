@@ -507,7 +507,8 @@ describe("useArcadeBoard", () => {
         | "hextris"
         | "super-voltorb-flip"
         | "tower-stacker"
-        | "typing-speed" = "space-shooter",
+        | "typing-speed"
+        | "script-knight" = "space-shooter",
     ) {
       fetchMock.mockResolvedValueOnce(okResponse(board([]))); // the mount GET
       const hook = renderHook(() => useArcadeBoard(game));
@@ -699,6 +700,41 @@ describe("useArcadeBoard", () => {
         chars: 300,
         acc: 97,
       });
+    });
+
+    it("sends Script Knight's day, turns and hand as its detail and the log as the proof", async () => {
+      const { result } = await mounted("script-knight");
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({
+          name: "Ada",
+          score: 118,
+          day: 20261015,
+          turns: 17,
+          hand: 1,
+          proof: "1:w0w0",
+        });
+      });
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect(body.game).toBe("script-knight");
+      expect(body.score).toBe(118);
+      expect(body.detail).toEqual({ day: 20261015, turns: 17, hand: 1 });
+      expect(body.proof).toBe("1:w0w0");
+    });
+
+    it("reads the turns and the by-hand tag off a Script Knight row", async () => {
+      fetchMock.mockResolvedValueOnce(
+        okResponse(
+          board([
+            serverEntry({ detail: { day: 20261015, turns: 17, hand: 1 } }),
+            serverEntry({ detail: { day: 20261015, turns: 20, hand: 0 } }),
+          ]),
+        ),
+      );
+      const { result } = renderHook(() => useArcadeBoard("script-knight"));
+      await waitFor(() => expect(result.current.entries).toHaveLength(2));
+      expect(result.current.entries[0]).toMatchObject({ day: 20261015, turns: 17, hand: 1 });
+      expect(result.current.entries[1]).toMatchObject({ turns: 20, hand: 0 });
     });
 
     it("a 422 is a rejection, not a retryable failure", async () => {

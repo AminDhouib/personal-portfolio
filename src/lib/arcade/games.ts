@@ -5,6 +5,9 @@ import {
   dailyBoard,
   dayNumber,
 } from "@/components/game/super-voltorb-flip/daily-board";
+import { dailyFloor, dayNumber as knightDayNumber } from "@/components/game/script-knight/daily";
+import { decodeLog } from "@/components/game/script-knight/engine/codec";
+import { createRun } from "@/components/game/script-knight/engine/run";
 import { dayNumber as towerDayNumber } from "@/components/game/tower-stacker/daily";
 import { maxBlocksFor } from "@/components/game/tower-stacker/engine";
 import { LAND_POINTS, scoreRange } from "@/components/game/tower-stacker/scoring";
@@ -33,6 +36,7 @@ export const ARCADE_GAME_SLUGS = [
   "super-voltorb-flip",
   "tower-stacker",
   "typing-speed",
+  "script-knight",
 ] as const satisfies readonly GameSlug[];
 
 export type ArcadeGameSlug = (typeof ARCADE_GAME_SLUGS)[number];
@@ -143,11 +147,21 @@ const typingDetailSchema = z.strictObject({
   acc: z.number().int().min(0).max(100),
 });
 
+// Script Knight's daily floor: the UTC day (YYYYMMDD), the turns the run took and whether it was
+// played by hand. The action log travels as the proof and is never stored; the verifier
+// re-simulates it and decides. The hand tag is client-claimed and display-only.
+const knightDetailSchema = z.strictObject({
+  day: z.number().int().min(20_000_101).max(99_991_231),
+  turns: z.number().int().min(1).max(200),
+  hand: z.union([z.literal(0), z.literal(1)]),
+});
+
 type SpaceShooterDetail = z.infer<typeof spaceShooterDetailSchema>;
 type HextrisDetail = z.infer<typeof hextrisDetailSchema>;
 type VoltorbDailyDetail = z.infer<typeof voltorbDailyDetailSchema>;
 type TowerDetail = z.infer<typeof towerDetailSchema>;
 type TypingDetail = z.infer<typeof typingDetailSchema>;
+type KnightDetail = z.infer<typeof knightDetailSchema>;
 
 /**
  * Orbital Dodge. s = seconds + 2 (floor, a stale UI sync, slack). Every term uses its
@@ -234,6 +248,58 @@ function checkTypingDailyAt(score: number, detail: TypingDetail, now: Date): Ver
   return reason === null ? { ok: true } : reject(reason);
 }
 
+/**
+ * Script Knight, daily floor, the synchronous half: the day must be today's UTC day by the server
+ * clock (no grace across midnight, the Voltorb rule). The run itself is checked by
+ * verifyScriptKnight, which re-simulates the proof.
+ */
+function checkScriptKnight(detail: KnightDetail, now: Date): Verdict {
+  if (detail.day !== knightDayNumber(utcDayKey(now))) return reject("not today's floor");
+  return { ok: true };
+}
+
+/** How many actions the verifier plays between looks at its deadline. */
+const KNIGHT_CHUNK = 25;
+
+/**
+ * Script Knight, daily floor, the real check. Unlike the other games this is a re-simulation, not
+ * a ceiling: the floor is rebuilt from the server's UTC day, the submitted actions are stepped
+ * through the same pure engine, and the run must reach the stairs, use every action, and score
+ * exactly the claimed total in exactly the claimed turns. Every typed engine failure is a reject;
+ * nothing here throws on a hostile log. The player's code never reaches the server.
+ */
+export const verifyScriptKnight: ArcadeVerify = async ({ score, detail, proof, now, deadline }) => {
+  if (proof === null) return reject("proof required");
+  const today = utcDayKey(now);
+  if (detail.day !== knightDayNumber(today)) return reject("not today's floor");
+  const actions = decodeLog(proof);
+  if (actions === null) return reject("unreadable log");
+
+  const run = createRun(dailyFloor(today).config);
+  for (let i = 0; i < actions.length; i += 1) {
+    if (i % KNIGHT_CHUNK === 0 && Date.now() > deadline) return reject("ran out of time");
+    if (run.status !== "playing") return reject("log longer than the run");
+    const stepped = run.step(actions[i] ?? null);
+    if (!stepped.ok) {
+      switch (stepped.reason.kind) {
+        case "ungranted-action":
+          return reject("an action the floor does not grant");
+        case "invalid-action":
+          return reject("an action the log cannot hold");
+        case "engine-error":
+          return reject("the engine stopped on this log");
+        case "run-over":
+          return reject("log longer than the run");
+      }
+    }
+  }
+  const result = run.result();
+  if (run.status !== "passed" || !result.passed) return reject("the run does not reach the stairs");
+  if (result.score?.total !== score) return reject("score does not match the replay");
+  if (result.turns !== detail.turns) return reject("turns do not match the replay");
+  return { ok: true };
+};
+
 /** Slug to strict detail schema; `validateArcadeSubmission` dispatches to the game's check. */
 export const ARCADE_GAMES = {
   "space-shooter": { detailSchema: spaceShooterDetailSchema },
@@ -241,6 +307,11 @@ export const ARCADE_GAMES = {
   "super-voltorb-flip": { detailSchema: voltorbDailyDetailSchema },
   "tower-stacker": { detailSchema: towerDetailSchema },
   "typing-speed": { detailSchema: typingDetailSchema },
+  "script-knight": {
+    detailSchema: knightDetailSchema,
+    requiresProof: true,
+    verify: verifyScriptKnight,
+  },
 } satisfies Record<ArcadeGameSlug, ArcadeGameEntry>;
 
 export type ArcadeSubmissionVerdict =
@@ -291,6 +362,10 @@ export function validateArcadeSubmission(
     case "typing-speed":
       return verdictFor(ARCADE_GAMES["typing-speed"].detailSchema.safeParse(rawDetail), (detail) =>
         checkTypingDailyAt(score, detail, now),
+      );
+    case "script-knight":
+      return verdictFor(ARCADE_GAMES["script-knight"].detailSchema.safeParse(rawDetail), (detail) =>
+        checkScriptKnight(detail, now),
       );
   }
 }
