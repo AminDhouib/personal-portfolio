@@ -4,16 +4,18 @@ import type { Phase } from "./engine/types";
 export type HexRunPhase = Phase;
 
 export type HexKeyAction =
-  "start" | "rotate-cw" | "rotate-ccw" | "rush" | "toggle-pause" | "panic" | "none";
+  "start" | "restart" | "rotate-cw" | "rotate-ccw" | "rush" | "toggle-pause" | "panic" | "none";
 
 const START_KEYS = new Set([" ", "Enter", "ArrowLeft", "ArrowRight", "ArrowDown", "a", "d", "s"]);
+const RESTART_KEYS = new Set([" ", "Enter", "r"]);
 
 // Decides what one keydown does. `textEntry` (a field the player is typing
 // in), `modifier` (a Ctrl/Meta/Alt chord) and `onControl` (Space or Enter on
 // a focused button or link) all leave the key to the browser. `preventDefault`
 // is set for every key the game claims, so Space and the arrows do not scroll
-// the page; on game over nothing is claimed, since the player must press
-// "Play again" deliberately. Left rotates counter-clockwise.
+// the page. On game over Space, Enter and R restart once `canRestart` says the
+// lockout has passed (game-over.ts); during it they are held but do nothing.
+// Left rotates counter-clockwise.
 export function hextrisKeyAction(input: {
   key: string;
   phase: HexRunPhase;
@@ -21,10 +23,17 @@ export function hextrisKeyAction(input: {
   onControl: boolean;
   modifier: boolean;
   repeat: boolean;
+  /** Game over only: the restart lockout has passed. */
+  canRestart?: boolean;
 }): { action: HexKeyAction; preventDefault: boolean } {
   const none = { action: "none", preventDefault: false } as const;
-  if (input.textEntry || input.modifier || input.onControl || input.phase === "over") return none;
+  if (input.textEntry || input.modifier || input.onControl) return none;
   const key = input.key;
+  if (input.phase === "over") {
+    if (!RESTART_KEYS.has(key.length === 1 ? key.toLowerCase() : key)) return none;
+    const restart = input.canRestart === true && !input.repeat;
+    return { action: restart ? "restart" : "none", preventDefault: true };
+  }
   if (input.phase === "ready") {
     if (!START_KEYS.has(key.length === 1 ? key.toLowerCase() : key)) return none;
     return { action: input.repeat ? "none" : "start", preventDefault: true };
