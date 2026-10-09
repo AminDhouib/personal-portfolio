@@ -1,11 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { utcDayKey } from "@/lib/arcade/boards";
+import { DailyBoardPanel } from "../board-panel";
 import { emptyProgress, PROGRESS_KEY, recordClear } from "../progress";
 import type { Runner } from "../run-floor";
 import { Stage } from "../stage";
 
 beforeEach(() => localStorage.clear());
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  Reflect.deleteProperty(window, "matchMedia");
+});
 
 // On a phone every control the game owns is at least 44 px square (min-h-11 min-w-11), as the
 // other games size theirs; the classes are keyed to a coarse pointer so desktop layout is unchanged.
@@ -80,5 +86,54 @@ describe("Script Knight touch targets", () => {
     });
     expectTouch(await screen.findByRole("button", { name: "Next floor" }));
     expectTouch(screen.getByRole("button", { name: "Improve this score" }));
+  });
+  it("sizes the play-style and mode buttons", () => {
+    render(<Stage runner={walkRunner(0)} />);
+    for (const name of ["Play by hand", "Write code", "Towers", "Today's floor"]) {
+      expectTouch(screen.getByRole("button", { name }));
+    }
+  });
+
+  it("sizes Play this floor, Exit and every pad control on a touch screen", () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes("coarse"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    render(<Stage runner={walkRunner(0)} />);
+    expectTouch(screen.getByRole("button", { name: "Play this floor" }));
+    for (const button of screen
+      .getByRole("region", { name: "Play by hand" })
+      .querySelectorAll("button")) {
+      expectTouch(button);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Play this floor" }));
+    expectTouch(screen.getByRole("button", { name: "Exit" }));
+  });
+
+  it("sizes the board panel: tabs, name field and Submit", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ entries: [], you: null }), { status: 200 })),
+    );
+    render(
+      <DailyBoardPanel
+        result={{ dayKey: utcDayKey(new Date()), score: 100, turns: 17, log: "1:", hand: true }}
+        handle=""
+        streakDays={0}
+        onHandle={() => {}}
+      />,
+    );
+    // The board's tabs are 44 px tall at every pointer size; Submit adds the coarse width too.
+    for (const name of ["Today", "This week", "All time"]) {
+      expect((await screen.findByRole("button", { name })).className.split(/\s+/)).toContain(
+        "min-h-11",
+      );
+    }
+    expectTouch(await screen.findByRole("button", { name: "Submit" }));
+    expect(screen.getByLabelText("Name for the board").className.split(/\s+/)).toContain(
+      "min-h-11",
+    );
   });
 });

@@ -75,6 +75,8 @@ export function handFloorRun(ref: LevelRef, config: LevelConfig, hand: HandRepla
 }
 
 export interface HandRun extends HandReplay {
+  /** The replay itself, one stable object per change, for memo dependencies. */
+  replay: HandReplay;
   /** True while the run is still being played. */
   playing: boolean;
   turns: number;
@@ -116,5 +118,5 @@ export function useHandRun(config: LevelConfig): HandRun {
   );
   const restart = useCallback(() => setActions([]), []);
 
-  return { ...replay, playing, turns, act, undo, restart };
+  return { ...replay, replay, playing, turns, act, undo, restart };
 }
