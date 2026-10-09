@@ -413,6 +413,23 @@ describe("Hextris board fit", () => {
     expect(fitted(shellCanvas(container))).toEqual(PLAIN);
   });
 
+  // The canvas's transition class animates translate and scale; an inline "none" turns it off.
+  it("animates only the move in: the board snaps back at a restart and on Hide", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    const canvas = shellCanvas(container);
+    expect(canvas.style.transition).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(canvas.style.transition).toBe("none");
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(canvas.style.transition).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    runFrames(1);
+    expect(canvas.style.transition).toBe("none");
+    expect(fitted(canvas)).toEqual(PLAIN);
+  });
+
   it("puts the board back on a key restart", () => {
     const { container } = render(<HextrisGame />);
     startRun(container);

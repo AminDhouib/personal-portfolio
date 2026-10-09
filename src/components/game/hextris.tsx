@@ -385,12 +385,14 @@ export function HextrisGame() {
 
   // While the game-over sheet is up, the board moves (and shrinks if it must) into the space the
   // sheet leaves, so the sheet never covers it. CSS translate and scale, so the clear shake's
-  // transform still composes; the canvas keeps its size and nothing is redrawn.
+  // transform still composes; the canvas keeps its size and nothing is redrawn. Only the move in
+  // animates: the way back snaps (transition "none"), so a new run never starts on a shrunk board.
   useEffect(() => {
     const canvas = canvasRef.current;
     const sheet = sheetRef.current;
     if (!canvas) return;
     const reset = () => {
+      canvas.style.transition = "none";
       canvas.style.translate = "";
       canvas.style.scale = "";
     };
@@ -408,6 +410,7 @@ export function HextrisGame() {
         reset();
         return;
       }
+      canvas.style.transition = "";
       canvas.style.translate = `${fit.dx}px ${fit.dy}px`;
       canvas.style.scale = String(fit.scale);
     };
