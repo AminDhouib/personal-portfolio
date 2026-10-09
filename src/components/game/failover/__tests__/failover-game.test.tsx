@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { FailoverGame } from "../../failover";
 import { FailoverController } from "../controller";
 import type { FailoverScene } from "../scene/scene";
+import { CONFIG } from "../sim/config";
 import { S, resetSim } from "../sim/state";
 
 // The mounted game with the WebGL scene stubbed out: the toolbar drives the
@@ -78,19 +79,20 @@ describe("FailoverGame", () => {
       "true",
     );
     expect(screen.getByText("$500")).toBeInTheDocument();
-    expect(screen.getByText("Rep 100%")).toBeInTheDocument();
+    expect(screen.getByText("REPUTATION").nextElementSibling).toHaveTextContent("100%");
     expect(screen.getByRole("button", { name: "Sound on" })).toBeInTheDocument();
   });
 
-  it("arms tools from the toolbar and the build menu", () => {
+  it("arms tools from the toolbar and services from the build palette", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Link (2)" }));
     expect(screen.getByRole("button", { name: "Link (2)" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    fireEvent.change(screen.getByLabelText("Build a service"), { target: { value: "waf" } });
-    expect(screen.getByLabelText("Build a service")).toHaveValue("waf");
+    const waf = `${CONFIG.services.waf.name} $${CONFIG.services.waf.cost}`;
+    fireEvent.click(screen.getByRole("button", { name: waf }));
+    expect(screen.getByRole("button", { name: waf })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Link (2)" })).toHaveAttribute(
       "aria-pressed",
       "false",
