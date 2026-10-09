@@ -49,11 +49,14 @@ describe("capTurn", () => {
   });
 
   it("keeps 10 think lines of at most 200 chars and drops the rest silently", () => {
-    const capped = capTurn(inner());
+    const turn = inner();
+    const capped = capTurn(turn);
     for (let i = 0; i < 12; i += 1) {
       capped.turn.think?.(`line ${i}`);
     }
     capped.turn.think?.("y".repeat(300));
+    // Each think the engine sees emits a full floor snapshot: the cap holds before the engine.
+    expect(turn.think).toHaveBeenCalledTimes(10);
     const lines = capped.thoughts();
     expect(lines).toHaveLength(10);
     expect(lines[0]).toBe("line 0");
