@@ -1,4 +1,4 @@
-import { SIDES, rotationOffset } from "../engine/state";
+import { SIDES, START_LIMIT_ROWS, rotationOffset } from "../engine/state";
 import type { Cell, RunState } from "../engine/types";
 import {
   COMBO_TEXT_FILL,
@@ -13,6 +13,16 @@ import { type Layout, ringRadius } from "./layout";
 // run and never writes to it or draws random numbers. `nowMs` is on the run clock (`elapsedMs`,
 // plus any part-tick the shell has accumulated), which drives the rotation ease, the combo ring
 // and the popups. The shell keeps the popups (from popupFor) and drops them after POPUP_MS.
+// Once the run is over the shell also passes an `ending`, whose animation runs on its own clock.
+
+/** What paint needs to draw the end of a run. Given only once the run is over. */
+export interface PaintEnding {
+  /** The stack that overflowed, indexed like `state.sides` (the engine's game-over event). */
+  side: number;
+  newBest: boolean;
+  /** Real ms since game over: 0 on the first frame after it, rising while the run clock stands. */
+  sinceMs: number;
+}
 
 /** The subset of CanvasRenderingContext2D the painter uses, so tests can pass a recorder. */
 export interface PaintCtx {
@@ -59,6 +69,19 @@ const MIN_TEXT_PX = 14;
 /** A popup drifts this many rows outward over its life and fades over the last part of it. */
 const POPUP_RISE_ROWS = 1;
 const POPUP_FADE_FROM = 0.6;
+// The ending: the board dims, and the overflowed side's band pulses red between two opacities.
+const ENDING_DIM_ALPHA = 0.45;
+const OVERFLOW_FILL = "#ff4d4d";
+const OVERFLOW_ALPHA_MIN = 0.2;
+const OVERFLOW_ALPHA_MAX = 0.55;
+const OVERFLOW_PULSE_MS = 1000;
+// The new-best burst: particles fan out from the core centre, a base-speed one ending a row past
+// the start limit ring's corner, and fade over the last part of their life.
+const BURST_COUNT = 36;
+const BURST_STEP = (2 * Math.PI) / BURST_COUNT;
+const BURST_SPEEDS = [0.8, 1, 1.2];
+const BURST_MS = 1200;
+const BURST_FADE_FROM = 0.6;
 
 type Pt = [number, number];
 
@@ -125,7 +148,8 @@ function outlinedText(
   fill: string,
   alpha: number,
 ): void {
-  ctx.globalAlpha = alpha;
+  const prev = ctx.globalAlpha;
+  ctx.globalAlpha = prev * alpha;
   ctx.font = `bold ${Math.round(px)}px system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -135,7 +159,7 @@ function outlinedText(
   ctx.strokeText(text, x, y);
   ctx.fillStyle = fill;
   ctx.fillText(text, x, y);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = prev;
 }
 
 function drawPopup(ctx: PaintCtx, l: Layout, turn: number, popup: ShownPopup, nowMs: number): void {
@@ -156,22 +180,70 @@ function drawPopup(ctx: PaintCtx, l: Layout, turn: number, popup: ShownPopup, no
   );
 }
 
+/** The overflowed side's band in pulsing red, outlined, with its cells redrawn on top. */
+function drawOverflow(
+  ctx: PaintCtx,
+  state: RunState,
+  l: Layout,
+  turn: number,
+  ending: PaintEnding,
+): void {
+  const stack = state.sides[ending.side] ?? [];
+  const angle = UP + (ending.side + turn) * STEP;
+  const corners = band(l, angle, 0, Math.max(stack.length, state.limitRows) + 1);
+  const mid = (OVERFLOW_ALPHA_MAX + OVERFLOW_ALPHA_MIN) / 2;
+  const swing = (OVERFLOW_ALPHA_MAX - OVERFLOW_ALPHA_MIN) / 2;
+  ctx.globalAlpha = mid + swing * Math.cos((2 * Math.PI * ending.sinceMs) / OVERFLOW_PULSE_MS);
+  ctx.fillStyle = OVERFLOW_FILL;
+  trace(ctx, corners);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = OVERFLOW_FILL;
+  ctx.lineWidth = limitLineWidth(l);
+  trace(ctx, corners);
+  ctx.stroke();
+  stack.forEach((cell, row) => drawCell(ctx, l, angle, row, cell));
+}
+
+function drawBurst(ctx: PaintCtx, l: Layout, sinceMs: number): void {
+  const life = sinceMs / BURST_MS;
+  if (life < 0 || life >= 1) return;
+  const reach = (ringRadius(l, START_LIMIT_ROWS) + l.rowHeight) * (1 - (1 - life) ** 3);
+  ctx.globalAlpha = life <= BURST_FADE_FROM ? 1 : (1 - life) / (1 - BURST_FADE_FROM);
+  for (let i = 0; i < BURST_COUNT; i++) {
+    const a = UP + i * BURST_STEP;
+    const d = reach * (BURST_SPEEDS[i % BURST_SPEEDS.length] ?? 1);
+    ctx.fillStyle = PALETTE[i % PALETTE.length] ?? RAINBOW_FILL;
+    ctx.beginPath();
+    ctx.arc(l.cx + Math.cos(a) * d, l.cy + Math.sin(a) * d, l.rowHeight / 3, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function limitLineWidth(l: Layout): number {
+  return Math.max(1, l.rowHeight * 0.12);
+}
+
 export function paint(
   ctx: PaintCtx,
   state: RunState,
   l: Layout,
   nowMs: number,
   popups: readonly ShownPopup[] = [],
+  ending?: PaintEnding,
 ): void {
   ctx.clearRect(0, 0, l.width, l.height);
   const turn = state.facing + rotationOffset(state, nowMs);
+  // At the end everything below is drawn dimmed; the cleared canvas itself gets no wash.
+  if (ending) ctx.globalAlpha = ENDING_DIM_ALPHA;
 
   ctx.fillStyle = CORE_FILL;
   trace(ctx, ring(l, 0, turn));
   ctx.fill();
 
   ctx.strokeStyle = state.boundaryWarned ? LIMIT_WARN_STROKE : LIMIT_STROKE;
-  ctx.lineWidth = Math.max(1, l.rowHeight * 0.12);
+  ctx.lineWidth = limitLineWidth(l);
   trace(ctx, ring(l, state.limitRows, turn));
   ctx.stroke();
 
@@ -199,4 +271,9 @@ export function paint(
   }
 
   for (const popup of popups) drawPopup(ctx, l, turn, popup, nowMs);
+
+  if (!ending) return;
+  ctx.globalAlpha = 1;
+  drawOverflow(ctx, state, l, turn, ending);
+  if (ending.newBest) drawBurst(ctx, l, ending.sinceMs);
 }

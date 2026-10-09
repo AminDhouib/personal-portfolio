@@ -7,10 +7,13 @@ export type Point = [number, number];
 export interface PathCall {
   style: string;
   points: Point[];
+  alpha: number;
+  lineWidth: number;
 }
 
 export interface ArcCall {
   style: string;
+  alpha: number;
   x: number;
   y: number;
   r: number;
@@ -59,7 +62,7 @@ export interface FakeCtx2D {
 
 export function makeFakeCtx2D(): FakeCtx2D {
   let path: Point[] = [];
-  let pathArcs: Omit<ArcCall, "style">[] = [];
+  let pathArcs: Omit<ArcCall, "style" | "alpha">[] = [];
   const ctx: FakeCtx2D = {
     fillStyle: "",
     strokeStyle: "",
@@ -96,12 +99,14 @@ export function makeFakeCtx2D(): FakeCtx2D {
       ctx.touched.push([x - r, y - r], [x + r, y + r]);
     },
     fill() {
-      ctx.fills.push({ style: ctx.fillStyle, points: [...path] });
-      for (const a of pathArcs) ctx.arcs.push({ style: ctx.fillStyle, ...a });
+      const { fillStyle: style, globalAlpha: alpha, lineWidth } = ctx;
+      ctx.fills.push({ style, points: [...path], alpha, lineWidth });
+      for (const a of pathArcs) ctx.arcs.push({ style, alpha, ...a });
     },
     stroke() {
-      ctx.strokes.push({ style: ctx.strokeStyle, points: [...path] });
-      for (const a of pathArcs) ctx.arcs.push({ style: ctx.strokeStyle, ...a });
+      const { strokeStyle: style, globalAlpha: alpha, lineWidth } = ctx;
+      ctx.strokes.push({ style, points: [...path], alpha, lineWidth });
+      for (const a of pathArcs) ctx.arcs.push({ style, alpha, ...a });
     },
     fillText(text, x, y) {
       ctx.texts.push({ kind: "fill", text, x, y, ...textState(ctx.fillStyle) });
