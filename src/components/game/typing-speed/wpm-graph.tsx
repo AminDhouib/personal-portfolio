@@ -13,16 +13,19 @@ interface WpmGraphProps {
   points: SeriesPoint[];
   /** Live draws the net line only; full adds raw WPM and a mark per second with errors. */
   variant: "live" | "full";
+  /** The ghost cumulative WPM per second (full only): a dashed line to beat. */
+  ghost?: number[] | null;
 }
 
 /** A hand-drawn SVG chart of WPM per second; no chart library. */
-export function WpmGraph({ points, variant }: WpmGraphProps) {
+export function WpmGraph({ points, variant, ghost = null }: WpmGraphProps) {
   if (points.length === 0) return null;
   const full = variant === "full";
   const h = full ? 160 : 40;
   const net = points.map((p) => p.wpm);
   const raw = points.map((p) => p.raw);
-  const max = niceMax(full ? [...net, ...raw] : net);
+  const ghostLine = full && ghost && ghost.length > 0 ? ghost : null;
+  const max = niceMax(full ? [...net, ...raw, ...(ghostLine ?? [])] : net);
   const first = Math.round(net[0] ?? 0);
   const last = Math.round(net.at(-1) ?? 0);
   const peak = Math.round(Math.max(...net));
@@ -45,6 +48,17 @@ export function WpmGraph({ points, variant }: WpmGraphProps) {
           strokeWidth="2"
           vectorEffect="non-scaling-stroke"
           className="stroke-(--muted)"
+        />
+      )}
+      {ghostLine && (
+        <path
+          data-line="ghost"
+          d={graphPath(ghostLine, { w: W, h, max })}
+          fill="none"
+          strokeWidth="2"
+          strokeDasharray="6 4"
+          vectorEffect="non-scaling-stroke"
+          className="stroke-accent-blue"
         />
       )}
       <path
@@ -88,6 +102,12 @@ export function WpmGraph({ points, variant }: WpmGraphProps) {
             {label}
           </li>
         ))}
+        {ghostLine && (
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="w-4 border-t-2 border-dashed border-accent-blue" />
+            Your best
+          </li>
+        )}
       </ul>
     </div>
   );
