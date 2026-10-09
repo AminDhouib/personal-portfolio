@@ -56,11 +56,14 @@ const keepKeyboard = (e: PointerEvent<HTMLElement>) => e.preventDefault();
 export function SheetHud({
   time,
   wpm,
+  pace,
   onRestart,
   onExit,
 }: {
   time: string;
   wpm: number;
+  /** The ghost pace chip, when there is a ghost; it shares the row and never grows it. */
+  pace?: ReactNode;
   onRestart: () => void;
   onExit: () => void;
 }) {
@@ -70,6 +73,7 @@ export function SheetHud({
       <span className="font-mono text-sm font-semibold text-accent-green tabular-nums">
         {wpm} WPM
       </span>
+      {pace}
       <div className="ml-auto flex items-center gap-1">
         <button
           type="button"

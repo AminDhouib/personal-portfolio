@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { GhostSpot } from "./engine/ghost";
 import { LOOKAHEAD_WORDS } from "./engine/run";
 import type { TypingRun } from "./engine/types";
 import { nextTrim } from "./line-window";
@@ -16,6 +17,9 @@ const LETTER_CLASS: Record<LetterState, string> = {
 const CARET_CLASS =
   "border-b-2 border-accent-blue shadow-[0_2px_8px_rgba(96,165,250,0.6)] animate-pulse";
 
+// The ghost is a dimmer marker than the caret: a soft block behind the letter, not an underline.
+const GHOST_CLASS = "rounded bg-(--muted)/30";
+
 function letterState(word: string, typed: string, j: number, committed: boolean): LetterState {
   if (j >= word.length) return "extra";
   if (j < typed.length) return typed[j] === word[j] ? "correct" : "wrong";
@@ -28,9 +32,18 @@ function letterState(word: string, typed: string, j: number, committed: boolean)
  * first line's words leave the DOM (Monkeytype's approach), which keeps a
  * 120 s run small. Letters carry data-state; the caret sits on the next
  * letter, or on the space after a fully typed word. A screen reader gets the
- * plain full text.
+ * plain full text. A ghost, when there is one, is marked on the letter (or the
+ * space) where your best run stood at this moment; it is decoration only.
  */
-export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
+export function TextView({
+  run,
+  caret,
+  ghost = null,
+}: {
+  run: TypingRun;
+  caret: boolean;
+  ghost?: GhostSpot | null;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   // Words before `from` are out of the DOM; a new run starts again at zero.
   const [trim, setTrim] = useState<{ run: TypingRun; from: number }>({ run, from: 0 });
@@ -71,30 +84,42 @@ export function TextView({ run, caret }: { run: TypingRun; caret: boolean }) {
     const committed = i < run.cursor;
     const letters = [...word, ...typed.slice(word.length)];
     const caretAt = playing && i === run.cursor ? typed.length : -1;
+    // A ghost on the space after the last word (the end of the text) rests on its last letter.
+    const spaceAfter = i < run.words.length - 1;
+    const ghostAt = ghost && ghost.word === i ? Math.min(ghost.letter, word.length) : -1;
+    const ghostLetter = ghostAt === word.length ? (spaceAfter ? -1 : word.length - 1) : ghostAt;
+    const spaceClasses: string[] = [];
+    if (caretAt >= letters.length) spaceClasses.push(CARET_CLASS);
+    if (ghostAt === word.length) spaceClasses.push(GHOST_CLASS);
     return (
       <span key={i} data-ts-word={i}>
         <span className="inline-block max-w-full break-words">
           {letters.map((ch, j) => {
             const state = letterState(word, typed, j, committed);
             const shown = state === "extra" ? (typed[j] ?? ch) : ch;
+            const classes: string[] = [LETTER_CLASS[state]];
+            if (j === caretAt) classes.push(CARET_CLASS);
+            if (j === ghostLetter) classes.push(GHOST_CLASS);
             return (
               <span
                 key={j}
                 data-state={state}
                 data-ts-caret={j === caretAt ? "" : undefined}
-                className={
-                  j === caretAt ? [LETTER_CLASS[state], CARET_CLASS].join(" ") : LETTER_CLASS[state]
-                }
+                data-testid={j === ghostLetter ? "ts-ghost" : undefined}
+                aria-hidden={j === ghostLetter ? "true" : undefined}
+                className={classes.join(" ")}
               >
                 {shown}
               </span>
             );
           })}
         </span>
-        {i < run.words.length - 1 && (
+        {spaceAfter && (
           <span
             data-ts-caret={caretAt >= letters.length ? "" : undefined}
-            className={caretAt >= letters.length ? CARET_CLASS : undefined}
+            data-testid={ghostAt === word.length ? "ts-ghost" : undefined}
+            aria-hidden={ghostAt === word.length ? "true" : undefined}
+            className={spaceClasses.length > 0 ? spaceClasses.join(" ") : undefined}
           >
             {" "}
           </span>

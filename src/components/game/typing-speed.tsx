@@ -7,6 +7,9 @@ import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { keyStats, wpmSeries, type KeyStats, type SeriesPoint } from "./typing-speed/engine/series";
 import { dailyScore, dailyText } from "./typing-speed/engine/daily";
+import { ghostCharsAt, ghostPosition, paceDelta } from "./typing-speed/engine/ghost";
+import { GhostChip } from "./typing-speed/ghost-chip";
+import { ghostFor, loadGhosts, offerGhost, saveGhosts } from "./typing-speed/ghost-store";
 import {
   DEFAULT_MODE,
   configFor,
@@ -109,6 +112,8 @@ export function TypingSpeedGame() {
     initialStats.lastMode === "daily" ? DEFAULT_MODE : initialStats.lastMode,
   );
   const [daily, setDaily] = useState<DailyState | null>(null);
+  const [ghosts, setGhosts] = useState(() => loadGhosts(utcDay()));
+  const [ghostOn, setGhostOn] = useState(initialStats.prefs.ghost);
   const [seed, setSeed] = useState(drawSeed);
   const [passageNo, setPassageNo] = useState(0);
   const [highScore, setHighScore] = useState(readHighScore);
@@ -222,6 +227,13 @@ export function TypingSpeedGame() {
         setDaily({ ...daily, rec, streak: streakAsOf(after, daily.day), lastBulk: bulk });
       }
       saveStats(after);
+      // A faster run replaces the ghost it raced.
+      const ghostDay = mode === "daily" ? daily?.day : undefined;
+      const offered = offerGhost(ghosts, mode, run, ghostDay);
+      if (offered !== ghosts) {
+        saveGhosts(offered);
+        setGhosts(offered);
+      }
       setResult({
         metrics,
         maxStreak: streaks(run).best,
@@ -233,7 +245,7 @@ export function TypingSpeedGame() {
         modeBest: !bulk && prior && metrics.netWpm > prior.wpm ? modeLabel(mode) : null,
       });
     },
-    [highScore, mode, daily],
+    [highScore, mode, daily, ghosts],
   );
 
   const typing = useTypingRun(configFor(mode, seed, passageNo, daily?.day), {
@@ -311,6 +323,13 @@ export function TypingSpeedGame() {
     [begin, mode, daily, enterDaily],
   );
 
+  const toggleGhost = useCallback(() => {
+    const next = !ghostOn;
+    setGhostOn(next);
+    const stats = loadStats();
+    saveStats({ ...stats, prefs: { ...stats.prefs, ghost: next } });
+  }, [ghostOn]);
+
   const onPosted = useCallback(
     (wpm: number, handle: string) => {
       if (!daily) return;
@@ -387,6 +406,19 @@ export function TypingSpeedGame() {
       ? Math.min(100, (typedChars / Math.max(1, totalChars)) * 100)
       : Math.min(100, (metrics.elapsedMs / (limit * 1000)) * 100);
 
+  // The ghost of your best run in this mode: a marker on the current text and a pace chip.
+  const ghost = ghostOn ? ghostFor(ghosts, mode, daily?.day) : null;
+  const raceMs = run.startedAt === null ? 0 : Math.max(0, typing.now - run.startedAt);
+  const racing = ghost !== null && playing;
+  const ghostSpot = racing ? ghostPosition(run.words, ghostCharsAt(ghost.samples, raceMs)) : null;
+  const paceChip = racing ? (
+    <GhostChip
+      delta={paceDelta(run, ghost.samples, typing.now)}
+      at={typing.now}
+      floating={!sheet}
+    />
+  ) : null;
+
   // A run that ended in the sheet leaves the results below the fold: bring them up.
   useEffect(() => {
     if (!done || !result || !scrollToResults.current) return;
@@ -399,7 +431,7 @@ export function TypingSpeedGame() {
   return (
     <div className="space-y-5">
       <div inert={sheet} className="space-y-5">
-        <ModeBar mode={mode} onChange={changeMode} />
+        <ModeBar mode={mode} onChange={changeMode} ghost={{ on: ghostOn, onToggle: toggleGhost }} />
 
         {/* Stats bar */}
         <div
@@ -481,11 +513,20 @@ export function TypingSpeedGame() {
         active={sheet}
         compact={layout.compact}
         viewport={viewport}
-        hud={<SheetHud time={timerText} wpm={liveNet} onRestart={restart} onExit={exitSheet} />}
+        hud={
+          <SheetHud
+            time={timerText}
+            wpm={liveNet}
+            pace={paceChip}
+            onRestart={restart}
+            onExit={exitSheet}
+          />
+        }
       >
         {/* The sparkline's slot is always there so it appearing does not shift the page. */}
         {(!sheet || layout.showGraph) && (
-          <div className="h-10" data-testid="ts-live-slot">
+          <div className="relative h-10" data-testid="ts-live-slot">
+            {!sheet && paceChip}
             {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
           </div>
         )}
@@ -509,7 +550,7 @@ export function TypingSpeedGame() {
             ...(sheet ? { fontSize: layout.fontPx } : {}),
           }}
         >
-          <TextView run={run} caret />
+          <TextView run={run} caret ghost={ghostSpot} />
 
           {sheet && !focused && (
             <div
