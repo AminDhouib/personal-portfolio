@@ -72,3 +72,22 @@ export const CUES = {
 } as const satisfies Record<string, Cue>;
 
 export type CueName = keyof typeof CUES;
+
+/** The cue for an engine event, or null when it makes no sound. */
+export function cueFor(eventType: string): CueName | null {
+  switch (eventType) {
+    case "walk":
+    case "pivot":
+      return "step";
+    case "takeDamage":
+    case "attack":
+    case "shoot":
+    case "detonate":
+      return "hit";
+    case "rescue":
+    case "release":
+      return "rescue";
+    default:
+      return null;
+  }
+}
