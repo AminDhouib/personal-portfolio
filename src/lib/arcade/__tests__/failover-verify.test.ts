@@ -291,7 +291,8 @@ describe("the rollout switch", () => {
 });
 
 describe("taking turns", () => {
-  it("lets one replay run, three wait, and answers busy to the rest", async () => {
+  it("lets one replay run, two wait, and answers busy to the rest", async () => {
+    expect(MAX_WAITING).toBe(2);
     const verdicts = await Promise.all(
       Array.from({ length: MAX_WAITING + 2 }, () => strict(input(retires))),
     );
