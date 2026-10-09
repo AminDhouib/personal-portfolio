@@ -136,6 +136,8 @@ export function Stage({
   const [daily, setDaily] = useState(false);
   const [dayKey, setDayKey] = useState(() => utcDayKey(new Date()));
   const [stats, setStats] = useState<KnightStats>(() => loadStats());
+  // The latest stats for callbacks that must not save from inside a state updater.
+  const statsRef = useRef(stats);
 
   const cancelRef = useRef<(() => void) | null>(null);
   const audioRef = useRef<KnightAudio | null>(null);
@@ -297,11 +299,11 @@ export function Stage({
   }, [invalidateRun]);
 
   const rememberHandle = useCallback((name: string) => {
-    setStats((prev) => {
-      const next = setHandle(prev, name);
-      if (next !== prev) saveStats(next);
-      return next;
-    });
+    const next = setHandle(statsRef.current, name);
+    if (next === statsRef.current) return;
+    statsRef.current = next;
+    setStats(next);
+    saveStats(next);
   }, []);
 
   const finishFloor = useCallback(
@@ -309,7 +311,11 @@ export function Stage({
       setFloorRun(done);
       if (!done.result.passed || !done.result.score) return;
       if (done.ref.kind === "daily") {
-        const next = recordDaily(stats, { score: done.result.score.total, day: done.ref.day });
+        const next = recordDaily(statsRef.current, {
+          score: done.result.score.total,
+          day: done.ref.day,
+        });
+        statsRef.current = next;
         setStats(next);
         saveStats(next);
         return;
@@ -321,7 +327,7 @@ export function Stage({
       };
       commitProgress(recordClear(progress, tower, level, clear));
     },
-    [commitProgress, level, progress, stats, tower],
+    [commitProgress, level, progress, tower],
   );
 
   /** True while `token` is the run in flight and the stage still shows the floor it started on. */
