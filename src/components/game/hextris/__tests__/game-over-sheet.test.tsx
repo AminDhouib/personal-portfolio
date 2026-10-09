@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HextrisSounds } from "../sound-manager";
 import type { EngineEvent } from "../engine/types";
 import {
   installShellStubs,
@@ -69,7 +70,8 @@ describe("Hextris game over keeps the board visible", () => {
     expect(screen.getByPlaceholderText("Your name")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide" }));
     expect(screen.queryByPlaceholderText("Your name")).toBeNull();
-    // The strip keeps the score and Play again in view.
+    // The strip keeps the score (once counted up) and Play again in view.
+    runFrames(60);
     expect(screen.getByRole("region", { name: "Game over" })).toHaveTextContent("120");
     expect(screen.getByRole("button", { name: "Play again" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show" }));
@@ -126,5 +128,52 @@ describe("Hextris game-over name prompt", () => {
     expect(postCalls()).toHaveLength(0);
     fireEvent.keyDown(screen.getByPlaceholderText("Your name"), { key: "Enter" });
     expect(postCalls()).toHaveLength(1);
+  });
+});
+
+describe("Hextris new best and count-up", () => {
+  const sheet = () => screen.getByRole("region", { name: "Game over" });
+  const shownScore = () => within(sheet()).getByTestId("final-score");
+
+  it("counts the score up over about 900 ms", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(1200);
+    expect(shownScore()).not.toHaveTextContent("1200");
+    runFrames(28);
+    const mid = Number(shownScore().textContent);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1200);
+    runFrames(32);
+    expect(shownScore()).toHaveTextContent(/^1200$/);
+  });
+
+  it("celebrates beating a stored best, once, with its own cue", () => {
+    window.localStorage.setItem("hextris_highscores", "[100]");
+    const cue = vi.spyOn(HextrisSounds.prototype, "newBest");
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    expect(within(sheet()).getByText("NEW BEST")).toBeInTheDocument();
+    expect(cue).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not celebrate the first run ever, a tie or a lower score", () => {
+    const cue = vi.spyOn(HextrisSounds.prototype, "newBest");
+    const cases: [string | null, number][] = [
+      [null, 120],
+      ["[120]", 120],
+      ["[500]", 120],
+    ];
+    for (const [stored, score] of cases) {
+      window.localStorage.clear();
+      if (stored) window.localStorage.setItem("hextris_highscores", stored);
+      const { container, unmount } = render(<HextrisGame />);
+      startRun(container);
+      endRun(score);
+      expect(within(sheet()).queryByText("NEW BEST")).toBeNull();
+      unmount();
+    }
+    expect(cue).not.toHaveBeenCalled();
   });
 });

@@ -158,6 +158,30 @@ export class HextrisSounds {
     });
   }
 
+  // A new best: a quick rising G major run that waits for the game-over sting to land, then
+  // holds its top note. Its own cue, so it never sounds like a clean sweep.
+  newBest() {
+    if (!this.enabled) return;
+    this.ensureCtx();
+    if (!this.ctx || !this.sfxGain) return;
+    const first = this.ctx.currentTime + 0.4;
+    const notes = [392, 493.88, 587.33, 783.99, 987.77];
+    notes.forEach((f, i) => {
+      const osc = this.ctx!.createOscillator();
+      const env = this.ctx!.createGain();
+      osc.type = "square";
+      osc.frequency.value = f;
+      const start = first + i * 0.07;
+      const hold = i === notes.length - 1 ? 0.6 : 0.16;
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(0.12, start + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, start + hold);
+      osc.connect(env).connect(this.sfxGain!);
+      osc.start(start);
+      osc.stop(start + hold + 0.02);
+    });
+  }
+
   // The start countdown: one short tick per number, then a brighter two-note GO.
   countdown() {
     this.playTone(523.25, 110, "square", 0.1);
