@@ -55,6 +55,8 @@ describe("the replay link on the game's address", () => {
   it("never writes anything: viewing a replay saves no progress", () => {
     openWith(fragmentOf({ kind: "tower", tower: "narrow-path", level: 1, epic: false }));
     expect(localStorage.getItem(PROGRESS_KEY)).toBeNull();
+    expect(localStorage.getItem("knight:stats")).toBeNull();
+    expect(localStorage.getItem("knight:code")).toBeNull();
   });
 
   it("plays a floor the player has reached", () => {
