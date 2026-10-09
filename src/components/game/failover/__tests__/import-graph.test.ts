@@ -39,18 +39,31 @@ function stripComments(text: string): string {
 
 /**
  * The specifiers a file imports statically: `import x from`, `import "x"`,
- * `export ... from`. `import(...)` is the lazy boundary and is not followed;
- * `import type` and `export type` are erased by the compiler and are not edges.
+ * `export ... from`, `require("x")` and `import x = require("x")`. `import(...)`
+ * is the lazy boundary and is not followed; `import type` and `export type` are
+ * erased by the compiler and are not edges.
  */
 function staticSpecifiers(text: string): string[] {
   const found: string[] = [];
+  const code = stripComments(text);
   const statement =
     /(?:^|[\s;}])(?:import|export)\s+(type\s+)?(?:[\w*{}\s,$]*?\s*from\s*)?["']([^"'\n]+)["']/g;
-  for (const match of stripComments(text).matchAll(statement)) {
+  for (const match of code.matchAll(statement)) {
     if (match[1] === undefined && match[2] !== undefined) found.push(match[2]);
+  }
+  const call = /(?:^|[^\w.$])require\s*\(\s*["']([^"'\n]+)["']\s*\)/g;
+  for (const match of code.matchAll(call)) {
+    if (match[1] !== undefined) found.push(match[1]);
   }
   return found;
 }
+
+// TypeScript's bundler resolution lets "./x.js" name ./x.ts (and Turbopack follows it).
+const SOURCE_FOR = new Map([
+  [".js", [".ts", ".tsx"]],
+  [".jsx", [".tsx"]],
+  [".mjs", [".mts"]],
+]);
 
 type Target = { kind: "file"; file: string } | { kind: "package"; name: string };
 
@@ -61,8 +74,11 @@ function resolve(srcRoot: string, from: string, specifier: string): Target | nul
   const base = specifier.startsWith("@/")
     ? path.resolve(srcRoot, specifier.slice(2))
     : path.resolve(path.dirname(from), specifier);
+  const ext = path.extname(base);
+  const swapped = (SOURCE_FOR.get(ext) ?? []).map((source) => base.slice(0, -ext.length) + source);
   for (const candidate of [
     base,
+    ...swapped,
     ...EXTENSIONS.map((ext) => base + ext),
     ...EXTENSIONS.map((ext) => path.join(base, `index${ext}`)),
   ]) {
@@ -177,6 +193,24 @@ describe("the guard itself", () => {
       "root.tsx -> barrel.ts -> failover/controller.ts",
       "root.tsx -> barrel.ts -> failover/scene/scene.ts",
       "root.tsx -> side.ts -> three",
+    ]);
+  });
+
+  it("catches a .js-suffixed specifier for a .ts file, and require() in both forms", () => {
+    const src = tree({
+      "root.tsx": [
+        'export { FailoverController } from "./components/game/failover/controller.js";',
+        'const sim = require("./components/game/failover/sim/tick");',
+        'import scene = require("./components/game/failover/scene/scene.jsx");',
+      ].join("\n"),
+      "components/game/failover/controller.ts": "export const FailoverController = 1;\n",
+      "components/game/failover/sim/tick.ts": "export const step = 1;\n",
+      "components/game/failover/scene/scene.tsx": "export const Scene = 1;\n",
+    });
+    expect(findViolations(src, ["root.tsx"]).sort()).toEqual([
+      "root.tsx -> failover/controller.ts",
+      "root.tsx -> failover/scene/scene.tsx",
+      "root.tsx -> failover/sim/tick.ts",
     ]);
   });
 
