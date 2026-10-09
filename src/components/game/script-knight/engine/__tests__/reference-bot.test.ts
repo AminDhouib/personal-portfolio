@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { encodeLog } from "../codec";
 import { createReferenceBot, playWithBot } from "../reference-bot";
-import { configForRef, replayLog } from "../run";
+import { configForRef } from "../run";
+import { replayOk } from "./helpers";
 
 function floor(tower: "narrow-path" | "powder-keep", level: number, epic: boolean) {
   return configForRef({ kind: "tower", tower, level, epic }, "Bot");
@@ -62,7 +63,7 @@ describe("the reference bot on the Narrow Path", () => {
   it("replays through the log to the same result it played", () => {
     const config = floor("narrow-path", 9, true);
     const played = playWithBot(config);
-    const replay = replayLog(config, played.actions);
+    const replay = replayOk(config, played.actions);
     expect(replay.consumed).toBe(played.actions.length);
     expect(replay.result).toEqual(played.result);
   });

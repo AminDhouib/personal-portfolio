@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { decodeLog } from "../codec";
 import type { FloorSpace } from "../core/floor";
-import { configForRef, replayLog } from "../run";
+import { configForRef } from "../run";
+import { replayOk } from "./helpers";
 import { isTowerId } from "../towers";
 import fixtures from "./fixtures/upstream-runs.json";
 
@@ -52,7 +53,7 @@ describe("upstream parity (36 recorded runs)", () => {
         { kind: "tower", tower: run.tower, level: run.level, epic: run.epic },
         "Probe",
       );
-      const replay = replayLog(config, actions ?? []);
+      const replay = replayOk(config, actions ?? []);
 
       expect(replay.consumed).toBe(actions?.length);
       expect(replay.result.passed).toBe(run.passed);
