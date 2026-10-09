@@ -26,3 +26,10 @@ updates:
       - dependency-name: "@types/node"
         update-types:
           - version-update:semver-major
+      # @ai-sdk/openai 4 builds LanguageModelV4 models. @copilotkit/runtime 1.77.x
+      # bundles ai 6, which accepts only spec v2/v3 models, so the chat route stops
+      # typechecking and would break at runtime. Revisit when CopilotKit's runtime
+      # moves to ai 7.
+      - dependency-name: "@ai-sdk/openai"
+        update-types:
+          - version-update:semver-major
