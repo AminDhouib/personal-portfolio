@@ -16,6 +16,11 @@ describe("Script Knight credits", () => {
     expect(entry?.detail).toMatch(/Original idea: ruby-warrior by Ryan Bates \(MIT\)/);
   });
 
+  it("credit CodeMirror for the editor and link it", () => {
+    const entry = credits.find((c) => c.href === "https://codemirror.net/");
+    expect(entry?.detail).toBe("Editor: CodeMirror 6 by Marijn Haverbeke and contributors (MIT)");
+  });
+
   it("do not link the WarriorJS logo or site", () => {
     const text = JSON.stringify(credits);
     expect(text).not.toMatch(/warriorjs\.com/i);

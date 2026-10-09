@@ -60,8 +60,10 @@ import {
   saveStats,
   setHandle,
 } from "./stats";
+import { EditorHost } from "./editor-host";
 import { TOUCH } from "./surface";
-import { TextareaEditor, type EditorProps } from "./textarea-editor";
+import { type SyntaxIssue, withSyntaxLine } from "./syntax-line";
+import type { EditorProps } from "./textarea-editor";
 import { Transport } from "./transport";
 import { usePlayback } from "./use-playback";
 import { utcDayKey } from "@/lib/arcade/boards";
@@ -75,7 +77,7 @@ const LINK = `underline pointer-coarse:inline-flex pointer-coarse:items-center $
 export interface StageProps {
   /** The sandbox entry point; a test passes a fake. */
   runner?: Runner;
-  /** T7-4 swaps in CodeMirror here with the same props. */
+  /** The code editor; the default shows a textarea and swaps in CodeMirror on a desktop pointer. */
   editor?: ComponentType<EditorProps>;
   /** The daily board and submit panel; a test or a later PR can swap it. */
   boardPanel?: ComponentType<DailyBoardProps>;
@@ -117,7 +119,7 @@ function summarizeEpic(runs: readonly FloorRun[]): EpicSummary {
 
 export function Stage({
   runner = runInSandbox,
-  editor: Editor = TextareaEditor,
+  editor: Editor = EditorHost,
   boardPanel: BoardPanel = DailyBoardPanel,
   handPad,
 }: StageProps) {
@@ -154,6 +156,21 @@ export function Stage({
     daily: null,
   });
   const wasPlayingRef = useRef(false);
+  // Where the code editor's own parse found a syntax error, so a Run can name the line.
+  const syntaxRef = useRef<SyntaxIssue | null>(null);
+  const onSyntaxError = useCallback((issue: SyntaxIssue | null) => {
+    syntaxRef.current = issue;
+  }, []);
+  const knownRunner = useCallback<Runner>(
+    (req, onTurn) => {
+      const handle = runner(req, onTurn);
+      return {
+        cancel: handle.cancel,
+        done: handle.done.then((outcome) => withSyntaxLine(outcome, syntaxRef.current)),
+      };
+    },
+    [runner],
+  );
 
   // Only a tower never edited falls back to the starter, so an emptied editor stays empty.
   const code = daily
@@ -346,12 +363,12 @@ export function Stage({
     async (token: RunToken) => {
       const handle = daily
         ? startDailyRun(dayKey, code, runner)
-        : startFloorRun({ kind: "tower", tower, level, epic: useEpic }, code, runner);
+        : startFloorRun({ kind: "tower", tower, level, epic: useEpic }, code, knownRunner);
       cancelRef.current = handle.cancel;
       const done = await handle.done;
       if (isLive(token)) finishFloor(done);
     },
-    [code, daily, dayKey, finishFloor, isLive, level, runner, tower, useEpic],
+    [code, daily, dayKey, finishFloor, isLive, knownRunner, level, runner, tower, useEpic],
   );
 
   const runEpic = useCallback(
@@ -362,7 +379,7 @@ export function Stage({
         const handle = startFloorRun(
           { kind: "tower", tower, level: floor, epic: true },
           code,
-          runner,
+          knownRunner,
         );
         cancelRef.current = handle.cancel;
         const done = await handle.done;
@@ -379,7 +396,7 @@ export function Stage({
         commitProgress(recordEpic(progress, tower, { score, grades }));
       }
     },
-    [code, commitProgress, isLive, progress, runner, tower],
+    [code, commitProgress, isLive, knownRunner, progress, tower],
   );
 
   const run = useCallback(async () => {
@@ -576,7 +593,13 @@ export function Stage({
           />
         )}
         <AbilityList abilities={info.warriorAbilities} />
-        <Editor value={code} onChange={changeCode} onRun={() => void run()} disabled={running} />
+        <Editor
+          value={code}
+          onChange={changeCode}
+          onRun={() => void run()}
+          disabled={running}
+          onSyntaxError={onSyntaxError}
+        />
         {code.length > CODE_MAX_CHARS ? null : (
           <p className="text-right font-mono text-[11px] text-(--muted)">
             {code.length} / {CODE_MAX_CHARS}

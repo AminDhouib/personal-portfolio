@@ -94,6 +94,11 @@ export const scriptKnightContent: GameContent = {
       href: "https://github.com/ryanb/ruby-warrior",
     },
     {
+      label: "Editor",
+      detail: "Editor: CodeMirror 6 by Marijn Haverbeke and contributors (MIT)",
+      href: "https://codemirror.net/",
+    },
+    {
       label: "Game",
       detail: "Game: sandbox, renderer, daily floors and board by Amin Dhouib",
     },

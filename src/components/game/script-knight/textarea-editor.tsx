@@ -3,19 +3,26 @@
 import { type KeyboardEvent, useRef } from "react";
 import { GAME_SURFACE } from "./surface";
 
+import type { SyntaxIssue } from "./syntax-line";
+
 export interface EditorProps {
   value: string;
   onChange: (value: string) => void;
   /** Ctrl or Cmd + Enter. */
   onRun: () => void;
   disabled: boolean;
+  /**
+   * The code editor reports where its own parse found a syntax error (null when there is none),
+   * so a Run can name the line. The textarea never calls this.
+   */
+  onSyntaxError?: (issue: SyntaxIssue | null) => void;
 }
 
 /**
  * The first editor, and the phone one: a monospace textarea. Tab inserts two spaces instead of
  * leaving the field, unless Escape was pressed just before it (then Tab moves on, so the field is
- * not a keyboard trap), and Ctrl or Cmd + Enter runs. T7-4 swaps in CodeMirror through the stage's
- * `editor` slot with these same props.
+ * not a keyboard trap), and Ctrl or Cmd + Enter runs. On a desktop pointer the editor host swaps
+ * in CodeMirror with these same props once it has loaded.
  */
 export function TextareaEditor({ value, onChange, onRun, disabled }: EditorProps) {
   // Set by Escape and cleared by the next key, so Escape then Tab leaves the field.
