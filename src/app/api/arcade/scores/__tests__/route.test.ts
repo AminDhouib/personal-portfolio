@@ -860,6 +860,14 @@ describe("proof seam", () => {
     expect(await reported()).not.toHaveBeenCalled();
   });
 
+  it("answers 422, with no Retry-After, for a reject that only talks about being busy", async () => {
+    await install({ verify: async () => ({ ok: false, reason: "busy, try again" }) });
+    const { res, json } = await submit({ proof: MARK });
+    expect(res.status).toBe(422);
+    expect(res.headers.get("Retry-After")).toBeNull();
+    expect(json).toEqual({ error: "implausible", reason: "busy, try again" });
+  });
+
   it.each([
     [
       "throws",
