@@ -12,6 +12,7 @@ import {
   orbit,
   panByKey,
   panByPixels,
+  projectToView,
   toggleView,
   zoomBy,
   type CameraState,
@@ -33,6 +34,7 @@ import { CONFIG } from "./sim/config";
 import { snapshot } from "./sim/snapshot";
 import { drainEvents, resetSim, S } from "./sim/state";
 import { step } from "./sim/tick";
+import { scoreOf } from "./sim/score";
 import { linkRefusalOf } from "./sim/topology";
 import { T, fmt } from "./strings";
 import type { GameMode, SimEvent } from "./sim/types";
@@ -43,6 +45,29 @@ import { readSimHud, type SimHud } from "./hud";
 // the scene, and the scene never touches React or the sim's objects.
 
 export type Speed = 1 | 2 | 3;
+
+/** A failure or soft badge pinned over a node: the reason's string key and where, in view pixels. */
+export interface Badge {
+  id: number;
+  key: string;
+  x: number;
+  y: number;
+}
+
+/** The sim's latest warning (an incident, an alert): a string key and its parameters. */
+export interface Alert {
+  key: string;
+  level: "info" | "warning" | "danger";
+  params: Readonly<Record<string, string | number>>;
+}
+
+/** How a run ended, handed to onRunEnd once per run. */
+export interface RunEnd {
+  mode: GameMode;
+  /** Game seconds survived. */
+  seconds: number;
+  score: number;
+}
 
 /** The sim's side of the HUD (hud.ts) plus the controller's own state. */
 export interface HudState extends SimHud {
@@ -56,6 +81,8 @@ export interface HudState extends SimHud {
   tier: PerfTier;
   /** The frame loop threw and stopped; the game shows its crash card. */
   crashed: boolean;
+  badges: Badge[];
+  alert: Alert | null;
 }
 
 export interface ControllerOptions {
@@ -68,6 +95,8 @@ export interface ControllerOptions {
   perfEnv?: PerfEnv;
   gfxPref?: GfxPref;
   createScene?: (canvas: HTMLCanvasElement, tier: PerfTier) => FailoverScene;
+  /** Called once when a run ends (the sim's game-over event), for the device record. */
+  onRunEnd?: (run: RunEnd) => void;
 }
 
 /** The HUD refreshes this often (ms) unless something discrete happens first. */
@@ -86,6 +115,12 @@ const DISCRETE: ReadonlySet<SimEvent["kind"]> = new Set<SimEvent["kind"]>([
   "game-over",
 ]);
 const TOAST_MS = 2600;
+/** A badge stays this long after the node's last failure of that kind. */
+const BADGE_MS = 1600;
+const MAX_BADGES = 24;
+/** A badge floats this high over the ground, about the top of a tier-1 node. */
+const BADGE_Y = 3;
+const ALERT_MS = 4000;
 const MAX_PENDING_EVENTS = 512;
 
 const REFUSALS: Record<string, string> = {
@@ -115,8 +150,10 @@ export class FailoverController {
   private readonly createScene: (canvas: HTMLCanvasElement, tier: PerfTier) => FailoverScene;
   private readonly audio: FailoverAudio;
   private readonly mode: GameMode;
+  private readonly onRunEnd: ((run: RunEnd) => void) | null;
 
   private scene: FailoverScene | null = null;
+  private viewportWidth = 0;
   private viewportHeight = 0;
   private loop: LoopState = createLoop();
   private rafId: number | null = null;
@@ -138,6 +175,9 @@ export class FailoverController {
   private speed: Speed = 1;
   private selected: string | null = null;
   private toast: { text: string; until: number } | null = null;
+  private badges: { id: number; serviceId: string; key: string; until: number }[] = [];
+  private nextBadgeId = 1;
+  private alert: (Alert & { until: number }) | null = null;
   private clockMs = 0;
 
   private hud: HudState;
@@ -150,6 +190,7 @@ export class FailoverController {
     this.createScene = opts.createScene ?? createFailoverScene;
     this.audio = opts.audio ?? createFailoverAudio();
     this.mode = opts.mode ?? "survival";
+    this.onRunEnd = opts.onRunEnd ?? null;
     const pref = opts.gfxPref ?? loadGfxPref();
     this.governor = createGovernor(initialTier(opts.perfEnv ?? readPerfEnv(), pref), pref);
     resetSim({ seed: opts.seed ?? freeSeed(), mode: this.mode });
@@ -167,6 +208,7 @@ export class FailoverController {
   }
 
   resize(width: number, height: number): void {
+    this.viewportWidth = width;
     this.viewportHeight = height;
     this.scene?.resize(width, height);
   }
@@ -207,6 +249,8 @@ export class FailoverController {
     this.selected = null;
     this.paused = false;
     this.pendingEvents = [];
+    this.badges = [];
+    this.alert = null;
     this.loop = resetClock(createLoop());
     this.applyOverlay();
     this.emit();
@@ -249,6 +293,7 @@ export class FailoverController {
         const cue = cueForEvent(event);
         if (cue) this.audio.play(cue, nowMs);
       }
+      this.collect(events, nowMs);
       this.pendingEvents.push(...events);
       if (this.pendingEvents.length > MAX_PENDING_EVENTS) {
         this.pendingEvents.splice(0, this.pendingEvents.length - MAX_PENDING_EVENTS);
@@ -269,6 +314,57 @@ export class FailoverController {
     }
     this.requestFrame();
   };
+
+  /** Badges, the latest warning and the end of the run, from this frame's sim events. */
+  private collect(events: readonly SimEvent[], nowMs: number): void {
+    for (const e of events) {
+      if (e.kind === "request-failed" && e.serviceId && e.reason) {
+        this.addBadge(e.serviceId, e.reason, nowMs);
+      } else if (e.kind === "service-badge") {
+        this.addBadge(e.serviceId, e.key, nowMs);
+      } else if (e.kind === "warning") {
+        this.alert = {
+          key: e.key,
+          level: e.level,
+          params: e.params ?? {},
+          until: nowMs + ALERT_MS,
+        };
+      } else if (e.kind === "game-over") {
+        this.onRunEnd?.({ mode: S.gameMode, seconds: S.elapsedGameTime, score: scoreOf() });
+      }
+    }
+    if (this.badges.length > 0) this.badges = this.badges.filter((b) => b.until > nowMs);
+  }
+
+  /** One badge per node: the same reason again keeps it up, a new reason replaces it. */
+  private addBadge(serviceId: string, key: string, nowMs: number): void {
+    const until = nowMs + BADGE_MS;
+    const same = this.badges.find((b) => b.serviceId === serviceId);
+    if (same && same.key === key) {
+      same.until = until;
+      return;
+    }
+    this.badges = this.badges.filter((b) => b.serviceId !== serviceId);
+    this.badges.push({ id: this.nextBadgeId++, serviceId, key, until });
+    if (this.badges.length > MAX_BADGES) this.badges.shift();
+  }
+
+  private badgeViews(): Badge[] {
+    const out: Badge[] = [];
+    for (const b of this.badges) {
+      if (b.until <= this.clockMs) continue;
+      const svc = S.services.find((s) => s.id === b.serviceId);
+      if (!svc) continue;
+      const at = projectToView(
+        this.camera,
+        [svc.position.x, BADGE_Y, svc.position.z],
+        this.viewportWidth,
+        this.viewportHeight,
+      );
+      if (at) out.push({ id: b.id, key: b.key, x: at.x, y: at.y });
+    }
+    return out;
+  }
 
   private renderFrame(nowMs: number): void {
     if (!this.scene) return;
@@ -308,6 +404,11 @@ export class FailoverController {
       soundOn: this.audio.isOn(),
       tier: this.governor.tier,
       crashed: this.crashed,
+      badges: this.badgeViews(),
+      alert:
+        this.alert && this.alert.until > this.clockMs
+          ? { key: this.alert.key, level: this.alert.level, params: this.alert.params }
+          : null,
     };
   }
 
@@ -470,6 +571,33 @@ export class FailoverController {
   upgradeSelected(): void {
     if (!this.selected) return;
     this.act({ op: 4, id: this.selected });
+    this.emit();
+  }
+
+  repairSelected(): void {
+    if (!this.selected) return;
+    this.act({ op: 6, id: this.selected });
+    this.emit();
+  }
+
+  toggleAsgSelected(): void {
+    if (!this.selected) return;
+    this.act({ op: 5, id: this.selected });
+    this.emit();
+  }
+
+  /** Demolish the inspected node (the inspector asks first) and close the inspector. */
+  demolishSelected(): void {
+    if (!this.selected) return;
+    const id = this.selected;
+    this.selected = null;
+    this.act({ op: 3, id });
+    this.emit();
+  }
+
+  /** Close the inspector. */
+  deselect(): void {
+    this.selected = null;
     this.emit();
   }
 

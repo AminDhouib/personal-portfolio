@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import {
+  Activity,
   Check,
   Eye,
   Link2,
@@ -88,8 +89,18 @@ export function Tools({ hud, controller }: { hud: HudState; controller: Failover
   );
 }
 
-/** Pause and the three speeds, the camera turns and view, and sound. */
-export function Controls({ hud, controller }: { hud: HudState; controller: FailoverController }) {
+/** Pause and the three speeds, the camera turns and view, the metrics panel, and sound. */
+export function Controls({
+  hud,
+  controller,
+  metricsOpen,
+  onToggleMetrics,
+}: {
+  hud: HudState;
+  controller: FailoverController;
+  metricsOpen: boolean;
+  onToggleMetrics: () => void;
+}) {
   return (
     <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
       <ToolButton
@@ -120,6 +131,9 @@ export function Controls({ hud, controller }: { hud: HudState; controller: Failo
       </ToolButton>
       <ToolButton label={`${T.top_down} (T)`} onClick={() => controller.toggleTopDown()}>
         <Eye className="h-4 w-4" aria-hidden />
+      </ToolButton>
+      <ToolButton label={T.metrics} pressed={metricsOpen} onClick={onToggleMetrics}>
+        <Activity className="h-4 w-4" aria-hidden />
       </ToolButton>
       <ToolButton
         label={hud.soundOn ? T.sound_off : T.sound_on}

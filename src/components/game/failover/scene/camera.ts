@@ -121,3 +121,39 @@ export function cameraPose(s: CameraState): CameraPose {
     halfHeight,
   };
 }
+
+type Vec3 = [number, number, number];
+const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+const unit = (a: Vec3): Vec3 => {
+  const n = Math.hypot(...a) || 1;
+  return [a[0] / n, a[1] / n, a[2] / n];
+};
+
+/**
+ * Where a world point lands on a `width` x `height` view, in pixels from its top
+ * left: the same orthographic camera the scene builds from the pose (three's
+ * lookAt basis), so the HUD can pin a label over a node without asking WebGL.
+ * Null on an empty view.
+ */
+export function projectToView(
+  s: CameraState,
+  point: Vec3,
+  width: number,
+  height: number,
+): { x: number; y: number } | null {
+  if (width <= 0 || height <= 0) return null;
+  const pose = cameraPose(s);
+  const back = unit(sub(pose.position, pose.target));
+  const right = unit(cross(pose.up, back));
+  const up = cross(back, right);
+  const d = sub(point, pose.target);
+  const nx = dot(d, right) / (pose.halfHeight * (width / height));
+  const ny = dot(d, up) / pose.halfHeight;
+  return { x: ((nx + 1) / 2) * width, y: ((1 - ny) / 2) * height };
+}

@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { FailoverController, type HudState } from "./failover/controller";
-import { T, fmt } from "./failover/strings";
-import { clock } from "./failover/ui/format";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FailoverController } from "./failover/controller";
+import { loadStats, recordRun, saveStats } from "./failover/stats";
+import { T } from "./failover/strings";
+import { FailureBadges } from "./failover/ui/failure-badges";
 import { StatusBar } from "./failover/ui/hud";
+import { Inspector } from "./failover/ui/inspector";
+import { alertText } from "./failover/ui/messages";
+import { MetricsPanel } from "./failover/ui/metrics-panel";
+import { Report } from "./failover/ui/report";
 import { Toast } from "./failover/ui/toast";
 import { ToolSheet } from "./failover/ui/tool-sheet";
 import { Controls, Tools } from "./failover/ui/toolbar";
@@ -22,29 +27,6 @@ import { createHudBridge, useHud } from "./failover/ui/use-hud";
 /** Movement under this many pixels between press and release is a tap, not a drag. */
 const TAP_SLOP_PX = 6;
 
-const OVER_TEXT: Record<NonNullable<HudState["over"]>, string> = {
-  reputation: T.over_reputation,
-  money: T.over_money,
-  retired: T.over_retired,
-};
-
-/** The picked node and its upgrade, until the inspector lands. */
-function Selection({ hud, controller }: { hud: HudState; controller: FailoverController }) {
-  if (!hud.selected) return null;
-  return (
-    <span className="pointer-events-auto inline-flex items-center gap-2 rounded-md bg-[#0b0b0d]/85 px-3 py-1.5 font-mono text-xs text-[#d4d4d8]">
-      {hud.selected.name} T{hud.selected.tier}, {Math.round(hud.selected.health)}%
-      <button
-        type="button"
-        onClick={() => controller.upgradeSelected()}
-        className="rounded border border-[#27272a] px-1.5 py-0.5 hover:border-[#52525b]"
-      >
-        {T.upgrade}
-      </button>
-    </span>
-  );
-}
-
 export function FailoverGame() {
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -52,6 +34,8 @@ export function FailoverGame() {
   const bridge = useMemo(() => createHudBridge(), []);
   const hud = useHud(bridge);
   const coarse = useCoarsePointer();
+  const [best, setBest] = useState(loadStats);
+  const [metricsOpen, setMetricsOpen] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -64,7 +48,15 @@ export function FailoverGame() {
     canvas.className = "block h-full w-full";
     host.appendChild(canvas);
 
-    const controller = new FailoverController();
+    const controller = new FailoverController({
+      // The device record: a survival run's time and score, once per run.
+      onRunEnd: (run) => {
+        if (run.mode !== "survival") return;
+        const next = recordRun(loadStats(), run);
+        saveStats(next);
+        setBest(next);
+      },
+    });
     controllerRef.current = controller;
     const rect = container.getBoundingClientRect();
     controller.attach(canvas, rect.width, rect.height);
@@ -202,36 +194,39 @@ export function FailoverGame() {
       />
       {hud && controller && (
         <>
+          <FailureBadges badges={hud.badges} />
           <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-1.5">
             <div className="flex flex-col items-start gap-1.5">
               <StatusBar hud={hud} />
               <Tools hud={hud} controller={controller} />
-              <Selection hud={hud} controller={controller} />
-              <Toast text={hud.toast} />
+              <Toast text={hud.toast ?? (hud.alert ? alertText(hud.alert) : null)} />
             </div>
-            <Controls hud={hud} controller={controller} />
+            <div className="flex flex-col items-end gap-1.5">
+              <Controls
+                hud={hud}
+                controller={controller}
+                metricsOpen={metricsOpen}
+                onToggleMetrics={() => setMetricsOpen((open) => !open)}
+              />
+              {metricsOpen && <MetricsPanel hud={hud} onClose={() => setMetricsOpen(false)} />}
+              {!coarse && <Inspector hud={hud} controller={controller} />}
+            </div>
           </div>
-          <div className="pointer-events-none absolute inset-x-2 bottom-2 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-col items-center gap-1.5">
+            {coarse && <Inspector hud={hud} controller={controller} />}
             <ToolSheet hud={hud} controller={controller} coarse={coarse} />
           </div>
         </>
       )}
       {hud?.over && controller && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#050505]/75 text-center text-[#ededed]">
-          <p className="font-display text-2xl font-black">{T.run_over}</p>
-          <p className="max-w-sm text-sm text-[#a1a1aa]">{OVER_TEXT[hud.over]}</p>
-          <p className="font-mono text-sm">{fmt(T.survived, { time: clock(hud.time) })}</p>
-          <button
-            type="button"
-            onClick={() => {
-              controller.restart();
-              containerRef.current?.focus({ preventScroll: true });
-            }}
-            className="min-h-11 rounded-lg border border-[#06b6d4] px-5 font-semibold text-[#06b6d4] hover:bg-[#06b6d4]/10"
-          >
-            {T.play_again}
-          </button>
-        </div>
+        <Report
+          hud={hud}
+          best={best}
+          onPlayAgain={() => {
+            controller.restart();
+            containerRef.current?.focus({ preventScroll: true });
+          }}
+        />
       )}
       {hud?.crashed && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">

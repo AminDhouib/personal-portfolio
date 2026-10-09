@@ -8,6 +8,7 @@ import {
   orbit,
   panByKey,
   panByPixels,
+  projectToView,
   toggleView,
   zoomBy,
 } from "../scene/camera";
@@ -129,6 +130,46 @@ describe("camera", () => {
     const keyUp = panByKey(s, 0, -1);
     expect((down.x - s.x) * (keyUp.x - s.x) + (down.z - s.z) * (keyUp.z - s.z)).toBeGreaterThan(0);
     expect(panByPixels(s, 100, 100, 0)).toBe(s);
+  });
+});
+
+describe("projectToView", () => {
+  const W = 800;
+  const H = 600;
+
+  it("puts the view centre in the middle, and nothing on an empty view", () => {
+    for (const s of [initialCamera(), toggleView(initialCamera()), orbit(initialCamera(), 1)]) {
+      const p = projectToView(s, [s.x, 0, s.z], W, H);
+      expect(p?.x).toBeCloseTo(W / 2, 6);
+      expect(p?.y).toBeCloseTo(H / 2, 6);
+    }
+    expect(projectToView(initialCamera(), [0, 0, 0], 0, H)).toBeNull();
+  });
+
+  it("maps one half-height of world straight up to the top edge, top-down", () => {
+    const s = toggleView(initialCamera());
+    const { up } = cameraPose(s);
+    const half = cameraPose(s).halfHeight;
+    const p = projectToView(s, [s.x + up[0] * half, 0, s.z + up[2] * half], W, H);
+    expect(p?.x).toBeCloseTo(W / 2, 6);
+    expect(p?.y).toBeCloseTo(0, 6);
+  });
+
+  it("moves a point right on screen the way a drag to the left pans the view", () => {
+    const s = initialCamera();
+    const dragged = panByPixels(s, -100, 0, H);
+    // The view centre moved right along the ground: the old centre is now left of the middle.
+    const p = projectToView(dragged, [s.x, 0, s.z], W, H);
+    expect(p?.x).toBeCloseTo(W / 2 - 100, 6);
+    expect(p?.y).toBeCloseTo(H / 2, 6);
+  });
+
+  it("draws a raised point higher on screen in the isometric view", () => {
+    const s = initialCamera();
+    const ground = projectToView(s, [s.x, 0, s.z], W, H)!;
+    const raised = projectToView(s, [s.x, 4, s.z], W, H)!;
+    expect(raised.x).toBeCloseTo(ground.x, 6);
+    expect(raised.y).toBeLessThan(ground.y);
   });
 });
 
