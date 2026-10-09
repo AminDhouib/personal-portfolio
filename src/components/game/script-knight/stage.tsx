@@ -458,6 +458,7 @@ export function Stage({
     finishFloor(handShown);
   }, [finishFloor, hand.playing, handShown]);
 
+  const restartHand = hand.restart;
   const chooseMode = useCallback(
     (next: PlayMode) => {
       if (next === mode) return;
@@ -466,10 +467,13 @@ export function Stage({
       setFloorRun(null);
       setEpicRuns(null);
       setNotice(null);
+      // A hand run ends with the switch: the result card, its board form and the once-only record
+      // all belong to it, so it must not come back (and record again) on the way back.
+      restartHand();
       setMode(next);
       saveMode(next);
     },
-    [invalidateRun, mode],
+    [invalidateRun, mode, restartHand],
   );
 
   const run = useCallback(async () => {
