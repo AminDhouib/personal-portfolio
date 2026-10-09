@@ -174,6 +174,46 @@ describe("submitting", () => {
   });
 });
 
+describe("guards before the POST", () => {
+  it("sends one POST when the form is submitted twice while the first is pending", async () => {
+    await mount();
+    let answer: (res: Response) => void = () => undefined;
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === "POST"
+        ? new Promise<Response>((resolve) => {
+            answer = resolve;
+          })
+        : Promise.resolve(json(BOARD)),
+    );
+    const form = screen.getByLabelText("Name for the board").closest("form") as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(posts()).toHaveLength(1);
+    await act(async () => {
+      answer(json({ ok: true, boards: [] }));
+    });
+    await screen.findAllByText("Posted.");
+    expect(posts()).toHaveLength(1);
+  });
+
+  it("closes and posts nothing when 00:00 UTC passes between game over and Submit", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T23:59:50Z"));
+    await mount({ day: "2026-10-15" });
+    vi.setSystemTime(new Date("2026-10-16T00:00:05Z"));
+    submit();
+    expect(
+      (await screen.findAllByText("Today's incident closed at 00:00 UTC. Start the new one."))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(posts()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /^(Submit|Retry)$/ })).toBeNull();
+  });
+});
+
 describe("a busy board (503)", () => {
   it("shows the message, holds Retry for the Retry-After, then sends the run again", async () => {
     await mount();
