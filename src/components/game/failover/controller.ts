@@ -186,6 +186,8 @@ export class FailoverController {
   private disposed = false;
   private crashed = false;
   private loading = false;
+  /** Aborted by dispose(), so a swap still running stops at its next yield, off the shared sim. */
+  private swap: AbortController | null = null;
 
   private machine: MachineState = initialMachine();
   private camera: CameraState = initialCamera();
@@ -259,6 +261,7 @@ export class FailoverController {
 
   dispose(): void {
     this.disposed = true;
+    this.swap?.abort();
     this.running = false;
     if (this.rafId !== null) this.cancel(this.rafId);
     this.rafId = null;
@@ -282,15 +285,22 @@ export class FailoverController {
    * `work` runs the loop asks for no frames (a load yields between chunks, and a frame would
    * step a half-built sim) and the board takes no input; a second call meanwhile is refused,
    * so a double tap never loads twice. The run left in the sim is adopted, mode and all.
+   * `signal` aborts when the controller is disposed: work that yields must check it and stop,
+   * since the sim is shared and the next game to mount would otherwise find it still moving.
    */
-  async replaceRun<R>(work: () => R | Promise<R>): Promise<{ ok: true; value: R } | { ok: false }> {
+  async replaceRun<R>(
+    work: (signal: AbortSignal) => R | Promise<R>,
+  ): Promise<{ ok: true; value: R } | { ok: false }> {
     if (this.loading || this.disposed) return { ok: false };
     this.loading = true;
+    const swap = new AbortController();
+    this.swap = swap;
     this.syncScheduling();
     this.emit();
     try {
-      return { ok: true, value: await work() };
+      return { ok: true, value: await work(swap.signal) };
     } finally {
+      this.swap = null;
       this.loading = false;
       this.mode = S.gameMode;
       this.freshRun();
