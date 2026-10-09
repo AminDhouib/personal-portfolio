@@ -62,7 +62,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
-      # Reads the build's loadable and first-load manifests (see the script's header).
+      # Reads the client chunks and the first-load manifests the build wrote (see the script's header).
       - name: Bundle budget (Failover game chunks, 420 KB gzip)
         run: node scripts/check-bundle-budget.mjs
 
