@@ -19,6 +19,16 @@ export interface ReplayOptions {
   log: ReadonlyArray<readonly number[]>;
   /** How many ticks the run claims to have lasted at most (the cap, or where it ended). */
   ticks: number;
+  /**
+   * Changes the daily makes from outside the action log (an incident's traffic mix, its
+   * timed events). `setup` runs once, right after the reset and before the first step.
+   */
+  setup?: () => void;
+  /**
+   * Calls made when the sim reaches a tick, in the order given for equal ticks, before the
+   * actions of that tick. Ticks must not run backwards; one past `ticks` is never made.
+   */
+  scheduled?: ReadonlyArray<{ readonly tick: number; readonly run: () => void }>;
 }
 
 export interface ReplayResult {
@@ -55,6 +65,11 @@ export class ReplayError extends Error {
 
 /** Ticks per chunk of the synchronous replay. */
 const CHUNK_TICKS = 500;
+
+interface Call {
+  tick: number;
+  run: () => void;
+}
 
 interface Planned {
   tick: number;
@@ -96,23 +111,36 @@ interface Run {
 
 function begin(opts: ReplayOptions): Run {
   const actions = plan(opts);
+  const calls: Call[] = (opts.scheduled ?? []).filter((call) => call.tick <= opts.ticks);
+  calls.forEach((call, index) => {
+    if (!Number.isSafeInteger(call.tick) || call.tick < 0)
+      throw new ReplayError("tick-range", index);
+    if (index > 0 && call.tick < (calls[index - 1]?.tick ?? 0)) {
+      throw new ReplayError("tick-order", index);
+    }
+  });
   resetSim({
     seed: opts.seed,
     mode: opts.mode,
     ...(opts.budget === undefined ? {} : { budget: opts.budget }),
   });
+  opts.setup?.();
   let next = 0;
+  let nextCall = 0;
 
   return {
     advance(target) {
       for (;;) {
-        // Everything issued at this tick goes in before the tick is stepped, in log order.
+        // Scheduled calls come first, then everything issued at this tick, in log order.
+        while (nextCall < calls.length && (calls[nextCall]?.tick ?? Infinity) <= S.tick) {
+          calls[nextCall++]?.run();
+        }
         while (next < actions.length && (actions[next]?.tick ?? Infinity) <= S.tick) {
           const planned = actions[next++];
           if (planned) dispatch(planned.action);
         }
         if (S.over || S.tick >= target) break;
-        const due = actions[next]?.tick ?? Infinity;
+        const due = Math.min(actions[next]?.tick ?? Infinity, calls[nextCall]?.tick ?? Infinity);
         step(Math.min(target, due) - S.tick);
       }
       return S.over !== null || S.tick >= opts.ticks;
