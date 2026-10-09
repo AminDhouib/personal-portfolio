@@ -7,7 +7,7 @@ export const scriptKnightContent: GameContent = {
   genre: ["Puzzle", "Educational"],
   playMode: "SinglePlayer",
   intro:
-    "Script Knight is a free coding game where you never touch the knight. You write a JavaScript class called Player, press Run, and the knight does exactly what your code says, one action per turn. Each floor of the tower is a small puzzle: a corridor, a few monsters, maybe a captive to rescue, and a staircase to reach. Your code runs in a locked-down sandbox in your browser, and the run is replayed on a glowing wireframe floor so you can see where it went right and where it went wrong.",
+    "Script Knight is a free coding game where you never touch the knight. You write a JavaScript class called Player, press Run, and the knight does exactly what your code says, one action per turn. Each floor is a small puzzle: a corridor, a few monsters, maybe a captive to rescue, and a staircase to reach. Your code runs in a sandbox in your browser, and the run is replayed on a wireframe floor.",
   howToPlay: [
     "Read the floor briefing and the abilities this floor gives the knight.",
     "Write a playTurn method in the editor. It is called once per turn and may do one action, such as walk, attack, rest or rescue.",
@@ -19,7 +19,8 @@ export const scriptKnightContent: GameContent = {
   controls: [
     {
       input: "Editor",
-      action: "Type your Player class. Tab inserts two spaces and keeps focus in the editor.",
+      action:
+        "Type your Player class. Tab inserts two spaces; press Escape, then Tab, to move focus out of the editor.",
     },
     {
       input: "Ctrl or Cmd + Enter",
@@ -35,14 +36,14 @@ export const scriptKnightContent: GameContent = {
     },
     {
       input: "Sound button",
-      action: "Mutes or unmutes the synthesized sounds; the choice is remembered on this device.",
+      action: "Mutes or unmutes the sounds; remembered on this device.",
     },
   ],
   strategy: [
-    "Sense before you act. Looking at the space ahead costs nothing, and many floors only need a check before each step.",
-    "Rest when you are hurt and nothing is in reach. A knight that rests recovers health, and health is what keeps a run alive.",
+    "Sense before you act. Looking ahead costs nothing, and many floors only need a check before each step.",
+    "Rest when you are hurt and nothing is in reach; health is what keeps a run alive.",
     "Write for the general case. Epic mode runs the same code through all nine floors in a row, so code that only works for one map will fail.",
-    "Use think to print values into the event log when your code does something you did not expect.",
+    "Use think to print values into the event log when your code misbehaves.",
     "Watch the turn budget. A run ends after 200 turns, and a faster clear scores better.",
   ],
   facts: [
@@ -60,19 +61,24 @@ export const scriptKnightContent: GameContent = {
         "A little helps. The first floors need one method and a call or two, and each floor lists its abilities, so you can learn by trying things and reading the replay.",
     },
     {
-      question: "Is my code sent anywhere?",
+      question: "Is my code sent anywhere, and what if it loops forever?",
       answer:
-        "No. Your code runs in a sandboxed Web Worker in your own browser. It is saved on your device so it is there when you come back, and it is not uploaded.",
+        "No. Your code runs in a sandboxed Web Worker in your own browser and is saved only on your device. The sandbox stops a turn that takes over a quarter of a second, or a run over five seconds, and tells you which turn was cut off.",
     },
     {
-      question: "What happens if my code loops forever?",
+      question: "Can I use TypeScript?",
       answer:
-        "The sandbox stops a turn that takes longer than a quarter of a second, and a whole run that takes longer than five seconds. The page stays responsive and tells you which turn was cut off.",
+        "Not yet. Script Knight takes JavaScript only. TypeScript would have to be turned into JavaScript first, which adds nothing a JavaScript player cannot do and would make error line numbers point at the wrong line.",
+    },
+    {
+      question: "What is epic mode?",
+      answer:
+        "After you clear floor 9 of a tower, epic mode runs the same code through all nine floors in a row with every ability, and grades each floor and the average.",
     },
     {
       question: "How are floors scored?",
       answer:
-        "A pass earns points from the knight, a time bonus for finishing quickly, and a clear bonus for leaving nothing else on the floor. The score is turned into a grade from F to S, and your best is kept for each floor.",
+        "A pass earns points from the knight, a time bonus and a clear bonus. The score becomes a grade from F to S, and your best is kept for each floor.",
     },
   ],
   credits: [

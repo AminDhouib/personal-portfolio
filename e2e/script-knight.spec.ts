@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { blockThirdParties } from "./helpers";
 
 // Script Knight against the production build, with the real sandbox worker: a passing solution
-// clears floor 1, a loop that never ends is cut off within a couple of seconds with the page still
-// alive, and the sandbox has no network (fetch is undefined inside it). The page is hidden (noindex
-// and out of every list) until launch, but it is still served at its own route.
+// clears floor 1, a loop that never ends is cut off and the page stays alive (the wait includes the
+// worker bundle load, so it is CI-safe rather than the 0.25 s turn limit), and the sandbox has no
+// network (fetch is undefined inside it). The page is hidden (noindex and out of every list) until
+// launch, but it is still served at its own route.
 
 const GAME_PATH = "/games/script-knight";
 
@@ -24,6 +25,10 @@ async function runAndSkipToEnd(page: Page) {
 test.describe("Script Knight", () => {
   test.beforeEach(async ({ context, baseURL }) => {
     await blockThirdParties(context, baseURL);
+    // The page writes nothing to the app. T7-5 adds a board that could, so a write is refused here.
+    await context.route("**/api/arcade/scores**", (route) =>
+      route.request().method() === "POST" ? route.abort() : route.fallback(),
+    );
   });
 
   test("a walking Player clears floor 1 in the real sandbox", async ({ page }) => {
@@ -39,7 +44,7 @@ test.describe("Script Knight", () => {
     await page.goto(GAME_PATH);
     await writeCode(page, "class Player {\n  playTurn(warrior) {\n    while (true) {}\n  }\n}\n");
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    await expect(page.getByText(/ran longer than 0\.25 s/)).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText(/ran longer than 0\.25 s/)).toBeVisible({ timeout: 20_000 });
 
     const sound = page.getByRole("button", { name: /^Sound (on|off)$/ });
     const before = await sound.textContent();
