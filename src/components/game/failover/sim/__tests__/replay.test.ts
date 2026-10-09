@@ -22,6 +22,20 @@ function expectReplayError(fn: () => unknown, code: ReplayError["code"]): void {
   expect((caught as ReplayError).code).toBe(code);
 }
 
+describe("the action cap", () => {
+  const retires = (n: number): number[][] => Array.from({ length: n }, () => [0, 8]);
+
+  it("plays 700 actions and refuses 701 before anything runs", () => {
+    expect(() =>
+      replay({ seed: SEED, mode: "survival", log: retires(700), ticks: 10 }),
+    ).not.toThrow();
+    expectReplayError(
+      () => replay({ seed: SEED, mode: "survival", log: retires(701), ticks: 10 }),
+      "too-many",
+    );
+  });
+});
+
 describe("replay", () => {
   it("reproduces a recorded run exactly: same hash, score and end", () => {
     const run = play(SEED, "survival", SCRIPT, TICKS);
