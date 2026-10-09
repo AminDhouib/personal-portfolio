@@ -11,7 +11,8 @@ export type GameSlug =
   | "tower-stacker"
   | "typing-speed"
   | "super-voltorb-flip"
-  | "password-game";
+  | "password-game"
+  | "script-knight";
 
 export interface GameMeta {
   slug: GameSlug;
@@ -97,6 +98,18 @@ export const GAMES: GameMeta[] = [
     accent: "#f472b6",
     accentTailwind: "accent-pink",
     external: true,
+  },
+  {
+    slug: "script-knight",
+    title: "Script Knight",
+    tagline: "Write the code, climb the tower",
+    description:
+      "A coding game where the knight does exactly what your JavaScript tells it to. Read the floor, write a Player class, press Run and watch the replay as you climb the tower and fight, rescue and outwit your way to the stairs.",
+    controls: "Write JavaScript in the editor, then press Run. Ctrl or Cmd + Enter runs too.",
+    accent: "#4ade80",
+    accentTailwind: "accent-green",
+    // Hidden until T7-8 launches it: still served, but noindex and out of every list.
+    hidden: true,
   },
 ];
 
