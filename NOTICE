@@ -58,6 +58,9 @@ Kostyantyn Pshenychnyy, released under the MIT license.
   License:  MIT, full text in src/components/game/failover/LICENSE-server-survival.txt
 
 Changes: ported to TypeScript; audio, art and strings replaced or rewritten.
+Behavior changes: the simulation runs on a fixed 20 Hz step with seeded random
+streams instead of the frame rate and Math.random; and demolishing a dead-letter
+queue re-homes the requests parked in it, where upstream leaves them stranded.
 
 
 Script Knight

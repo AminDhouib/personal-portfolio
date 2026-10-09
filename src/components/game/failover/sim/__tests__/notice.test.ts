@@ -15,6 +15,12 @@ describe("Server Survival attribution", () => {
     expect(notice).toContain("7804e5969e28267cd33837e023eb46fa65da72b7");
   });
 
+  it("NOTICE records the behavior changes from upstream", () => {
+    const notice = readFileSync(path.join(ROOT, "NOTICE"), "utf8");
+    expect(notice).toMatch(/20 Hz/);
+    expect(notice).toMatch(/dead-letter/);
+  });
+
   it("the licence text ships with the port, copyright line intact", () => {
     expect(existsSync(LICENSE)).toBe(true);
     const text = readFileSync(LICENSE, "utf8");

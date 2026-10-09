@@ -205,7 +205,9 @@ export function deleteObject(id: string): boolean {
     // A stream holds records in its partitions, and a dead-letter queue holds its
     // parked requests: neither is in queue or processing, and a parked request's
     // target is the node it failed at, not the DLQ. Re-home them too or demolishing
-    // the node would strand them.
+    // the node would strand them. DEVIATION from upstream, which strands them in
+    // the request list forever: that is an upstream bug, so the port re-homes them
+    // (power.test.ts pins it, NOTICE records it).
     ...svc.partitions.flat(),
     ...svc.parked,
     // A GPU's live batch and an Inference Gateway's deadline entries are off-pipeline
