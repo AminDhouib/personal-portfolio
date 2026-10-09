@@ -15,8 +15,10 @@ function onLine(text: string, line: number | null): string {
   return line === null ? text : `Line ${line}: ${text}`;
 }
 
-function describeTimeout(phase: "load" | "turn" | "run", t: number): OutcomeMessage {
+function describeTimeout(phase: "boot" | "load" | "turn" | "run", t: number): OutcomeMessage {
   switch (phase) {
+    case "boot":
+      return { text: "The sandbox could not start.", retry: true };
     case "load":
       return {
         text: "Your code did not finish loading within 1 second. Look for a loop at the top level or in the constructor.",

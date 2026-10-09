@@ -90,6 +90,11 @@ describe("describeOutcome", () => {
     );
   });
 
+  it("explains a sandbox that never booted, with a retry", () => {
+    const boot: RunOutcome = { kind: "timeout", log: "1:", phase: "boot", t: 1 };
+    expect(describeOutcome(boot)).toEqual({ text: "The sandbox could not start.", retry: true });
+  });
+
   it("offers a retry after a crash", () => {
     expect(describeOutcome({ kind: "crash", log: "1:" })).toEqual({
       text: "The sandbox stopped unexpectedly.",
