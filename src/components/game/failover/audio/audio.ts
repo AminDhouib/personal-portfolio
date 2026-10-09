@@ -11,7 +11,8 @@ import {
 
 // Failover's audio facade. Sound is off until the player turns it on (the
 // choice is kept in failover:audio). Nothing is created until unlock(), which
-// the Play tap calls, so loading the page never opens an AudioContext.
+// the board's first pointerdown or keydown calls, so loading the page never
+// opens an AudioContext.
 
 export interface FailoverAudio {
   /** Create the AudioContext (from a user gesture). Safe to call again. */
