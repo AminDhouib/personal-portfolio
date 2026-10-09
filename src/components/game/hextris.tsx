@@ -18,7 +18,7 @@ import { AFK_AFTER_MS } from "./hextris/engine/scoring";
 import { advance, applyAction } from "./hextris/engine/step";
 import type { EngineAction, RunState } from "./hextris/engine/types";
 import { layout, type Layout } from "./hextris/render/layout";
-import { paint } from "./hextris/render/paint";
+import { paint, type PaintEnding } from "./hextris/render/paint";
 import { POPUP_MS, type ShownPopup } from "./hextris/render/juice";
 import {
   feedbackFor,
@@ -459,7 +459,10 @@ export function HextrisGame() {
     let frameNow = performance.now();
     let overAt: number | null = null;
     const restartReady = () => overAt !== null && frameNow - overAt >= RESTART_LOCKOUT_MS;
-    // The shake is the one effect that follows the OS reduced-motion preference.
+    // What the painter marks on the board after game over: the overflowed side, and whether to
+    // burst for a new best. The loop keeps painting under the sheet, so the side keeps pulsing.
+    let ending: Omit<PaintEnding, "sinceMs"> | null = null;
+    // The shake and the game-over pulse and burst follow the OS reduced-motion preference.
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
     // Haptic feedback helper — no-op on desktop / unsupported devices.
@@ -524,15 +527,17 @@ export function HextrisGame() {
         popups = [];
         overAt = frameNow;
         // Read the best before this run is recorded into the list.
-        const ending = gameOverView({
+        const outcome = gameOverView({
           score: f.over.score,
           previousBest: highScores[0] ?? null,
           side: f.over.side,
           nowMs: 0,
           overAtMs: 0,
         });
-        setUiNewBest(ending.isNewBest);
-        if (ending.isNewBest) sounds.newBest();
+        setUiNewBest(outcome.isNewBest);
+        if (outcome.isNewBest) sounds.newBest();
+        // Reduced motion: no burst, and the highlight holds still (sinceMs stays 0 below).
+        ending = { side: outcome.side, newBest: outcome.isNewBest && !reducedMotion };
         if (isRecordableRun(f.over.score)) {
           highScores = recordHighScore(highScores, f.over.score);
           safeLocalSet("hextris_highscores", JSON.stringify(highScores));
@@ -587,6 +592,7 @@ export function HextrisGame() {
     function startRun() {
       run = newRun();
       overAt = null;
+      ending = null;
       popups = [];
       sounds.resume(); // Audio contexts require a user gesture to start
       act("start");
@@ -626,7 +632,16 @@ export function HextrisGame() {
         const nowMs = run.elapsedMs + run.carryMs;
         if (popups.length > 0) popups = popups.filter((p) => nowMs - p.bornMs < POPUP_MS);
         applyShake(now);
-        paint(ctx, run, view, nowMs, popups);
+        paint(
+          ctx,
+          run,
+          view,
+          nowMs,
+          popups,
+          ending && overAt !== null
+            ? { ...ending, sinceMs: reducedMotion ? 0 : now - overAt }
+            : undefined,
+        );
       } catch (err) {
         cancelAnimationFrame(animRef.current);
         destroyedRef.current = true;

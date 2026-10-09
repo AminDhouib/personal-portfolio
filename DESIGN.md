@@ -575,12 +575,15 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   so a tab opened, started and abandoned scores nothing. Do not "fix" an idle 0. The shell's
   only UI for it is a quiet "Away" line above the meter after 8 s of play, and
   `content/__tests__/hextris-copy.test.ts` pins the About copy to the engine's numbers.
-- **The Hextris clear shake follows the OS reduced-motion preference, the one Hextris effect
-  that does.** It is an exception to "Reduced-motion is inverted between chrome and games": the
-  shake moves the whole board (a CSS translate on the canvas, eased to 0 over 250 ms), which is
-  the kind of motion the preference exists for, while the "+N" popups, the countdown and the
-  rest of the game's motion stay ungated. The shell reads `prefers-reduced-motion` once per
-  mount.
+- **The Hextris clear shake and game-over marks follow the OS reduced-motion preference, the
+  only Hextris effects that do.** They are an exception to "Reduced-motion is inverted between
+  chrome and games": the shake moves the whole board (a CSS translate on the canvas, eased to 0
+  over 250 ms), which is the kind of motion the preference exists for. After game over the
+  painter pulses the overflowed side and bursts particles on a new best (`PaintEnding` in
+  `hextris/render/paint.ts`). Under the preference the shell passes `newBest: false` and holds
+  `sinceMs` at 0, so the side shows a steady highlight and there is no burst. The "+N" popups,
+  the countdown and the rest of the game's motion stay ungated. The shell reads
+  `prefers-reduced-motion` once per mount.
 - **The Hextris Panic Clear tip shows once per browser.** `hextris/tips.ts` stores
   `{"v":1,"panicSeen":true}` under `hextris_tips` as the tip shows, so a reload never shows it
   again. The games hub never reads that key; `HUB_STAT_KEYS` stays an allowlist of score keys.
