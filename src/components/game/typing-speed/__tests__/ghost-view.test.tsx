@@ -87,6 +87,16 @@ describe("the ghost caret and pace chip", () => {
     expect(screen.getAllByTestId("ts-ghost")).toHaveLength(1);
   });
 
+  it("insets the live slot by the floating chip so the sparkline start stays visible", () => {
+    seed({ quote: { wpm: 48, samples: FAST } });
+    render(<TypingSpeedGame />);
+    expect(screen.getByTestId("ts-live-slot")).not.toHaveClass("pl-24");
+    key("a", 0);
+    key("b", 2000);
+    expect(screen.getByTestId("ts-ghost-chip")).toHaveClass("absolute");
+    expect(screen.getByTestId("ts-live-slot")).toHaveClass("pl-24");
+  });
+
   it("puts the ghost on a letter inside a word and reads ahead when you lead", () => {
     seed({ quote: { wpm: 6, samples: SLOW } });
     render(<TypingSpeedGame />);

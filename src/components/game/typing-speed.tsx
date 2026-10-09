@@ -543,7 +543,12 @@ export function TypingSpeedGame() {
       >
         {/* The sparkline's slot is always there so it appearing does not shift the page. */}
         {(!sheet || layout.showGraph) && (
-          <div className="relative h-10" data-testid="ts-live-slot">
+          <div
+            className={["relative h-10", !sheet && paceChip ? "pl-24" : ""]
+              .filter(Boolean)
+              .join(" ")}
+            data-testid="ts-live-slot"
+          >
             {!sheet && paceChip}
             {playing && liveSeries.length > 0 && <WpmGraph points={liveSeries} variant="live" />}
           </div>
