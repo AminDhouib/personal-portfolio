@@ -144,3 +144,34 @@ describe("playerLine", () => {
     expect(playerLine(err)).toBeNull();
   });
 });
+
+describe("compilePlayer: promises", () => {
+  const MESSAGE = "playTurn must not be async: return after choosing one action.";
+
+  it("throws when playTurn is async or returns a thenable", () => {
+    for (const body of [
+      "async playTurn(w) { await 1; }",
+      "playTurn(w) { return new Promise(() => {}); }",
+      "playTurn(w) { return { then() {} }; }",
+      "playTurn(w) { return { get then() { return () => {}; } }; }",
+    ]) {
+      const result = compilePlayer(`class Player { ${body} }`);
+      if (!result.ok) throw new Error("expected the player to compile");
+      expect(() => result.player.playTurn({})).toThrow(MESSAGE);
+    }
+  });
+
+  it("lets a plain return value through", () => {
+    const result = compilePlayer("class Player { playTurn(w) { return 5; } }");
+    if (!result.ok) throw new Error("expected the player to compile");
+    expect(() => result.player.playTurn({})).not.toThrow();
+  });
+
+  it("reports a constructor that returns a promise", () => {
+    const result = compilePlayer(
+      "class Player { constructor() { return Promise.resolve(); } playTurn() {} }",
+    );
+    expect(result).toMatchObject({ ok: false, kind: "constructor" });
+    if (!result.ok) expect(result.message).toBe("Your Player constructor must not be async.");
+  });
+});
