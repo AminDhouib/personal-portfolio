@@ -180,17 +180,19 @@ export function CodeEditor({
   onRun,
   disabled,
   onSyntaxError,
+  maxChars,
+  onTooLong,
   initialSelection,
   focusOnMount,
 }: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const handlers = useRef({ onChange, onRun, onSyntaxError });
+  const handlers = useRef({ onChange, onRun, onSyntaxError, onTooLong });
   const lock = useRef(new Compartment());
   const [issue, setIssue] = useState<SyntaxIssue | null>(null);
 
   useEffect(() => {
-    handlers.current = { onChange, onRun, onSyntaxError };
+    handlers.current = { onChange, onRun, onSyntaxError, onTooLong };
   });
 
   useEffect(() => {
@@ -219,6 +221,20 @@ export function CodeEditor({
               },
             ]),
           ),
+          // An edit that would pass the page's limit never lands, so the editor cannot show text
+          // the page refused to keep (Run would otherwise run the old code under the new text).
+          EditorState.transactionFilter.of((tr) => {
+            if (
+              maxChars === undefined ||
+              !tr.docChanged ||
+              tr.annotation(fromProps) ||
+              tr.newDoc.length <= maxChars
+            ) {
+              return tr;
+            }
+            handlers.current.onTooLong?.();
+            return [];
+          }),
           lineNumbers(),
           gutter({
             class: "cm-syntax-gutter",

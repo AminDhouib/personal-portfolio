@@ -1,6 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
+import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CodeEditor } from "../code-editor";
+import { CODE_MAX_CHARS, TOO_LONG_MESSAGE } from "../code-store";
 import { emptyProgress, PROGRESS_KEY, recordClear, setAt } from "../progress";
 import type { Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
@@ -329,6 +332,30 @@ describe("Stage runs", () => {
     fireEvent.click(button("Skip to end"));
     expect(screen.queryByText(/ran longer than/)).toBeNull();
     expect(screen.queryByText("Floor not passed")).toBeNull();
+  });
+  it("puts the page's code back in the code editor when a paste is too long to keep", async () => {
+    const runs: string[] = [];
+    const runner: Runner = (req) => {
+      runs.push(req.code);
+      return {
+        done: Promise.resolve<RunOutcome>({ kind: "finished", log: "1:", thoughts: [] }),
+        cancel: () => {},
+      };
+    };
+    const { container } = render(<Stage runner={runner} editor={CodeEditor} />);
+    const view = EditorView.findFromDOM(
+      container.querySelector(".cm-editor") as HTMLElement,
+    ) as EditorView;
+    const before = view.state.doc.toString();
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, to: before.length, insert: "x".repeat(CODE_MAX_CHARS + 1) },
+      });
+    });
+    expect(view.state.doc.toString()).toBe(before);
+    expect(screen.getByText(TOO_LONG_MESSAGE)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await waitFor(() => expect(runs).toEqual([before]));
   });
 });
 

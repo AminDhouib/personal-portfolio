@@ -16,6 +16,12 @@ export interface EditorProps {
    * so a Run can name the line. The textarea never calls this.
    */
   onSyntaxError?: (issue: SyntaxIssue | null) => void;
+  /**
+   * The longest text the page keeps. The code editor refuses an edit past it (so what it shows is
+   * what Run runs) and calls onTooLong; the textarea leaves the limit to the page.
+   */
+  maxChars?: number;
+  onTooLong?: () => void;
 }
 
 /**
