@@ -14,7 +14,10 @@ vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn(), logEr
 import { captureException } from "@/lib/log";
 import {
   createFailoverVerifier,
+  DRIFT_MIN_SCORE,
+  DRIFT_SCORE_FRACTION,
   judge,
+  resetDriftReports,
   MAX_PLAUSIBLE_SCORE,
   MAX_WAITING,
   SHADOW,
@@ -27,7 +30,10 @@ const DAY = "2026-10-15";
 const strict = createFailoverVerifier({ shadow: false });
 
 afterEach(() => resetSim({ seed: "after-failover-verify" }));
-beforeEach(() => vi.mocked(captureException).mockClear());
+beforeEach(() => {
+  vi.mocked(captureException).mockClear();
+  resetDriftReports();
+});
 
 let dies: Recorded;
 let retires: Recorded;
@@ -227,6 +233,15 @@ describe("judge", () => {
     ).toEqual({ ok: true });
   });
 
+  it("calls a replay close to its claim drift, and one far from it a plain refusal", () => {
+    expect(judge(result({ endedAtTick: 120 }), 50, detail)).toMatchObject({ drift: true });
+    expect(judge(result({ endedAtTick: 121 }), 50, detail)).toMatchObject({ drift: false });
+    expect(judge(result({ score: 5000 }), 5100, detail)).toMatchObject({ drift: true });
+    expect(judge(result({ score: 5000 }), 5101, detail)).toMatchObject({ drift: false });
+    expect(judge(result({ score: 10 }), 60, detail)).toMatchObject({ drift: true });
+    expect(judge(result({ score: 10 }), 61, detail)).toMatchObject({ drift: false });
+  });
+
   it("refuses alive-before-the-cap, a different end tick and a different score", () => {
     expect(judge(result({ endReason: "time" }), 50, detail)).toMatchObject({ ok: false });
     expect(judge(result({ endedAtTick: 99 }), 50, detail)).toMatchObject({
@@ -243,7 +258,50 @@ describe("the rollout switch", () => {
     expect(SHADOW).toBe(true);
   });
 
-  it("accepts and reports a mismatch under the plausibility ceiling while it is on", async () => {
+  it("refuses the empty proof that claims a big score, the exploit SHADOW once let through", async () => {
+    const forged = input(retires, {
+      proof: "",
+      score: 200_000,
+      detail: { ...input(retires).detail, actions: 0 },
+    });
+    expect((await verifyFailoverRun(forged)).ok).toBe(false);
+    expect((await strict(forged)).ok).toBe(false);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  const retiresAt = (ticks: number) =>
+    input(retires, {
+      detail: { ...input(retires).detail, ticks, seconds: Math.floor(ticks / 20) },
+    });
+
+  it("accepts a replay a tick off with a near score under SHADOW, and refuses it when SHADOW is off", async () => {
+    expect(await verifyFailoverRun(retiresAt(retires.ticks + 1))).toEqual({ ok: true });
+    expect(await strict(retiresAt(retires.ticks + 1))).toMatchObject({ ok: false });
+  });
+
+  it("accepts a replay that ends 20 ticks off and refuses one that ends 21 off", async () => {
+    expect(await verifyFailoverRun(retiresAt(retires.ticks + 20))).toEqual({ ok: true });
+    expect(await verifyFailoverRun(retiresAt(retires.ticks + 21))).toEqual({
+      ok: false,
+      reason: "ticks do not match the replay",
+    });
+  });
+
+  it("accepts a score within the drift allowance and refuses one past it", async () => {
+    const room = Math.floor(Math.max(DRIFT_MIN_SCORE, DRIFT_SCORE_FRACTION * dies.score));
+    expect(await verifyFailoverRun(input(dies, { score: dies.score + room }))).toEqual({
+      ok: true,
+    });
+    expect(await verifyFailoverRun(input(dies, { score: dies.score - room }))).toEqual({
+      ok: true,
+    });
+    expect(await verifyFailoverRun(input(dies, { score: dies.score + room + 1 }))).toEqual({
+      ok: false,
+      reason: "score does not match the replay",
+    });
+  });
+
+  it("accepts and reports a mismatch that is only drift while it is on", async () => {
     const lie = input(dies, { score: dies.score + 1 });
     expect(await verifyFailoverRun(lie)).toEqual({ ok: true });
     expect(captureException).toHaveBeenCalledTimes(1);
@@ -274,19 +332,46 @@ describe("the rollout switch", () => {
     });
   });
 
-  it("accepts a replay that ran out of time, and reports it", async () => {
-    const verdict = await verifyFailoverRun(input(dies, { deadline: Date.now() - 1 }));
-    expect(verdict).toEqual({ ok: true });
-    expect(vi.mocked(captureException).mock.calls[0]?.[1]).toEqual(
-      new Error("failover replay disagrees: ran out of time"),
-    );
+  it("answers busy, never accepted, when the replay runs out of time", async () => {
+    // A client that makes the server slow must not get a forged score in.
+    const slow = input(dies, { deadline: Date.now() - 1, score: 150_000 });
+    expect(await verifyFailoverRun(slow)).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+    expect(await strict(slow)).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
   });
 
-  it("refuses for the same reasons the moment it is off", async () => {
-    expect(await strict(input(dies, { deadline: Date.now() - 1 }))).toEqual({
-      ok: false,
-      reason: "ran out of time",
+  it("answers busy when the deadline passes in the middle of a replay", async () => {
+    const verdict = await verifyFailoverRun(input(dies, { deadline: Date.now() + 1 }));
+    expect(verdict).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+  });
+});
+
+describe("reporting", () => {
+  afterEach(() => vi.useRealTimers());
+
+  const drift = () => input(dies, { score: dies.score + 1 });
+
+  it("tells Sentry of one reason at most once a minute, and each reason on its own", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(new Date("2030-01-01T00:00:30Z"));
+    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    // A different reason is not held back by the first.
+    const ticks = dies.ticks + 1;
+    await verifyFailoverRun({
+      ...input(dies, { detail: { ...input(dies).detail, ticks, seconds: Math.floor(ticks / 20) } }),
+      deadline: Date.now() + 60_000,
     });
+    expect(captureException).toHaveBeenCalledTimes(2);
+
+    vi.setSystemTime(new Date("2030-01-01T00:01:01Z"));
+    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    expect(captureException).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -311,7 +396,22 @@ describe("taking turns", () => {
       strict(input(retires, { deadline: Date.now() + 1 })),
     ]);
     expect(first).toEqual({ ok: true });
-    expect(late).toEqual({ ok: false, reason: "ran out of time" });
+    expect(late).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+  });
+
+  it("frees the slot of a waiter whose deadline passed", async () => {
+    // A runs; B and C wait with a 10 ms deadline and give up; D and E then fit the queue.
+    const first = strict(input(dies));
+    const soon = () => strict(input(retires, { deadline: Date.now() + 10 }));
+    const gaveUp = Promise.all([soon(), soon()]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const next = await Promise.all([strict(input(retires)), strict(input(retires))]);
+    expect(await gaveUp).toEqual([
+      { ok: false, reason: VERIFY_BUSY_REASON },
+      { ok: false, reason: VERIFY_BUSY_REASON },
+    ]);
+    expect(next).toEqual([{ ok: true }, { ok: true }]);
+    expect(await first).toEqual({ ok: true });
   });
 
   it("gives the event loop a turn during a long replay", async () => {

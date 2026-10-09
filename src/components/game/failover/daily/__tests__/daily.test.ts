@@ -14,6 +14,7 @@ import {
   dayNumber,
   profileFor,
 } from "../daily";
+import { fnv1a } from "../../../password-game-2/engine/rng";
 import { PROFILES } from "../profiles";
 
 afterEach(() => resetSim({ seed: "after-daily" }));
@@ -189,5 +190,18 @@ describe("each profile on the sim", () => {
       const again = replay({ ...dailyReplayOptions(day), log, ticks: 6000 });
       expect(again, profile.id).toEqual(withDay);
     }
+  });
+});
+
+// The serialized profile table, hashed. A profile edit changes what a day means exactly as a
+// seed change does, so it needs a new DAILY_SEED_PREFIX; change both together. The prefix names
+// the table it was issued for, so an edit without a bump (or a bump without a new entry) fails.
+const PROFILE_TABLE_HASHES: Record<string, number> = {
+  "failover-daily-v1-": 2760215387,
+};
+
+describe("the profile table", () => {
+  it("is the one the seed prefix was issued for", () => {
+    expect(fnv1a(JSON.stringify(PROFILES))).toBe(PROFILE_TABLE_HASHES[DAILY_SEED_PREFIX]);
   });
 });

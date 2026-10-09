@@ -9,6 +9,7 @@ import { type IncidentStep, type Profile, PROFILES } from "./profiles";
 /**
  * The recipe version. The day's seed is this plus the UTC day key; bump it to change what a day
  * is (the profile table, the starting budget), which retires every score ranked under the old one.
+ * The profile table is hashed in __tests__/daily.test.ts next to this prefix: change both together.
  */
 export const DAILY_SEED_PREFIX = "failover-daily-v1-";
 
