@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyProgress, PROGRESS_KEY, recordClear, setAt } from "../progress";
 import type { Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
@@ -247,5 +247,106 @@ describe("Stage runs", () => {
     fireEvent.click(button("Skip to end"));
     expect(screen.queryByText(/ran longer than/)).toBeNull();
     expect(screen.queryByText("Floor not passed")).toBeNull();
+  });
+});
+
+describe("Stage, Today's floor", () => {
+  const DAY = "2026-10-15";
+  const LOG = "1:h0h0h0h0h0w0w0w0s0h0h0h0h0w0w0w0w0";
+  const TOKENS = LOG.slice(2).match(/../g) ?? [];
+
+  let posts: { url: string; body: Record<string, unknown> }[];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${DAY}T12:00:00Z`));
+    posts = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          posts.push({ url, body: JSON.parse(String(init.body)) });
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              boards: [{ period: "daily", board: DAY, rank: 1, best: 118, improved: true }],
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ entries: [], you: null }), { status: 200 });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function dailyRunner(levels: unknown[] = []): Runner {
+    return (req, onTurn) => {
+      levels.push(req.level);
+      TOKENS.forEach((token, i) => onTurn(i + 1, token, []));
+      return { done: Promise.resolve(finished(LOG)), cancel: () => {} };
+    };
+  }
+
+  it("runs the day's floor, records the clear, and offers the board", async () => {
+    const levels: unknown[] = [];
+    render(<Stage runner={dailyRunner(levels)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    expect(screen.getByText(/Par 118/)).toBeTruthy();
+    await runAndSkip();
+    expect(levels).toEqual([{ kind: "daily", day: DAY }]);
+    expect(await screen.findByText("Floor passed")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Submit" })).toBeTruthy();
+
+    const stats = JSON.parse(localStorage.getItem("knight:stats") ?? "{}");
+    expect(stats).toMatchObject({ runs: 1, bestDaily: { day: DAY, score: 118 }, streakDays: 1 });
+    // The daily is not a tower floor: tower progress is untouched.
+    expect(localStorage.getItem(PROGRESS_KEY)).toBeNull();
+  });
+
+  it("posts the log as the proof and numbers only as the detail", async () => {
+    render(<Stage runner={dailyRunner()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    await runAndSkip();
+    fireEvent.click(await screen.findByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    const { url, body } = posts[0]!;
+    expect(url).toBe("/api/arcade/scores");
+    expect(body.game).toBe("script-knight");
+    expect(body.score).toBe(118);
+    expect(body.proof).toBe(LOG);
+    expect(body.detail).toEqual({ day: 20261015, turns: 17, hand: 0 });
+    expect(await screen.findByText(/Rank 1 today/)).toBeTruthy();
+  });
+
+  it("refuses to post once the UTC day has turned over, and says so", async () => {
+    render(<Stage runner={dailyRunner()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    await runAndSkip();
+    const submit = await screen.findByRole("button", { name: "Submit" });
+    vi.setSystemTime(new Date("2026-10-16T00:00:01Z"));
+    fireEvent.click(submit);
+    expect(await screen.findByText(/closed at 00:00 UTC/)).toBeTruthy();
+    expect(posts).toHaveLength(0);
+  });
+
+  it("keeps the day's code apart from the tower's, starting from it", async () => {
+    render(<Stage runner={dailyRunner()} />);
+    const editor = () =>
+      screen.getByLabelText("Your Player code (JavaScript)") as HTMLTextAreaElement;
+    fireEvent.change(editor(), { target: { value: "class Player { /* tower */ }" } });
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    expect(editor().value).toBe("class Player { /* tower */ }");
+    fireEvent.change(editor(), { target: { value: "class Player { /* today */ }" } });
+    await waitFor(() => expect(localStorage.getItem("knight:code")).toContain("today"), {
+      timeout: 2000,
+    });
+    const saved = JSON.parse(localStorage.getItem("knight:code") ?? "{}");
+    expect(saved.daily).toEqual({ day: DAY, code: "class Player { /* today */ }" });
+    expect(saved.towers["narrow-path"]).toBe("class Player { /* tower */ }");
   });
 });

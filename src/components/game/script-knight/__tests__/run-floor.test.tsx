@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CUES, cueFor, endCue } from "../sound-cues";
-import { startFloorRun, type Runner } from "../run-floor";
+import { startDailyRun, startFloorRun, type Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
 import { usePlayback } from "../use-playback";
 import { towerFrames } from "./frames";
@@ -49,6 +49,27 @@ describe("startFloorRun", () => {
     const none = await startFloorRun(ref, "", runnerOf([], { kind: "no-worker" })).done;
     expect(none.ranNothing).toBe(true);
     expect(none.frames).toHaveLength(1);
+  });
+});
+
+describe("startDailyRun", () => {
+  it("replays the day's floor and scores the bot's log as the server will", async () => {
+    const log = "1:h0h0h0h0h0w0w0w0s0h0h0h0h0w0w0w0w0";
+    const tokens = log.slice(2).match(/../g) ?? [];
+    const outcome: RunOutcome = { kind: "finished", log, thoughts: [] };
+    let sent: unknown = null;
+    const runner: Runner = (req, onTurn) => {
+      sent = req.level;
+      tokens.forEach((token, i) => onTurn(i + 1, token, []));
+      return { done: Promise.resolve(outcome), cancel: () => {} };
+    };
+    const run = await startDailyRun("2026-10-15", "", runner).done;
+    expect(sent).toEqual({ kind: "daily", day: "2026-10-15" });
+    expect(run.ref).toEqual({ kind: "daily", day: "2026-10-15" });
+    expect(run.status).toBe("passed");
+    expect(run.result.score?.total).toBe(118);
+    expect(run.result.turns).toBe(17);
+    expect(run.log).toBe(log);
   });
 });
 

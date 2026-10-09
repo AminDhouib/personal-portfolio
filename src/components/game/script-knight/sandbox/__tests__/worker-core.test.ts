@@ -1,9 +1,11 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { dailyFloor } from "../../daily";
 import { decodeLog } from "../../engine/codec";
 import type { LevelRef } from "../../engine/level-ref";
 import fixtures from "../../engine/__tests__/fixtures/upstream-runs.json";
+import { replayLog } from "../../engine/run";
 import { parseFromWorker, type FromWorker, type ToWorker } from "../protocol";
 import { REMOVED_GLOBALS } from "../lockdown";
 import { handleRun, turnFailureMessage } from "../worker-core";
@@ -253,14 +255,24 @@ describe("handleRun", () => {
   });
 
   it("throws for a floor it cannot build", () => {
-    const bad: LevelRef[] = [
-      { kind: "tower", tower: "narrow-path", level: 99, epic: false },
-      { kind: "daily", day: "2026-10-09" },
-    ];
+    const bad: LevelRef[] = [{ kind: "tower", tower: "narrow-path", level: 99, epic: false }];
     for (const level of bad) {
       const { post, scope } = harness();
       expect(() => handleRun(runMessage(WALKER, level), post, scope)).toThrow();
     }
+  });
+
+  it("plays the daily floor the server would rebuild from the same day", () => {
+    const day = "2026-10-15";
+    const { posted, post, scope } = harness();
+    handleRun(runMessage(WALKER, { kind: "daily", day }), post, scope);
+    expect(posted[0]).toEqual({ type: "ready" });
+    expect(posted.at(-1)).toEqual({ type: "done" });
+    const turns = posted.filter((m) => m.type === "turn");
+    expect(turns.length).toBeGreaterThan(0);
+    const actions = decodeLog(`1:${turns.map((m) => m.a).join("")}`) ?? [];
+    const replay = replayLog(dailyFloor(day).config, actions);
+    expect(replay.ok && replay.consumed).toBe(actions.length);
   });
 
   it("ends an unwinnable run at turn 200 with done", () => {

@@ -93,5 +93,5 @@ export function dailyCodeFor(
   starter: string,
 ): string {
   if (store.daily?.day === day) return store.daily.code;
-  return store.towers[tower] || starter;
+  return store.towers[tower] ?? starter;
 }
