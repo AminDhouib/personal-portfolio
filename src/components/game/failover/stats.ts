@@ -70,14 +70,17 @@ export function recordRun(
   };
 }
 
-/** Write the record, unless a newer build already wrote a later version. */
-export function saveStats(stats: FailoverStats): void {
+/**
+ * Write the record, unless a newer build already wrote a later version. True
+ * only when it was written, so the caller shows only what is stored.
+ */
+export function saveStats(stats: FailoverStats): boolean {
   const stored = readRaw();
   if (typeof stored === "object" && stored !== null) {
     const v = (stored as { v?: unknown }).v;
-    if (typeof v === "number" && v > 1) return;
+    if (typeof v === "number" && v > 1) return false;
   }
-  safeLocalSet(
+  return safeLocalSet(
     STATS_KEY,
     JSON.stringify({
       v: 1,

@@ -99,8 +99,18 @@ describe("failover:stats", () => {
     const newer = '{"v":2,"bestSeconds":900,"bestScore":99999,"runs":40,"streak":3}';
     window.localStorage.setItem("failover:stats", newer);
     expect(loadStats()).toEqual(EMPTY_STATS);
-    saveStats({ bestSeconds: 1, bestScore: 1, runs: 1, lastDailyDay: null });
+    expect(saveStats({ bestSeconds: 1, bestScore: 1, runs: 1, lastDailyDay: null })).toBe(false);
     expect(window.localStorage.getItem("failover:stats")).toBe(newer);
+  });
+
+  it("says whether the record was written, so the game shows only what is stored", () => {
+    const stats = { bestSeconds: 5, bestScore: 50, runs: 1, lastDailyDay: null };
+    expect(saveStats(stats)).toBe(true);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    expect(saveStats({ ...stats, runs: 2 })).toBe(false);
+    expect(loadStats()).toEqual(stats);
   });
 
   it("folds a run in: bests only go up, runs count, fractions floor and junk counts as zero", () => {
