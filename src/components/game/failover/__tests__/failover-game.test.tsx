@@ -208,6 +208,30 @@ describe("FailoverGame", () => {
     );
   });
 
+  it("shows no device best when a newer build's record refuses the write", () => {
+    const newer = '{"v":2,"bestSeconds":900,"bestScore":99999,"runs":40,"streak":3}';
+    window.localStorage.setItem("failover:stats", newer);
+    const frames: ((t: number) => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => frames.push(cb));
+    mount();
+    let t = 1000;
+    const tick = (ms: number) =>
+      act(() => {
+        t += ms;
+        frames.shift()?.(t);
+      });
+    tick(0);
+    for (let i = 0; i < 40; i++) tick(50);
+    act(() => {
+      expect(dispatch({ op: 8 }).ok).toBe(true);
+    });
+    tick(50);
+    expect(screen.getByRole("dialog", { name: "Run over" })).not.toHaveTextContent(
+      "Best on this device",
+    );
+    expect(window.localStorage.getItem("failover:stats")).toBe(newer);
+  });
+
   it("starts a first run paused under the coach, and a skip keeps it away", () => {
     window.localStorage.removeItem("failover:coach");
     mount();

@@ -65,8 +65,8 @@ export function FailoverGame() {
       onRunEnd: (run) => {
         if (run.mode !== "survival") return;
         const next = recordRun(loadStats(), run);
-        saveStats(next);
-        setBest(next);
+        // A refused write (a newer build's record, blocked storage) leaves the shown best as stored.
+        if (saveStats(next)) setBest(next);
       },
     });
     controllerRef.current = controller;
