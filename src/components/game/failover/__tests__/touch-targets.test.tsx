@@ -44,10 +44,12 @@ function expectTouch(el: Element) {
   });
 }
 
-/** Every button, tab and radio label in the game, sized for a thumb. */
+/** Every button, tab, radio label and visible field in the game, sized for a thumb. */
 function sweep(): number {
   const board = screen.getByLabelText(/Failover game board/);
-  const controls = board.querySelectorAll("button, [role=tab], label, a");
+  const controls = board.querySelectorAll(
+    "button, [role=tab], label, a, select, input:not(.sr-only)",
+  );
   controls.forEach(expectTouch);
   return controls.length;
 }
@@ -149,6 +151,28 @@ describe("Failover touch targets", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByRole("button", { name: "Delete the save" })).toBeInTheDocument();
     sweep();
+  });
+
+  it("sizes the share dialog's field and copy button, and a shared link's dialog", async () => {
+    render(<FailoverGame />);
+    act(() => {
+      expect(dispatch({ op: 0, type: "waf", x: -28, z: 0 }).ok).toBe(true);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    expect(screen.getByRole("textbox", { name: "Link to this build" })).toBeInTheDocument();
+    expect(sweep()).toBeGreaterThan(10);
+    const url = (screen.getByRole("textbox") as HTMLInputElement).value;
+    cleanup();
+
+    window.history.replaceState(null, "", new URL(url).pathname + new URL(url).search);
+    render(<FailoverGame />);
+    expect(screen.getByRole("button", { name: "Build it" })).toBeInTheDocument();
+    sweep();
+    fireEvent.click(screen.getByRole("button", { name: "Build it" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Build it" })).toBeNull());
+    sweep();
+    window.history.replaceState(null, "", "/");
   });
 
   it("sizes Play again on the report and Reload on the crash card", () => {

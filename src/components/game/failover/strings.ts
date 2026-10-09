@@ -26,6 +26,7 @@ export const T = {
   budget: "BUDGET",
   build: "Build", // ours
   build_a_service: "Build a service", // ours
+  build_it: "Build it", // ours
   build_menu_close: "Hide the build menu", // ours
   build_menu_open: "Open the build menu", // ours
   cache_short: "Cache",
@@ -42,6 +43,7 @@ export const T = {
   compute_short: "Compute",
   confirm: "Confirm", // ours
   container_short: "Cluster",
+  copy_by_hand: "The link is selected; copy it by hand.", // ours
   cost_spike_warning: "CLOUD COST SPIKE! Upkeep doubled for 30s",
   db_short: "SQL DB",
   ddos_incoming: "DDoS INCOMING",
@@ -94,6 +96,13 @@ export const T = {
   graphics: "Graphics", // ours
   hardware: "Hardware", // ours
   hp_display: "{hp}% HP",
+  import_done: "Services built: {placed} of {total}. Links made: {linked}.", // ours
+  import_dropped: "Not valid, so left out: {services} of the services and {links} of the links.", // ours
+  import_invalid: "This link does not hold a Failover build, so nothing was built.", // ours
+  import_refused: "Refused by the board's rules: services {skipped}, links {unlinked}.", // ours
+  import_replaces: "Building it starts a new Sandbox run in place of this one.", // ours
+  import_summary: "Services: {services}. Links: {links}.", // ours
+  import_title: "Shared build", // ours
   income: "Income", // ours
   infgw_short: "Inf GW",
   inspector_label: "{name} details", // ours
@@ -196,6 +205,15 @@ export const T = {
   service: "Service",
   service_outage_warning: "{type} OUTAGE! Service offline for 30s",
   settings: "Settings", // ours
+  share: "Share", // ours
+  share_copy_failed: "Copy failed - your browser blocked clipboard access.",
+  share_copy_link: "Copy Link",
+  share_link_copied: "Link copied to clipboard!",
+  share_link_label: "Link to this build", // ours
+  share_note:
+    "The link holds the services, where they stand and how they are linked, and the Sandbox budget. It opens as a new Sandbox run.", // ours
+  share_title: "Share Architecture",
+  share_too_large: "This build is too large to fit in a link.",
   skip_tutorial: "Skip Tutorial",
   soft_bad_answer: "Bad answer",
   soft_slow: "Slow",

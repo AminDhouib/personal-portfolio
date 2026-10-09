@@ -26,6 +26,7 @@ export function Settings({
   onReplayCoach,
   onStartMode,
   onOpenSave,
+  onOpenShare,
   onClose,
 }: {
   hud: HudState;
@@ -33,6 +34,7 @@ export function Settings({
   onReplayCoach: () => void;
   onStartMode: (mode: GameMode) => void;
   onOpenSave: () => void;
+  onOpenShare: () => void;
   onClose: () => void;
 }) {
   const other: GameMode = hud.mode === "sandbox" ? "survival" : "sandbox";
@@ -110,6 +112,10 @@ export function Settings({
 
       <button type="button" onClick={onOpenSave} className={`${BUTTON} ${BUTTON_IDLE} self-start`}>
         {T.save_or_load}
+      </button>
+
+      <button type="button" onClick={onOpenShare} className={`${BUTTON} ${BUTTON_IDLE} self-start`}>
+        {T.share}
       </button>
 
       <button
