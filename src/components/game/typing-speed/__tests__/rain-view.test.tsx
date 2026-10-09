@@ -209,6 +209,20 @@ describe("Word Rain view", () => {
     expect(screen.getByLabelText("Lives: 3")).toBeInTheDocument();
   });
 
+  it("after Exit on a phone the next run waits to be started, and Escape starts nothing", () => {
+    fakeVV(450);
+    render(<RainGame header={<p>bar</p>} phone nextSeed={() => 11} />);
+    fireEvent.click(screen.getByTestId("ts-rain-area"));
+    frames(5);
+    fireEvent.click(within(screen.getByTestId("ts-hud")).getByRole("button", { name: "Exit" }));
+    expect(screen.queryByTestId("ts-sheet")).toBeNull();
+    expect(screen.getByTestId("ts-rain-pause")).toHaveTextContent("Click or press a key to start");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByTestId("ts-rain-pause")).toHaveTextContent("Click or press a key to start");
+    expect(input()).not.toHaveFocus();
+    expect(screen.queryByTestId("ts-sheet")).toBeNull();
+  });
+
   it("pauses when the input loses focus and says how to carry on", () => {
     renderRain();
     start();

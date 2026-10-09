@@ -130,7 +130,7 @@ export function RainGame({
     const next = nextSeed();
     setSeed(next);
     setOutcome(null);
-    reset(next);
+    reset(next, true);
     // Synchronous, inside the click, so mobile Safari keeps the keyboard.
     inputRef.current?.focus();
     if (phone) setSheetOn(true);
@@ -143,7 +143,7 @@ export function RainGame({
     const next = nextSeed();
     setSeed(next);
     setOutcome(null);
-    reset(next);
+    reset(next, false);
   }, [nextSeed, reset]);
 
   // A printable key focuses the input (and so starts the run); Escape restarts; Enter plays again.
