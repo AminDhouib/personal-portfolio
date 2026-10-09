@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 
@@ -14,8 +13,16 @@ export const GFX_KEY = "failover:gfx";
 /** Auto picks a tier from the device and frame times; High and Low pin it. */
 export type GfxPref = "auto" | "high" | "low";
 
-const audioSchema = z.object({ v: z.literal(1), on: z.boolean() });
-const gfxSchema = z.object({ v: z.literal(1), tier: z.enum(["auto", "high", "low"]) });
+// Checked by hand, not with zod: zod would put about 1 MB (dev) into the game's
+// chunk group for two tiny shapes. The prefs tests pin what is accepted.
+const GFX_PREFS: readonly GfxPref[] = ["auto", "high", "low"];
+
+/** A version-1 record: a plain object with v === 1 (extra fields are ignored). */
+function v1(raw: unknown): Record<string, unknown> | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  return record.v === 1 ? record : null;
+}
 
 function read(key: string, scope: string): unknown {
   let text: string | null;
@@ -37,8 +44,8 @@ function newerVersionStored(key: string): boolean {
 }
 
 export function parseAudioOn(raw: unknown): boolean {
-  const result = audioSchema.safeParse(raw);
-  return result.success ? result.data.on : false;
+  const on = v1(raw)?.on;
+  return typeof on === "boolean" ? on : false;
 }
 
 export function loadAudioOn(): boolean {
@@ -51,8 +58,8 @@ export function saveAudioOn(on: boolean): void {
 }
 
 export function parseGfxPref(raw: unknown): GfxPref {
-  const result = gfxSchema.safeParse(raw);
-  return result.success ? result.data.tier : "auto";
+  const tier = v1(raw)?.tier;
+  return GFX_PREFS.find((pref) => pref === tier) ?? "auto";
 }
 
 export function loadGfxPref(): GfxPref {

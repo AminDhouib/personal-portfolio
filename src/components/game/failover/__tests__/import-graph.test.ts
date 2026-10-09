@@ -106,8 +106,18 @@ function forbidden(srcRoot: string, target: Target): string | null {
   return null;
 }
 
+/** Why `target` may not be in the game's own chunk group: zod is for saves, loaded with them. */
+function forbiddenInGame(_srcRoot: string, target: Target): string | null {
+  if (target.kind !== "package") return null;
+  return target.name === "zod" || target.name.startsWith("zod/") ? target.name : null;
+}
+
 /** Every forbidden module the roots reach statically, each with the chain that reached it. */
-function findViolations(srcRoot: string, roots: readonly string[]): string[] {
+function findViolations(
+  srcRoot: string,
+  roots: readonly string[],
+  isForbidden: (srcRoot: string, target: Target) => string | null = forbidden,
+): string[] {
   const violations: string[] = [];
   const parent = new Map<string, string | null>();
   const queue: string[] = [];
@@ -132,7 +142,7 @@ function findViolations(srcRoot: string, roots: readonly string[]): string[] {
     for (const specifier of staticSpecifiers(readFileSync(file, "utf8"))) {
       const target = resolve(srcRoot, file, specifier);
       if (target === null) continue;
-      const bad = forbidden(srcRoot, target);
+      const bad = isForbidden(srcRoot, target);
       if (bad !== null) violations.push(`${chain(file)} -> ${bad}`);
       if (target.kind === "file" && !parent.has(target.file)) {
         parent.set(target.file, file);
@@ -147,6 +157,10 @@ describe("Failover's lazy boundary", () => {
   it("keeps sim, scene, controller and three out of the static graph of every first-load root", () => {
     for (const root of ROOTS) expect(existsSync(path.join(REAL_SRC, root))).toBe(true);
     expect(findViolations(REAL_SRC, ROOTS)).toEqual([]);
+  });
+
+  it("keeps zod (about 1 MB in dev) out of the game itself; the save schema brings it when needed", () => {
+    expect(findViolations(REAL_SRC, ["components/game/failover.tsx"], forbiddenInGame)).toEqual([]);
   });
 });
 
