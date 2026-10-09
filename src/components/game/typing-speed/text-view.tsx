@@ -20,6 +20,8 @@ const CARET_CLASS =
 // The ghost is a dimmer marker than the caret: an outline around the letter, so it never
 // tints behind the glyph and stays apart from the caret underline.
 const GHOST_CLASS = "rounded outline outline-1 outline-(--muted)";
+// transition-colors also fades outline-color, which would blur the marker in on every move.
+const GHOST_TRANSITION = "transition-[color,background-color] duration-100";
 
 function letterState(word: string, typed: string, j: number, committed: boolean): LetterState {
   if (j >= word.length) return "extra";
@@ -98,7 +100,11 @@ export function TextView({
           {letters.map((ch, j) => {
             const state = letterState(word, typed, j, committed);
             const shown = state === "extra" ? (typed[j] ?? ch) : ch;
-            const classes: string[] = [LETTER_CLASS[state]];
+            const classes: string[] = [
+              j === ghostLetter
+                ? LETTER_CLASS[state].replace("transition-colors duration-100", GHOST_TRANSITION)
+                : LETTER_CLASS[state],
+            ];
             if (j === caretAt) classes.push(CARET_CLASS);
             if (j === ghostLetter) classes.push(GHOST_CLASS);
             return (
