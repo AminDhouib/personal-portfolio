@@ -616,6 +616,76 @@ describe("POST /api/arcade/scores", () => {
     });
   });
 
+  describe("Script Knight daily floor", () => {
+    // The reference bot's winning log for 2026-10-15 (pinned in script-knight.test.ts).
+    const LOG = "1:h0h0h0h0h0w0w0w0s0h0h0h0h0w0w0w0w0";
+    const knight = (over: Record<string, unknown> = {}) => ({
+      game: "script-knight",
+      score: 118,
+      detail: { day: 20261015, turns: 17, hand: 0 },
+      proof: LOG,
+      ...over,
+    });
+
+    beforeEach(() => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+    });
+
+    it("accepts the replayed run and stores numbers only, never the log", async () => {
+      const { res, json } = await submit(knight());
+      expect(res.status).toBe(200);
+      expect(json.ok).toBe(true);
+      const inserts = emu.fake.queries.filter((q) => q.sql.startsWith("INSERT INTO arcade_scores"));
+      expect(inserts).toHaveLength(3);
+      for (const insert of inserts) {
+        expect(insert.params[4]).toBe(JSON.stringify({ day: 20261015, turns: 17, hand: 0 }));
+      }
+      expect(JSON.stringify(emu.fake.queries.map((q) => q.params))).not.toContain(LOG);
+    });
+
+    it("keeps the by-hand tag", async () => {
+      const { res } = await submit(knight({ detail: { day: 20261015, turns: 17, hand: 1 } }));
+      expect(res.status).toBe(200);
+      expect(emu.scores().map((s) => s.detail)).toContainEqual({
+        day: 20261015,
+        turns: 17,
+        hand: 1,
+      });
+    });
+
+    it("answers 400 when the proof is missing", async () => {
+      const { proof: _proof, ...withoutProof } = knight();
+      const { res, json } = await submit(withoutProof);
+      expect(res.status).toBe(400);
+      expect(json).toEqual({ error: "proof required" });
+    });
+
+    it("answers 422 with the replay's reason and writes nothing", async () => {
+      const { res, json } = await submit(knight({ score: 119 }));
+      expect(res.status).toBe(422);
+      expect(json).toEqual({ error: "implausible", reason: "score does not match the replay" });
+      expect(emu.scores()).toHaveLength(0);
+      expect(emu.players().size).toBe(0);
+    });
+
+    it("answers 422 for another day, and for a log that is not a log", async () => {
+      const day = await submit(knight({ detail: { day: 20261014, turns: 17, hand: 0 } }));
+      expect(day.res.status).toBe(422);
+      expect(day.json.reason).toBe("not today's floor");
+      const junk = await submit(knight({ proof: "x".repeat(12_000) }));
+      expect(junk.res.status).toBe(422);
+      expect(junk.json.reason).toBe("unreadable log");
+    });
+
+    it("lets a 200-turn log through the size guard", async () => {
+      const long = `1:${"r-".repeat(200)}`;
+      expect(long.length).toBe(402);
+      const { res, json } = await submit(knight({ proof: long }));
+      expect(res.status).toBe(422);
+      expect(json.reason).toBe("the run does not reach the stairs");
+    });
+  });
+
   describe("guard chain", () => {
     it("rejects a cross-origin request with 403 before touching the database", async () => {
       const res = await post(body(), { origin: "https://evil.example" });
@@ -680,10 +750,12 @@ describe("submit contract (pins before the proof seam)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("registers no verifier and no proof requirement for any game yet", async () => {
+  it("registers a verifier and a proof requirement for Script Knight and for no other game", async () => {
     const { ARCADE_GAMES } = await import("@/lib/arcade/games");
-    for (const entry of Object.values(ARCADE_GAMES)) {
-      expect(Object.keys(entry)).toEqual(["detailSchema"]);
+    for (const [slug, entry] of Object.entries(ARCADE_GAMES)) {
+      expect(Object.keys(entry), slug).toEqual(
+        slug === "script-knight" ? ["detailSchema", "requiresProof", "verify"] : ["detailSchema"],
+      );
     }
   });
 });

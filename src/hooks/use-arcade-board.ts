@@ -25,6 +25,9 @@ export interface ArcadeBoardEntry {
   ms?: number;
   chars?: number;
   acc?: number;
+  turns?: number;
+  /** 1 when the run was played by hand; client-claimed, display-only. */
+  hand?: number;
   createdAt: string;
   /** Set only when the server said so; Hextris falls back to its old heuristic otherwise. */
   isYou?: boolean;
@@ -84,6 +87,7 @@ const DETAIL_KEYS: { [G in ArcadeGameSlug]: readonly (keyof ArcadeDetail<G> & st
   "super-voltorb-flip": ["day", "flips"],
   "tower-stacker": ["day", "blocks", "perfects", "streak", "seconds"],
   "typing-speed": ["day", "ms", "chars", "acc"],
+  "script-knight": ["day", "turns", "hand"],
 };
 
 // Mirrors ARCADE_SCORE_CAP in src/lib/arcade/games.ts. That module imports zod and the
@@ -130,6 +134,8 @@ function toEntry(x: unknown): ArcadeBoardEntry | null {
   const ms = finite(detail.ms);
   const chars = finite(detail.chars);
   const acc = finite(detail.acc);
+  const turns = finite(detail.turns);
+  const hand = finite(detail.hand);
   return {
     rank,
     name: handle,
@@ -146,6 +152,8 @@ function toEntry(x: unknown): ArcadeBoardEntry | null {
     ...(ms !== undefined && { ms }),
     ...(chars !== undefined && { chars }),
     ...(acc !== undefined && { acc }),
+    ...(turns !== undefined && { turns }),
+    ...(hand !== undefined && { hand }),
     createdAt: achievedAt,
     ...(typeof isYou === "boolean" && { isYou }),
   };

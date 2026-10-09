@@ -29,6 +29,7 @@ describe("registry", () => {
       "super-voltorb-flip",
       "tower-stacker",
       "typing-speed",
+      "script-knight",
     ]);
   });
 
