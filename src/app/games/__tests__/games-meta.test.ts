@@ -20,6 +20,13 @@ describe("GAMES featured flag", () => {
       "typing-speed",
       "super-voltorb-flip",
       "password-game",
+      "script-knight",
     ]);
+  });
+
+  it("keeps Script Knight out of every public list until it launches", () => {
+    const knight = GAMES.find((game) => game.slug === "script-knight");
+    expect(knight?.hidden).toBe(true);
+    expect(knight?.accent).toBe("#4ade80");
   });
 });

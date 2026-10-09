@@ -7,6 +7,7 @@ import { WebGLOnly } from "@/components/three/webgl-only";
 import {
   HextrisBanner,
   PasswordGameBanner,
+  ScriptKnightBanner,
   SpaceShooterBanner,
   SuperVoltorbFlipBanner,
   TowerStackerBanner,
@@ -49,6 +50,10 @@ const SuperVoltorbFlipGame = dynamic(
   () => import("./super-voltorb-flip").then((m) => m.SuperVoltorbFlipGame),
   { ssr: false, loading: () => <GameSkeleton /> },
 );
+const ScriptKnightGame = dynamic(() => import("./script-knight").then((m) => m.ScriptKnightGame), {
+  ssr: false,
+  loading: () => <GameSkeleton />,
+});
 const TowerStacker = dynamic(() => import("./tower-stacker"), {
   ssr: false,
   loading: () => <GameSkeleton />,
@@ -71,6 +76,7 @@ export const GAME_CLIENT: Record<GameSlug, GameClientEntry> = {
   "typing-speed": { Banner: TypingSpeedBanner, render: () => <TypingSpeedGame /> },
   "super-voltorb-flip": { Banner: SuperVoltorbFlipBanner, render: () => <SuperVoltorbFlipGame /> },
   "password-game": { Banner: PasswordGameBanner, render: null },
+  "script-knight": { Banner: ScriptKnightBanner, render: () => <ScriptKnightGame /> },
 };
 
 export function GameBanner({ slug }: { slug: GameSlug }) {

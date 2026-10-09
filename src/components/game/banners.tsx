@@ -1210,3 +1210,37 @@ export function PasswordGameBanner() {
     </div>
   );
 }
+
+export function ScriptKnightBanner() {
+  const code = ["class Player {", "  playTurn(warrior) {", "    warrior.walk();", "  }", "}"];
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ background: "#05070d" }}>
+      {/* The code panel */}
+      <div className="absolute top-1/2 left-[8%] -translate-y-1/2 font-mono text-[10px] leading-4 text-[#4ade80]/70">
+        {code.map((line, i) => (
+          <motion.div
+            key={i}
+            className="whitespace-pre"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.12, duration: 0.3 }}
+          >
+            {line}
+          </motion.div>
+        ))}
+      </div>
+      {/* The floor: a dashed corridor, the knight walking to the stairs */}
+      <div className="absolute top-1/2 right-[8%] h-10 w-[38%] -translate-y-1/2 rounded-sm border border-dashed border-[#4ade80]/40">
+        <motion.div
+          className="absolute top-1/2 left-1 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-[#4ade80]"
+          style={{ boxShadow: "0 0 10px #4ade8080" }}
+          animate={{ left: ["4%", "76%"] }}
+          transition={{ duration: 2.4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+        />
+        <div className="absolute top-1/2 right-1.5 -translate-y-1/2 font-mono text-sm text-[#4ade80]/80">
+          &gt;&gt;
+        </div>
+      </div>
+    </div>
+  );
+}

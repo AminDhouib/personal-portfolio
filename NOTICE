@@ -58,3 +58,23 @@ Kostyantyn Pshenychnyy, released under the MIT license.
   License:  MIT, full text in src/components/game/failover/LICENSE-server-survival.txt
 
 Changes: ported to TypeScript; audio, art and strings replaced or rewritten.
+
+
+Script Knight
+-------------
+
+The engine and the tower data in the Script Knight game
+(src/components/game/script-knight/engine/) are ported from WarriorJS,
+https://github.com/olistic/warriorjs, at commit bc68e87.
+
+  Copyright (c) 2015-present Matias Olivera. MIT License. The licence text is
+  in src/components/game/script-knight/engine/LICENSE.
+
+The port is modified by Amin Dhouib, 2026: it is rewritten in TypeScript, adds
+a step API, an instance logger, unit ids and direction checks, and hands the
+player's code a frozen per-turn facade.
+
+WarriorJS is itself a port of ruby-warrior by Ryan Bates,
+https://github.com/ryanb/ruby-warrior (MIT License). It is credited as the
+original idea; no ruby-warrior code is used here. The WarriorJS logo is not
+used.
