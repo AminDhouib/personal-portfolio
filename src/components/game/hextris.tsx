@@ -1100,34 +1100,8 @@ export function HextrisGame() {
                 </div>
               )}
 
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
-                    Max Combo
-                  </div>
-                  <div className="mt-0.5 font-mono text-base text-accent-amber tabular-nums">
-                    &times;{uiRun.bestCombo}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
-                    Cleared
-                  </div>
-                  <div className="mt-0.5 font-mono text-base text-accent-blue tabular-nums">
-                    {uiRun.cellsCleared}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
-                    Time
-                  </div>
-                  <div className="mt-0.5 font-mono text-base text-accent-pink tabular-nums">
-                    {formatRunTime(uiRun.elapsedMs)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Name + submit. A run that scored 0 has nothing to post. */}
+              {/* Name + submit lead the sheet; posting stays manual (Submit or Enter, never
+                  automatic). A run that scored 0 has nothing to post. */}
               {isRecordableRun(uiRun.score) ? (
                 <>
                   <div className="mt-4 flex items-center gap-2">
@@ -1185,6 +1159,33 @@ export function HextrisGame() {
               ) : (
                 <p className="mt-4 text-center font-mono text-xs text-white/50">No score to post</p>
               )}
+
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
+                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
+                    Max Combo
+                  </div>
+                  <div className="mt-0.5 font-mono text-base text-accent-amber tabular-nums">
+                    &times;{uiRun.bestCombo}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
+                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
+                    Cleared
+                  </div>
+                  <div className="mt-0.5 font-mono text-base text-accent-blue tabular-nums">
+                    {uiRun.cellsCleared}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
+                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
+                    Time
+                  </div>
+                  <div className="mt-0.5 font-mono text-base text-accent-pink tabular-nums">
+                    {formatRunTime(uiRun.elapsedMs)}
+                  </div>
+                </div>
+              </div>
 
               {/* Top 8 leaderboard */}
               <div className="mt-4">

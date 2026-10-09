@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EngineEvent } from "../engine/types";
 import {
   installShellStubs,
+  postCalls,
   removeShellStubs,
   runFrames,
   shellCanvas,
@@ -85,5 +86,45 @@ describe("Hextris game over keeps the board visible", () => {
     expect(screen.queryByRole("region", { name: "Game over" })).toBeNull();
     endRun(80);
     expect(screen.getByPlaceholderText("Your name")).toBeInTheDocument();
+  });
+});
+
+describe("Hextris game-over name prompt", () => {
+  const follows = (a: Node, b: Node) =>
+    (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+  it("leads the sheet: the name field and Submit come before the stats and the board", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    const name = screen.getByPlaceholderText("Your name");
+    const submit = screen.getByRole("button", { name: "Submit" });
+    expect(follows(name, screen.getByText("Max Combo"))).toBe(true);
+    expect(follows(submit, screen.getByText("Max Combo"))).toBe(true);
+    expect(follows(name, screen.getByText("Top Runs"))).toBe(true);
+    expect(classesOf(name)).toContain("min-h-11");
+    expect(classesOf(submit)).toContain("min-h-11");
+  });
+
+  it("never submits by itself, even with a saved name; Submit or Enter posts once", () => {
+    window.localStorage.setItem("hextris_name", "Ada");
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    // Two seconds of frames with a name already filled in: still nothing posted.
+    runFrames(125);
+    expect(postCalls()).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(postCalls()).toHaveLength(1);
+  });
+
+  it("posts on Enter in the name field", () => {
+    window.localStorage.setItem("hextris_name", "Ada");
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    expect(postCalls()).toHaveLength(0);
+    fireEvent.keyDown(screen.getByPlaceholderText("Your name"), { key: "Enter" });
+    expect(postCalls()).toHaveLength(1);
   });
 });
