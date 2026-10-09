@@ -66,3 +66,19 @@ test("Orbital Dodge's own page shows the notice instead of the game, with no unc
   await expect(page.locator("canvas")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+// Failover mounts its scene only after Play, and its WebGL probe runs before the poster:
+// without WebGL the notice shows and three.js is never fetched.
+test("Failover's own page shows the notice instead of the poster, with no uncaught errors", async ({
+  page,
+}) => {
+  const { errors, settled } = watch(page);
+  await page.goto("/games/failover");
+
+  await expect(page.getByText("Failover needs WebGL")).toBeVisible();
+  await expect(page.getByText("Loading game...")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /play failover/i })).toHaveCount(0);
+  await settled();
+  await expect(page.locator("canvas")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

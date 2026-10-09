@@ -62,6 +62,10 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
+      # Reads the build's loadable and first-load manifests (see the script's header).
+      - name: Bundle budget (Failover game chunks, 420 KB gzip)
+        run: node scripts/check-bundle-budget.mjs
+
   lighthouse:
     name: Lighthouse (all public pages)
     runs-on: ubuntu-latest

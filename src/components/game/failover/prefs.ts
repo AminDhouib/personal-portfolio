@@ -7,6 +7,8 @@ import { safeLocalSet } from "@/lib/safe-storage";
 // are versioned JSON so a later shape can be told apart from this one.
 
 export const AUDIO_KEY = "failover:audio";
+// Only the game's own chunks carry this string; scripts/check-bundle-budget.mjs
+// uses it to find them in the build output if the manifest keys do not.
 export const GFX_KEY = "failover:gfx";
 
 /** Auto picks a tier from the device and frame times; High and Low pin it. */
