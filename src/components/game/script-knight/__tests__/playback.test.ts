@@ -9,6 +9,7 @@ import {
   buildFrames,
   clampFrame,
   describeEvent,
+  type Frame,
   frameDelayMs,
   lastFrameOfTurn,
   nextFrame,
@@ -293,5 +294,78 @@ describe("quiet stretches", () => {
   it("does not touch the instant speed", () => {
     const frames = towerFrames("narrow-path", 1, idle(10));
     expect(frameDelayMs(frames, 10, "instant")).toBe(0);
+  });
+});
+
+describe("quiet stretches, one kind of change at a time", () => {
+  type Unit = Frame["floor"]["units"][number];
+  const knight: Unit = {
+    id: 0,
+    name: "Knight",
+    warrior: true,
+    x: 0,
+    y: 0,
+    facing: "east",
+    health: 20,
+    maxHealth: 20,
+    bound: false,
+    ticking: null,
+  };
+  const captive: Unit = {
+    id: 1,
+    name: "Captive",
+    warrior: false,
+    x: 3,
+    y: 0,
+    facing: "west",
+    health: 1,
+    maxHealth: 1,
+    bound: true,
+    ticking: 7,
+  };
+  const STILL = { health: 20, score: 0 };
+
+  /** Six identical turns, then a seventh that differs from them in one thing only. */
+  function framesWithChange(change: (units: Unit[]) => Unit[], status = STILL) {
+    const floor = (units: Unit[]) => ({ width: 5, height: 1, stairs: { x: 4, y: 0 }, units });
+    const frames: Frame[] = [];
+    for (let turn = 0; turn <= 7; turn += 1) {
+      const changed = turn === 7;
+      frames.push({
+        index: turn,
+        turn,
+        event: null,
+        floor: floor(changed ? change([knight, captive]) : [knight, captive]),
+        status: changed ? status : STILL,
+        text: "",
+      });
+    }
+    return frames;
+  }
+  const slow = (frames: Frame[]) => frameDelayMs(frames, 7, "1x");
+  const fast = (frames: Frame[]) => frameDelayMs(frames, 6, "1x");
+
+  const cases: [string, (units: Unit[]) => Unit[], { health: number; score: number }?][] = [
+    ["a unit's health", ([k, c]) => [{ ...k!, health: 17 }, c!]],
+    ["a captive's bound state", ([k, c]) => [k!, { ...c!, bound: false }]],
+    ["a bomb's tick", ([k, c]) => [k!, { ...c!, ticking: 6 }]],
+    ["which way a unit faces", ([k, c]) => [{ ...k!, facing: "west" }, c!]],
+    ["where a unit stands", ([k, c]) => [{ ...k!, x: 1 }, c!]],
+    ["a unit leaving the floor", ([k]) => [k!]],
+    ["the warrior's score alone", (units) => units, { health: 20, score: 12 }],
+    ["the warrior's health alone", (units) => units, { health: 17, score: 0 }],
+  ];
+
+  it.each(cases)(
+    "plays at the usual pace when only %s changes after a quiet stretch",
+    (_name, change, status) => {
+      const frames = framesWithChange(change, status);
+      expect(fast(frames)).toBeLessThan(20);
+      expect(slow(frames)).toBe(300);
+    },
+  );
+
+  it("fast-forwards the same stretch when nothing at all changes", () => {
+    expect(slow(framesWithChange((units) => units))).toBeLessThan(20);
   });
 });
