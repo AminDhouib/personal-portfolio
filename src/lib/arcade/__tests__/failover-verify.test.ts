@@ -1,9 +1,10 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOARD_S, MID_RUN_S } from "@/components/game/failover/sim/__tests__/scripted";
 import { dayNumber, DAILY_MAX_TICKS } from "@/components/game/failover/daily/daily";
 import type { LoggedAction } from "@/components/game/failover/sim/action-log";
 import { encodeProof } from "@/components/game/failover/sim/proof";
+import type { ReplayResult, replayAsync } from "@/components/game/failover/sim/replay";
 import { resetSim } from "@/components/game/failover/sim/state";
 import { BOARD, record, type Recorded, SHORT } from "./failover-fixtures";
 import type { ArcadeVerifyInput } from "../games";
@@ -14,10 +15,11 @@ vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn(), logEr
 import { captureException } from "@/lib/log";
 import {
   createFailoverVerifier,
+  DRIFT_MAX_TICKS,
   DRIFT_MIN_SCORE,
   DRIFT_SCORE_FRACTION,
   judge,
-  resetDriftReports,
+  resetVerifierForTests,
   MAX_PLAUSIBLE_SCORE,
   MAX_WAITING,
   SHADOW,
@@ -29,18 +31,28 @@ const NOW = new Date("2026-10-15T12:00:00Z");
 const DAY = "2026-10-15";
 const strict = createFailoverVerifier({ shadow: false });
 
-afterEach(() => resetSim({ seed: "after-failover-verify" }));
+// Real replays run in the tests that are about the sim; the queue, the budget and the reporting
+// are tested with a controllable fake replay, so no outcome depends on how fast the host is.
+// A slow host only needs the generous test timeout and deadline below.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
+const GENEROUS_MS = 600_000;
+
+afterEach(() => {
+  vi.useRealTimers();
+  resetSim({ seed: "after-failover-verify" });
+});
 beforeEach(() => {
   vi.mocked(captureException).mockClear();
-  resetDriftReports();
+  // Whatever a test left behind (a held mutex, a waiter) must not reach the next one.
+  resetVerifierForTests();
 });
 
 let dies: Recorded;
 let retires: Recorded;
 
-beforeEach(() => {
-  dies ??= record(DAY, BOARD);
-  retires ??= record(DAY, SHORT);
+beforeAll(() => {
+  dies = record(DAY, BOARD);
+  retires = record(DAY, SHORT);
 });
 
 function input(run: Recorded, over: Partial<ArcadeVerifyInput> = {}): ArcadeVerifyInput {
@@ -49,7 +61,7 @@ function input(run: Recorded, over: Partial<ArcadeVerifyInput> = {}): ArcadeVeri
     detail: { day: dayNumber(DAY), seconds: run.seconds, ticks: run.ticks, actions: run.actions },
     proof: run.proof,
     now: NOW,
-    deadline: Date.now() + 2_000,
+    deadline: Date.now() + GENEROUS_MS,
     ...over,
   };
 }
@@ -253,6 +265,38 @@ describe("judge", () => {
   });
 });
 
+type Replay = typeof replayAsync;
+
+/** What a faithful replay of this recording reports. */
+function faithful(run: Recorded, over: Partial<ReplayResult> = {}): ReplayResult {
+  return {
+    endedAtTick: run.ticks,
+    endReason: run.endReason === "retired" ? "retired" : "reputation",
+    seconds: run.seconds,
+    score: run.score,
+    hash: 0,
+    ...over,
+  };
+}
+
+/** A replay that answers at once with a fixed result. */
+const answering =
+  (result: ReplayResult): Replay =>
+  async () =>
+    result;
+
+/** A replay the test finishes by hand, one call at a time. */
+function gated() {
+  const started: Array<(result: ReplayResult) => void> = [];
+  const replay: Replay = () => new Promise<ReplayResult>((resolve) => started.push(resolve));
+  return { replay, started };
+}
+
+/** Let the queue hand out turns: a few trips round the event loop. */
+async function settle() {
+  for (let i = 0; i < 3; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
 describe("the rollout switch", () => {
   it("is on for the first release", () => {
     expect(SHADOW).toBe(true);
@@ -287,22 +331,41 @@ describe("the rollout switch", () => {
     });
   });
 
-  it("accepts a score within the drift allowance and refuses one past it", async () => {
-    const room = Math.floor(Math.max(DRIFT_MIN_SCORE, DRIFT_SCORE_FRACTION * dies.score));
-    expect(await verifyFailoverRun(input(dies, { score: dies.score + room }))).toEqual({
-      ok: true,
+  it("names its drift bounds in one place: 20 ticks, and max(50, 2%) of the score", () => {
+    expect([DRIFT_MAX_TICKS, DRIFT_MIN_SCORE, DRIFT_SCORE_FRACTION]).toEqual([20, 50, 0.02]);
+  });
+
+  describe("the score allowance, max(50, 2%) of the replay's score, on both sides", () => {
+    // Fixed replays, so the edge is exact: 2% of 10,000 is 200; of 1,000 the floor of 50 rules.
+    const claim = (replayScore: number, claimed: number) =>
+      createFailoverVerifier({
+        shadow: true,
+        replay: answering(faithful(retires, { score: replayScore })),
+      })(input(retires, { score: claimed }));
+
+    it("accepts a claim up to the allowance above the replay and refuses one past it", async () => {
+      expect(await claim(10_000, 10_200)).toEqual({ ok: true });
+      expect(await claim(10_000, 10_201)).toEqual({
+        ok: false,
+        reason: "score does not match the replay",
+      });
+      expect(await claim(1_000, 1_050)).toEqual({ ok: true });
+      expect((await claim(1_000, 1_051)).ok).toBe(false);
     });
-    expect(await verifyFailoverRun(input(dies, { score: dies.score - room }))).toEqual({
-      ok: true,
-    });
-    expect(await verifyFailoverRun(input(dies, { score: dies.score + room + 1 }))).toEqual({
-      ok: false,
-      reason: "score does not match the replay",
+
+    it("accepts a claim up to the allowance below the replay and refuses one past it", async () => {
+      expect(await claim(10_000, 9_800)).toEqual({ ok: true });
+      expect(await claim(10_000, 9_799)).toEqual({
+        ok: false,
+        reason: "score does not match the replay",
+      });
+      expect(await claim(1_000, 950)).toEqual({ ok: true });
+      expect((await claim(1_000, 949)).ok).toBe(false);
     });
   });
 
   it("accepts and reports a mismatch that is only drift while it is on", async () => {
-    const lie = input(dies, { score: dies.score + 1 });
+    const lie = input(retires, { score: retires.score + 1 });
     expect(await verifyFailoverRun(lie)).toEqual({ ok: true });
     expect(captureException).toHaveBeenCalledTimes(1);
     const [scope, error] = vi.mocked(captureException).mock.calls[0] ?? [];
@@ -313,7 +376,7 @@ describe("the rollout switch", () => {
   });
 
   it("still refuses a mismatch over the ceiling, and says nothing", async () => {
-    const lie = input(dies, { score: MAX_PLAUSIBLE_SCORE + 1 });
+    const lie = input(retires, { score: MAX_PLAUSIBLE_SCORE + 1 });
     expect(await verifyFailoverRun(lie)).toEqual({
       ok: false,
       reason: "score does not match the replay",
@@ -321,105 +384,181 @@ describe("the rollout switch", () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
-  it("still refuses a claim that is wrong on its face, and a busy answer", async () => {
-    expect(await verifyFailoverRun(input(dies, { proof: null }))).toEqual({
+  it("still refuses a claim that is wrong on its face", async () => {
+    expect(await verifyFailoverRun(input(retires, { proof: null }))).toEqual({
       ok: false,
       reason: "proof required",
     });
-    expect(await verifyFailoverRun(input(dies, { proof: "garbage" }))).toEqual({
+    expect(await verifyFailoverRun(input(retires, { proof: "garbage" }))).toEqual({
       ok: false,
       reason: "unreadable proof",
     });
   });
+});
 
-  it("answers busy, never accepted, when the replay runs out of time", async () => {
-    // A client that makes the server slow must not get a forged score in.
-    const slow = input(dies, { deadline: Date.now() - 1, score: 150_000 });
-    expect(await verifyFailoverRun(slow)).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
-    expect(await strict(slow)).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+describe("running out of time", () => {
+  it("answers busy, never accepted, when the deadline has passed before the replay starts", async () => {
+    const replay = vi.fn<Replay>();
+    const late = input(retires, { deadline: Date.now() - 1, score: 150_000 });
+    for (const shadow of [true, false]) {
+      expect(await createFailoverVerifier({ shadow, replay })(late)).toEqual({
+        ok: false,
+        reason: VERIFY_BUSY_REASON,
+      });
+    }
+    expect(replay).not.toHaveBeenCalled();
   });
 
-  it("answers busy when the deadline passes in the middle of a replay", async () => {
-    const verdict = await verifyFailoverRun(input(dies, { deadline: Date.now() + 1 }));
+  it("answers busy when the deadline passes in the middle of a replay, and frees the mutex", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    const slow: Replay = async (_options, { yieldFn }) => {
+      vi.setSystemTime(NOW.getTime() + 10_000);
+      await yieldFn();
+      return faithful(retires);
+    };
+    const verdict = await createFailoverVerifier({ shadow: true, replay: slow })(
+      input(retires, { deadline: NOW.getTime() + 8_000 }),
+    );
     expect(verdict).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+    // The mutex is free again: the next caller starts at once.
+    const next = gated();
+    void createFailoverVerifier({ shadow: true, replay: next.replay })(input(retires));
+    await settle();
+    expect(next.started).toHaveLength(1);
   });
 });
 
 describe("reporting", () => {
-  afterEach(() => vi.useRealTimers());
-
-  const drift = () => input(dies, { score: dies.score + 1 });
+  const drifting = createFailoverVerifier({
+    shadow: true,
+    replay: async () => faithful(retires, { score: retires.score - 1 }),
+  });
+  const driftingTicks = createFailoverVerifier({
+    shadow: true,
+    replay: async () => faithful(retires, { endedAtTick: retires.ticks - 1 }),
+  });
 
   it("tells Sentry of one reason at most once a minute, and each reason on its own", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
-    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
-    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    const run = () => input(retires, { deadline: Date.now() + GENEROUS_MS });
+    await drifting(run());
+    await drifting(run());
     expect(captureException).toHaveBeenCalledTimes(1);
 
     vi.setSystemTime(new Date("2030-01-01T00:00:30Z"));
-    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    await drifting(run());
     expect(captureException).toHaveBeenCalledTimes(1);
 
     // A different reason is not held back by the first.
-    const ticks = dies.ticks + 1;
-    await verifyFailoverRun({
-      ...input(dies, { detail: { ...input(dies).detail, ticks, seconds: Math.floor(ticks / 20) } }),
-      deadline: Date.now() + 60_000,
-    });
+    await driftingTicks(run());
     expect(captureException).toHaveBeenCalledTimes(2);
 
     vi.setSystemTime(new Date("2030-01-01T00:01:01Z"));
-    await verifyFailoverRun({ ...drift(), deadline: Date.now() + 60_000 });
+    await drifting(run());
     expect(captureException).toHaveBeenCalledTimes(3);
   });
 });
 
 describe("taking turns", () => {
+  const verifier = (replay: Replay) => createFailoverVerifier({ shadow: false, replay });
+
   it("lets one replay run, two wait, and answers busy to the rest", async () => {
     expect(MAX_WAITING).toBe(2);
-    const verdicts = await Promise.all(
-      Array.from({ length: MAX_WAITING + 2 }, () => strict(input(retires))),
-    );
-    expect(verdicts.filter((v) => v.ok)).toHaveLength(MAX_WAITING + 1);
-    expect(verdicts.filter((v) => !v.ok)).toEqual([{ ok: false, reason: VERIFY_BUSY_REASON }]);
+    const { replay, started } = gated();
+    const verify = verifier(replay);
+    const calls = Array.from({ length: MAX_WAITING + 2 }, () => verify(input(retires)));
+    await settle();
+    // Only the first has started; the fourth was turned away at the door.
+    expect(started).toHaveLength(1);
+    expect(await calls[MAX_WAITING + 1]).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+
+    for (let i = 0; i < MAX_WAITING + 1; i++) {
+      started[i]?.(faithful(retires));
+      await settle();
+      expect(started).toHaveLength(Math.min(i + 2, MAX_WAITING + 1));
+    }
+    expect(await Promise.all(calls.slice(0, MAX_WAITING + 1))).toEqual([
+      { ok: true },
+      { ok: true },
+      { ok: true },
+    ]);
   });
 
   it("leaves the queue empty afterwards, so the next caller runs at once", async () => {
-    await Promise.all(Array.from({ length: MAX_WAITING + 2 }, () => strict(input(retires))));
-    expect(await strict(input(retires))).toEqual({ ok: true });
+    const { replay, started } = gated();
+    const verify = verifier(replay);
+    const first = Array.from({ length: MAX_WAITING + 1 }, () => verify(input(retires)));
+    for (let i = 0; i <= MAX_WAITING; i++) {
+      await settle();
+      started[i]?.(faithful(retires));
+    }
+    await Promise.all(first);
+    void verify(input(retires));
+    await settle();
+    expect(started).toHaveLength(MAX_WAITING + 2);
   });
 
-  it("does not start a replay for a caller whose deadline passed while it waited", async () => {
-    const [first, late] = await Promise.all([
-      strict(input(dies)),
-      strict(input(retires, { deadline: Date.now() + 1 })),
-    ]);
-    expect(first).toEqual({ ok: true });
-    expect(late).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+  it("frees the slot of a waiter whose deadline passed, and never starts its replay", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    const { replay, started } = gated();
+    const verify = verifier(replay);
+    // A runs. B and C wait with a 10 ms deadline.
+    const a = verify(input(retires, { deadline: NOW.getTime() + 60_000 }));
+    const b = verify(input(retires, { deadline: NOW.getTime() + 10 }));
+    const c = verify(input(retires, { deadline: NOW.getTime() + 10 }));
+    await vi.advanceTimersByTimeAsync(11);
+    expect(await b).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+    expect(await c).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+    expect(started).toHaveLength(1);
+
+    // D and E fit the queue the two gave up; F is the one turned away.
+    const d = verify(input(retires, { deadline: NOW.getTime() + 60_000 }));
+    const e = verify(input(retires, { deadline: NOW.getTime() + 60_000 }));
+    const f = verify(input(retires, { deadline: NOW.getTime() + 60_000 }));
+    expect(await f).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+
+    for (let i = 0; i < 3; i++) {
+      await settle();
+      started[i]?.(faithful(retires));
+    }
+    expect(await Promise.all([a, d, e])).toEqual([{ ok: true }, { ok: true }, { ok: true }]);
+    expect(started).toHaveLength(3);
   });
 
-  it("frees the slot of a waiter whose deadline passed", async () => {
-    // A runs; B and C wait with a 10 ms deadline and give up; D and E then fit the queue.
-    const first = strict(input(dies));
-    const soon = () => strict(input(retires, { deadline: Date.now() + 10 }));
-    const gaveUp = Promise.all([soon(), soon()]);
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    const next = await Promise.all([strict(input(retires)), strict(input(retires))]);
-    expect(await gaveUp).toEqual([
-      { ok: false, reason: VERIFY_BUSY_REASON },
-      { ok: false, reason: VERIFY_BUSY_REASON },
-    ]);
-    expect(next).toEqual([{ ok: true }, { ok: true }]);
-    expect(await first).toEqual({ ok: true });
-  });
+  it("clears a held mutex and the queue on reset, so a test cannot cascade", async () => {
+    const { replay, started } = gated();
+    const verify = verifier(replay);
+    void verify(input(retires));
+    const waiter = verify(input(retires));
+    await settle();
+    expect(started).toHaveLength(1);
 
+    resetVerifierForTests();
+    expect(await waiter).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+    void verify(input(retires));
+    await settle();
+    expect(started).toHaveLength(2);
+  });
+});
+
+describe("with the real sim", () => {
   it("gives the event loop a turn during a long replay", async () => {
     const order: string[] = [];
     setTimeout(() => order.push("timer"), 0);
+    const began = performance.now();
     await strict(input(dies));
     order.push("done");
+    console.info(
+      `failover verify timing: honest ${dies.ticks}-tick run replayed in ${Math.round(performance.now() - began)} ms`,
+    );
     expect(order).toEqual(["timer", "done"]);
+  });
+
+  it("accepts an honest run that ended in a loss at its real score", async () => {
+    expect(await strict(input(dies))).toEqual({ ok: true });
   });
 });
 
@@ -439,7 +578,11 @@ describe("a strong honest run", () => {
         actions: strong.actions,
       },
     });
+    const began = performance.now();
     expect(await strict(claim)).toEqual({ ok: true });
+    console.info(
+      `failover verify timing: worst-case honest run, ${strong.ticks} ticks, ${strong.actions} actions, replayed in ${Math.round(performance.now() - began)} ms`,
+    );
     expect(await verifyFailoverRun(claim)).toEqual({ ok: true });
     expect(captureException).not.toHaveBeenCalled();
   });

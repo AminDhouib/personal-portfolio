@@ -71,6 +71,8 @@ export function isPlausible(score: number, detail: Record<string, number>): bool
   return (detail.seconds ?? Infinity) <= 900 && score >= 0 && score <= MAX_PLAUSIBLE_SCORE;
 }
 
+type Replay = typeof replayAsync;
+
 /** `drift` marks a mismatch close enough to the claim to be taken as cross-engine drift. */
 type Finding = { ok: true } | { ok: false; reason: string; drift: boolean };
 
@@ -92,15 +94,20 @@ function reportDrift(reason: string): void {
   captureException(SHADOW_SCOPE, new Error(`failover replay disagrees: ${reason}`));
 }
 
-/** Forget what was reported; tests start each case from a quiet process. */
-export function resetDriftReports(): void {
-  lastReported.clear();
-}
-
 // ---- taking turns ------------------------------------------------------------------------
 
 let running = false;
-const waiting: Array<{ grant: () => void }> = [];
+const waiting: Array<{ grant: () => void; abandon: () => void }> = [];
+
+/**
+ * Test-only: clear the mutex, the queue (waiters are told busy) and the report throttle, so one
+ * test can never leave the next a held mutex or a full queue.
+ */
+export function resetVerifierForTests(): void {
+  for (const waiter of waiting.splice(0)) waiter.abandon();
+  running = false;
+  lastReported.clear();
+}
 
 /** Resolves true when it is this caller's turn, false when the queue is full or time ran out. */
 function takeTurn(deadline: number): Promise<boolean> {
@@ -115,13 +122,17 @@ function takeTurn(deadline: number): Promise<boolean> {
         clearTimeout(timer);
         resolve(true);
       },
+      abandon: () => {
+        clearTimeout(timer);
+        resolve(false);
+      },
     };
     // A waiter nobody will hear from must not hold a slot.
     const timer = setTimeout(
       () => {
         const at = waiting.indexOf(waiter);
         if (at !== -1) waiting.splice(at, 1);
-        resolve(false);
+        waiter.abandon();
       },
       Math.max(0, deadline - Date.now()),
     );
@@ -160,7 +171,7 @@ export function judge(
   return { ok: true };
 }
 
-async function check(input: Parameters<ArcadeVerify>[0]): Promise<Finding> {
+async function check(input: Parameters<ArcadeVerify>[0], replay: Replay): Promise<Finding> {
   const { score, detail, proof, now, deadline } = input;
   if (proof === null) return refuse("proof required");
   const today = utcDayKey(now);
@@ -181,7 +192,7 @@ async function check(input: Parameters<ArcadeVerify>[0]): Promise<Finding> {
   try {
     // Time spent waiting counts against the budget; do not start a replay nobody will hear of.
     if (Date.now() > deadline) return refuse(VERIFY_BUSY_REASON);
-    const result = await replayAsync(
+    const result = await replay(
       { ...dailyReplayOptions(today), log, ticks },
       {
         yieldEvery: YIELD_EVERY_TICKS,
@@ -205,9 +216,16 @@ async function check(input: Parameters<ArcadeVerify>[0]): Promise<Finding> {
 }
 
 /** The verifier with the rollout switch as a parameter; tests build both settings. */
-export function createFailoverVerifier({ shadow }: { shadow: boolean }): ArcadeVerify {
+export function createFailoverVerifier({
+  shadow,
+  replay = replayAsync,
+}: {
+  shadow: boolean;
+  /** The replay to run; tests pass a controllable one so timing does not decide the outcome. */
+  replay?: Replay;
+}): ArcadeVerify {
   return async (input) => {
-    const finding = await check(input);
+    const finding = await check(input, replay);
     if (finding.ok) return { ok: true };
     if (finding.drift && shadow && isPlausible(input.score, input.detail)) {
       reportDrift(finding.reason);
