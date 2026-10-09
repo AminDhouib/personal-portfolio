@@ -27,7 +27,7 @@ export function captureSave(now: number): CaptureResult {
     log = encodeProof(S.log);
   } catch (err) {
     if (!(err instanceof RangeError)) throw err;
-    // A refused off-board placement is in the log, and the proof format cannot write it down.
+    // Defensive: dispatch only logs what the proof format can write, but a hand-built S.log may not encode.
     return { ok: false, reason: "unencodable" };
   }
 
@@ -39,7 +39,8 @@ export function captureSave(now: number): CaptureResult {
     tick: S.tick,
     log,
   };
-  const budget = Math.round(S.sandboxBudget);
+  // The starting money, not sandboxBudget: a rebuilt blueprint may start higher than the budget its link carries.
+  const budget = Math.round(S.startBudget);
   if (S.gameMode === "sandbox" && budget !== CONFIG.sandbox.defaultBudget) save.budget = budget;
 
   // Never write what we would not read back.
@@ -93,7 +94,10 @@ const LOAD_CHUNK_TICKS = 500;
 const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
- * Replay a save into the live sim, leaving it at the saved tick, ready to carry on. A save the
+ * Replay a save into the live sim, leaving it at the saved tick, ready to carry on. If the
+ * replay ends before that tick (the log retires the run, or survival is lost on the way) the
+ * result is still ok: the sim is left at the end, `result.endReason` is not "time" and
+ * `result.endedAtTick` says where, and the caller must treat it as a finished run. A save the
  * replay refuses (a log the proof path would also refuse) comes back as a reason and touches
  * nothing. The caller must not step the sim until this resolves.
  */
