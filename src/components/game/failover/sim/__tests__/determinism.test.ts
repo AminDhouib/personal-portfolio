@@ -58,4 +58,5 @@ describe("determinism", () => {
 
 // Recorded from this build. A change here means the sim plays differently: bump it on purpose, never to quiet a failure.
 // Re-pinned in T8-1b when stateHash gained the board layout, wiring and fleet state (was 1858401894).
-const PINNED_HASH = 2572237937;
+// Re-pinned again in T8-1b A2 when stateHash gained the GPU batch, gateway queue, model-load flag, bad answers and the expiry count (was 2572237937).
+const PINNED_HASH = 2107164061;

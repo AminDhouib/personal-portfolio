@@ -1,6 +1,6 @@
 import { CONFIG, SERVICE_TYPES, type TrafficMix } from "./config";
 import { seedStreams } from "./rng";
-import type { Finances, GameMode, SimEvent, SimState } from "./types";
+import type { Finances, GameMode, MetricsState, SimEvent, SimState } from "./types";
 
 export interface ResetOptions {
   seed: string;
@@ -39,6 +39,18 @@ function createFinances(): Finances {
       byService: zeroByService(),
       countByService: zeroByService(),
     },
+  };
+}
+
+function createMetrics(): MetricsState {
+  return {
+    sampleTicks: 0,
+    sampleCount: 0,
+    series: new Map(),
+    alertCooldowns: new Map(),
+    peaks: new Map(),
+    goodput: [],
+    pending: { onTime: 0, late: 0, failed: 0 },
   };
 }
 
@@ -117,11 +129,15 @@ export function createState(opts: ResetOptions): SimState {
     nextServiceId: 1,
     nextRequestId: 1,
     entryRR: {},
+    completedByService: {},
+    scriptedEvents: false,
 
     resilience: { trips: 0, retries: 0, outages: 0, drained: 0 },
     // No GPUs yet, so only the base grid. recomputePower() is the one writer after this.
     power: { usedKw: 0, capKw: CONFIG.power.baseCapKw },
     regionOutage: null,
+    inference: { expired: 0 },
+    metrics: createMetrics(),
 
     events: [],
 

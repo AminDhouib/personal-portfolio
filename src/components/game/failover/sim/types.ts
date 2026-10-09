@@ -16,6 +16,12 @@ export interface Job {
   timer: number;
 }
 
+/** An Inference Gateway entry: the held request and the game time it was admitted. */
+export interface PendingEntry {
+  req: Request;
+  enqueuedAt: number;
+}
+
 /**
  * What a handler tells the job loop: `next` (consumed or forwarded), `requeue-next`
  * (not consumed, try the next job) or `requeue-stop` (backpressure, stop for this step).
@@ -145,6 +151,48 @@ export interface Connection {
   to: string;
 }
 
+/** One service's rolling samples, newest last, plus the counters the next sample drains. */
+export interface ServiceSeries {
+  util: number[];
+  queueDepth: number[];
+  errorRate: number[];
+  latency: number[];
+  errors: number;
+  successes: number;
+  latencySum: number;
+  latencyCount: number;
+  /** Consecutive samples above the high-load alert threshold. */
+  utilStreak: number;
+}
+
+/** Terminated requests in one metrics sample, for the rolling goodput window. */
+export interface GoodputBucket {
+  onTime: number;
+  late: number;
+  failed: number;
+}
+
+/** The hottest a service ever ran this run, kept even after it is demolished. */
+export interface RunPeak {
+  type: ServiceType;
+  util: number;
+  atSec: number;
+}
+
+/** The observability layer's state: sampled series, alert cooldowns, goodput window and run peaks. */
+export interface MetricsState {
+  /** Ticks since the last sample. */
+  sampleTicks: number;
+  sampleCount: number;
+  series: Map<string, ServiceSeries>;
+  /** "serviceId:rule" to the game time of the last fire. */
+  alertCooldowns: Map<string, number>;
+  peaks: Map<string, RunPeak>;
+  goodput: GoodputBucket[];
+  /** Outcomes since the last sample. */
+  pending: GoodputBucket;
+}
+
 /** The Internet entry node: always present, never a Service. */
 export interface InternetNode {
   id: "internet";
@@ -196,10 +244,26 @@ export interface SimState {
   /** Round-robin cursor per entry type, cleared by resetSim. */
   entryRR: Record<string, number>;
 
+  /**
+   * Completions by the type of the service that finished them (`db`, `replica`,
+   * `notify`...). A campaign objective can say "reads served by the replica", which
+   * the per-class income counters cannot.
+   */
+  completedByService: Record<string, number>;
+  /**
+   * A campaign level that opted in to survival's spike, traffic-shift and random-event
+   * machinery (`enableSurvivalShifts`). Survival always runs it; every other mode only
+   * when this is set.
+   */
+  scriptedEvents: boolean;
+
   resilience: Resilience;
   power: Power;
   /** The live or last forced region outage, null before one fires. */
   regionOutage: RegionOutage | null;
+  /** AI Wave session counter: requests the Inference Gateway expired past their deadline. */
+  inference: { expired: number };
+  metrics: MetricsState;
 
   /** Pending view events. Capped, so a headless replay that never drains stays bounded. */
   events: SimEvent[];

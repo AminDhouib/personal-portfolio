@@ -208,6 +208,10 @@ export function deleteObject(id: string): boolean {
     // the node would strand them.
     ...svc.partitions.flat(),
     ...svc.parked,
+    // A GPU's live batch and an Inference Gateway's deadline entries are off-pipeline
+    // backlog too: neither is in queue or processing.
+    ...svc.batch,
+    ...svc.pending.map((entry) => entry.req),
     ...S.requests.filter((r) => r.target === svc),
   ]);
   for (const req of orphaned) removeRequest(req);

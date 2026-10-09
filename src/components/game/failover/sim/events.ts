@@ -3,7 +3,7 @@
 // pushed onto S.events as a key and params, never as prose.
 
 import { failRequest, removeRequest } from "./actions";
-import { CONFIG, TICK, TRAFFIC_TYPES, type RandomEventType } from "./config";
+import { CONFIG, TICK, TRAFFIC_TYPES, type RandomEventType, type TrafficType } from "./config";
 import { FAIL_REASONS } from "./failure-reasons";
 import type { Request } from "./request";
 import { rand } from "./rng";
@@ -22,10 +22,15 @@ const DEFAULT_EVENT_MS = 30000;
 /** Chance a random-event check starts an event. */
 const EVENT_CHANCE = 0.3;
 
+/** Survival always runs the spike, shift and event timers; a campaign level can opt in. */
+function eventsEnabled(): boolean {
+  return S.gameMode === "survival" || S.scriptedEvents;
+}
+
 // ==================== MALICIOUS SPIKE ====================
 
 export function updateMaliciousSpike(): void {
-  if (S.gameMode !== "survival") return;
+  if (!eventsEnabled()) return;
   if (!SPIKE.enabled) return;
 
   S.maliciousSpikeTicks++;
@@ -86,7 +91,7 @@ function endMaliciousSpike(): void {
 // ==================== TRAFFIC SHIFTS ====================
 
 export function updateTrafficShift(dt: number): void {
-  if (S.gameMode !== "survival") return;
+  if (!eventsEnabled()) return;
   const config = CONFIG.survival.trafficShift;
   if (!config.enabled) return;
 
@@ -142,10 +147,60 @@ function endTrafficShift(): void {
   iv.currentShift = null;
 }
 
+// ==================== INFERENCE SURVIVAL STAGING ====================
+//
+// The AI wave arrives in stages, with no chicken-and-egg deadlock and no dead GPU:
+// survival starts at a 0 base INFERENCE share; after 300 s of game time the base
+// moves to 3%, a legible slow bleed (-1 rep per unserved request) that arms the "AI
+// demand is emerging" hint; and once the player owns at least one GPU it rebalances to
+// 10%, taken proportionally from the other shares, so the GPU has steady food between
+// hype waves.
+//
+// The rebalance targets the BASE distribution, whichever object an active malicious
+// spike or traffic shift is going to restore, never a shift's own mix, so a staging
+// step taken mid-shift survives the restore instead of being overwritten by it.
+
+const INFERENCE_STAGE_AT_SEC = 300; // the 3% bleed begins here
+const INFERENCE_BASE_SHARE = 0.03;
+const INFERENCE_FED_SHARE = 0.1; // once a GPU exists
+
+/** Pure re-derivation over game time and GPU ownership, so it needs no dt. */
+export function updateInferenceStaging(): void {
+  if (S.gameMode !== "survival") return;
+
+  const hasGpu = S.services.some((s) => s.type === "gpu");
+  const target = hasGpu
+    ? INFERENCE_FED_SHARE
+    : S.elapsedGameTime >= INFERENCE_STAGE_AT_SEC
+      ? INFERENCE_BASE_SHARE
+      : 0;
+
+  const iv = S.intervention;
+  const base =
+    S.maliciousSpikeActive && S.normalTrafficDist
+      ? S.normalTrafficDist
+      : iv.trafficShiftActive && iv.originalTrafficDist
+        ? iv.originalTrafficDist
+        : S.trafficDistribution;
+
+  const current = base.INFERENCE ?? 0;
+  if (Math.abs(current - target) < 1e-9) return;
+
+  // Take (or give back) the delta proportionally across the other shares.
+  const others = (Object.keys(base) as TrafficType[]).filter((k) => k !== "INFERENCE");
+  let othersTotal = 0;
+  for (const key of others) othersTotal += base[key] ?? 0;
+  if (othersTotal > 0) {
+    const scale = (1 - target) / othersTotal;
+    for (const key of others) base[key] = (base[key] ?? 0) * scale;
+  }
+  base.INFERENCE = target;
+}
+
 // ==================== RANDOM EVENTS ====================
 
 export function updateRandomEvents(dt: number): void {
-  if (S.gameMode !== "survival") return;
+  if (!eventsEnabled()) return;
   const config = CONFIG.survival.randomEvents;
   if (!config.enabled) return;
 
@@ -421,7 +476,13 @@ export function triggerRegionOutage(durationSec: number): boolean {
   for (const id of serviceIds) {
     const s = S.services.find((x) => x.id === id);
     if (!s) continue;
-    const caught = [...s.queue.splice(0), ...s.processing.splice(0).map((job) => job.req)];
+    const caught = [
+      ...s.queue.splice(0),
+      ...s.processing.splice(0).map((job) => job.req),
+      // A busy GPU's batch and a gateway's deadline entries die with their region too.
+      ...s.batch.splice(0),
+      ...s.pending.splice(0).map((entry) => entry.req),
+    ];
     for (const req of caught) terminateInDeadRegion(req);
   }
   for (const req of S.requests.slice()) {
