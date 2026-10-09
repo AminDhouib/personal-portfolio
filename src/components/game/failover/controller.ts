@@ -79,6 +79,8 @@ export interface HudState extends SimHud {
   toast: string | null;
   soundOn: boolean;
   tier: PerfTier;
+  /** The graphics choice in Settings: Auto, or High or Low pinned. */
+  gfxPref: GfxPref;
   /** The frame loop threw and stopped; the game shows its crash card. */
   crashed: boolean;
   badges: Badge[];
@@ -95,6 +97,8 @@ export interface ControllerOptions {
   perfEnv?: PerfEnv;
   gfxPref?: GfxPref;
   createScene?: (canvas: HTMLCanvasElement, tier: PerfTier) => FailoverScene;
+  /** Start with time stopped (the first-run coach starts the clock with its last step). */
+  startPaused?: boolean;
   /** Called once when a run ends (the sim's game-over event), for the device record. */
   onRunEnd?: (run: RunEnd) => void;
 }
@@ -151,6 +155,7 @@ export class FailoverController {
   private readonly audio: FailoverAudio;
   private readonly mode: GameMode;
   private readonly onRunEnd: ((run: RunEnd) => void) | null;
+  private readonly perfEnv: PerfEnv;
 
   private scene: FailoverScene | null = null;
   private viewportWidth = 0;
@@ -192,7 +197,9 @@ export class FailoverController {
     this.mode = opts.mode ?? "survival";
     this.onRunEnd = opts.onRunEnd ?? null;
     const pref = opts.gfxPref ?? loadGfxPref();
-    this.governor = createGovernor(initialTier(opts.perfEnv ?? readPerfEnv(), pref), pref);
+    this.perfEnv = opts.perfEnv ?? readPerfEnv();
+    this.governor = createGovernor(initialTier(this.perfEnv, pref), pref);
+    this.paused = opts.startPaused ?? false;
     resetSim({ seed: opts.seed ?? freeSeed(), mode: this.mode });
     this.hud = this.buildHud();
   }
@@ -403,6 +410,7 @@ export class FailoverController {
       toast: this.toast ? this.toast.text : null,
       soundOn: this.audio.isOn(),
       tier: this.governor.tier,
+      gfxPref: this.governor.pref,
       crashed: this.crashed,
       badges: this.badgeViews(),
       alert:
@@ -557,6 +565,11 @@ export class FailoverController {
     this.apply({ kind: "view" });
   }
 
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.emit();
+  }
+
   togglePause(): void {
     this.paused = !this.paused;
     this.emit();
@@ -604,6 +617,14 @@ export class FailoverController {
   /** Call from the user gesture that starts the game, so sound can play once it is on. */
   unlockAudio(): void {
     this.audio.unlock();
+  }
+
+  /** The Settings graphics choice: Auto picks from the device and frame times, High or Low pin it. */
+  setGfxPref(pref: GfxPref): void {
+    this.governor = createGovernor(initialTier(this.perfEnv, pref), pref);
+    this.scene?.setTier(this.governor.tier);
+    this.lastFrameMs = null;
+    this.emit();
   }
 
   setSoundOn(on: boolean): void {
