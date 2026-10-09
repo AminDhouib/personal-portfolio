@@ -18,9 +18,16 @@ const LABELS: Record<string, string> = {
 };
 
 // Internet -> Firewall -> Load Balancer is allowed; nothing reaches the database.
+// Internet -> Load Balancer is already wired, so it and its reverse are refused.
 const ctx: MachineContext = {
-  canLink: (from, to) =>
-    (from === "internet" && to === "svc_1") || (from === "svc_1" && to === "svc_2"),
+  linkRefusal: (from, to) => {
+    if ((from === "internet" && to === "svc_1") || (from === "svc_1" && to === "svc_2")) {
+      return null;
+    }
+    if (from === "internet" && to === "svc_2") return "exists";
+    if (from === "svc_2" && to === "internet") return "reverse";
+    return "invalid";
+  },
   label: (id) => LABELS[id] ?? id,
 };
 
@@ -112,6 +119,29 @@ describe("the input machine", () => {
         message: "No route from Firewall to Relational DB",
       });
       expect(state).toMatchObject({ mode: "linkFrom", from: "svc_1" });
+    });
+
+    it("a link that is already there says so, not No route, and keeps the source", () => {
+      const exists = run(
+        armed(LINK),
+        { type: "tapNode", id: "internet", pointer: "mouse" },
+        { type: "tapNode", id: "svc_2", pointer: "mouse" },
+      );
+      expect(exists.intents[1]).toEqual({
+        kind: "toast",
+        message: "Internet already sends to Load Balancer",
+      });
+      expect(exists.state).toMatchObject({ mode: "linkFrom", from: "internet" });
+
+      const reverse = run(
+        armed(LINK),
+        { type: "tapNode", id: "svc_2", pointer: "mouse" },
+        { type: "tapNode", id: "internet", pointer: "mouse" },
+      );
+      expect(reverse.intents[1]).toEqual({
+        kind: "toast",
+        message: "Internet already sends to Load Balancer; a link runs one way",
+      });
     });
 
     it("tapping the source again, or an empty cell, cancels", () => {
