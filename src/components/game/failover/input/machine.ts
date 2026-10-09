@@ -1,5 +1,6 @@
 import type { ServiceType } from "../sim/config";
 import type { LinkRefusal } from "../sim/topology";
+import { T, fmt } from "../strings";
 import type { KeyCommand } from "./keys";
 
 // The pointer and keyboard model, as a pure state machine:
@@ -107,8 +108,8 @@ function tapCell(s: MachineState, x: number, z: number, pointer: Pointer): Machi
 }
 
 /**
- * A refused link, in words. A repeat of a link that is already there must not read as
- * "No route": the T8-2 walk took that for a missed click on the first, working, link.
+ * A refused link, in words. A repeat of a link that is already there must not read as an
+ * invalid edge: the T8-2 walk took "No route" for a missed click on the first, working, link.
  */
 function linkRefusalText(
   refusal: LinkRefusal | "missing",
@@ -120,13 +121,13 @@ function linkRefusalText(
   const b = ctx.label(to);
   switch (refusal) {
     case "exists":
-      return `${a} already sends to ${b}`;
+      return fmt(T.link_exists, { from: a, to: b });
     case "reverse":
-      return `${b} already sends to ${a}; a link runs one way`;
+      return fmt(T.link_reverse, { from: a, to: b });
     case "self":
     case "missing":
     case "invalid":
-      return `No route from ${a} to ${b}`;
+      return fmt(T.link_rejected, { from: a, to: b });
   }
 }
 
@@ -134,12 +135,12 @@ function tapNode(s: MachineState, id: string, pointer: Pointer, ctx: MachineCont
   const { tool, gesturing } = s;
   switch (tool.kind) {
     case "place":
-      return out(idle(tool, gesturing), { kind: "toast", message: "That tile is taken" });
+      return out(idle(tool, gesturing), { kind: "toast", message: T.tile_taken });
     case "select":
       return out(s, { kind: "inspect", id });
     case "demolish":
       if (id === "internet") {
-        return out(idle(tool, gesturing), { kind: "toast", message: "The Internet stays" });
+        return out(idle(tool, gesturing), { kind: "toast", message: T.internet_stays });
       }
       if (pointer === "mouse") return out(idle(tool, gesturing), { kind: "demolish", id });
       return out({ mode: "confirmDemolish", tool, id, gesturing });

@@ -116,7 +116,7 @@ describe("the input machine", () => {
       );
       expect(intents[1]).toEqual({
         kind: "toast",
-        message: "No route from Firewall to Relational DB",
+        message: "Firewall can't send traffic to Relational DB.",
       });
       expect(state).toMatchObject({ mode: "linkFrom", from: "svc_1" });
     });
