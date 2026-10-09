@@ -11,7 +11,7 @@ import {
   validateArcadeSubmission,
 } from "@/lib/arcade/games";
 import { readBoard, submitScore } from "@/lib/arcade/store";
-import { runVerifier } from "@/lib/arcade/verify";
+import { runVerifier, VERIFY_BUSY_REASON } from "@/lib/arcade/verify";
 import { captureException } from "@/lib/log";
 import { sanitizePlayerName } from "@/lib/player-name";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -118,6 +118,13 @@ export async function POST(req: Request) {
     });
     if (!outcome.ok) {
       if ("error" in outcome) captureException("api:arcade-scores.verify", outcome.error);
+      // Busy is the server's state, not the run's fault: the client may try again shortly.
+      if (outcome.reason === VERIFY_BUSY_REASON) {
+        return NextResponse.json(
+          { error: "busy", reason: outcome.reason },
+          { status: 503, headers: { "Retry-After": "2" } },
+        );
+      }
       return NextResponse.json({ error: "implausible", reason: outcome.reason }, { status: 422 });
     }
   }

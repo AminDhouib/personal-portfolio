@@ -868,6 +868,18 @@ describe("proof seam", () => {
     expect(json).toEqual({ error: "implausible", reason: "busy, try again" });
   });
 
+  it("answers 503 with Retry-After for the busy signal, writing nothing and reporting nothing", async () => {
+    const { VERIFY_BUSY_REASON } = await import("@/lib/arcade/verify");
+    await install({ verify: async () => ({ ok: false, reason: VERIFY_BUSY_REASON }) });
+    const { res, json } = await submit({ proof: MARK });
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("2");
+    expect(json).toEqual({ error: "busy", reason: VERIFY_BUSY_REASON });
+    expect(emu.scores()).toHaveLength(0);
+    expect(emu.players().size).toBe(0);
+    expect(await reported()).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       "throws",
