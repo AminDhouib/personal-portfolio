@@ -40,6 +40,11 @@ describe("REMOVED_GLOBALS", () => {
       "crypto",
       "reportError",
       "dispatchEvent",
+      "WebSocketStream",
+      "RTCPeerConnection",
+      "TCPSocket",
+      "UDPSocket",
+      "TCPServerSocket",
     ]);
   });
 

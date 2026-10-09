@@ -1,6 +1,7 @@
 /**
- * Names the player's code must not reach inside the worker: the network, other threads, the
- * channel back to the page, timers and clocks, and the page-identity objects. `Date` is kept
+ * Names the player's code must not reach inside the worker: the usual network APIs (this
+ * prevents accidents; it is not a network boundary), other threads, the channel back to the page,
+ * ways to raise a crash report, timers and clocks, and the page-identity objects. `Date` is kept
  * (the engine never reads a clock, so it is harmless).
  */
 export const REMOVED_GLOBALS = [
@@ -32,6 +33,11 @@ export const REMOVED_GLOBALS = [
   "crypto",
   "reportError",
   "dispatchEvent",
+  "WebSocketStream",
+  "RTCPeerConnection",
+  "TCPSocket",
+  "UDPSocket",
+  "TCPServerSocket",
 ] as const;
 
 /** How many frames a stack keeps (Chrome); the default of 10 can lose the player's line. */
