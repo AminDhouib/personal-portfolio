@@ -110,12 +110,11 @@ export async function POST(req: Request) {
 
   // After the synchronous check, and only if it passed. A game without a verifier ignores proof.
   if (entry.verify) {
-    const outcome = await runVerifier(entry.verify, {
-      score: body.score,
-      detail: verdict.detail,
-      proof: body.proof ?? null,
-      now,
-    });
+    const outcome = await runVerifier(
+      entry.verify,
+      { score: body.score, detail: verdict.detail, proof: body.proof ?? null, now },
+      entry.verifyBudgetMs,
+    );
     if (!outcome.ok) {
       if ("error" in outcome) captureException("api:arcade-scores.verify", outcome.error);
       // Busy is the server's state, not the run's fault: the client may try again shortly.

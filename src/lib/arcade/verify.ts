@@ -29,8 +29,9 @@ function failure(error: Error): VerifyOutcome {
 export async function runVerifier(
   verify: ArcadeVerify,
   input: { score: number; detail: Record<string, number>; proof: string | null; now: Date },
+  budgetMs: number = ARCADE_VERIFY_BUDGET_MS,
 ): Promise<VerifyOutcome> {
-  const deadline = Date.now() + ARCADE_VERIFY_BUDGET_MS;
+  const deadline = Date.now() + budgetMs;
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Neither side of the race can reject, so a verifier that fails after the timer won has no
   // unhandled rejection to leave behind.
@@ -43,13 +44,13 @@ export async function runVerifier(
     }
   })();
   const budget = new Promise<Settled>((resolve) => {
-    timer = setTimeout(() => resolve({ timedOut: true }), ARCADE_VERIFY_BUDGET_MS);
+    timer = setTimeout(() => resolve({ timedOut: true }), budgetMs);
   });
   const settled = await Promise.race([attempt, budget]);
   clearTimeout(timer);
 
   if ("timedOut" in settled || Date.now() > deadline) {
-    return failure(new Error(`arcade verifier exceeded its ${ARCADE_VERIFY_BUDGET_MS} ms budget`));
+    return failure(new Error(`arcade verifier exceeded its ${budgetMs} ms budget`));
   }
   if ("error" in settled) return failure(settled.error);
   if (!isVerdict(settled.verdict)) {

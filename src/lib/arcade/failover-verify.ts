@@ -40,9 +40,15 @@ export const DRIFT_SCORE_FRACTION = 0.02;
 
 /**
  * Replays that may wait behind the one running; the next caller is told to come back. One running
- * plus two waiting is about 1.8 s at the worst case (0.6 s each), inside the 2000 ms budget.
+ * plus two waiting is about 1.8 s at the worst case (0.6 s each), well inside the budget above.
  */
 export const MAX_WAITING = 2;
+
+/**
+ * The verify budget for Failover, queueing included. Worst case is 605 ms on a fast desktop;
+ * 8000 covers a host about 4 times slower with 2 waiting. Past it the answer is busy, never a pass.
+ */
+export const FAILOVER_VERIFY_BUDGET_MS = 8_000;
 
 /** Ticks played between looks at the event loop. */
 export const YIELD_EVERY_TICKS = 500;

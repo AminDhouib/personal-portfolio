@@ -737,6 +737,28 @@ describe("useArcadeBoard", () => {
       expect(result.current.entries[1]).toMatchObject({ turns: 20, hand: 0 });
     });
 
+    it("waits longer for a submit that carries a proof, since the server replays it", async () => {
+      const { result } = await mounted();
+      const timeout = vi.spyOn(AbortSignal, "timeout");
+      fetchMock.mockResolvedValue(okResponse({ ok: true, boards: [] }));
+      await act(async () => {
+        await result.current.submit({ name: "Ada", score: 5, seconds: 1, kills: 1, distance: 1 });
+      });
+      expect(timeout).toHaveBeenLastCalledWith(8000);
+      await act(async () => {
+        await result.current.submit({
+          name: "Ada",
+          score: 5,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+          proof: "0,8",
+        });
+      });
+      expect(timeout).toHaveBeenLastCalledWith(12_000);
+      timeout.mockRestore();
+    });
+
     it("a 422 is a rejection, not a retryable failure", async () => {
       const { result } = await mounted();
       fetchMock.mockResolvedValueOnce(okResponse({ error: "implausible", reason: "kills" }, 422));

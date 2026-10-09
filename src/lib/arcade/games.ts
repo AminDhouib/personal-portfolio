@@ -18,7 +18,11 @@ import {
 } from "@/components/game/typing-speed/engine/daily";
 import { dayNumber as failoverDayNumber } from "@/components/game/failover/daily/daily";
 import { utcDayKey } from "./boards";
-import { MAX_PLAUSIBLE_SCORE, verifyFailoverRun } from "./failover-verify";
+import {
+  FAILOVER_VERIFY_BUDGET_MS,
+  MAX_PLAUSIBLE_SCORE,
+  verifyFailoverRun,
+} from "./failover-verify";
 
 /**
  * The arcade plausibility registry. Games are fully client side, so every submitted
@@ -98,6 +102,8 @@ export interface ArcadeGameEntry {
   requiresProof?: boolean;
   /** Runs after the synchronous plausibility check passes; a reject is a 422. */
   verify?: ArcadeVerify;
+  /** The verifier's time budget in ms, queueing included; ARCADE_VERIFY_BUDGET_MS when unset. */
+  verifyBudgetMs?: number;
 }
 
 function reject(reason: string): Verdict {
@@ -344,6 +350,7 @@ export const ARCADE_GAMES = {
     detailSchema: failoverDetailSchema,
     requiresProof: true,
     verify: verifyFailoverRun,
+    verifyBudgetMs: FAILOVER_VERIFY_BUDGET_MS,
   },
 } satisfies Record<ArcadeGameSlug, ArcadeGameEntry>;
 

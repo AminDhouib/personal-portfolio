@@ -102,6 +102,8 @@ const HANDLE_MAX_SENT = 200;
 
 const PERIODS: readonly BoardPeriod[] = ["daily", "weekly", "all-time"];
 const REQUEST_TIMEOUT_MS = 8000;
+// A submit with a proof waits for the server to replay it, which can take up to its 8 s budget.
+const PROOF_SUBMIT_TIMEOUT_MS = 12_000;
 
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
@@ -315,7 +317,9 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
             detail: pickDetail(slug, payload),
             ...(payload.proof !== undefined && { proof: payload.proof }),
           }),
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          signal: AbortSignal.timeout(
+            payload.proof === undefined ? REQUEST_TIMEOUT_MS : PROOF_SUBMIT_TIMEOUT_MS,
+          ),
         });
         const data = await readJsonBody(res);
         if (res.status === 422) {
