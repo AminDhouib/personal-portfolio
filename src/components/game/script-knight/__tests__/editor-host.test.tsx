@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CodeEditorProps } from "../code-editor";
@@ -62,6 +63,19 @@ describe("EditorHost on a fine pointer", () => {
     const swapped = await screen.findByTestId("fake-cm");
     expect(JSON.parse(swapped.dataset.selection ?? "null")).toEqual({ anchor: 2, head: 4 });
     expect(swapped.dataset.focus).toBe("true");
+  });
+
+  it("keeps text typed into the textarea before the swap", async () => {
+    finePointer();
+    function Page() {
+      const [value, setValue] = useState("let a = 1;");
+      return <EditorHost {...props({ value, onChange: setValue })} />;
+    }
+    render(<Page />);
+    const field = screen.getByLabelText("Your Player code (JavaScript)") as HTMLTextAreaElement;
+    fireEvent.change(field, { target: { value: "let a = 1;\nlet typed = 2;" } });
+    const swapped = await screen.findByTestId("fake-cm");
+    expect(swapped.textContent).toBe("let a = 1;\nlet typed = 2;");
   });
 
   it("does not swap after it has unmounted", async () => {
