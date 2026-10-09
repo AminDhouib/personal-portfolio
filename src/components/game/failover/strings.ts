@@ -55,6 +55,7 @@ export const T = {
   cost_spike_warning: "CLOUD COST SPIKE! Upkeep doubled for 30s",
   daily_board: "Daily board", // ours
   daily_busy: "The board is busy, try again in a moment", // ours
+  daily_hud: "Daily: {name}", // ours
   daily_closed: "Today's incident closed at 00:00 UTC. Start the new one.", // ours
   daily_copied: "Result copied.", // ours
   daily_copy_failed: "Could not copy the result.", // ours

@@ -34,7 +34,11 @@ describe("starting a daily", () => {
     const h = started();
     expect(S.gameMode).toBe("survival");
     expect(h.controller.getHud().mode).toBe("survival");
-    expect(h.controller.getHud().daily).toEqual({ day: DAY, result: null });
+    expect(h.controller.getHud().daily).toEqual({
+      day: DAY,
+      profile: dailyRun(DAY).profile.name,
+      result: null,
+    });
     expect(S.log).toEqual([]);
   });
 
