@@ -81,10 +81,18 @@ describe("Stage, Watch the bot", () => {
     expect(screen.queryByText(/Watching the reference bot/)).toBeNull();
   });
 
-  it("is gone once the player moves to another floor", () => {
+  it("is gone once the player moves to another floor, and stays gone on coming back", () => {
     render(<Stage runner={runner} />);
     watch();
     fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    expect(screen.queryByText(/Watching the reference bot/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Towers" }));
+    expect(screen.queryByText(/Watching the reference bot/)).toBeNull();
+
+    watch();
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    watch();
+    fireEvent.click(screen.getByRole("button", { name: "Towers" }));
     expect(screen.queryByText(/Watching the reference bot/)).toBeNull();
   });
 });
