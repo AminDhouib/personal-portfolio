@@ -74,14 +74,40 @@ describe("the reference bot on the Narrow Path", () => {
     expect(encodeLog(a.actions)).toBe(encodeLog(b.actions));
   });
 
-  it("only calls abilities the floor grants, so a thin floor does not throw", () => {
-    // Floor 5 as unlocked has no look or shoot: the bot loses, but it must not crash or cheat.
+  it("only calls abilities the floor grants, so a thin floor loses without crashing", () => {
+    // Floor 5 as unlocked has no look or shoot: the bot cannot win it, but it must neither throw
+    // nor reach for an ability it was not given (which the step API would refuse).
     const outcome = playWithBot(floor("narrow-path", 5, false));
-    expect(["passed", "failed", "out-of-turns"]).toContain(outcome.status);
-    expect(outcome.actions.length).toBeGreaterThan(0);
+    expect(outcome.status).toBe("failed");
+    expect(outcome.result).toMatchObject({ passed: false, turns: 15, score: null });
+    expect(encodeLog(outcome.actions)).toBe("1:w0s0w0a0a0w0a0a0r-r-w0a0a0a0a0");
   });
 
-  it("is one function per run: a bot remembers its health, so each run gets a fresh one", () => {
-    expect(createReferenceBot()).not.toBe(createReferenceBot());
+  it("keeps its health memory per bot, so a fresh bot does not inherit a history", () => {
+    // Health 20 then 10 means the bot is under fire and keeps moving; a bot that sees 10 for the
+    // first time is not under fire and rests. Sharing one bot between runs would blur the two.
+    const noUnit = {
+      isUnit: () => false,
+      isWall: () => false,
+      isStairs: () => false,
+      getUnit: () => null,
+    };
+    function turnAt(health: number, calls: string[]) {
+      return {
+        health: () => health,
+        maxHealth: () => 20,
+        feel: () => noUnit,
+        rest: () => void calls.push("rest"),
+        walk: () => void calls.push("walk"),
+      };
+    }
+    const seasoned: string[] = [];
+    const veteran = createReferenceBot();
+    veteran(turnAt(20, seasoned));
+    veteran(turnAt(10, seasoned));
+    const fresh: string[] = [];
+    createReferenceBot()(turnAt(10, fresh));
+    expect(seasoned.at(-1)).toBe("walk");
+    expect(fresh).toEqual(["rest"]);
   });
 });
