@@ -1072,6 +1072,9 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   bombed space before the first bomb falls (the chained blast can remove the warrior itself), and
   skips units with no health left. Everything else is upstream's outcome: the explosion still kills
   everyone alive, once. `detonate-ticking-captive.test.ts` pins it with the real classes.
+  Beyond that one case, `step` and `endTurn` are atomic: any other exception inside the engine ends
+  the run as `engine-error` (a typed `StepResult` failure), and the half-played turn is not
+  counted or returned.
 
 ## Adversarial standoffs (restated from the audit's final report)
 

@@ -18,7 +18,12 @@ export interface TurnRecord {
   events: TurnEvent[];
 }
 
-export type RunStatus = "playing" | "passed" | "failed" | "out-of-turns";
+export type RunStatus = "playing" | "passed" | "failed" | "out-of-turns" | "engine-error";
+
+/** Why a step did not produce a turn. An engine error ends the run; the others leave it as it was. */
+export type RunFailure = { kind: "engine-error"; message: string };
+
+export type StepResult = { ok: true; record: TurnRecord } | { ok: false; reason: RunFailure };
 
 export interface RunResult {
   passed: boolean;
@@ -33,13 +38,18 @@ export interface Run {
   readonly config: LevelConfig;
   readonly status: RunStatus;
   readonly turnCount: number;
+  /** Set once the run ended with an engine error; the half-played turn is not counted. */
+  readonly failure: RunFailure | null;
   readonly initial: TurnEvent;
   /** The warrior's turn facade for this turn; call its abilities, then endTurn. */
   beginTurn(): WarriorTurn;
-  /** Every other unit chooses, then all units act, in upstream order. */
-  endTurn(): TurnRecord;
+  /**
+   * Every other unit chooses, then all units act, in upstream order. An exception inside the
+   * engine ends the run as "engine-error" instead of escaping with a half-applied turn.
+   */
+  endTurn(): StepResult;
   /** Step with a known action (replays, hand mode, the server). */
-  step(action: TurnAction): TurnRecord;
+  step(action: TurnAction): StepResult;
   result(): RunResult;
 }
 
@@ -63,6 +73,7 @@ class RunImpl implements Run {
   private current: TurnFacade | null = null;
   private currentStatus: RunStatus = "playing";
   private played = 0;
+  private lastFailure: RunFailure | null = null;
 
   constructor(config: LevelConfig) {
     this.config = config;
@@ -76,6 +87,22 @@ class RunImpl implements Run {
 
   get turnCount(): number {
     return this.played;
+  }
+
+  get failure(): RunFailure | null {
+    return this.lastFailure;
+  }
+
+  /** Ends the run on an engine exception; the turn in flight is dropped, never half-applied. */
+  private fail(error: unknown): StepResult {
+    this.current?.revoke();
+    this.current = null;
+    this.currentStatus = "engine-error";
+    this.lastFailure = {
+      kind: "engine-error",
+      message: error instanceof Error ? error.message : String(error),
+    };
+    return { ok: false, reason: this.lastFailure };
   }
 
   beginTurn(): WarriorTurn {
@@ -94,14 +121,22 @@ class RunImpl implements Run {
     return this.current.turn;
   }
 
-  endTurn(): TurnRecord {
+  endTurn(): StepResult {
     const facade = this.current;
     if (!facade) {
       throw new Error("No turn in progress: call beginTurn first.");
     }
-    this.current = null;
     facade.revoke();
 
+    try {
+      return this.playTurn(facade);
+    } catch (error) {
+      return this.fail(error);
+    }
+  }
+
+  private playTurn(facade: TurnFacade): StepResult {
+    this.current = null;
     // Level.play's order: every unit chooses against the start-of-turn state (the warrior has
     // already chosen, through the facade), then every unit that was alive acts.
     const { floor } = this.level;
@@ -122,13 +157,16 @@ class RunImpl implements Run {
       this.currentStatus = "out-of-turns";
     }
     return {
-      t: this.played,
-      action: facade.action(),
-      events: this.level.logger.lastTurn ?? [],
+      ok: true,
+      record: {
+        t: this.played,
+        action: facade.action(),
+        events: this.level.logger.lastTurn ?? [],
+      },
     };
   }
 
-  step(action: TurnAction): TurnRecord {
+  step(action: TurnAction): StepResult {
     if (this.currentStatus !== "playing") {
       throw new Error("The run is over.");
     }
@@ -143,13 +181,17 @@ class RunImpl implements Run {
       }
     }
     const turn = this.beginTurn();
-    if (action) {
-      const act = turn[action.name];
-      if (action.direction === null) {
-        act?.();
-      } else {
-        act?.(action.direction);
+    try {
+      if (action) {
+        const act = turn[action.name];
+        if (action.direction === null) {
+          act?.();
+        } else {
+          act?.(action.direction);
+        }
       }
+    } catch (error) {
+      return this.fail(error);
     }
     return this.endTurn();
   }
@@ -189,7 +231,11 @@ export function replayLog(
     if (run.status !== "playing") {
       break;
     }
-    records.push(run.step(action));
+    const stepped = run.step(action);
+    if (!stepped.ok) {
+      throw new Error(stepped.reason.message);
+    }
+    records.push(stepped.record);
     consumed += 1;
   }
   return { records, result: run.result(), consumed };
