@@ -473,3 +473,18 @@ describe("Hextris game-over panel on a short screen", () => {
     expect(within(row).getByRole("button", { name: "Share" })).toBeInTheDocument();
   });
 });
+
+describe("Hextris name field on a touch screen", () => {
+  it("stays at 16 px on a coarse pointer, so iOS does not zoom on focus", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    const classes = classesOf(screen.getByPlaceholderText("Your name"));
+    expect(classes).toContain("text-base");
+    // A landscape phone is at or above sm: only a fine pointer (a mouse) may shrink the text.
+    expect(classes).not.toContain("sm:text-sm");
+    const smaller = classes.filter((c) => /(^|:)text-(xs|sm)$/.test(c));
+    expect(smaller.length).toBeGreaterThan(0);
+    for (const c of smaller) expect(c.split(":")).toContain("pointer-fine");
+  });
+});
