@@ -11,7 +11,7 @@ export function AbilityList({ abilities }: { abilities: readonly AbilitySpec[] }
         {abilities.map((ability) => (
           <li key={ability.name} className="rounded-md border border-(--border) px-2 py-1">
             <span className="font-mono text-(--foreground)">warrior.{ability.name}()</span>
-            <span className="ml-2 text-[10px] tracking-wide text-[#4ade80] uppercase">
+            <span className="ml-2 text-[10px] tracking-wide text-accent-green uppercase">
               {ability.isAction ? "Action" : "Sense"}
             </span>
             <p className="mt-0.5 text-(--muted)">{ability.description}</p>

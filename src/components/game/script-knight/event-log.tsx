@@ -1,4 +1,5 @@
 import type { Frame } from "./playback";
+import { GAME_SURFACE } from "./surface";
 
 export interface EventLogProps {
   frames: readonly Frame[];
@@ -37,7 +38,7 @@ export function EventLog({ frames, index, thoughts }: EventLogProps) {
     <section aria-label="Event log">
       <ol
         role="log"
-        className="max-h-48 space-y-0.5 overflow-y-auto rounded-lg border border-(--border) bg-black/40 p-2 font-mono text-xs"
+        className={`max-h-48 space-y-0.5 overflow-y-auto rounded-lg border border-(--border) p-2 font-mono text-xs ${GAME_SURFACE}`}
       >
         {lines.map((line) => (
           <li key={line.key} className={line.think ? "text-[#4ade80]" : "text-(--muted)"}>

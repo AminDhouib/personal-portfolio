@@ -23,7 +23,7 @@ export function LevelPanel({
     <section aria-label="This floor" className="space-y-1.5 text-sm">
       <h2 className="font-semibold text-(--foreground)">
         {towerName}, floor {level} of {floors}
-        {epic ? <span className="ml-2 text-xs font-normal text-[#4ade80]">Epic</span> : null}
+        {epic ? <span className="ml-2 text-xs font-normal text-accent-green">Epic</span> : null}
       </h2>
       <p className="text-(--muted)">{description}</p>
       <p className="text-(--muted)">

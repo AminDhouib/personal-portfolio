@@ -1,8 +1,8 @@
 import { type Speed, SPEEDS } from "./playback";
+import { TOUCH } from "./surface";
 import type { Playback } from "./use-playback";
 
-const BUTTON =
-  "rounded-md border border-(--border) px-2.5 py-1 text-xs text-(--foreground) hover:border-[#4ade80] disabled:opacity-40";
+const BUTTON = `rounded-md border border-(--border) px-2.5 py-1 text-xs text-(--foreground) hover:border-accent-green disabled:opacity-40 ${TOUCH}`;
 
 export interface TransportProps {
   playback: Playback;
@@ -48,10 +48,10 @@ export function Transport({ playback, frameCount, muted, onToggleMute }: Transpo
         <select
           value={playback.speed}
           onChange={(event) => playback.setSpeed(event.target.value as Speed)}
-          className="rounded-md border border-(--border) bg-transparent px-1.5 py-1 text-xs text-(--foreground)"
+          className={`rounded-md border border-(--border) bg-transparent px-1.5 py-1 text-xs text-(--foreground) ${TOUCH}`}
         >
           {SPEEDS.map((speed) => (
-            <option key={speed} value={speed} className="bg-black">
+            <option key={speed} value={speed} className="bg-(--background)">
               {speed}
             </option>
           ))}
@@ -68,7 +68,7 @@ export function Transport({ playback, frameCount, muted, onToggleMute }: Transpo
         value={playback.index}
         disabled={disabled}
         onChange={(event) => playback.scrubTo(Number(event.target.value))}
-        className="min-w-32 flex-1 accent-[#4ade80]"
+        className="min-w-32 flex-1 accent-accent-green pointer-coarse:h-11"
       />
     </div>
   );

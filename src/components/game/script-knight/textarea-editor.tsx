@@ -1,6 +1,7 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, useRef } from "react";
+import { GAME_SURFACE } from "./surface";
 
 export interface EditorProps {
   value: string;
@@ -12,17 +13,23 @@ export interface EditorProps {
 
 /**
  * The first editor, and the phone one: a monospace textarea. Tab inserts two spaces instead of
- * leaving the field, and Ctrl or Cmd + Enter runs. T7-4 swaps in CodeMirror through the stage's
+ * leaving the field, unless Escape was pressed just before it (then Tab moves on, so the field is
+ * not a keyboard trap), and Ctrl or Cmd + Enter runs. T7-4 swaps in CodeMirror through the stage's
  * `editor` slot with these same props.
  */
 export function TextareaEditor({ value, onChange, onRun, disabled }: EditorProps) {
+  // Set by Escape and cleared by the next key, so Escape then Tab leaves the field.
+  const escapedRef = useRef(false);
+
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    const escaped = escapedRef.current;
+    escapedRef.current = event.key === "Escape";
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       onRun();
       return;
     }
-    if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+    if (event.key === "Tab" && !escaped && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
       const field = event.currentTarget;
       const { selectionStart, selectionEnd } = field;
@@ -42,11 +49,14 @@ export function TextareaEditor({ value, onChange, onRun, disabled }: EditorProps
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
       onKeyDown={onKeyDown}
+      onBlur={() => {
+        escapedRef.current = false;
+      }}
       spellCheck={false}
       autoCapitalize="off"
       autoCorrect="off"
       rows={14}
-      className="block min-h-48 w-full resize-y rounded-lg border border-(--border) bg-black/50 p-3 font-mono text-[13px] leading-5 text-(--foreground) outline-none focus-visible:border-[#4ade80]"
+      className={`block min-h-48 w-full resize-y rounded-lg border border-(--border) p-3 font-mono text-[13px] leading-5 outline-none focus-visible:border-[#4ade80] ${GAME_SURFACE}`}
     />
   );
 }
