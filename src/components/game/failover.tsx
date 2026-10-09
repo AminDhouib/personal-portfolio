@@ -18,6 +18,7 @@ import {
 import { FailoverController, type HudState, type Speed } from "./failover/controller";
 import type { Tool } from "./failover/input/machine";
 import { CONFIG, SERVICE_TYPES, type ServiceType } from "./failover/sim/config";
+import { T, fmt } from "./failover/strings";
 
 /**
  * Failover: build a cloud that survives the traffic. The sim, the scene and
@@ -60,9 +61,9 @@ function createHudBridge() {
 const SERVER_HUD = () => null;
 
 const OVER_TEXT: Record<NonNullable<HudState["over"]>, string> = {
-  reputation: "Reputation hit zero. The customers have left.",
-  money: "The account is $1,000 in the red. The run is over.",
-  retired: "You ended the run.",
+  reputation: T.over_reputation,
+  money: T.over_money,
+  retired: T.over_retired,
 };
 
 function clock(seconds: number): string {
@@ -106,7 +107,7 @@ function Toolbar({ hud, controller }: { hud: HudState; controller: FailoverContr
   return (
     <div className="pointer-events-auto flex flex-wrap items-center gap-1.5">
       <label className="sr-only" htmlFor="failover-build">
-        Build a service
+        {T.build_a_service}
       </label>
       <select
         id="failover-build"
@@ -117,7 +118,7 @@ function Toolbar({ hud, controller }: { hud: HudState; controller: FailoverContr
         }}
         className="h-9 rounded-md border border-[#27272a] bg-[#0b0b0d]/90 px-2 text-xs text-[#d4d4d8]"
       >
-        <option value="">Build...</option>
+        <option value="">{T.build_menu}</option>
         {SERVICE_TYPES.map((type) => (
           <option key={type} value={type}>
             {CONFIG.services[type].name} (${CONFIG.services[type].cost})
@@ -125,21 +126,21 @@ function Toolbar({ hud, controller }: { hud: HudState; controller: FailoverContr
         ))}
       </select>
       <ToolButton
-        label="Select (1)"
+        label={`${T.select} (1)`}
         pressed={tool.kind === "select"}
         onClick={() => setTool({ kind: "select" })}
       >
         <MousePointer2 className="h-4 w-4" aria-hidden />
       </ToolButton>
       <ToolButton
-        label="Link (2)"
+        label={`${T.link} (2)`}
         pressed={tool.kind === "link"}
         onClick={() => setTool({ kind: "link" })}
       >
         <Link2 className="h-4 w-4" aria-hidden />
       </ToolButton>
       <ToolButton
-        label="Demolish (3)"
+        label={`${T.demolish} (3)`}
         pressed={tool.kind === "demolish"}
         onClick={() => setTool({ kind: "demolish" })}
       >
@@ -147,17 +148,17 @@ function Toolbar({ hud, controller }: { hud: HudState; controller: FailoverContr
       </ToolButton>
       {hud.confirming && (
         <>
-          <ToolButton label="Confirm" onClick={() => controller.confirm()}>
+          <ToolButton label={T.confirm} onClick={() => controller.confirm()}>
             <Check className="h-4 w-4" aria-hidden />
           </ToolButton>
-          <ToolButton label="Cancel" onClick={() => controller.cancelPending()}>
+          <ToolButton label={T.cancel} onClick={() => controller.cancelPending()}>
             <X className="h-4 w-4" aria-hidden />
           </ToolButton>
         </>
       )}
       <span className="mx-1 h-6 w-px bg-[#27272a]" aria-hidden />
       <ToolButton
-        label={hud.paused ? "Resume (Space)" : "Pause (Space)"}
+        label={`${hud.paused ? T.resume : T.pause} (Space)`}
         onClick={() => controller.togglePause()}
       >
         {hud.paused ? (
@@ -169,24 +170,24 @@ function Toolbar({ hud, controller }: { hud: HudState; controller: FailoverContr
       {([1, 2, 3] as Speed[]).map((speed) => (
         <ToolButton
           key={speed}
-          label={`Speed ${speed}x`}
+          label={fmt(T.speed_n, { n: speed })}
           pressed={!hud.paused && hud.speed === speed}
           onClick={() => controller.setSpeed(speed)}
         >
           {speed}x
         </ToolButton>
       ))}
-      <ToolButton label="Turn left (Q)" onClick={() => controller.orbitView(-1)}>
+      <ToolButton label={`${T.turn_left} (Q)`} onClick={() => controller.orbitView(-1)}>
         <RotateCcw className="h-4 w-4" aria-hidden />
       </ToolButton>
-      <ToolButton label="Turn right (E)" onClick={() => controller.orbitView(1)}>
+      <ToolButton label={`${T.turn_right} (E)`} onClick={() => controller.orbitView(1)}>
         <RotateCw className="h-4 w-4" aria-hidden />
       </ToolButton>
-      <ToolButton label="Top-down view (T)" onClick={() => controller.toggleTopDown()}>
+      <ToolButton label={`${T.top_down} (T)`} onClick={() => controller.toggleTopDown()}>
         <Eye className="h-4 w-4" aria-hidden />
       </ToolButton>
       <ToolButton
-        label={hud.soundOn ? "Sound off" : "Sound on"}
+        label={hud.soundOn ? T.sound_off : T.sound_on}
         pressed={hud.soundOn}
         onClick={() => controller.setSoundOn(!hud.soundOn)}
       >
@@ -204,9 +205,13 @@ function StatusLine({ hud, controller }: { hud: HudState; controller: FailoverCo
   return (
     <div className="pointer-events-auto flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[#0b0b0d]/85 px-3 py-1.5 font-mono text-xs text-[#d4d4d8]">
       <span>${Math.floor(hud.money).toLocaleString("en-US")}</span>
-      <span>Rep {Math.max(0, Math.round(hud.reputation))}%</span>
+      <span>
+        {T.rep_short} {Math.max(0, Math.round(hud.reputation))}%
+      </span>
       <span>{clock(hud.time)}</span>
-      <span>{hud.rps.toFixed(1)} req/s</span>
+      <span>
+        {hud.rps.toFixed(1)} {T.reqs_per_second}
+      </span>
       {hud.selected && (
         <span className="inline-flex items-center gap-2">
           {hud.selected.name} T{hud.selected.tier}, {Math.round(hud.selected.health)}%
@@ -215,7 +220,7 @@ function StatusLine({ hud, controller }: { hud: HudState; controller: FailoverCo
             onClick={() => controller.upgradeSelected()}
             className="rounded border border-[#27272a] px-1.5 py-0.5 hover:border-[#52525b]"
           >
-            Upgrade
+            {T.upgrade}
           </button>
         </span>
       )}
@@ -367,7 +372,7 @@ export function FailoverGame() {
       onPointerDownCapture={unlockAudio}
       onKeyDownCapture={unlockAudio}
       onKeyDown={onKeyDown}
-      aria-label="Failover game board. Keys: 1 select, 2 link, 3 demolish, WASD pan, Q and E turn, Space pause."
+      aria-label={T.board_label}
       className="relative h-[min(72vh,640px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-(--border) bg-[#050505] outline-none focus-visible:ring-2 focus-visible:ring-[#06b6d4]"
       style={{ overscrollBehavior: "none" }}
     >
@@ -388,9 +393,9 @@ export function FailoverGame() {
       )}
       {hud?.over && controller && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#050505]/75 text-center text-[#ededed]">
-          <p className="font-display text-2xl font-black">Run over</p>
+          <p className="font-display text-2xl font-black">{T.run_over}</p>
           <p className="max-w-sm text-sm text-[#a1a1aa]">{OVER_TEXT[hud.over]}</p>
-          <p className="font-mono text-sm">Survived {clock(hud.time)}</p>
+          <p className="font-mono text-sm">{fmt(T.survived, { time: clock(hud.time) })}</p>
           <button
             type="button"
             onClick={() => {
@@ -399,7 +404,7 @@ export function FailoverGame() {
             }}
             className="min-h-11 rounded-lg border border-[#06b6d4] px-5 font-semibold text-[#06b6d4] hover:bg-[#06b6d4]/10"
           >
-            Play again
+            {T.play_again}
           </button>
         </div>
       )}
@@ -407,15 +412,15 @@ export function FailoverGame() {
         <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-6 text-center text-white shadow-2xl">
             <div className="mb-2 font-mono text-[11px] tracking-widest text-[#06b6d4] uppercase">
-              Game Error
+              {T.game_error}
             </div>
-            <div className="mt-2 text-sm text-white/70">This game hit an error and stopped.</div>
+            <div className="mt-2 text-sm text-white/70">{T.game_error_text}</div>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="mt-4 w-full rounded-lg border border-[#06b6d4]/40 bg-[#06b6d4]/10 py-2.5 text-sm font-medium text-[#06b6d4] transition-colors hover:bg-[#06b6d4]/20"
             >
-              Reload
+              {T.reload}
             </button>
           </div>
         </div>

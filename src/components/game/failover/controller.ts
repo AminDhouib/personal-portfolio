@@ -34,6 +34,7 @@ import { snapshot } from "./sim/snapshot";
 import { drainEvents, resetSim, S } from "./sim/state";
 import { step } from "./sim/tick";
 import { linkRefusalOf } from "./sim/topology";
+import { T, fmt } from "./strings";
 import type { GameMode, GameOverReason, SimEvent } from "./sim/types";
 
 // Owns one run: the sim, the fixed-step loop, the scene and the sound. React
@@ -81,14 +82,14 @@ const TOAST_MS = 2600;
 const MAX_PENDING_EVENTS = 512;
 
 const REFUSALS: Record<string, string> = {
-  money: "Not enough money",
-  occupied: "That tile is taken",
-  bounds: "That is off the board",
-  over: "The run is over",
-  missing: "Nothing there",
-  "max-tier": "Already at the top tier",
-  "not-upgradable": "That cannot be upgraded",
-  healthy: "Nothing to repair",
+  money: T.no_money,
+  occupied: T.tile_taken,
+  bounds: T.off_board,
+  over: T.run_is_over,
+  missing: T.nothing_there,
+  "max-tier": T.top_tier,
+  "not-upgradable": T.not_upgradable,
+  healthy: T.nothing_to_repair,
 };
 
 function freeSeed(): string {
@@ -345,7 +346,7 @@ export class FailoverController {
 
   private act(action: Action): boolean {
     const result = dispatch(action);
-    if (!result.ok) this.showToast(REFUSALS[result.reason] ?? "Not allowed");
+    if (!result.ok) this.showToast(REFUSALS[result.reason] ?? T.not_allowed);
     return result.ok;
   }
 
@@ -358,7 +359,9 @@ export class FailoverController {
         return;
       case "link":
         if (this.act({ op: 1, from: intent.from, to: intent.to })) {
-          this.showToast(`Linked ${nodeLabel(intent.from)} to ${nodeLabel(intent.to)}`);
+          this.showToast(
+            fmt(T.link_made, { from: nodeLabel(intent.from), to: nodeLabel(intent.to) }),
+          );
         }
         return;
       case "demolish":

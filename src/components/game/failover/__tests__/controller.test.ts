@@ -297,7 +297,7 @@ describe("input to sim", () => {
     controller.tap(0, 0, "mouse");
     view.setPick({ cell: { x: -16, z: 0 }, node: "svc_2" });
     controller.tap(0, 0, "mouse");
-    expect(controller.getHud().toast).toBe("No route from Firewall to Relational DB");
+    expect(controller.getHud().toast).toBe("Firewall can't send traffic to Relational DB.");
     controller.dispose();
   });
 
