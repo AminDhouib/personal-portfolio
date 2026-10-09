@@ -251,7 +251,7 @@ export function TypingSpeedGame() {
         counts: charCounts(run),
         series,
         ghost:
-          raced || saved
+          ghostOn && (raced || saved)
             ? {
                 delta: raced ? metrics.netWpm - raced.wpm : null,
                 saved,

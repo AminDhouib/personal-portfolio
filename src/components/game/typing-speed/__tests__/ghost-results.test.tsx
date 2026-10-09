@@ -94,11 +94,15 @@ describe("the results overlay", () => {
     expect(document.querySelector('[data-line="ghost"]')).toBeNull();
   });
 
-  it("leaves the comparison out with the toggle off", () => {
+  it("leaves the whole overlay out with the toggle off", () => {
     seed({ quote: { wpm: 100, samples: FAST } }, { ghost: false });
     render(<TypingSpeedGame />);
     playAll(100);
     expect(screen.queryByTestId("ts-vs-ghost")).toBeNull();
     expect(document.querySelector('[data-line="ghost"]')).toBeNull();
+    expect(screen.queryByTestId("ts-ghost-saved")).toBeNull();
+    // The ghost is still kept, so switching the toggle back on has something to race.
+    const stored = JSON.parse(window.localStorage.getItem(GHOSTS_KEY) as string);
+    expect(stored.ghosts.quote.wpm).toBeGreaterThan(100);
   });
 });
