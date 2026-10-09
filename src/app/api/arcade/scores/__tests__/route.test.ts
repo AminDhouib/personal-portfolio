@@ -652,6 +652,47 @@ describe("POST /api/arcade/scores", () => {
   });
 });
 
+// Pins written before the proof seam: they describe today's submit contract, so a later change
+// to it has to be deliberate.
+describe("submit contract (pins before the proof seam)", () => {
+  it("answers a failed plausibility check with exactly { error, reason } and 422", async () => {
+    const { res, json } = await submit({
+      score: 1_000_000,
+      detail: { seconds: 10, kills: 0, distance: 0 },
+    });
+    expect(res.status).toBe(422);
+    expect(Object.keys(json).sort()).toEqual(["error", "reason"]);
+  });
+
+  it("hands the store the validated detail and nothing else to put in a row", async () => {
+    await submit();
+    const inserts = emu.fake.queries.filter((q) => q.sql.startsWith("INSERT INTO arcade_scores"));
+    expect(inserts).toHaveLength(3);
+    for (const insert of inserts) {
+      // [game, board, playerId, score, detailJson, now]
+      expect(insert.params).toHaveLength(6);
+      expect(insert.params[4]).toBe(JSON.stringify(SS_DETAIL));
+    }
+  });
+
+  it("lets a body of about 15 KiB through the size guard (it fails the schema instead)", async () => {
+    const res = await post(body({ handle: "x".repeat(15_000) }));
+    expect(res.status).toBe(400);
+  });
+
+  it("treats a proof key as unknown today", async () => {
+    const res = await post(body({ proof: "abc" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("registers no verifier and no proof requirement for any game yet", async () => {
+    const { ARCADE_GAMES } = await import("@/lib/arcade/games");
+    for (const entry of Object.values(ARCADE_GAMES)) {
+      expect(Object.keys(entry)).toEqual(["detailSchema"]);
+    }
+  });
+});
+
 describe("board row cap", () => {
   const CAP = 1000;
 
