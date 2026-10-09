@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { COUNT_UP_MS, RESTART_LOCKOUT_MS, countUpValue, gameOverView } from "../game-over";
+import {
+  COUNT_UP_MS,
+  NO_FIT,
+  RESTART_LOCKOUT_MS,
+  boardFit,
+  countUpValue,
+  gameOverView,
+} from "../game-over";
 
 const view = (over: Partial<Parameters<typeof gameOverView>[0]> = {}) =>
   gameOverView({ score: 500, previousBest: 300, side: 2, nowMs: 0, overAtMs: 0, ...over });
@@ -58,5 +65,33 @@ describe("gameOverView", () => {
     expect(view({ overAtMs: 1000, nowMs: 1000 }).canRestart).toBe(false);
     expect(view({ overAtMs: 1000, nowMs: 2199 }).canRestart).toBe(false);
     expect(view({ overAtMs: 1000, nowMs: 2200 }).canRestart).toBe(true);
+  });
+});
+
+describe("boardFit", () => {
+  it("lifts and shrinks the board into the space above a phone's bottom sheet", () => {
+    const fit = boardFit({ w: 390, h: 844 }, { x: 0, y: 380, w: 390, h: 464 });
+    expect(fit.scale).toBeCloseTo(380 / 390);
+    expect(fit.dx).toBe(0);
+    expect(fit.dy).toBe(190 - 422);
+  });
+
+  it("moves the board left of a desktop side panel", () => {
+    const fit = boardFit({ w: 900, h: 630 }, { x: 580, y: 0, w: 320, h: 630 });
+    expect(fit.scale).toBeCloseTo(580 / 630);
+    expect(fit.dx).toBe(290 - 450);
+    expect(fit.dy).toBe(0);
+  });
+
+  it("never grows the board", () => {
+    const fit = boardFit({ w: 1200, h: 600 }, { x: 880, y: 0, w: 320, h: 600 });
+    expect(fit.scale).toBe(1);
+    expect(fit.dx).toBe(440 - 600);
+  });
+
+  it("leaves the board alone when the sheet is outside the canvas or has no size", () => {
+    expect(boardFit({ w: 390, h: 844 }, { x: 0, y: 844, w: 390, h: 60 })).toEqual(NO_FIT);
+    expect(boardFit({ w: 390, h: 844 }, { x: 0, y: 0, w: 0, h: 0 })).toEqual(NO_FIT);
+    expect(boardFit({ w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 })).toEqual(NO_FIT);
   });
 });

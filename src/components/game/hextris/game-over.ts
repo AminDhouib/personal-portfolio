@@ -47,3 +47,43 @@ export function gameOverView(input: GameOverInput): GameOverView {
     side: input.side,
   };
 }
+
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** A CSS scale and offset for the canvas; NO_FIT leaves it where it is. */
+export interface BoardFit {
+  scale: number;
+  dx: number;
+  dy: number;
+}
+
+export const NO_FIT: BoardFit = { scale: 1, dx: 0, dy: 0 };
+
+/**
+ * Where the board goes while the game-over sheet is up, so the sheet never covers it. The board
+ * fills the canvas's shorter side (render/layout.ts), so it is scaled to the shorter side of the
+ * free space above the sheet (a phone's bottom sheet) or left of it (a desktop side panel),
+ * whichever is bigger, and centred there. It never grows. `canvas` is the canvas's own size and
+ * `sheet` the sheet's box in the same coordinates, both untransformed.
+ */
+export function boardFit(canvas: { w: number; h: number }, sheet: Box): BoardFit {
+  const short = Math.min(canvas.w, canvas.h);
+  if (short <= 0 || sheet.w <= 0 || sheet.h <= 0) return NO_FIT;
+  if (sheet.y >= canvas.h || sheet.x >= canvas.w) return NO_FIT;
+  const free: Box[] = [
+    { x: 0, y: 0, w: canvas.w, h: sheet.y },
+    { x: 0, y: 0, w: sheet.x, h: canvas.h },
+  ].filter((box) => box.w > 0 && box.h > 0);
+  let best: BoardFit | null = null;
+  for (const box of free) {
+    const scale = Math.min(1, Math.min(box.w, box.h) / short);
+    if (best && scale <= best.scale) continue;
+    best = { scale, dx: box.x + box.w / 2 - canvas.w / 2, dy: box.y + box.h / 2 - canvas.h / 2 };
+  }
+  return best ?? NO_FIT;
+}

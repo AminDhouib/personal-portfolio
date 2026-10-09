@@ -31,6 +31,7 @@ import {
 } from "./hextris/feedback";
 import { arcadeSubmission, isRecordableRun, recordHighScore, runSeed } from "./hextris/session";
 import { hextrisKeyAction } from "./hextris/input";
+import { NO_FIT, boardFit } from "./hextris/game-over";
 import { markPanicTipSeen, readTips } from "./hextris/tips";
 import { isTextEntryTarget } from "./text-entry";
 import { safeJsonParse } from "@/lib/safe-json";
@@ -78,6 +79,9 @@ export function HextrisGame() {
     bestCombo: 1,
   });
   const [scorePulse, setScorePulse] = useState(0);
+  // The game-over sheet, and whether the player has collapsed it to a strip to see the board.
+  const sheetRef = useRef<HTMLElement>(null);
+  const [sheetHidden, setSheetHidden] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -325,9 +329,48 @@ export function HextrisGame() {
     if (uiState === "playing") {
       setRank(null);
       setSubmitState("idle");
+      setSheetHidden(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiState]);
+
+  // While the game-over sheet is up, the board moves (and shrinks if it must) into the space the
+  // sheet leaves, so the sheet never covers it. CSS translate and scale, so the clear shake's
+  // transform still composes; the canvas keeps its size and nothing is redrawn.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const sheet = sheetRef.current;
+    if (!canvas) return;
+    const reset = () => {
+      canvas.style.translate = "";
+      canvas.style.scale = "";
+    };
+    if (uiState !== "gameover" || sheetHidden || !sheet) {
+      reset();
+      return;
+    }
+    const place = () => {
+      // offset* ignore transforms, so the sheet's slide-in does not skew the measure.
+      const fit = boardFit(
+        { w: canvas.offsetWidth, h: canvas.offsetHeight },
+        { x: sheet.offsetLeft, y: sheet.offsetTop, w: sheet.offsetWidth, h: sheet.offsetHeight },
+      );
+      if (fit === NO_FIT) {
+        reset();
+        return;
+      }
+      canvas.style.translate = `${fit.dx}px ${fit.dy}px`;
+      canvas.style.scale = String(fit.scale);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(sheet);
+    observer.observe(canvas);
+    return () => {
+      observer.disconnect();
+      reset();
+    };
+  }, [uiState, sheetHidden]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -715,7 +758,11 @@ export function HextrisGame() {
             : "relative w-full rounded-xl"
       }`}
     >
-      <canvas ref={canvasRef} className="block w-full" style={{ touchAction: "none" }} />
+      <canvas
+        ref={canvasRef}
+        className="block w-full transition-[translate,scale] duration-500 ease-out"
+        style={{ touchAction: "none" }}
+      />
 
       {/* Start screen. Clicks pass through to the canvas, which starts the run. */}
       {uiState === "menu" && !crashed && (
@@ -998,18 +1045,47 @@ export function HextrisGame() {
         </div>
       )}
 
-      {/* Game-over card — React-rendered for interactivity. Dark palette is
-          hard-coded so the card renders consistently even in light mode. */}
+      {/* Game-over sheet: a bottom sheet on phones and a right-hand panel from sm up, so the
+          board stays in view beside it (the effect above moves the board clear). Hide
+          collapses it to a strip. Dark palette is hard-coded so it renders consistently even
+          in light mode. */}
       {uiState === "gameover" && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center overflow-auto px-3 py-4 sm:px-4">
-          <div className="hextris-gameover-in pointer-events-auto w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-4 text-white shadow-2xl backdrop-blur-md sm:p-6">
-            <div className="text-center">
-              <div className="mb-2 font-mono text-[11px] tracking-widest text-accent-pink uppercase">
+        <section
+          ref={sheetRef}
+          aria-label="Game over"
+          className={`hextris-sheet-in pointer-events-auto absolute inset-x-0 bottom-0 z-30 overflow-y-auto rounded-t-2xl border-t border-white/10 bg-black/90 p-4 text-white shadow-2xl backdrop-blur-md sm:top-0 sm:left-auto sm:w-80 sm:rounded-none sm:border-t-0 sm:border-l sm:p-5 ${
+            sheetHidden ? "sm:bottom-auto" : "max-h-[55%] sm:max-h-none"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[11px] tracking-widest text-accent-pink uppercase">
                 Game Over
               </div>
               <div className="font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
-                {uiScore}
+                {uiRun.score}
               </div>
+            </div>
+            {sheetHidden && (
+              <button
+                type="button"
+                onClick={() => restartRef.current()}
+                className="min-h-11 rounded-md border border-accent-pink/40 bg-accent-pink/10 px-3 font-mono text-xs text-accent-pink transition-colors hover:bg-accent-pink/20"
+              >
+                Play again
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSheetHidden((hidden) => !hidden)}
+              aria-expanded={!sheetHidden}
+              className="min-h-11 rounded-md border border-white/10 bg-white/[0.03] px-3 font-mono text-xs text-white/70 transition-colors hover:text-white"
+            >
+              {sheetHidden ? "Show" : "Hide"}
+            </button>
+          </div>
+          {!sheetHidden && (
+            <>
               {uiHigh > 0 && (
                 <div className="mt-1 font-mono text-xs text-white/50">
                   Best <span className="text-accent-green">{uiHigh}</span>
@@ -1023,175 +1099,175 @@ export function HextrisGame() {
                   )}
                 </div>
               )}
-            </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
-                  Max Combo
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
+                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
+                    Max Combo
+                  </div>
+                  <div className="mt-0.5 font-mono text-base text-accent-amber tabular-nums">
+                    &times;{uiRun.bestCombo}
+                  </div>
                 </div>
-                <div className="mt-0.5 font-mono text-base text-accent-amber tabular-nums">
-                  &times;{uiRun.bestCombo}
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
+                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
+                    Cleared
+                  </div>
+                  <div className="mt-0.5 font-mono text-base text-accent-blue tabular-nums">
+                    {uiRun.cellsCleared}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
+                  <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
+                    Time
+                  </div>
+                  <div className="mt-0.5 font-mono text-base text-accent-pink tabular-nums">
+                    {formatRunTime(uiRun.elapsedMs)}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
-                  Cleared
-                </div>
-                <div className="mt-0.5 font-mono text-base text-accent-blue tabular-nums">
-                  {uiRun.cellsCleared}
-                </div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] py-2">
-                <div className="font-mono text-[10px] tracking-wider text-white/50 uppercase">
-                  Time
-                </div>
-                <div className="mt-0.5 font-mono text-base text-accent-pink tabular-nums">
-                  {formatRunTime(uiRun.elapsedMs)}
-                </div>
-              </div>
-            </div>
 
-            {/* Name + submit. A run that scored 0 has nothing to post. */}
-            {isRecordableRun(uiRun.score) ? (
-              <>
-                <div className="mt-4 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      if (
-                        submitState !== "submitting" &&
-                        submitState !== "submitted" &&
-                        submitState !== "rejected" &&
-                        playerName.trim()
-                      ) {
+              {/* Name + submit. A run that scored 0 has nothing to post. */}
+              {isRecordableRun(uiRun.score) ? (
+                <>
+                  <div className="mt-4 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={playerName}
+                      onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        if (
+                          submitState !== "submitting" &&
+                          submitState !== "submitted" &&
+                          submitState !== "rejected" &&
+                          playerName.trim()
+                        ) {
+                          void submitScore(playerName);
+                        }
+                      }}
+                      placeholder="Your name"
+                      maxLength={12}
+                      className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
                         void submitScore(playerName);
+                      }}
+                      disabled={
+                        submitState === "submitting" ||
+                        submitState === "submitted" ||
+                        submitState === "rejected" ||
+                        !playerName.trim()
                       }
-                    }}
-                    placeholder="Your name"
-                    maxLength={12}
-                    className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void submitScore(playerName);
-                    }}
-                    disabled={
-                      submitState === "submitting" ||
-                      submitState === "submitted" ||
-                      submitState === "rejected" ||
-                      !playerName.trim()
-                    }
-                    className="min-h-11 rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {submitState === "submitting"
-                      ? "..."
-                      : submitState === "submitted"
-                        ? "Saved"
-                        : submitState === "failed"
-                          ? "Retry"
-                          : submitState === "rejected"
-                            ? "Rejected"
-                            : "Submit"}
-                  </button>
-                </div>
+                      className="min-h-11 rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {submitState === "submitting"
+                        ? "..."
+                        : submitState === "submitted"
+                          ? "Saved"
+                          : submitState === "failed"
+                            ? "Retry"
+                            : submitState === "rejected"
+                              ? "Rejected"
+                              : "Submit"}
+                    </button>
+                  </div>
 
-                {submitState === "rejected" && (
-                  <p role="status" className="mt-2 font-mono text-xs text-accent-amber">
-                    Score not accepted
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-4 text-center font-mono text-xs text-white/50">No score to post</p>
-            )}
-
-            {/* Top 8 leaderboard */}
-            <div className="mt-4">
-              <div className="mb-2 px-1 font-mono text-[10px] tracking-widest text-white/50 uppercase">
-                Top Runs
-              </div>
-              <ArcadeBoardTabs
-                label="Leaderboard period"
-                period={boardPeriod}
-                onChange={setBoardPeriod}
-                className="mb-2"
-                activeClassName="border-pink-400/60 bg-pink-500/20 text-pink-300"
-                inactiveClassName="border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
-              />
-              {leaderboard.length === 0 ? (
-                <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center font-mono text-xs text-white/50">
-                  {boardLoading
-                    ? "Loading"
-                    : boardError
-                      ? "Could not load the board"
-                      : boardPeriod === "daily"
-                        ? "No scores yet today"
-                        : boardPeriod === "weekly"
-                          ? "No scores yet this week"
-                          : "No scores yet"}
-                </p>
+                  {submitState === "rejected" && (
+                    <p role="status" className="mt-2 font-mono text-xs text-accent-amber">
+                      Score not accepted
+                    </p>
+                  )}
+                </>
               ) : (
-                <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
-                  {leaderboard.slice(0, 8).map((e) => {
-                    // The server marks the viewer's own row. The old name-and-rank match is
-                    // only the fallback for a response that omits the flag.
-                    const isYou =
-                      e.isYou ??
-                      (rank !== null &&
-                        e.rank === rank &&
-                        e.score === uiScore &&
-                        e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase());
-                    return (
-                      <div
-                        key={`${e.rank}-${e.name}-${e.createdAt}`}
-                        className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
-                          isYou ? "bg-accent-pink/10" : ""
-                        }`}
-                      >
-                        <span
-                          className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
-                        >
-                          {e.rank}
-                        </span>
-                        <span
-                          className={`flex-1 truncate ${
-                            isYou ? "font-bold text-accent-pink" : "text-white/90"
+                <p className="mt-4 text-center font-mono text-xs text-white/50">No score to post</p>
+              )}
+
+              {/* Top 8 leaderboard */}
+              <div className="mt-4">
+                <div className="mb-2 px-1 font-mono text-[10px] tracking-widest text-white/50 uppercase">
+                  Top Runs
+                </div>
+                <ArcadeBoardTabs
+                  label="Leaderboard period"
+                  period={boardPeriod}
+                  onChange={setBoardPeriod}
+                  className="mb-2"
+                  activeClassName="border-pink-400/60 bg-pink-500/20 text-pink-300"
+                  inactiveClassName="border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
+                />
+                {leaderboard.length === 0 ? (
+                  <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-center font-mono text-xs text-white/50">
+                    {boardLoading
+                      ? "Loading"
+                      : boardError
+                        ? "Could not load the board"
+                        : boardPeriod === "daily"
+                          ? "No scores yet today"
+                          : boardPeriod === "weekly"
+                            ? "No scores yet this week"
+                            : "No scores yet"}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
+                    {leaderboard.slice(0, 8).map((e) => {
+                      // The server marks the viewer's own row. The old name-and-rank match is
+                      // only the fallback for a response that omits the flag.
+                      const isYou =
+                        e.isYou ??
+                        (rank !== null &&
+                          e.rank === rank &&
+                          e.score === uiScore &&
+                          e.name.toLowerCase() === (playerName.trim() || "Player").toLowerCase());
+                      return (
+                        <div
+                          key={`${e.rank}-${e.name}-${e.createdAt}`}
+                          className={`flex items-center gap-2 px-3 py-1.5 font-mono text-xs ${
+                            isYou ? "bg-accent-pink/10" : ""
                           }`}
                         >
-                          {e.name}
-                        </span>
-                        <span
-                          className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
-                        >
-                          {e.score}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
-                <div className="mt-2 px-1 font-mono text-[10px] text-white/50">
-                  Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
-                </div>
-              )}
-            </div>
+                          <span
+                            className={`w-5 text-right tabular-nums ${isYou ? "text-accent-pink" : "text-white/40"}`}
+                          >
+                            {e.rank}
+                          </span>
+                          <span
+                            className={`flex-1 truncate ${
+                              isYou ? "font-bold text-accent-pink" : "text-white/90"
+                            }`}
+                          >
+                            {e.name}
+                          </span>
+                          <span
+                            className={`tabular-nums ${isYou ? "text-accent-pink" : "text-white/70"}`}
+                          >
+                            {e.score}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
+                  <div className="mt-2 px-1 font-mono text-[10px] text-white/50">
+                    Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
+                  </div>
+                )}
+              </div>
 
-            <button
-              type="button"
-              onClick={() => restartRef.current()}
-              className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
-            >
-              Play again
-            </button>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => restartRef.current()}
+                className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
+              >
+                Play again
+              </button>
+            </>
+          )}
+        </section>
       )}
 
       {/* Crash overlay — the game loop threw and stopped; reload is the
