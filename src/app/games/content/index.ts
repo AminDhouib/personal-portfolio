@@ -1,4 +1,5 @@
 import type { GameSlug } from "../games-meta";
+import { failoverContent } from "./failover";
 import { hextrisContent } from "./hextris";
 import { passwordGameContent } from "./password-game";
 import { scriptKnightContent } from "./script-knight";
@@ -18,4 +19,5 @@ export const GAME_CONTENT: Record<GameSlug, GameContent> = {
   "super-voltorb-flip": superVoltorbFlipContent,
   "password-game": passwordGameContent,
   "script-knight": scriptKnightContent,
+  failover: failoverContent,
 };

@@ -1244,3 +1244,70 @@ export function ScriptKnightBanner() {
     </div>
   );
 }
+
+export function FailoverBanner() {
+  // Internet -> firewall -> load balancer -> two servers -> database, as wireframe boxes.
+  const nodes = [
+    { x: 30, y: 60, c: "#ededed" },
+    { x: 80, y: 60, c: "#ef4444" },
+    { x: 130, y: 60, c: "#6366f1" },
+    { x: 180, y: 38, c: "#22c55e" },
+    { x: 180, y: 82, c: "#22c55e" },
+    { x: 225, y: 60, c: "#f59e0b" },
+  ];
+  const links: [number, number][] = [
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [2, 4],
+    [3, 5],
+    [4, 5],
+  ];
+  const requests = ["#06b6d4", "#6366f1", "#f59e0b", "#a78bfa"];
+  const at = (i: number) => nodes[i] ?? { x: 0, y: 0, c: "" };
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ background: "#050505" }}>
+      <svg
+        viewBox="0 0 260 120"
+        className="absolute inset-0 h-full w-full"
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden
+      >
+        {/* The ground grid */}
+        <g stroke="#27272a" strokeWidth="0.4">
+          {Array.from({ length: 13 }, (_, i) => (
+            <line key={`v${i}`} x1={i * 20 + 10} y1="0" x2={i * 20 + 10} y2="120" />
+          ))}
+          {Array.from({ length: 6 }, (_, i) => (
+            <line key={`h${i}`} x1="0" y1={i * 20 + 10} x2="260" y2={i * 20 + 10} />
+          ))}
+        </g>
+        <g stroke="#a1a1aa" strokeOpacity="0.5" strokeWidth="0.8">
+          {links.map(([a, b]) => (
+            <line key={`${a}-${b}`} x1={at(a).x} y1={at(a).y} x2={at(b).x} y2={at(b).y} />
+          ))}
+        </g>
+        {nodes.map((n, i) => (
+          <g key={i} fill="none" stroke={n.c} strokeWidth="1">
+            <rect x={n.x - 8} y={n.y - 8} width="16" height="16" />
+            <rect x={n.x - 5} y={n.y - 5} width="10" height="10" strokeOpacity="0.6" />
+          </g>
+        ))}
+        {/* Requests flying the two routes */}
+        {requests.map((color, i) => {
+          const route = i % 2 === 0 ? [0, 1, 2, 3, 5] : [0, 1, 2, 4, 5];
+          return (
+            <motion.circle
+              key={i}
+              r="2"
+              fill={color}
+              initial={{ cx: at(0).x, cy: at(0).y }}
+              animate={{ cx: route.map((p) => at(p).x), cy: route.map((p) => at(p).y) }}
+              transition={{ duration: 2.4, delay: i * 0.6, repeat: Infinity, ease: "linear" }}
+            />
+          );
+        })}
+      </svg>
+    </div>
+  );
+}

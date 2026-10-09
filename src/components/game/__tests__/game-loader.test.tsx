@@ -35,6 +35,14 @@ describe("GameLoader", () => {
     expect(screen.queryByText("Loading game...")).not.toBeInTheDocument();
   });
 
+  it("shows a notice in place of Failover where WebGL is off, never mounting its poster", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    render(<GameLoader slug="failover" />);
+    expect(screen.getByText("Failover needs WebGL")).toBeInTheDocument();
+    expect(screen.queryByText("Loading game...")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /play failover/i })).not.toBeInTheDocument();
+  });
+
   it("returns null for password-game (it has its own dedicated top-level route)", () => {
     expect(GameLoader({ slug: "password-game" })).toBeNull();
   });
