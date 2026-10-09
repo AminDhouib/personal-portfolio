@@ -1,4 +1,4 @@
-import { failRequest } from "../actions";
+import { failOrPark } from "../actions";
 import { TRAFFIC_TYPES } from "../config";
 import { chargeServerlessInvocation } from "../economy";
 import { FAIL_REASONS, type FailReason } from "../failure-reasons";
@@ -22,7 +22,7 @@ export function process(service: Service, job: Job): HandlerOutcome {
   };
   const fail = (reason: FailReason | null): HandlerOutcome => {
     charge();
-    failRequest(req, reason);
+    failOrPark(req, service, reason);
     return "next";
   };
 

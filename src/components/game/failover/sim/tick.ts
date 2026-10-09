@@ -11,6 +11,7 @@ import { spawnRequest } from "./traffic";
 import {
   updateMaliciousSpike,
   updateRandomEvents,
+  updateRegionOutage,
   updateRpsMilestones,
   updateTrafficShift,
 } from "./events";
@@ -42,6 +43,7 @@ function stepOnce(): void {
   S.tick++;
   S.elapsedGameTime = S.tick * TICK;
   const dt = TICK;
+  updateRegionOutage();
 
   // A failed request lingers briefly for the view, then goes.
   for (const req of S.requests.slice()) {

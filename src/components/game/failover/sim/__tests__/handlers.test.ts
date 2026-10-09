@@ -446,10 +446,13 @@ describe("generic forwarding", () => {
     const dlq = place("dlq");
     connect("internet", alb);
     connect(alb, dlq);
-    inject("READ");
+    const req = inject("READ");
     run(1.5);
-    expect(S.failuresByReason[FAIL_REASONS.NO_ROUTE]).toBe(1);
+    // The DLQ is never a route (nothing enters its queue), but it IS the failure
+    // sink for the node it is wired from: the no-route request is parked, not failed.
     expect(dlq.queue).toHaveLength(0);
+    expect(S.events).toContainEqual({ kind: "request-parked", id: req.id, dlqId: dlq.id });
+    expect(S.failuresByReason[FAIL_REASONS.NO_ROUTE]).toBeUndefined();
   });
 
   it("a service type with no handler of its own falls back to forwarding", () => {

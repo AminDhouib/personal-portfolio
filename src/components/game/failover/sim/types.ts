@@ -1,5 +1,6 @@
 import type { RandomEventType, ServiceType, TrafficMix, TrafficType } from "./config";
-import type { FailReason } from "./failure-reasons";
+import type { LoggedAction } from "./action-log";
+import type { FailReason, SoftBadge } from "./failure-reasons";
 import type { Request } from "./request";
 import type { Service } from "./service";
 
@@ -21,9 +22,13 @@ export interface Job {
  */
 export type HandlerOutcome = "next" | "requeue-next" | "requeue-stop";
 
+/** closed: normal; open: routing skips the service; half-open: a few probes are let through. */
+export type BreakerState = "closed" | "open" | "half-open";
+
 export type GameMode = "survival" | "sandbox";
 
-export type GameOverReason = "reputation" | "money";
+/** `retired` is the player ending the run on purpose (Retire in the action log). */
+export type GameOverReason = "reputation" | "money" | "retired";
 
 /** What the scene and the audio layer drain each frame. The sim only appends. */
 export type SimEvent =
@@ -41,6 +46,11 @@ export type SimEvent =
       breach: boolean;
     }
   | { kind: "request-blocked"; id: number; serviceId: string }
+  | { kind: "request-throttled"; id: number; serviceId: string | null }
+  | { kind: "request-parked"; id: number; dlqId: string }
+  | { kind: "request-recovered"; id: number; dlqId: string }
+  | { kind: "request-retry"; id: number; serviceId: string; peerId: string }
+  | { kind: "service-badge"; serviceId: string; key: SoftBadge }
   | { kind: "cache-hit"; id: number; serviceId: string }
   | { kind: "money-short" }
   | {
@@ -94,9 +104,40 @@ export interface Finances {
     autoRepair: number;
     mitigation: number;
     breach: number;
+    /** What dead-letter queue drains cost: its own line, not DDoS mitigation. */
+    dlq: number;
     byService: Record<string, number>;
     countByService: Record<string, number>;
   };
+}
+
+/** Session counters the resilience mechanics keep, read by objectives and the debrief. */
+export interface Resilience {
+  /** Circuit breakers opened. */
+  trips: number;
+  /** Requests retried through a healthy peer. */
+  retries: number;
+  /** Outage events, random or forced. */
+  outages: number;
+  /** Requests a dead-letter queue recovered. */
+  drained: number;
+}
+
+/** The power grid: always a derivation over the live services (see power.ts). */
+export interface Power {
+  usedKw: number;
+  capKw: number;
+}
+
+/** A whole regional stack taken dark behind a GeoDNS front door. */
+export interface RegionOutage {
+  serviceIds: string[];
+  /** Game time the region comes back. */
+  endAtSec: number;
+  active: boolean;
+  /** `requestsProcessed` when the lights went out, and when they came back (null while dark). */
+  startedCompleted: number;
+  endedCompleted: number | null;
 }
 
 export interface Connection {
@@ -155,6 +196,16 @@ export interface SimState {
   /** Round-robin cursor per entry type, cleared by resetSim. */
   entryRR: Record<string, number>;
 
+  resilience: Resilience;
+  power: Power;
+  /** The live or last forced region outage, null before one fires. */
+  regionOutage: RegionOutage | null;
+
   /** Pending view events. Capped, so a headless replay that never drains stays bounded. */
   events: SimEvent[];
+
+  /** Every action the player attempted, applied or refused: the proof a replay re-plays. */
+  log: LoggedAction[];
+  /** More actions than the log keeps. The run stays playable but cannot be ranked. */
+  logOverflow: boolean;
 }

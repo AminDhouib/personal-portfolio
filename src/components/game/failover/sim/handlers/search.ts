@@ -3,13 +3,13 @@ import { FAIL_REASONS } from "../failure-reasons";
 import type { Service } from "../service";
 import type { HandlerOutcome, Job } from "../types";
 
-/** Terminal node: completes storage traffic (destination s3 or cdn, both are static origins). */
+/** Terminal node: completes SEARCH requests only. */
 export function process(service: Service, job: Job): HandlerOutcome {
-  if (job.req.destination === "s3" || job.req.destination === "cdn") {
+  if (job.req.type === "SEARCH") {
     finishRequest(job.req, service);
   } else {
-    // Object storage cannot answer database or search traffic.
-    failRequest(job.req, FAIL_REASONS.WRONG_STORE);
+    // A search index serves SEARCH and nothing else.
+    failRequest(job.req, FAIL_REASONS.SEARCH_ONLY);
   }
   return "next";
 }

@@ -2,6 +2,8 @@
 
 import { flashMoney, removeRequest } from "./actions";
 import { CONFIG, SERVICE_TYPES, type ServiceType } from "./config";
+import { hasPowerHeadroom, recomputePower, substationRemovalStrandsGpus } from "./power";
+import { isRoutable } from "./routing";
 import { Service } from "./service";
 import { emit, S } from "./state";
 import type { Vec2 } from "./types";
@@ -111,6 +113,12 @@ export function linkTargets(sourceId: string): Set<string> {
 
 /** Place a service. Returns it, or null when the money is short or the tile is taken. */
 export function createService(type: ServiceType, pos: Vec2): Service | null {
+  // Power gate: a GPU cannot go on the grid past the cap (boundary inclusive, see
+  // power.ts). Checked before any money moves.
+  if (type === "gpu" && !hasPowerHeadroom()) {
+    emit({ kind: "warning", key: "power_gate_blocked", level: "danger" });
+    return null;
+  }
   const cost = CONFIG.services[type].cost;
   if (S.money < cost) {
     flashMoney();
@@ -133,6 +141,7 @@ export function createService(type: ServiceType, pos: Vec2): Service | null {
 
   const service = new Service(type, pos);
   S.services.push(service);
+  recomputePower();
   emit({ kind: "service-placed", id: service.id, type });
   return service;
 }
@@ -174,6 +183,14 @@ export function deleteObject(id: string): boolean {
   const svc = S.services.find((s) => s.id === id);
   if (!svc) return false;
 
+  // Anti-cheese: refuse to remove a Substation whose loss would leave the powered
+  // GPUs past the reduced cap, or buy-place-refund runs an 18 kW fleet on an 8 kW
+  // grid forever. Removing a GPU stays free: shedding load is always legal.
+  if (svc.type === "power" && substationRemovalStrandsGpus()) {
+    emit({ kind: "warning", key: "power_delete_blocked", level: "danger" });
+    return false;
+  }
+
   for (const s of S.services) s.connections = s.connections.filter((c) => c !== id);
   S.internetNode.connections = S.internetNode.connections.filter((c) => c !== id);
   S.connections = S.connections.filter((c) => c.from !== id && c.to !== id);
@@ -185,11 +202,18 @@ export function deleteObject(id: string): boolean {
   const orphaned = new Set([
     ...svc.queue,
     ...svc.processing.map((job) => job.req),
+    // A stream holds records in its partitions, and a dead-letter queue holds its
+    // parked requests: neither is in queue or processing, and a parked request's
+    // target is the node it failed at, not the DLQ. Re-home them too or demolishing
+    // the node would strand them.
+    ...svc.partitions.flat(),
+    ...svc.parked,
     ...S.requests.filter((r) => r.target === svc),
   ]);
   for (const req of orphaned) removeRequest(req);
 
   S.services = S.services.filter((s) => s.id !== id);
+  recomputePower();
 
   // The refund books itself like every other money movement: as a REDUCTION of
   // what the hardware cost, not as income.
@@ -202,4 +226,42 @@ export function deleteObject(id: string): boolean {
 
   emit({ kind: "service-removed", id });
   return true;
+}
+
+/**
+ * Single-point-of-failure detection. A service is a SPOF when it is the ONLY
+ * routable service of its type that traffic can reach from the Internet.
+ *
+ * Reachability is a plain forward walk from the Internet node over the connection
+ * graph, so services parked off the active path are ignored, as are nodes that
+ * never take traffic (Monitoring is unreachable by construction: it has no valid
+ * edges). "Only one of its type" is what makes the N+1 lesson land: with a second
+ * instance of that type wired to the same upstream, routing (every candidate
+ * filter skips a disabled or breaker-open node) fails over on its own.
+ *
+ * Not modelled: partial redundancy, where a second instance exists but hangs off a
+ * different upstream. That is a "your redundancy is not wired up" lesson and needs
+ * its own hint text rather than a false negative here.
+ */
+export function findSPOFs(): Service[] {
+  const byId = new Map(S.services.map((s) => [s.id, s]));
+  const reachable = new Set<string>();
+  const frontier = [...S.internetNode.connections];
+
+  for (let id = frontier.pop(); id !== undefined; id = frontier.pop()) {
+    if (reachable.has(id)) continue;
+    const svc = byId.get(id);
+    if (!svc) continue;
+    reachable.add(id);
+    for (const next of svc.connections) frontier.push(next);
+  }
+
+  const countByType: Partial<Record<ServiceType, number>> = {};
+  for (const s of S.services) {
+    if (isRoutable(s)) countByType[s.type] = (countByType[s.type] ?? 0) + 1;
+  }
+
+  return [...reachable]
+    .map((id) => byId.get(id))
+    .filter((s): s is Service => !!s && isRoutable(s) && countByType[s.type] === 1);
 }

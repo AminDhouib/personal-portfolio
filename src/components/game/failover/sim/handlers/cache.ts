@@ -1,4 +1,4 @@
-import { failRequest, finishRequest } from "../actions";
+import { failOrPark, finishRequest } from "../actions";
 import { CONFIG } from "../config";
 import { FAIL_REASONS } from "../failure-reasons";
 import type { Request } from "../request";
@@ -31,7 +31,7 @@ export function process(service: Service, job: Job): HandlerOutcome {
     if (rand("rolls") < effectiveHitRate(service, req)) {
       req.cached = true;
       emit({ kind: "cache-hit", id: req.id, serviceId: service.id });
-      finishRequest(req);
+      finishRequest(req, service);
       return "next";
     }
   }
@@ -65,7 +65,7 @@ export function process(service: Service, job: Job): HandlerOutcome {
       req.flyTo(sqlTarget);
       return "next";
     }
-    failRequest(req, FAIL_REASONS.NO_ROUTE);
+    failOrPark(req, service, FAIL_REASONS.NO_ROUTE);
   } else {
     // Storage-family destinations are interchangeable on a miss: STATIC's
     // destination is "cdn" but a cache wired to S3 should still deliver it.
@@ -76,7 +76,7 @@ export function process(service: Service, job: Job): HandlerOutcome {
     if (target) {
       req.flyTo(target);
     } else {
-      failRequest(req, FAIL_REASONS.NO_ROUTE);
+      failOrPark(req, service, FAIL_REASONS.NO_ROUTE);
     }
   }
   return "next";
