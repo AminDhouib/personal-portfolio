@@ -6,6 +6,7 @@ import type { FailoverController, HudState } from "../controller";
 import type { CaptureFailure, LoadResult, Slot } from "../persist/save";
 import { T, fmt } from "../strings";
 import { TICK } from "../sim/config";
+import { S } from "../sim/state";
 import { clock } from "./format";
 import { BUTTON, BUTTON_IDLE, BUTTON_ON, PANEL } from "./surface";
 
@@ -100,18 +101,26 @@ export function SaveMenu({
     const saved = slot.save;
     setMessage(null);
     let out: Awaited<ReturnType<typeof controller.replaceRun<LoadResult>>>;
+    let aborted = false;
+    // resetSim gives the sim a new log, so a different array means the replay had begun.
+    const liveLog = S.log;
     try {
       out = await controller.replaceRun((signal) =>
         mod.loadSave(saved, async () => {
           await new Promise((resolve) => setTimeout(resolve, 0));
           // A torn-down game stops its load here, between chunks.
+          aborted = signal.aborted;
           signal.throwIfAborted();
         }),
       );
     } catch {
-      // silent-ok: shown below. A fault outside the replay's own refusals (or a load stopped by
-      // teardown) ends the load; plan() checks the whole log before the sim is touched, so a
-      // refused save leaves the run as it was.
+      // silent-ok: shown below. A fault outside the replay's own refusals ends the load. Before the
+      // replay began, the run is as it was; partway, the sim is half built, so a fresh paused run
+      // replaces it. A load stopped by teardown leaves the sim alone: the game is gone.
+      if (!aborted && S.log !== liveLog) {
+        controller.restart();
+        controller.setPaused(true);
+      }
       setMessage(T.load_failed_corrupted);
       return;
     }

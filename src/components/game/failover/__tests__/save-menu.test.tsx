@@ -24,6 +24,22 @@ vi.mock("../persist/save", async (importOriginal) => {
   };
 });
 
+// A fault inside the replay itself: the sim's step throws once a load has stepped this often.
+const stepFault = vi.hoisted(() => ({ after: null as number | null, calls: 0 }));
+
+vi.mock("../sim/tick", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../sim/tick")>();
+  return {
+    ...real,
+    step: (...args: Parameters<typeof real.step>) => {
+      if (stepFault.after !== null && ++stepFault.calls > stepFault.after) {
+        throw new Error("a fault in the sim");
+      }
+      return real.step(...args);
+    },
+  };
+});
+
 // The menu imports the save code (and zod) on open. Fetch it once up front, with room for a
 // loaded machine, so each test waits on the menu and not on the first transform of zod.
 beforeAll(async () => {
@@ -32,6 +48,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   loadFault.on = false;
+  stepFault.after = null;
+  stepFault.calls = 0;
   window.localStorage.clear();
 });
 
@@ -190,6 +208,28 @@ describe("SaveMenu", () => {
     expect(screen.getByRole("button", { name: "Load" })).toBeEnabled();
     expect(S.services.map((s) => s.type)).toEqual(["waf", "compute"]);
     expect(S.tick).toBe(100);
+  });
+
+  it("starts a fresh paused run when the replay faults partway, not the half-built one", async () => {
+    const h = await mount();
+    act(() => {
+      expect(dispatch({ op: 0, type: "waf", x: -28, z: 0 }).ok).toBe(true);
+      step(3000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    // The replay steps once per 500-tick chunk here; it faults in the third.
+    stepFault.after = 2;
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Failed to load game. The save file may be corrupted.",
+      ),
+    );
+    expect(stepFault.calls).toBe(3);
+    expect(S.tick).toBe(0);
+    expect(S.services).toEqual([]);
+    expect(S.log).toEqual([]);
+    expect(h.controller.getHud()).toMatchObject({ loading: false, paused: true, time: 0 });
   });
 
   it("stops a load mid-replay when the game is torn down, off the shared sim", async () => {
