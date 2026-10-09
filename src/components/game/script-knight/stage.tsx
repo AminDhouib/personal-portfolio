@@ -40,15 +40,17 @@ import {
 import { ResultCard } from "./result-card";
 import { type FloorRun, type Runner, startFloorRun, WARRIOR_NAME } from "./run-floor";
 import { runInSandbox } from "./sandbox/run-client";
-import { CUES, cueFor } from "./sound-cues";
+import { CUES, cueFor, endCue } from "./sound-cues";
 import { STARTER } from "./starter";
+import { TOUCH } from "./surface";
 import { TextareaEditor, type EditorProps } from "./textarea-editor";
 import { Transport } from "./transport";
 import { usePlayback } from "./use-playback";
 
 const SAVE_DEBOUNCE_MS = 500;
-const BUTTON =
-  "rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--foreground) hover:border-[#4ade80] disabled:opacity-40";
+const BUTTON = `rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--foreground) hover:border-accent-green disabled:opacity-40 ${TOUCH}`;
+const SELECT = `rounded-md border border-(--border) bg-transparent px-1.5 py-1 text-xs text-(--foreground) ${TOUCH}`;
+const LINK = `underline pointer-coarse:inline-flex pointer-coarse:items-center ${TOUCH}`;
 
 export interface StageProps {
   /** The sandbox entry point; a test passes a fake. */
@@ -70,6 +72,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 function floorLabel(tower: TowerId, level: number, epic: boolean): string {
   return `${TOWERS[tower].name}, floor ${level}${epic ? " (epic)" : ""}`;
+}
+
+/** One Run press: Stop, navigation and unmount flip it, and a result for a stale one is dropped. */
+interface RunToken {
+  cancelled: boolean;
+  tower: TowerId;
+  level: number;
+  epic: boolean;
 }
 
 interface EpicSummary {
@@ -104,8 +114,15 @@ export function Stage({
   const audioRef = useRef<KnightAudio | null>(null);
   const codesRef = useRef(codes);
   const dirtyRef = useRef(false);
+  // The run in flight, if any. The guard against a second Run is a ref so two presses before a
+  // render still start one run.
+  const tokenRef = useRef<RunToken | null>(null);
+  const runningRef = useRef(false);
+  const viewRef = useRef({ tower, level, epic });
+  const wasPlayingRef = useRef(false);
 
-  const code = codes.towers[tower] || STARTER;
+  // Only a tower never edited falls back to the starter, so an emptied editor stays empty.
+  const code = codes.towers[tower] ?? STARTER;
   const towerProgress = progress.towers[tower];
   const epicAvailable = towerProgress.best[String(FLOORS_PER_TOWER)] !== undefined;
   const useEpic = epic && epicAvailable;
@@ -121,11 +138,28 @@ export function Stage({
   const shown =
     useEpic && epicRuns
       ? (epicRuns[level - 1] ?? null)
-      : floorRun?.ref.level === level
+      : floorRun &&
+          floorRun.ref.tower === tower &&
+          floorRun.ref.level === level &&
+          floorRun.ref.epic === useEpic
         ? floorRun
         : null;
   const frames = shown?.frames ?? idleFrames;
   const playback = usePlayback(frames);
+
+  useEffect(() => {
+    viewRef.current = { tower, level, epic: useEpic };
+  }, [tower, level, useEpic]);
+
+  // Ends the run in flight: its loop stops, its worker is cancelled, and a result still on the
+  // way is dropped.
+  const invalidateRun = useCallback(() => {
+    if (tokenRef.current) tokenRef.current.cancelled = true;
+    tokenRef.current = null;
+    runningRef.current = false;
+    cancelRef.current?.();
+    cancelRef.current = null;
+  }, []);
 
   useEffect(() => {
     const audio = createKnightAudio();
@@ -134,18 +168,25 @@ export function Stage({
     return () => {
       audio.close();
       audioRef.current = null;
-      cancelRef.current?.();
+      invalidateRun();
     };
-  }, []);
+  }, [invalidateRun]);
 
-  // Sound: a cue for each event as it plays, and one for how the replay ends.
+  // Sound: a cue for each event as it plays, and the stairs or fail cue when the replay ends.
   const frameIndex = playback.index;
   const playing = playback.playing;
+  const shownPassed = shown ? shown.result.passed : null;
   useEffect(() => {
-    if (!playing) return;
-    const cue = cueFor(frames[frameIndex]?.event?.action.type ?? "");
+    const wasPlaying = wasPlayingRef.current;
+    wasPlayingRef.current = playing;
+    const endedNow = wasPlaying && !playing && frames.length > 1 && frameIndex >= frames.length - 1;
+    if (!playing && !endedNow) return;
+    const cue =
+      endedNow && shownPassed !== null
+        ? endCue(shownPassed)
+        : cueFor(frames[frameIndex]?.event?.action.type ?? "");
     if (cue) audioRef.current?.play(CUES[cue]);
-  }, [playing, frameIndex, frames]);
+  }, [playing, frameIndex, frames, shownPassed]);
 
   // The code is saved 500 ms after the last keystroke, and once more when the page goes away.
   useEffect(() => {
@@ -157,12 +198,18 @@ export function Stage({
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [codes]);
-  useEffect(
-    () => () => {
-      if (dirtyRef.current) saveCode(codesRef.current);
-    },
-    [],
-  );
+  useEffect(() => {
+    function flush() {
+      if (!dirtyRef.current) return;
+      saveCode(codesRef.current);
+      dirtyRef.current = false;
+    }
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   const commitProgress = useCallback((next: Progress) => {
     setProgress(next);
@@ -185,7 +232,7 @@ export function Stage({
 
   const goTo = useCallback(
     (nextTower: TowerId, nextLevel: number, nextEpic: boolean) => {
-      cancelRef.current?.();
+      invalidateRun();
       setRunning(false);
       setTower(nextTower);
       setLevel(nextLevel);
@@ -195,7 +242,7 @@ export function Stage({
       setNotice(null);
       commitProgress(setAt(progress, { tower: nextTower, level: nextLevel, epic: nextEpic }));
     },
-    [commitProgress, progress],
+    [commitProgress, invalidateRun, progress],
   );
 
   const finishFloor = useCallback(
@@ -212,53 +259,88 @@ export function Stage({
     [commitProgress, level, progress, tower],
   );
 
-  const runOne = useCallback(async () => {
-    const handle = startFloorRun({ kind: "tower", tower, level, epic: useEpic }, code, runner);
-    cancelRef.current = handle.cancel;
-    const done = await handle.done;
-    finishFloor(done);
-  }, [code, finishFloor, level, runner, tower, useEpic]);
+  /** True while `token` is the run in flight and the stage still shows the floor it started on. */
+  const isLive = useCallback((token: RunToken) => {
+    const view = viewRef.current;
+    return (
+      tokenRef.current === token &&
+      view.tower === token.tower &&
+      view.level === token.level &&
+      view.epic === token.epic
+    );
+  }, []);
 
-  const runEpic = useCallback(async () => {
-    const runs: FloorRun[] = [];
-    for (let floor = 1; floor <= FLOORS_PER_TOWER; floor += 1) {
-      const handle = startFloorRun(
-        { kind: "tower", tower, level: floor, epic: true },
-        code,
-        runner,
-      );
+  const runOne = useCallback(
+    async (token: RunToken) => {
+      const handle = startFloorRun({ kind: "tower", tower, level, epic: useEpic }, code, runner);
       cancelRef.current = handle.cancel;
       const done = await handle.done;
-      runs.push(done);
-      if (done.outcome && done.ranNothing) break;
-    }
-    setEpicRuns(runs);
-    if (runs.length === FLOORS_PER_TOWER) {
-      const { grades } = summarizeEpic(runs);
-      const score = runs.reduce((sum, run) => sum + (run.result.score?.total ?? 0), 0);
-      commitProgress(recordEpic(progress, tower, { score, grades }));
-    }
-  }, [code, commitProgress, progress, runner, tower]);
+      if (isLive(token)) finishFloor(done);
+    },
+    [code, finishFloor, isLive, level, runner, tower, useEpic],
+  );
+
+  const runEpic = useCallback(
+    async (token: RunToken) => {
+      const runs: FloorRun[] = [];
+      for (let floor = 1; floor <= FLOORS_PER_TOWER; floor += 1) {
+        if (token.cancelled || !isLive(token)) break;
+        const handle = startFloorRun(
+          { kind: "tower", tower, level: floor, epic: true },
+          code,
+          runner,
+        );
+        cancelRef.current = handle.cancel;
+        const done = await handle.done;
+        runs.push(done);
+        if (token.cancelled || !isLive(token)) break;
+        if (done.outcome && done.ranNothing) break;
+      }
+      // Navigation or unmount ended the run: nothing is left to show or save.
+      if (!isLive(token)) return;
+      setEpicRuns(runs);
+      if (runs.length === FLOORS_PER_TOWER && !token.cancelled) {
+        const { grades } = summarizeEpic(runs);
+        const score = runs.reduce((sum, run) => sum + (run.result.score?.total ?? 0), 0);
+        commitProgress(recordEpic(progress, tower, { score, grades }));
+      }
+    },
+    [code, commitProgress, isLive, progress, runner, tower],
+  );
 
   const run = useCallback(async () => {
-    if (running) return;
+    if (runningRef.current) return;
+    runningRef.current = true;
+    const token: RunToken = { cancelled: false, tower, level, epic: useEpic };
+    tokenRef.current = token;
     audioRef.current?.unlock();
     setRunning(true);
     setNotice(null);
     setFloorRun(null);
     setEpicRuns(null);
     try {
-      await (useEpic ? runEpic() : runOne());
+      await (useEpic ? runEpic(token) : runOne(token));
     } catch (error) {
       // silent-ok: shown to the player in the notice line; the page stays usable.
-      setNotice(error instanceof Error ? error.message : "The run could not start.");
+      if (tokenRef.current === token) {
+        setNotice(error instanceof Error ? error.message : "The run could not start.");
+      }
     } finally {
-      cancelRef.current = null;
-      setRunning(false);
+      // A run that was navigated away from or unmounted already reset all of this.
+      if (tokenRef.current === token) {
+        tokenRef.current = null;
+        runningRef.current = false;
+        cancelRef.current = null;
+        setRunning(false);
+      }
     }
-  }, [running, runEpic, runOne, useEpic]);
+  }, [level, runEpic, runOne, tower, useEpic]);
 
-  const stop = useCallback(() => cancelRef.current?.(), []);
+  // Stop ends the run in flight, the rest of an epic run included; the floors played still show.
+  const stop = useCallback(() => {
+    if (tokenRef.current) tokenRef.current.cancelled = true;
+    cancelRef.current?.();
+  }, []);
 
   const resetCode = useCallback(() => {
     const next = setTowerCode(codes, tower, STARTER);
@@ -292,6 +374,8 @@ export function Stage({
   const frame = playback.frame ?? frames[0];
   if (!frame) return null;
   const failedShown = shown !== null && !shown.result.passed;
+  // The clue is for a floor that was lost, not for code that did not run or was stopped.
+  const clueShown = failedShown && shown.outcome === null;
   const reason = shown ? (shown.outcome?.text ?? shown.end) : null;
   const showResult = shown !== null && playback.atEnd && !running;
   const epicSummary = useEpic && epicRuns ? summarizeEpic(epicRuns) : null;
@@ -320,12 +404,12 @@ export function Stage({
             <select
               value={tower}
               onChange={(event) => goTo(event.target.value as TowerId, 1, false)}
-              className="rounded-md border border-(--border) bg-transparent px-1.5 py-1 text-xs text-(--foreground)"
+              className={SELECT}
             >
               {TOWER_IDS.map((id) => {
                 const locked = !isTowerUnlocked(progress, id);
                 return (
-                  <option key={id} value={id} disabled={locked} className="bg-black">
+                  <option key={id} value={id} disabled={locked} className="bg-(--background)">
                     {TOWERS[id].name}
                     {locked ? " (clear The Narrow Path first)" : ""}
                   </option>
@@ -338,22 +422,27 @@ export function Stage({
             <select
               value={level}
               onChange={(event) => goTo(tower, Number(event.target.value), useEpic)}
-              className="rounded-md border border-(--border) bg-transparent px-1.5 py-1 text-xs text-(--foreground)"
+              className={SELECT}
             >
               {Array.from({ length: FLOORS_PER_TOWER }, (_unused, i) => i + 1).map((floor) => (
-                <option key={floor} value={floor} disabled={floor > reached} className="bg-black">
+                <option
+                  key={floor}
+                  value={floor}
+                  disabled={floor > reached}
+                  className="bg-(--background)"
+                >
                   {floor}
                 </option>
               ))}
             </select>
           </label>
           {epicAvailable ? (
-            <label className="flex items-center gap-1 text-xs text-(--muted)">
+            <label className={`flex items-center gap-1 text-xs text-(--muted) ${TOUCH}`}>
               <input
                 type="checkbox"
                 checked={useEpic}
                 onChange={(event) => goTo(tower, level, event.target.checked)}
-                className="accent-[#4ade80]"
+                className="accent-accent-green"
               />
               Epic mode
             </label>
@@ -366,7 +455,7 @@ export function Stage({
           epic={useEpic}
           description={info.description}
           tip={info.tip}
-          clue={failedShown ? info.clue : null}
+          clue={clueShown ? info.clue : null}
         />
         <AbilityList abilities={info.warriorAbilities} />
         <Editor value={code} onChange={changeCode} onRun={() => void run()} disabled={running} />
@@ -380,7 +469,7 @@ export function Stage({
             type="button"
             onClick={() => void run()}
             disabled={running}
-            className="rounded-md bg-[#4ade80] px-4 py-1.5 text-sm font-medium text-black disabled:opacity-40"
+            className={`rounded-md bg-[#4ade80] px-4 py-1.5 text-sm font-medium text-black disabled:opacity-40 ${TOUCH}`}
           >
             {running ? "Running" : useEpic ? "Run epic" : "Run"}
           </button>
@@ -394,7 +483,7 @@ export function Stage({
           </button>
         </div>
         {notice ? (
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-accent-red">
             {notice}
           </p>
         ) : null}
@@ -402,7 +491,7 @@ export function Stage({
           <ResultCard
             result={shown.result}
             reason={shown.result.passed ? null : reason}
-            clue={shown.result.passed ? null : info.clue}
+            clue={clueShown ? info.clue : null}
             hasNextFloor={shown.result.passed && !useEpic && level < FLOORS_PER_TOWER}
             onNext={() => goTo(tower, level + 1, useEpic)}
             onRetry={() => setFloorRun(null)}
@@ -427,7 +516,7 @@ export function Stage({
                   <button
                     type="button"
                     onClick={() => setLevel(i + 1)}
-                    className="hover:text-[#4ade80]"
+                    className={`hover:text-accent-green ${TOUCH}`}
                   >
                     Floor {i + 1}: {getGradeLetter(grade)}
                   </button>
@@ -443,7 +532,7 @@ export function Stage({
             href="https://github.com/olistic/warriorjs"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline"
+            className={LINK}
           >
             WarriorJS
           </a>{" "}
@@ -452,7 +541,7 @@ export function Stage({
             href="https://github.com/ryanb/ruby-warrior"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline"
+            className={LINK}
           >
             ruby-warrior
           </a>{" "}

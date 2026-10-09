@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { CUES, cueFor } from "../sound-cues";
+import { CUES, cueFor, endCue } from "../sound-cues";
 import { startFloorRun, type Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
 import { usePlayback } from "../use-playback";
@@ -59,6 +59,13 @@ describe("cueFor", () => {
       expect(cue && cue in CUES).toBe(true);
     }
     expect(cueFor("think")).toBeNull();
+  });
+
+  it("ends a replay with the stairs cue on a pass and the fail cue otherwise", () => {
+    expect(endCue(true)).toBe("stairs");
+    expect(endCue(false)).toBe("fail");
+    expect(CUES.stairs.ms).toBeGreaterThan(0);
+    expect(CUES.fail.ms).toBeGreaterThan(0);
   });
 });
 

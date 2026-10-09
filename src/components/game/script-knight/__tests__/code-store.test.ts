@@ -38,14 +38,14 @@ describe("knight:code storage", () => {
     expect(CODE_MAX_CHARS).toBe(20_000);
     expect(emptyCodeStore()).toEqual({
       v: 1,
-      towers: { "narrow-path": "", "powder-keep": "" },
+      towers: { "narrow-path": null, "powder-keep": null },
       daily: null,
     });
   });
 
   it("writes exactly this JSON (the pinned stored shape), through safeLocalSet", () => {
     saveCode(emptyCodeStore());
-    const json = '{"v":1,"towers":{"narrow-path":"","powder-keep":""},"daily":null}';
+    const json = '{"v":1,"towers":{"narrow-path":null,"powder-keep":null},"daily":null}';
     expect(window.localStorage.getItem("knight:code")).toBe(json);
     expect(safeStorage.calls).toEqual([[CODE_KEY, json]]);
   });
@@ -59,6 +59,13 @@ describe("knight:code storage", () => {
     };
     saveCode(store);
     expect(loadCode()).toEqual(store);
+  });
+
+  it("keeps an emptied tower as an empty string, apart from a tower never saved", () => {
+    const emptied = setTowerCode(emptyCodeStore(), "narrow-path", "");
+    expect(emptied.ok).toBe(true);
+    saveCode(emptied.ok ? emptied.store : emptyCodeStore());
+    expect(loadCode().towers).toEqual({ "narrow-path": "", "powder-keep": null });
   });
 
   it("loads the empty store from empty, corrupt or blocked storage", () => {
@@ -99,7 +106,7 @@ describe("parseCode", () => {
       towers: { "narrow-path": 12, "powder-keep": "class Player {}" },
       daily: { day: "yesterday", code: "x" },
     });
-    expect(parsed.towers).toEqual({ "narrow-path": "", "powder-keep": "class Player {}" });
+    expect(parsed.towers).toEqual({ "narrow-path": null, "powder-keep": "class Player {}" });
     expect(parsed.daily).toBeNull();
   });
 
@@ -109,7 +116,7 @@ describe("parseCode", () => {
       towers: { "narrow-path": "x".repeat(CODE_MAX_CHARS + 1), "powder-keep": "ok" },
       daily: null,
     });
-    expect(parsed.towers["narrow-path"]).toBe("");
+    expect(parsed.towers["narrow-path"]).toBeNull();
     expect(parsed.towers["powder-keep"]).toBe("ok");
   });
 

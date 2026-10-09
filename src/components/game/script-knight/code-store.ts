@@ -4,7 +4,8 @@ import { safeLocalSet } from "@/lib/safe-storage";
 import type { TowerId } from "./engine/towers";
 import { storedVersionIsNewer } from "./stored-version";
 
-// The player's code. One evolving Player per tower, as upstream keeps one Player.js per profile.
+// The player's code. One evolving Player per tower, as upstream keeps one Player.js
+// per profile. A tower never edited is null, so an emptied editor ("") is kept and not refilled.
 // Display-only and local, like every knight:* key.
 export const CODE_KEY = "knight:code";
 
@@ -13,22 +14,22 @@ export const TOO_LONG_MESSAGE = "That is longer than 20,000 characters; it was n
 
 export type CodeStore = {
   v: 1;
-  towers: Record<TowerId, string>;
+  towers: Record<TowerId, string | null>;
   /** The daily floor's code (T7-5 fills it in). */
   daily: { day: string; code: string } | null;
 };
 
 export function emptyCodeStore(): CodeStore {
-  return { v: 1, towers: { "narrow-path": "", "powder-keep": "" }, daily: null };
+  return { v: 1, towers: { "narrow-path": null, "powder-keep": null }, daily: null };
 }
 
-const codeText = z.string().max(CODE_MAX_CHARS).catch("");
+const codeText = z.string().max(CODE_MAX_CHARS).nullable().catch(null);
 
 const codeSchema = z.object({
   v: z.literal(1),
   towers: z
     .object({ "narrow-path": codeText, "powder-keep": codeText })
-    .catch({ "narrow-path": "", "powder-keep": "" }),
+    .catch({ "narrow-path": null, "powder-keep": null }),
   daily: z
     .object({
       day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

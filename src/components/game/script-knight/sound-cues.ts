@@ -73,7 +73,7 @@ export const CUES = {
 
 export type CueName = keyof typeof CUES;
 
-/** The cue for an engine event, or null when it makes no sound. */
+/** The cue for an engine event, or null when it makes no sound. How a replay ends: `endCue`. */
 export function cueFor(eventType: string): CueName | null {
   switch (eventType) {
     case "walk":
@@ -90,4 +90,9 @@ export function cueFor(eventType: string): CueName | null {
     default:
       return null;
   }
+}
+
+/** The cue for how a replay ends: the fanfare on a pass, the fall on anything else. */
+export function endCue(passed: boolean): CueName {
+  return passed ? "stairs" : "fail";
 }
