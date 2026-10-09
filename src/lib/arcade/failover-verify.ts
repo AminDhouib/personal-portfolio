@@ -24,11 +24,17 @@ import { VERIFY_BUSY_REASON } from "./verify-reasons";
  * ceiling, so a drift between engines cannot reject honest players during the first release.
  * Malformed claims and proofs are always rejected. The change that ends the rollout is setting
  * this to false.
+ *
+ * Turning it off happens at launch (T8-6), only after the golden browser test passes in CI and
+ * Sentry shows no mismatches under SHADOW_SCOPE, and only with the owner's sign-off.
  */
 export const SHADOW = true;
 
-/** Replays that may wait behind the one running; a fifth caller is told to come back. */
-export const MAX_WAITING = 3;
+/**
+ * Replays that may wait behind the one running; the next caller is told to come back. One running
+ * plus two waiting is about 1.8 s at the worst case (0.6 s each), inside the 2000 ms budget.
+ */
+export const MAX_WAITING = 2;
 
 /** Ticks played between looks at the event loop. */
 export const YIELD_EVERY_TICKS = 500;
@@ -36,6 +42,7 @@ export const YIELD_EVERY_TICKS = 500;
 /** The most a 900 s run can plausibly score: ten a second plus the points banked. */
 export const MAX_PLAUSIBLE_SCORE = 10 * 900 + 200_000;
 
+/** The Sentry scope of every SHADOW report; the rollout is judged on this staying empty. */
 export const SHADOW_SCOPE = "arcade:failover-verify.shadow";
 
 function reject(reason: string): ArcadeVerdict {
