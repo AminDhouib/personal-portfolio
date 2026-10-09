@@ -54,6 +54,7 @@ export const T = {
   copy_by_hand: "The link is selected; copy it by hand.", // ours
   cost_spike_warning: "CLOUD COST SPIKE! Upkeep doubled for 30s",
   db_short: "SQL DB",
+  daily_share: "Failover daily {day}: {time}, {score}. amindhou.com/games/failover", // ours
   ddos_incoming: "DDoS INCOMING",
   delete: "Delete", // ours
   delete_confirm: "Delete the save?", // ours
