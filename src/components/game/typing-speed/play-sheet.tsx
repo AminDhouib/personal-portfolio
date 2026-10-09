@@ -56,12 +56,15 @@ const keepKeyboard = (e: PointerEvent<HTMLElement>) => e.preventDefault();
 export function SheetHud({
   time,
   wpm,
+  lead,
   pace,
   onRestart,
   onExit,
 }: {
-  time: string;
-  wpm: number;
+  time?: string;
+  wpm?: number;
+  /** Replaces the time and WPM, for a mode with other things to show (Word Rain). */
+  lead?: ReactNode;
   /** The ghost pace chip, when there is a ghost; it shares the row and never grows it. */
   pace?: ReactNode;
   onRestart: () => void;
@@ -69,10 +72,16 @@ export function SheetHud({
 }) {
   return (
     <div className="flex items-center gap-3 pt-1" data-testid="ts-hud">
-      <span className="font-mono text-sm font-semibold text-accent-blue tabular-nums">{time}s</span>
-      <span className="font-mono text-sm font-semibold text-accent-green tabular-nums">
-        {wpm} WPM
-      </span>
+      {lead ?? (
+        <>
+          <span className="font-mono text-sm font-semibold text-accent-blue tabular-nums">
+            {time}s
+          </span>
+          <span className="font-mono text-sm font-semibold text-accent-green tabular-nums">
+            {wpm} WPM
+          </span>
+        </>
+      )}
       {pace}
       <div className="ml-auto flex items-center gap-1">
         <button

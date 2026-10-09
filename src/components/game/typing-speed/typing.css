@@ -4,3 +4,25 @@ html.typing-lock {
   overflow: hidden;
   overscroll-behavior: none;
 }
+
+/* Word Rain: a wrong letter shakes the typed buffer. */
+@keyframes ts-rain-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.ts-rain-shake {
+  animation: ts-rain-shake 0.2s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ts-rain-shake {
+    animation: none;
+  }
+}
