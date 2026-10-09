@@ -35,10 +35,20 @@ const BANNED: Array<[string, RegExp]> = [
   ["three import", /from\s+["']three["']/],
   ["react import", /from\s+["']react["']/],
   ["localStorage", /\blocalStorage\b/],
+  // Allowlist, not a blocklist: the only Math members the sim may touch are the
+  // ones ECMAScript requires to be exact. Anything else (a transcendental, a
+  // bracket lookup, a destructure, an alias) is caught by not being on the list.
   [
-    "libm transcendental",
-    /\bMath\.(exp|expm1|log|log1p|log2|log10|pow|sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|cbrt|hypot)\b/,
+    "non-exact Math member",
+    /\bMath\b(?!\.(?:floor|ceil|round|trunc|min|max|abs|sign|sqrt|imul|fround|clz32)\b)/,
   ],
+  ["Intl", /\bIntl\b/],
+  ["locale-dependent string method", /\b(?:toLocale\w*|localeCompare)\b/],
+  ["number toString with a radix", /\.toString\(\s*\d/],
+  ["globalThis", /\bglobalThis\b/],
+  ["crypto", /\bcrypto\b/],
+  ["process global", /\bprocess\./],
+  ["requestAnimationFrame", /\brequestAnimationFrame\b/],
   ["exponent operator", /\*\*/],
 ];
 
@@ -51,6 +61,34 @@ describe("sim purity guard", () => {
       expect(offenders).toEqual([]);
     });
   }
+
+  it("the guard catches each way round the old blocklist", () => {
+    const violations = [
+      "const { random } = Math;",
+      'const r = Math["random"]();',
+      "const M = Math; M.sin(1);",
+      "Math.asinh(2);",
+      "Math.hypot(3, 4);",
+      "new Intl.NumberFormat();",
+      "x.toLocaleString();",
+      "a.localeCompare(b);",
+      "n.toString(2);",
+      "globalThis.foo = 1;",
+      "crypto.getRandomValues(a);",
+      "process.hrtime();",
+      "requestAnimationFrame(f);",
+    ];
+    for (const src of violations) {
+      const hit = BANNED.some(([, pattern]) => pattern.test(stripComments(src)));
+      expect(hit, src).toBe(true);
+    }
+  });
+
+  it("the guard lets the exact Math members through", () => {
+    const fine =
+      "Math.floor(a) + Math.ceil(b) + Math.round(c) + Math.min(d, e) + Math.max(f, g) + Math.sqrt(h);";
+    expect(BANNED.some(([, pattern]) => pattern.test(fine))).toBe(false);
+  });
 
   it("the comment stripper keeps code and drops prose", () => {
     const src = ["const a = 1; // Math.random() is banned", "/* Date.now */ const b = 2;"].join(
