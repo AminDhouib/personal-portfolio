@@ -1,14 +1,7 @@
 "use client";
 
-import {
-  type ComponentType,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { AbilityList } from "./ability-list";
 import { createKnightAudio, type KnightAudio } from "./audio";
 import {
@@ -23,17 +16,20 @@ import {
 } from "./code-store";
 import { DailyBoardPanel, type DailyBoardProps } from "./board-panel";
 import { dailyFloor } from "./daily";
+import type { LevelRef } from "./engine/level-ref";
 import { EventLog } from "./event-log";
 import { FloorView } from "./floor-view";
 import { ghostFrames, ghostKnightAt } from "./ghost";
+import { HandPad } from "./hand-pad";
 import { getLevel } from "./engine/core/level";
-import type { LevelRef } from "./engine/level-ref";
 import { getGradeLetter } from "./engine/scoring";
 import { configForRef, createRun } from "./engine/run";
 import { TOWER_IDS, type TowerId, TOWERS } from "./engine/towers";
 import { LevelPanel } from "./level-panel";
 import { botPlayed, type Played } from "./played";
+import { loadMode, type PlayMode, saveMode } from "./mode";
 import { buildFrames } from "./playback";
+import { SheetHud, SHEET_CLASS, sheetStyle, useCoarsePointer, useScrollLock } from "./play-sheet";
 import {
   FLOORS_PER_TOWER,
   isTowerUnlocked,
@@ -71,6 +67,7 @@ import { TOUCH } from "./surface";
 import { type SyntaxIssue, withSyntaxLine } from "./syntax-line";
 import type { EditorProps } from "./textarea-editor";
 import { Transport } from "./transport";
+import { handFloorRun, useHandRun } from "./use-hand-run";
 import { usePlayback } from "./use-playback";
 import { utcDayKey } from "@/lib/arcade/boards";
 
@@ -89,8 +86,6 @@ export interface StageProps {
   boardPanel?: ComponentType<DailyBoardProps>;
   /** Where to open: a floor from a replay link (clamped to what the player has reached). */
   start?: LevelRef;
-  /** T7-7: the hand-play pad. */
-  handPad?: ReactNode;
 }
 
 /** True when a key press belongs to a field, so page-wide shortcuts must leave it alone. */
@@ -130,7 +125,6 @@ export function Stage({
   editor: Editor = EditorHost,
   boardPanel: BoardPanel = DailyBoardPanel,
   start,
-  handPad,
 }: StageProps) {
   const [progress, setProgress] = useState<Progress>(() => loadProgress());
   const [codes, setCodes] = useState<CodeStore>(() => loadCode());
@@ -150,6 +144,15 @@ export function Stage({
   const [daily, setDaily] = useState(begin.daily);
   const [dayKey, setDayKey] = useState(() => utcDayKey(new Date()));
   const [stats, setStats] = useState<KnightStats>(() => loadStats());
+  // By hand or by code. A touch screen plays by hand until the player picks (knight:mode).
+  const coarse = useCoarsePointer();
+  const [mode, setMode] = useState<PlayMode>(() => loadMode(coarse));
+  const handMode = mode === "hand";
+  // The phone play sheet: a touch screen opens it from "Play this floor" and Exit closes it.
+  const [sheetOn, setSheetOn] = useState(false);
+  const sheet = coarse && sheetOn;
+  const viewport = useVisualViewport(sheet);
+  useScrollLock(sheet);
   // The latest stats for callbacks that must not save from inside a state updater.
   const statsRef = useRef(stats);
   // The day's best log from before this attempt, drawn as a ghost. It is read when a run starts,
@@ -195,7 +198,7 @@ export function Stage({
     : (codes.towers[tower] ?? STARTER);
   const towerProgress = progress.towers[tower];
   const epicAvailable = towerProgress.best[String(FLOORS_PER_TOWER)] !== undefined;
-  const useEpic = !daily && epic && epicAvailable;
+  const useEpic = !daily && epic && epicAvailable && !handMode;
 
   const dailyInfo = useMemo(() => (daily ? dailyFloor(dayKey) : null), [daily, dayKey]);
   const config = useMemo(
@@ -210,10 +213,21 @@ export function Stage({
     [daily, ghostLog, config],
   );
   const idleFrames = useMemo(() => buildFrames(config, createRun(config).initial, []), [config]);
+  const hand = useHandRun(config);
+  const handRef = useMemo(
+    (): LevelRef =>
+      daily ? { kind: "daily", day: dayKey } : { kind: "tower", tower, level, epic: false },
+    [daily, dayKey, tower, level],
+  );
+  const handShown = useMemo(
+    () => (handMode && hand.turns > 0 ? handFloorRun(handRef, config, hand.replay) : null),
+    [handMode, hand.turns, hand.replay, handRef, config],
+  );
 
   // What the replay shows: the last run on this floor, or the bare floor before any run.
-  const shown =
-    useEpic && epicRuns
+  const shown = handMode
+    ? handShown
+    : useEpic && epicRuns
       ? (epicRuns[level - 1] ?? null)
       : floorRun &&
           (daily
@@ -431,6 +445,33 @@ export function Stage({
     [code, commitProgress, isLive, knownRunner, progress, tower],
   );
 
+  // A hand run that ends is recorded once, like a code run's result: the pass feeds the progress
+  // or the daily stats. Starting over (no turns) lets the same moves record again.
+  const recordedHandLog = useRef<string | null>(null);
+  useEffect(() => {
+    if (!handShown) {
+      recordedHandLog.current = null;
+      return;
+    }
+    if (hand.playing || recordedHandLog.current === handShown.log) return;
+    recordedHandLog.current = handShown.log;
+    finishFloor(handShown);
+  }, [finishFloor, hand.playing, handShown]);
+
+  const chooseMode = useCallback(
+    (next: PlayMode) => {
+      if (next === mode) return;
+      invalidateRun();
+      setRunning(false);
+      setFloorRun(null);
+      setEpicRuns(null);
+      setNotice(null);
+      setMode(next);
+      saveMode(next);
+    },
+    [invalidateRun, mode],
+  );
+
   const run = useCallback(async () => {
     if (runningRef.current) return;
     runningRef.current = true;
@@ -502,13 +543,21 @@ export function Stage({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggle]);
 
-  const frame = playback.frame ?? frames[0];
+  // By hand the floor shows the latest turn straight away (a unit still slides to its new space);
+  // the replay clock is for code runs.
+  const handLive = handMode && !botShown;
+  const frame = handLive ? hand.frames.at(-1) : (playback.frame ?? frames[0]);
   if (!frame) return null;
+  const warriorFacing = frame.floor.units.find((unit) => unit.warrior)?.facing ?? "east";
   const failedShown = shown !== null && !shown.result.passed;
   // The clue is for a floor that was lost, not for code that did not run or was stopped.
   const clueShown = failedShown && shown.outcome === null;
   const reason = shown ? (shown.outcome?.text ?? shown.end) : null;
-  const showResult = shown !== null && playback.atEnd && !running && !botShown;
+  const showResult = botShown
+    ? false
+    : handMode
+      ? shown !== null && !hand.playing
+      : shown !== null && playback.atEnd && !running;
   const epicSummary = useEpic && epicRuns ? summarizeEpic(epicRuns) : null;
   const reached = towerProgress.reached;
   const dailyResult =
@@ -517,8 +566,26 @@ export function Stage({
       : null;
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="space-y-3">
+    <div
+      className={`grid w-full gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] ${sheet ? SHEET_CLASS : ""}`}
+      style={sheet ? sheetStyle(viewport) : undefined}
+    >
+      {sheet ? (
+        <SheetHud
+          title={daily ? "Today's floor" : floorLabel(tower, level, false)}
+          onExit={() => setSheetOn(false)}
+        />
+      ) : null}
+      <div className={`space-y-3 ${sheet && viewport.keyboardOpen && !handMode ? "hidden" : ""}`}>
+        {coarse && !sheet ? (
+          <button
+            type="button"
+            onClick={() => setSheetOn(true)}
+            className={`w-full rounded-md bg-[#4ade80] px-4 py-2 text-sm font-medium text-black ${TOUCH}`}
+          >
+            Play this floor
+          </button>
+        ) : null}
         <FloorView
           frame={frame}
           label={daily ? "Today's floor" : floorLabel(tower, level, useEpic)}
@@ -527,20 +594,50 @@ export function Stage({
         <p className="font-mono text-xs text-(--muted)" aria-live="polite">
           {frame.status ? `Health ${frame.status.health}, score ${frame.status.score}` : ""}
         </p>
-        <Transport
-          playback={playback}
-          frameCount={frames.length}
-          muted={muted}
-          onToggleMute={toggleMute}
-        />
+        {handLive ? (
+          <HandPad
+            abilities={info.warriorAbilities}
+            facing={warriorFacing}
+            live={hand.playing}
+            canUndo={hand.turns > 0 && hand.status !== "passed"}
+            onAct={hand.act}
+            onUndo={hand.undo}
+            onRestart={hand.restart}
+            keyboard={handLive}
+          />
+        ) : (
+          <Transport
+            playback={playback}
+            frameCount={frames.length}
+            muted={muted}
+            onToggleMute={toggleMute}
+          />
+        )}
         <EventLog
-          frames={frames}
-          index={playback.index}
+          frames={handLive ? hand.frames : frames}
+          index={handLive ? hand.frames.length - 1 : playback.index}
           thoughts={botShown ? [] : (shown?.thoughts ?? [])}
         />
-        {handPad}
       </div>
       <div className="space-y-3">
+        <div role="group" aria-label="Play style" className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={handMode}
+            onClick={() => chooseMode("hand")}
+            className={handMode ? MODE_ACTIVE : BUTTON}
+          >
+            Play by hand
+          </button>
+          <button
+            type="button"
+            aria-pressed={!handMode}
+            onClick={() => chooseMode("code")}
+            className={handMode ? BUTTON : MODE_ACTIVE}
+          >
+            Write code
+          </button>
+        </div>
         <div role="group" aria-label="Mode" className="flex gap-2">
           <button
             type="button"
@@ -598,7 +695,7 @@ export function Stage({
                 ))}
               </select>
             </label>
-            {epicAvailable ? (
+            {epicAvailable && !handMode ? (
               <label className={`flex items-center gap-1 text-xs text-(--muted) ${TOUCH}`}>
                 <input
                   type="checkbox"
@@ -632,37 +729,45 @@ export function Stage({
           />
         )}
         <AbilityList abilities={info.warriorAbilities} />
-        <Editor
-          value={code}
-          onChange={changeCode}
-          onRun={() => void run()}
-          disabled={running}
-          onSyntaxError={onSyntaxError}
-          maxChars={CODE_MAX_CHARS}
-          onTooLong={onTooLong}
-        />
-        {code.length > CODE_MAX_CHARS ? null : (
-          <p className="text-right font-mono text-[11px] text-(--muted)">
-            {code.length} / {CODE_MAX_CHARS}
-          </p>
+        {handMode ? null : (
+          <>
+            <Editor
+              value={code}
+              onChange={changeCode}
+              onRun={() => void run()}
+              disabled={running}
+              onSyntaxError={onSyntaxError}
+              maxChars={CODE_MAX_CHARS}
+              onTooLong={onTooLong}
+            />
+            {code.length > CODE_MAX_CHARS ? null : (
+              <p className="text-right font-mono text-[11px] text-(--muted)">
+                {code.length} / {CODE_MAX_CHARS}
+              </p>
+            )}
+            <div
+              className={`flex flex-wrap gap-2 ${sheet ? "sticky bottom-0 z-10 bg-(--background) py-2" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => void run()}
+                disabled={running}
+                className={`rounded-md bg-[#4ade80] px-4 py-1.5 text-sm font-medium text-black disabled:opacity-40 ${TOUCH}`}
+              >
+                {running ? "Running" : useEpic ? "Run epic" : "Run"}
+              </button>
+              {running ? (
+                <button type="button" onClick={stop} className={BUTTON}>
+                  Stop
+                </button>
+              ) : null}
+              <button type="button" onClick={resetCode} disabled={running} className={BUTTON}>
+                Reset to starter
+              </button>
+            </div>
+          </>
         )}
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void run()}
-            disabled={running}
-            className={`rounded-md bg-[#4ade80] px-4 py-1.5 text-sm font-medium text-black disabled:opacity-40 ${TOUCH}`}
-          >
-            {running ? "Running" : useEpic ? "Run epic" : "Run"}
-          </button>
-          {running ? (
-            <button type="button" onClick={stop} className={BUTTON}>
-              Stop
-            </button>
-          ) : null}
-          <button type="button" onClick={resetCode} disabled={running} className={BUTTON}>
-            Reset to starter
-          </button>
           <button
             type="button"
             onClick={() => setBot(botPlayed(floorRef))}
@@ -693,7 +798,7 @@ export function Stage({
             clue={clueShown ? info.clue : null}
             hasNextFloor={!daily && shown.result.passed && !useEpic && level < FLOORS_PER_TOWER}
             onNext={() => goTo(tower, level + 1, useEpic)}
-            onRetry={() => setFloorRun(null)}
+            onRetry={handMode ? hand.restart : () => setFloorRun(null)}
           />
         ) : null}
         {showResult && shown?.result.passed && shown.result.score ? (
@@ -745,7 +850,7 @@ export function Stage({
               score: dailyResult.result.score?.total ?? 0,
               turns: dailyResult.result.turns,
               log: dailyResult.log,
-              hand: false,
+              hand: handMode,
             }}
             handle={stats.handle}
             streakDays={activeStreak(stats, dayKey)}
