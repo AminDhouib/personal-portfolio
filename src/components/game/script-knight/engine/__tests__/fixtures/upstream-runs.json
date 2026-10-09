@@ -1,0 +1,1592 @@
+[
+  {
+    "tower": "narrow-path",
+    "level": 1,
+    "epic": false,
+    "log": "1:w-w-w-w-w-w-w-",
+    "passed": true,
+    "turns": 7,
+    "score": { "warrior": 0, "timeBonus": 8, "clearBonus": 2, "total": 10 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 1,
+    "epic": true,
+    "log": "1:w-w-w-w-w-w-w-",
+    "passed": true,
+    "turns": 7,
+    "score": { "warrior": 0, "timeBonus": 8, "clearBonus": 2, "total": 10 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 2,
+    "epic": false,
+    "log": "1:w-w-w-a0a0a0w-w-w-w-",
+    "passed": true,
+    "turns": 10,
+    "score": { "warrior": 12, "timeBonus": 10, "clearBonus": 4, "total": 26 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 2,
+    "epic": true,
+    "log": "1:w-h-h-h-h-w-w-w-w-w-w-",
+    "passed": true,
+    "turns": 11,
+    "score": { "warrior": 12, "timeBonus": 9, "clearBonus": 4, "total": 25 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 3,
+    "epic": false,
+    "log": "1:w-a0a0a0w-w-a0a0a0r-r-w-a0a0a0r-r-r-w-w-a0a0a0r-r-r-w-w-",
+    "passed": true,
+    "turns": 28,
+    "score": { "warrior": 48, "timeBonus": 7, "clearBonus": 11, "total": 66 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 3,
+    "epic": true,
+    "log": "1:h-h-h-h-w-h-h-h-h-w-h-h-h-h-w-w-h-h-h-h-w-w-w-w-",
+    "passed": true,
+    "turns": 24,
+    "score": { "warrior": 48, "timeBonus": 11, "clearBonus": 12, "total": 71 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 4,
+    "epic": false,
+    "log": "1:w-a0a0a0a0a0r-w-a0a0r-r-r-r-r-r-w-w-a0a0a0a0a0r-r-r-r-r-r-w-w-",
+    "passed": true,
+    "turns": 31,
+    "score": { "warrior": 55, "timeBonus": 14, "clearBonus": 14, "total": 83 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 4,
+    "epic": true,
+    "log": "1:h-h-h-h-h-h-h-h-h-h-h-w-w-h-h-h-h-h-h-h-h-w-w-w-w-",
+    "passed": true,
+    "turns": 25,
+    "score": { "warrior": 55, "timeBonus": 20, "clearBonus": 15, "total": 90 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 5,
+    "epic": false,
+    "log": "1:w-s0w-a0a0w-a0a0r-r-w-a0a0a0a0",
+    "passed": false,
+    "turns": 15,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "stairs": true, "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 5,
+    "epic": true,
+    "log": "1:w-s0h-h-h-h-h-h-r-r-w-h-h-h-h-h-h-h-h-w-w-w-s0w-",
+    "passed": true,
+    "turns": 24,
+    "score": { "warrior": 78, "timeBonus": 21, "clearBonus": 20, "total": 119 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 6,
+    "epic": false,
+    "log": "1:w-a0a0a0a0a0r-w-w2w2r-r-r-r-r-r-w-w-w-a0a0r-w2",
+    "passed": false,
+    "turns": 23,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Archer", "maxHealth": 7 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 6,
+    "epic": true,
+    "log": "1:p-w-s0p-h-h-h-h-h-h-h-h-w-w-h-h-h-w-h-h-h-r-r-w-w-w-",
+    "passed": true,
+    "turns": 26,
+    "score": { "warrior": 58, "timeBonus": 29, "clearBonus": 17, "total": 104 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 7,
+    "epic": false,
+    "log": "1:w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-w-",
+    "passed": false,
+    "turns": 200,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "stairs": true },
+        { "unit": { "name": "Archer", "maxHealth": 7 } },
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        {},
+        { "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 7,
+    "epic": true,
+    "log": "1:p-h-h-h-h-h-h-h-h-w-h-h-h-w-w-w-w-",
+    "passed": true,
+    "turns": 17,
+    "score": { "warrior": 31, "timeBonus": 13, "clearBonus": 9, "total": 53 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 8,
+    "epic": false,
+    "log": "1:w-s0h-h-w-w-w-w-",
+    "passed": true,
+    "turns": 8,
+    "score": { "warrior": 26, "timeBonus": 12, "clearBonus": 8, "total": 46 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 8,
+    "epic": true,
+    "log": "1:w-s0h-h-w-w-w-w-",
+    "passed": true,
+    "turns": 8,
+    "score": { "warrior": 26, "timeBonus": 12, "clearBonus": 8, "total": 46 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 9,
+    "epic": false,
+    "log": "1:h-h-h-h-h-h-h-",
+    "passed": false,
+    "turns": 7,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "stairs": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "unit": { "name": "Archer", "maxHealth": 7 } },
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        {},
+        { "unit": { "name": "Wizard", "maxHealth": 3 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "narrow-path",
+    "level": 9,
+    "epic": true,
+    "log": "1:h-h-h-h-h-h-h-",
+    "passed": false,
+    "turns": 7,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "stairs": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "unit": { "name": "Archer", "maxHealth": 7 } },
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        {},
+        { "unit": { "name": "Wizard", "maxHealth": 3 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 1,
+    "epic": false,
+    "log": "1:w1w0w1w0",
+    "passed": true,
+    "turns": 4,
+    "score": { "warrior": 0, "timeBonus": 16, "clearBonus": 3, "total": 19 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        {},
+        {},
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 1,
+    "epic": true,
+    "log": "1:w1w0w1w0",
+    "passed": true,
+    "turns": 4,
+    "score": { "warrior": 0, "timeBonus": 16, "clearBonus": 3, "total": 19 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        {},
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        {},
+        {},
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 2,
+    "epic": false,
+    "log": "1:a0a0a0w0a1a1a1r-r-w0a1a1a1a1",
+    "passed": false,
+    "turns": 14,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 2,
+    "epic": true,
+    "log": "1:a0a0a0w0a1a1a1r-r-w0a1a1a1a1",
+    "passed": false,
+    "turns": 14,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 3,
+    "epic": false,
+    "log": "1:a0a0a0",
+    "passed": false,
+    "turns": 3,
+    "score": null,
+    "finalMap": [
+      [{ "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }],
+      [
+        { "wall": true },
+        { "stairs": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        {},
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "wall": true }
+      ],
+      [{ "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 3,
+    "epic": true,
+    "log": "1:a0a0a0",
+    "passed": false,
+    "turns": 3,
+    "score": null,
+    "finalMap": [
+      [{ "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }],
+      [
+        { "wall": true },
+        { "stairs": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        {},
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "wall": true }
+      ],
+      [{ "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }, { "wall": true }]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 4,
+    "epic": false,
+    "log": "1:w0a0a0a0",
+    "passed": false,
+    "turns": 4,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 4,
+    "epic": true,
+    "log": "1:w0a0a0a0",
+    "passed": false,
+    "turns": 4,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 5,
+    "epic": false,
+    "log": "1:w0",
+    "passed": true,
+    "turns": 1,
+    "score": { "warrior": 0, "timeBonus": 44, "clearBonus": 0, "total": 44 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 5,
+    "epic": true,
+    "log": "1:w0",
+    "passed": true,
+    "turns": 1,
+    "score": { "warrior": 0, "timeBonus": 44, "clearBonus": 0, "total": 44 },
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        { "stairs": true, "unit": { "name": "Probe", "maxHealth": 20, "warrior": true } },
+        {},
+        { "unit": { "name": "Thick Sludge", "maxHealth": 24 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 6,
+    "epic": false,
+    "log": "1:s3w0a3a3a3w0a0",
+    "passed": false,
+    "turns": 7,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, { "stairs": true }, { "wall": true }],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 6,
+    "epic": true,
+    "log": "1:s3w0a3a3a3w0a0",
+    "passed": false,
+    "turns": 7,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, { "stairs": true }, { "wall": true }],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 7,
+    "epic": false,
+    "log": "1:w0s0a1a1a1",
+    "passed": false,
+    "turns": 5,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 7,
+    "epic": true,
+    "log": "1:w0s0a1a1a1",
+    "passed": false,
+    "turns": 5,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        {},
+        {},
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, { "wall": true }],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 8,
+    "epic": false,
+    "log": "1:w0a0a0a0a0a0r-r-w0",
+    "passed": false,
+    "turns": 9,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "stairs": true }, { "wall": true }],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 8,
+    "epic": true,
+    "log": "1:w0a0a0a0a0a0r-r-w0",
+    "passed": false,
+    "turns": 9,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [{ "wall": true }, {}, {}, {}, {}, {}, {}, { "stairs": true }, { "wall": true }],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 9,
+    "epic": false,
+    "log": "1:a0a0a0",
+    "passed": false,
+    "turns": 3,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  },
+  {
+    "tower": "powder-keep",
+    "level": 9,
+    "epic": true,
+    "log": "1:a0a0a0",
+    "passed": false,
+    "turns": 3,
+    "score": null,
+    "finalMap": [
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        { "stairs": true },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        {},
+        {},
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Sludge", "maxHealth": 12 } },
+        { "unit": { "name": "Captive", "maxHealth": 1 } },
+        {},
+        { "wall": true }
+      ],
+      [
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true },
+        { "wall": true }
+      ]
+    ]
+  }
+]
