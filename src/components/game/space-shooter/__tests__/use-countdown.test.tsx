@@ -54,4 +54,27 @@ describe("useCountdown", () => {
     expect(onChime).toHaveBeenCalledTimes(1);
     expect(onLaunch).not.toHaveBeenCalled();
   });
+
+  it("cannot chime or launch once the guard says the game is no longer armed", () => {
+    vi.useFakeTimers();
+    const onChime = vi.fn();
+    const onLaunch = vi.fn();
+    let armed = true;
+    const canAct = () => armed;
+    const { result } = renderHook(() => useCountdown(onChime, onLaunch, canAct), {
+      wrapper: StrictMode,
+    });
+    act(() => result.current.begin());
+    act(() => {
+      vi.advanceTimersByTime(900);
+    });
+    // A tap starts the run just before the step-2 boundary; the cancel effect is deferred.
+    armed = false;
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(onChime).toHaveBeenCalledTimes(1);
+    expect(onLaunch).not.toHaveBeenCalled();
+    expect(result.current.step).toBeNull();
+  });
 });

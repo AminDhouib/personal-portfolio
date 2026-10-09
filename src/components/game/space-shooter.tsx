@@ -312,6 +312,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   // Fly Again's 3-2-1: the displayed step (null when not counting) and the
   // timestamp state machine behind it.
   const chimeCue = useCallback(() => sounds.play("chime"), []);
+  const countdownMayAct = useCallback(() => gameRefs.current.status === "armed", []);
   const launchRun = useCallback(() => {
     const g = gameRefs.current;
     if (g.status === "armed") startRun(g);
@@ -320,7 +321,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     step: countStep,
     begin: beginCountdown,
     cancel: cancelCountdown,
-  } = useCountdown(chimeCue, launchRun);
+  } = useCountdown(chimeCue, launchRun, countdownMayAct);
   const [crashed, setCrashed] = useState(false);
   const PERSONAL_CONFETTI = useMemo(() => buildConfetti(28, 220), []);
   const WORLD_CONFETTI = useMemo(() => buildConfetti(60, 360), []);
