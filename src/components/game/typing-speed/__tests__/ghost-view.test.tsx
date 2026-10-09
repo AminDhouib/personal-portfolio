@@ -103,6 +103,8 @@ describe("the ghost caret and pace chip", () => {
     expect(textClass(ghost)).not.toEqual([]);
     expect(ghost.className).not.toMatch(/(^| )bg-/);
     expect(ghost.className).toMatch(/outline/);
+    // It must land at full strength on the frame it moves: no colour transition fades the outline in.
+    expect(ghost.className).not.toMatch(/(^| )transition-colors( |$)/);
     expect(screen.getByTestId("ts-ghost-chip")).toHaveTextContent("+1 ahead");
   });
 
