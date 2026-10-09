@@ -345,6 +345,18 @@ passage; the corpus test pins the counts and lengths.
   rain, preferences) fill them without a version bump, so the schema reads each with a `.catch` fallback to its
   empty default. The loader rejects a newer stored version instead of overwriting it. A bulk run counts only
   toward `runs` and `lastMode`, never a best or the key counts.
+- **`typing:ghosts` v1 holds the ghost of your best run per mode, apart from `typing:stats`.**
+  A ghost is the run's net characters sampled every 250 ms (`engine/ghost.ts`), at most 481
+  samples (a 120 s run), so ten modes stay far under 30 KB. It has its own key so a large or
+  corrupt ghost can never cost the stats; a bad entry is dropped on its own and a newer version
+  is left alone, like the other keys. `offerGhost` replaces a ghost only on a strictly higher
+  net WPM and never for a bulk run, a zero run, or a run past 120 s (it would not fit). The
+  daily ghost carries its UTC day and is dropped on load once the day changes. The caret and chip
+  place the ghost by net characters along the current text, so a words or quotes run (new text
+  each time) races the same pace, not the same letters. The on/off switch is
+  `typing:stats.prefs.ghost` (default on); off hides the caret, chip and results overlay but
+  runs still update the ghost. The chip is decoration; its live region repeats the pace at most
+  once per 5 s, and in the phone sheet it sits in the HUD row so the sheet geometry is unchanged.
 - **The text is a three-line stream.** `text-view.tsx` renders words from a trim index to
   `cursor + LOOKAHEAD_WORDS` and measures each word's `offsetTop` in a frame callback; once the
   cursor is on the third line the first line's words are dropped. The screen-reader copy keeps the
