@@ -114,3 +114,11 @@ describe("dmath pinned bit patterns", () => {
     });
   }
 });
+
+describe("exp overflow edge", () => {
+  it("is finite right up to where Math.exp is, and Infinity past it", () => {
+    expect(Number.isFinite(exp(709.7827))).toBe(true);
+    expect(rel(exp(709.7827), Math.exp(709.7827))).toBeLessThan(1e-12);
+    expect(exp(709.79)).toBe(Infinity);
+  });
+});

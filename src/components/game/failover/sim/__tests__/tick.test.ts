@@ -79,6 +79,13 @@ describe("game over", () => {
     expect(S.over?.reason).toBe("money");
   });
 
+  it("a run just inside the debt floor stays alive", () => {
+    resetWorld({ mode: "survival" });
+    S.money = -999;
+    step();
+    expect(S.over).toBe(null);
+  });
+
   it("reports reputation when both are gone", () => {
     resetWorld({ mode: "survival" });
     S.money = -5000;

@@ -97,7 +97,7 @@ export function updateScore(
   } else if (outcome === "FAILED") {
     S.reputation += points.FAIL_REPUTATION;
     // Booked into a row as well as the total, so the rows add up to the total.
-    const penalty = typeConfig.score / 2;
+    const penalty = (typeConfig.score || 5) / 2;
     S.score.penalties += penalty;
     S.score.total -= penalty;
     S.failures[req.type]++;

@@ -38,7 +38,7 @@ function pow2(n: number): number {
 
 export function exp(x: number): number {
   if (x !== x) return NaN;
-  if (x > 709.78) return Infinity;
+  if (x > 709.782712893384) return Infinity;
   if (x < -745.2) return 0;
   // x = k*ln2 + r with |r| <= ln2/2, then exp(r) by a degree-14 Taylor series.
   const k = Math.round(x * INV_LN2);

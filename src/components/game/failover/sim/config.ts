@@ -630,6 +630,8 @@ const SERVICE_CONFIG: Record<ServiceType, ServiceConfig> = {
   },
 };
 
+// Upstream reads a few of these fields with `||`; the port uses `??`. They differ only
+// for a value of 0, and config-assumptions.test.ts pins that none of them is.
 export const CONFIG = {
   gridSize: 30,
   tileSize: 4,
