@@ -111,6 +111,8 @@ export function HextrisGame() {
   const [uiNewBest, setUiNewBest] = useState(false);
   // A short note under Share when the score went to the clipboard (a share sheet speaks for itself).
   const [shareNote, setShareNote] = useState<"Copied" | "Could not copy" | null>(null);
+  // Share is off while a share sheet or a copy is in flight, so a second tap cannot copy.
+  const [sharing, setSharing] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -1339,12 +1341,15 @@ export function HextrisGame() {
                   <button
                     type="button"
                     onClick={() => {
+                      setSharing(true);
                       void shareRun(uiRun.score).then((outcome) => {
+                        setSharing(false);
                         if (outcome === "copied") setShareNote("Copied");
                         else if (outcome === "failed") setShareNote("Could not copy");
                       });
                     }}
-                    className="min-h-11 rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white/80 transition-colors hover:text-white"
+                    disabled={sharing}
+                    className="min-h-11 rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white/80 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Share
                   </button>

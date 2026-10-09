@@ -290,6 +290,25 @@ describe("Hextris share", () => {
     await waitFor(() => expect(screen.getByText("Could not copy")).toBeInTheDocument());
   });
 
+  it("ignores a second tap while the share sheet is open", async () => {
+    // The sheet stays open: the promise never settles.
+    const share = vi.fn(() => new Promise<void>(() => {}));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    const button = screen.getByRole("button", { name: "Share" });
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    fireEvent.click(button);
+    await Promise.resolve();
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.queryByText("Copied")).toBeNull();
+  });
+
   it("is not offered for a run that scored 0", () => {
     const { container } = render(<HextrisGame />);
     startRun(container);

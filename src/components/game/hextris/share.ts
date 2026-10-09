@@ -11,8 +11,8 @@ export type ShareOutcome = "shared" | "copied" | "dismissed" | "failed";
 
 /**
  * Opens the share sheet (title, line and link) when the browser has one, else copies the line
- * and the link. A sheet the player dismissed is left alone (no surprise copy); any other share
- * error falls back to the clipboard.
+ * and the link. A sheet the player dismissed, or one already open (InvalidStateError), is left
+ * alone (no surprise copy); any other share error falls back to the clipboard.
  */
 export async function shareRun(score: number): Promise<ShareOutcome> {
   const text = shareText(score);
@@ -21,7 +21,12 @@ export async function shareRun(score: number): Promise<ShareOutcome> {
       await navigator.share({ title: "Hextris", text, url: HEXTRIS_URL });
       return "shared";
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return "dismissed";
+      if (
+        err instanceof DOMException &&
+        (err.name === "AbortError" || err.name === "InvalidStateError")
+      ) {
+        return "dismissed";
+      }
       // silent-ok: a broken share sheet falls through to the clipboard below
     }
   }
