@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { GameSlug } from "@/app/games/games-meta";
 import { WebGLOnly } from "@/components/three/webgl-only";
 import {
+  FailoverBanner,
   HextrisBanner,
   PasswordGameBanner,
   ScriptKnightBanner,
@@ -58,6 +59,20 @@ const TowerStacker = dynamic(() => import("./tower-stacker"), {
   ssr: false,
   loading: () => <GameSkeleton />,
 });
+// The poster is the lazy boundary: the game behind it (sim, scene, three.js) loads on Play.
+const FailoverPoster = dynamic(() => import("./failover/poster").then((m) => m.FailoverPoster), {
+  ssr: false,
+  loading: () => <GameSkeleton />,
+});
+
+// The WebGL probe runs before the poster, so where WebGL is missing three.js is never fetched.
+function FailoverEntry() {
+  return (
+    <WebGLOnly fallback={<NeedsWebGL game="Failover" />} pending={<GameSkeleton />}>
+      <FailoverPoster />
+    </WebGLOnly>
+  );
+}
 
 export const GAME_CLIENT: Record<GameSlug, GameClientEntry> = {
   "space-shooter": {
@@ -77,6 +92,7 @@ export const GAME_CLIENT: Record<GameSlug, GameClientEntry> = {
   "super-voltorb-flip": { Banner: SuperVoltorbFlipBanner, render: () => <SuperVoltorbFlipGame /> },
   "password-game": { Banner: PasswordGameBanner, render: null },
   "script-knight": { Banner: ScriptKnightBanner, render: () => <ScriptKnightGame /> },
+  failover: { Banner: FailoverBanner, render: () => <FailoverEntry /> },
 };
 
 export function GameBanner({ slug }: { slug: GameSlug }) {

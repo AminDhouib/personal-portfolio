@@ -12,7 +12,8 @@ export type GameSlug =
   | "typing-speed"
   | "super-voltorb-flip"
   | "password-game"
-  | "script-knight";
+  | "script-knight"
+  | "failover";
 
 export interface GameMeta {
   slug: GameSlug;
@@ -109,6 +110,19 @@ export const GAMES: GameMeta[] = [
     accent: "#4ade80",
     accentTailwind: "accent-green",
     // Hidden until T7-8 launches it: still served, but noindex and out of every list.
+    hidden: true,
+  },
+  {
+    slug: "failover",
+    title: "Failover",
+    tagline: "Build a cloud that survives the traffic",
+    description:
+      "A cloud architecture survival game. Place firewalls, load balancers, servers and databases, wire them up from the Internet, and keep money and reputation above water as the traffic grows and incidents strike.",
+    controls:
+      "Click to build and link. WASD or drag to pan, wheel to zoom, Q and E to turn, Space to pause.",
+    accent: "#06b6d4",
+    accentTailwind: "accent-cyan",
+    // Hidden until T8-6 launches it: still served, but noindex and out of every list.
     hidden: true,
   },
 ];

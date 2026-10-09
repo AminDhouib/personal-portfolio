@@ -21,6 +21,7 @@ describe("GAMES featured flag", () => {
       "super-voltorb-flip",
       "password-game",
       "script-knight",
+      "failover",
     ]);
   });
 
@@ -28,5 +29,11 @@ describe("GAMES featured flag", () => {
     const knight = GAMES.find((game) => game.slug === "script-knight");
     expect(knight?.hidden).toBe(true);
     expect(knight?.accent).toBe("#4ade80");
+  });
+
+  it("keeps Failover out of every public list until it launches", () => {
+    const failover = GAMES.find((game) => game.slug === "failover");
+    expect(failover?.hidden).toBe(true);
+    expect(failover?.featured).toBeUndefined();
   });
 });
