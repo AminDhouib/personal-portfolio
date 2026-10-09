@@ -23,6 +23,8 @@ const BUDGET = 5_000_000;
 const TARGET_TOTAL_MS = 1500;
 const TARGET_CHUNK_MS = 40;
 const MARGIN = 4;
+// Records one run and replays it three times; coverage instrumentation triples that.
+const TEST_TIMEOUT_MS = 60_000;
 
 interface Placed {
   type: ServiceType;
@@ -149,26 +151,30 @@ const fmt = (m: Measured): string =>
   `chunk median ${m.medianChunkMs.toFixed(1)} / max ${m.maxChunkMs.toFixed(1)} ms`;
 
 describe("replay cost (go / no-go spike)", () => {
-  it("re-simulates a 15 minute, 40 service, 700 action run within budget", async () => {
-    const log = recordRun();
-    const endedLive = S.tick;
-    expect(endedLive).toBeGreaterThanOrEqual(TICKS);
-    expect(log.length).toBe(MAX_LOGGED_ACTIONS);
+  it(
+    "re-simulates a 15 minute, 40 service, 700 action run within budget",
+    async () => {
+      const log = recordRun();
+      const endedLive = S.tick;
+      expect(endedLive).toBeGreaterThanOrEqual(TICKS);
+      expect(log.length).toBe(MAX_LOGGED_ACTIONS);
 
-    // The first pass is cold (a fresh server process); later passes are warm.
-    const cold = await measure(log, endedLive, CHUNK);
-    const warm = await measure(log, endedLive, CHUNK);
-    const small = await measure(log, endedLive, CHUNK_SMALL);
-    console.info(
-      `replay cost: ${endedLive} ticks (${endedLive * 0.05} s), ${log.length} actions, ` +
-        `ends '${cold.endReason}'\n` +
-        `  cold ${CHUNK}-tick chunks: ${fmt(cold)}\n` +
-        `  warm ${CHUNK}-tick chunks: ${fmt(warm)}\n` +
-        `  warm ${CHUNK_SMALL}-tick chunks: ${fmt(small)}`,
-    );
+      // The first pass is cold (a fresh server process); later passes are warm.
+      const cold = await measure(log, endedLive, CHUNK);
+      const warm = await measure(log, endedLive, CHUNK);
+      const small = await measure(log, endedLive, CHUNK_SMALL);
+      console.info(
+        `replay cost: ${endedLive} ticks (${endedLive * 0.05} s), ${log.length} actions, ` +
+          `ends '${cold.endReason}'\n` +
+          `  cold ${CHUNK}-tick chunks: ${fmt(cold)}\n` +
+          `  warm ${CHUNK}-tick chunks: ${fmt(warm)}\n` +
+          `  warm ${CHUNK_SMALL}-tick chunks: ${fmt(small)}`,
+      );
 
-    expect(cold.endedAt).toBe(endedLive);
-    expect(cold.wallMs).toBeLessThan(TARGET_TOTAL_MS * MARGIN);
-    expect(small.maxChunkMs).toBeLessThan(TARGET_CHUNK_MS * MARGIN);
-  });
+      expect(cold.endedAt).toBe(endedLive);
+      expect(cold.wallMs).toBeLessThan(TARGET_TOTAL_MS * MARGIN);
+      expect(small.maxChunkMs).toBeLessThan(TARGET_CHUNK_MS * MARGIN);
+    },
+    TEST_TIMEOUT_MS,
+  );
 });
