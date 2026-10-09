@@ -218,15 +218,31 @@ describe("Hextris one-tap restart", () => {
     }
   });
 
-  it("never restarts from a tap on the sheet", () => {
+  it("never restarts from a tap on the sheet, even past the lockout", () => {
     const { container } = render(<HextrisGame />);
     startRun(container);
     endRun(120);
     runFrames(framesFor(1500));
     const shown = sheet();
     if (!shown) throw new Error("no sheet");
-    fireEvent.click(shown);
-    fireEvent.click(screen.getByText("Top Runs"));
+    fireEvent.click(within(shown).getByText("Top Runs"));
+    fireEvent.click(within(shown).getByText("Max Combo"));
+    runFrames(1);
+    expect(sheet()).not.toBeNull();
+    // The control: at the same moment a tap on the board does restart.
+    fireEvent.click(shellCanvas(container));
+    runFrames(1);
+    expect(sheet()).toBeNull();
+  });
+
+  it("never restarts from a click on the game's container around the board and the sheet", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    runFrames(framesFor(1500));
+    const frame = shellCanvas(container).parentElement;
+    if (!frame) throw new Error("no frame");
+    fireEvent.click(frame);
     runFrames(1);
     expect(sheet()).not.toBeNull();
   });
