@@ -16,6 +16,7 @@ import {
   SPEED_TURN_MS,
 } from "../playback";
 import type { TurnAction } from "../engine/codec";
+import { towerFrames } from "./frames";
 
 function play(config: LevelConfig, actions: TurnAction[]): TurnRecord[] {
   const run = createRun(config);
@@ -247,5 +248,50 @@ describe("speeds", () => {
   it("gives the starting frame a short beat", () => {
     expect(frameDelayMs(frames, 0, "1x")).toBe(300);
     expect(frameDelayMs(frames, 0, "instant")).toBe(0);
+  });
+});
+
+describe("quiet stretches", () => {
+  const idle = (turns: number): TurnAction[] => Array.from({ length: turns }, () => null);
+  const total = (frames: ReturnType<typeof towerFrames>, speed: "1x" | "4x" = "1x") =>
+    frames.reduce((sum, _frame, i) => sum + frameDelayMs(frames, i, speed), 0);
+
+  it("fast-forwards a run where nothing changes, so an idle program ends in about a second", () => {
+    // 200 idle turns used to take 200 x 300 ms = 60 s to play before any result showed.
+    const frames = towerFrames("narrow-path", 1, idle(200));
+    expect(total(frames)).toBeLessThan(2_500);
+  });
+
+  it("keeps the first quiet turns at full speed so a pause still reads as a pause", () => {
+    const frames = towerFrames("narrow-path", 1, idle(10));
+    expect(frameDelayMs(frames, 1, "1x")).toBe(300);
+    expect(frameDelayMs(frames, 3, "1x")).toBe(300);
+    expect(frameDelayMs(frames, 10, "1x")).toBeLessThan(20);
+  });
+
+  it("plays a run with something happening in every turn at the usual pace", () => {
+    const frames = towerFrames(
+      "narrow-path",
+      1,
+      Array.from({ length: 4 }, () => ({ name: "walk" as const, direction: "forward" as const })),
+    );
+    expect(total(frames)).toBeCloseTo(300 * (1 + 4), 5);
+  });
+
+  it("slows down again when the floor changes after a quiet stretch", () => {
+    const actions: TurnAction[] = [
+      ...idle(8),
+      { name: "walk", direction: "forward" },
+      { name: "walk", direction: "forward" },
+    ];
+    const frames = towerFrames("narrow-path", 1, actions);
+    const last = frames.length - 1;
+    expect(frameDelayMs(frames, 8, "1x")).toBeLessThan(20);
+    expect(frameDelayMs(frames, last, "1x")).toBeGreaterThanOrEqual(300 / 3);
+  });
+
+  it("does not touch the instant speed", () => {
+    const frames = towerFrames("narrow-path", 1, idle(10));
+    expect(frameDelayMs(frames, 10, "instant")).toBe(0);
   });
 });

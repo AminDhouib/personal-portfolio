@@ -96,12 +96,54 @@ export function lastFrameOfTurn(frames: readonly Frame[], turn: number): number 
   return found;
 }
 
+/** This many quiet turns in a row play at the usual pace; the rest are fast-forwarded. */
+const QUIET_GRACE_TURNS = 3;
+/** What a fast-forwarded frame is shown for, at every speed but instant. */
+const FAST_FRAME_MS = 4;
+
+const fastTurnsCache = new WeakMap<readonly Frame[], ReadonlySet<number>>();
+
+/**
+ * The turns to fast-forward: those past the third in an unbroken stretch where nothing changed on
+ * the floor or in the warrior's health and score. A program that does nothing idles until the
+ * 200-turn limit, which at 300 ms a turn kept the result off screen for a minute; the log and the
+ * engine are untouched, only how long each such frame is shown.
+ */
+function fastTurns(frames: readonly Frame[]): ReadonlySet<number> {
+  const cached = fastTurnsCache.get(frames);
+  if (cached) return cached;
+  const fast = new Set<number>();
+  let before = JSON.stringify([frames[0]?.floor, frames[0]?.status]);
+  let quietRun = 0;
+  let turn = 0;
+  let turnChanged = false;
+  const closeTurn = () => {
+    if (turn === 0) return;
+    quietRun = turnChanged ? 0 : quietRun + 1;
+    if (quietRun > QUIET_GRACE_TURNS) fast.add(turn);
+  };
+  for (const frame of frames.slice(1)) {
+    if (frame.turn !== turn) {
+      closeTurn();
+      turn = frame.turn;
+      turnChanged = false;
+    }
+    const now = JSON.stringify([frame.floor, frame.status]);
+    if (now !== before) turnChanged = true;
+    before = now;
+  }
+  closeTurn();
+  fastTurnsCache.set(frames, fast);
+  return fast;
+}
+
 /** How long to show frame `index` before moving on. A turn's time is shared by its frames. */
 export function frameDelayMs(frames: readonly Frame[], index: number, speed: Speed): number {
   const turnMs = SPEED_TURN_MS[speed];
   const frame = frames[index];
   if (!frame || turnMs === 0) return 0;
   if (frame.turn === 0) return turnMs;
+  if (fastTurns(frames).has(frame.turn)) return FAST_FRAME_MS;
   const inTurn = frames.filter((other) => other.turn === frame.turn).length;
   return turnMs / Math.max(1, inTurn);
 }
