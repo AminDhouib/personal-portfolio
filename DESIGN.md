@@ -404,6 +404,40 @@ passage; the corpus test pins the counts and lengths.
 - **The graph's last point is the headline.** `wpmSeries` overrides the final point's net WPM with
   `runMetrics.netWpm`, so the chart ends on the same number the card shows.
 
+## Script Knight
+
+The game page is `src/components/game/script-knight.tsx` (the entry, `ScriptKnightGame`) over
+`script-knight/`: `engine/` and `sandbox/` are described under Boundaries; `stage.tsx` is the page
+(floor and tower pickers, run, replay, result card, epic mode); `run-floor.ts` runs one floor
+through the sandbox; `playback.ts` and `use-playback.ts` turn a run into frames and drive the clock;
+`view-model.ts` and `floor-view.tsx` draw a frame; `progress.ts` and `code-store.ts` own the two
+storage keys. The stage takes named slots (`editor`, `boardPanel`, `handPad`) so the CodeMirror
+editor, the daily board and the hand pad are added without rewriting it.
+
+- **Run is two engines.** The sandbox worker runs the player's code and sends one action token per
+  turn; the page decodes each token and steps its own main-thread copy of the engine with it. What
+  is replayed, scored and saved is that re-simulation, never anything the worker reports about
+  health or score. A token the log cannot hold, or one the engine refuses, throws inside the
+  `onTurn` callback and the run client ends the run as a crash.
+- **Snapshots do not carry health, facing, bound or ticking state.** The engine's `FloorSpace`
+  has only the wall, the stairs and a unit's id, name and max health. `view-model.ts` derives the
+  rest from the level config plus the event stream (`takeDamage` and `heal` carry
+  `remainingHp`, `pivot` a direction, `bind` a target, `tick` the bomb timer), so a frame is
+  never read straight off a snapshot. Positions do come from the snapshot.
+- **Storage.** `knight:progress` holds, per tower, the highest floor reached, the best score,
+  grade and turns per floor, and the best epic run; `knight:code` holds one Player per tower (see
+  the register); `knight:sound` is the mute flag. Writes go through `safeLocalSet`, reads through
+  `safeJsonParse` and zod with per-field fallbacks, and a store written by a newer build is read
+  but never overwritten (`stored-version.ts`). Code is capped at 20,000 characters and saved 500 ms
+  after the last keystroke.
+- **Towers.** The Narrow Path is always open; Powder Keep opens once floor 9 of the Narrow Path has
+  a best. Epic mode is offered once a tower's floor 9 is cleared, and runs the same code through
+  all nine floors with every ability.
+- **Hidden until launch.** The `GAMES` row carries `hidden: true`: the route serves, with
+  `noindex`, and the game is out of the sitemap, the lists, llms.txt and the hub. T7-8 removes the
+  flag together with the launch copy. The About copy and credits already describe only what the
+  code does today (no daily, no phone pad yet).
+
 ## Intentional-design register
 
 Things that look like bugs or oversights but are deliberate. Each was verified against the
@@ -1139,6 +1173,21 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   action would land after the turn. **Untested engines:** the line-number offset and a clean
   `lockDown` (no stuck names) are verified only in Chromium (Chrome and Edge); Firefox and WebKit
   are untested. If a CSP is ever added, the worker needs `'unsafe-eval'` for `new Function`.
+
+- **Script Knight's tower code is one evolving Player per tower.** Moving between floors keeps the
+  tower's single saved program instead of giving each floor its own: the code is the player's
+  solution so far, and later floors extend it, as in upstream's one Player file per profile. Reset
+  to starter replaces it for the current tower only. The daily floor's code is a separate slot
+  (`daily`).
+- **Script Knight's replay animation ignores `prefers-reduced-motion`.** The floor renderer slides
+  units and pulses a ticking bomb unconditionally. This follows "Reduced-motion is inverted between
+  chrome and games" above: the replay is the game, and a frozen floor would be unplayable. The
+  playback speed select (including instant) and the pause control are the way out of the motion.
+- **A Script Knight run that stops early is still replayed.** A timeout, a thrown error or a
+  crash keeps the turns that arrived before it, replays them, and then shows the reason, so a
+  player sees how far the code got. Only a run that never produced a turn (no Worker, a syntax
+  error) has nothing to replay. The no-Worker message does not offer to play by hand until hand
+  mode exists (T7-7).
 
 ## Adversarial standoffs (restated from the audit's final report)
 
