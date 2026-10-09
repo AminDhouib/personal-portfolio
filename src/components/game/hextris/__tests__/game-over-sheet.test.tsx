@@ -12,17 +12,19 @@ import {
 } from "./shell-harness";
 
 // The game-over sheet over the real shell and engine. The game over itself is slipped into the
-// shell's next drain, so a test reaches the sheet without playing a run out.
+// shell's next drain, so a test reaches the sheet without playing a run out; the run is put in
+// the over phase with it, as the engine does when it emits the event.
 const injected = vi.hoisted(() => [] as EngineEvent[]);
 
 vi.mock("../engine/state", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../engine/state")>();
   return {
     ...actual,
-    drainEvents: (run: Parameters<typeof actual.drainEvents>[0]) => [
-      ...actual.drainEvents(run),
-      ...injected.splice(0),
-    ],
+    drainEvents: (run: Parameters<typeof actual.drainEvents>[0]) => {
+      const extra = injected.splice(0);
+      if (extra.some((event) => event.type === "game-over")) run.phase = "over";
+      return [...actual.drainEvents(run), ...extra];
+    },
   };
 });
 
@@ -175,5 +177,66 @@ describe("Hextris new best and count-up", () => {
       unmount();
     }
     expect(cue).not.toHaveBeenCalled();
+  });
+});
+
+describe("Hextris one-tap restart", () => {
+  const sheet = () => screen.queryByRole("region", { name: "Game over" });
+  // Frames run 16 ms apart; the game over lands on the first frame after endRun's push.
+  const framesFor = (ms: number) => Math.round(ms / 16);
+
+  it("ignores a tap on the board for 1200 ms, then restarts on one", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    runFrames(framesFor(1000));
+    fireEvent.click(shellCanvas(container));
+    runFrames(1);
+    expect(sheet()).not.toBeNull();
+    runFrames(framesFor(300));
+    fireEvent.click(shellCanvas(container));
+    runFrames(1);
+    expect(sheet()).toBeNull();
+    // A fresh run, through the countdown.
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("restarts on Space, Enter or R after the lockout, not before", () => {
+    for (const key of [" ", "Enter", "r"]) {
+      const { container, unmount } = render(<HextrisGame />);
+      startRun(container);
+      endRun(120);
+      runFrames(framesFor(1000));
+      fireEvent.keyDown(window, { key });
+      runFrames(1);
+      expect(sheet()).not.toBeNull();
+      runFrames(framesFor(500));
+      fireEvent.keyDown(window, { key });
+      runFrames(1);
+      expect(sheet()).toBeNull();
+      unmount();
+    }
+  });
+
+  it("never restarts from a tap on the sheet", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    runFrames(framesFor(1500));
+    const shown = sheet();
+    if (!shown) throw new Error("no sheet");
+    fireEvent.click(shown);
+    fireEvent.click(screen.getByText("Top Runs"));
+    runFrames(1);
+    expect(sheet()).not.toBeNull();
+  });
+
+  it("keeps Play again working straight away", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    runFrames(1);
+    expect(sheet()).toBeNull();
   });
 });

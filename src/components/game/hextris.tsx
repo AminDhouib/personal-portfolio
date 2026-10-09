@@ -31,7 +31,13 @@ import {
 } from "./hextris/feedback";
 import { arcadeSubmission, isRecordableRun, recordHighScore, runSeed } from "./hextris/session";
 import { hextrisKeyAction } from "./hextris/input";
-import { NO_FIT, boardFit, countUpValue, gameOverView } from "./hextris/game-over";
+import {
+  NO_FIT,
+  RESTART_LOCKOUT_MS,
+  boardFit,
+  countUpValue,
+  gameOverView,
+} from "./hextris/game-over";
 import { markPanicTipSeen, readTips } from "./hextris/tips";
 import { isTextEntryTarget } from "./text-entry";
 import { safeJsonParse } from "@/lib/safe-json";
@@ -438,6 +444,11 @@ export function HextrisGame() {
     // The size the canvas backing store was last given, as width x height @ DPR, immersive.
     let fittedTo = "";
     let shownAway = false;
+    // The latest animation-frame time, and the frame time the run ended on (null while it runs):
+    // a key or a tap on the board restarts only RESTART_LOCKOUT_MS after the end.
+    let frameNow = performance.now();
+    let overAt: number | null = null;
+    const restartReady = () => overAt !== null && frameNow - overAt >= RESTART_LOCKOUT_MS;
     // The shake is the one effect that follows the OS reduced-motion preference.
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -501,6 +512,7 @@ export function HextrisGame() {
       if (f.over) {
         // The run clock stops at game over, so a popup would hang on the board.
         popups = [];
+        overAt = frameNow;
         // Read the best before this run is recorded into the list.
         const ending = gameOverView({
           score: f.over.score,
@@ -564,6 +576,7 @@ export function HextrisGame() {
 
     function startRun() {
       run = newRun();
+      overAt = null;
       popups = [];
       sounds.resume(); // Audio contexts require a user gesture to start
       act("start");
@@ -581,6 +594,7 @@ export function HextrisGame() {
         // A long gap (a background tab) is not fed to the run in one go.
         const dt = Math.min(MAX_FRAME_MS, Math.max(0, now - lastFrameAt));
         lastFrameAt = now;
+        frameNow = now;
         // The countdown runs the run clock too; play starts at GO.
         if (run.phase === "playing" || run.phase === "countdown") {
           advance(run, dt);
@@ -651,8 +665,8 @@ export function HextrisGame() {
     // ─── INPUT ───────────────────────────────────────────────
 
     function handleKeyDown(e: KeyboardEvent) {
-      // After game-over the player must explicitly click "Play again" so
-      // they have time to read the final score: the router ignores stray keys.
+      // After game over Space, Enter or R restart once the lockout has passed, so the
+      // player reads the score first (game-over.ts); the router holds them until then.
       const { action, preventDefault } = hextrisKeyAction({
         key: e.key,
         phase: run.phase,
@@ -663,6 +677,7 @@ export function HextrisGame() {
           (e.key === " " || e.key === "Enter"),
         modifier: e.ctrlKey || e.metaKey || e.altKey,
         repeat: e.repeat,
+        canRestart: restartReady(),
       });
       if (preventDefault) e.preventDefault();
       if (action === "start" || action === "restart") startRun();
@@ -695,9 +710,9 @@ export function HextrisGame() {
           act("toggle-pause");
           return;
         case "over":
-          // Same rule as keyboard: don't auto-restart on a stray tap once the
-          // game is over: let the player read the score and use the "Play
-          // again" button.
+          // Same rule as the keys: a tap on the board restarts once the lockout has
+          // passed. The sheet is not part of the canvas, so a tap on it never lands here.
+          if (restartReady()) startRun();
           return;
         case "countdown":
         case "playing": {
