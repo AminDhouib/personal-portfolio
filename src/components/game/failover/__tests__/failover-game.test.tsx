@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { FailoverGame } from "../../failover";
 import { FailoverController } from "../controller";
 import type { FailoverScene } from "../scene/scene";
+import { dispatch } from "../sim/action-log";
 import { CONFIG } from "../sim/config";
 import { S, resetSim } from "../sim/state";
 
@@ -174,6 +175,33 @@ describe("FailoverGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     expect(screen.queryByText("Run over")).toBeNull();
     expect(S.over).toBeNull();
+  });
+
+  it("records a finished survival run on the device once, and the report shows the best", () => {
+    const frames: ((t: number) => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => frames.push(cb));
+    mount();
+    let t = 1000;
+    const tick = (ms: number) =>
+      act(() => {
+        t += ms;
+        frames.shift()?.(t);
+      });
+    tick(0);
+    for (let i = 0; i < 40; i++) tick(50);
+    act(() => {
+      expect(dispatch({ op: 8 }).ok).toBe(true);
+    });
+    tick(50);
+    tick(50);
+    expect(JSON.parse(window.localStorage.getItem("failover:stats") ?? "null")).toMatchObject({
+      v: 1,
+      bestSeconds: 2,
+      runs: 1,
+    });
+    expect(screen.getByRole("dialog", { name: "Run over" })).toHaveTextContent(
+      "Best on this device: 0:02",
+    );
   });
 
   it("shows the crash card when the loop stops on an error", () => {

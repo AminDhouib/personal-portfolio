@@ -1,7 +1,7 @@
 import { canAutoscale, upkeepInstanceFactor } from "./sim/autoscaling";
 import { CONFIG, type ServiceType } from "./sim/config";
 import { getAutoRepairUpkeep, getUpkeepMultiplier } from "./sim/economy";
-import { getRollingGoodput, getServiceMetrics, hasMonitoring } from "./sim/metrics";
+import { getRollingGoodput, getRunReport, getServiceMetrics, hasMonitoring } from "./sim/metrics";
 import { scoreOf } from "./sim/score";
 import { S } from "./sim/state";
 import type { GameMode, GameOverReason, Power } from "./sim/types";
@@ -53,6 +53,28 @@ export interface Milestones {
   db: boolean;
 }
 
+/** The post-mortem the end-of-run report shows; built only once the run is over. */
+export interface RunSummary {
+  served: number;
+  onTime: number;
+  late: number;
+  failures: number;
+  /** The five commonest failure reasons (fail_* keys). */
+  topReasons: ReadonlyArray<{ key: string; count: number }>;
+  /** The three hottest nodes of the run (util: 1 = full), demolished ones included. */
+  peaks: ReadonlyArray<{ id: string; name: string; util: number; atSec: number }>;
+  income: number;
+  expenses: {
+    services: number;
+    upkeep: number;
+    repairs: number;
+    autoRepair: number;
+    mitigation: number;
+    breach: number;
+    dlq: number;
+  };
+}
+
 export interface SimHud {
   mode: GameMode;
   money: number;
@@ -77,6 +99,7 @@ export interface SimHud {
   selected: SelectedInfo | null;
   /** Rows for the metrics panel; empty without Monitoring. */
   metrics: MetricRow[];
+  report: RunSummary | null;
 }
 
 const last = (series: readonly number[]): number => series[series.length - 1] ?? 0;
@@ -143,6 +166,35 @@ function milestones(): Milestones {
   };
 }
 
+function runSummary(): RunSummary {
+  const report = getRunReport(5);
+  const e = S.finances.expenses;
+  return {
+    served: report.processed,
+    onTime: report.onTime,
+    late: report.late,
+    failures: report.failures,
+    topReasons: report.topReasons,
+    peaks: report.peaks.slice(0, 3).map((p) => ({
+      id: p.id,
+      name: CONFIG.services[p.type as ServiceType]?.name ?? p.type,
+      // Peaks are smoothed load, where 0.5 is 100% of rated capacity.
+      util: p.util * 2,
+      atSec: p.atSec,
+    })),
+    income: S.finances.income.total,
+    expenses: {
+      services: e.services,
+      upkeep: e.upkeep,
+      repairs: e.repairs,
+      autoRepair: e.autoRepair,
+      mitigation: e.mitigation,
+      breach: e.breach,
+      dlq: e.dlq,
+    },
+  };
+}
+
 export function readSimHud(selectedId: string | null): SimHud {
   const monitoring = hasMonitoring();
   const failuresByReason = Object.entries(S.failuresByReason)
@@ -166,5 +218,6 @@ export function readSimHud(selectedId: string | null): SimHud {
     milestones: milestones(),
     selected: selectedInfo(selectedId),
     metrics: monitoring ? metricRows() : [],
+    report: S.over ? runSummary() : null,
   };
 }
