@@ -232,7 +232,7 @@ export function createFailoverScene(canvas: HTMLCanvasElement, tier: PerfTier): 
 
   function applyCamera(): void {
     if (!cam) return;
-    const pose = cameraPose(cam);
+    const pose = cameraPose(cam, aspect);
     camera.left = -pose.halfHeight * aspect;
     camera.right = pose.halfHeight * aspect;
     camera.top = pose.halfHeight;
