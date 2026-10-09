@@ -320,6 +320,7 @@ export function Stage({
     (nextTower: TowerId, nextLevel: number, nextEpic: boolean) => {
       invalidateRun();
       setRunning(false);
+      setBot(null);
       setDaily(false);
       setTower(nextTower);
       setLevel(nextLevel);
@@ -335,6 +336,7 @@ export function Stage({
   const enterDaily = useCallback(() => {
     invalidateRun();
     setRunning(false);
+    setBot(null);
     const today = utcDayKey(new Date());
     setDaily(true);
     setDayKey(today);
