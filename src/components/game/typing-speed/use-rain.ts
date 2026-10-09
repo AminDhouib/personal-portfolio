@@ -27,8 +27,8 @@ export interface RainApi {
   started: boolean;
   /** Ticking: started, the input is focused, the tab is visible, and the run is on. */
   active: boolean;
-  /** A fresh run from a seed. It stays started when the input still has focus. */
-  reset: (seed: number) => void;
+  /** A fresh run from a seed. `keepStarted` carries "started" over, as Play again does. */
+  reset: (seed: number, keepStarted: boolean) => void;
 }
 
 /**
@@ -77,13 +77,14 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
   );
 
   const reset = useCallback(
-    (seed: number) => {
+    (seed: number, keepStarted: boolean) => {
       const fresh = createRain(seed);
       rainRef.current = fresh;
       overRef.current = false;
       bulkRef.current = 0;
       setBulk(0);
       setRain(fresh);
+      if (!keepStarted) setStarted(false);
       setBuf("", false);
       setVersion((v) => v + 1);
     },
