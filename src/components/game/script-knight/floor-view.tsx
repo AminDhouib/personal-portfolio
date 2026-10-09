@@ -45,6 +45,27 @@ function Stairs({ x, y }: { x: number; y: number }) {
   );
 }
 
+/** Your best run of the day as a faint knight: drawn only, never part of the floor. */
+function GhostView({ unit }: { unit: FrameUnit }) {
+  return (
+    <g
+      data-ghost=""
+      aria-hidden="true"
+      opacity={0.35}
+      style={{
+        transform: `translate(${(unit.x + 1) * CELL}px, ${(unit.y + 1) * CELL}px)`,
+        transition: `transform ${MOVE_MS}ms ease-out`,
+      }}
+    >
+      <g style={{ color: glyphColor("knight") }}>
+        <g transform={`rotate(${FACING_DEGREES[unit.facing]} 5 5)`}>
+          <Glyph kind="knight" />
+        </g>
+      </g>
+    </g>
+  );
+}
+
 function UnitView({ unit }: { unit: FrameUnit }) {
   const kind = glyphKind(unit);
   const ratio = unit.maxHealth > 0 ? Math.max(0, Math.min(1, unit.health / unit.maxHealth)) : 0;
@@ -101,7 +122,16 @@ function UnitView({ unit }: { unit: FrameUnit }) {
  * the same Sludge is the same element from one event to the next. Games here are exempt from the
  * OS reduced-motion preference (DESIGN.md), so the slide and the bomb's pulse are not gated.
  */
-export function FloorView({ frame, label }: { frame: Frame; label: string }) {
+export function FloorView({
+  frame,
+  label,
+  ghost = null,
+}: {
+  frame: Frame;
+  label: string;
+  /** Where the ghost knight stands on this frame, when the day has one. */
+  ghost?: FrameUnit | null;
+}) {
   const { floor } = frame;
   const width = (floor.width + 2) * CELL;
   const height = (floor.height + 2) * CELL;
@@ -124,6 +154,7 @@ export function FloorView({ frame, label }: { frame: Frame; label: string }) {
         strokeDasharray="2 1.4"
       />
       <Stairs x={floor.stairs.x} y={floor.stairs.y} />
+      {ghost ? <GhostView unit={ghost} /> : null}
       {floor.units.map((unit) => (
         <UnitView key={unit.id} unit={unit} />
       ))}
