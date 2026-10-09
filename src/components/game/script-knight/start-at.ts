@@ -25,6 +25,6 @@ export function resolveStart(ref: LevelRef | undefined, progress: Progress): Sta
   const { reached, best } = progress.towers[tower];
   const level = Math.max(1, Math.min(ref.level, reached, FLOORS_PER_TOWER));
   const epic = ref.epic && best[String(FLOORS_PER_TOWER)] !== undefined;
-  const clamped = tower !== ref.tower || level !== ref.level;
+  const clamped = tower !== ref.tower || level !== ref.level || epic !== ref.epic;
   return { daily: false, at: { tower, level, epic }, notice: clamped ? LOCKED_NOTICE : null };
 }
