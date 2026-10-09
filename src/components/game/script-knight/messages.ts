@@ -52,7 +52,10 @@ export function describeOutcome(outcome: RunOutcome): OutcomeMessage | null {
     case "crash":
       return { text: "The sandbox stopped unexpectedly.", retry: true };
     case "no-worker":
-      return { text: "Your browser blocks Web Workers, so code cannot run here.", retry: false };
+      return {
+        text: "Your browser blocks Web Workers, so code cannot run here. Choose Play by hand to play without code.",
+        retry: false,
+      };
     case "cancelled":
       return { text: "Run stopped.", retry: false };
   }
