@@ -16,12 +16,17 @@ export const scriptKnightContent: GameContent = {
     "Step or scrub through the replay and read the event log.",
     "Reach the stairs to pass a floor and open the next one. Nine floors make a tower.",
     "Open Today's floor for the daily: a new corridor each UTC day, with a leaderboard.",
+    "On a phone you play by hand: tap an action, then a direction.",
   ],
   controls: [
     {
       input: "Editor",
       action:
         "Type your Player class. Tab inserts two spaces; press Escape, then Tab, to move focus out of the editor.",
+    },
+    {
+      input: "Hand pad",
+      action: "Tap an action, then an arrow. W A S D steer, Z undoes.",
     },
     {
       input: "Ctrl or Cmd + Enter",
@@ -45,13 +50,11 @@ export const scriptKnightContent: GameContent = {
     "Rest when you are hurt and nothing is in reach; health is what keeps a run alive.",
     "Write for the general case. Epic mode runs the same code through all nine floors in a row, so code that only works for one map will fail.",
     "Use think to print values into the event log when your code misbehaves.",
-    "Watch the turn budget. A run ends after 200 turns, and a faster clear scores better.",
   ],
   facts: [
     { label: "Language", value: "JavaScript" },
     { label: "Floors", value: "Nine in The Narrow Path, then nine more in Powder Keep" },
     { label: "Turn limit", value: "200 turns per run" },
-    { label: "Code time limit", value: "A quarter of a second per turn, five seconds per run" },
     { label: "Where your code runs", value: "In a Web Worker in your browser, never on a server" },
     { label: "Saved on this device", value: "Your code, your progress and your best grades" },
   ],

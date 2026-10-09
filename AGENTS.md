@@ -86,7 +86,8 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   player's code in `sandbox/`, and the game page (`stage.tsx`, hidden until launch) around them. See
   DESIGN.md's "Script Knight" section and the Script Knight register entries. Its daily floor
   (`daily.ts`) ranks on the arcade board through a proof-verified entry that replays the action log
-  on the server (DESIGN.md's "Arcade backend").
+  on the server (DESIGN.md's "Arcade backend"). Hand mode (`use-hand-run.ts`, `hand-pad.tsx`) and
+  the phone play sheet (`play-sheet.tsx`) are in the same section.
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries
