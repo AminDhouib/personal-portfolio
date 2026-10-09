@@ -282,7 +282,6 @@ export class FailoverController {
   /** Start a fresh run on a new seed, keeping the view and the settings; `mode` switches Survival and Sandbox. */
   restart(seed: string = freeSeed(), mode: GameMode = this.mode): void {
     if (this.loading) return;
-    this.daily = null;
     this.mode = mode;
     resetSim({ seed, mode });
     this.paused = false;
@@ -318,6 +317,7 @@ export class FailoverController {
 
   /** The controller's side of a new run. The sim's queued events belong to how it was built, not to play. */
   private freshRun(): void {
+    this.daily = null;
     drainEvents();
     this.machine = initialMachine();
     this.selected = null;
