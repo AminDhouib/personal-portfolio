@@ -207,8 +207,11 @@ export class Unit {
   }
 
   getOtherUnits(): Unit[] {
-    const position = this.requirePosition();
-    return position.floor.getUnits().filter((unit) => unit !== this);
+    // A unit just removed by a bomb (a ticking captive) still belongs to its floor for the
+    // explosion it triggers: see the DESIGN.md register.
+    const floor = this.position?.floor ?? this.floor;
+    invariant(floor, `${this.name} has no position (unit is not on the floor).`);
+    return floor.getUnits().filter((unit) => unit !== this);
   }
 
   getSpace(): Space {

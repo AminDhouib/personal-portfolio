@@ -1065,6 +1065,13 @@ The following Password Game 2 entries were verified against the current tree on 
   differences are deliberate: `think` formats with a guarded `JSON.stringify` instead of
   `util.format` (no `node:util`), and a run that uses all 200 turns ends as `out-of-turns`
   (upstream fails it silently).
+- **Detonating a ticking captive does not crash Script Knight.** Upstream throws `Captive has no
+position` there: `Detonate` damages the captive (which removes it), then its chained `Ticking`
+  asks the removed unit for its neighbours. On Powder Keep levels 6 and 7 epic that corrupted the
+  run. The port reads the floor from the unit's floor link when it has no position, reads every
+  bombed space before the first bomb falls (the chained blast can remove the warrior itself), and
+  skips units with no health left. Everything else is upstream's outcome: the explosion still kills
+  everyone alive, once. `detonate-ticking-captive.test.ts` pins it with the real classes.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
