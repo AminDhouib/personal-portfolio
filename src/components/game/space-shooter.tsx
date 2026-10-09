@@ -66,6 +66,7 @@ import { PanelClose } from "./space-shooter/panel-close";
 import { CountUp } from "./space-shooter/count-up";
 import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/post-run";
 import { shareRun } from "./space-shooter/share";
+import { CountdownOverlay } from "./space-shooter/countdown-overlay";
 import { useCountdown } from "./space-shooter/use-countdown";
 import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
@@ -1508,23 +1509,6 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
               )}
             </AnimatePresence>
 
-            {countStep !== null && ui.status === "armed" && !panelOpen && (
-              <div
-                className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                role="status"
-                aria-live="assertive"
-              >
-                <motion.div
-                  key={countStep}
-                  initial={{ opacity: 0, scale: 1.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="font-display text-8xl font-black text-white tabular-nums drop-shadow-lg"
-                >
-                  {countStep}
-                </motion.div>
-              </div>
-            )}
             {ui.status === "playing" && <RunBanner startedAt={0} now={ui.seconds * 1000} />}
 
             {/* The run HUD shows only during a run, never behind a modal on the
@@ -1651,6 +1635,9 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
             )}
           </>
         )}
+
+        {/* Fly Again 3-2-1: over the armed screen, outside the run-only HUD above. */}
+        <CountdownOverlay step={countStep} status={ui.status} panelOpen={panelOpen} />
 
         {/* Pulsing instruction overlay — anchored low so the ship in the
             centre of the canvas stays visible behind it. */}
