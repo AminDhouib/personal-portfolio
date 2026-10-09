@@ -257,6 +257,10 @@ export function FailoverGame() {
                     hud={hud}
                     controller={controller}
                     onReplayCoach={replayCoach}
+                    onStartMode={(mode) => {
+                      setSettingsOpen(false);
+                      controller.restart(undefined, mode);
+                    }}
                     onClose={() => setSettingsOpen(false)}
                   />
                 )}

@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import type { FailoverController, HudState } from "../controller";
 import { saveGfxPref, type GfxPref } from "../prefs";
+import type { GameMode } from "../sim/types";
 import { T } from "../strings";
 import { BUTTON, BUTTON_IDLE, BUTTON_ON, PANEL, TOUCH } from "./surface";
 
@@ -13,7 +14,8 @@ const GFX: readonly { pref: GfxPref; label: string }[] = [
 ];
 
 /**
- * Sound (cues only; there is no music), the graphics tier (Auto picks from the
+ * The mode (Survival, or Sandbox: switching starts a new run), sound (cues
+ * only; there is no music), the graphics tier (Auto picks from the
  * device and the frame times, High or Low pin it; kept in failover:gfx), the
  * coach replay, and a note on reduced motion: games keep their motion when the
  * OS asks for less (DESIGN.md's register), so this game does not gate on it.
@@ -22,13 +24,16 @@ export function Settings({
   hud,
   controller,
   onReplayCoach,
+  onStartMode,
   onClose,
 }: {
   hud: HudState;
   controller: FailoverController;
   onReplayCoach: () => void;
+  onStartMode: (mode: GameMode) => void;
   onClose: () => void;
 }) {
+  const other: GameMode = hud.mode === "sandbox" ? "survival" : "sandbox";
   const choose = (pref: GfxPref) => {
     saveGfxPref(pref);
     controller.setGfxPref(pref);
@@ -49,6 +54,20 @@ export function Settings({
           <X className="h-4 w-4" aria-hidden />
         </button>
       </header>
+
+      <div className="flex flex-col gap-1">
+        <p>
+          {T.mode}: {hud.mode === "sandbox" ? T.sandbox_mode : T.survival_mode}
+        </p>
+        <p className="text-[#a1a1aa]">{T.sandbox_note}</p>
+        <button
+          type="button"
+          onClick={() => onStartMode(other)}
+          className={`${BUTTON} ${BUTTON_IDLE} self-start`}
+        >
+          {other === "sandbox" ? T.new_sandbox_run : T.new_survival_run}
+        </button>
+      </div>
 
       <div className="flex items-center justify-between gap-2">
         <span>{T.sound}</span>

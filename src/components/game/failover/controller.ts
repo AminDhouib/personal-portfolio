@@ -93,6 +93,8 @@ export interface HudState extends SimHud {
   gfxPref: GfxPref;
   /** The frame loop threw and stopped; the game shows its crash card. */
   crashed: boolean;
+  /** A save or a blueprint is being built into the sim; the board takes no input meanwhile. */
+  loading: boolean;
   badges: Badge[];
   alert: Alert | null;
 }
@@ -169,7 +171,7 @@ export class FailoverController {
   private readonly cancel: (id: number) => void;
   private readonly createScene: (canvas: HTMLCanvasElement, tier: PerfTier) => FailoverScene;
   private readonly audio: FailoverAudio;
-  private readonly mode: GameMode;
+  private mode: GameMode;
   private readonly onRunEnd: ((run: RunEnd) => void) | null;
   private readonly perfEnv: PerfEnv;
 
@@ -183,6 +185,7 @@ export class FailoverController {
   private onScreen = true;
   private disposed = false;
   private crashed = false;
+  private loading = false;
 
   private machine: MachineState = initialMachine();
   private camera: CameraState = initialCamera();
@@ -265,12 +268,40 @@ export class FailoverController {
     this.listeners.clear();
   }
 
-  /** Start a fresh run on a new seed, keeping the view and the settings. */
-  restart(seed: string = freeSeed()): void {
-    resetSim({ seed, mode: this.mode });
+  /** Start a fresh run on a new seed, keeping the view and the settings; `mode` switches Survival and Sandbox. */
+  restart(seed: string = freeSeed(), mode: GameMode = this.mode): void {
+    if (this.loading) return;
+    this.mode = mode;
+    resetSim({ seed, mode });
+    this.paused = false;
+    this.freshRun();
+  }
+
+  /**
+   * Swap the live run for one built elsewhere: a save's replay, a shared blueprint. While
+   * `work` runs the loop asks for no frames (a load yields between chunks, and a frame would
+   * step a half-built sim) and the board takes no input; a second call meanwhile is refused,
+   * so a double tap never loads twice. The run left in the sim is adopted, mode and all.
+   */
+  async replaceRun<R>(work: () => R | Promise<R>): Promise<{ ok: true; value: R } | { ok: false }> {
+    if (this.loading || this.disposed) return { ok: false };
+    this.loading = true;
+    this.syncScheduling();
+    this.emit();
+    try {
+      return { ok: true, value: await work() };
+    } finally {
+      this.loading = false;
+      this.mode = S.gameMode;
+      this.freshRun();
+    }
+  }
+
+  /** The controller's side of a new run. The sim's queued events belong to how it was built, not to play. */
+  private freshRun(): void {
+    drainEvents();
     this.machine = initialMachine();
     this.selected = null;
-    this.paused = false;
     this.pendingEvents = [];
     this.badges = [];
     this.alert = null;
@@ -281,7 +312,14 @@ export class FailoverController {
   }
 
   private canRun(): boolean {
-    return this.running && this.visible && this.onScreen && !this.disposed && !this.crashed;
+    return (
+      this.running &&
+      this.visible &&
+      this.onScreen &&
+      !this.disposed &&
+      !this.crashed &&
+      !this.loading
+    );
   }
 
   private requestFrame(): void {
@@ -305,6 +343,8 @@ export class FailoverController {
   /** One animation frame: step the sim, play cues, render, refresh the HUD. Public for tests. */
   readonly frame = (nowMs: number): void => {
     this.rafId = null;
+    // A frame already in flight when a load began: the sim is not the game's until it ends.
+    if (this.loading) return;
     try {
       this.clockMs = nowMs;
       const out = advance(this.loop, nowMs, this.paused ? 0 : this.speed);
@@ -456,6 +496,7 @@ export class FailoverController {
       tier: this.governor.tier,
       gfxPref: this.governor.pref,
       crashed: this.crashed,
+      loading: this.loading,
       badges: this.badgeViews(),
       alert:
         this.alert && this.alert.until > this.clockMs
@@ -477,6 +518,7 @@ export class FailoverController {
   // ---- input ----
 
   private feed(event: Parameters<typeof next>[1]): boolean {
+    if (this.loading) return false;
     const out = next(this.machine, event, {
       linkRefusal: linkRefusalOf,
       label: nodeLabel,
@@ -489,6 +531,7 @@ export class FailoverController {
   }
 
   private act(action: Action): boolean {
+    if (this.loading) return false;
     const result = dispatch(action);
     if (!result.ok) this.showToast(REFUSALS[result.reason] ?? T.not_allowed);
     return result.ok;
