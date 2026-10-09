@@ -31,6 +31,13 @@ const DISTANCE = 120;
 /** The true isometric elevation, atan(1 / sqrt 2). */
 const ISO_ELEVATION = Math.atan(1 / Math.SQRT2);
 const BOARD_LIMIT = (CONFIG.gridSize * CONFIG.tileSize) / 2;
+/**
+ * A board narrower than it is tall sees less to each side, so its view slides
+ * left (toward the Internet node, at the default heading) by this share of
+ * what it lost against a square board. At 390 x 844 that keeps the Internet
+ * and the start of the board in view; a wide board does not move.
+ */
+const NARROW_SHIFT = 0.5;
 /** One keyboard pan step, in world units at zoom 1. */
 const KEY_PAN_STEP = 6;
 
@@ -96,14 +103,24 @@ export function toggleView(s: CameraState): CameraState {
   return { ...s, topDown: !s.topDown };
 }
 
-export function cameraPose(s: CameraState): CameraPose {
+/**
+ * The camera for a state on a view `aspect` wide per unit of height (omit it for
+ * the bare pose). The narrow-board slide is a fixed offset along screen right,
+ * the same in both views, so drags and zoom work on the state exactly as before.
+ */
+export function cameraPose(s: CameraState, aspect?: number): CameraPose {
   const a = azimuth(s);
-  const target: [number, number, number] = [s.x, 0, s.z];
   const halfHeight = VIEW_HEIGHT / 2 / s.zoom;
+  const shift =
+    aspect !== undefined && aspect > 0 ? halfHeight * Math.max(0, 1 - aspect) * NARROW_SHIFT : 0;
+  // Screen right on the ground is (cos a, -sin a) in both views; slide the other way.
+  const cx = s.x - Math.cos(a) * shift;
+  const cz = s.z + Math.sin(a) * shift;
+  const target: [number, number, number] = [cx, 0, cz];
   if (s.topDown) {
     // Straight down; screen up is the heading's forward, so Q/E still turn the board.
     return {
-      position: [s.x, DISTANCE, s.z],
+      position: [cx, DISTANCE, cz],
       target,
       up: [-Math.sin(a), 0, -Math.cos(a)],
       halfHeight,
@@ -112,9 +129,9 @@ export function cameraPose(s: CameraState): CameraPose {
   const flat = Math.cos(ISO_ELEVATION) * DISTANCE;
   return {
     position: [
-      s.x + Math.sin(a) * flat,
+      cx + Math.sin(a) * flat,
       Math.sin(ISO_ELEVATION) * DISTANCE,
-      s.z + Math.cos(a) * flat,
+      cz + Math.cos(a) * flat,
     ],
     target,
     up: [0, 1, 0],
@@ -148,7 +165,7 @@ export function projectToView(
   height: number,
 ): { x: number; y: number } | null {
   if (width <= 0 || height <= 0) return null;
-  const pose = cameraPose(s);
+  const pose = cameraPose(s, width / height);
   const back = unit(sub(pose.position, pose.target));
   const right = unit(cross(pose.up, back));
   const up = cross(back, right);
