@@ -11,3 +11,7 @@ const post = self.postMessage.bind(self) as (message: FromWorker) => void;
 self.addEventListener("message", (event: MessageEvent<unknown>) => {
   handleRun(event.data, post, self);
 });
+
+// Tell the page the bundle has loaded, so its player-load deadline starts here and a slow
+// download or parse is not counted against the player's code.
+post({ type: "booted" });

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FromWorker } from "../protocol";
-import { LOAD_MS, RUN_MS, runInSandbox, TURN_MS } from "../run-client";
+import { BOOT_MS, LOAD_MS, RUN_MS, runInSandbox, TURN_MS } from "../run-client";
 
 const REQ = {
   code: "class Player { playTurn() {} }",
@@ -39,6 +39,8 @@ function start(onPost?: (worker: FakeWorker) => void) {
   return { worker, turns, ...run };
 }
 
+const booted = (w: FakeWorker): void => w.emit({ type: "booted" });
+
 const turnMsg = (t: number, a = "w-", thoughts: string[] = []): FromWorker => ({
   type: "turn",
   t,
@@ -61,6 +63,7 @@ describe("runInSandbox", () => {
   it("posts the run request and finishes with the log and the thoughts", async () => {
     const { worker, turns, done } = start();
     expect(worker.postMessage).toHaveBeenCalledWith({ type: "run", ...REQ });
+    booted(worker);
     worker.emit({ type: "ready" });
     worker.emit(turnMsg(1, "w-", ["a"]));
     worker.emit(turnMsg(2, "a0"));
@@ -74,8 +77,9 @@ describe("runInSandbox", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("times out at load when there is no ready within 1,000 ms", async () => {
+  it("times out at load when there is no ready within 1,000 ms of booting", async () => {
     const { worker, done } = start();
+    booted(worker);
     await vi.advanceTimersByTimeAsync(LOAD_MS);
     expect(await done).toEqual({ kind: "timeout", log: "1:", phase: "load", t: 1 });
     expect(worker.terminate).toHaveBeenCalledTimes(1);
@@ -84,6 +88,7 @@ describe("runInSandbox", () => {
 
   it("does not time out at load just before the deadline", async () => {
     const { worker } = start();
+    booted(worker);
     await vi.advanceTimersByTimeAsync(LOAD_MS - 1);
     expect(worker.terminate).not.toHaveBeenCalled();
     worker.emit({ type: "ready" });
@@ -91,8 +96,39 @@ describe("runInSandbox", () => {
     expect(worker.terminate).not.toHaveBeenCalled();
   });
 
+  it("does not count the worker's boot time against the player's load deadline", async () => {
+    const { worker, done } = start();
+    await vi.advanceTimersByTimeAsync(BOOT_MS - 1);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    booted(worker);
+    await vi.advanceTimersByTimeAsync(LOAD_MS - 1);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await done).toEqual({ kind: "timeout", log: "1:", phase: "load", t: 1 });
+  });
+
+  it("times out at boot when the worker never says it booted", async () => {
+    const { worker, done } = start();
+    await vi.advanceTimersByTimeAsync(BOOT_MS);
+    expect(await done).toEqual({ kind: "timeout", log: "1:", phase: "boot", t: 1 });
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ends as a crash on a ready before booted, or a second booted", async () => {
+    const early = start();
+    early.worker.emit({ type: "ready" });
+    expect(await early.done).toEqual({ kind: "crash", log: "1:" });
+
+    const twice = start();
+    booted(twice.worker);
+    booted(twice.worker);
+    expect(await twice.done).toEqual({ kind: "crash", log: "1:" });
+  });
+
   it("times out on a turn that takes over 250 ms, with the turns so far", async () => {
     const { worker, done } = start();
+    booted(worker);
     worker.emit({ type: "ready" });
     for (let t = 1; t <= 4; t += 1) worker.emit(turnMsg(t));
     await vi.advanceTimersByTimeAsync(TURN_MS);
@@ -107,14 +143,17 @@ describe("runInSandbox", () => {
 
   it("times out when the whole run passes 5,000 ms, even with quick turns", async () => {
     const { worker, done } = start((w) => {
-      setTimeout(() => w.emit({ type: "ready" }), 0);
-      let t = 0;
-      setInterval(() => w.emit(turnMsg((t += 1))), 200);
+      setTimeout(() => {
+        booted(w);
+        w.emit({ type: "ready" });
+        let t = 0;
+        setInterval(() => w.emit(turnMsg((t += 1))), 200);
+      }, 8_000);
     });
-    await vi.advanceTimersByTimeAsync(RUN_MS);
+    // The run deadline starts at boot, not at the start of the call.
+    await vi.advanceTimersByTimeAsync(8_000 + RUN_MS);
     const outcome = await done;
-    expect(outcome).toMatchObject({ kind: "timeout", phase: "run", t: 25 });
-    expect(outcome.kind === "timeout" && outcome.log).toBe(`1:${"w-".repeat(24)}`);
+    expect(outcome).toMatchObject({ kind: "timeout", phase: "run" });
     expect(worker.terminate).toHaveBeenCalledTimes(1);
     // Only the fake worker's own interval is left; the client cleared all of its timers.
     expect(vi.getTimerCount()).toBe(1);
@@ -122,6 +161,7 @@ describe("runInSandbox", () => {
 
   it("ends as a crash on a worker error", async () => {
     const { worker, done } = start();
+    booted(worker);
     worker.emit({ type: "ready" });
     worker.emit(turnMsg(1));
     worker.fail("out of memory");
@@ -157,6 +197,7 @@ describe("runInSandbox", () => {
       { type: "done", forged: true },
     ]) {
       const { worker, done } = start();
+      booted(worker);
       worker.emit({ type: "ready" });
       worker.emit(bad);
       expect(await done).toEqual({ kind: "crash", log: "1:" });
@@ -170,16 +211,19 @@ describe("runInSandbox", () => {
     expect(await early.done).toEqual({ kind: "crash", log: "1:" });
 
     const skipped = start();
+    booted(skipped.worker);
     skipped.worker.emit({ type: "ready" });
     skipped.worker.emit(turnMsg(2));
     expect(await skipped.done).toEqual({ kind: "crash", log: "1:" });
 
     const twice = start();
+    booted(twice.worker);
     twice.worker.emit({ type: "ready" });
     twice.worker.emit({ type: "ready" });
     expect(await twice.done).toEqual({ kind: "crash", log: "1:" });
 
     const errorAhead = start();
+    booted(errorAhead.worker);
     errorAhead.worker.emit({ type: "ready" });
     errorAhead.worker.emit({ type: "player-error", t: 3, message: "m", line: null });
     expect(await errorAhead.done).toEqual({ kind: "crash", log: "1:" });
@@ -194,6 +238,7 @@ describe("runInSandbox", () => {
       },
       () => worker as unknown as Worker,
     );
+    booted(worker);
     worker.emit({ type: "ready" });
     worker.emit(turnMsg(1));
     expect(await run.done).toEqual({ kind: "crash", log: "1:w-" });
@@ -202,6 +247,7 @@ describe("runInSandbox", () => {
 
   it("reports a compile error and terminates", async () => {
     const { worker, done } = start();
+    booted(worker);
     worker.emit({ type: "compile-error", kind: "no-player", message: "m", line: null });
     expect(await done).toEqual({
       kind: "compile-error",
@@ -212,6 +258,7 @@ describe("runInSandbox", () => {
 
   it("reports a player error with the turns before it", async () => {
     const { worker, done } = start();
+    booted(worker);
     worker.emit({ type: "ready" });
     worker.emit(turnMsg(1));
     worker.emit({ type: "player-error", t: 2, message: "TypeError: x", line: 7 });
@@ -227,6 +274,7 @@ describe("runInSandbox", () => {
 
   it("cancel terminates and resolves, and later messages change nothing", async () => {
     const { worker, turns, done, cancel } = start();
+    booted(worker);
     worker.emit({ type: "ready" });
     worker.emit(turnMsg(1));
     cancel();

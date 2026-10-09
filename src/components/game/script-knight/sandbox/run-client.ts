@@ -3,11 +3,13 @@
 import { gameCrashToReport } from "@/lib/report-game-error";
 import { parseFromWorker, type CompileErrorKind, type ToWorker } from "./protocol";
 
-/** From the start to `ready`: the player's top-level code and constructor. */
+/** From the start to `booted`: fetching and parsing the worker bundle on a slow device. */
+export const BOOT_MS = 10_000;
+/** From `booted` to `ready`: the player's top-level code and constructor. */
 export const LOAD_MS = 1_000;
 /** Between two consecutive messages: one turn of `playTurn`. */
 export const TURN_MS = 250;
-/** The whole run, start to `done`. */
+/** The whole run, `booted` to `done`. */
 export const RUN_MS = 5_000;
 
 export type CompileErrorInfo = {
@@ -20,7 +22,7 @@ export type RunOutcome =
   | { kind: "finished"; log: string; thoughts: string[][] }
   | { kind: "compile-error"; error: CompileErrorInfo }
   | { kind: "player-error"; log: string; t: number; message: string; line: number | null }
-  | { kind: "timeout"; log: string; phase: "load" | "turn" | "run"; t: number }
+  | { kind: "timeout"; log: string; phase: "boot" | "load" | "turn" | "run"; t: number }
   | { kind: "crash"; log: string }
   | { kind: "cancelled"; log: string }
   | { kind: "no-worker" };
@@ -35,7 +37,9 @@ function defaultMakeWorker(): Worker | null {
 /**
  * Runs the player's code in a fresh Web Worker and watches it from here. Synchronous player code
  * cannot be interrupted from inside the worker, so three deadlines are enforced from outside and
- * a breach terminates the worker: LOAD_MS to `ready`, TURN_MS between messages, RUN_MS overall.
+ * a breach terminates the worker: BOOT_MS for the bundle to load, then LOAD_MS to `ready`,
+ * TURN_MS between messages and RUN_MS overall, all counted from the worker's `booted` message so
+ * a slow download is never held against the player's code.
  * Everything the worker posts is checked by `parseFromWorker` and by turn order; anything else
  * ends the run as a crash. One worker per call, terminated on every exit path, and there is no
  * main-thread fallback: without Workers the outcome is `no-worker`.
@@ -64,16 +68,19 @@ export function runInSandbox(
 
   const tokens: string[] = [];
   const thoughts: string[][] = [];
+  let booted = false;
   let ready = false;
   let settled = false;
   let turnTimer: ReturnType<typeof setTimeout> | undefined;
-  const loadTimer = setTimeout(() => timeout("load"), LOAD_MS);
-  const runTimer = setTimeout(() => timeout("run"), RUN_MS);
+  let loadTimer: ReturnType<typeof setTimeout> | undefined;
+  let runTimer: ReturnType<typeof setTimeout> | undefined;
+  const bootTimer = setTimeout(() => timeout("boot"), BOOT_MS);
   const log = (): string => `1:${tokens.join("")}`;
 
   function finish(outcome: RunOutcome): void {
     if (settled) return;
     settled = true;
+    clearTimeout(bootTimer);
     clearTimeout(loadTimer);
     clearTimeout(turnTimer);
     clearTimeout(runTimer);
@@ -93,7 +100,7 @@ export function runInSandbox(
     finish({ kind: "crash", log: log() });
   }
 
-  function timeout(phase: "load" | "turn" | "run"): void {
+  function timeout(phase: "boot" | "load" | "turn" | "run"): void {
     finish({ kind: "timeout", log: log(), phase, t: tokens.length + 1 });
   }
 
@@ -107,6 +114,17 @@ export function runInSandbox(
     const message = parseFromWorker(event.data);
     if (!message) {
       crash(new Error("The sandbox posted a message that does not fit the protocol."));
+      return;
+    }
+    if (!booted) {
+      if (message.type === "booted") {
+        booted = true;
+        clearTimeout(bootTimer);
+        loadTimer = setTimeout(() => timeout("load"), LOAD_MS);
+        runTimer = setTimeout(() => timeout("run"), RUN_MS);
+      } else {
+        crash(new Error(`The sandbox sent ${message.type} before it booted.`));
+      }
       return;
     }
     if (!ready) {
@@ -155,6 +173,7 @@ export function runInSandbox(
           line: message.line,
         });
         return;
+      case "booted":
       case "ready":
       case "compile-error":
         crash(new Error(`The sandbox sent ${message.type} after it was ready.`));

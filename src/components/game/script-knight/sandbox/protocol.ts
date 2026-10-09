@@ -7,6 +7,8 @@ export type ToWorker = { type: "run"; code: string; language: "javascript"; leve
 export type CompileErrorKind = "syntax" | "no-player" | "no-play-turn" | "constructor";
 
 export type FromWorker =
+  /** The worker module has loaded and is listening: its boot time is over. */
+  | { type: "booted" }
   | { type: "ready" }
   | { type: "turn"; t: number; a: string; thoughts: string[] }
   | { type: "done" }
@@ -59,6 +61,8 @@ export function parseFromWorker(data: unknown): FromWorker | null {
   }
   const msg = data as Record<string, unknown>;
   switch (msg.type) {
+    case "booted":
+      return hasExactKeys(msg, ["type"]) ? { type: "booted" } : null;
     case "ready":
       return hasExactKeys(msg, ["type"]) ? { type: "ready" } : null;
     case "done":
