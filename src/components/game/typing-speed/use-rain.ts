@@ -56,6 +56,8 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
   );
   const overRef = useRef(false);
   const lastValue = useRef(SENTINEL);
+  // Between compositionstart and compositionend the keyboard owns the input value.
+  const composingRef = useRef(false);
   const onOverRef = useRef(onOver);
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
       const fresh = createRain(seed);
       rainRef.current = fresh;
       overRef.current = false;
+      composingRef.current = false;
       bulkRef.current = 0;
       setBulk(0);
       setRain(fresh);
@@ -163,12 +166,13 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
   );
 
   // The hidden input holds SENTINEL plus the buffer, so Backspace on an empty buffer still fires.
+  // While an IME composes, the value is the keyboard's: clearing it mid-composition makes some
+  // keyboards re-insert the old text, so nothing is scored or rewritten until compositionend.
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
-    const onInput = (e: Event) => {
+    const settle = (inputType: string) => {
       const r = rainRef.current;
-      const inputType = (e as InputEvent).inputType || "insertText";
       const diff = diffInput(lastValue.current, el.value, inputType);
       if (diff.rejected || r.status === "over") {
         setBuf(bufferRef.current, invalidRef.current);
@@ -176,20 +180,35 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
       }
       applyOps(diff.ops, diff.bulk);
     };
+    const onInput = (e: Event) => {
+      if (composingRef.current || (e as InputEvent).isComposing) return;
+      settle((e as InputEvent).inputType || "insertText");
+    };
+    const onCompositionStart = () => {
+      composingRef.current = true;
+    };
+    const onCompositionEnd = () => {
+      composingRef.current = false;
+      settle("insertCompositionText");
+    };
     const onBeforeInput = (e: Event) => {
       if (REJECTED_TYPES.includes((e as InputEvent).inputType)) e.preventDefault();
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter") setBuf("", false);
+      if (e.key === "Enter" && !composingRef.current && !e.isComposing) setBuf("", false);
     };
     const refuse = (e: Event) => e.preventDefault();
     el.addEventListener("input", onInput);
+    el.addEventListener("compositionstart", onCompositionStart);
+    el.addEventListener("compositionend", onCompositionEnd);
     el.addEventListener("beforeinput", onBeforeInput);
     el.addEventListener("keydown", onKeyDown);
     el.addEventListener("paste", refuse);
     el.addEventListener("drop", refuse);
     return () => {
       el.removeEventListener("input", onInput);
+      el.removeEventListener("compositionstart", onCompositionStart);
+      el.removeEventListener("compositionend", onCompositionEnd);
       el.removeEventListener("beforeinput", onBeforeInput);
       el.removeEventListener("keydown", onKeyDown);
       el.removeEventListener("paste", refuse);
@@ -209,6 +228,7 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
       last = now;
       // A buffer whose word has fallen away is dropped, unless the last letter was a typo.
       if (
+        !composingRef.current &&
         bufferRef.current !== "" &&
         !invalidRef.current &&
         rainTarget(r, bufferRef.current) === null
