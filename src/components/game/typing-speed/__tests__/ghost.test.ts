@@ -173,7 +173,11 @@ describe("paceDelta", () => {
 describe("ghostSeries", () => {
   it("is the ghost's cumulative WPM at the end of each second", () => {
     const samples = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // 4 characters a second
-    expect(ghostSeries(samples, 3)).toEqual([48, 48, 32]);
+    expect(ghostSeries(samples, 2)).toEqual([48, 48]);
+  });
+  it("stops where the ghost run ended instead of decaying", () => {
+    const samples = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // a 2 s run
+    expect(ghostSeries(samples, 5)).toEqual([48, 48]);
   });
   it("is empty for no samples", () => {
     expect(ghostSeries([], 3)).toEqual([]);

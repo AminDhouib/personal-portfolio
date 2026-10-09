@@ -57,6 +57,20 @@ describe("WpmGraph", () => {
     expect(line).toHaveAttribute("stroke-dasharray");
     expect(screen.getByTestId("ts-graph-legend")).toHaveTextContent("Your best");
   });
+  it("keeps a shorter ghost on the run's time axis instead of stretching it", () => {
+    const { container } = render(<WpmGraph points={points} variant="full" ghost={[8, 30]} />);
+    const endX = (line: string) =>
+      Number(
+        container
+          .querySelector(`path[data-line='${line}']`)
+          ?.getAttribute("d")
+          ?.match(/L[0-9.]+,/g)
+          ?.at(-1)
+          ?.slice(1, -1),
+      );
+    // two ghost points are one step of the run's three
+    expect(endX("ghost")).toBeCloseTo(endX("net") / 3, 0);
+  });
   it("draws no ghost line without a ghost, and never in the live variant", () => {
     const full = render(<WpmGraph points={points} variant="full" ghost={null} />);
     expect(full.container.querySelector("path[data-line='ghost']")).toBeNull();

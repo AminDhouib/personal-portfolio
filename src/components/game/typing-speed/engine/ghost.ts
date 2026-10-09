@@ -106,11 +106,12 @@ export function paceDelta(run: TypingRun, samples: readonly number[], now: numbe
   return netCharCount(run) - ghostCharsAt(samples, elapsed);
 }
 
-/** The ghost cumulative net WPM at the end of each of `count` seconds, like the run own line. */
+/** The ghost cumulative net WPM at the end of each of up to `count` seconds, stopping where its run ended. */
 export function ghostSeries(samples: readonly number[], count: number): number[] {
   if (samples.length === 0) return [];
+  const seconds = Math.min(count, Math.ceil(((samples.length - 1) * SAMPLE_MS) / 1000));
   return Array.from(
-    { length: count },
+    { length: seconds },
     (_, i) => (ghostCharsAt(samples, (i + 1) * 1000) * 12) / (i + 1),
   );
 }

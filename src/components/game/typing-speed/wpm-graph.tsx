@@ -53,7 +53,7 @@ export function WpmGraph({ points, variant, ghost = null }: WpmGraphProps) {
       {ghostLine && (
         <path
           data-line="ghost"
-          d={graphPath(ghostLine, { w: W, h, max })}
+          d={graphPath(ghostLine, { w: step * Math.max(ghostLine.length - 1, 1), h, max })}
           fill="none"
           strokeWidth="2"
           strokeDasharray="6 4"
