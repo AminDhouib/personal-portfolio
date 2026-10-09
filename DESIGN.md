@@ -156,7 +156,7 @@ style suggestions.
 ## Arcade backend
 
 Leaderboard v2 for the arcade games. Orbital Dodge and Hextris are on it (T1b-2), Super Voltorb
-Flip's Daily board (T2e), Tower Stacker's daily tower (T6-3) and Typing Speed's daily text (T4-4); the legacy `leaderboard_entries`
+Flip's Daily board (T2e), Tower Stacker's daily tower (T6-3), Typing Speed's daily text (T4-4) and Script Knight's daily floor (T7-5); the legacy `leaderboard_entries`
 table is frozen history behind a read-only `/api/leaderboard`. Code: `src/lib/arcade/`, route
 `src/app/api/arcade/scores/route.ts`.
 
@@ -216,6 +216,18 @@ seconds }`. `checkTowerStacker` requires today's UTC day by the server clock (no
   300 WPM ceiling), more characters than the text has, and a score that is not
   `round(chars * 12000 / ms)`. The pure module `typing-speed/engine/daily.ts` is shared by the
   game and the server (node-tested). Ceilings on client numbers, not anti-cheat.
+- **Script Knight's arcade entry is the daily floor, and it is a real check.** Detail
+  `{ day, turns, hand }` (numbers only), score = the engine's own total, and the action log
+  travels as the `proof` (the seam below). The entry sets `requiresProof`; the synchronous
+  `checkScriptKnight` requires today's UTC day by the server clock (no grace across midnight) and
+  `verifyScriptKnight` rebuilds the day's floor with `dailyFloor`, steps the log through the pure
+  engine in chunks of 25 actions (checking `deadline` before each chunk) and rejects, with a
+  stable reason: an unreadable log, an action the floor does not grant, a log longer than the run,
+  a run that does not reach the stairs, a score that does not match the replay, or turns that do
+  not match. Every typed engine failure is a reject; a genuine bug throws and the route fails
+  closed (422 `could not verify the run`, reported once). Measured cost: about 6 ms warm for a
+  full 200-turn log and about 22 ms for the first call of a UTC day, which also builds the floor.
+  `hand` is client-claimed and display-only (see the register).
 - **Browser identity.** `src/lib/arcade/identity.ts` keeps `{ playerId, token }` in
   `localStorage` under `arcade:player:v1`. A read never creates one (so first-time visitors stay
   cacheable); the first submit does, with an in-memory copy that wins over storage for the page
@@ -439,6 +451,19 @@ editor, the daily board and the hand pad are added without rewriting it.
 - **Phone targets.** Every control the game owns carries `TOUCH` (`surface.ts`), so it is 44 px
   square on a coarse pointer, and `touch-targets.test.tsx` pins it. The site header and footer are
   not the game's.
+- **Today's floor.** `daily.ts` generates one Narrow Path style corridor per UTC day, seeded by
+  `fnv1a("knight-daily-v1-<day>")` and the attempt, with the epic ability set (the full set the
+  warrior has at the end of the tower). The reference bot must clear it, with at least two enemies
+  and a par of 8 turns or more; after 64 attempts the fallback is a Narrow Path floor in epic
+  configuration chosen by the day number (none of the 365 days tested from 2026-10-01 fell back).
+  The bot's score is the par and the grade's ace score. `DAILY_RECIPE` is a version: change the
+  generator and bump it, and the pinned 2026-10-15 layout in `daily.test.ts` shows the diff. The
+  floor is memoized for one day. The worker builds it from a `{ kind: "daily", day }` ref with the
+  same function the server uses, so the page, the worker and the verifier agree. The day is fixed
+  when the player opens the tab: a run that finishes after 00:00 UTC is still replayed but cannot
+  be posted. The daily code lives in `knight:code.daily` and starts from the tower's code each
+  day; a cleared daily updates `knight:stats` (best, runs, streak) and nothing in the tower
+  progress.
 - **Hidden until launch.** The `GAMES` row carries `hidden: true`: the route serves, with
   `noindex`, and the game is out of the sitemap, the lists, llms.txt and the hub. T7-8 removes the
   flag together with the launch copy. The About copy and credits already describe only what the
@@ -1201,6 +1226,12 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   player sees how far the code got. Only a run that never produced a turn (no Worker, a syntax
   error) has nothing to replay. The no-Worker message does not offer to play by hand until hand
   mode exists (T7-7).
+
+- **Script Knight's "by hand" tag is client-claimed and display-only.** `detail.hand` (0 or 1)
+  is the only part of a daily submission the server cannot check: the same log is legal whether
+  code or a person produced it, and code can hard-code a move list for a visible floor, so the
+  two are not separable. The board shows a "by hand" badge on `hand: 1` rows and ranks them with
+  everyone else; nothing gates on the tag. T7-5 only carries it (always 0 until hand mode, T7-7).
 
 ## Adversarial standoffs (restated from the audit's final report)
 

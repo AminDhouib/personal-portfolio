@@ -61,4 +61,25 @@ test.describe("Script Knight", () => {
     await runAndSkipToEnd(page);
     await expect(page.getByRole("log")).toContainText("think: undefined");
   });
+
+  test("Today's floor shows its par, runs in the real sandbox and posts nothing on a fail", async ({
+    page,
+  }) => {
+    // Every leaderboard request is stubbed; a POST here would be a bug, so count them.
+    const posts: string[] = [];
+    await page.route("**/api/arcade/scores**", async (route) => {
+      if (route.request().method() === "POST") posts.push(route.request().url());
+      await route.fulfill({ json: { entries: [], you: null } });
+    });
+    await page.goto(GAME_PATH);
+    await page.getByRole("button", { name: "Today's floor" }).click();
+    await expect(page.getByText(/Par \d+/)).toBeVisible();
+
+    // Walking straight ahead never clears a floor with enemies on it.
+    await writeCode(page, "class Player {\n  playTurn(warrior) {\n    warrior.walk();\n  }\n}\n");
+    await runAndSkipToEnd(page);
+    await expect(page.getByText("Floor not passed")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Submit" })).toHaveCount(0);
+    expect(posts).toEqual([]);
+  });
 });
