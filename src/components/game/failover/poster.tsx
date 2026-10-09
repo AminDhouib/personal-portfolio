@@ -10,8 +10,6 @@ import { Play, VolumeX } from "lucide-react";
 // browser is idle and the visitor has not asked to save data; never at
 // hydration. (import-graph.test.ts keeps it that way.)
 
-// The import() sits inside dynamic() itself so the build can see it and list the
-// chunk in the route's loadable manifest (scripts/check-bundle-budget.mjs reads it).
 const FailoverGame = dynamic(() => import("../failover").then((m) => m.FailoverGame), {
   ssr: false,
   loading: () => <PosterFrame busy />,
