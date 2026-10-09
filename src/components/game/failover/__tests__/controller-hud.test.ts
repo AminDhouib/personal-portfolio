@@ -162,3 +162,54 @@ describe("the inspector's actions", () => {
     h.controller.dispose();
   });
 });
+
+describe("the pending choice", () => {
+  it("names a finger's ghost and sits beside it, following the camera", () => {
+    const h = makeController();
+    h.controller.setTool({ kind: "place", service: "compute" });
+    h.aim({ x: 0, z: 0 });
+    h.controller.tap(0, 0, "touch");
+    const first = h.controller.getHud().pending;
+    expect(first).toMatchObject({ kind: "place", name: CONFIG.services.compute.name });
+    expect(first!.x).toBeGreaterThan(0);
+    expect(first!.x).toBeLessThan(800);
+    expect(first!.y).toBeGreaterThan(0);
+    expect(first!.y).toBeLessThan(600);
+    // A pan while the ghost waits redraws the HUD at once, so the pair keeps up.
+    h.controller.dragBy(40, 0);
+    const moved = h.controller.getHud().pending;
+    expect(moved!.x).toBeGreaterThan(first!.x);
+    h.controller.confirm();
+    expect(h.controller.getHud().pending).toBeNull();
+    expect(S.services.map((s) => s.type)).toEqual(["compute"]);
+  });
+
+  it("names the node a finger is about to demolish, and a mouse never waits", () => {
+    const h = makeController();
+    h.place("db", -16, 0);
+    expect(h.controller.getHud().pending).toBeNull();
+    h.controller.setTool({ kind: "demolish" });
+    h.aim({ x: -16, z: 0 }, "svc_1");
+    h.controller.tap(0, 0, "touch");
+    expect(h.controller.getHud().pending).toMatchObject({
+      kind: "demolish",
+      name: CONFIG.services.db.name,
+    });
+    h.controller.cancelPending();
+    expect(h.controller.getHud().pending).toBeNull();
+    expect(S.services).toHaveLength(1);
+  });
+
+  it("stays on the board when its point is off the edge", () => {
+    const h = makeController();
+    h.controller.setTool({ kind: "place", service: "waf" });
+    h.aim({ x: -28, z: 0 });
+    h.controller.tap(0, 0, "touch");
+    h.controller.dragBy(5000, 5000);
+    const at = h.controller.getHud().pending!;
+    expect(at.x).toBeLessThanOrEqual(800);
+    expect(at.x).toBeGreaterThanOrEqual(0);
+    expect(at.y).toBeLessThanOrEqual(600);
+    expect(at.y).toBeGreaterThanOrEqual(0);
+  });
+});

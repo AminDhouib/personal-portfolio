@@ -3,9 +3,10 @@
 import type { ReactNode } from "react";
 import {
   Activity,
-  Check,
   Eye,
   Link2,
+  Maximize2,
+  Minimize2,
   MousePointer2,
   Pause,
   Play,
@@ -13,7 +14,6 @@ import {
   RotateCw,
   SlidersHorizontal,
   Trash2,
-  X,
 } from "lucide-react";
 import type { FailoverController, HudState, Speed } from "../controller";
 import { T, fmt } from "../strings";
@@ -44,7 +44,7 @@ export function ToolButton({
   );
 }
 
-/** Select, Link and Demolish (keys 1, 2, 3), and Confirm and Cancel while a finger's choice waits. */
+/** Select, Link and Demolish (keys 1, 2, 3). A finger's Confirm and Cancel sit by the ghost (confirm-pair.tsx). */
 export function Tools({ hud, controller }: { hud: HudState; controller: FailoverController }) {
   const tool = hud.tool;
   return (
@@ -74,21 +74,15 @@ export function Tools({ hud, controller }: { hud: HudState; controller: Failover
       >
         <Trash2 className="h-4 w-4" aria-hidden />
       </ToolButton>
-      {hud.confirming && (
-        <>
-          <ToolButton label={T.confirm} onClick={() => controller.confirm()}>
-            <Check className="h-4 w-4" aria-hidden />
-          </ToolButton>
-          <ToolButton label={T.cancel} onClick={() => controller.cancelPending()}>
-            <X className="h-4 w-4" aria-hidden />
-          </ToolButton>
-        </>
-      )}
     </div>
   );
 }
 
-/** Pause and the three speeds, the camera turns and view, the metrics panel, and Settings. */
+/**
+ * Pause and the three speeds, the camera turns and view, the metrics panel,
+ * Settings, and on a phone the way in and out of the full-screen layer
+ * (fullScreen is null where it is not offered).
+ */
 export function Controls({
   hud,
   controller,
@@ -96,6 +90,8 @@ export function Controls({
   onToggleMetrics,
   settingsOpen,
   onToggleSettings,
+  fullScreen,
+  onToggleFullScreen,
 }: {
   hud: HudState;
   controller: FailoverController;
@@ -103,6 +99,8 @@ export function Controls({
   onToggleMetrics: () => void;
   settingsOpen: boolean;
   onToggleSettings: () => void;
+  fullScreen: boolean | null;
+  onToggleFullScreen: () => void;
 }) {
   return (
     <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
@@ -141,6 +139,18 @@ export function Controls({
       <ToolButton label={T.settings} pressed={settingsOpen} onClick={onToggleSettings}>
         <SlidersHorizontal className="h-4 w-4" aria-hidden />
       </ToolButton>
+      {fullScreen !== null && (
+        <ToolButton
+          label={fullScreen ? T.exit_full_screen : T.full_screen}
+          onClick={onToggleFullScreen}
+        >
+          {fullScreen ? (
+            <Minimize2 className="h-4 w-4" aria-hidden />
+          ) : (
+            <Maximize2 className="h-4 w-4" aria-hidden />
+          )}
+        </ToolButton>
+      )}
     </div>
   );
 }

@@ -53,6 +53,7 @@ export const T = {
   dns_short: "GeoDNS",
   elapsed_time: "Elapsed Time",
   event_ended: "Event ended",
+  exit_full_screen: "Exit full screen", // ours
   fail_analytics_store: "Analytics store, not for reads",
   fail_breach: "Breach!",
   fail_circuit_open: "Circuit open",
@@ -74,6 +75,7 @@ export const T = {
   fail_wrong_store: "Wrong store type",
   final_score: "Final Score: {score}",
   finances: "Finances",
+  full_screen: "Full screen", // ours
   fw: "FW",
   game_error: "Game Error", // ours
   game_error_text: "This game hit an error and stopped.", // ours
@@ -123,6 +125,8 @@ export const T = {
   over_reputation: "Reputation hit zero. The customers have left.", // ours
   over_retired: "You ended the run.", // ours
   pause: "Pause", // ours
+  pending_demolish: "Demolish {name}?", // ours
+  pending_place: "Build {name} here?", // ours
   per_minute: "/min", // ours
   play_again: "Play again", // ours
   power_delete_blocked: "Substation in use - unplug GPUs first",

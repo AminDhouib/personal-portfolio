@@ -5,19 +5,22 @@ import { FailoverController } from "./failover/controller";
 import { loadCoachDone, saveCoachDone } from "./failover/prefs";
 import { loadStats, recordRun, saveStats } from "./failover/stats";
 import { T } from "./failover/strings";
-import { FailureBadges } from "./failover/ui/failure-badges";
 import { Coach } from "./failover/ui/coach";
+import { ConfirmPair } from "./failover/ui/confirm-pair";
+import { FailureBadges } from "./failover/ui/failure-badges";
 import { StatusBar } from "./failover/ui/hud";
 import { Inspector } from "./failover/ui/inspector";
 import { alertText } from "./failover/ui/messages";
 import { MetricsPanel } from "./failover/ui/metrics-panel";
 import { Report } from "./failover/ui/report";
 import { Settings } from "./failover/ui/settings";
+import { TOUCH } from "./failover/ui/surface";
 import { Toast } from "./failover/ui/toast";
 import { ToolSheet } from "./failover/ui/tool-sheet";
 import { Controls, Tools } from "./failover/ui/toolbar";
 import { useCoarsePointer } from "./failover/ui/use-coarse-pointer";
 import { createHudBridge, useHud } from "./failover/ui/use-hud";
+import { usePlaySheet } from "./failover/ui/use-play-sheet";
 
 /**
  * Failover: build a cloud that survives the traffic. The sim, the scene and
@@ -37,6 +40,7 @@ export function FailoverGame() {
   const bridge = useMemo(() => createHudBridge(), []);
   const hud = useHud(bridge);
   const coarse = useCoarsePointer();
+  const { sheet, toggle: toggleSheet } = usePlaySheet();
   const [best, setBest] = useState(loadStats);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -66,7 +70,7 @@ export function FailoverGame() {
       },
     });
     controllerRef.current = controller;
-    const rect = container.getBoundingClientRect();
+    const rect = host.getBoundingClientRect();
     controller.attach(canvas, rect.width, rect.height);
     controller.setVisible(!document.hidden);
     controller.start();
@@ -76,7 +80,7 @@ export function FailoverGame() {
     const resize = new ResizeObserver(([entry]) => {
       if (entry) controller.resize(entry.contentRect.width, entry.contentRect.height);
     });
-    resize.observe(container);
+    resize.observe(host);
     const seen = new IntersectionObserver(([entry]) => {
       if (entry) controller.setOnScreen(entry.isIntersecting);
     });
@@ -208,82 +212,92 @@ export function FailoverGame() {
       onKeyDownCapture={unlockAudio}
       onKeyDown={onKeyDown}
       aria-label={T.board_label}
-      className="relative h-[min(72vh,640px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-(--border) bg-[#050505] outline-none focus-visible:ring-2 focus-visible:ring-[#06b6d4]"
+      data-sheet={sheet || undefined}
+      className={
+        sheet
+          ? "fixed inset-0 z-80 h-[100dvh] w-screen overflow-hidden bg-[#050505] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] outline-none"
+          : "relative h-[min(72vh,640px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-(--border) bg-[#050505] outline-none focus-visible:ring-2 focus-visible:ring-[#06b6d4]"
+      }
       style={{ overscrollBehavior: "none" }}
     >
-      <div
-        ref={hostRef}
-        className="absolute inset-0 touch-none"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onContextMenu={(e) => e.preventDefault()}
-      />
-      {hud && controller && (
-        <>
-          <FailureBadges badges={hud.badges} />
-          <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-1.5">
-            <div className="flex flex-col items-start gap-1.5">
-              <StatusBar hud={hud} />
-              <Tools hud={hud} controller={controller} />
-              <Toast text={hud.toast ?? (hud.alert ? alertText(hud.alert) : null)} />
-              {coaching && !hud.over && <Coach hud={hud} onDone={finishCoach} />}
-            </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <Controls
-                hud={hud}
-                controller={controller}
-                metricsOpen={metricsOpen}
-                onToggleMetrics={() => setMetricsOpen((open) => !open)}
-                settingsOpen={settingsOpen}
-                onToggleSettings={() => setSettingsOpen((open) => !open)}
-              />
-              {settingsOpen && (
-                <Settings
+      <div className="relative h-full w-full">
+        <div
+          ref={hostRef}
+          className="absolute inset-0 touch-none"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+        {hud && controller && (
+          <>
+            <FailureBadges badges={hud.badges} />
+            <ConfirmPair hud={hud} controller={controller} />
+            <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-1.5">
+              <div className="flex flex-col items-start gap-1.5">
+                <StatusBar hud={hud} />
+                <Tools hud={hud} controller={controller} />
+                <Toast text={hud.toast ?? (hud.alert ? alertText(hud.alert) : null)} />
+                {coaching && !hud.over && <Coach hud={hud} onDone={finishCoach} />}
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                <Controls
                   hud={hud}
                   controller={controller}
-                  onReplayCoach={replayCoach}
-                  onClose={() => setSettingsOpen(false)}
+                  metricsOpen={metricsOpen}
+                  onToggleMetrics={() => setMetricsOpen((open) => !open)}
+                  settingsOpen={settingsOpen}
+                  onToggleSettings={() => setSettingsOpen((open) => !open)}
+                  fullScreen={coarse || sheet ? sheet : null}
+                  onToggleFullScreen={toggleSheet}
                 />
-              )}
-              {metricsOpen && <MetricsPanel hud={hud} onClose={() => setMetricsOpen(false)} />}
-              {!coarse && <Inspector hud={hud} controller={controller} />}
+                {settingsOpen && (
+                  <Settings
+                    hud={hud}
+                    controller={controller}
+                    onReplayCoach={replayCoach}
+                    onClose={() => setSettingsOpen(false)}
+                  />
+                )}
+                {metricsOpen && <MetricsPanel hud={hud} onClose={() => setMetricsOpen(false)} />}
+                {!coarse && <Inspector hud={hud} controller={controller} />}
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-col items-center gap-1.5">
+              {coarse && <Inspector hud={hud} controller={controller} />}
+              <ToolSheet hud={hud} controller={controller} coarse={coarse} />
+            </div>
+          </>
+        )}
+        {hud?.over && controller && (
+          <Report
+            hud={hud}
+            best={best}
+            onPlayAgain={() => {
+              controller.restart();
+              containerRef.current?.focus({ preventScroll: true });
+            }}
+          />
+        )}
+        {hud?.crashed && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-6 text-center text-white shadow-2xl">
+              <div className="mb-2 font-mono text-[11px] tracking-widest text-[#06b6d4] uppercase">
+                {T.game_error}
+              </div>
+              <div className="mt-2 text-sm text-white/70">{T.game_error_text}</div>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className={`mt-4 w-full rounded-lg border border-[#06b6d4]/40 bg-[#06b6d4]/10 py-2.5 text-sm font-medium text-[#06b6d4] transition-colors hover:bg-[#06b6d4]/20 ${TOUCH}`}
+              >
+                {T.reload}
+              </button>
             </div>
           </div>
-          <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-col items-center gap-1.5">
-            {coarse && <Inspector hud={hud} controller={controller} />}
-            <ToolSheet hud={hud} controller={controller} coarse={coarse} />
-          </div>
-        </>
-      )}
-      {hud?.over && controller && (
-        <Report
-          hud={hud}
-          best={best}
-          onPlayAgain={() => {
-            controller.restart();
-            containerRef.current?.focus({ preventScroll: true });
-          }}
-        />
-      )}
-      {hud?.crashed && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/90 p-6 text-center text-white shadow-2xl">
-            <div className="mb-2 font-mono text-[11px] tracking-widest text-[#06b6d4] uppercase">
-              {T.game_error}
-            </div>
-            <div className="mt-2 text-sm text-white/70">{T.game_error_text}</div>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-4 w-full rounded-lg border border-[#06b6d4]/40 bg-[#06b6d4]/10 py-2.5 text-sm font-medium text-[#06b6d4] transition-colors hover:bg-[#06b6d4]/20"
-            >
-              {T.reload}
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
