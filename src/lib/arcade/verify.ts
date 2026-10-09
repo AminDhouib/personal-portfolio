@@ -3,12 +3,7 @@ import { ARCADE_VERIFY_BUDGET_MS, type ArcadeVerdict, type ArcadeVerify } from "
 /** The reason a client sees when a verifier fails closed; the real cause is reported, not sent. */
 export const VERIFY_FAILED_REASON = "could not verify the run";
 
-/**
- * What a verifier answers when it cannot take the run now (it serializes a shared simulation and
- * its queue is full). The route turns exactly this reason into a 503 the client can retry; every
- * other reject stays a 422.
- */
-export const VERIFY_BUSY_REASON = "the verifier is busy, try again";
+export { VERIFY_BUSY_REASON } from "./verify-reasons";
 
 export type VerifyOutcome = ArcadeVerdict | { ok: false; reason: string; error: Error };
 

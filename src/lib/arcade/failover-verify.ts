@@ -10,7 +10,7 @@ import { TICK } from "@/components/game/failover/sim/config";
 import { captureException } from "@/lib/log";
 import { utcDayKey } from "./boards";
 import type { ArcadeVerdict, ArcadeVerify } from "./games";
-import { VERIFY_BUSY_REASON } from "./verify";
+import { VERIFY_BUSY_REASON } from "./verify-reasons";
 
 // Failover's Daily Incident, the real check. The page records the actions the player took; this
 // plays them again from the day's seed through the same sim and accepts the score only if the
