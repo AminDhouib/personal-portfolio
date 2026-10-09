@@ -5,6 +5,7 @@ import type { FailoverStats } from "../stats";
 import { T, fmt } from "../strings";
 import { clock, money, percent } from "./format";
 import { badgeText } from "./messages";
+import { TOUCH } from "./surface";
 
 const OVER_TEXT: Record<NonNullable<HudState["over"]>, string> = {
   reputation: T.over_reputation,
@@ -141,7 +142,7 @@ export function Report({
         <button
           type="button"
           onClick={onPlayAgain}
-          className="min-h-11 rounded-lg border border-[#06b6d4] px-5 font-semibold text-[#06b6d4] hover:bg-[#06b6d4]/10"
+          className={`min-h-11 rounded-lg border border-[#06b6d4] px-5 font-semibold text-[#06b6d4] hover:bg-[#06b6d4]/10 ${TOUCH}`}
         >
           {T.play_again}
         </button>

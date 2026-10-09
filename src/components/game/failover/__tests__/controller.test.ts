@@ -270,7 +270,7 @@ describe("input to sim", () => {
     controller.tap(10, 10, "touch");
     expect(S.services).toHaveLength(0);
     expect(view.overlays.at(-1)?.ghost).toEqual({ type: "compute", x: 0, z: 8 });
-    expect(controller.getHud().confirming).toBe(true);
+    expect(controller.getHud().pending).toMatchObject({ kind: "place" });
     controller.confirm();
     expect(S.services).toHaveLength(1);
     expect(view.overlays.at(-1)?.ghost).toBeNull();

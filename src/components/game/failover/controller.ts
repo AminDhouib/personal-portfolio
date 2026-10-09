@@ -30,7 +30,7 @@ import {
 import type { Cell } from "./scene/pick";
 import { createFailoverScene, type FailoverScene, type Overlay } from "./scene/scene";
 import { dispatch, type Action } from "./sim/action-log";
-import { CONFIG } from "./sim/config";
+import { CONFIG, type ServiceType } from "./sim/config";
 import { snapshot } from "./sim/snapshot";
 import { drainEvents, resetSim, S } from "./sim/state";
 import { step } from "./sim/tick";
@@ -61,6 +61,17 @@ export interface Alert {
   params: Readonly<Record<string, string | number>>;
 }
 
+/**
+ * A finger's placement or demolish waiting for Confirm: what it is, and where
+ * the Confirm and Cancel pair sits, in board pixels, kept on the board.
+ */
+export interface Pending {
+  kind: "place" | "demolish";
+  name: string;
+  x: number;
+  y: number;
+}
+
 /** How a run ended, handed to onRunEnd once per run. */
 export interface RunEnd {
   mode: GameMode;
@@ -74,8 +85,7 @@ export interface HudState extends SimHud {
   paused: boolean;
   speed: Speed;
   tool: Tool;
-  /** A placement or demolish is waiting for Confirm. */
-  confirming: boolean;
+  pending: Pending | null;
   toast: string | null;
   soundOn: boolean;
   tier: PerfTier;
@@ -125,6 +135,8 @@ const MAX_BADGES = 24;
 /** A badge floats this high over the ground, about the top of a tier-1 node. */
 const BADGE_Y = 3;
 const ALERT_MS = 4000;
+/** How far the Confirm and Cancel pair keeps from the board's edges, in pixels. */
+const PENDING_MARGIN_PX = 48;
 const MAX_PENDING_EVENTS = 512;
 
 const REFUSALS: Record<string, string> = {
@@ -373,6 +385,34 @@ export class FailoverController {
     return out;
   }
 
+  private pendingView(): Pending | null {
+    const m = this.machine;
+    let kind: Pending["kind"];
+    let type: ServiceType;
+    let point: [number, number, number];
+    if (m.mode === "ghost") {
+      kind = "place";
+      type = m.tool.service;
+      point = [m.x, 0, m.z];
+    } else if (m.mode === "confirmDemolish") {
+      const svc = S.services.find((s) => s.id === m.id);
+      if (!svc) return null;
+      kind = "demolish";
+      type = svc.type;
+      point = [svc.position.x, 0, svc.position.z];
+    } else {
+      return null;
+    }
+    const w = this.viewportWidth;
+    const h = this.viewportHeight;
+    const at = projectToView(this.camera, point, w, h) ?? { x: w / 2, y: h };
+    const clamp = (v: number, size: number) => {
+      const margin = Math.min(PENDING_MARGIN_PX, size / 2);
+      return Math.min(Math.max(v, margin), size - margin);
+    };
+    return { kind, name: CONFIG.services[type].name, x: clamp(at.x, w), y: clamp(at.y, h) };
+  }
+
   private renderFrame(nowMs: number): void {
     if (!this.scene) return;
     const settings = TIER_SETTINGS[this.governor.tier];
@@ -406,7 +446,7 @@ export class FailoverController {
       paused: this.paused,
       speed: this.speed,
       tool: this.machine.tool,
-      confirming: this.machine.mode === "ghost" || this.machine.mode === "confirmDemolish",
+      pending: this.pendingView(),
       toast: this.toast ? this.toast.text : null,
       soundOn: this.audio.isOn(),
       tier: this.governor.tier,
@@ -495,6 +535,8 @@ export class FailoverController {
   private setCamera(state: CameraState): void {
     this.camera = state;
     this.scene?.setCamera(state);
+    // The Confirm and Cancel pair sits by its ghost, so a pan or pinch moves it at once.
+    if (this.machine.mode === "ghost" || this.machine.mode === "confirmDemolish") this.emit();
   }
 
   private applyOverlay(): void {
