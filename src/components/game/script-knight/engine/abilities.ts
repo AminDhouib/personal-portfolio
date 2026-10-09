@@ -409,6 +409,9 @@ function formatValue(value: unknown): string {
   if (typeof value !== "object" && typeof value !== "function") {
     return String(value);
   }
+  if (value instanceof Error) {
+    return value.message;
+  }
   try {
     const json = JSON.stringify(value);
     return typeof json === "string" ? json : "[object]";

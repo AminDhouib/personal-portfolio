@@ -51,6 +51,15 @@ describe("Think", () => {
       });
     });
 
+    test("prints an error's message, not the empty object JSON makes of it", () => {
+      think.perform(new Error("the floor is lava"));
+      expect(unit.emit).toHaveBeenCalledWith({
+        type: "think",
+        description: "thinks {thought}",
+        params: { thought: "the floor is lava" },
+      });
+    });
+
     test("allows complex thoughts, as JSON rather than util.format", () => {
       think.perform("that %o", { brave: true });
       expect(unit.emit).toHaveBeenCalledWith({
