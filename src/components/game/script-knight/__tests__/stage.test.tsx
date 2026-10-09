@@ -323,6 +323,22 @@ describe("Stage, Today's floor", () => {
     expect(await screen.findByText(/Rank 1 today/)).toBeTruthy();
   });
 
+  it("saves the stats once per clear, and once more when the handle changes", async () => {
+    const writes = () => setItem.mock.calls.filter(([key]) => key === "knight:stats").length;
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    render(<Stage runner={dailyRunner()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
+    await runAndSkip();
+    await screen.findByRole("button", { name: "Submit" });
+    expect(writes()).toBe(1);
+    fireEvent.change(screen.getByLabelText("Name for the board"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(writes()).toBe(2);
+    expect(JSON.parse(localStorage.getItem("knight:stats") ?? "{}").handle).toBe("Ada");
+    setItem.mockRestore();
+  });
+
   it("refuses to post once the UTC day has turned over, and says so", async () => {
     render(<Stage runner={dailyRunner()} />);
     fireEvent.click(screen.getByRole("button", { name: "Today's floor" }));
