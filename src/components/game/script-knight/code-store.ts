@@ -71,3 +71,27 @@ export function setTowerCode(
   if (code.length > CODE_MAX_CHARS) return { ok: false, reason: "too-long" };
   return { ok: true, store: { ...store, towers: { ...store.towers, [tower]: code } } };
 }
+
+/** Puts the day's code in the store (replacing another day's), or refuses code over the cap. */
+export function setDailyCode(
+  store: CodeStore,
+  day: string,
+  code: string,
+): { ok: true; store: CodeStore } | { ok: false; reason: "too-long" } {
+  if (code.length > CODE_MAX_CHARS) return { ok: false, reason: "too-long" };
+  return { ok: true, store: { ...store, daily: { day, code } } };
+}
+
+/**
+ * The code to show for the daily floor: the day's own edits, or the tower's saved code (then the
+ * starter) as the starting point when the day has none yet.
+ */
+export function dailyCodeFor(
+  store: CodeStore,
+  day: string,
+  tower: TowerId,
+  starter: string,
+): string {
+  if (store.daily?.day === day) return store.daily.code;
+  return store.towers[tower] || starter;
+}
