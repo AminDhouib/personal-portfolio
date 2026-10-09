@@ -316,3 +316,35 @@ describe("Hextris share", () => {
     expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
   });
 });
+
+describe("Hextris game-over announcement", () => {
+  const sheet = () => screen.getByRole("region", { name: "Game over" });
+
+  it("moves focus to the sheet itself when it opens, not to a control", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    expect(document.activeElement).toBe(sheet());
+    expect(sheet().getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("describes the sheet by the final score, never by the count-up's 0", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    // The count-up has not moved yet.
+    expect(screen.getByTestId("final-score").textContent).toBe("0");
+    expect(screen.getByTestId("final-score").getAttribute("aria-hidden")).toBe("true");
+    expect(sheet()).toHaveAccessibleDescription("Final score 120");
+  });
+
+  it("still restarts on a key with the focus on the sheet", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    runFrames(Math.round(1500 / 16));
+    fireEvent.keyDown(sheet(), { key: "Enter" });
+    runFrames(1);
+    expect(screen.queryByRole("region", { name: "Game over" })).toBeNull();
+  });
+});

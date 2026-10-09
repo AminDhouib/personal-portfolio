@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useId, useRef, useEffect, useState } from "react";
 import {
   Volume2,
   VolumeX,
@@ -68,7 +68,13 @@ function ScoreCountUp({ score }: { score: number }) {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [score]);
-  return <span data-testid="final-score">{shown}</span>;
+  // Hidden from screen readers, which would read the 0 it starts at; the sheet carries the final
+  // score as its description instead.
+  return (
+    <span data-testid="final-score" aria-hidden="true">
+      {shown}
+    </span>
+  );
 }
 
 /** A run's unpaused play time as m:ss. */
@@ -106,6 +112,7 @@ export function HextrisGame() {
   const [scorePulse, setScorePulse] = useState(0);
   // The game-over sheet, and whether the player has collapsed it to a strip to see the board.
   const sheetRef = useRef<HTMLElement>(null);
+  const finalScoreId = useId();
   const [sheetHidden, setSheetHidden] = useState(false);
   // The run beat a stored best (never on the first run ever: there was nothing to beat).
   const [uiNewBest, setUiNewBest] = useState(false);
@@ -361,6 +368,10 @@ export function HextrisGame() {
   // presses Submit (or Enter in the name box), never automatically.
   useEffect(() => {
     if (uiState === "gameover") {
+      // Focus goes to the sheet itself (not a control and not the name field, which would open a
+      // phone keyboard over the board), so a screen reader announces "Game over" and the final
+      // score once. Space, Enter and R still restart from it after the lockout.
+      sheetRef.current?.focus({ preventScroll: true });
       void refreshLeaderboard();
     }
     if (uiState === "playing") {
@@ -1125,7 +1136,9 @@ export function HextrisGame() {
         <section
           ref={sheetRef}
           aria-label="Game over"
-          className={`hextris-sheet-in pointer-events-auto absolute inset-x-0 bottom-0 z-30 overflow-y-auto rounded-t-2xl border-t border-white/10 bg-black/90 p-4 text-white shadow-2xl backdrop-blur-md sm:top-0 sm:left-auto sm:w-80 sm:rounded-none sm:border-t-0 sm:border-l sm:p-5 ${
+          aria-describedby={finalScoreId}
+          tabIndex={-1}
+          className={`hextris-sheet-in pointer-events-auto absolute inset-x-0 bottom-0 z-30 overflow-y-auto rounded-t-2xl border-t border-white/10 bg-black/90 p-4 text-white shadow-2xl backdrop-blur-md outline-none sm:top-0 sm:left-auto sm:w-80 sm:rounded-none sm:border-t-0 sm:border-l sm:p-5 ${
             sheetHidden ? "sm:bottom-auto" : "max-h-[55%] sm:max-h-none"
           }`}
         >
@@ -1140,6 +1153,9 @@ export function HextrisGame() {
                 )}
               </div>
               <div className="font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
+                <span id={finalScoreId} className="sr-only">
+                  {`Final score ${uiRun.score}`}
+                </span>
                 <ScoreCountUp score={uiRun.score} />
               </div>
             </div>
