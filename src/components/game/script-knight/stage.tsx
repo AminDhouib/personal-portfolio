@@ -54,6 +54,7 @@ import {
 import { runInSandbox } from "./sandbox/run-client";
 import { CUES, cueFor, endCue } from "./sound-cues";
 import { resolveStart } from "./start-at";
+import { ShareRunButton } from "./share-button";
 import { STARTER } from "./starter";
 import {
   activeStreak,
@@ -662,6 +663,20 @@ export function Stage({
             hasNextFloor={!daily && shown.result.passed && !useEpic && level < FLOORS_PER_TOWER}
             onNext={() => goTo(tower, level + 1, useEpic)}
             onRetry={() => setFloorRun(null)}
+          />
+        ) : null}
+        {showResult && shown?.result.passed && shown.result.score ? (
+          <ShareRunButton
+            floor={shown.ref}
+            log={shown.log}
+            title={
+              shown.ref.kind === "daily"
+                ? shown.ref.day
+                : floorLabel(shown.ref.tower, shown.ref.level, shown.ref.epic)
+            }
+            score={shown.result.score.total}
+            turns={shown.result.turns}
+            par={shown.ref.kind === "daily" && dailyInfo ? dailyInfo.par : null}
           />
         ) : null}
         {showResult && shown?.outcome?.retry ? (
