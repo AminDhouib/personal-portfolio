@@ -292,9 +292,12 @@ export function RainGame({
     <div
       key={shake}
       data-testid="ts-rain-echo"
-      className={[ECHO_BASE, invalid ? "ts-rain-shake text-red-400" : "text-(--foreground)"].join(
-        " ",
-      )}
+      className={[
+        ECHO_BASE,
+        invalid
+          ? "ts-rain-shake text-red-400 underline decoration-red-400 decoration-wavy underline-offset-4"
+          : "text-(--foreground)",
+      ].join(" ")}
     >
       {buffer}
     </div>

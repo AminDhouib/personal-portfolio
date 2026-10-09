@@ -140,9 +140,12 @@ describe("Word Rain view", () => {
     typeText("!");
     expect(screen.getByTestId("ts-rain-echo")).toHaveClass("ts-rain-shake");
     expect(screen.getByTestId("ts-rain-area")).toHaveAttribute("data-missed", "1");
+    // The shake is off under reduced motion, so a miss also underlines the echo (not colour alone).
+    expect(screen.getByTestId("ts-rain-echo")).toHaveClass("underline", "decoration-wavy");
     // Backspace edits the buffer back to something valid.
     setValue(input().value.slice(0, -1), "deleteContentBackward");
     expect(screen.getByTestId("ts-rain-echo")).not.toHaveClass("ts-rain-shake");
+    expect(screen.getByTestId("ts-rain-echo")).not.toHaveClass("underline");
     expect(screen.getByTestId("ts-rain-echo")).toHaveTextContent(text.slice(0, 1));
   });
 
