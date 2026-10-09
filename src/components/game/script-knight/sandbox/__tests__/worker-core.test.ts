@@ -224,6 +224,17 @@ describe("handleRun", () => {
     expect(posted.at(-1)).toEqual({ type: "done" });
   });
 
+  it("posts a player-error when playTurn is async", () => {
+    const { posted, post, scope } = harness();
+    handleRun(runMessage("class Player { async playTurn(w) { w.walk(); } }"), post, scope);
+    expect(posted.at(-1)).toMatchObject({
+      type: "player-error",
+      t: 1,
+      message: "playTurn must not be async: return after choosing one action.",
+    });
+    expect(posted.some((m) => m.type === "done")).toBe(false);
+  });
+
   it("throws, so the page sees a crash, when the engine fails inside a turn", () => {
     const { posted, post, scope } = harness();
     const original = Array.prototype.forEach;

@@ -1,5 +1,6 @@
 import type { CompileErrorKind } from "./protocol";
 import type { WarriorTurn } from "../engine/facade";
+import { RuleError } from "./facade";
 
 export type CompileResult =
   | { ok: true; player: { playTurn: (turn: WarriorTurn) => void } }
@@ -27,6 +28,16 @@ export function playerLine(err: unknown): number | null {
   const match = V8_FRAME.exec(stack) ?? GECKO_FRAME.exec(stack);
   const line = match ? Number(match[1]) - LINES_BEFORE_PLAYER : 0;
   return line >= 1 ? line : null;
+}
+
+const ASYNC_MESSAGE = "playTurn must not be async: return after choosing one action.";
+
+function isThenable(value: unknown): boolean {
+  return (
+    (typeof value === "object" || typeof value === "function") &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
 }
 
 function describeError(err: unknown): string {
@@ -79,6 +90,9 @@ export function compilePlayer(code: string): CompileResult {
       playerLine(err),
     );
   }
+  if (isThenable(player)) {
+    return fail("constructor", "Your Player constructor must not be async.", null);
+  }
   const playTurn = (player as { playTurn?: unknown } | null)?.playTurn;
   if (typeof playTurn !== "function") {
     return fail("no-play-turn", "Your Player class must define a playTurn method.", null);
@@ -86,7 +100,14 @@ export function compilePlayer(code: string): CompileResult {
   return {
     ok: true,
     player: {
-      playTurn: (turn) => void (playTurn as (t: WarriorTurn) => unknown).call(player, turn),
+      playTurn: (turn) => {
+        const returned = (playTurn as (t: WarriorTurn) => unknown).call(player, turn);
+        // An async playTurn would choose its action after the turn is over: refuse it loudly
+        // instead of letting every turn idle.
+        if (isThenable(returned)) {
+          throw new RuleError(ASYNC_MESSAGE);
+        }
+      },
     },
   };
 }
