@@ -100,7 +100,10 @@ export function RainGame({
     },
     [onRunOver],
   );
-  const { rain, buffer, invalid, started, active, reset } = useRain(seed, { inputRef, onOver });
+  const { rain, buffer, invalid, started, active, press, reset } = useRain(seed, {
+    inputRef,
+    onOver,
+  });
   const over = rain.status === "over";
   const [shake, setShake] = useState(0);
   const [wasInvalid, setWasInvalid] = useState(false);
@@ -173,11 +176,12 @@ export function RainGame({
       if (document.activeElement !== inputRef.current) {
         e.preventDefault();
         inputRef.current?.focus();
+        if (e.key !== " ") press(e.key);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [started, over, again]);
+  }, [started, over, again, press]);
 
   const target = rainTarget(rain, buffer);
   const paused = !over && !active;

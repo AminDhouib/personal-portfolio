@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { SENTINEL, REJECTED_TYPES, diffInput } from "./engine/input";
+import type { Op } from "./engine/types";
 import { createRain, rainTarget, tickRain, typeRain, type RainState } from "./engine/rain";
 
 /** A frame never advances the rain by more than this, so a stall cannot drop words on the floor. */
@@ -27,6 +28,8 @@ export interface RainApi {
   started: boolean;
   /** Ticking: started, the input is focused, the tab is visible, and the run is on. */
   active: boolean;
+  /** Types a letter as if it had come through the input; for the key that resumes a run. */
+  press: (ch: string) => void;
   /** A fresh run from a seed. `keepStarted` carries "started" over, as Play again does. */
   reset: (seed: number, keepStarted: boolean) => void;
 }
@@ -115,21 +118,12 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  // The hidden input holds SENTINEL plus the buffer, so Backspace on an empty buffer still fires.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    const onInput = (e: Event) => {
+  const applyOps = useCallback(
+    (ops: Op[], bulkInsert: boolean) => {
       const r = rainRef.current;
-      const inputType = (e as InputEvent).inputType || "insertText";
-      const diff = diffInput(lastValue.current, el.value, inputType);
-      if (diff.rejected || r.status === "over") {
-        setBuf(bufferRef.current, invalidRef.current);
-        return;
-      }
       let buf = bufferRef.current;
       let bad = invalidRef.current;
-      for (const op of diff.ops) {
+      for (const op of ops) {
         if (op.kind === "char") {
           buf += op.ch;
           const result = typeRain(r, buf);
@@ -147,12 +141,40 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
           bad = false;
         }
       }
-      if (diff.bulk && diff.ops.length > 0) {
+      if (bulkInsert && ops.length > 0) {
         bulkRef.current++;
         setBulk(bulkRef.current);
       }
       setBuf(buf, bad);
       setVersion((v) => v + 1);
+    },
+    [setBuf],
+  );
+
+  // A printable key that wakes a paused run is typed input, as in the timed modes. A fresh run
+  // has nothing on screen yet, so its starting key would only be a miss and is dropped.
+  const press = useCallback(
+    (ch: string) => {
+      const r = rainRef.current;
+      if (r.status === "over" || r.words.length === 0) return;
+      applyOps([ch === " " ? { kind: "space" } : { kind: "char", ch }], false);
+    },
+    [applyOps],
+  );
+
+  // The hidden input holds SENTINEL plus the buffer, so Backspace on an empty buffer still fires.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const onInput = (e: Event) => {
+      const r = rainRef.current;
+      const inputType = (e as InputEvent).inputType || "insertText";
+      const diff = diffInput(lastValue.current, el.value, inputType);
+      if (diff.rejected || r.status === "over") {
+        setBuf(bufferRef.current, invalidRef.current);
+        return;
+      }
+      applyOps(diff.ops, diff.bulk);
     };
     const onBeforeInput = (e: Event) => {
       if (REJECTED_TYPES.includes((e as InputEvent).inputType)) e.preventDefault();
@@ -173,7 +195,7 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
       el.removeEventListener("paste", refuse);
       el.removeEventListener("drop", refuse);
     };
-  }, [inputRef, setBuf]);
+  }, [inputRef, setBuf, applyOps]);
 
   const active = started && focused && visible && rain.status === "running";
   useEffect(() => {
@@ -207,5 +229,5 @@ export function useRain(initialSeed: number, { inputRef, onOver }: RainOptions):
     return () => cancelAnimationFrame(id);
   }, [active, setBuf]);
 
-  return { rain, version, buffer, invalid, bulk, started, active, reset };
+  return { rain, version, buffer, invalid, bulk, started, active, press, reset };
 }
