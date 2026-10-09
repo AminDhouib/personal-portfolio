@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
 import { useArcadeBoard } from "@/hooks/use-arcade-board";
 import { utcDayKey } from "@/lib/arcade/boards";
-import { safeLocalSet } from "@/lib/safe-storage";
 import { dayNumber } from "../daily/daily";
 import type { DailyResult } from "../daily/result";
 import { dailyShareText, shareDaily } from "../daily/share-text";
+import { HANDLE_MAX, loadHandle, saveHandle } from "../handle";
 import { T, fmt } from "../strings";
 import { clock } from "./format";
 import { BUTTON, BUTTON_IDLE, TOUCH } from "./surface";
@@ -15,9 +15,6 @@ import { BUTTON, BUTTON_IDLE, TOUCH } from "./surface";
 // The Daily Incident's board, on the end-of-run report: submit the run with its proof, read the
 // Today / This week / All time boards, share the result. It is rendered only for a run the
 // controller started as a daily, so a free or sandbox run never reaches the board.
-
-export const HANDLE_KEY = "failover:handle";
-export const HANDLE_MAX = 12;
 
 type SubmitState = "idle" | "sending" | "submitted" | "failed" | "rejected" | "identity" | "busy";
 
@@ -30,15 +27,6 @@ const EMPTY_TEXT = {
   weekly: T.daily_empty_weekly,
   "all-time": T.daily_empty_all,
 } as const;
-
-function loadHandle(): string {
-  try {
-    return (window.localStorage.getItem(HANDLE_KEY) ?? "").slice(0, HANDLE_MAX);
-  } catch {
-    // silent-ok: blocked storage just means the name box starts empty
-    return "";
-  }
-}
 
 export function DailyPanel({ result }: { result: DailyResult }) {
   const { entries, you, period, setPeriod, loading, readError, refresh, submit } = useArcadeBoard(
@@ -86,7 +74,7 @@ export function DailyPanel({ result }: { result: DailyResult }) {
       return;
     }
     const typed = name.trim().slice(0, HANDLE_MAX);
-    safeLocalSet(HANDLE_KEY, typed);
+    saveHandle(typed);
     setState("sending");
     const sent = await submit({
       name: typed || "Player",

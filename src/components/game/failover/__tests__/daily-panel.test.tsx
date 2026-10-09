@@ -11,7 +11,8 @@ vi.mock("@/lib/arcade/identity", () => ({
 import { utcDayKey } from "@/lib/arcade/boards";
 import { dayNumber } from "../daily/daily";
 import type { DailyResult } from "../daily/result";
-import { DailyPanel, HANDLE_KEY } from "../ui/daily-panel";
+import { HANDLE_KEY } from "../handle";
+import { DailyPanel } from "../ui/daily-panel";
 
 const ID = { playerId: "11111111-1111-4111-8111-111111111111", token: "A".repeat(43) };
 
@@ -129,7 +130,7 @@ describe("submitting", () => {
       detail: { day: dayNumber(utcDayKey(new Date())), seconds: 342, ticks: 6840, actions: 12 },
       proof: "0,8",
     });
-    expect(window.localStorage.getItem(HANDLE_KEY)).toBe("Grace");
+    expect(window.localStorage.getItem(HANDLE_KEY)).toBe('{"v":1,"handle":"Grace"}');
   });
 
   it("locks after a post so one run is sent once", async () => {
@@ -143,7 +144,7 @@ describe("submitting", () => {
   });
 
   it("remembers the name for the next run", async () => {
-    window.localStorage.setItem(HANDLE_KEY, "Linus");
+    window.localStorage.setItem(HANDLE_KEY, '{"v":1,"handle":"Linus"}');
     await mount();
     expect((screen.getByLabelText("Name for the board") as HTMLInputElement).value).toBe("Linus");
   });
