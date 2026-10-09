@@ -88,6 +88,7 @@ const DETAIL_KEYS: { [G in ArcadeGameSlug]: readonly (keyof ArcadeDetail<G> & st
   "tower-stacker": ["day", "blocks", "perfects", "streak", "seconds"],
   "typing-speed": ["day", "ms", "chars", "acc"],
   "script-knight": ["day", "turns", "hand"],
+  failover: ["day", "seconds", "ticks", "actions"],
 };
 
 // Mirrors ARCADE_SCORE_CAP in src/lib/arcade/games.ts. That module imports zod and the

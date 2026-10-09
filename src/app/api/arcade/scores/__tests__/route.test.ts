@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 import { dailyText } from "@/components/game/typing-speed/engine/daily";
 import { makeJsonPostRequest, uniqueIp } from "@/test/api-route-helpers";
 import { createFakePool } from "@/test/fake-pg";
+import { record, type Recorded, SHORT } from "@/lib/arcade/__tests__/failover-fixtures";
 
 // Same shape as the legacy route test: the pool is the only thing replaced. Here it is an
 // in-memory emulation of the arcade statements (the store's, plus the legacy import the
@@ -686,6 +687,86 @@ describe("POST /api/arcade/scores", () => {
     });
   });
 
+  describe("Failover daily incident", () => {
+    const DAY_NUMBER = 20261015;
+    let run: Recorded;
+    const failover = (over: Record<string, unknown> = {}) => ({
+      game: "failover",
+      score: run.score,
+      detail: { day: DAY_NUMBER, seconds: run.seconds, ticks: run.ticks, actions: run.actions },
+      proof: run.proof,
+      ...over,
+    });
+
+    beforeAll(() => {
+      run = record("2026-10-15", SHORT);
+    });
+
+    beforeEach(async () => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+      (await reported()).mockClear();
+    });
+
+    it("accepts the replayed run and stores numbers only, never the proof", async () => {
+      const { res, json } = await submit(failover());
+      expect(res.status).toBe(200);
+      expect(json.ok).toBe(true);
+      const inserts = emu.fake.queries.filter((q) => q.sql.startsWith("INSERT INTO arcade_scores"));
+      expect(inserts).toHaveLength(3);
+      for (const insert of inserts) {
+        expect(insert.params[4]).toBe(
+          JSON.stringify({
+            day: DAY_NUMBER,
+            seconds: run.seconds,
+            ticks: run.ticks,
+            actions: run.actions,
+          }),
+        );
+      }
+      expect(JSON.stringify(emu.fake.queries.map((q) => q.params))).not.toContain(run.proof);
+      expect(await reported()).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 when the proof is missing, and for a key the schema does not know", async () => {
+      const { proof: _proof, ...withoutProof } = failover();
+      const missing = await submit(withoutProof);
+      expect(missing.res.status).toBe(400);
+      expect(missing.json).toEqual({ error: "proof required" });
+      const extra = await submit(failover({ detail: { ...failover().detail, hand: 0 } }));
+      expect(extra.res.status).toBe(400);
+      expect(extra.json).toEqual({ error: "invalid detail" });
+    });
+
+    it("answers 422 for another day, and for a score no 900 s run reaches, writing nothing", async () => {
+      const day = await submit(failover({ detail: { ...failover().detail, day: 20261014 } }));
+      expect(day.res.status).toBe(422);
+      expect(day.json.reason).toBe("not today's run");
+      const high = await submit(failover({ score: 300_000 }));
+      expect(high.res.status).toBe(422);
+      expect(high.json.reason).toBe("score too high for the run");
+      expect(emu.scores()).toHaveLength(0);
+    });
+
+    it("answers 422 for a proof that is not one", async () => {
+      const { res, json } = await submit(failover({ proof: "not,a,proof" }));
+      expect(res.status).toBe(422);
+      expect(json.reason).toBe("unreadable proof");
+      expect(emu.scores()).toHaveLength(0);
+    });
+
+    it("accepts a score the replay disagrees with while the rollout switch is on, and reports it", async () => {
+      const { res } = await submit(failover({ score: run.score + 1 }));
+      expect(res.status).toBe(200);
+      expect(await reported()).toHaveBeenCalledTimes(1);
+      expect(await reported()).toHaveBeenCalledWith(
+        "arcade:failover-verify.shadow",
+        expect.objectContaining({
+          message: "failover replay disagrees: score does not match the replay",
+        }),
+      );
+    });
+  });
+
   describe("guard chain", () => {
     it("rejects a cross-origin request with 403 before touching the database", async () => {
       const res = await post(body(), { origin: "https://evil.example" });
@@ -750,11 +831,13 @@ describe("submit contract (pins before the proof seam)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("registers a verifier and a proof requirement for Script Knight and for no other game", async () => {
+  it("registers a verifier and a proof requirement for Script Knight and Failover and for no other game", async () => {
     const { ARCADE_GAMES } = await import("@/lib/arcade/games");
     for (const [slug, entry] of Object.entries(ARCADE_GAMES)) {
       expect(Object.keys(entry), slug).toEqual(
-        slug === "script-knight" ? ["detailSchema", "requiresProof", "verify"] : ["detailSchema"],
+        slug === "script-knight" || slug === "failover"
+          ? ["detailSchema", "requiresProof", "verify"]
+          : ["detailSchema"],
       );
     }
   });

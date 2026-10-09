@@ -16,7 +16,9 @@ import {
   dailyText,
   dayNumber as typingDayNumber,
 } from "@/components/game/typing-speed/engine/daily";
+import { dayNumber as failoverDayNumber } from "@/components/game/failover/daily/daily";
 import { utcDayKey } from "./boards";
+import { MAX_PLAUSIBLE_SCORE, verifyFailoverRun } from "./failover-verify";
 
 /**
  * The arcade plausibility registry. Games are fully client side, so every submitted
@@ -37,6 +39,7 @@ export const ARCADE_GAME_SLUGS = [
   "tower-stacker",
   "typing-speed",
   "script-knight",
+  "failover",
 ] as const satisfies readonly GameSlug[];
 
 export type ArcadeGameSlug = (typeof ARCADE_GAME_SLUGS)[number];
@@ -156,12 +159,23 @@ const knightDetailSchema = z.strictObject({
   hand: z.union([z.literal(0), z.literal(1)]),
 });
 
+// Failover's Daily Incident: the UTC day (YYYYMMDD), whole seconds survived, the tick the run
+// ended on (20 a second, 900 s at most), and how many actions the proof holds (700 at most).
+// The action log travels as the proof and is never stored; verifyFailoverRun replays it.
+const failoverDetailSchema = z.strictObject({
+  day: z.number().int().min(20_000_101).max(99_991_231),
+  seconds: z.number().int().min(0).max(900),
+  ticks: z.number().int().min(1).max(18_000),
+  actions: z.number().int().min(0).max(700),
+});
+
 type SpaceShooterDetail = z.infer<typeof spaceShooterDetailSchema>;
 type HextrisDetail = z.infer<typeof hextrisDetailSchema>;
 type VoltorbDailyDetail = z.infer<typeof voltorbDailyDetailSchema>;
 type TowerDetail = z.infer<typeof towerDetailSchema>;
 type TypingDetail = z.infer<typeof typingDetailSchema>;
 type KnightDetail = z.infer<typeof knightDetailSchema>;
+type FailoverDetail = z.infer<typeof failoverDetailSchema>;
 
 /**
  * Orbital Dodge. s = seconds + 2 (floor, a stale UI sync, slack). Every term uses its
@@ -258,6 +272,20 @@ function checkScriptKnight(detail: KnightDetail, now: Date): Verdict {
   return { ok: true };
 }
 
+/**
+ * Failover, daily incident, the synchronous half: the day must be today's UTC day by the server
+ * clock (no grace across midnight, the Voltorb rule), the seconds must be the ticks over twenty,
+ * and the score must be under what a 900 s run can reach. verifyFailoverRun replays the proof.
+ */
+function checkFailover(score: number, detail: FailoverDetail, now: Date): Verdict {
+  if (detail.day !== failoverDayNumber(utcDayKey(now))) return reject("not today's run");
+  if (detail.seconds !== Math.floor(detail.ticks / 20)) {
+    return reject("seconds do not match the ticks");
+  }
+  if (score > MAX_PLAUSIBLE_SCORE) return reject("score too high for the run");
+  return { ok: true };
+}
+
 /** How many actions the verifier plays between looks at its deadline. */
 const KNIGHT_CHUNK = 25;
 
@@ -311,6 +339,11 @@ export const ARCADE_GAMES = {
     detailSchema: knightDetailSchema,
     requiresProof: true,
     verify: verifyScriptKnight,
+  },
+  failover: {
+    detailSchema: failoverDetailSchema,
+    requiresProof: true,
+    verify: verifyFailoverRun,
   },
 } satisfies Record<ArcadeGameSlug, ArcadeGameEntry>;
 
@@ -366,6 +399,10 @@ export function validateArcadeSubmission(
     case "script-knight":
       return verdictFor(ARCADE_GAMES["script-knight"].detailSchema.safeParse(rawDetail), (detail) =>
         checkScriptKnight(detail, now),
+      );
+    case "failover":
+      return verdictFor(ARCADE_GAMES.failover.detailSchema.safeParse(rawDetail), (detail) =>
+        checkFailover(score, detail, now),
       );
   }
 }

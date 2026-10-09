@@ -30,6 +30,7 @@ describe("registry", () => {
       "tower-stacker",
       "typing-speed",
       "script-knight",
+      "failover",
     ]);
   });
 

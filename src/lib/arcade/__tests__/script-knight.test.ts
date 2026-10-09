@@ -51,8 +51,8 @@ function verdict(
 }
 
 describe("script-knight in the arcade registry", () => {
-  it("is the last arcade slug, and not a legacy one", () => {
-    expect(ARCADE_GAME_SLUGS.at(-1)).toBe("script-knight");
+  it("is an arcade slug, and not a legacy one", () => {
+    expect([...ARCADE_GAME_SLUGS]).toContain("script-knight");
     expect([...LEGACY_ARCADE_GAME_SLUGS]).not.toContain("script-knight");
   });
 
