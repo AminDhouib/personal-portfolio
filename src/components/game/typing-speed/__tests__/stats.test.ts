@@ -4,6 +4,7 @@ import {
   emptyStats,
   loadStats,
   recordDay,
+  recordRain,
   recordRun,
   saveStats,
   streakAsOf,
@@ -196,5 +197,32 @@ describe("one bad field", () => {
     expect(s.keys).toEqual({});
     expect(s.runs).toBe(1);
     expect(s.bests["words-30"]?.wpm).toBe(70);
+  });
+});
+
+describe("recordRain", () => {
+  it("keeps the best score and the best wave on their own", () => {
+    const a = recordRain(emptyStats(), { score: 120, wave: 3, bulk: false });
+    expect(a.rain).toEqual({ best: 120, bestWave: 3 });
+    const b = recordRain(a, { score: 90, wave: 5, bulk: false });
+    expect(b.rain).toEqual({ best: 120, bestWave: 5 });
+    const c = recordRain(b, { score: 200, wave: 2, bulk: false });
+    expect(c.rain).toEqual({ best: 200, bestWave: 5 });
+  });
+  it("ignores a bulk run", () => {
+    const s = recordRain(emptyStats(), { score: 500, wave: 9, bulk: true });
+    expect(s.rain).toEqual({ best: 0, bestWave: 0 });
+  });
+  it("touches nothing but rain, and never mutates its input", () => {
+    const before = recordRun(emptyStats(), run({ mode: "quote" }));
+    const frozen = structuredClone(before);
+    const after = recordRain(before, { score: 50, wave: 2, bulk: false });
+    expect(before).toEqual(frozen);
+    expect({ ...after, rain: before.rain }).toEqual(before);
+    expect(localStorage.getItem("typing-high-score")).toBeNull();
+  });
+  it("loads Word Rain back as the last mode", () => {
+    saveStats({ ...emptyStats(), lastMode: "rain" });
+    expect(loadStats().lastMode).toBe("rain");
   });
 });

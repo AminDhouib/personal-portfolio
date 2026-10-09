@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CalendarDays, Ghost } from "lucide-react";
+import { CalendarDays, CloudRain, Ghost } from "lucide-react";
 import { DURATIONS, modeId, parseMode, type ModeId } from "./engine/modes";
 import type { Content, Seconds } from "./engine/types";
 
@@ -85,6 +85,12 @@ export function ModeBar({
         icon={<CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />}
         pressed={mode === "daily"}
         onClick={() => onChange("daily")}
+      />
+      <Choice
+        label="Rain"
+        icon={<CloudRain aria-hidden="true" className="h-3.5 w-3.5" />}
+        pressed={mode === "rain"}
+        onClick={() => onChange("rain")}
       />
       {ghost && (
         <Choice

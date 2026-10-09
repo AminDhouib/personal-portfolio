@@ -133,6 +133,18 @@ export interface RunRecord {
   bulk: number;
 }
 
+/**
+ * Folds a finished Word Rain run into its local best (the reserved `rain` fields). The best
+ * score and the best wave are kept apart, and a run typed with suggestions never counts.
+ */
+export function recordRain(stats: Stats, r: { score: number; wave: number; bulk: boolean }): Stats {
+  if (r.bulk) return stats;
+  const next = structuredClone(stats);
+  next.rain.best = Math.min(COUNT_CAP, Math.max(next.rain.best, r.score));
+  next.rain.bestWave = Math.min(COUNT_CAP, Math.max(next.rain.bestWave, r.wave));
+  return next;
+}
+
 /** The UTC day before `dayKey` ("2026-10-09" -> "2026-10-08"). */
 function previousDay(dayKey: string): string {
   const date = new Date(`${dayKey}T00:00:00Z`);

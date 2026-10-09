@@ -15,7 +15,25 @@ describe("ModeBar", () => {
     const names = within(group)
       .getAllByRole("button")
       .map((b) => b.textContent);
-    expect(names).toEqual(["Words", "Quotes", "15", "30", "60", "120", "Quote", "Daily"]);
+    expect(names).toEqual(["Words", "Quotes", "15", "30", "60", "120", "Quote", "Daily", "Rain"]);
+  });
+  it("marks only Rain as pressed in Word Rain, and picks it", () => {
+    const { group, onChange } = bar("rain");
+    const pressed = within(group)
+      .getAllByRole("button", { pressed: true })
+      .map((b) => b.textContent);
+    expect(pressed).toEqual(["Rain"]);
+    cleanup();
+    const again = bar("words-30");
+    fireEvent.click(screen.getByRole("button", { name: "Rain" }));
+    expect(again.onChange).toHaveBeenCalledWith("rain");
+    expect(screen.getByRole("button", { name: "Rain" })).toHaveClass("min-h-11", "min-w-11");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it("leaves Word Rain for a timed mode at 30 seconds", () => {
+    const { onChange } = bar("rain");
+    fireEvent.click(screen.getByRole("button", { name: "Words" }));
+    expect(onChange).toHaveBeenLastCalledWith("words-30");
   });
   it("marks the buttons that match the current mode as pressed", () => {
     const { group } = bar("quotes-60");

@@ -4,7 +4,7 @@ import { dailyText } from "../engine/daily";
 import { DEFAULT_MODE, MODE_IDS, configFor, isModeId, modeLabel, parseMode } from "../engine/modes";
 
 describe("modes", () => {
-  it("lists the eight timed modes, the single quote and the daily", () => {
+  it("lists the eight timed modes, the single quote, the daily and Word Rain", () => {
     expect(MODE_IDS).toEqual([
       "words-15",
       "words-30",
@@ -16,6 +16,7 @@ describe("modes", () => {
       "quotes-120",
       "quote",
       "daily",
+      "rain",
     ]);
     expect(DEFAULT_MODE).toBe("words-30");
   });
@@ -36,6 +37,12 @@ describe("modes", () => {
     expect(configFor("daily", 9, 0, "2026-10-08")).toEqual({ kind: "text", text });
     expect(configFor("daily", 1234, 3, "2026-10-08")).toEqual({ kind: "text", text });
     expect(parseMode("daily")).toBeNull();
+  });
+  it("knows Word Rain: no timed config, and a short label", () => {
+    expect(isModeId("rain")).toBe(true);
+    expect(parseMode("rain")).toBeNull();
+    expect(modeLabel("rain")).toBe("Rain");
+    expect(configFor("rain", 9).kind).toBe("text");
   });
   it("rejects anything else", () => {
     for (const x of ["words-45", "daily-2", "", null, 3]) expect(isModeId(x)).toBe(false);

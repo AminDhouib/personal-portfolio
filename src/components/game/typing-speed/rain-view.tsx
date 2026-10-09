@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Heart, RotateCcw } from "lucide-react";
+import { Heart, RotateCcw, Trophy } from "lucide-react";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { isTextEntryTarget } from "../text-entry";
-import { RAIN_LIVES, rainTarget, type RainState } from "./engine/rain";
+import { RAIN_LIVES, rainAccuracy, rainTarget, rainWpm, type RainState } from "./engine/rain";
+import { isNewBest } from "./metrics";
 import { PlaySheet, SheetHud } from "./play-sheet";
 import { sheetLayout } from "./sheet-layout";
 import { useRain } from "./use-rain";
@@ -70,12 +71,15 @@ export function RainGame({
   phone,
   nextSeed,
   onSheetChange,
+  onOver: onRunOver,
 }: {
-  /** The mode bar: it stays in place, and goes inert while the sheet is up. */
-  header: ReactNode;
+  /** Something above the area that goes inert while the sheet is up. */
+  header?: ReactNode;
   phone: boolean;
   nextSeed: () => number;
   onSheetChange?: (on: boolean) => void;
+  /** Called once when a run ends; returns the best score from before it, or null if none. */
+  onOver?: (rain: RainState, bulk: number) => number | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [seed, setSeed] = useState(nextSeed);
@@ -89,7 +93,13 @@ export function RainGame({
   const viewport = useVisualViewport(sheet);
   const layout = sheetLayout({ vvHeight: viewport.height, keyboardOpen: viewport.keyboardOpen });
 
-  const onOver = useCallback(() => {}, []);
+  const [outcome, setOutcome] = useState<{ prior: number | null; bulk: number } | null>(null);
+  const onOver = useCallback(
+    (r: RainState, bulk: number) => {
+      setOutcome({ prior: onRunOver?.(r, bulk) ?? null, bulk });
+    },
+    [onRunOver],
+  );
   const { rain, buffer, invalid, started, active, reset } = useRain(seed, { inputRef, onOver });
   const over = rain.status === "over";
   const [shake, setShake] = useState(0);
@@ -119,6 +129,7 @@ export function RainGame({
   const again = useCallback(() => {
     const next = nextSeed();
     setSeed(next);
+    setOutcome(null);
     reset(next);
     // Synchronous, inside the click, so mobile Safari keeps the keyboard.
     inputRef.current?.focus();
@@ -131,6 +142,7 @@ export function RainGame({
     inputRef.current?.blur();
     const next = nextSeed();
     setSeed(next);
+    setOutcome(null);
     reset(next);
   }, [nextSeed, reset]);
 
@@ -221,7 +233,44 @@ export function RainGame({
           className="absolute inset-0 flex flex-col items-center justify-center gap-2 overflow-y-auto bg-(--card)/90 p-4 text-center font-sans"
         >
           <p className="font-display text-2xl font-black text-accent-green">Game over</p>
-          <p className="text-sm text-(--muted)">{rain.score} letters cleared</p>
+          <p className="font-mono text-4xl font-black text-accent-green tabular-nums">
+            <span data-testid="ts-rain-result-score">{rain.score}</span>
+            <span className="ml-1 font-sans text-base font-semibold text-(--muted)">letters</span>
+          </p>
+          <dl className="grid grid-cols-4 gap-x-4 text-sm text-(--muted)">
+            {(
+              [
+                ["words", "Words", String(rain.cleared)],
+                ["wave", "Wave", String(rain.wave)],
+                ["wpm", "WPM", String(rainWpm(rain))],
+                ["acc", "Accuracy", `${rainAccuracy(rain)}%`],
+              ] as const
+            ).map(([id, label, value]) => (
+              <div key={id}>
+                <dd
+                  data-testid={`ts-rain-result-${id}`}
+                  className="font-mono text-lg font-semibold text-(--foreground) tabular-nums"
+                >
+                  {value}
+                </dd>
+                <dt>{label}</dt>
+              </div>
+            ))}
+          </dl>
+          {outcome && !outcome.bulk && isNewBest(rain.score, outcome.prior) && (
+            <p
+              data-testid="ts-rain-new-best"
+              className="flex items-center gap-1 text-sm font-semibold text-accent-amber"
+            >
+              <Trophy className="h-3.5 w-3.5" />
+              New best
+            </p>
+          )}
+          {outcome && outcome.bulk > 0 && (
+            <p className="text-xs text-accent-amber">
+              Typed with keyboard suggestions, so this run cannot set a best.
+            </p>
+          )}
           <button
             type="button"
             onClick={again}
@@ -249,7 +298,7 @@ export function RainGame({
 
   return (
     <div className="space-y-5">
-      <div inert={sheet}>{header}</div>
+      {header !== undefined && header !== null && <div inert={sheet}>{header}</div>}
       <PlaySheet
         active={sheet}
         compact={layout.compact}
@@ -268,7 +317,7 @@ export function RainGame({
         ref={inputRef}
         type="text"
         data-ts-hidden
-        aria-label="Typing area"
+        aria-label="Word Rain typing area"
         inputMode="text"
         enterKeyHint="next"
         autoComplete="off"
