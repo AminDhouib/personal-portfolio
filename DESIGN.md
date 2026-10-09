@@ -1105,19 +1105,22 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   counted or returned.
 
 - **Player code runs only in a per-run Web Worker.** Script Knight evaluates the visitor's own
-  JavaScript with `new Function` (`sandbox/compile.ts`, the one call, with its one
-  `eslint-disable-next-line no-new-func` and reason), and only inside a fresh Web Worker that the
-  page terminates after the run. Never on the main thread, never on the server (the guard test
+  JavaScript with `new Function` (`sandbox/compile.ts`, the one place, with a plain comment
+  saying why; `no-new-func` is not enabled), and only inside a fresh Web Worker that the page
+  terminates after the run. Never on the main thread, never on the server (the guard test
   fails the build if `src/app/`, `src/lib/`, `src/hooks/` or `engine/` imports `sandbox/`). The
   threat model is the visitor's own code in the visitor's own browser: the worker protects the
-  page from its mistakes (loops, crashes, stray globals) and keeps pasted code away from the page,
-  its storage and the network. Score integrity does not depend on it, because the page re-simulates
+  page from its mistakes (loops, crashes, stray globals) and keeps pasted code away from the page
+  and its storage. It is **not a network boundary**: `lockDown` withholds the usual network APIs so
+  nothing reaches out by accident, but a dynamic `import()` of a remote module still works and
+  nothing here stops it. Score integrity does not depend on it, because the page re-simulates
   the run from the action tokens the worker posts and the server does the same. `lockDown` runs
-  before any player code and removes `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`,
-  `WebTransport`, `importScripts`, `indexedDB`, `caches`, `BroadcastChannel`, `Worker`,
+  before any player code and removes `fetch`, `XMLHttpRequest`, `WebSocket`, `WebSocketStream`,
+  `EventSource`, `WebTransport`, `RTCPeerConnection`, the raw socket constructors, `importScripts`, `indexedDB`, `caches`, `BroadcastChannel`, `Worker`,
   `SharedWorker`, `postMessage`, `onmessage`, the listener APIs, `close`, the timers,
-  `queueMicrotask`, `requestAnimationFrame`, `navigator`, `location`, `performance` and `crypto`
-  from the scope and its whole prototype chain (`REMOVED_GLOBALS` is pinned by a test); the
+  `queueMicrotask`, `requestAnimationFrame`, `navigator`, `location`, `performance`, `crypto`,
+  `reportError` and `dispatchEvent` (the last two would let player code raise a crash report
+  with its own text) from the scope and its whole prototype chain (`REMOVED_GLOBALS` is pinned by a test); the
   worker captured its own `postMessage` first, so the player cannot post or forge a message. A name
   that cannot be removed stops the run as a crash instead of running the code. **Nothing is
   frozen**, on purpose: a player can pollute prototypes inside its own worker, which can only
@@ -1130,9 +1133,12 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   messages, 5,000 ms overall, then `worker.terminate()`. The facade caps
   1,000 ability calls and 10 think lines per turn. Anything the worker posts that does not fit
   `parseFromWorker`, or arrives out of turn order, ends the run as a crash. There is **no
-  main-thread fallback**: without Workers the player is told so and can still play by hand. A
-  dynamic `import()` of a remote module is outside this model (the code is the visitor's own and
-  the worker has no page access), and is not blocked.
+  main-thread fallback**: without Workers the player is told so and can still play by hand. The
+  remote `import()` is accepted because the code is the visitor's own and the worker holds no
+  secrets. An `async playTurn` (or any returned promise) is refused with a player error, since its
+  action would land after the turn. **Untested engines:** the line-number offset and a clean
+  `lockDown` (no stuck names) are verified only in Chromium (Chrome and Edge); Firefox and WebKit
+  are untested. If a CSP is ever added, the worker needs `'unsafe-eval'` for `new Function`.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
