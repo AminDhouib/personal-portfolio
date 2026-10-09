@@ -328,7 +328,10 @@ test.describe("Typing Speed Word Rain", () => {
     expect(text.length).toBeGreaterThan(1);
     await page.keyboard.type(text);
     await expect(page.getByTestId("ts-rain-score")).toHaveText(String(text.length));
-    await expect(page.getByTestId("ts-rain-word").filter({ hasText: text })).toHaveCount(0);
+    // Anchored: a later word that merely contains the typed one ("it" in "with") must not count.
+    await expect(
+      page.getByTestId("ts-rain-word").filter({ hasText: new RegExp(`^${text}$`) }),
+    ).toHaveCount(0);
 
     // Left alone, the words land one by one: 3 lives gone well inside 40 s of rain.
     await page.clock.runFor(40_000);
