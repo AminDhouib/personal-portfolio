@@ -16,10 +16,9 @@ const SCRIPT = [...BOARD_S, ...MID_RUN_S];
 //
 // How these were recorded: run this file with the pins set to 0, copy the two
 // values from the failure output, then re-run. Re-record only after a deliberate
-// sim change (the coordinator re-pins at the end of T8-1b once every mechanic has
-// landed; a mechanic added to the sim shifts both numbers). First recorded while
-// the T8-1b mechanics were still arriving, so expect this pin to move once.
-// Re-recorded in T8-1b A2 for the same stateHash additions (was 1246757318; the score did not move).
+// sim change; a mechanic added to the sim shifts both numbers. These are the final
+// T8-1b pins: re-recorded once every mechanic had landed (the score never moved, only
+// the hash, as stateHash grew to cover the new state).
 const GOLDEN_HASH = 464767114;
 const GOLDEN_SCORE = 26175;
 
