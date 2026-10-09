@@ -6,6 +6,8 @@ import {
   loadCode,
   parseCode,
   saveCode,
+  dailyCodeFor,
+  setDailyCode,
   setTowerCode,
   TOO_LONG_MESSAGE,
 } from "../code-store";
@@ -150,5 +152,43 @@ describe("the source", () => {
     const { join } = await import("node:path");
     const text = readFileSync(join(__dirname, "..", "code-store.ts"), "utf8");
     expect(text).not.toMatch(/\.setItem\(/);
+  });
+});
+
+describe("the daily code slot", () => {
+  it("starts from the tower code, then keeps the day's own edits", () => {
+    const tower = setTowerCode(emptyCodeStore(), "narrow-path", "class Player { /* tower */ }");
+    const store = tower.ok ? tower.store : emptyCodeStore();
+    expect(dailyCodeFor(store, "2026-10-15", "narrow-path", "STARTER")).toBe(
+      "class Player { /* tower */ }",
+    );
+    const edited = setDailyCode(store, "2026-10-15", "class Player { /* today */ }");
+    expect(edited.ok && edited.store.daily).toEqual({
+      day: "2026-10-15",
+      code: "class Player { /* today */ }",
+    });
+    const kept = edited.ok ? edited.store : store;
+    expect(dailyCodeFor(kept, "2026-10-15", "narrow-path", "STARTER")).toBe(
+      "class Player { /* today */ }",
+    );
+  });
+
+  it("resets with the day: yesterday's code is not today's", () => {
+    const edited = setDailyCode(emptyCodeStore(), "2026-10-14", "class Player { /* old */ }");
+    const store = edited.ok ? edited.store : emptyCodeStore();
+    expect(dailyCodeFor(store, "2026-10-15", "narrow-path", "STARTER")).toBe("STARTER");
+  });
+
+  it("refuses code over the cap and says why", () => {
+    expect(setDailyCode(emptyCodeStore(), "2026-10-15", "x".repeat(CODE_MAX_CHARS + 1))).toEqual({
+      ok: false,
+      reason: "too-long",
+    });
+    expect(setDailyCode(emptyCodeStore(), "2026-10-15", "x".repeat(CODE_MAX_CHARS)).ok).toBe(true);
+  });
+
+  it("does not touch the tower code", () => {
+    const edited = setDailyCode(emptyCodeStore(), "2026-10-15", "class Player {}");
+    expect(edited.ok && edited.store.towers).toEqual(emptyCodeStore().towers);
   });
 });
