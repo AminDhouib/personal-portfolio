@@ -136,6 +136,31 @@ describe("runs that never reach the board", () => {
     expect(posts()).toHaveLength(0);
   });
 
+  it("a loaded save or an imported blueprint (replaceRun) leaves no board and no POST", async () => {
+    const h = mountGame("survival");
+    fireEvent.click(startButton());
+    await act(async () => {
+      await h.controller.replaceRun(() => {
+        resetSim({ seed: "a-loaded-run", mode: "survival" });
+      });
+    });
+    expect(h.controller.getHud().daily).toBeNull();
+    endRun(h);
+    expect(h.controller.getHud().over).toBe("retired");
+    expect(screen.queryByTestId("failover-daily-panel")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("switching to Sandbox from a daily leaves no board and no POST", () => {
+    const h = mountGame("survival");
+    fireEvent.click(startButton());
+    act(() => h.controller.restart(undefined, "sandbox"));
+    expect(h.controller.getHud().mode).toBe("sandbox");
+    endRun(h);
+    expect(screen.queryByTestId("failover-daily-panel")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("a run begun any other way than the daily start (a loaded save, an arch link) carries no result", () => {
     const h = mountGame("survival");
     fireEvent.click(startButton());

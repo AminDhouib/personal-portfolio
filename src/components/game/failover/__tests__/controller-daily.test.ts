@@ -50,11 +50,46 @@ describe("starting a daily", () => {
     expect(h.controller.getHud().daily?.day).toBe(DAY);
   });
 
-  it("is dropped by Play again, which is a free run", () => {
+  it("is dropped by Play again, a free survival run (the daily left the controller in survival)", () => {
     const h = started();
     h.controller.restart();
     expect(h.controller.getHud().daily).toBeNull();
-    expect(S.gameMode).toBe("sandbox");
+    expect(S.gameMode).toBe("survival");
+  });
+});
+
+describe("swapping the run for one built elsewhere", () => {
+  it("drops the daily, as a save load or an arch import does", async () => {
+    const h = started();
+    expect(h.controller.getHud().daily?.day).toBe(DAY);
+    const out = await h.controller.replaceRun(() => {
+      resetSim({ seed: "a-loaded-run", mode: "survival" });
+    });
+    expect(out.ok).toBe(true);
+    expect(h.controller.getHud().daily).toBeNull();
+    // A run that ends afterwards makes no daily result.
+    dispatch({ op: 8 });
+    h.frame(50);
+    expect(h.controller.getHud().over).toBe("retired");
+    expect(h.controller.getHud().daily).toBeNull();
+  });
+
+  it("refuses to start a daily while a swap is in progress", async () => {
+    const h = makeController();
+    h.controller.start();
+    h.frame(16);
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pending = h.controller.replaceRun(async () => {
+      resetSim({ seed: "built", mode: "survival" });
+      await gate;
+    });
+    h.controller.startDaily(DAY);
+    release();
+    await pending;
+    expect(h.controller.getHud().daily).toBeNull();
   });
 });
 
