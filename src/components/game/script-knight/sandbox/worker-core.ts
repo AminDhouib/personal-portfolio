@@ -1,3 +1,4 @@
+import { dailyFloor } from "../daily";
 import { encodeAction } from "../engine/codec";
 import type { LevelRef } from "../engine/level-ref";
 import { configForRef, createRun, type RunFailure } from "../engine/run";
@@ -76,12 +77,12 @@ export function handleRun(
   if (!isRunMessage(data)) {
     throw new Error("The sandbox got a message that is not a run.");
   }
-  if (data.level.kind !== "tower") {
-    throw new Error("Daily floors cannot run in the sandbox yet.");
-  }
-
   // Level configs hold classes, so they are rebuilt here from the ref and never posted.
-  const run = createRun(configForRef(data.level, WARRIOR_NAME));
+  const config =
+    data.level.kind === "daily"
+      ? dailyFloor(data.level.day).config
+      : configForRef(data.level, WARRIOR_NAME);
+  const run = createRun(config);
   const granted = Object.keys(run.config.floor.warrior.abilities ?? {});
 
   const { stuck } = lock(scope);

@@ -1,4 +1,5 @@
 import { decodeLog, encodeLog } from "./engine/codec";
+import { dailyFloor } from "./daily";
 import type { LevelConfig } from "./engine/core/level-config";
 import type { LevelRef, TowerLevelRef } from "./engine/level-ref";
 import {
@@ -25,7 +26,7 @@ export const WARRIOR_NAME = "Knight";
 
 /** A floor played to its end, or as far as the code got. */
 export interface FloorRun {
-  ref: TowerLevelRef;
+  ref: LevelRef;
   config: LevelConfig;
   frames: Frame[];
   status: RunStatus;
@@ -56,24 +57,38 @@ export function startFloorRun(
   code: string,
   runner: Runner,
 ): { done: Promise<FloorRun>; cancel: () => void } {
-  const config = configForRef(ref, WARRIOR_NAME);
+  return startRun(configForRef(ref, WARRIOR_NAME), toLevelRef(ref), code, runner);
+}
+
+/** The same for the day's generated floor (UTC day key, "YYYY-MM-DD"). */
+export function startDailyRun(
+  day: string,
+  code: string,
+  runner: Runner,
+): { done: Promise<FloorRun>; cancel: () => void } {
+  return startRun(dailyFloor(day).config, { kind: "daily", day }, code, runner);
+}
+
+function startRun(
+  config: LevelConfig,
+  ref: LevelRef,
+  code: string,
+  runner: Runner,
+): { done: Promise<FloorRun>; cancel: () => void } {
   const run = createRun(config);
   const records: TurnRecord[] = [];
   const thoughts: string[][] = [];
 
-  const handle = runner(
-    { code, language: "javascript", level: toLevelRef(ref) },
-    (_t, token, turnThoughts) => {
-      const action = decodeLog(`1:${token}`)?.[0];
-      if (action === undefined) throw new Error("The sandbox sent an action the log cannot hold.");
-      const stepped = run.step(action);
-      // A failed step ends the run as a crash in the run client, which reports it once.
-      if (!stepped.ok)
-        throw new Error(`The engine refused the sandbox's action: ${stepped.reason.kind}`);
-      records.push(stepped.record);
-      thoughts.push(turnThoughts);
-    },
-  );
+  const handle = runner({ code, language: "javascript", level: ref }, (_t, token, turnThoughts) => {
+    const action = decodeLog(`1:${token}`)?.[0];
+    if (action === undefined) throw new Error("The sandbox sent an action the log cannot hold.");
+    const stepped = run.step(action);
+    // A failed step ends the run as a crash in the run client, which reports it once.
+    if (!stepped.ok)
+      throw new Error(`The engine refused the sandbox's action: ${stepped.reason.kind}`);
+    records.push(stepped.record);
+    thoughts.push(turnThoughts);
+  });
 
   const done = handle.done.then((outcome): FloorRun => {
     const frames = buildFrames(config, run.initial, records);
