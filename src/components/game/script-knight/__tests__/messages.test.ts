@@ -117,10 +117,11 @@ describe("describeOutcome", () => {
     });
   });
 
-  it("says Workers are blocked, and does not promise a mode that is not there yet", () => {
+  it("says Workers are blocked and points to Play by hand, a button that is on the page", () => {
     const message = describeOutcome({ kind: "no-worker" });
-    expect(message?.text).toBe("Your browser blocks Web Workers, so code cannot run here.");
-    expect(message?.text).not.toMatch(/by hand/);
+    expect(message?.text).toBe(
+      "Your browser blocks Web Workers, so code cannot run here. Choose Play by hand to play without code.",
+    );
   });
 
   it("acknowledges a cancelled run", () => {
