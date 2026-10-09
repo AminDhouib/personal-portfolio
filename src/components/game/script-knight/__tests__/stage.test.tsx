@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PROGRESS_KEY } from "../progress";
+import { emptyProgress, PROGRESS_KEY, recordClear, setAt } from "../progress";
 import type { Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
 import { Stage } from "../stage";
@@ -95,5 +95,157 @@ describe("Stage", () => {
     });
     fireEvent.change(editor, { target: { value: "x".repeat(20_001) } });
     expect((await screen.findByRole("alert")).textContent).toContain("20,000");
+  });
+
+  it("keeps the editor empty when the player deletes everything, and saves it empty", () => {
+    render(<Stage runner={fakeRunner([], finished)} />);
+    const editor = screen.getByLabelText("Your Player code (JavaScript)") as HTMLTextAreaElement;
+    expect(editor.value).not.toBe("");
+    fireEvent.change(editor, { target: { value: "" } });
+    expect(editor.value).toBe("");
+    window.dispatchEvent(new Event("pagehide"));
+    expect(JSON.parse(localStorage.getItem("knight:code") ?? "{}").towers["narrow-path"]).toBe("");
+  });
+
+  it("saves the code at once when the page is hidden, without waiting for the pause", () => {
+    render(<Stage runner={fakeRunner([], finished)} />);
+    const editor = screen.getByLabelText("Your Player code (JavaScript)");
+    fireEvent.change(editor, { target: { value: "class Player {}" } });
+    expect(localStorage.getItem("knight:code")).toBeNull();
+    window.dispatchEvent(new Event("pagehide"));
+    expect(localStorage.getItem("knight:code")).toContain("class Player {}");
+  });
+
+  it("does not show the floor clue for code that did not run", async () => {
+    seedFloor(2);
+    const error = fakeRunner(["w-"], () => ({
+      kind: "player-error",
+      log: "1:w-",
+      t: 2,
+      message: "boom is not defined",
+      line: 3,
+    }));
+    render(<Stage runner={error} />);
+    await runAndSkip();
+    expect(await screen.findByText(/boom is not defined/)).toBeTruthy();
+    expect(screen.queryByText(/Clue/)).toBeNull();
+  });
+
+  it("shows the clue when the floor was lost by a run that did finish", async () => {
+    seedFloor(2);
+    render(<Stage runner={fakeRunner(["w-", "w-", "w-"], finished)} />);
+    await runAndSkip();
+    expect((await screen.findAllByText(/Clue/)).length).toBeGreaterThan(0);
+  });
+});
+
+/** Opens floor 2 of the Narrow Path (floor 1 has no clue) and lands the stage on it. */
+function seedFloor(level: number) {
+  const cleared = recordClear(emptyProgress(), "narrow-path", level - 1, {
+    score: 100,
+    grade: 0.9,
+    turns: 10,
+  });
+  const progress = setAt(cleared, { tower: "narrow-path", level, epic: false });
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+}
+
+/** Clears the Narrow Path so epic mode is offered, and lands the stage on it. */
+function seedEpic(epic: boolean) {
+  let progress = emptyProgress();
+  for (let floor = 1; floor <= 9; floor += 1) {
+    progress = recordClear(progress, "narrow-path", floor, { score: 100, grade: 0.9, turns: 10 });
+  }
+  progress = setAt(progress, { tower: "narrow-path", level: 1, epic });
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+}
+
+/** A runner that plays one turn and then waits, so a test decides when a floor ends. */
+function pendingRunner(cancelEnds = true) {
+  const calls: { resolve: (outcome: RunOutcome) => void }[] = [];
+  const runner: Runner = (_req, onTurn) => {
+    onTurn(1, "w-", []);
+    let resolve!: (outcome: RunOutcome) => void;
+    const done = new Promise<RunOutcome>((r) => {
+      resolve = r;
+    });
+    calls.push({ resolve });
+    const cancel = () => {
+      if (cancelEnds) resolve({ kind: "cancelled", log: "1:w-" });
+    };
+    return { done, cancel };
+  };
+  return { runner, calls };
+}
+
+const settle = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  });
+
+function button(name: string) {
+  return screen.getByRole("button", { name }) as HTMLButtonElement;
+}
+
+describe("Stage runs", () => {
+  it("Stop during an epic run starts no further floor", async () => {
+    seedEpic(true);
+    const { runner, calls } = pendingRunner();
+    render(<Stage runner={runner} />);
+    fireEvent.click(button("Run epic"));
+    expect(calls).toHaveLength(1);
+    fireEvent.click(button("Stop"));
+    await settle();
+    expect(calls).toHaveLength(1);
+    expect(button("Run epic").disabled).toBe(false);
+  });
+
+  it("leaving the page during an epic run starts no further floor", async () => {
+    seedEpic(true);
+    const { runner, calls } = pendingRunner();
+    const { unmount } = render(<Stage runner={runner} />);
+    fireEvent.click(button("Run epic"));
+    expect(calls).toHaveLength(1);
+    unmount();
+    await settle();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("changing the floor during an epic run ends it and leaves Run free", async () => {
+    seedEpic(true);
+    const { runner, calls } = pendingRunner();
+    render(<Stage runner={runner} />);
+    fireEvent.click(button("Run epic"));
+    fireEvent.change(screen.getByLabelText("Floor"), { target: { value: "2" } });
+    await settle();
+    expect(calls).toHaveLength(1);
+    expect(button("Run epic").disabled).toBe(false);
+  });
+
+  it("two Run presses before a render start one run", () => {
+    const { runner, calls } = pendingRunner();
+    render(<Stage runner={runner} />);
+    const editor = screen.getByLabelText("Your Player code (JavaScript)");
+    act(() => {
+      fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+      fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("drops a result that arrives after the player moved to another tower", async () => {
+    seedEpic(false);
+    const { runner, calls } = pendingRunner(false);
+    render(<Stage runner={runner} />);
+    fireEvent.click(button("Run"));
+    fireEvent.change(screen.getByLabelText("Tower"), { target: { value: "powder-keep" } });
+    await act(async () => {
+      calls[0]?.resolve({ kind: "timeout", log: "1:w-", phase: "turn", t: 2 });
+      await Promise.resolve();
+    });
+    await settle();
+    fireEvent.click(button("Skip to end"));
+    expect(screen.queryByText(/ran longer than/)).toBeNull();
+    expect(screen.queryByText("Floor not passed")).toBeNull();
   });
 });
