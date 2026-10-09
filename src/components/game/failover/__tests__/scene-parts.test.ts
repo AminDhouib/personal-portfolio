@@ -14,7 +14,7 @@ import {
 import { LINK_Y, writeConnectionSegments } from "../scene/connections";
 import { diffIds, nodeShape, nodeStyle } from "../scene/nodes";
 import { ACCENT, DISABLED_COLOR, SERVICE_COLORS, TRAFFIC_COLORS } from "../scene/palette";
-import { cellAt, groundPoint, nodeAt } from "../scene/pick";
+import { cellAt, groundPoint, nodeAt, pickNode } from "../scene/pick";
 import { REQUEST_Y, writeRequestInstances, type Rgb } from "../scene/requests";
 import { dispatch } from "../sim/action-log";
 import { SERVICE_TYPES, TRAFFIC_TYPES } from "../sim/config";
@@ -153,6 +153,30 @@ describe("pick", () => {
     expect(nodeAt({ x: -28, z: 0 }, snap)).toBe("svc_1");
     expect(nodeAt({ x: -4, z: 4 }, snap)).toBe("svc_3");
     expect(nodeAt({ x: 0, z: 0 }, snap)).toBeNull();
+  });
+
+  it("picks the Internet on the top half of its ball, where the ground cell behind it is empty", () => {
+    const snap = board();
+    const origin = { x: -40, y: 30, z: 30 };
+    const dir = { x: 0, y: 3.5 - 30, z: -30 };
+    const ground = groundPoint(origin, dir);
+    const cell = ground ? cellAt(ground) : null;
+    expect(cell).toEqual({ x: -40, z: -4 });
+    expect(cell && nodeAt(cell, snap)).toBeNull();
+    expect(pickNode(origin, dir, snap)).toEqual({ id: "internet", cell: { x: -40, z: 0 } });
+  });
+
+  it("picks the nearest node along the ray, against each node's own height", () => {
+    const snap = board();
+    expect(pickNode({ x: -60, y: 1, z: 0 }, { x: 1, y: 0, z: 0 }, snap)?.id).toBe("internet");
+    expect(pickNode({ x: -22, y: 1, z: 0 }, { x: -1, y: 0, z: 0 }, snap)).toEqual({
+      id: "svc_1",
+      cell: { x: -28, z: 0 },
+    });
+    // Over the tier-1 WAF and ALB (1.6 tall) and past the Compute one row over.
+    expect(pickNode({ x: -34, y: 2, z: 0 }, { x: 1, y: 0, z: 0 }, snap)).toBeNull();
+    // Pointing away from everything.
+    expect(pickNode({ x: -22, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }, snap)).toBeNull();
   });
 });
 
