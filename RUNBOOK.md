@@ -424,6 +424,15 @@ order — is what decides, not the media query. Moving this block earlier in the
 silently stop it from winning. To emulate the preference in a browser for testing, use the
 `--force-prefers-reduced-motion` flag rather than OS-level settings.
 
+### Script Knight's sandbox needs real Workers
+
+jsdom has no `Worker`, so unit tests cover the sandbox in pieces: `worker-core.ts` (the worker's
+whole body) is driven with a fake `post` and scope, and `run-client.ts` with a fake Worker and
+fake timers. Neither proves the bundled worker file loads, that `lockDown` can remove every name
+in a real worker scope, or that the watchdog kills a real infinite loop. Only a real browser
+does: the e2e spec runs a program against a production build. If a Script Knight run reports
+"The sandbox stopped unexpectedly" in a real browser, check the worker chunk first.
+
 ### Browser automation against this site (QA-agent gotchas, learned 2026-07)
 
 - **Windows occlusion freezes rAF**: automated Chrome opened occluded on this machine stops
