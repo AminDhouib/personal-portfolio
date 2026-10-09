@@ -74,9 +74,52 @@ describe("hextrisKeyAction", () => {
     expect(k("Enter", "countdown")).toEqual({ action: "none", preventDefault: false });
   });
 
-  it("ignores everything on game over", () => {
-    expect(k(" ", "over")).toEqual({ action: "none", preventDefault: false });
+  it("restarts on Space, Enter or R once game over allows it, and claims them", () => {
+    for (const key of [" ", "Enter", "r", "R"]) {
+      expect(k(key, "over", { canRestart: true })).toEqual({
+        action: "restart",
+        preventDefault: true,
+      });
+    }
+    expect(k("ArrowLeft", "over", { canRestart: true })).toEqual({
+      action: "none",
+      preventDefault: false,
+    });
+    expect(k("x", "over", { canRestart: true })).toEqual({ action: "none", preventDefault: false });
+    expect(k("f", "over", { canRestart: true }).action).toBe("none");
+  });
+
+  it("holds the restart keys during the game-over lockout without scrolling the page", () => {
+    for (const key of [" ", "Enter", "r"]) {
+      expect(k(key, "over", { canRestart: false })).toEqual({
+        action: "none",
+        preventDefault: true,
+      });
+    }
+    // The default is the lockout.
+    expect(k(" ", "over")).toEqual({ action: "none", preventDefault: true });
     expect(k("ArrowLeft", "over")).toEqual({ action: "none", preventDefault: false });
+  });
+
+  it("never restarts from a held key, a text field, a chord or a focused control", () => {
+    expect(k(" ", "over", { canRestart: true, repeat: true })).toEqual({
+      action: "none",
+      preventDefault: true,
+    });
+    expect(k("r", "over", { canRestart: true, textEntry: true })).toEqual({
+      action: "none",
+      preventDefault: false,
+    });
+    expect(k("r", "over", { canRestart: true, modifier: true }).action).toBe("none");
+    expect(k("Enter", "over", { canRestart: true, onControl: true })).toEqual({
+      action: "none",
+      preventDefault: false,
+    });
+  });
+
+  it("does not restart from other phases", () => {
+    expect(k("r", "playing", { canRestart: true }).action).toBe("none");
+    expect(k("Enter", "playing", { canRestart: true }).action).toBe("none");
   });
 
   it("starts on uppercase A, S and D", () => {

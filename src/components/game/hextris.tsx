@@ -592,7 +592,7 @@ export function HextrisGame() {
         repeat: e.repeat,
       });
       if (preventDefault) e.preventDefault();
-      if (action === "start") startRun();
+      if (action === "start" || action === "restart") startRun();
       else if (action !== "none") act(action);
     }
 
