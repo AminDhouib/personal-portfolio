@@ -1219,7 +1219,7 @@ export function HextrisGame() {
                       }}
                       placeholder="Your name"
                       maxLength={12}
-                      className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:text-sm"
+                      className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:pointer-fine:text-sm"
                     />
                     <button
                       type="button"

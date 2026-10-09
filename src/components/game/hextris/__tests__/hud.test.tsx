@@ -67,7 +67,9 @@ describe("Hextris HUD sizing", () => {
     runFrames(1);
     const name = screen.getByPlaceholderText("Your name");
     const classes = name.className.split(/\s+/);
-    expect(classes).toEqual(expect.arrayContaining(["text-base", "sm:text-sm", "min-h-11"]));
+    expect(classes).toEqual(
+      expect.arrayContaining(["text-base", "sm:pointer-fine:text-sm", "min-h-11"]),
+    );
     expect(classes).not.toContain("text-sm");
     const submit = screen.getByRole("button", { name: "Submit" });
     expect(submit.className.split(/\s+/)).toContain("min-h-11");
