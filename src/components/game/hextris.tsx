@@ -31,6 +31,7 @@ import {
 } from "./hextris/feedback";
 import { arcadeSubmission, isRecordableRun, recordHighScore, runSeed } from "./hextris/session";
 import { hextrisKeyAction } from "./hextris/input";
+import { shareRun } from "./hextris/share";
 import {
   NO_FIT,
   RESTART_LOCKOUT_MS,
@@ -108,6 +109,8 @@ export function HextrisGame() {
   const [sheetHidden, setSheetHidden] = useState(false);
   // The run beat a stored best (never on the first run ever: there was nothing to beat).
   const [uiNewBest, setUiNewBest] = useState(false);
+  // A short note under Share when the score went to the clipboard (a share sheet speaks for itself).
+  const [shareNote, setShareNote] = useState<"Copied" | "Could not copy" | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -317,6 +320,12 @@ export function HextrisGame() {
     return () => window.clearTimeout(t);
   }, [panicTip]);
 
+  useEffect(() => {
+    if (!shareNote) return;
+    const t = window.setTimeout(() => setShareNote(null), 2000);
+    return () => window.clearTimeout(t);
+  }, [shareNote]);
+
   // Auto-clear combo milestone overlay after its animation
   useEffect(() => {
     if (!milestone) return;
@@ -356,6 +365,7 @@ export function HextrisGame() {
       setRank(null);
       setSubmitState("idle");
       setSheetHidden(false);
+      setShareNote(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiState]);
@@ -1309,13 +1319,34 @@ export function HextrisGame() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => restartRef.current()}
-                className="mt-4 w-full rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
-              >
-                Play again
-              </button>
+              <div className="mt-4 flex gap-2">
+                {isRecordableRun(uiRun.score) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void shareRun(uiRun.score).then((outcome) => {
+                        if (outcome === "copied") setShareNote("Copied");
+                        else if (outcome === "failed") setShareNote("Could not copy");
+                      });
+                    }}
+                    className="min-h-11 rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white/80 transition-colors hover:text-white"
+                  >
+                    Share
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => restartRef.current()}
+                  className="min-h-11 flex-1 rounded-lg border border-accent-pink/40 bg-accent-pink/10 py-2.5 text-sm font-medium text-accent-pink transition-colors hover:bg-accent-pink/20"
+                >
+                  Play again
+                </button>
+              </div>
+              {shareNote && (
+                <p role="status" className="mt-2 text-center font-mono text-xs text-accent-green">
+                  {shareNote}
+                </p>
+              )}
             </>
           )}
         </section>
