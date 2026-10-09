@@ -60,6 +60,9 @@ export function compilePlayer(code: string): CompileResult {
   try {
     // The one place player code is evaluated: only inside the locked-down worker, never on the
     // main thread or the server (DESIGN.md register).
+    // The player's code alone is parsed first, so a syntax error names a token they typed and
+    // not one of the epilogue's.
+    new Function(PREAMBLE + code);
     factory = new Function(PREAMBLE + code + EPILOGUE) as () => unknown;
   } catch (err) {
     // silent-ok: the error is returned to the player as a compile error

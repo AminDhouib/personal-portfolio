@@ -27,6 +27,14 @@ describe("compilePlayer", () => {
     }
   });
 
+  it("names the token the player typed for a stray closing brace", () => {
+    const result = compilePlayer("class Player { playTurn() {} }}");
+    expect(result).toMatchObject({ ok: false, kind: "syntax" });
+    if (!result.ok) {
+      expect(result.message).toContain("Unexpected token '}'");
+    }
+  });
+
   it("reports no class as no-player with the player-facing text", () => {
     expect(compilePlayer("const x = 1;")).toEqual({
       ok: false,
