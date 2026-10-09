@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { verifyScriptKnight } from "@/lib/arcade/games";
 import { MODE_KEY } from "../mode";
 import { PROGRESS_KEY } from "../progress";
 import type { Runner } from "../run-floor";
+import type { RunOutcome } from "../sandbox/run-client";
 import { Stage } from "../stage";
 
 beforeEach(() => localStorage.clear());
@@ -132,7 +133,7 @@ describe("Stage, playing a floor by hand", () => {
     ).toBe(true);
   });
 
-  it("starts over from the pad, and from Retry on the result card", () => {
+  it("starts over from the pad", () => {
     render(<Stage runner={noSandbox} />);
     walkForward(7);
     expect(screen.getByText("Floor passed")).toBeTruthy();
@@ -140,6 +141,53 @@ describe("Stage, playing a floor by hand", () => {
     expect(screen.queryByText("Floor passed")).toBeNull();
     walkForward(7);
     expect(screen.getByText("Floor passed")).toBeTruthy();
+  });
+
+  it("starts over from the result card's own button, and the pad is live again", () => {
+    render(<Stage runner={noSandbox} />);
+    walkForward(7);
+    const card = screen.getByText("Floor passed").closest("section") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "Improve this score" }));
+    expect(screen.queryByText("Floor passed")).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Walk forward" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("reaches Watch the bot in hand mode: the bot replaces the pad, and Stop watching brings it back", () => {
+    render(<Stage runner={noSandbox} />);
+    click("Watch the bot");
+    expect(screen.getByRole("status").textContent).toMatch(/not scored, saved or posted/);
+    expect(screen.queryByRole("region", { name: "Play by hand" })).toBeNull();
+    expect(screen.getByRole("group", { name: "Playback" })).toBeTruthy();
+    expect(screen.queryByText("Floor passed")).toBeNull();
+    click("Stop watching");
+    expect(screen.getByRole("region", { name: "Play by hand" })).toBeTruthy();
+  });
+
+  it("drops the result of a code run still in flight when the player switches to hand", async () => {
+    stubPointer(false);
+    let finish: (outcome: RunOutcome) => void = () => {};
+    const pending: Runner = (_req, onTurn) => {
+      for (let i = 1; i <= 7; i += 1) onTurn(i, "w-", []);
+      return {
+        done: new Promise<RunOutcome>((resolve) => {
+          finish = resolve;
+        }),
+        cancel: () => {},
+      };
+    };
+    render(<Stage runner={pending} />);
+    click("Run");
+    click("Play by hand");
+    await act(async () => {
+      finish({ kind: "finished", log: "1:w-w-w-w-w-w-w-", thoughts: [] });
+      await Promise.resolve();
+    });
+    click("Write code");
+    expect(screen.queryByText("Floor passed")).toBeNull();
+    expect(localStorage.getItem(PROGRESS_KEY)).toBeNull();
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("plays with the keyboard too", () => {
@@ -227,6 +275,43 @@ describe("Stage, Today's floor by hand", () => {
       deadline: Date.now() + 5_000,
     });
     expect(verdict).toEqual({ ok: true });
+  });
+
+  it("records a hand clear once, however often the player flips the play style", async () => {
+    render(<Stage runner={noSandbox} />);
+    clearTodayByHand();
+    fireEvent.click(await screen.findByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    const runs = () => JSON.parse(localStorage.getItem("knight:stats") ?? "{}").runs;
+    expect(runs()).toBe(1);
+    click("Write code");
+    click("Play by hand");
+    click("Write code");
+    click("Play by hand");
+    expect(runs()).toBe(1);
+    // The finished run is not resurrected with a fresh Submit form, so nothing can post twice.
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+    expect(posts).toHaveLength(1);
+  });
+
+  it("shares a hand daily clear with the same replay link a code run gets", async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: async (text: string) => {
+          copied.push(text);
+        },
+      },
+      configurable: true,
+    });
+    render(<Stage runner={noSandbox} />);
+    clearTodayByHand();
+    fireEvent.click(await screen.findByRole("button", { name: "Share this run" }));
+    await waitFor(() => expect(copied).toHaveLength(1));
+    expect(copied[0]).toMatch(
+      /^Script Knight, 2026-10-15: 118 points in 17 turns \(par 118\) https:\/\/\S+\/games\/script-knight#replay=1\.d\.20261015\.h0h0h0h0h0w0w0w0s0h0h0h0h0w0w0w0w0$/,
+    );
+    Reflect.deleteProperty(navigator, "clipboard");
   });
 
   it("updates the daily stats on a hand clear", () => {
