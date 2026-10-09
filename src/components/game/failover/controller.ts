@@ -3,6 +3,8 @@
 import { gameCrashToReport } from "@/lib/report-game-error";
 import { createFailoverAudio, type FailoverAudio } from "./audio/audio";
 import { cueForEvent } from "./audio/cues";
+import { dailyRun, DAILY_MAX_TICKS, type DailyRun } from "./daily/daily";
+import { readDailyResult, type DailyResult } from "./daily/result";
 import { keyCommand } from "./input/keys";
 import { initialMachine, next, type Intent, type MachineState, type Tool } from "./input/machine";
 import { advance, createLoop, resetClock, type LoopState } from "./loop";
@@ -78,6 +80,8 @@ export interface RunEnd {
   /** Game seconds survived. */
   seconds: number;
   score: number;
+  /** The UTC day, when this was a Daily Incident. */
+  daily?: string;
 }
 
 /** The sim's side of the HUD (hud.ts) plus the controller's own state. */
@@ -97,6 +101,8 @@ export interface HudState extends SimHud {
   loading: boolean;
   badges: Badge[];
   alert: Alert | null;
+  /** Set while the run is a Daily Incident; `result` once it has ended. */
+  daily: { day: string; result: DailyResult | null } | null;
 }
 
 export interface ControllerOptions {
@@ -205,6 +211,8 @@ export class FailoverController {
   private nextBadgeId = 1;
   private alert: (Alert & { until: number }) | null = null;
   private clockMs = 0;
+  /** The Daily Incident being played: its calls on the sim, how many are made, its result. */
+  private daily: { run: DailyRun; made: number; result: DailyResult | null } | null = null;
 
   private hud: HudState;
   private lastHudMs = -Infinity;
@@ -274,6 +282,7 @@ export class FailoverController {
   /** Start a fresh run on a new seed, keeping the view and the settings; `mode` switches Survival and Sandbox. */
   restart(seed: string = freeSeed(), mode: GameMode = this.mode): void {
     if (this.loading) return;
+    this.daily = null;
     this.mode = mode;
     resetSim({ seed, mode });
     this.paused = false;
@@ -321,6 +330,43 @@ export class FailoverController {
     this.syncScheduling();
   }
 
+  /** Start today's Daily Incident: the day's seed and incident, in survival, no sandbox. */
+  startDaily(day: string): void {
+    if (this.loading) return;
+    const run = dailyRun(day);
+    this.restart(run.seed, "survival");
+    run.setup();
+    this.daily = { run, made: 0, result: null };
+    this.makeDueCalls();
+    this.emit();
+  }
+
+  /** The incident's calls that have come due, made before anything else happens at this tick. */
+  private makeDueCalls(): void {
+    const daily = this.daily;
+    if (!daily) return;
+    const { scheduled } = daily.run;
+    while (daily.made < scheduled.length && (scheduled[daily.made]?.tick ?? Infinity) <= S.tick) {
+      scheduled[daily.made++]?.run();
+    }
+  }
+
+  /**
+   * Step the sim. A daily goes one tick at a time so each incident call lands on its tick, as
+   * the replay on the server makes it, and retires a run still alive at the 900 s cap.
+   */
+  private stepSim(steps: number): void {
+    if (!this.daily) {
+      step(steps);
+      return;
+    }
+    for (let i = 0; i < steps && !S.over; i++) {
+      step(1);
+      this.makeDueCalls();
+      if (!S.over && S.tick >= DAILY_MAX_TICKS) dispatch({ op: 8 });
+    }
+  }
+
   private canRun(): boolean {
     return (
       this.running &&
@@ -359,7 +405,7 @@ export class FailoverController {
       this.clockMs = nowMs;
       const out = advance(this.loop, nowMs, this.paused ? 0 : this.speed);
       this.loop = out.loop;
-      if (out.steps > 0) step(out.steps);
+      if (out.steps > 0) this.stepSim(out.steps);
 
       const events = drainEvents();
       for (const event of events) {
@@ -403,7 +449,13 @@ export class FailoverController {
           until: nowMs + ALERT_MS,
         };
       } else if (e.kind === "game-over") {
-        this.onRunEnd?.({ mode: S.gameMode, seconds: S.elapsedGameTime, score: scoreOf() });
+        if (this.daily) this.daily.result = readDailyResult(this.daily.run.day);
+        this.onRunEnd?.({
+          mode: S.gameMode,
+          seconds: S.elapsedGameTime,
+          score: scoreOf(),
+          ...(this.daily && { daily: this.daily.run.day }),
+        });
       }
     }
     if (this.badges.length > 0) this.badges = this.badges.filter((b) => b.until > nowMs);
@@ -508,6 +560,7 @@ export class FailoverController {
       crashed: this.crashed,
       loading: this.loading,
       badges: this.badgeViews(),
+      daily: this.daily ? { day: this.daily.run.day, result: this.daily.result } : null,
       alert:
         this.alert && this.alert.until > this.clockMs
           ? { key: this.alert.key, level: this.alert.level, params: this.alert.params }
