@@ -464,6 +464,21 @@ editor, the daily board and the hand pad are added without rewriting it.
   be posted. The daily code lives in `knight:code.daily` and starts from the tower's code each
   day; a cleared daily updates `knight:stats` (best, runs, streak) and nothing in the tower
   progress.
+- **The editor is a textarea first and CodeMirror 6 on a desktop pointer.** `editor-host.tsx` (the
+  stage's default `editor`) always paints the textarea, then on `(pointer: fine)` loads
+  `code-editor.tsx` with a dynamic `import()` after mount and swaps it in with the same text,
+  caret and focus. A coarse pointer never fetches the chunk, and a failed load keeps the textarea
+  (reported once). The set is minimal on purpose (view, state, commands, language,
+  lang-javascript, and `@lezer/highlight` for the colours; not the `codemirror` meta package):
+  about 136 KB gzipped by the planner's measurement (a minified rolldown bundle of the same
+  imports measured about 125 KB; no local Next build was run).
+  `editor-lazy.test.ts` pins that only `code-editor.tsx` and `syntax-check.ts` import the
+  libraries and that nothing reaches the chunk except that one `import()`; CI's build is the
+  final proof. A syntax error is found by walking the lezer tree for error nodes, marked with a
+  gutter marker and a wavy underline, and its line is remembered by the stage: the sandbox's own
+  syntax message has no line in V8, so a Run adds the editor's line and the player reads
+  "Line 4: Unexpected token '}'" through the usual message path. The lezer line can differ from
+  the engine's by recovery, which is why the message text still comes from the sandbox.
 - **Hidden until launch.** The `GAMES` row carries `hidden: true`: the route serves, with
   `noindex`, and the game is out of the sitemap, the lists, llms.txt and the hub. T7-8 removes the
   flag together with the launch copy. The About copy and credits already describe only what the

@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyProgress, PROGRESS_KEY, recordClear, setAt } from "../progress";
 import type { Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
 import { Stage } from "../stage";
+import type { EditorProps } from "../textarea-editor";
 
 beforeEach(() => localStorage.clear());
 afterEach(cleanup);
@@ -65,6 +67,38 @@ describe("Stage", () => {
     expect(await screen.findByText("The sandbox could not start.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(calls).toBe(2));
+  });
+
+  it("names the line the editor found for a syntax error the sandbox reports without one", async () => {
+    function FindingEditor({ onSyntaxError }: EditorProps) {
+      useEffect(() => {
+        onSyntaxError?.({ line: 3, column: 13, from: 40, to: 41 });
+      }, [onSyntaxError]);
+      return <textarea aria-label="Your Player code (JavaScript)" readOnly />;
+    }
+    const runner: Runner = () => ({
+      done: Promise.resolve<RunOutcome>({
+        kind: "compile-error",
+        error: { kind: "syntax", message: "Unexpected token ';'", line: null },
+      }),
+      cancel: () => {},
+    });
+    render(<Stage runner={runner} editor={FindingEditor} />);
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText("Line 3: Unexpected token ';'")).toBeTruthy();
+  });
+
+  it("leaves a syntax error without a line alone when the editor found none", async () => {
+    const runner: Runner = () => ({
+      done: Promise.resolve<RunOutcome>({
+        kind: "compile-error",
+        error: { kind: "syntax", message: "Unexpected token ';'", line: null },
+      }),
+      cancel: () => {},
+    });
+    render(<Stage runner={runner} />);
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText("Unexpected token ';'")).toBeTruthy();
   });
 
   it("keeps Powder Keep locked until the Narrow Path is cleared", () => {
