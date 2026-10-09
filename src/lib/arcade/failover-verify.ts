@@ -104,7 +104,6 @@ function takeTurn(deadline: number): Promise<boolean> {
   }
   if (waiting.length >= MAX_WAITING) return Promise.resolve(false);
   return new Promise<boolean>((resolve) => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const waiter = {
       grant: () => {
         clearTimeout(timer);
@@ -112,7 +111,7 @@ function takeTurn(deadline: number): Promise<boolean> {
       },
     };
     // A waiter nobody will hear from must not hold a slot.
-    timer = setTimeout(
+    const timer = setTimeout(
       () => {
         const at = waiting.indexOf(waiter);
         if (at !== -1) waiting.splice(at, 1);
