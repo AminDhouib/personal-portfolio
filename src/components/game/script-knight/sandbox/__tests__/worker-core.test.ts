@@ -5,6 +5,7 @@ import { decodeLog } from "../../engine/codec";
 import type { LevelRef } from "../../engine/level-ref";
 import fixtures from "../../engine/__tests__/fixtures/upstream-runs.json";
 import { parseFromWorker, type FromWorker, type ToWorker } from "../protocol";
+import { REMOVED_GLOBALS } from "../lockdown";
 import { handleRun, turnFailureMessage } from "../worker-core";
 
 const NARROW_1: LevelRef = { kind: "tower", tower: "narrow-path", level: 1, epic: false };
@@ -159,6 +160,52 @@ describe("handleRun", () => {
       delete g.skSentinelFetch;
       delete g.postMessage;
     }
+  });
+
+  it("with the real lockDown on the real global, the player cannot post or fetch", () => {
+    // Player code resolves names against the real global, so this runs the real lockDown on it
+    // and puts everything back afterwards (it removes timers, performance, crypto and more).
+    const saved: Array<[object, string, PropertyDescriptor]> = [];
+    for (const name of REMOVED_GLOBALS) {
+      for (
+        let o: object | null = globalThis;
+        o && o !== Object.prototype;
+        o = Object.getPrototypeOf(o)
+      ) {
+        const descriptor = Object.getOwnPropertyDescriptor(o, name);
+        if (descriptor) saved.push([o, name, descriptor]);
+      }
+    }
+    const g = globalThis as Record<string, unknown>;
+    const forged = vi.fn();
+    const sentinel = Object.getOwnPropertyDescriptor(g, "postMessage");
+    g.postMessage = forged;
+    const fetchBefore = typeof g.fetch;
+    try {
+      const { posted, post } = harness();
+      const code = [
+        "class Player {",
+        "  playTurn(w) {",
+        "    w.think(typeof postMessage, typeof fetch, typeof globalThis.postMessage);",
+        "    try { postMessage({ type: 'done' }); } catch (e) { w.think(e.name); }",
+        "    try { Function('return this')().postMessage({ type: 'done' }); } catch (e) { w.think(e.name); }",
+        "    w.walk();",
+        "  }",
+        "}",
+      ].join("\n");
+      handleRun(runMessage(code), post, globalThis);
+      const first = posted.find((m) => m.type === "turn");
+      expect(first).toMatchObject({
+        thoughts: ["undefined undefined undefined", "ReferenceError", "TypeError"],
+      });
+      expect(forged).not.toHaveBeenCalled();
+    } finally {
+      for (const [target, name, descriptor] of saved) {
+        Object.defineProperty(target, name, descriptor);
+      }
+      if (!sentinel) delete g.postMessage;
+    }
+    expect(typeof g.fetch).toBe(fetchBefore);
   });
 
   it("really locks the scope it is given", () => {
