@@ -34,8 +34,8 @@ importers:
         specifier: ^1.77.0
         version: 1.77.0(cf649ec72486d6f90fb5842c4f72c253)
       '@google-analytics/data':
-        specifier: ^5.2.1
-        version: 5.2.1
+        specifier: ^6.1.0
+        version: 6.1.0
       '@react-three/fiber':
         specifier: ^9.5.0
         version: 9.5.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(three@0.183.2)
@@ -769,8 +769,8 @@ packages:
   '@formatjs/intl-localematcher@0.6.2':
     resolution: {integrity: sha512-XOMO2Hupl0wdd172Y06h6kLpBz6Dv+J4okPLl4LPtzbr8f66WbIoy4ev98EBuZ6ZK4h5ydTN6XneT4QVpD7cdA==}
 
-  '@google-analytics/data@5.2.1':
-    resolution: {integrity: sha512-JZdRY4OGPx0RnAdsFu0k/mD5x7mVXATKccSi5bB5ncbgaBbfLOz2cCjNna6dHxwDchYYZv1Zm/sISZHKtCclgw==}
+  '@google-analytics/data@6.1.0':
+    resolution: {integrity: sha512-72sICGmThvOuy1yVlaVRvWgUZ+4VvAlmkIlDgzo1SSSRl2MvbNJavnMTG7uGhNnlgwuHNwReKrm6R/7gAKo4hw==}
     engines: {node: '>=18'}
 
   '@graphql-tools/executor@1.5.1':
@@ -9294,7 +9294,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@google-analytics/data@5.2.1':
+  '@google-analytics/data@6.1.0':
     dependencies:
       google-gax: 5.0.6
     transitivePeerDependencies:
@@ -15993,7 +15993,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
-      '@types/node': 22.20.0
+      '@types/node': 22.20.5
       long: 5.3.2
 
   proxy-addr@2.0.8:
