@@ -32,6 +32,14 @@ export const T = {
   cache_short: "Cache",
   cancel: "Cancel",
   capacity_drop_warning: "RESOURCE THROTTLING! Capacity reduced for 30s",
+  card_failed: "The image could not be made.", // ours
+  card_sandbox: "Sandbox build: {services} services", // ours
+  card_saved: "Image saved.", // ours
+  card_share: "Share image", // ours
+  card_share_failed: "The image could not be shared; it was saved instead.", // ours
+  card_shared: "Image shared.", // ours
+  card_survival: "Survival: {time}, score {score}", // ours
+  card_title: "Failover", // ours
   cat_async: "Async",
   cat_compute: "Compute",
   cat_data: "Data",
@@ -212,6 +220,7 @@ export const T = {
   share_link_label: "Link to this build", // ours
   share_note:
     "The link holds the services, where they stand and how they are linked, and the Sandbox budget. It opens as a new Sandbox run.", // ours
+  share_png: "Download PNG",
   share_title: "Share Architecture",
   share_too_large: "This build is too large to fit in a link.",
   skip_tutorial: "Skip Tutorial",

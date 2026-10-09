@@ -34,6 +34,7 @@ vi.mock("../scene/scene", () => ({
       setCamera: () => undefined,
       setOverlay: () => undefined,
       setTier: () => undefined,
+      capture: () => null,
       pick: () => null,
       dispose: () => {
         scenes.disposed++;

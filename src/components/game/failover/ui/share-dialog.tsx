@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
-import type { FailoverController } from "../controller";
+import type { FailoverController, HudState } from "../controller";
 import {
   buildShareUrl,
   extractArchParam,
@@ -10,12 +10,15 @@ import {
   type RebuildResult,
 } from "../persist/blueprint";
 import { decodeArchParam, type Arch } from "../persist/blueprint-schema";
+import { CARD_FILE, cardBlob, composeCard, downloadCard, shareCard } from "../persist/card";
+import { S } from "../sim/state";
 import { T, fmt } from "../strings";
 import { BUTTON, BUTTON_IDLE, BUTTON_ON, PANEL, TOUCH } from "./surface";
 
 // The ?arch= share link both ways. Out: the live build as a link (services,
 // their places and links, and the Sandbox budget; never the score or the run)
-// with a copy button. In: a link opened on the page is decoded and described,
+// with a copy button, and the board as a PNG card to download or share. In: a
+// link opened on the page is decoded and described,
 // with what of it is not valid, before anything is built; building is a new
 // Sandbox run, made only through dispatch so the board's rules apply again.
 
@@ -58,14 +61,64 @@ function Modal({
   );
 }
 
-/** Share in Settings: the live build as a link, with a copy button that falls back to a selected field. */
-export function ShareDialog({ onClose }: { onClose: () => void }) {
+/** Whether this browser can hand a PNG to the OS share sheet. */
+function canShareFiles(): boolean {
+  if (typeof navigator.share !== "function" || typeof navigator.canShare !== "function") {
+    return false;
+  }
+  return navigator.canShare({ files: [new File([""], CARD_FILE, { type: "image/png" })] });
+}
+
+/**
+ * Share in Settings: the live build as a link, with a copy button that falls back to a
+ * selected field, and the board as a PNG card.
+ */
+export function ShareDialog({
+  hud,
+  controller,
+  onClose,
+}: {
+  hud: HudState;
+  controller: FailoverController;
+  onClose: () => void;
+}) {
   const fieldId = useId();
   const field = useRef<HTMLInputElement>(null);
   const [share] = useState(() =>
     buildShareUrl(`${window.location.origin}${window.location.pathname}`),
   );
   const [message, setMessage] = useState<string | null>(null);
+  const [filesShare] = useState(canShareFiles);
+
+  const card = async (how: "download" | "share") => {
+    // The frame is drawn and copied out here, in the click's own task.
+    const frame = controller.captureScene();
+    const composed =
+      frame &&
+      composeCard(frame, {
+        mode: hud.mode,
+        seconds: hud.time,
+        score: hud.score,
+        services: S.services.length,
+      });
+    const png = composed ? await cardBlob(composed) : null;
+    if (!png) {
+      setMessage(T.card_failed);
+      return;
+    }
+    if (how === "share") {
+      const out = await shareCard(png);
+      if (out === "shared") setMessage(T.card_shared);
+      else if (out === "cancelled") setMessage(null);
+      else {
+        downloadCard(png);
+        setMessage(T.card_share_failed);
+      }
+      return;
+    }
+    downloadCard(png);
+    setMessage(T.card_saved);
+  };
 
   const selectField = () => {
     field.current?.focus();
@@ -110,6 +163,24 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
       ) : (
         <p>{T.share_too_large}</p>
       )}
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => void card("download")}
+          className={`${BUTTON} ${BUTTON_IDLE}`}
+        >
+          {T.share_png}
+        </button>
+        {filesShare && (
+          <button
+            type="button"
+            onClick={() => void card("share")}
+            className={`${BUTTON} ${BUTTON_IDLE}`}
+          >
+            {T.card_share}
+          </button>
+        )}
+      </div>
       <p role="status" className="min-h-4 text-[#a1a1aa]">
         {message}
       </p>

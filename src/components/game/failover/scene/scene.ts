@@ -70,6 +70,12 @@ export interface FailoverScene {
   setTier(tier: PerfTier): void;
   /** What lies under a point in client (CSS pixel) coordinates, or null off the board. */
   pick(clientX: number, clientY: number): PickResult | null;
+  /**
+   * The board as a 2D canvas, for the share card, or null when it cannot be read. WebGL
+   * keeps no drawing buffer once a frame is shown (there is no preserveDrawingBuffer), so
+   * this renders a fresh frame and copies it out in the same task, before it can be cleared.
+   */
+  capture(): HTMLCanvasElement | null;
   dispose(): void;
 }
 
@@ -378,6 +384,19 @@ export function createFailoverScene(canvas: HTMLCanvasElement, tier: PerfTier): 
       const cell = point ? cellAt(point) : null;
       if (!cell) return null;
       return { cell, node: last ? nodeAt(cell, last) : null };
+    },
+    capture() {
+      if (canvas.width <= 0 || canvas.height <= 0) return null;
+      // The card shows the build, not a placement in progress; the next frame puts the ghost back.
+      for (const view of ghostViews.values()) view.group.visible = false;
+      renderer.render(scene, camera);
+      const out = document.createElement("canvas");
+      out.width = canvas.width;
+      out.height = canvas.height;
+      const ctx = out.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(canvas, 0, 0);
+      return out;
     },
     dispose() {
       const geometries = new Set<BufferGeometry>();

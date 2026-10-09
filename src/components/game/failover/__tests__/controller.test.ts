@@ -57,6 +57,7 @@ function fakeScene() {
       scene.tiers.push(t);
     },
     pick: () => pickResult,
+    capture: () => null,
     dispose() {
       scene.disposed++;
     },
