@@ -7,7 +7,13 @@ import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { keyStats, wpmSeries, type KeyStats, type SeriesPoint } from "./typing-speed/engine/series";
 import { dailyScore, dailyText } from "./typing-speed/engine/daily";
-import { ghostCharsAt, ghostPosition, paceDelta } from "./typing-speed/engine/ghost";
+import {
+  ghostCharsAt,
+  ghostPosition,
+  ghostSeries,
+  paceDelta,
+  type GhostResult,
+} from "./typing-speed/engine/ghost";
 import { GhostChip } from "./typing-speed/ghost-chip";
 import { ghostFor, loadGhosts, offerGhost, saveGhosts } from "./typing-speed/ghost-store";
 import {
@@ -66,6 +72,7 @@ interface Result {
   allKeys: KeyStats;
   /** Set when this run beat a stored best for its mode, e.g. "15s words". */
   modeBest: string | null;
+  ghost: GhostResult | null;
 }
 
 /** The Daily view: its day is fixed when the view opens, so a run and its Post agree on the text. */
@@ -227,25 +234,36 @@ export function TypingSpeedGame() {
         setDaily({ ...daily, rec, streak: streakAsOf(after, daily.day), lastBulk: bulk });
       }
       saveStats(after);
-      // A faster run replaces the ghost it raced.
+      // The ghost raced is the one this run started against; a faster run then replaces it.
       const ghostDay = mode === "daily" ? daily?.day : undefined;
+      const raced = ghostOn && !bulk ? ghostFor(ghosts, mode, ghostDay) : null;
       const offered = offerGhost(ghosts, mode, run, ghostDay);
-      if (offered !== ghosts) {
+      const saved = offered !== ghosts;
+      if (saved) {
         saveGhosts(offered);
         setGhosts(offered);
       }
+      const series = wpmSeries(run);
       setResult({
         metrics,
         maxStreak: streaks(run).best,
         bulk,
         counts: charCounts(run),
-        series: wpmSeries(run),
+        series,
+        ghost:
+          raced || saved
+            ? {
+                delta: raced ? metrics.netWpm - raced.wpm : null,
+                saved,
+                line: raced ? ghostSeries(raced.samples, series.length) : null,
+              }
+            : null,
         runKeys,
         allKeys: after.keys,
         modeBest: !bulk && prior && metrics.netWpm > prior.wpm ? modeLabel(mode) : null,
       });
     },
-    [highScore, mode, daily, ghosts],
+    [highScore, mode, daily, ghosts, ghostOn],
   );
 
   const typing = useTypingRun(configFor(mode, seed, passageNo, daily?.day), {
@@ -651,6 +669,7 @@ export function TypingSpeedGame() {
               runKeys={result.runKeys}
               allKeys={result.allKeys}
               modeBest={result.modeBest}
+              ghost={result.ghost}
               onNext={timed || mode === "daily" ? null : nextPassage}
               onAgain={restart}
             />

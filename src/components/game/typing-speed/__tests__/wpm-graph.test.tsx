@@ -48,4 +48,21 @@ describe("WpmGraph", () => {
     const { container } = render(<WpmGraph points={[]} variant="live" />);
     expect(container.querySelector("svg")).toBeNull();
   });
+  it("the full variant draws a dashed ghost line and names it in the legend", () => {
+    const { container } = render(
+      <WpmGraph points={points} variant="full" ghost={[8, 30, 45, 60]} />,
+    );
+    const line = container.querySelector("path[data-line='ghost']");
+    expect(line).not.toBeNull();
+    expect(line).toHaveAttribute("stroke-dasharray");
+    expect(screen.getByTestId("ts-graph-legend")).toHaveTextContent("Your best");
+  });
+  it("draws no ghost line without a ghost, and never in the live variant", () => {
+    const full = render(<WpmGraph points={points} variant="full" ghost={null} />);
+    expect(full.container.querySelector("path[data-line='ghost']")).toBeNull();
+    expect(screen.getByTestId("ts-graph-legend")).not.toHaveTextContent("Your best");
+    cleanup();
+    const live = render(<WpmGraph points={points} variant="live" ghost={[8, 30]} />);
+    expect(live.container.querySelector("path[data-line='ghost']")).toBeNull();
+  });
 });

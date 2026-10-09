@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, SkipForward, Trophy } from "lucide-react";
+import { Ghost, RotateCcw, SkipForward, Trophy } from "lucide-react";
+import type { GhostResult } from "./engine/ghost";
 import type { KeyStats, SeriesPoint } from "./engine/series";
 import { KeyMap } from "./key-map";
 import type { CharCounts, RunMetrics } from "./metrics";
@@ -17,9 +18,17 @@ interface ResultsCardProps {
   allKeys: KeyStats;
   /** Mode label when this run beat a stored best for it, else null. */
   modeBest: string | null;
+  /** How the run went against the ghost it raced, and whether it became the new ghost. */
+  ghost?: GhostResult | null;
   /** Null in timed modes, which have no next passage. */
   onNext: (() => void) | null;
   onAgain: () => void;
+}
+
+/** "+3 WPM", "-3 WPM", or "matched". */
+function versusLabel(delta: number): string {
+  if (delta === 0) return "matched";
+  return `${delta > 0 ? "+" : ""}${delta} WPM`;
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -35,6 +44,7 @@ export function ResultsCard({
   runKeys,
   allKeys,
   modeBest,
+  ghost = null,
   onNext,
   onAgain,
 }: ResultsCardProps) {
@@ -98,12 +108,26 @@ export function ResultsCard({
           New best for {modeBest}
         </p>
       )}
+      {ghost && ghost.delta !== null && (
+        <p data-testid="ts-vs-ghost" className="relative mt-1 text-sm text-(--muted)">
+          vs your best: {versusLabel(ghost.delta)}
+        </p>
+      )}
+      {ghost?.saved && (
+        <p
+          data-testid="ts-ghost-saved"
+          className="relative mt-1 flex items-center justify-center gap-1 text-sm font-semibold text-accent-blue"
+        >
+          <Ghost aria-hidden="true" className="h-3.5 w-3.5" />
+          New ghost saved
+        </p>
+      )}
       <div data-testid="ts-counts" className="relative mt-1 text-sm text-(--muted)">
         {counts.correct} correct, {counts.incorrect} incorrect, {counts.extra} extra,{" "}
         {counts.missed} missed
       </div>
       <div className="relative mt-4">
-        <WpmGraph points={series} variant="full" />
+        <WpmGraph points={series} variant="full" ghost={ghost?.line ?? null} />
       </div>
       <div className="relative mt-4">
         <KeyMap run={runKeys} all={allKeys} />
