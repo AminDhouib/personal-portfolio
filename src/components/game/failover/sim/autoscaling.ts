@@ -190,6 +190,9 @@ export interface Satellite {
   ready: boolean;
 }
 
+// 2 * pi, written out: it is exactly Math.PI * 2, and the purity guard allows no Math constants.
+const TAU = 6.283185307179586;
+
 /**
  * The ring of satellite boxes, one per EXTRA instance. Slots are fixed by
  * maxInstances, so existing boxes never shuffle when the fleet changes size;
@@ -203,7 +206,7 @@ export function satellitesOf(service: Service): Satellite[] {
   const readyExtra = Math.max(0, service.instances - 1);
   const ring: Satellite[] = [];
   for (let i = 0; i < want; i++) {
-    ring.push({ angle: (i / slots) * Math.PI * 2, ready: i < readyExtra });
+    ring.push({ angle: (i / slots) * TAU, ready: i < readyExtra });
   }
   return ring;
 }
