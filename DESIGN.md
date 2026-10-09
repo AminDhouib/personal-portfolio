@@ -495,10 +495,31 @@ editor, the daily board and the hand pad are added without rewriting it.
   syntax message has no line in V8, so a Run adds the editor's line and the player reads
   "Line 4: Unexpected token '}'" through the usual message path. The lezer line can differ from
   the engine's by recovery, which is why the message text still comes from the sandbox.
+- **Play by hand and the phone sheet.** One engine, two ways to play, chosen with the Play style
+  switch and stored as `knight:mode` (`{"v":1,"mode":"hand"|"code"}`; nothing is stored until the
+  player picks, a coarse pointer defaults to hand and a desktop pointer to code, malformed storage
+  reads as the default). `use-hand-run.ts` keeps only the list of actions and derives the run by
+  replaying it on the main thread (no player code, so no worker); undo is the replay of the log
+  minus its last action, and its log, frames and result equal a code run's with the same moves,
+  so a hand run posts the same proof and the server verifier accepts it unchanged. A finished
+  hand run is recorded once (tower progress or the daily stats) and posts `hand: 1`. The pad
+  (`hand-pad.tsx`) has a chip per granted action and four arrows laid out as they point on screen
+  but meaning forward, right, backward or left for the way the knight faces; keys (WASD or the
+  arrows, letters or 1 to 8, Z) are taken with `preventDefault` only while a hand run is live.
+  Epic runs are code only. On a coarse pointer "Play this floor" turns the stage itself into the
+  fixed full-height sheet (`play-sheet.tsx`: `fixed inset-x-0 z-80`, as tall as the visual
+  viewport above the keyboard, page scroll locked, Exit on top); in code mode the Run bar sticks
+  to the sheet's bottom and the floor column folds away while the keyboard is up, so Run is never
+  below the fold while typing.
+- **An idle run ends in about a second.** A program that does nothing idles to the 200-turn limit
+  and the replay used to show each of those turns for 300 ms. After the third quiet turn in a row
+  (nothing changed on the floor, in health or in score) `frameDelayMs` shows each further frame
+  for 4 ms. Only playback timing changed: the engine, the scores and the log are as before, and
+  the instant speed is unaffected.
 - **Hidden until launch.** The `GAMES` row carries `hidden: true`: the route serves, with
   `noindex`, and the game is out of the sitemap, the lists, llms.txt and the hub. T7-8 removes the
   flag together with the launch copy. The About copy and credits already describe only what the
-  code does today (no daily, no phone pad yet).
+  code does today.
 
 ## Intentional-design register
 
@@ -1255,14 +1276,14 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
 - **A Script Knight run that stops early is still replayed.** A timeout, a thrown error or a
   crash keeps the turns that arrived before it, replays them, and then shows the reason, so a
   player sees how far the code got. Only a run that never produced a turn (no Worker, a syntax
-  error) has nothing to replay. The no-Worker message does not offer to play by hand until hand
-  mode exists (T7-7).
+  error) has nothing to replay. The no-Worker message points the player to Play by hand,
+  which needs no Worker.
 
 - **Script Knight's "by hand" tag is client-claimed and display-only.** `detail.hand` (0 or 1)
   is the only part of a daily submission the server cannot check: the same log is legal whether
   code or a person produced it, and code can hard-code a move list for a visible floor, so the
   two are not separable. The board shows a "by hand" badge on `hand: 1` rows and ranks them with
-  everyone else; nothing gates on the tag. T7-5 only carries it (always 0 until hand mode, T7-7).
+  everyone else; nothing gates on the tag. The stage sets it to 1 for a daily cleared in hand mode.
 
 - **A Script Knight replay link proves nothing.** It carries a log anyone can write, the viewer
   plays it for fun, and nothing about a link is ranked, stored or posted; the daily board still

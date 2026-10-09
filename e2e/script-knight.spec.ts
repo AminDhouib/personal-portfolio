@@ -82,4 +82,60 @@ test.describe("Script Knight", () => {
     await expect(page.getByRole("button", { name: "Submit" })).toHaveCount(0);
     expect(posts).toEqual([]);
   });
+  test("a program that does nothing ends with a visible result in seconds", async ({ page }) => {
+    await page.goto(GAME_PATH);
+    // The starter is comment-only: the knight idles to the 200-turn limit. The replay used to take
+    // a minute at 1x, so no Skip is pressed here.
+    await expect(page.getByLabel("Your Player code (JavaScript)")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.getByText("Floor not passed")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("phone: clear Narrow Path 1 by taps in the play sheet, with the page locked", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    await blockThirdParties(context, baseURL);
+    await context.route("**/api/arcade/scores**", (route) =>
+      route.request().method() === "POST" ? route.abort() : route.fallback(),
+    );
+    const page = await context.newPage();
+    try {
+      await page.goto(GAME_PATH);
+      // A touch screen plays by hand: no editor, a pad, and a button that opens the sheet.
+      await expect(page.getByRole("button", { name: "Play by hand" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+        { timeout: 20_000 },
+      );
+      await page.getByRole("button", { name: "Play this floor" }).tap();
+      const locked = await page.evaluate(() => getComputedStyle(document.documentElement).overflow);
+      expect(locked).toBe("hidden");
+
+      const walk = page.getByRole("button", { name: "Walk forward" });
+      const box = await walk.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      for (let i = 0; i < 7; i += 1) await walk.tap();
+      await expect(page.getByText("Floor passed")).toBeVisible();
+
+      // The page behind the sheet never scrolled, and nothing spilled sideways.
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      const sideways = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(sideways).toBeLessThanOrEqual(0);
+
+      await page.getByRole("button", { name: "Exit" }).tap();
+      const after = await page.evaluate(() => getComputedStyle(document.documentElement).overflow);
+      expect(after).not.toBe("hidden");
+    } finally {
+      await context.close();
+    }
+  });
 });
