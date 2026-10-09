@@ -1122,9 +1122,12 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   that cannot be removed stops the run as a crash instead of running the code. **Nothing is
   frozen**, on purpose: a player can pollute prototypes inside its own worker, which can only
   change what its own senses return, and freezing intrinsics would break ordinary code through the
-  override mistake for no integrity gain. The page enforces three deadlines from outside
-  (`run-client.ts`), since synchronous code cannot be interrupted from inside: 1,000 ms to
-  `ready`, 250 ms between messages, 5,000 ms overall, then `worker.terminate()`. The facade caps
+  override mistake for no integrity gain. The page enforces its deadlines from outside
+  (`run-client.ts`), since synchronous code cannot be interrupted from inside. The worker posts
+  `booted` once its bundle has loaded, so a slow download or parse on a phone is never held
+  against the player: boot has its own 10 s limit (a breach is "The sandbox could not start."),
+  and the clock for the player's code starts at `booted`: 1,000 ms to `ready`, 250 ms between
+  messages, 5,000 ms overall, then `worker.terminate()`. The facade caps
   1,000 ability calls and 10 think lines per turn. Anything the worker posts that does not fit
   `parseFromWorker`, or arrives out of turn order, ends the run as a crash. There is **no
   main-thread fallback**: without Workers the player is told so and can still play by hand. A

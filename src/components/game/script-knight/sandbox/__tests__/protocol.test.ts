@@ -5,6 +5,7 @@ import { parseFromWorker } from "../protocol";
 
 describe("parseFromWorker", () => {
   it("accepts each shape", () => {
+    expect(parseFromWorker({ type: "booted" })).toEqual({ type: "booted" });
     expect(parseFromWorker({ type: "ready" })).toEqual({ type: "ready" });
     expect(parseFromWorker({ type: "done" })).toEqual({ type: "done" });
     expect(parseFromWorker({ type: "turn", t: 1, a: "w-", thoughts: [] })).toEqual({
@@ -39,6 +40,7 @@ describe("parseFromWorker", () => {
   });
 
   it("rejects extra keys", () => {
+    expect(parseFromWorker({ type: "booted", extra: 1 })).toBeNull();
     expect(parseFromWorker({ type: "ready", extra: 1 })).toBeNull();
     expect(parseFromWorker({ type: "done", extra: 1 })).toBeNull();
     expect(parseFromWorker({ type: "turn", t: 1, a: "w-", thoughts: [], extra: 1 })).toBeNull();
