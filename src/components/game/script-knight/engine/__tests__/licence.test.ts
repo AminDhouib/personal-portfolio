@@ -26,6 +26,12 @@ describe("WarriorJS MIT notices", () => {
     expect(text).toMatch(/Permission is hereby granted, free of charge/);
   });
 
+  it("credits ruby-warrior and Ryan Bates next to WarriorJS", () => {
+    const text = readFileSync(join(DIR, "LICENSE"), "utf8");
+    expect(text).toMatch(/ruby-warrior by Ryan Bates/);
+    expect(text).toMatch(/MIT License/);
+  });
+
   it("covers every file in core/", () => {
     expect(PORTED.filter((f) => f.startsWith("core/")).length).toBeGreaterThanOrEqual(9);
   });
