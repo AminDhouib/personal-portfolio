@@ -238,6 +238,27 @@ describe("Word Rain view", () => {
     expect(input().value).toBe(SENTINEL + text[0]!);
   });
 
+  it("announces a pause and the game over, and nothing while words fall or are cleared", () => {
+    renderRain();
+    const live = screen.getByRole("status");
+    expect(live).toHaveClass("sr-only");
+    expect(document.querySelectorAll("[role=status], [aria-live]")).toHaveLength(1);
+    expect(live).toHaveTextContent("Click or press a key to start");
+    start();
+    frames(2);
+    expect(live).toBeEmptyDOMElement();
+    typeText(words()[0]!.textContent!);
+    frames(20);
+    expect(live).toBeEmptyDOMElement(); // clearing and falling are silent
+    act(() => input().blur());
+    expect(live).toHaveTextContent("Paused");
+    start();
+    expect(live).toBeEmptyDOMElement();
+    frames(400);
+    expect(live).toHaveTextContent(/^Game over\. .*letters/);
+    expect(document.querySelectorAll("[role=status], [aria-live]")).toHaveLength(1);
+  });
+
   it("pauses when the input loses focus and says how to carry on", () => {
     renderRain();
     start();

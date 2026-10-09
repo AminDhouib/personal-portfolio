@@ -300,8 +300,20 @@ export function RainGame({
     </div>
   );
 
+  // The one live region: it changes on a pause and at game over only, never per word.
+  const announcement = over
+    ? `Game over. ${rain.score} letters, ${rain.cleared} words, wave ${rain.wave}.`
+    : paused
+      ? started
+        ? "Paused"
+        : "Click or press a key to start"
+      : "";
+
   return (
     <div className="space-y-5">
+      <p role="status" data-testid="ts-rain-live" className="sr-only">
+        {announcement}
+      </p>
       {header !== undefined && header !== null && <div inert={sheet}>{header}</div>}
       <PlaySheet
         active={sheet}
