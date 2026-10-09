@@ -8,8 +8,8 @@ vi.mock("@/lib/arcade/identity", () => ({
   resetIdentity: identity.reset,
 }));
 
-import { ARCADE_SCORE_CAP } from "@/lib/arcade/games";
-import { useArcadeBoard } from "../use-arcade-board";
+import { ARCADE_PROOF_MAX_CHARS, ARCADE_SCORE_CAP } from "@/lib/arcade/games";
+import { type ArcadeSubmitPayload, useArcadeBoard } from "../use-arcade-board";
 
 const ID = { playerId: "11111111-1111-4111-8111-111111111111", token: "A".repeat(43) };
 const ID2 = { playerId: "22222222-2222-4222-8222-222222222222", token: "B".repeat(43) };
@@ -851,6 +851,62 @@ describe("useArcadeBoard", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
       const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
       expect(body.score).toBe(ARCADE_SCORE_CAP);
+    });
+
+    it("sends an optional proof as its own top-level field, never inside detail", async () => {
+      const { result } = await mounted();
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({
+          name: "Ada",
+          score: 500,
+          seconds: 60,
+          kills: 40,
+          distance: 1500,
+          proof: "1:w-w-",
+        });
+      });
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect(body.proof).toBe("1:w-w-");
+      expect(body.detail).toEqual({ seconds: 60, kills: 40, distance: 1500 });
+    });
+
+    it("leaves the proof field out of the body when none is given", async () => {
+      const { result } = await mounted();
+      fetchMock.mockResolvedValueOnce(okResponse({ ok: true, boards: BOARDS }));
+      await act(async () => {
+        await result.current.submit({ name: "Ada", score: 5, seconds: 1, kills: 1, distance: 1 });
+      });
+      const body = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+      expect("proof" in body).toBe(false);
+    });
+
+    it("does not POST a proof longer than the server accepts: it returns a rejection", async () => {
+      const { result } = await mounted();
+      let submitResult: unknown;
+      await act(async () => {
+        submitResult = await result.current.submit({
+          name: "Ada",
+          score: 5,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+          proof: "p".repeat(ARCADE_PROOF_MAX_CHARS + 1),
+        });
+      });
+      expect(submitResult).toEqual({ ok: false, rejected: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("types proof as an optional string and still rejects stray keys", () => {
+      type Payload = ArcadeSubmitPayload<"space-shooter">;
+      const ok: Payload = { name: "Ada", score: 1, seconds: 1, kills: 1, distance: 1 };
+      const withProof: Payload = { ...ok, proof: "x" };
+      // @ts-expect-error proof is a string
+      const badProof: Payload = { ...ok, proof: 5 };
+      // @ts-expect-error unknown keys are still a compile error
+      const stray: Payload = { ...ok, region: 1 };
+      expect([ok, withProof, badProof, stray]).toHaveLength(4);
     });
 
     it("returns { ok:false } instead of rejecting when the identity cannot be created", async () => {

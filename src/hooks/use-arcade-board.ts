@@ -49,11 +49,13 @@ type ArcadeDetail<G extends ArcadeGameSlug> = z.infer<(typeof ARCADE_GAMES)[G]["
 /**
  * What a game submits: the name, the score and exactly the game's detail keys. The server
  * rejects a body with a missing or extra detail key (400), so the type makes that a compile
- * error instead.
+ * error instead. `proof` is the optional evidence a game's server verifier re-simulates (a
+ * replay log, never code); it travels beside the detail, never inside it, and is not stored.
  */
 export type ArcadeSubmitPayload<G extends ArcadeGameSlug = ArcadeGameSlug> = {
   name: string;
   score: number;
+  proof?: string;
 } & ArcadeDetail<G>;
 
 export interface ArcadeSubmitResult {
@@ -88,6 +90,8 @@ const DETAIL_KEYS: { [G in ArcadeGameSlug]: readonly (keyof ArcadeDetail<G> & st
 // validators, which a client component must not pull in for one number; the hook test pins
 // the two together (a score at the cap is sent, one above it is not).
 const SCORE_CAP = 10_000_000;
+// Mirrors ARCADE_PROOF_MAX_CHARS the same way, pinned by the hook test.
+const PROOF_MAX_CHARS = 12_000;
 // The server's body schema takes a handle up to 200 characters and sanitizes it to 12.
 const HANDLE_MAX_SENT = 200;
 
@@ -285,6 +289,9 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
           // The server would answer 400; this is the same "not accepted" outcome as a 422.
           return { ok: false, rejected: true };
         }
+        if (payload.proof !== undefined && payload.proof.length > PROOF_MAX_CHARS) {
+          return { ok: false, rejected: true };
+        }
         // Inside the try: creating the identity touches crypto and storage, which can throw.
         const identity = getIdentity();
         const res = await fetch("/api/arcade/scores", {
@@ -297,6 +304,7 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
             handle: payload.name.slice(0, HANDLE_MAX_SENT),
             score,
             detail: pickDetail(slug, payload),
+            ...(payload.proof !== undefined && { proof: payload.proof }),
           }),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
