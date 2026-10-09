@@ -96,6 +96,13 @@ describe("the ghost caret and pace chip", () => {
     const ghost = screen.getByTestId("ts-ghost");
     expect(ghost.closest("[data-ts-word]")).toHaveAttribute("data-ts-word", "0");
     expect(ghost.textContent).toBe("b");
+    // The marker must not tint behind the glyph: the letter keeps its own text colour.
+    const textClass = (el: Element | null) =>
+      (el?.className ?? "").split(" ").filter((c) => c.startsWith("text-"));
+    expect(textClass(ghost)).toEqual(textClass(ghost.previousElementSibling));
+    expect(textClass(ghost)).not.toEqual([]);
+    expect(ghost.className).not.toMatch(/(^| )bg-/);
+    expect(ghost.className).toMatch(/outline/);
     expect(screen.getByTestId("ts-ghost-chip")).toHaveTextContent("+1 ahead");
   });
 
