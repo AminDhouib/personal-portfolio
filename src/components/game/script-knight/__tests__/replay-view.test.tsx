@@ -88,3 +88,24 @@ describe("ReplayViewer", () => {
     expect(screen.getByRole("alert").textContent).toBe(DAMAGED_MESSAGE);
   });
 });
+
+describe("ReplayViewer, damaged links reach the page", () => {
+  const good = fragmentOf(NP2);
+  const damaged: Record<string, string> = {
+    truncated: good.slice(0, 30),
+    "truncated minus one char": good.slice(0, -1),
+    "level 99": "#replay=1.t.np.99.0.w-w-",
+    "5,000 chars of junk": `#replay=1.${"x".repeat(5000)}`,
+  };
+
+  for (const [name, hash] of Object.entries(damaged)) {
+    it(`renders ${name} as damaged without an error, and again on a re-render`, () => {
+      const props = { hash, today: TODAY, onPlay: vi.fn(), onClose: vi.fn() };
+      const { rerender } = render(<ReplayViewer {...props} />);
+      expect(screen.getByRole("alert").textContent).toBe(DAMAGED_MESSAGE);
+      // A second render is what exposed it: the empty frame list must be the same list each time.
+      rerender(<ReplayViewer {...props} />);
+      expect(screen.getByRole("alert").textContent).toBe(DAMAGED_MESSAGE);
+    });
+  }
+});

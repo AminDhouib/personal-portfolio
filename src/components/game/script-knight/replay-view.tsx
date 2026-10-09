@@ -7,12 +7,17 @@ import { getGradeLetter } from "./engine/scoring";
 import { TOWERS } from "./engine/towers";
 import { FloorView } from "./floor-view";
 import { playLog } from "./played";
+import type { Frame } from "./playback";
 import { parseReplayFragment } from "./replay-link";
 import { GAME_SURFACE, TOUCH } from "./surface";
 import { Transport } from "./transport";
 import { usePlayback } from "./use-playback";
 
 const BUTTON = `rounded-md border border-(--border) px-3 py-1.5 text-sm text-(--foreground) hover:border-accent-green ${TOUCH}`;
+
+// One list for every render of a damaged link: usePlayback resets when it sees a different list,
+// so a fresh [] each render would loop forever.
+const NO_FRAMES: Frame[] = [];
 
 export const DAMAGED_MESSAGE = "This replay link is damaged";
 
@@ -39,7 +44,7 @@ function titleOf(ref: LevelRef): string {
 export function ReplayViewer({ hash, today, onPlay, onClose }: ReplayViewerProps) {
   const replay = useMemo(() => parseReplayFragment(hash), [hash]);
   const played = useMemo(() => (replay ? playLog(replay.ref, replay.actions) : null), [replay]);
-  const frames = played?.frames ?? [];
+  const frames = played?.frames ?? NO_FRAMES;
   const playback = usePlayback(frames);
   const frame = playback.frame ?? frames[0];
 
