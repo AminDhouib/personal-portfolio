@@ -84,7 +84,9 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 - Script Knight engine: `src/components/game/script-knight/engine/`, a pure TS port of WarriorJS
   (MIT) with an action-log codec, a step API and a reference bot, a Web Worker sandbox for the
   player's code in `sandbox/`, and the game page (`stage.tsx`, hidden until launch) around them. See
-  DESIGN.md's "Script Knight" section and the Script Knight register entries.
+  DESIGN.md's "Script Knight" section and the Script Knight register entries. Its daily floor
+  (`daily.ts`) ranks on the arcade board through a proof-verified entry that replays the action log
+  on the server (DESIGN.md's "Arcade backend").
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries

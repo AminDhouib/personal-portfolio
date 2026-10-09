@@ -14,7 +14,8 @@ export const scriptKnightContent: GameContent = {
     "Use senses, such as feel and health, to decide before you act.",
     "Press Run. The whole run is played out in the sandbox, then replayed for you.",
     "Step or scrub through the replay and read the event log.",
-    "Reach the stairs to pass the floor and open the next one. Nine floors make a tower.",
+    "Reach the stairs to pass a floor and open the next one. Nine floors make a tower.",
+    "Open Today's floor for the daily: a new corridor each UTC day, with a leaderboard.",
   ],
   controls: [
     {
@@ -40,7 +41,7 @@ export const scriptKnightContent: GameContent = {
     },
   ],
   strategy: [
-    "Sense before you act. Looking ahead costs nothing, and many floors only need a check before each step.",
+    "Sense before you act. Looking ahead costs nothing.",
     "Rest when you are hurt and nothing is in reach; health is what keeps a run alive.",
     "Write for the general case. Epic mode runs the same code through all nine floors in a row, so code that only works for one map will fail.",
     "Use think to print values into the event log when your code misbehaves.",
@@ -68,7 +69,7 @@ export const scriptKnightContent: GameContent = {
     {
       question: "Can I use TypeScript?",
       answer:
-        "Not yet. Script Knight takes JavaScript only. TypeScript would have to be turned into JavaScript first, which adds nothing a JavaScript player cannot do and would make error line numbers point at the wrong line.",
+        "Not yet. Script Knight takes JavaScript only, so error line numbers match your code.",
     },
     {
       question: "What is epic mode?",
@@ -76,9 +77,9 @@ export const scriptKnightContent: GameContent = {
         "After you clear floor 9 of a tower, epic mode runs the same code through all nine floors in a row with every ability, and grades each floor and the average.",
     },
     {
-      question: "How are floors scored?",
+      question: "How are scores and the leaderboard checked?",
       answer:
-        "A pass earns points from the knight, a time bonus and a clear bonus. The score becomes a grade from F to S, and your best is kept for each floor.",
+        "A pass earns points from the knight, a time bonus and a clear bonus, graded F to S. For the daily board the server replays your moves and works out the score itself; your code never leaves your browser.",
     },
   ],
   credits: [
@@ -94,7 +95,7 @@ export const scriptKnightContent: GameContent = {
     },
     {
       label: "Game",
-      detail: "Game: sandbox, renderer and stage by Amin Dhouib",
+      detail: "Game: sandbox, renderer, daily floors and board by Amin Dhouib",
     },
   ],
 };

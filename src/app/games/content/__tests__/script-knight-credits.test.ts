@@ -27,3 +27,11 @@ describe("Script Knight credits", () => {
     expect(own?.detail).toMatch(/sandbox/);
   });
 });
+
+describe("Script Knight leaderboard copy", () => {
+  it("says the server replays moves and the code stays in the browser", () => {
+    const entry = GAME_CONTENT["script-knight"].faq.find((f) => /leaderboard/i.test(f.question));
+    expect(entry?.answer).toMatch(/replays your moves/);
+    expect(entry?.answer).toMatch(/code never leaves your browser/);
+  });
+});
