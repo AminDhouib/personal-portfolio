@@ -78,6 +78,18 @@ describe("CodeEditor", () => {
     expect(screen.getByRole("status").textContent).toBe("");
   });
 
+  it("indents on Tab, and lets Escape then Tab leave the editor", () => {
+    const { container, editor } = setup({ value: "" });
+    const content = container.querySelector(".cm-content") as HTMLElement;
+    const tab = { key: "Tab", code: "Tab", keyCode: 9 };
+    // Tab alone is taken: the editor indents and the browser's focus move is cancelled.
+    expect(fireEvent.keyDown(content, tab)).toBe(false);
+    expect(editor.state.doc.toString()).not.toBe("");
+    // Escape first, as the textarea does: the next Tab is left to the browser.
+    fireEvent.keyDown(content, { key: "Escape", code: "Escape", keyCode: 27 });
+    expect(fireEvent.keyDown(content, tab)).toBe(true);
+  });
+
   it("starts with the caret the textarea had", () => {
     const { editor } = setup({ initialSelection: { anchor: 3, head: 7 } });
     expect(editor.state.selection.main.anchor).toBe(3);

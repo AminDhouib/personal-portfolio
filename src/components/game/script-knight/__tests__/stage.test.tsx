@@ -88,6 +88,54 @@ describe("Stage", () => {
     expect(await screen.findByText("Line 3: Unexpected token ';'")).toBeTruthy();
   });
 
+  it("prefers the line the sandbox gave over the editor's, so the prefix matches the message", async () => {
+    function FindingEditor({ onSyntaxError }: EditorProps) {
+      useEffect(() => {
+        onSyntaxError?.({ line: 3, column: 1, from: 40, to: 41 });
+      }, [onSyntaxError]);
+      return <textarea aria-label="Your Player code (JavaScript)" readOnly />;
+    }
+    const runner: Runner = () => ({
+      done: Promise.resolve<RunOutcome>({
+        kind: "compile-error",
+        error: { kind: "syntax", message: "Unexpected token ';'", line: 5 },
+      }),
+      cancel: () => {},
+    });
+    render(<Stage runner={runner} editor={FindingEditor} />);
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText("Line 5: Unexpected token ';'")).toBeTruthy();
+  });
+
+  it("runs once when the editor asks to run twice before a render", async () => {
+    let calls = 0;
+    const runner: Runner = () => {
+      calls += 1;
+      return {
+        done: Promise.resolve<RunOutcome>({ kind: "finished", log: "1:", thoughts: [] }),
+        cancel: () => {},
+      };
+    };
+    function ShortcutEditor({ onRun }: EditorProps) {
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            onRun();
+            onRun();
+          }}
+        >
+          fake run shortcut
+        </button>
+      );
+    }
+    render(<Stage runner={runner} editor={ShortcutEditor} />);
+    fireEvent.click(screen.getByRole("button", { name: "fake run shortcut" }));
+    await waitFor(() => expect(calls).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(calls).toBe(1);
+  });
+
   it("leaves a syntax error without a line alone when the editor found none", async () => {
     const runner: Runner = () => ({
       done: Promise.resolve<RunOutcome>({
