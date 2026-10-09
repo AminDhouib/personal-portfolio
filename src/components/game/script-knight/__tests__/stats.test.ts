@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activeStreak,
   EMPTY_STATS,
+  ghostFor,
   HANDLE_MAX,
   loadStats,
   parseStats,
@@ -34,6 +35,7 @@ describe("knight:stats storage", () => {
       streakDays: 0,
       bestStreakDays: 0,
       handle: "",
+      ghost: null,
     });
   });
 
@@ -41,7 +43,7 @@ describe("knight:stats storage", () => {
     saveStats(EMPTY_STATS);
     expect(window.localStorage.getItem("knight:stats")).toBe(
       '{"v":1,"bestDaily":null,"runs":0,"lastDailyDay":null,"streakDays":0,' +
-        '"bestStreakDays":0,"handle":""}',
+        '"bestStreakDays":0,"handle":"","ghost":null}',
     );
   });
 
@@ -53,6 +55,7 @@ describe("knight:stats storage", () => {
       streakDays: 3,
       bestStreakDays: 4,
       handle: "Ada",
+      ghost: { day: "2026-10-15", log: "1:w-w-", score: 112 },
     });
     saveStats(stats);
     expect(loadStats()).toEqual(stats);
@@ -179,5 +182,76 @@ describe("setHandle", () => {
     expect(setHandle(EMPTY_STATS, "Ada Lovelace the First").handle).toBe("Ada Lovelace");
     const named = setHandle(EMPTY_STATS, "Ada");
     expect(setHandle(named, "Ada")).toBe(named);
+  });
+});
+
+describe("the ghost", () => {
+  const LOG = "1:h0h0w0w-";
+
+  it("reads as null when the field is missing: a v1 record from before the ghost", () => {
+    const old = {
+      v: 1,
+      bestDaily: null,
+      runs: 2,
+      lastDailyDay: null,
+      streakDays: 0,
+      bestStreakDays: 0,
+      handle: "Ada",
+    };
+    expect(parseStats(old)).toEqual({ ...EMPTY_STATS, runs: 2, handle: "Ada", ghost: null });
+  });
+
+  it("reads a malformed ghost as null without breaking the rest of the record", () => {
+    for (const bad of [
+      "x",
+      7,
+      {},
+      { day: "2026-10-15", log: LOG },
+      { day: "yesterday", log: LOG, score: 5 },
+      { day: "2026-10-15", log: "1:zz", score: 5 },
+      { day: "2026-10-15", log: "2:w-", score: 5 },
+      { day: "2026-10-15", log: LOG, score: -1 },
+      { day: "2026-10-15", log: LOG, score: "5" },
+      { day: "2026-10-15", log: 5, score: 5 },
+    ]) {
+      const parsed = parseStats({ v: 1, runs: 3, handle: "Ada", ghost: bad });
+      expect(parsed.ghost, JSON.stringify(bad)).toBeNull();
+      expect(parsed).toMatchObject({ runs: 3, handle: "Ada" });
+    }
+  });
+
+  it("keeps a good ghost", () => {
+    const ghost = { day: "2026-10-15", log: LOG, score: 112 };
+    expect(parseStats({ v: 1, ghost }).ghost).toEqual(ghost);
+  });
+
+  it("is set by the first clear that brings a log, and ignored when none comes", () => {
+    const s = recordDaily(EMPTY_STATS, { score: 100, day: "2026-10-15", log: LOG });
+    expect(s.ghost).toEqual({ day: "2026-10-15", log: LOG, score: 100 });
+    expect(recordDaily(EMPTY_STATS, { score: 100, day: "2026-10-15" }).ghost).toBeNull();
+    expect(recordDaily(s, { score: 120, day: "2026-10-15" }).ghost).toEqual(s.ghost);
+  });
+
+  it("is the best log of one day: a strictly higher score replaces it, a tie or less does not", () => {
+    let s = recordDaily(EMPTY_STATS, { score: 100, day: "2026-10-15", log: "1:w-" });
+    s = recordDaily(s, { score: 100, day: "2026-10-15", log: "1:r-" });
+    expect(s.ghost?.log).toBe("1:w-");
+    s = recordDaily(s, { score: 90, day: "2026-10-15", log: "1:r-" });
+    expect(s.ghost?.log).toBe("1:w-");
+    s = recordDaily(s, { score: 101, day: "2026-10-15", log: "1:r-" });
+    expect(s.ghost).toEqual({ day: "2026-10-15", log: "1:r-", score: 101 });
+  });
+
+  it("belongs to its day: a new day's clear replaces it even with a lower score", () => {
+    let s = recordDaily(EMPTY_STATS, { score: 200, day: "2026-10-15", log: "1:w-" });
+    s = recordDaily(s, { score: 50, day: "2026-10-16", log: "1:r-" });
+    expect(s.ghost).toEqual({ day: "2026-10-16", log: "1:r-", score: 50 });
+  });
+
+  it("is offered only for the same day", () => {
+    const s = recordDaily(EMPTY_STATS, { score: 100, day: "2026-10-15", log: LOG });
+    expect(ghostFor(s, "2026-10-15")).toBe(LOG);
+    expect(ghostFor(s, "2026-10-16")).toBeNull();
+    expect(ghostFor(EMPTY_STATS, "2026-10-15")).toBeNull();
   });
 });
