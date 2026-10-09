@@ -79,7 +79,7 @@ describe("starting the daily", () => {
   it("starts today's incident at once on a fresh board", () => {
     const h = mountGame("sandbox");
     fireEvent.click(startButton());
-    expect(h.controller.getHud().daily).toEqual({ day: utcDayKey(new Date()), result: null });
+    expect(h.controller.getHud().daily).toMatchObject({ day: utcDayKey(new Date()), result: null });
     expect(h.onStarted).toHaveBeenCalledTimes(1);
   });
 

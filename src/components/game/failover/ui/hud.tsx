@@ -42,6 +42,15 @@ export function StatusBar({ hud }: { hud: HudState }) {
           {T.sandbox}
         </dd>
       )}
+      {hud.daily && (
+        <dd
+          data-testid="failover-daily-marker"
+          title={hud.daily.day}
+          className="max-w-[9rem] self-center truncate rounded border border-[#06b6d4]/60 px-1.5 font-mono text-[10px] tracking-wider text-[#06b6d4]"
+        >
+          {fmt(T.daily_hud, { name: hud.daily.profile })}
+        </dd>
+      )}
       {hud.power && (
         <Readout
           label={T.power_label}

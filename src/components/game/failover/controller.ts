@@ -102,7 +102,7 @@ export interface HudState extends SimHud {
   badges: Badge[];
   alert: Alert | null;
   /** Set while the run is a Daily Incident; `result` once it has ended. */
-  daily: { day: string; result: DailyResult | null } | null;
+  daily: { day: string; profile: string; result: DailyResult | null } | null;
 }
 
 export interface ControllerOptions {
@@ -560,7 +560,13 @@ export class FailoverController {
       crashed: this.crashed,
       loading: this.loading,
       badges: this.badgeViews(),
-      daily: this.daily ? { day: this.daily.run.day, result: this.daily.result } : null,
+      daily: this.daily
+        ? {
+            day: this.daily.run.day,
+            profile: this.daily.run.profile.name,
+            result: this.daily.result,
+          }
+        : null,
       alert:
         this.alert && this.alert.until > this.clockMs
           ? { key: this.alert.key, level: this.alert.level, params: this.alert.params }
