@@ -41,7 +41,7 @@ import {
   TRAFFIC_COLORS,
 } from "./palette";
 import { TIER_SETTINGS, type PerfTier } from "./perf-tier";
-import { cellAt, groundPoint, nodeAt, type Cell } from "./pick";
+import { INTERNET_RADIUS, cellAt, groundPoint, nodeAt, pickNode, type Cell } from "./pick";
 import { writeRequestInstances, type Rgb } from "./requests";
 
 // The imperative three.js view of the board, in the site's neon wireframe:
@@ -152,10 +152,10 @@ export function createFailoverScene(canvas: HTMLCanvasElement, tier: PerfTier): 
 
   // The Internet: a slowly turning wire ball where all traffic starts.
   const internet = new LineSegments(
-    new EdgesGeometry(new IcosahedronGeometry(2.2, 0)),
+    new EdgesGeometry(new IcosahedronGeometry(INTERNET_RADIUS, 0)),
     new LineBasicMaterial({ color: new Color(INTERNET_COLOR) }),
   );
-  internet.position.y = 2.2;
+  internet.position.y = INTERNET_RADIUS;
   scene.add(internet);
 
   // Links: one LineSegments rewritten from the snapshot.
@@ -371,7 +371,10 @@ export function createFailoverScene(canvas: HTMLCanvasElement, tier: PerfTier): 
         -((clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(ndc, camera);
-      const point = groundPoint(raycaster.ray.origin, raycaster.ray.direction);
+      const { origin, direction } = raycaster.ray;
+      const hit = last ? pickNode(origin, direction, last) : null;
+      if (hit) return { cell: hit.cell, node: hit.id };
+      const point = groundPoint(origin, direction);
       const cell = point ? cellAt(point) : null;
       if (!cell) return null;
       return { cell, node: last ? nodeAt(cell, last) : null };

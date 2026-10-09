@@ -1,9 +1,10 @@
 import { CONFIG } from "../sim/config";
 import type { Snapshot } from "../sim/snapshot";
+import { nodeStyle } from "./nodes";
 
 // Pointer to board: where a ray from the camera meets the ground, which tile
-// that is, and which node (if any) stands on it. Pure arithmetic; the scene
-// feeds it the ray three's Raycaster built.
+// that is, and which node (if any) the ray passes through or stands on that
+// tile. Pure arithmetic; the scene feeds it the ray three's Raycaster built.
 
 export interface Cell {
   x: number;
@@ -35,4 +36,69 @@ export function nodeAt(cell: Cell, snapshot: Snapshot): string | null {
   if (snapshot.internet.x === cell.x && snapshot.internet.z === cell.z) return "internet";
   const service = snapshot.services.find((s) => s.x === cell.x && s.z === cell.z);
   return service ? service.id : null;
+}
+
+/** The Internet's ball (an icosahedron this wide, resting on the ground). */
+export const INTERNET_RADIUS = 2.2;
+/** Half the widest node footprint: the queue diamond (the box is 1.4, the drum 1.5). */
+const NODE_HALF_WIDTH = 1.6;
+
+/** Where the ray enters the box [min, max], as a ray parameter, or null if it misses. */
+function rayBox(origin: Vec3, dir: Vec3, min: Vec3, max: Vec3): number | null {
+  let near = 0;
+  let far = Infinity;
+  for (const axis of ["x", "y", "z"] as const) {
+    if (Math.abs(dir[axis]) < 1e-9) {
+      if (origin[axis] < min[axis] || origin[axis] > max[axis]) return null;
+      continue;
+    }
+    const a = (min[axis] - origin[axis]) / dir[axis];
+    const b = (max[axis] - origin[axis]) / dir[axis];
+    near = Math.max(near, Math.min(a, b));
+    far = Math.min(far, Math.max(a, b));
+    if (near > far) return null;
+  }
+  return near;
+}
+
+/**
+ * The nearest node the ray passes through, against each node's drawn bounds: so a
+ * click on the top of the Internet's ball or a tall node picks it, though the ground
+ * behind it is another tile.
+ */
+export function pickNode(
+  origin: Vec3,
+  dir: Vec3,
+  snapshot: Snapshot,
+): { id: string; cell: Cell } | null {
+  const { internet } = snapshot;
+  const nodes = [
+    {
+      id: "internet",
+      cell: { x: internet.x, z: internet.z },
+      half: INTERNET_RADIUS,
+      height: INTERNET_RADIUS * 2,
+    },
+    ...snapshot.services.map((service) => ({
+      id: service.id,
+      cell: { x: service.x, z: service.z },
+      half: NODE_HALF_WIDTH,
+      height: nodeStyle(service, null).height,
+    })),
+  ];
+  let best: { id: string; cell: Cell } | null = null;
+  let bestT = Infinity;
+  for (const { id, cell, half, height } of nodes) {
+    const t = rayBox(
+      origin,
+      dir,
+      { x: cell.x - half, y: 0, z: cell.z - half },
+      { x: cell.x + half, y: height, z: cell.z + half },
+    );
+    if (t !== null && t < bestT) {
+      best = { id, cell };
+      bestT = t;
+    }
+  }
+  return best;
 }
