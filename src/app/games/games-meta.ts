@@ -68,9 +68,9 @@ export const GAMES: GameMeta[] = [
   {
     slug: "typing-speed",
     title: "Typing Speed",
-    tagline: "Race the clock through flowing sentences",
+    tagline: "Race the clock, chase your ghost, stop the falling words",
     description:
-      "Timed tests of 15 to 120 seconds or a single classic-book quote, honest net and raw WPM, a live speed graph, and a map of the keys you miss. Every correct letter has a little pop.",
+      "Timed tests of 15 to 120 seconds or a single classic-book quote, honest net and raw WPM, a live speed graph, a ghost of your best run, and a map of the keys you miss. Or play Word Rain and stop the falling words.",
     controls:
       "Pick a mode, then press any key and type the passage. The clock starts on your first key. Tab then Enter restarts.",
     accent: "#60a5fa",

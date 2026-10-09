@@ -357,6 +357,16 @@ passage; the corpus test pins the counts and lengths.
   `typing:stats.prefs.ghost` (default on); off hides the caret, chip and results overlay but
   runs still update the ghost. The chip is decoration; its live region repeats the pace at most
   once per 5 s, and in the phone sheet it sits in the HUD row so the sheet geometry is unchanged.
+- **Word Rain is the `rain` mode, with its own engine and no server.** `engine/rain.ts` is
+  pure and seeded (a plain-number rng, so the state compares with `toEqual`); `use-rain.ts` and
+  `rain-view.tsx` run it. A typed buffer targets the lowest falling word that starts with it, and
+  the spawner never lets one live word start another, so a buffer maps to one word. Positions are
+  fractions of the play area and speeds are areas per second, so a 300 px phone area is as hard as
+  the 420 px desktop card. The loop clamps dt to 50 ms and stops while the tab is hidden or the
+  input is blurred: a paused run neither banks nor loses anything. The best score and wave live in
+  `typing:stats.rain` (`recordRain`; bulk runs never count); there is no leaderboard (open
+  question 14) and the Ghost toggle and chip do not apply. The timed modes' hidden input stays
+  mounted but `hidden` while Rain is on, because `useTypingRun` bound its listeners to it once.
 - **The text is a three-line stream.** `text-view.tsx` renders words from a trim index to
   `cursor + LOOKAHEAD_WORDS` and measures each word's `offsetTop` in a frame callback; once the
   cursor is on the third line the first line's words are dropped. The screen-reader copy keeps the
