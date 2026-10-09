@@ -8,7 +8,7 @@ import { Ticking } from "../effects";
 import { EAST, WEST } from "../spatial";
 import { configForRef, createRun, replayLog, type Run } from "../run";
 import type { TowerLevelRef } from "../level-ref";
-import { endOk, stepOk } from "./helpers";
+import { endOk, replayOk, stepOk } from "./helpers";
 
 const NAME = "Probe";
 
@@ -208,19 +208,30 @@ describe("step", () => {
     expect(record.events[0]?.action.type).toBe("walk");
   });
 
-  it("refuses an action the floor does not grant", () => {
+  it("returns a typed failure for an action the floor does not grant, and stays playable", () => {
     const run = createRun(tower(1));
-    expect(() => stepOk(run, { name: "shoot", direction: "forward" })).toThrow(
-      "This floor does not give you shoot yet.",
-    );
+    expect(run.step({ name: "shoot", direction: "forward" })).toEqual({
+      ok: false,
+      reason: { kind: "ungranted-action", action: "shoot" },
+    });
     expect(run.turnCount).toBe(0);
+    expect(run.status).toBe("playing");
+    expect(stepOk(run, { name: "walk", direction: null }).t).toBe(1);
+  });
+
+  it("returns a typed failure for a direction that is not one, and stays playable", () => {
+    const run = createRun(tower(1));
+    const stepped = run.step({ name: "walk", direction: "north" as never });
+    expect(stepped).toMatchObject({ ok: false, reason: { kind: "invalid-action" } });
+    expect(run.turnCount).toBe(0);
+    expect(run.status).toBe("playing");
   });
 
   it("refuses to step a finished run", () => {
     const run = createRun(tower(1));
     for (let i = 0; i < 7; i++) stepOk(run, { name: "walk", direction: null });
     expect(run.status).toBe("passed");
-    expect(() => stepOk(run, null)).toThrow("The run is over.");
+    expect(run.step(null)).toEqual({ ok: false, reason: { kind: "run-over" } });
     expect(() => run.beginTurn()).toThrow("The run is over.");
   });
 
@@ -232,7 +243,7 @@ describe("step", () => {
     expect(run.status).toBe("out-of-turns");
     expect(run.turnCount).toBe(200);
     expect(run.result()).toMatchObject({ passed: false, turns: 200, score: null });
-    expect(() => stepOk(run, null)).toThrow("The run is over.");
+    expect(run.step(null)).toEqual({ ok: false, reason: { kind: "run-over" } });
   });
 
   it("passes on turn 200 when the stairs are reached on the last turn", () => {
@@ -280,7 +291,7 @@ describe("replayLog", () => {
       name: "walk" as const,
       direction: null,
     }));
-    const replay = replayLog(tower(1), actions);
+    const replay = replayOk(tower(1), actions);
     expect(replay.consumed).toBe(7);
     expect(replay.records).toHaveLength(7);
     expect(replay.result.passed).toBe(true);
@@ -291,21 +302,27 @@ describe("replayLog", () => {
       name: "walk" as const,
       direction: null,
     }));
-    const replay = replayLog(tower(1), actions);
+    const replay = replayOk(tower(1), actions);
     expect(replay.consumed).toBe(7);
     expect(actions.length - replay.consumed).toBe(3);
   });
 
   it("replays a log that ends while still playing", () => {
-    const replay = replayLog(tower(1), [{ name: "walk", direction: null }]);
+    const replay = replayOk(tower(1), [{ name: "walk", direction: null }]);
     expect(replay.consumed).toBe(1);
     expect(replay.result.passed).toBe(false);
   });
 
-  it("throws on an action the floor does not grant", () => {
-    expect(() => replayLog(tower(1), [{ name: "shoot", direction: null }])).toThrow(
-      "This floor does not give you shoot yet.",
-    );
+  it("returns a typed failure, with its position, on an action the floor does not grant", () => {
+    const walk = { name: "walk", direction: null } as const;
+    expect(replayLog(tower(1), [{ name: "shoot", direction: null }])).toMatchObject({
+      ok: false,
+      at: 0,
+      reason: { kind: "ungranted-action", action: "shoot" },
+    });
+    const late = replayLog(tower(1), [walk, walk, { name: "bind", direction: "left" }]);
+    expect(late).toMatchObject({ ok: false, at: 2, reason: { kind: "ungranted-action" } });
+    expect(late.ok ? [] : late.records).toHaveLength(2);
   });
 
   it("is deterministic: two replays give identical records", () => {
@@ -313,8 +330,8 @@ describe("replayLog", () => {
       name: i % 3 === 0 ? ("attack" as const) : ("walk" as const),
       direction: null,
     }));
-    const a = replayLog(tower(2, true), actions);
-    const b = replayLog(tower(2, true), actions);
+    const a = replayOk(tower(2, true), actions);
+    const b = replayOk(tower(2, true), actions);
     expect(JSON.stringify(a.records)).toBe(JSON.stringify(b.records));
   });
 });
@@ -323,6 +340,13 @@ describe("configForRef", () => {
   it("builds the normal and the epic config of a floor", () => {
     expect(Object.keys(tower(1).floor.warrior.abilities ?? {}).sort()).toEqual(["think", "walk"]);
     expect(Object.keys(tower(1, true).floor.warrior.abilities ?? {})).toContain("shoot");
+  });
+
+  it("rejects a tower id that is not one, including prototype keys", () => {
+    for (const bad of ["constructor", "__proto__", "toString", "hasOwnProperty", "nope"]) {
+      const ref = { kind: "tower", tower: bad as never, level: 1, epic: false } as const;
+      expect(() => configForRef(ref, NAME)).toThrow(`no tower "${bad}"`);
+    }
   });
 
   it("rejects a level outside the tower", () => {

@@ -4,7 +4,8 @@ import type { AbilityUnit } from "../core/ability";
 import type { EffectUnit } from "../core/effect";
 import type { TurnAction } from "../codec";
 import type { Turn } from "../core/unit";
-import type { Run, StepResult, TurnRecord } from "../run";
+import type { LevelConfig } from "../core/level-config";
+import { replayLog, type Run, type StepResult, type TurnRecord } from "../run";
 
 /** A hand-made stand-in for a unit, space or turn: whatever the code under test reads. */
 export type Rec = Record<string, unknown>;
@@ -42,4 +43,13 @@ export function stepOk(run: Run, action: TurnAction): TurnRecord {
 /** Ends the turn in progress and returns its record; a failed turn throws. */
 export function endOk(run: Run): TurnRecord {
   return expectRecord(run.endTurn());
+}
+
+/** Replays a log that is expected to play through; a typed failure throws, so the test fails. */
+export function replayOk(config: LevelConfig, actions: readonly TurnAction[]) {
+  const replay = replayLog(config, actions);
+  if (!replay.ok) {
+    throw new Error(`replay failed at ${replay.at}: ${replay.reason.kind}`);
+  }
+  return replay;
 }

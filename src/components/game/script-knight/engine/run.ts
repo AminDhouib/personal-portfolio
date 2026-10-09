@@ -1,4 +1,4 @@
-import type { TurnAction } from "./codec";
+import type { ActionName, TurnAction } from "./codec";
 import { type Level, loadLevel, MAX_TURNS } from "./core/level";
 import { getLevelConfig, type LevelConfig } from "./core/level-config";
 import type { TurnEvent } from "./core/logger";
@@ -6,7 +6,7 @@ import { createFacade, type TurnFacade, type WarriorTurn } from "./facade";
 import type { TowerLevelRef } from "./level-ref";
 import { getLevelScore, type LevelScore } from "./scoring";
 import { verifyRelativeDirection } from "./spatial";
-import { TOWERS } from "./towers";
+import { isTowerId, TOWERS } from "./towers";
 
 export type { WarriorTurn } from "./facade";
 
@@ -21,7 +21,14 @@ export interface TurnRecord {
 export type RunStatus = "playing" | "passed" | "failed" | "out-of-turns" | "engine-error";
 
 /** Why a step did not produce a turn. An engine error ends the run; the others leave it as it was. */
-export type RunFailure = { kind: "engine-error"; message: string };
+export type RunFailure =
+  | { kind: "engine-error"; message: string }
+  /** The floor does not give the warrior this ability yet. */
+  | { kind: "ungranted-action"; action: ActionName }
+  /** The action itself is malformed (for example a direction that is not one). */
+  | { kind: "invalid-action"; message: string }
+  /** The run already ended. */
+  | { kind: "run-over" };
 
 export type StepResult = { ok: true; record: TurnRecord } | { ok: false; reason: RunFailure };
 
@@ -53,8 +60,14 @@ export interface Run {
   result(): RunResult;
 }
 
-/** Builds the level config for a tower floor; throws for a level the tower does not have. */
+/**
+ * Builds the level config for a tower floor; throws for a tower or level that does not exist.
+ * The ref may come from an untrusted request, so the tower id is checked before it indexes.
+ */
 export function configForRef(ref: TowerLevelRef, warriorName: string): LevelConfig {
+  if (!isTowerId(ref.tower)) {
+    throw new Error(`no tower "${String(ref.tower)}"`);
+  }
   const tower = TOWERS[ref.tower];
   if (!Number.isInteger(ref.level) || ref.level < 1 || ref.level > tower.levels.length) {
     throw new Error(`${ref.tower} has no level ${ref.level}`);
@@ -168,16 +181,21 @@ class RunImpl implements Run {
 
   step(action: TurnAction): StepResult {
     if (this.currentStatus !== "playing") {
-      throw new Error("The run is over.");
+      return { ok: false, reason: { kind: "run-over" } };
     }
-    // Check everything that could throw before the turn begins, so a refused action leaves the
+    // Check everything that could fail before the turn begins, so a refused action leaves the
     // run exactly as it was.
     if (action) {
       if (!this.level.floor.warrior?.abilities.has(action.name)) {
-        throw new Error(`This floor does not give you ${action.name} yet.`);
+        return { ok: false, reason: { kind: "ungranted-action", action: action.name } };
       }
       if (action.direction !== null) {
-        verifyRelativeDirection(action.direction);
+        try {
+          verifyRelativeDirection(action.direction);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { ok: false, reason: { kind: "invalid-action", message } };
+        }
       }
     }
     const turn = this.beginTurn();
@@ -215,15 +233,17 @@ export function createRun(config: LevelConfig): Run {
   return new RunImpl(config);
 }
 
+export type ReplayResult =
+  | { ok: true; records: TurnRecord[]; result: RunResult; consumed: number }
+  /** `at` is the index of the action that could not be played; `records` are the turns before it. */
+  | { ok: false; reason: RunFailure; at: number; records: TurnRecord[] };
+
 /**
  * Replays an action log from the start. Stops at the first terminal status and reports how many
- * actions it consumed (the server rejects a log with leftovers). Throws on an action the floor
- * does not grant.
+ * actions it consumed (the server rejects a log with leftovers). An action the floor does not
+ * grant, or an engine error, comes back as a typed failure with its position.
  */
-export function replayLog(
-  config: LevelConfig,
-  actions: readonly TurnAction[],
-): { records: TurnRecord[]; result: RunResult; consumed: number } {
+export function replayLog(config: LevelConfig, actions: readonly TurnAction[]): ReplayResult {
   const run = createRun(config);
   const records: TurnRecord[] = [];
   let consumed = 0;
@@ -233,10 +253,10 @@ export function replayLog(
     }
     const stepped = run.step(action);
     if (!stepped.ok) {
-      throw new Error(stepped.reason.message);
+      return { ok: false, reason: stepped.reason, at: consumed, records };
     }
     records.push(stepped.record);
     consumed += 1;
   }
-  return { records, result: run.result(), consumed };
+  return { ok: true, records, result: run.result(), consumed };
 }
