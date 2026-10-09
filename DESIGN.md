@@ -241,6 +241,24 @@ seconds }`. `checkTowerStacker` requires today's UTC day by the server clock (no
   derived from the game's own scoring rules, with one accept and one reject pinned per
   inequality. A malformed detail is a 400; an implausible score is a 422 with a stable reason.
   Adding a game to the arcade = a validator + tests + a hook swap.
+- **The proof seam (re-simulated scores).** A game whose score can be re-played on the server
+  (Script Knight's action log, Failover's seed plus action log) submits an optional `proof` string
+  (at most `ARCADE_PROOF_MAX_CHARS`, 12,000, beside `detail` and inside the unchanged 16 KiB body
+  guard; a log, never code). Its `ARCADE_GAMES` entry may set `requiresProof` (a missing proof is
+  a 400 `{ error: "proof required" }`, before any check) and `verify`, an async function given
+  `{ score, detail, proof, now, deadline }`. The order is: body schema, requiresProof, the
+  synchronous plausibility check (400 or 422), then `verify` only if that passed, then the store.
+  A game without a verifier ignores `proof`. A reject verdict is the same 422
+  `{ error: "implausible", reason }`. A verifier that throws, rejects, returns something that is not
+  a verdict, returns after its deadline or never settles **fails closed**: 422 with the fixed
+  reason `could not verify the run`, the cause reported once through `captureException`
+  (`api:arcade-scores.verify`), never a 500. The budget is `ARCADE_VERIFY_BUDGET_MS` (2,000 ms).
+  The verifier runs in-process, so a timer cannot stop synchronous work: `deadline` (epoch ms)
+  is handed in and the verifier must check it between chunks and stop; the route also discards a
+  verdict that arrives late and abandons one that never settles (`runVerifier`,
+  `src/lib/arcade/verify.ts`). **The proof is never stored**: the schema, the store and `detail`
+  are unchanged, and a test pins that no query parameter carries it (no server-side leader logs in
+  v1). `useArcadeBoard`'s `submit` passes an optional `proof` through as its own body field.
 - **Board cap: 1000 rows.** Each submit that wrote a row on a board (the upsert's `improved`)
   trims that board back to its top `BOARD_ROW_CAP` (1000) rows by `(score DESC, achieved_at ASC)`,
   in the same transaction, so a flood of fresh player ids cannot grow `arcade_scores` without

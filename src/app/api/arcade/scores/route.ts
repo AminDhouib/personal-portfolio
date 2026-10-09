@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { BOARD_PERIODS, boardKey } from "@/lib/arcade/boards";
 import { getArcadePool } from "@/lib/arcade/db";
-import { ARCADE_GAME_SLUGS, ARCADE_SCORE_CAP, validateArcadeSubmission } from "@/lib/arcade/games";
+import {
+  ARCADE_GAME_SLUGS,
+  ARCADE_GAMES,
+  ARCADE_PROOF_MAX_CHARS,
+  ARCADE_SCORE_CAP,
+  type ArcadeGameEntry,
+  validateArcadeSubmission,
+} from "@/lib/arcade/games";
 import { readBoard, submitScore } from "@/lib/arcade/store";
+import { runVerifier } from "@/lib/arcade/verify";
 import { captureException } from "@/lib/log";
 import { sanitizePlayerName } from "@/lib/player-name";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -30,6 +38,8 @@ const submitBodySchema = z.strictObject({
   handle: z.string().max(200),
   score: z.number().int().min(0).max(ARCADE_SCORE_CAP),
   detail: z.record(z.string(), z.unknown()),
+  // Evidence for a game's server-side verifier (a replay log, never code). Not stored.
+  proof: z.string().max(ARCADE_PROOF_MAX_CHARS).optional(),
 });
 
 export async function GET(req: Request) {
@@ -82,6 +92,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
   const body = parsed.data;
+  const entry: ArcadeGameEntry = ARCADE_GAMES[body.game];
+  if (entry.requiresProof && body.proof === undefined) {
+    return NextResponse.json({ error: "proof required" }, { status: 400 });
+  }
 
   // One instant for the whole request: the validator's day check and the board keys the
   // store writes must agree on it.
@@ -92,6 +106,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid detail" }, { status: 400 });
     }
     return NextResponse.json({ error: "implausible", reason: verdict.reason }, { status: 422 });
+  }
+
+  // After the synchronous check, and only if it passed. A game without a verifier ignores proof.
+  if (entry.verify) {
+    const outcome = await runVerifier(entry.verify, {
+      score: body.score,
+      detail: verdict.detail,
+      proof: body.proof ?? null,
+      now,
+    });
+    if (!outcome.ok) {
+      if ("error" in outcome) captureException("api:arcade-scores.verify", outcome.error);
+      return NextResponse.json({ error: "implausible", reason: outcome.reason }, { status: 422 });
+    }
   }
 
   const handle = sanitizePlayerName(body.handle, { maxLength: HANDLE_MAX, fallback: "Pilot" });

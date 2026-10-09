@@ -54,6 +54,45 @@ export const ARCADE_SCORE_CAP = 10_000_000;
 
 type Verdict = { ok: true } | { ok: false; reason: string };
 
+/** What a check or a verifier decides: accept, or reject with a short stable reason. */
+export type ArcadeVerdict = Verdict;
+
+/**
+ * The most a game's verifier may take. The verifier runs in this process, so a timer cannot
+ * interrupt it: it is handed `deadline` (epoch milliseconds, the same clock as `Date.now()`)
+ * and must look at it between chunks of work and give up. The route backs that up two ways:
+ * a verdict that arrives after the deadline is discarded, and a verifier that never settles is
+ * abandoned by a timer. Both fail closed (see `runVerifier`).
+ */
+export const ARCADE_VERIFY_BUDGET_MS = 2_000;
+
+/** The longest proof the route accepts, in characters (the body as a whole stays under 16 KiB). */
+export const ARCADE_PROOF_MAX_CHARS = 12_000;
+
+export interface ArcadeVerifyInput {
+  score: number;
+  /** The game's strict-validated detail, the same object the store would write. */
+  detail: Record<string, number>;
+  /** The submitted proof; null when the client sent none (only possible without requiresProof). */
+  proof: string | null;
+  /** The request's instant: the one the board keys and the plausibility check also use. */
+  now: Date;
+  /** Epoch milliseconds after which the verdict is discarded; check it between chunks. */
+  deadline: number;
+}
+
+/** A game's server-side re-simulation of the run its proof describes. Never receives code. */
+export type ArcadeVerify = (input: ArcadeVerifyInput) => Promise<ArcadeVerdict>;
+
+/** One registry entry. `proof` is never stored: it only feeds `verify`. */
+export interface ArcadeGameEntry {
+  detailSchema: z.ZodType;
+  /** When true, a submission without a proof is a 400. */
+  requiresProof?: boolean;
+  /** Runs after the synchronous plausibility check passes; a reject is a 422. */
+  verify?: ArcadeVerify;
+}
+
 function reject(reason: string): Verdict {
   return { ok: false, reason };
 }
@@ -202,7 +241,7 @@ export const ARCADE_GAMES = {
   "super-voltorb-flip": { detailSchema: voltorbDailyDetailSchema },
   "tower-stacker": { detailSchema: towerDetailSchema },
   "typing-speed": { detailSchema: typingDetailSchema },
-} satisfies Record<ArcadeGameSlug, { detailSchema: z.ZodType }>;
+} satisfies Record<ArcadeGameSlug, ArcadeGameEntry>;
 
 export type ArcadeSubmissionVerdict =
   | { ok: true; detail: Record<string, number> }
