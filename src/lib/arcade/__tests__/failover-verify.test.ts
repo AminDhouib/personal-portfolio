@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOARD_S } from "@/components/game/failover/sim/__tests__/scripted";
+import { BOARD_S, MID_RUN_S } from "@/components/game/failover/sim/__tests__/scripted";
 import { dayNumber, DAILY_MAX_TICKS } from "@/components/game/failover/daily/daily";
 import type { LoggedAction } from "@/components/game/failover/sim/action-log";
 import { encodeProof } from "@/components/game/failover/sim/proof";
@@ -420,5 +420,27 @@ describe("taking turns", () => {
     await strict(input(dies));
     order.push("done");
     expect(order).toEqual(["timer", "done"]);
+  });
+});
+
+describe("a strong honest run", () => {
+  it("that scores past the old 209,000 cap is accepted at its real score, shadow or not", async () => {
+    // The scripted data-import build survives the full 900 s; it scored 224,349 on 2026-10-09.
+    const day = "2026-10-01";
+    const strong = record(day, [...BOARD_S, ...MID_RUN_S]);
+    expect(strong.score).toBeGreaterThan(209_000);
+    expect(strong.endReason).toBe("time");
+    const claim = input(strong, {
+      now: new Date(`${day}T12:00:00Z`),
+      detail: {
+        day: dayNumber(day),
+        seconds: strong.seconds,
+        ticks: strong.ticks,
+        actions: strong.actions,
+      },
+    });
+    expect(await strict(claim)).toEqual({ ok: true });
+    expect(await verifyFailoverRun(claim)).toEqual({ ok: true });
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
