@@ -46,6 +46,16 @@ behind it. `tower-stacker.tsx` is a thin entry that forwards `?tower-seed=`. Its
 come from `password-game-2/engine/rng` (the one cross-game import; the audio and control
 helpers are copies, as games do not import each other's modules).
 
+`script-knight/engine/` is a port of WarriorJS (MIT, Matias Olivera; bc68e87) as pure TypeScript:
+no React, DOM, storage or clock, and no hidden randomness, so a run is fully determined by its
+level and its action log (`codec.ts`, `"1:"` plus two characters per turn). `run.ts` steps it
+(`beginTurn` / `endTurn`, or `step(action)` for replays, hand play and the server). Its `LICENSE`
+ships beside it and every ported file names the upstream file it came from
+(`__tests__/licence.test.ts` pins both). `__tests__/fixtures/upstream-runs.json` holds 36
+upstream runs that `upstream-parity.test.ts` replays. The server will re-simulate daily runs with
+this same engine (planned for T7-5); player code never runs on the server and nothing server-side may import
+`script-knight/sandbox/` (T7-2 adds the guard).
+
 `src/env.ts` is the sole `process.env` gateway for everything except five allowlisted files
 (`next.config.ts`, `playwright.config.ts` for its `E2E_*` variables, `src/instrumentation.ts`,
 `src/instrumentation-client.ts`, and `src/components/game/space-shooter.tsx` for `NODE_ENV`-gated
@@ -1032,6 +1042,29 @@ The following Password Game 2 entries were verified against the current tree on 
   least one coin extends it. A loss or an empty quit counts as played, neither extends nor breaks
   it, and carries its day forward, so only a UTC day with no board played lapses it (shown as 0 from
   then on, the best is kept). Display-only and local like the rest of the statistics.
+
+- **Unknown directions throw in Script Knight.** Upstream WarriorJS lets any string that is not a
+  relative direction fall through to `left` (`relativeDirections.ts`), and abilities never
+  validated it, so `walk('north')` quietly walked left. The port calls `verifyRelativeDirection`
+  in every direction-taking ability and sense, and the turn facade checks the direction at the
+  call, so `'north' is not a direction: use forward, right, backward or left.` is a player error
+  and the action-log alphabet stays closed (four directions and "none"). `deviations.test.ts` pins
+  it. Do not restore the fall-through.
+- **The Script Knight turn object is a frozen facade.** Upstream hands player code the unit's own
+  turn state, whose `action` field is writable, so `warrior.action = ['detonate', []]` set an
+  action without going through the method. The port hands out a frozen object with ability methods
+  only (`engine/facade.ts`); an action method records into the turn once (a second one throws the
+  upstream text), a bad direction fails the call without spending the turn's action, `rest` drops
+  any argument, and the facade is revoked at `endTurn` so a kept reference throws
+  `That turn is over`. The sandbox in T7-2 wraps the same facade with its per-turn caps.
+- **Script Knight events carry unit ids.** Upstream identifies a unit by name only, so two Sludges
+  are indistinguishable between events. Each `FloorSpace.unit` and `TurnEvent.actor` gains an `id`
+  (the unit's index in `floor.units`; the warrior is 0), and each run owns its own `Logger` instead
+  of upstream's module singleton, so two runs stepped alternately do not mix their logs. The
+  parity test strips the ids before comparing against upstream's final maps. Two other small
+  differences are deliberate: `think` formats with a guarded `JSON.stringify` instead of
+  `util.format` (no `node:util`), and a run that uses all 200 turns ends as `out-of-turns`
+  (upstream fails it silently).
 
 ## Adversarial standoffs (restated from the audit's final report)
 

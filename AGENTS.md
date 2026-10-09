@@ -81,6 +81,9 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
 - Voltorb Flip solver: `src/app/games/super-voltorb-flip/solver/` (static server-rendered page plus
   the client island `solver-client.tsx`) over the pure solver in
   `src/components/game/super-voltorb-flip/solver.ts`. See DESIGN.md's "Voltorb Flip solver".
+- Script Knight engine: `src/components/game/script-knight/engine/`, a pure TS port of WarriorJS
+  (MIT) with an action-log codec, a step API and a reference bot; no UI or slug yet. See
+  DESIGN.md's "Boundaries" paragraph and the three Script Knight register entries.
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries
