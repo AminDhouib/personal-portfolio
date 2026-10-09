@@ -433,6 +433,12 @@ editor, the daily board and the hand pad are added without rewriting it.
 - **Towers.** The Narrow Path is always open; Powder Keep opens once floor 9 of the Narrow Path has
   a best. Epic mode is offered once a tower's floor 9 is cleared, and runs the same code through
   all nine floors with every ability.
+- **Runs are tokens.** A Run press makes a token (tower, floor, epic mode, cancelled flag). Stop,
+  navigation and unmount flip it, an epic run checks it before each floor, and a result for a token
+  that is no longer the live one is dropped. The guard against a second Run is a ref, not state.
+- **Phone targets.** Every control the game owns carries `TOUCH` (`surface.ts`), so it is 44 px
+  square on a coarse pointer, and `touch-targets.test.tsx` pins it. The site header and footer are
+  not the game's.
 - **Hidden until launch.** The `GAMES` row carries `hidden: true`: the route serves, with
   `noindex`, and the game is out of the sitemap, the lists, llms.txt and the hub. T7-8 removes the
   flag together with the launch copy. The About copy and credits already describe only what the
@@ -670,6 +676,13 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   again" works at once. `content/__tests__/hextris-copy.test.ts` pins the About copy's "1.2
   seconds" to the constant. Do not shorten the lockout to "fix" a key press that seems to do
   nothing.
+- **Script Knight's game surface is a fixed dark panel in both site themes, deliberately.** The
+  floor, the event log, the result card and the editor use `GAME_SURFACE` (`script-knight/surface.ts`),
+  which sets a dark background and redefines `--foreground`, `--muted` and `--border` inside it, as
+  the other games keep a dark playfield. `surface.test.tsx` pins 4.5:1 for its text and 3:1 for its
+  glyphs. Copy outside the panel (briefing, abilities, controls) uses the themed tokens and
+  `text-accent-green`, which turns dark green in the light theme. Do not put `#4ade80` text outside
+  the panel.
 - **Super Voltorb Flip and PG2 render light-styled in both site themes, deliberately.** Their
   chrome is period/genre styling, not the site palette — do not wire them to the theme toggle.
 - **The shared leaderboard row is reused loosely across games, by design.** Hextris stores
