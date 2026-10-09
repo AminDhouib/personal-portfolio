@@ -1,0 +1,168 @@
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dispatch } from "../sim/action-log";
+import { S, resetSim } from "../sim/state";
+import { step } from "../sim/tick";
+import { SAVE_KEY } from "../persist/save-schema";
+import { SaveMenu } from "../ui/save-menu";
+import { createHudBridge, useHud } from "../ui/use-hud";
+import { makeController } from "./ui-harness";
+
+// The one-slot save menu over a real controller and sim: Save writes the slot,
+// Load replays it into the live run (once, with the board held meanwhile),
+// Delete asks first, and every refusal says why in words.
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  window.localStorage.clear();
+  resetSim({ seed: "save-menu-reset" });
+});
+
+async function mount() {
+  const h = makeController({ mode: "sandbox" });
+  const bridge = createHudBridge();
+  const onClose = vi.fn();
+  function Host() {
+    const hud = useHud(bridge);
+    return hud ? <SaveMenu hud={hud} controller={h.controller} onClose={onClose} /> : null;
+  }
+  render(<Host />);
+  act(() => {
+    bridge.connect(h.controller);
+    h.controller.start();
+  });
+  // The save code (and zod with it) arrives on open, not with the game.
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeEnabled());
+  return { ...h, onClose };
+}
+
+const dialog = () => screen.getByRole("dialog", { name: "Save Game" });
+
+describe("SaveMenu", () => {
+  it("says the slot is empty, saves the run, and names what it holds", async () => {
+    await mount();
+    expect(dialog()).toHaveTextContent("No saved game found.");
+    expect(screen.getByRole("button", { name: "Load" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    act(() => {
+      step(1200);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Game Saved!");
+    expect(JSON.parse(window.localStorage.getItem(SAVE_KEY)!)).toMatchObject({
+      v: 1,
+      mode: "sandbox",
+      tick: 1200,
+    });
+    expect(dialog()).toHaveTextContent(/Sandbox Mode, 1:00 in, saved /);
+    expect(screen.getByRole("button", { name: "Load" })).toBeEnabled();
+  });
+
+  it("loads the slot back into the live run, once, holding the board meanwhile", async () => {
+    const h = await mount();
+    act(() => {
+      expect(dispatch({ op: 0, type: "waf", x: -28, z: 0 }).ok).toBe(true);
+      step(200);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    act(() => {
+      expect(dispatch({ op: 0, type: "compute", x: -16, z: 0 }).ok).toBe(true);
+      step(300);
+    });
+    const swap = vi.spyOn(h.controller, "replaceRun");
+    const load = screen.getByRole("button", { name: "Load" });
+    fireEvent.click(load);
+    // The swap began at once: the board is held and Load cannot be pressed again.
+    expect(h.controller.getHud().loading).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the save...");
+    expect(load).toBeDisabled();
+    fireEvent.click(load);
+    await waitFor(() => expect(h.controller.getHud().loading).toBe(false));
+    expect(swap).toHaveBeenCalledTimes(1);
+    expect(S.tick).toBe(200);
+    expect(S.services.map((s) => s.type)).toEqual(["waf"]);
+    expect(h.controller.getHud().paused).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent(/^Loaded save from /);
+  });
+
+  it("puts each reason a run cannot be saved in words", async () => {
+    await mount();
+    const save = () => fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const cases: [() => void, string][] = [
+      [() => (S.tick = 36_001), "This run is past 30 minutes, too long to save."],
+      [() => S.log.push([0, 0, 0, 4000, 0]), "This run could not be written to a save."],
+      [() => (S.logOverflow = true), "This run has more actions than a save can hold."],
+      [() => dispatch({ op: 8 }), "The run is over, so there is nothing to save."],
+    ];
+    for (const [spoil, text] of cases) {
+      act(() => {
+        resetSim({ seed: "spoilt", mode: "sandbox" });
+        spoil();
+      });
+      save();
+      expect(screen.getByRole("status")).toHaveTextContent(text);
+    }
+    expect(window.localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it("leaves a newer build's save alone, and says so", async () => {
+    const newer = JSON.stringify({ v: 2, blob: "from the future" });
+    window.localStorage.setItem(SAVE_KEY, newer);
+    await mount();
+    expect(dialog()).toHaveTextContent("from a newer version of the game");
+    expect(screen.getByRole("button", { name: "Load" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("status")).toHaveTextContent("from a newer version of the game");
+    expect(window.localStorage.getItem(SAVE_KEY)).toBe(newer);
+  });
+
+  it("says an unreadable slot is unreadable and lets a new save replace it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    window.localStorage.setItem(SAVE_KEY, "{not json");
+    await mount();
+    expect(dialog()).toHaveTextContent("The save file may be corrupted.");
+    expect(screen.getByRole("button", { name: "Load" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Game Saved!");
+  });
+
+  it("refuses a save the replay refuses, and leaves the run alone", async () => {
+    // It parses, but its one action (traffic toggle 2, neither on nor off) does not decode.
+    window.localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({ v: 1, savedAt: 1, mode: "sandbox", seed: "x", tick: 0, log: "0,7,2" }),
+    );
+    const h = await mount();
+    act(() => {
+      expect(dispatch({ op: 0, type: "waf", x: -28, z: 0 }).ok).toBe(true);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+    await waitFor(() => expect(h.controller.getHud().loading).toBe(false));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Failed to load game. The save file may be corrupted.",
+    );
+    expect(S.services.map((s) => s.type)).toEqual(["waf"]);
+  });
+
+  it("deletes the slot after asking, and closes", async () => {
+    const h = await mount();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(dialog()).toHaveTextContent("Delete the save?");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(window.localStorage.getItem(SAVE_KEY)).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete the save" }));
+    expect(window.localStorage.getItem(SAVE_KEY)).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Save deleted.");
+    expect(dialog()).toHaveTextContent("No saved game found.");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+  });
+});

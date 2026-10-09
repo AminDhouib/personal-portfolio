@@ -45,6 +45,10 @@ export const T = {
   cost_spike_warning: "CLOUD COST SPIKE! Upkeep doubled for 30s",
   db_short: "SQL DB",
   ddos_incoming: "DDoS INCOMING",
+  delete: "Delete", // ours
+  delete_confirm: "Delete the save?", // ours
+  delete_failed: "The save could not be deleted.", // ours
+  delete_save_confirm: "Delete the save", // ours
   demolish: "Demolish",
   demolish_ask: "Demolish for a {refund} refund?", // ours
   demolish_refund: "Demolish (refund {refund})", // ours
@@ -79,6 +83,7 @@ export const T = {
   fw: "FW",
   game_error: "Game Error", // ours
   game_error_text: "This game hit an error and stopped.", // ours
+  game_saved: "Game Saved!",
   gfx_auto: "Auto", // ours
   gfx_high: "High", // ours
   gfx_low: "Low", // ours
@@ -100,7 +105,12 @@ export const T = {
   link_made: "Linked {from} to {to}", // ours
   link_rejected: "{from} can't send traffic to {to}.",
   link_reverse: "{to} already sends to {from}; a link runs one way", // ours
+  load: "Load",
+  load_ended: "The saved run had already ended.", // ours
+  load_failed_corrupted: "Failed to load game. The save file may be corrupted.",
   load_rps: "LOAD (RPS)",
+  loading: "Loading...", // ours
+  loading_save: "Loading the save...", // ours
   max_tier: "Max Tier",
   metrics: "Metrics",
   metrics_col_err: "Err",
@@ -116,6 +126,7 @@ export const T = {
   new_sandbox_run: "Start a Sandbox run", // ours
   new_survival_run: "Start a Survival run", // ours
   no_money: "Not enough money", // ours
+  no_save_found: "No saved game found.",
   nosql_short: "NoSQL",
   not_allowed: "Not allowed", // ours
   not_upgradable: "That cannot be upgraded", // ours
@@ -164,6 +175,20 @@ export const T = {
   sandbox_mode: "Sandbox Mode",
   sandbox_note:
     "Sandbox: a large budget, no failure and no score, and nothing is recorded. Switching starts a new run.", // ours
+  save: "Save", // ours
+  save_corrupted: "Failed to load game. The save file may be corrupted.",
+  save_deleted: "Save deleted.", // ours
+  save_failed: "Failed to save game. Please try again.",
+  save_game: "Save Game",
+  save_loaded: "Loaded save from {date}",
+  save_menu_failed: "The save menu could not load. Check the connection and try again.", // ours
+  save_newer: "The slot holds a save from a newer version of the game. It is left as it is.", // ours
+  save_or_load: "Save or load", // ours
+  save_over: "The run is over, so there is nothing to save.", // ours
+  save_slot: "{mode}, {time} in, saved {date}", // ours
+  save_too_long: "This run is past 30 minutes, too long to save.", // ours
+  save_too_many: "This run has more actions than a save can hold.", // ours
+  save_unencodable: "This run could not be written to a save.", // ours
   scheduler_short: "Cron",
   search_short: "Search",
   select: "Select",

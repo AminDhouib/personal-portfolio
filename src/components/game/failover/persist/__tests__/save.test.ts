@@ -6,7 +6,7 @@ import { encodeProof } from "../../sim/proof";
 import { resetSim, S } from "../../sim/state";
 import { step } from "../../sim/tick";
 import { BOARD_S, MID_RUN_S, play } from "../../sim/__tests__/scripted";
-import { captureSave, loadSave, readSave, writeSave } from "../save";
+import { captureSave, deleteSave, loadSave, readSave, readSlot, writeSave } from "../save";
 import { MAX_SAVE_TICKS, SAVE_KEY, type SaveV1 } from "../save-schema";
 
 // Saving is the seed plus the action log; loading is a replay. The tests here
@@ -148,6 +148,49 @@ describe("writeSave and readSave", () => {
     });
     expect(readSave()).toBeNull();
     expect(writeSave(save)).toBe("failed");
+  });
+});
+
+describe("readSlot and deleteSave (the save menu's view of the slot)", () => {
+  it("tells an empty slot, a save, a newer build's value and an unreadable one apart", () => {
+    expect(readSlot()).toEqual({ kind: "empty" });
+    play("slot-a", "survival", BOARD_S, 100);
+    const save = capture();
+    writeSave(save);
+    expect(readSlot()).toEqual({ kind: "save", save });
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 2, blob: "from the future" }));
+    expect(readSlot()).toEqual({ kind: "newer" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const raw of ["{not json", "null", JSON.stringify({ v: 1, seed: "x" })]) {
+      window.localStorage.setItem(SAVE_KEY, raw);
+      expect(readSlot()).toEqual({ kind: "unreadable" });
+    }
+  });
+
+  it("reads a blocked store as empty, without throwing", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    expect(readSlot()).toEqual({ kind: "empty" });
+  });
+
+  it("empties the slot, but leaves a newer build's value and survives a blocked store", () => {
+    play("slot-d", "survival", BOARD_S, 100);
+    writeSave(capture());
+    expect(deleteSave()).toBe("deleted");
+    expect(window.localStorage.getItem(SAVE_KEY)).toBeNull();
+    expect(deleteSave()).toBe("deleted");
+
+    const newer = JSON.stringify({ v: 2, blob: "from the future" });
+    window.localStorage.setItem(SAVE_KEY, newer);
+    expect(deleteSave()).toBe("newer");
+    expect(window.localStorage.getItem(SAVE_KEY)).toBe(newer);
+
+    window.localStorage.clear();
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    expect(deleteSave()).toBe("failed");
   });
 });
 

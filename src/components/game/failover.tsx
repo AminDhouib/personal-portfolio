@@ -13,6 +13,7 @@ import { Inspector } from "./failover/ui/inspector";
 import { alertText } from "./failover/ui/messages";
 import { MetricsPanel } from "./failover/ui/metrics-panel";
 import { Report } from "./failover/ui/report";
+import { SaveMenu } from "./failover/ui/save-menu";
 import { Settings } from "./failover/ui/settings";
 import { TOUCH } from "./failover/ui/surface";
 import { Toast } from "./failover/ui/toast";
@@ -44,6 +45,7 @@ export function FailoverGame() {
   const [best, setBest] = useState(loadStats);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [menu, setMenu] = useState<"save" | null>(null);
   // A first run (no failover:coach yet) starts paused under the coach.
   const [coaching, setCoaching] = useState(() => !loadCoachDone());
   const startPaused = useRef(coaching);
@@ -261,6 +263,10 @@ export function FailoverGame() {
                       setSettingsOpen(false);
                       controller.restart(undefined, mode);
                     }}
+                    onOpenSave={() => {
+                      setSettingsOpen(false);
+                      setMenu("save");
+                    }}
                     onClose={() => setSettingsOpen(false)}
                   />
                 )}
@@ -283,6 +289,9 @@ export function FailoverGame() {
               containerRef.current?.focus({ preventScroll: true });
             }}
           />
+        )}
+        {menu === "save" && hud && controller && (
+          <SaveMenu hud={hud} controller={controller} onClose={() => setMenu(null)} />
         )}
         {hud?.crashed && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#050505]/75 px-4">
