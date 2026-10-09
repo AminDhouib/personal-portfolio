@@ -65,7 +65,14 @@ describe("resolveStart", () => {
     });
   });
 
-  it("drops epic until the tower's ninth floor is cleared, silently", () => {
+  it("says so when an epic link is opened without epic", () => {
+    expect(resolveStart(tower("narrow-path", 2, true), cleared(3)).notice).toBe(LOCKED_NOTICE);
+    expect(
+      resolveStart(tower("narrow-path", 2, true), cleared(FLOORS_PER_TOWER)).notice,
+    ).toBeNull();
+  });
+
+  it("drops epic until the tower's ninth floor is cleared", () => {
     const start = resolveStart(tower("narrow-path", 2, true), cleared(3));
     expect(start.at.epic).toBe(false);
     expect(resolveStart(tower("narrow-path", 2, true), cleared(FLOORS_PER_TOWER)).at.epic).toBe(
