@@ -48,6 +48,17 @@ describe("Typing Speed copy describes the engine", () => {
     expect(faq).not.toMatch(/no leaderboard/i);
     expect([...all].every((ch) => (ch.codePointAt(0) ?? 0) < 128)).toBe(true);
   });
+  it("explains the ghost: your own best, local only, per mode, with an off switch", () => {
+    expect(typingSpeedContent.intro).toMatch(/ghost/);
+    expect(typingSpeedContent.howToPlay.join(" ")).toMatch(/ghost/i);
+    const faq = typingSpeedContent.faq.find((f) => f.question === "What is the ghost?");
+    expect(faq?.answer).toMatch(/best run/);
+    expect(faq?.answer).toMatch(/only in your browser/);
+    expect(faq?.answer).toMatch(/one per mode/);
+    expect(faq?.answer).toMatch(/Ghost button turns it off/);
+    const progress = typingSpeedContent.facts.find((f) => f.label === "Progress");
+    expect(progress?.value).toMatch(/ghost/);
+  });
   it("describes the phone sheet: text above the keyboard, tap the text to come back", () => {
     const phone = typingSpeedContent.controls.find((c) => c.input === "Phone");
     expect(phone?.action).toMatch(/above the keyboard/);

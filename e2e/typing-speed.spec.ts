@@ -229,3 +229,78 @@ test.describe("Typing Speed", () => {
     await expect(page.locator("html")).not.toHaveClass(/typing-lock/);
   });
 });
+
+// The ghost: a stored words-15 ghost at four characters a second, seeded through the
+// storageState fixture (applied before any page script, so no setItem call in our code).
+// Written by reasoning, not run locally: CI runs it against the production build.
+const GHOST_SAMPLES = Array.from({ length: 61 }, (_, i) => i);
+const GHOST_STORAGE: Record<string, string> = {
+  "typing:stats": JSON.stringify({
+    v: 1,
+    runs: 1,
+    lastMode: "words-15",
+    bests: {},
+    keys: {},
+    daily: { streak: 0, bestStreak: 0, lastDay: null, days: 0 },
+    rain: { best: 0, bestWave: 0 },
+    prefs: { ghost: true },
+  }),
+  "typing:ghosts": JSON.stringify({
+    v: 1,
+    ghosts: { "words-15": { wpm: 48, samples: GHOST_SAMPLES } },
+  }),
+};
+
+test.describe("Typing Speed ghost", () => {
+  test.use({
+    storageState: async (
+      { baseURL }: { baseURL: string | undefined },
+      apply: (state: {
+        cookies: [];
+        origins: { origin: string; localStorage: { name: string; value: string }[] }[];
+      }) => Promise<void>,
+    ) => {
+      if (!baseURL) throw new Error("baseURL is required to seed storage");
+      await apply({
+        cookies: [],
+        origins: [
+          {
+            origin: new URL(baseURL).origin,
+            localStorage: Object.entries(GHOST_STORAGE).map(([name, value]) => ({ name, value })),
+          },
+        ],
+      });
+    },
+  });
+
+  test.beforeEach(async ({ context, baseURL }) => {
+    await blockThirdParties(context, baseURL);
+  });
+
+  test("the ghost caret moves during a run and the toggle hides it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(GAME_PATH);
+    await expect(page.getByTestId("ts-target")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: "15 seconds", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(page.getByTestId("ts-ghost")).toHaveCount(0); // not before the run starts
+
+    await page.getByTestId("ts-target").click();
+    await page.keyboard.type("t");
+    const ghost = page.getByTestId("ts-ghost");
+    await expect(ghost).toBeVisible();
+    await expect(page.getByTestId("ts-ghost-chip")).toBeVisible();
+    const first = await ghost.boundingBox();
+    await page.waitForTimeout(1000);
+    const second = await ghost.boundingBox();
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(`${second?.x},${second?.y}`).not.toBe(`${first?.x},${first?.y}`);
+
+    await page.getByRole("button", { name: "Ghost", exact: true }).click();
+    await expect(page.getByTestId("ts-ghost")).toHaveCount(0);
+    await expect(page.getByTestId("ts-ghost-chip")).toHaveCount(0);
+  });
+});
