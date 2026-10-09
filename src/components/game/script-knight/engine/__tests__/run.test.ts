@@ -297,9 +297,32 @@ describe("ticking captives", () => {
     expect(record.t).toBe(7);
   });
 
-  it("uses the Ticking effect from the level config", () => {
-    expect(Ticking.with({ time: 7 })[1]).toEqual({ time: 7 });
-  });
+  it.each([
+    [6, 7],
+    [7, 10],
+    [8, 9],
+    [9, 20],
+  ])(
+    "Powder Keep %i: its captive explodes on the turn the level config sets (%i)",
+    (level, time) => {
+      const config = keep(level);
+      const ticking = (config.floor.units ?? []).find((entry) => entry.effects?.ticking);
+      expect(ticking?.effects?.ticking).toEqual(Ticking.with({ time }));
+      // Alone on the floor with the warrior idle, nothing else can end the run before the blast.
+      const run = createRun({
+        ...config,
+        floor: { ...config.floor, units: ticking ? [ticking] : [] },
+      });
+      let exploded = 0;
+      while (run.status === "playing" && !exploded) {
+        const record = stepOk(run, null);
+        if (record.events.some((event) => event.action.type === "explode")) {
+          exploded = record.t;
+        }
+      }
+      expect(exploded).toBe(time);
+    },
+  );
 });
 
 describe("replayLog", () => {
