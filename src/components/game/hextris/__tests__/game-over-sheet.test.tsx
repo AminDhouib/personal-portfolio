@@ -456,3 +456,20 @@ describe("Hextris board fit", () => {
     expect(fitted(shellCanvas(container))).toEqual(PLAIN);
   });
 });
+
+describe("Hextris game-over panel on a short screen", () => {
+  it("keeps Play again and Share pinned to the panel's bottom from sm up, not on a phone held upright", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    const buttons = screen.getAllByRole("button", { name: "Play again" });
+    const row = buttons[buttons.length - 1]?.parentElement;
+    if (!row) throw new Error("no action row");
+    const classes = classesOf(row);
+    expect(classes).toContain("sm:sticky");
+    expect(classes).toContain("sm:bottom-0");
+    // The phone's bottom sheet keeps its plain flow.
+    expect(classes).not.toContain("sticky");
+    expect(within(row).getByRole("button", { name: "Share" })).toBeInTheDocument();
+  });
+});

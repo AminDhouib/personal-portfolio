@@ -1355,7 +1355,9 @@ export function HextrisGame() {
                 )}
               </div>
 
-              <div className="mt-4 flex gap-2">
+              {/* From sm up the panel is a full-height column; on a short landscape screen the row
+                  sticks to its bottom, so Play again never needs a scroll. */}
+              <div className="mt-4 flex gap-2 sm:sticky sm:bottom-0 sm:-mx-5 sm:mt-1 sm:bg-black sm:px-5 sm:py-3">
                 {isRecordableRun(uiRun.score) && (
                   <button
                     type="button"
