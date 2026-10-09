@@ -22,17 +22,40 @@ function sources(dir: string): string[] {
   });
 }
 
+/** Strip comments, keeping string literals intact so a `//` in a URL survives. */
+function stripComments(text: string): string {
+  return text.replace(
+    /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+    (_match, literal: string | undefined) => literal ?? "",
+  );
+}
+
+/** The T.<key> names a source uses; a key named only in a comment is not a use. */
+function keysIn(text: string): string[] {
+  return [...stripComments(text).matchAll(/\bT\.([a-z][a-z0-9_]*)\b/g)].map(
+    (match) => match[1] as string,
+  );
+}
+
 function usedKeys(): Set<string> {
   const used = new Set<string>();
   for (const file of [...sources(ROOT), path.join(ROOT, "..", "failover.tsx")]) {
-    for (const match of readFileSync(file, "utf8").matchAll(/\bT\.([a-z][a-z0-9_]*)\b/g)) {
-      used.add(match[1] as string);
-    }
+    for (const key of keysIn(readFileSync(file, "utf8"))) used.add(key);
   }
   return used;
 }
 
 describe("Failover UI strings", () => {
+  it("counts a key named only in a comment as unused", () => {
+    const source = [
+      "// Shows T.planted_line when the run ends.",
+      "/* T.planted_block, see T.planted_too */",
+      'const url = "https://example.com//T.in_a_string";',
+      "const label = T.real_use; // and T.planted_tail",
+    ].join("\n");
+    expect(keysIn(source)).toEqual(["in_a_string", "real_use"]);
+  });
+
   it("names every key it defines, and defines every key it names", () => {
     const used = usedKeys();
     expect([...used].sort()).toEqual(Object.keys(T).sort());
