@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatch } from "../sim/action-log";
 import { S, resetSim } from "../sim/state";
 import { step } from "../sim/tick";
@@ -23,6 +23,12 @@ vi.mock("../persist/save", async (importOriginal) => {
       loadFault.on ? Promise.reject(new TypeError("a fault in the load")) : real.loadSave(...args),
   };
 });
+
+// The menu imports the save code (and zod) on open. Fetch it once up front, with room for a
+// loaded machine, so each test waits on the menu and not on the first transform of zod.
+beforeAll(async () => {
+  await import("../persist/save");
+}, 30_000);
 
 beforeEach(() => {
   loadFault.on = false;
