@@ -304,3 +304,36 @@ test.describe("Typing Speed ghost", () => {
     await expect(page.getByTestId("ts-ghost-chip")).toHaveCount(0);
   });
 });
+
+test.describe("Typing Speed Word Rain", () => {
+  test.beforeEach(async ({ context, baseURL }) => {
+    await blockThirdParties(context, baseURL);
+  });
+
+  test("a typed word clears, and three missed words end the run", async ({ page }) => {
+    // A fake clock drives requestAnimationFrame, so the whole run takes no real time.
+    await page.clock.install();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(GAME_PATH);
+    await expect(page.getByTestId("ts-target")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Rain", exact: true }).click();
+    await expect(page.getByTestId("ts-rain-area")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ghost", exact: true })).toHaveCount(0);
+
+    await page.getByTestId("ts-rain-area").click();
+    await page.clock.runFor(500);
+    const word = page.getByTestId("ts-rain-word").first();
+    await expect(word).toBeVisible();
+    const text = ((await word.textContent()) ?? "").trim();
+    expect(text.length).toBeGreaterThan(1);
+    await page.keyboard.type(text);
+    await expect(page.getByTestId("ts-rain-score")).toHaveText(String(text.length));
+    await expect(page.getByTestId("ts-rain-word").filter({ hasText: text })).toHaveCount(0);
+
+    // Left alone, the words land one by one: 3 lives gone well inside 40 s of rain.
+    await page.clock.runFor(40_000);
+    await expect(page.getByTestId("ts-rain-over")).toBeVisible();
+    await expect(page.getByLabel("Lives: 0")).toBeVisible();
+    await expect(page.getByTestId("ts-rain-result-score")).toHaveText(String(text.length));
+  });
+});

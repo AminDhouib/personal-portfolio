@@ -66,4 +66,22 @@ describe("Typing Speed copy describes the engine", () => {
     const fact = typingSpeedContent.facts.find((f) => f.label === "Phones");
     expect(fact?.value).toMatch(/above the keyboard/);
   });
+  it("carries the Word Rain tagline, and the copy says how the falling-words mode plays", () => {
+    const meta = GAMES.find((g) => g.slug === "typing-speed");
+    expect(meta?.tagline).toBe("Race the clock, chase your ghost, stop the falling words");
+    expect(meta?.description).toMatch(/falling words/);
+    expect(typingSpeedContent.seoDescription).toMatch(/falling-words|Word Rain/);
+    expect(typingSpeedContent.intro).toMatch(/Word Rain/);
+    const how = typingSpeedContent.howToPlay.join(" ");
+    expect(how).toMatch(/Rain/);
+    expect(how).toMatch(/three lives/);
+    expect(how).toMatch(/wave/);
+    const control = typingSpeedContent.controls.find((c) => c.input === "Word Rain");
+    expect(control?.action).toMatch(/above the keyboard/);
+    const modes = typingSpeedContent.facts.find((f) => f.label === "Modes");
+    expect(modes?.value).toMatch(/Word Rain/);
+    const saves = typingSpeedContent.faq.find((f) => f.question.startsWith("Does the typing game"));
+    expect(saves?.answer).toMatch(/Word Rain/);
+    expect(saves?.answer).toMatch(/no leaderboard|Only the Daily/i);
+  });
 });
