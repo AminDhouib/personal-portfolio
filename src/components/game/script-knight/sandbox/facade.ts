@@ -86,20 +86,34 @@ const NOT_A_FUNCTION = /\.(\w+) is not a function/;
  * own error, named by type.
  */
 export function describePlayerError(err: unknown, granted: readonly string[]): string {
-  let text: string;
-  if (err instanceof RuleError) {
-    text = err.message;
-  } else {
+  try {
+    if (err instanceof RuleError) {
+      return err.message.slice(0, MAX_MESSAGE_CHARS);
+    }
     const missing = err instanceof TypeError ? NOT_A_FUNCTION.exec(err.message)?.[1] : undefined;
     if (
       missing !== undefined &&
       allAbilityNames().includes(missing) &&
       !granted.includes(missing)
     ) {
-      text = `This floor does not give you ${missing} yet.`;
-    } else {
-      text = err instanceof Error ? `${err.name}: ${err.message}` : `Error: ${String(err)}`;
+      return `This floor does not give you ${missing} yet.`;
     }
+  } catch {
+    // silent-ok: a hostile error object; the player is shown the generic text
+    return UNPRINTABLE;
   }
-  return text.slice(0, MAX_MESSAGE_CHARS);
+  return describeThrown(err);
+}
+
+export const UNPRINTABLE = "Your code threw a value that could not be printed.";
+
+/** "Name: message" for an error, or the value as text; never throws, whatever was thrown. */
+export function describeThrown(err: unknown): string {
+  try {
+    const text = err instanceof Error ? `${err.name}: ${err.message}` : `Error: ${String(err)}`;
+    return text.slice(0, MAX_MESSAGE_CHARS);
+  } catch {
+    // silent-ok: a hostile error object (throwing getter or toString); shown as generic text
+    return UNPRINTABLE;
+  }
 }

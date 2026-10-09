@@ -129,6 +129,26 @@ describe("playerLine", () => {
     expect(playerLine(err)).toBe(6);
   });
 
+  it("returns null when reading the stack throws", () => {
+    const err = Object.defineProperty({}, "stack", {
+      get() {
+        throw new Error("no");
+      },
+    });
+    expect(playerLine(err)).toBeNull();
+  });
+
+  it("reports a hostile thrown value from the constructor or load without throwing", () => {
+    for (const code of [
+      "class Player { constructor() { throw { toString() { throw 1; } }; } playTurn() {} }",
+      "throw { toString() { throw 1; } };",
+    ]) {
+      const result = compilePlayer(code);
+      expect(result).toMatchObject({ ok: false, kind: "constructor" });
+      if (!result.ok) expect(result.message).toContain("could not be printed");
+    }
+  });
+
   it("returns null for a stack with no player frame, or a non-error", () => {
     const err = new Error("x");
     err.stack = "Error: x\n    at foo (https://example.test/w.js:1:1)";

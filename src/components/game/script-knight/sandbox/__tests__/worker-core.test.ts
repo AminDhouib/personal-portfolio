@@ -224,6 +224,21 @@ describe("handleRun", () => {
     expect(posted.at(-1)).toEqual({ type: "done" });
   });
 
+  it("posts a player-error, not a crash, for a thrown value that cannot be printed", () => {
+    const { posted, post, scope } = harness();
+    handleRun(
+      runMessage("class Player { playTurn() { throw { toString() { throw 1; } }; } }"),
+      post,
+      scope,
+    );
+    expect(posted.at(-1)).toEqual({
+      type: "player-error",
+      t: 1,
+      message: "Your code threw a value that could not be printed.",
+      line: null,
+    });
+  });
+
   it("posts a player-error when playTurn is async", () => {
     const { posted, post, scope } = harness();
     handleRun(runMessage("class Player { async playTurn(w) { w.walk(); } }"), post, scope);
