@@ -199,6 +199,19 @@ describe("cache tiers change the hit rate", () => {
     expect(req.cached).toBe(false);
   });
 
+  it("the cap is exactly 0.95: a roll just under it still hits", () => {
+    const cache = place("cache");
+    const s3 = place("s3");
+    connect(cache, s3);
+    cache.config = { ...cache.config, cacheHitRate: TIERS[2]?.cacheHitRate ?? 0 };
+    const req = new Request("STATIC");
+    S.requests.push(req);
+    req.flyTo(cache);
+    pin.value = 0.94;
+    run(10);
+    expect(req.cached).toBe(true);
+  });
+
   it("no tier makes non-cacheable traffic cacheable", () => {
     const cache = place("cache");
     const db = place("db");

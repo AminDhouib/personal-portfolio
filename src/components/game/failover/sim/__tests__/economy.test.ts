@@ -15,6 +15,16 @@ import { connect, inject, place, resetWorld, run } from "./helpers";
 beforeEach(() => resetWorld());
 afterEach(() => resetSim({ seed: "after-economy" }));
 
+describe("load failure chance", () => {
+  it("is nil up to half load, then climbs linearly to certain at full load", () => {
+    expect(calculateFailChanceBasedOnLoad(0)).toBe(0);
+    expect(calculateFailChanceBasedOnLoad(0.5)).toBe(0);
+    expect(calculateFailChanceBasedOnLoad(0.55)).toBeCloseTo(0.1, 12);
+    expect(calculateFailChanceBasedOnLoad(0.75)).toBeCloseTo(0.5, 12);
+    expect(calculateFailChanceBasedOnLoad(1)).toBe(1);
+  });
+});
+
 describe("getAutoRepairUpkeep", () => {
   it("is 0 while auto-repair is off", () => {
     place("db");
