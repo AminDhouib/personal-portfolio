@@ -220,6 +220,25 @@ describe("the loop", () => {
     controller.dispose();
   });
 
+  it("puts a crash in the HUD at once, and stays stopped when shown again", () => {
+    vi.stubGlobal("reportError", () => undefined);
+    const { controller, sched, view } = setup();
+    const seen: boolean[] = [];
+    controller.subscribe(() => seen.push(controller.getHud().crashed));
+    expect(controller.getHud().crashed).toBe(false);
+    view.scene.render = () => {
+      throw new Error("boom");
+    };
+    controller.start();
+    sched.fire(1000);
+    expect(seen.at(-1)).toBe(true);
+    controller.setVisible(false);
+    controller.setVisible(true);
+    controller.setOnScreen(true);
+    expect(sched.pending.size).toBe(0);
+    controller.dispose();
+  });
+
   it("dispose releases the scene, the sound and the frame", () => {
     const { controller, sched, view, sound } = setup();
     controller.start();
