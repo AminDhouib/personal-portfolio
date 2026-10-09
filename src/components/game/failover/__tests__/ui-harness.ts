@@ -14,6 +14,7 @@ export function makeController(over: Partial<ControllerOptions> = {}) {
     setCamera: () => undefined,
     setOverlay: () => undefined,
     setTier: () => undefined,
+    capture: () => null,
     pick: () => pick,
     dispose: () => undefined,
   };

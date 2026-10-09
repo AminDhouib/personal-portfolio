@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { FailoverGame } from "../../failover";
 import { decodeArchParam, encodeArchParam, type ArchWire } from "../persist/blueprint-schema";
 import type { FailoverScene } from "../scene/scene";
@@ -10,6 +10,8 @@ import { S, resetSim } from "../sim/state";
 // link with a copy button, and opening a link shows what it holds, and what of
 // it is not valid, before anything is built, and only through dispatch.
 
+const frame = vi.hoisted(() => ({ make: (): HTMLCanvasElement | null => null }));
+
 vi.mock("../scene/scene", () => ({
   createFailoverScene: (): FailoverScene => ({
     render: () => undefined,
@@ -17,6 +19,7 @@ vi.mock("../scene/scene", () => ({
     setCamera: () => undefined,
     setOverlay: () => undefined,
     setTier: () => undefined,
+    capture: () => frame.make(),
     pick: () => null,
     dispose: () => undefined,
   }),
@@ -33,6 +36,7 @@ const PATH = "/games/failover";
 const status = () => within(screen.getByRole("dialog")).getByRole("status");
 
 beforeEach(() => {
+  frame.make = () => null;
   window.localStorage.clear();
   window.localStorage.setItem("failover:coach", '{"v":1,"done":true}');
   window.history.replaceState(null, "", PATH);
@@ -113,6 +117,73 @@ describe("Share", () => {
     expect(dialog).toHaveTextContent("This build is too large to fit in a link.");
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy Link" })).toBeNull();
+  });
+});
+
+describe("the share card", () => {
+  const png = new Blob(["png"], { type: "image/png" });
+
+  function canvasStubs() {
+    frame.make = () => {
+      const c = document.createElement("canvas");
+      c.width = 640;
+      c.height = 360;
+      return c;
+    };
+    const ctx = { fillRect() {}, drawImage() {}, fillText() {} };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      (() => ctx) as unknown as HTMLCanvasElement["getContext"],
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb: BlobCallback) =>
+      cb(png),
+    );
+    // jsdom has no object URLs; lend them for the test and take them back after.
+    const { createObjectURL, revokeObjectURL } = URL;
+    URL.createObjectURL = () => "blob:card";
+    URL.revokeObjectURL = () => undefined;
+    onTestFinished(() => {
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = revokeObjectURL;
+    });
+    return vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  }
+
+  it("downloads the board as a PNG with its band and address", async () => {
+    const click = canvasStubs();
+    vi.stubGlobal("navigator", { ...navigator, share: undefined, canShare: undefined });
+    render(<FailoverGame />);
+    buildWafLine();
+    openShare();
+    // No file sharing here, so only the download is offered.
+    expect(screen.queryByRole("button", { name: "Share image" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Download PNG" }));
+    await waitFor(() => expect(status()).toHaveTextContent("Image saved."));
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands it to the share sheet where files can be shared, and downloads if that fails", async () => {
+    const click = canvasStubs();
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, share, canShare: () => true });
+    render(<FailoverGame />);
+    openShare();
+    fireEvent.click(screen.getByRole("button", { name: "Share image" }));
+    await waitFor(() => expect(status()).toHaveTextContent("Image shared."));
+    const data = share.mock.calls[0]?.[0] as ShareData | undefined;
+    expect(data?.files?.[0]?.type).toBe("image/png");
+    expect(click).not.toHaveBeenCalled();
+
+    share.mockRejectedValue(new DOMException("nope", "NotAllowedError"));
+    fireEvent.click(screen.getByRole("button", { name: "Share image" }));
+    await waitFor(() => expect(status()).toHaveTextContent("it was saved instead"));
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("says so when the board cannot be read", async () => {
+    render(<FailoverGame />);
+    openShare();
+    fireEvent.click(screen.getByRole("button", { name: "Download PNG" }));
+    await waitFor(() => expect(status()).toHaveTextContent("The image could not be made."));
   });
 });
 

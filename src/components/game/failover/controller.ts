@@ -703,6 +703,11 @@ export class FailoverController {
     this.emit();
   }
 
+  /** A fresh frame of the board as a 2D canvas, for the share card; null before the scene exists. */
+  captureScene(): HTMLCanvasElement | null {
+    return this.scene?.capture() ?? null;
+  }
+
   /** Call from the user gesture that starts the game, so sound can play once it is on. */
   unlockAudio(): void {
     this.audio.unlock();

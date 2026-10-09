@@ -300,7 +300,9 @@ export function FailoverGame() {
         {menu === "save" && hud && controller && (
           <SaveMenu hud={hud} controller={controller} onClose={() => setMenu(null)} />
         )}
-        {menu === "share" && <ShareDialog onClose={() => setMenu(null)} />}
+        {menu === "share" && hud && controller && (
+          <ShareDialog hud={hud} controller={controller} onClose={() => setMenu(null)} />
+        )}
         {incoming && controller && (
           <ImportDialog
             arch={incoming.arch}
