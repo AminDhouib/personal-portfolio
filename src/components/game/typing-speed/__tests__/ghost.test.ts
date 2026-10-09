@@ -78,6 +78,20 @@ describe("netCharsAt", () => {
   });
 });
 
+describe("netCharsAt on the last word of a text run", () => {
+  it("counts the partial prefix when Space ends the run, as the engine does", () => {
+    const run = createRun({ kind: "text", text: "ab" });
+    play(run, [
+      [ch("a"), 0],
+      [{ kind: "space" }, 100], // finishes the run without advancing the cursor
+    ]);
+    expect(run.status).toBe("done");
+    expect(runMetrics(run).netChars).toBe(1);
+    expect(netCharsAt(run, 100)).toBe(runMetrics(run).netChars);
+    expect(sampleRun(run).at(-1)).toBe(1);
+  });
+});
+
 describe("sampleRun", () => {
   it("has ceil(elapsed / 250) + 1 integers and starts at 0", () => {
     const samples = sampleRun(example());

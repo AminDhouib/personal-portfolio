@@ -40,6 +40,8 @@ function replay(run: TypingRun, times: readonly number[]): number[] {
       if (key.kind === "char") {
         state.typed[state.cursor] = cur + (key.ch ?? "");
       } else if (key.kind === "space") {
+        // Space on the last word of a text run ends it; the engine leaves the cursor there.
+        if (run.config.kind === "text" && state.cursor === run.words.length - 1) continue;
         state.cursor++;
         if (state.typed.length <= state.cursor) state.typed.push("");
       } else if (cur !== "") {
