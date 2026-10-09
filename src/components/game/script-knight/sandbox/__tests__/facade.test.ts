@@ -159,6 +159,34 @@ describe("describePlayerError", () => {
     );
   });
 
+  it("survives a thrown value that cannot be printed", () => {
+    const text = "Your code threw a value that could not be printed.";
+    const hostile = [
+      {
+        toString() {
+          throw new Error("no");
+        },
+      },
+      Object.defineProperty(new Error("x"), "message", {
+        get() {
+          throw new Error("no");
+        },
+      }),
+      new Proxy(
+        {},
+        {
+          get() {
+            throw new Error("no");
+          },
+        },
+      ),
+      Object.create(null),
+    ];
+    for (const err of hostile) {
+      expect(describePlayerError(err, granted)).toBe(text);
+    }
+  });
+
   it("names the error type for the player's own errors", () => {
     expect(describePlayerError(new RangeError("too deep"), granted)).toBe("RangeError: too deep");
     expect(describePlayerError(new Error("mine"), granted)).toBe("Error: mine");

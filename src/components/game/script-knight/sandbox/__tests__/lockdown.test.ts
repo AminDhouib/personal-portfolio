@@ -38,6 +38,8 @@ describe("REMOVED_GLOBALS", () => {
       "location",
       "performance",
       "crypto",
+      "reportError",
+      "dispatchEvent",
     ]);
   });
 

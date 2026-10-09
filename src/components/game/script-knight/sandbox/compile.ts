@@ -1,6 +1,6 @@
 import type { CompileErrorKind } from "./protocol";
 import type { WarriorTurn } from "../engine/facade";
-import { RuleError } from "./facade";
+import { describeThrown, RuleError } from "./facade";
 
 export type CompileResult =
   | { ok: true; player: { playTurn: (turn: WarriorTurn) => void } }
@@ -21,13 +21,19 @@ const GECKO_FRAME = /(?:Function|eval):(\d+):\d+\s*$/m;
 
 /** The 1-based line in the player's code for an error thrown from it, or null. */
 export function playerLine(err: unknown): number | null {
-  const stack = typeof err === "object" && err !== null ? (err as { stack?: unknown }).stack : null;
-  if (typeof stack !== "string") {
+  try {
+    const stack =
+      typeof err === "object" && err !== null ? (err as { stack?: unknown }).stack : null;
+    if (typeof stack !== "string") {
+      return null;
+    }
+    const match = V8_FRAME.exec(stack) ?? GECKO_FRAME.exec(stack);
+    const line = match ? Number(match[1]) - LINES_BEFORE_PLAYER : 0;
+    return line >= 1 ? line : null;
+  } catch {
+    // silent-ok: a hostile error object (throwing getter or proxy); there is simply no line
     return null;
   }
-  const match = V8_FRAME.exec(stack) ?? GECKO_FRAME.exec(stack);
-  const line = match ? Number(match[1]) - LINES_BEFORE_PLAYER : 0;
-  return line >= 1 ? line : null;
 }
 
 const ASYNC_MESSAGE = "playTurn must not be async: return after choosing one action.";
@@ -38,10 +44,6 @@ function isThenable(value: unknown): boolean {
     value !== null &&
     typeof (value as { then?: unknown }).then === "function"
   );
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? `${err.name}: ${err.message}` : String(err);
 }
 
 function fail(kind: CompileErrorKind, message: string, line: number | null): CompileResult {
@@ -71,7 +73,7 @@ export function compilePlayer(code: string): CompileResult {
     // silent-ok: the error is returned to the player as a load error
     return fail(
       "constructor",
-      `Your code threw while loading: ${describeError(err)}`,
+      `Your code threw while loading: ${describeThrown(err)}`,
       playerLine(err),
     );
   }
@@ -86,7 +88,7 @@ export function compilePlayer(code: string): CompileResult {
     // silent-ok: the error is returned to the player as a constructor error
     return fail(
       "constructor",
-      `Your Player constructor threw: ${describeError(err)}`,
+      `Your Player constructor threw: ${describeThrown(err)}`,
       playerLine(err),
     );
   }

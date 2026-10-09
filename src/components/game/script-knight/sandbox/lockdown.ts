@@ -30,6 +30,8 @@ export const REMOVED_GLOBALS = [
   "location",
   "performance",
   "crypto",
+  "reportError",
+  "dispatchEvent",
 ] as const;
 
 /** How many frames a stack keeps (Chrome); the default of 10 can lose the player's line. */
