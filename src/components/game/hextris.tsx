@@ -301,6 +301,8 @@ export function HextrisGame() {
 
   async function submitScore(name: string) {
     if (submitState === "submitting" || submitState === "rejected") return;
+    // A 0 (an idle or abandoned run) has no place on the board; the card offers no form for it.
+    if (!isRecordableRun(uiRun.score)) return;
     setSubmitState("submitting");
     const result = await submit(arcadeSubmission(name, uiRun));
     if (result.ok && typeof result.rank === "number") {
@@ -1050,57 +1052,63 @@ export function HextrisGame() {
               </div>
             </div>
 
-            {/* Name + submit */}
-            <div className="mt-4 flex items-center gap-2">
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  if (
-                    submitState !== "submitting" &&
-                    submitState !== "submitted" &&
-                    submitState !== "rejected" &&
-                    playerName.trim()
-                  ) {
-                    void submitScore(playerName);
-                  }
-                }}
-                placeholder="Your name"
-                maxLength={12}
-                className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  void submitScore(playerName);
-                }}
-                disabled={
-                  submitState === "submitting" ||
-                  submitState === "submitted" ||
-                  submitState === "rejected" ||
-                  !playerName.trim()
-                }
-                className="min-h-11 rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {submitState === "submitting"
-                  ? "..."
-                  : submitState === "submitted"
-                    ? "Saved"
-                    : submitState === "failed"
-                      ? "Retry"
-                      : submitState === "rejected"
-                        ? "Rejected"
-                        : "Submit"}
-              </button>
-            </div>
+            {/* Name + submit. A run that scored 0 has nothing to post. */}
+            {isRecordableRun(uiRun.score) ? (
+              <>
+                <div className="mt-4 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value.slice(0, 12))}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      if (
+                        submitState !== "submitting" &&
+                        submitState !== "submitted" &&
+                        submitState !== "rejected" &&
+                        playerName.trim()
+                      ) {
+                        void submitScore(playerName);
+                      }
+                    }}
+                    placeholder="Your name"
+                    maxLength={12}
+                    className="min-h-11 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-base text-white placeholder-white/40 focus:border-accent-pink/60 focus:outline-none sm:text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void submitScore(playerName);
+                    }}
+                    disabled={
+                      submitState === "submitting" ||
+                      submitState === "submitted" ||
+                      submitState === "rejected" ||
+                      !playerName.trim()
+                    }
+                    className="min-h-11 rounded-md border border-accent-green/40 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {submitState === "submitting"
+                      ? "..."
+                      : submitState === "submitted"
+                        ? "Saved"
+                        : submitState === "failed"
+                          ? "Retry"
+                          : submitState === "rejected"
+                            ? "Rejected"
+                            : "Submit"}
+                  </button>
+                </div>
 
-            {submitState === "rejected" && (
-              <p role="status" className="mt-2 font-mono text-xs text-accent-amber">
-                Score not accepted
-              </p>
+                {submitState === "rejected" && (
+                  <p role="status" className="mt-2 font-mono text-xs text-accent-amber">
+                    Score not accepted
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-4 text-center font-mono text-xs text-white/50">No score to post</p>
             )}
 
             {/* Top 8 leaderboard */}
