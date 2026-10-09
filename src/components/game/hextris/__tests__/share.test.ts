@@ -53,6 +53,14 @@ describe("shareRun", () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 
+  it("treats a share already in progress as dismissed, not as a reason to copy", async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException("busy", "InvalidStateError"));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setNavigator({ share, clipboard: { writeText } });
+    await expect(shareRun(1200)).resolves.toBe("dismissed");
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it("falls back to the clipboard when the share sheet breaks", async () => {
     const share = vi.fn().mockRejectedValue(new TypeError("no"));
     const writeText = vi.fn().mockResolvedValue(undefined);
