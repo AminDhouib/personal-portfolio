@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import type { FailoverController, HudState } from "../controller";
-import type { CaptureFailure, Slot } from "../persist/save";
+import type { CaptureFailure, LoadResult, Slot } from "../persist/save";
 import { T, fmt } from "../strings";
 import { TICK } from "../sim/config";
 import { clock } from "./format";
@@ -99,7 +99,22 @@ export function SaveMenu({
     if (!mod || slot?.kind !== "save") return;
     const saved = slot.save;
     setMessage(null);
-    const out = await controller.replaceRun(() => mod.loadSave(saved));
+    let out: Awaited<ReturnType<typeof controller.replaceRun<LoadResult>>>;
+    try {
+      out = await controller.replaceRun((signal) =>
+        mod.loadSave(saved, async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          // A torn-down game stops its load here, between chunks.
+          signal.throwIfAborted();
+        }),
+      );
+    } catch {
+      // silent-ok: shown below. A fault outside the replay's own refusals (or a load stopped by
+      // teardown) ends the load; plan() checks the whole log before the sim is touched, so a
+      // refused save leaves the run as it was.
+      setMessage(T.load_failed_corrupted);
+      return;
+    }
     if (!out.ok) return;
     if (!out.value.ok) {
       setMessage(T.load_failed_corrupted);

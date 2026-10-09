@@ -12,7 +12,20 @@ import { makeController } from "./ui-harness";
 // Load replays it into the live run (once, with the board held meanwhile),
 // Delete asks first, and every refusal says why in words.
 
+// A load can fail for a reason the replay does not own (a fault, a torn-down game).
+const loadFault = vi.hoisted(() => ({ on: false }));
+
+vi.mock("../persist/save", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../persist/save")>();
+  return {
+    ...real,
+    loadSave: (...args: Parameters<typeof real.loadSave>) =>
+      loadFault.on ? Promise.reject(new TypeError("a fault in the load")) : real.loadSave(...args),
+  };
+});
+
 beforeEach(() => {
+  loadFault.on = false;
   window.localStorage.clear();
 });
 
@@ -148,6 +161,51 @@ describe("SaveMenu", () => {
       "Failed to load game. The save file may be corrupted.",
     );
     expect(S.services.map((s) => s.type)).toEqual(["waf"]);
+  });
+
+  it("catches a load that fails for a reason of its own, says so and keeps the run", async () => {
+    const h = await mount();
+    act(() => {
+      expect(dispatch({ op: 0, type: "waf", x: -28, z: 0 }).ok).toBe(true);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    act(() => {
+      expect(dispatch({ op: 0, type: "compute", x: -16, z: 0 }).ok).toBe(true);
+      step(100);
+    });
+    loadFault.on = true;
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Failed to load game. The save file may be corrupted.",
+      ),
+    );
+    expect(h.controller.getHud().loading).toBe(false);
+    expect(screen.getByRole("button", { name: "Load" })).toBeEnabled();
+    expect(S.services.map((s) => s.type)).toEqual(["waf", "compute"]);
+    expect(S.tick).toBe(100);
+  });
+
+  it("stops a load mid-replay when the game is torn down, off the shared sim", async () => {
+    const h = await mount();
+    act(() => {
+      step(3000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    act(() => {
+      resetSim({ seed: "elsewhere", mode: "sandbox" });
+    });
+    const swap = vi.spyOn(h.controller, "replaceRun");
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+    // What unmounting the game does: dispose the controller while the replay is in its first chunk.
+    h.controller.dispose();
+    await act(async () => {
+      await swap.mock.results[0]?.value.catch(() => undefined);
+    });
+    const stoppedAt = S.tick;
+    expect(stoppedAt).toBeLessThan(3000);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(S.tick).toBe(stoppedAt);
   });
 
   it("deletes the slot after asking, and closes", async () => {
