@@ -35,7 +35,8 @@ import { drainEvents, resetSim, S } from "./sim/state";
 import { step } from "./sim/tick";
 import { linkRefusalOf } from "./sim/topology";
 import { T, fmt } from "./strings";
-import type { GameMode, GameOverReason, SimEvent } from "./sim/types";
+import type { GameMode, SimEvent } from "./sim/types";
+import { readSimHud, type SimHud } from "./hud";
 
 // Owns one run: the sim, the fixed-step loop, the scene and the sound. React
 // talks to it through methods and reads a throttled HudState; it never touches
@@ -43,20 +44,13 @@ import type { GameMode, GameOverReason, SimEvent } from "./sim/types";
 
 export type Speed = 1 | 2 | 3;
 
-export interface HudState {
-  money: number;
-  reputation: number;
-  /** Game seconds. */
-  time: number;
-  rps: number;
-  over: GameOverReason | null;
+/** The sim's side of the HUD (hud.ts) plus the controller's own state. */
+export interface HudState extends SimHud {
   paused: boolean;
   speed: Speed;
   tool: Tool;
   /** A placement or demolish is waiting for Confirm. */
   confirming: boolean;
-  /** The node the Select tool picked, with what the toolbar shows of it. */
-  selected: { id: string; name: string; tier: number; health: number } | null;
   toast: string | null;
   soundOn: boolean;
   tier: PerfTier;
@@ -78,6 +72,19 @@ export interface ControllerOptions {
 
 /** The HUD refreshes this often (ms) unless something discrete happens first. */
 const HUD_INTERVAL_MS = 250;
+
+/** Sim events the HUD shows at once rather than on its next 4 Hz refresh. */
+const DISCRETE: ReadonlySet<SimEvent["kind"]> = new Set<SimEvent["kind"]>([
+  "service-placed",
+  "service-removed",
+  "service-upgraded",
+  "service-repaired",
+  "link-added",
+  "link-removed",
+  "event-start",
+  "event-end",
+  "game-over",
+]);
 const TOAST_MS = 2600;
 const MAX_PENDING_EVENTS = 512;
 
@@ -235,7 +242,6 @@ export class FailoverController {
       this.clockMs = nowMs;
       const out = advance(this.loop, nowMs, this.paused ? 0 : this.speed);
       this.loop = out.loop;
-      const wasOver = S.over !== null;
       if (out.steps > 0) step(out.steps);
 
       const events = drainEvents();
@@ -250,7 +256,7 @@ export class FailoverController {
 
       this.renderFrame(nowMs);
 
-      const discrete = !wasOver && S.over !== null;
+      const discrete = events.some((event) => DISCRETE.has(event.kind));
       if (this.toast && this.toast.until <= nowMs) this.toast = null;
       if (discrete || nowMs - this.lastHudMs >= HUD_INTERVAL_MS) this.emit();
     } catch (err) {
@@ -292,27 +298,12 @@ export class FailoverController {
   getHud = (): HudState => this.hud;
 
   private buildHud(): HudState {
-    const selectedService = this.selected
-      ? S.services.find((s) => s.id === this.selected)
-      : undefined;
     return {
-      money: S.money,
-      reputation: S.reputation,
-      time: S.elapsedGameTime,
-      rps: S.currentRPS,
-      over: S.over ? S.over.reason : null,
+      ...readSimHud(this.selected),
       paused: this.paused,
       speed: this.speed,
       tool: this.machine.tool,
       confirming: this.machine.mode === "ghost" || this.machine.mode === "confirmDemolish",
-      selected: selectedService
-        ? {
-            id: selectedService.id,
-            name: CONFIG.services[selectedService.type].name,
-            tier: selectedService.tier,
-            health: selectedService.health,
-          }
-        : null,
       toast: this.toast ? this.toast.text : null,
       soundOn: this.audio.isOn(),
       tier: this.governor.tier,
