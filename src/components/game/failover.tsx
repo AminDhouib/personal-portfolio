@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Check,
   Eye,
@@ -19,6 +19,7 @@ import { FailoverController, type HudState, type Speed } from "./failover/contro
 import type { Tool } from "./failover/input/machine";
 import { CONFIG, SERVICE_TYPES, type ServiceType } from "./failover/sim/config";
 import { T, fmt } from "./failover/strings";
+import { createHudBridge, useHud } from "./failover/ui/use-hud";
 
 /**
  * Failover: build a cloud that survives the traffic. The sim, the scene and
@@ -29,36 +30,6 @@ import { T, fmt } from "./failover/strings";
 
 /** Movement under this many pixels between press and release is a tap, not a drag. */
 const TAP_SLOP_PX = 6;
-
-/** The HUD store React reads: empty until the controller exists, then the controller's own. */
-function createHudBridge() {
-  let controller: FailoverController | null = null;
-  let unsubscribe: (() => void) | null = null;
-  const listeners = new Set<() => void>();
-  const notify = () => {
-    for (const listener of listeners) listener();
-  };
-  return {
-    connect(next: FailoverController | null) {
-      unsubscribe?.();
-      unsubscribe = null;
-      controller = next;
-      if (next) unsubscribe = next.subscribe(notify);
-      notify();
-    },
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    get: (): HudState | null => (controller ? controller.getHud() : null),
-    /** The connected controller; non-null exactly when get() is. */
-    controller: (): FailoverController | null => controller,
-  };
-}
-
-const SERVER_HUD = () => null;
 
 const OVER_TEXT: Record<NonNullable<HudState["over"]>, string> = {
   reputation: T.over_reputation,
@@ -236,7 +207,7 @@ export function FailoverGame() {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<FailoverController | null>(null);
   const bridge = useMemo(() => createHudBridge(), []);
-  const hud = useSyncExternalStore(bridge.subscribe, bridge.get, SERVER_HUD);
+  const hud = useHud(bridge);
 
   useEffect(() => {
     const container = containerRef.current;
