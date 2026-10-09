@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Ghost } from "lucide-react";
 import { DURATIONS, modeId, parseMode, type ModeId } from "./engine/modes";
 import type { Content, Seconds } from "./engine/types";
 
@@ -43,7 +43,16 @@ function Choice({
 }
 
 /** Content, duration and the single quote. Picking a part keeps the others where it can. */
-export function ModeBar({ mode, onChange }: { mode: ModeId; onChange: (mode: ModeId) => void }) {
+export function ModeBar({
+  mode,
+  onChange,
+  ghost,
+}: {
+  mode: ModeId;
+  onChange: (mode: ModeId) => void;
+  /** The ghost switch; left out, the bar has no such button. */
+  ghost?: { on: boolean; onToggle: () => void };
+}) {
   const timed = parseMode(mode);
   const content = timed?.content ?? "words";
   const seconds = timed?.seconds ?? FALLBACK_SECONDS;
@@ -77,6 +86,14 @@ export function ModeBar({ mode, onChange }: { mode: ModeId; onChange: (mode: Mod
         pressed={mode === "daily"}
         onClick={() => onChange("daily")}
       />
+      {ghost && (
+        <Choice
+          label="Ghost"
+          icon={<Ghost aria-hidden="true" className="h-3.5 w-3.5" />}
+          pressed={ghost.on}
+          onClick={ghost.onToggle}
+        />
+      )}
     </div>
   );
 }
