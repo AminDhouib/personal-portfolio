@@ -7,14 +7,15 @@ export const typingSpeedContent: GameContent = {
   genre: ["Typing", "Skill"],
   playMode: "SinglePlayer",
   intro:
-    "Typing Speed is a free typing speed test that runs in your browser. Pick a timed test of 15, 30, 60 or 120 seconds with common words or classic-book quotes, or type a single quote at your own pace. Daily gives everyone the same passage for the whole UTC day, with a leaderboard. The clock starts on your first keystroke, and the result card adds a graph and a map of the keys you miss most. Your best net WPM for each mode is saved on your device.",
+    "Typing Speed is a free typing speed test that runs in your browser. Pick a timed test of 15, 30, 60 or 120 seconds with common words or classic-book quotes, or type one quote at your own pace. Daily gives everyone the same passage for the whole UTC day, with a leaderboard. The result card adds a graph and a map of the keys you miss most. Your best run in each mode is saved on your device as a ghost you can race.",
   howToPlay: [
     "Choose Words or Quotes and a length in the mode bar, or pick Quote for one passage.",
-    "Click the text or press any key, then type. Space moves to the next word.",
-    "A wrong letter turns red but stays inside its own word, so one slip never ruins the rest of the line. Backspace fixes it.",
-    "In a timed mode the round ends when the countdown hits zero. In Quote mode, finish the last word.",
-    "Check your net WPM, raw WPM, accuracy, graph and key map, then press Tab and Enter to go again.",
-    "Pick Daily for today's shared text. Try as often as you like, then press Post to put your best on the board.",
+    "Click the text or press any key, then type. Space ends a word.",
+    "A wrong letter turns red but stays inside its own word. Backspace fixes it.",
+    "A timed round ends at zero. A Quote round ends on its last word.",
+    "Check your net WPM, accuracy, graph and key map, then press Tab and Enter to go again.",
+    "Race your ghost: a dim marker shows where your best run stood.",
+    "Pick Daily for today's shared text, then press Post to put your best on the board.",
   ],
   controls: [
     {
@@ -23,7 +24,7 @@ export const typingSpeedContent: GameContent = {
     },
     {
       input: "Ctrl or Alt + Backspace",
-      action: "Clears the word you are typing.",
+      action: "Clears the current word.",
     },
     {
       input: "Enter, or Tab then Enter",
@@ -35,7 +36,7 @@ export const typingSpeedContent: GameContent = {
     },
     {
       input: "Mouse",
-      action: "Click the mode bar, Restart, or Skip for a different quote.",
+      action: "Click the mode bar, Restart, or Skip for a new quote.",
     },
     {
       input: "Phone",
@@ -44,14 +45,14 @@ export const typingSpeedContent: GameContent = {
     },
   ],
   strategy: [
-    "Protect accuracy. Every wrong key stays in your accuracy figure even after you fix it, so slow down a little rather than correct a lot.",
-    "Punctuation and spaces count toward WPM, so do not rush past commas and full stops.",
-    "After a run, open the key map. Your most-missed keys are the ones to drill.",
+    "Protect accuracy. Every wrong key stays in your accuracy figure even after you fix it, so slow down rather than correct a lot.",
+    "Punctuation and spaces count toward WPM.",
+    "After a run, open the key map. Drill your most-missed keys.",
   ],
   facts: [
     {
       label: "Modes",
-      value: "15, 30, 60, 120 s words or quotes, single quote",
+      value: "15, 30, 60, 120 s words or quotes, one quote",
     },
     {
       label: "Passages",
@@ -59,11 +60,11 @@ export const typingSpeedContent: GameContent = {
     },
     {
       label: "Score",
-      value: "Net WPM, raw WPM, accuracy and mistakes",
+      value: "Net WPM, raw WPM, accuracy",
     },
     {
       label: "Progress",
-      value: "Best net WPM per mode and key stats saved on this device",
+      value: "Best net WPM, key stats and a ghost per mode, saved on this device",
     },
     {
       label: "Leaderboard",
@@ -76,14 +77,14 @@ export const typingSpeedContent: GameContent = {
   ],
   faq: [
     {
-      question: "How is WPM calculated in this typing test?",
+      question: "How are WPM and accuracy calculated in this typing test?",
       answer:
-        "Net WPM, the headline figure, counts the characters of your correctly typed words and their spaces, divided by 5 and by the minutes taken. Raw WPM counts every character typed, right or wrong, the same way.",
+        "Net WPM, the headline figure, counts the characters of your correctly typed words and their spaces, divided by 5 and by the minutes taken. Raw WPM counts every character typed, right or wrong, the same way. Accuracy is correct keystrokes over all character and space keystrokes, and a fixed slip still costs you.",
     },
     {
-      question: "How is typing accuracy calculated?",
+      question: "What is the ghost?",
       answer:
-        "Accuracy is your correct keystrokes divided by all character and space keystrokes. Backspaces are not counted, and a fixed slip still costs you.",
+        "Your best run in a mode, replayed as a dim marker on the text, with a chip showing how many characters you are ahead or behind. It lives only in your browser, one per mode, and the Ghost button turns it off.",
     },
     {
       question: "Can I paste text into the typing test?",
@@ -93,7 +94,7 @@ export const typingSpeedContent: GameContent = {
     {
       question: "Does the typing game save my score?",
       answer:
-        "It saves your best net WPM for each mode, plus which keys you miss, in your browser. Only the Daily text has a leaderboard, and a result reaches it only when you press Post. There is no account.",
+        "It saves your best net WPM per mode and the keys you miss in your browser. Only the Daily text has a leaderboard, and only when you press Post. There is no account.",
     },
     {
       question: "What is the daily text?",
