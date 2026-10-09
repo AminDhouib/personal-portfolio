@@ -1,6 +1,6 @@
 // The player's side of the sim: every build, wire, upgrade and retire goes
 // through dispatch(), which applies it through the same topology and economy
-// functions the rules live in and logs the attempt. A replay feeds the log back
+// functions the rules live in and logs it if it was accepted. A replay feeds the log back
 // through dispatch(), so the live game and the server's re-simulation refuse and
 // accept exactly the same things (money, placement and edge rules are all state).
 
@@ -203,17 +203,21 @@ function apply(a: Action): ActionResult {
 }
 
 /**
- * Apply one player action at the current tick and log it, applied or not. A
- * finished run takes nothing more, and an action that cannot be written down
- * (NaN, a made-up id) is refused unlogged; neither can happen in a replay of an
- * honest log, and neither changes the sim.
+ * Apply one player action at the current tick and log it if it was accepted. A refusal
+ * (money, a taken tile, an edge rule, a made-up id) changes nothing a replay can see
+ * and draws no random number, so it is not recorded: a stray click can neither fill the
+ * 700-action cap nor put something in the log the proof format cannot write. A finished
+ * run takes nothing more, and an action that cannot be written down (NaN) is refused.
  */
 export function dispatch(a: Action): ActionResult {
   if (S.over) return refuse("over");
   const entry = encodeAction(S.tick, a);
   if (!entry) return refuse("bad-args");
 
-  if (S.log.length < MAX_LOGGED_ACTIONS) S.log.push(entry);
-  else S.logOverflow = true;
-  return apply(a);
+  const result = apply(a);
+  if (result.ok) {
+    if (S.log.length < MAX_LOGGED_ACTIONS) S.log.push(entry);
+    else S.logOverflow = true;
+  }
+  return result;
 }

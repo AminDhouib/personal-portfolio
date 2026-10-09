@@ -101,6 +101,12 @@ function recordRun(): LoggedAction[] {
       ];
       const action = actions[(tick / 24) % actions.length];
       if (action) dispatch(action);
+      // Refusals are not logged, so a pair of auto-repair flips (always accepted, net
+      // no change) is what carries the log to the cap across the run.
+      if ((tick / 24) % 2 === 0) {
+        dispatch({ op: 7, on: true });
+        dispatch({ op: 7, on: false });
+      }
     }
   }
   return copyLog();
