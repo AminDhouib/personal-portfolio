@@ -8,6 +8,7 @@ import { Ticking } from "../effects";
 import { EAST, WEST } from "../spatial";
 import { configForRef, createRun, replayLog, type Run } from "../run";
 import type { TowerLevelRef } from "../level-ref";
+import { endOk, stepOk } from "./helpers";
 
 const NAME = "Probe";
 
@@ -22,7 +23,7 @@ function keep(level: number): LevelConfig {
 
 function walkOnly(run: Run): void {
   run.beginTurn().walk?.();
-  run.endTurn();
+  endOk(run);
 }
 
 /** Warrior at x=0 facing a Sludge at x=1, floor of 3 spaces, stairs at the far end. */
@@ -89,7 +90,7 @@ describe("turn order", () => {
   it("lets the warrior act before every other unit", () => {
     const run = createRun(duelConfig());
     run.beginTurn().rest?.();
-    const record = run.endTurn();
+    const record = endOk(run);
     const actors = record.events.map((event) => event.actor?.warrior);
     expect(actors[0]).toBe(true);
     expect(record.events.some((event) => event.actor && !event.actor.warrior)).toBe(true);
@@ -100,7 +101,7 @@ describe("turn order", () => {
     // the same turn even though the warrior hit first.
     const run = createRun(duelConfig());
     run.beginTurn().attack?.();
-    const types = run.endTurn().events.map((event) => `${event.actor?.name}:${event.action.type}`);
+    const types = endOk(run).events.map((event) => `${event.actor?.name}:${event.action.type}`);
     expect(types).toEqual([
       `${NAME}:attack`,
       "Sludge:takeDamage",
@@ -114,7 +115,7 @@ describe("turn order", () => {
     const records = [];
     for (let i = 0; i < 4; i++) {
       run.beginTurn().walk?.();
-      records.push(run.endTurn());
+      records.push(endOk(run));
     }
     expect(records.map((record) => record.t)).toEqual([1, 2, 3, 4]);
     expect(run.turnCount).toBe(records.length);
@@ -141,7 +142,7 @@ describe("the turn facade", () => {
     const run = createRun(tower(1));
     const turn = run.beginTurn();
     turn.walk?.();
-    run.endTurn();
+    endOk(run);
     expect(() => turn.walk?.()).toThrow("That turn is over");
     expect(() => turn.think?.("late")).toThrow("That turn is over");
   });
@@ -152,7 +153,7 @@ describe("the turn facade", () => {
     expect(() => turn.walk?.("north")).toThrow("'north' is not a direction");
     // the failed call did not use up the turn's action
     turn.walk?.("forward");
-    expect(run.endTurn().action).toEqual({ name: "walk", direction: "forward" });
+    expect(endOk(run).action).toEqual({ name: "walk", direction: "forward" });
   });
 
   it("rejects a direction that is not a string", () => {
@@ -164,7 +165,7 @@ describe("the turn facade", () => {
   it("drops arguments that rest does not take", () => {
     const run = createRun(duelConfig());
     run.beginTurn().rest?.("left");
-    expect(run.endTurn().action).toEqual({ name: "rest", direction: null });
+    expect(endOk(run).action).toEqual({ name: "rest", direction: null });
   });
 
   it("senses immediately and rejects unknown directions in senses too", () => {
@@ -177,7 +178,7 @@ describe("the turn facade", () => {
 
   it("refuses beginTurn twice and endTurn before beginTurn", () => {
     const run = createRun(tower(1));
-    expect(() => run.endTurn()).toThrow("beginTurn");
+    expect(() => endOk(run)).toThrow("beginTurn");
     run.beginTurn();
     expect(() => run.beginTurn()).toThrow("already begun");
   });
@@ -185,7 +186,7 @@ describe("the turn facade", () => {
   it("an unrecorded turn is an idle turn", () => {
     const run = createRun(tower(1));
     run.beginTurn();
-    const record = run.endTurn();
+    const record = endOk(run);
     expect(record.action).toBeNull();
     expect(record.events[0]?.action.type).toBe("idle");
   });
@@ -194,7 +195,7 @@ describe("the turn facade", () => {
 describe("step", () => {
   it("step(null) is an idle turn", () => {
     const run = createRun(tower(1));
-    const record = run.step(null);
+    const record = stepOk(run, null);
     expect(record.action).toBeNull();
     expect(record.events.map((event) => event.action.type)).toEqual(["idle"]);
     expect(run.turnCount).toBe(1);
@@ -202,14 +203,14 @@ describe("step", () => {
 
   it("performs the given action", () => {
     const run = createRun(tower(1));
-    const record = run.step({ name: "walk", direction: "forward" });
+    const record = stepOk(run, { name: "walk", direction: "forward" });
     expect(record.action).toEqual({ name: "walk", direction: "forward" });
     expect(record.events[0]?.action.type).toBe("walk");
   });
 
   it("refuses an action the floor does not grant", () => {
     const run = createRun(tower(1));
-    expect(() => run.step({ name: "shoot", direction: "forward" })).toThrow(
+    expect(() => stepOk(run, { name: "shoot", direction: "forward" })).toThrow(
       "This floor does not give you shoot yet.",
     );
     expect(run.turnCount).toBe(0);
@@ -217,28 +218,28 @@ describe("step", () => {
 
   it("refuses to step a finished run", () => {
     const run = createRun(tower(1));
-    for (let i = 0; i < 7; i++) run.step({ name: "walk", direction: null });
+    for (let i = 0; i < 7; i++) stepOk(run, { name: "walk", direction: null });
     expect(run.status).toBe("passed");
-    expect(() => run.step(null)).toThrow("The run is over.");
+    expect(() => stepOk(run, null)).toThrow("The run is over.");
     expect(() => run.beginTurn()).toThrow("The run is over.");
   });
 
   it("ends out of turns at 200 and says so", () => {
     const run = createRun(tower(1));
-    for (let i = 0; i < 199; i++) run.step(null);
+    for (let i = 0; i < 199; i++) stepOk(run, null);
     expect(run.status).toBe("playing");
-    run.step(null);
+    stepOk(run, null);
     expect(run.status).toBe("out-of-turns");
     expect(run.turnCount).toBe(200);
     expect(run.result()).toMatchObject({ passed: false, turns: 200, score: null });
-    expect(() => run.step(null)).toThrow("The run is over.");
+    expect(() => stepOk(run, null)).toThrow("The run is over.");
   });
 
   it("passes on turn 200 when the stairs are reached on the last turn", () => {
     const run = createRun(tower(1));
-    for (let i = 0; i < 193; i++) run.step({ name: "walk", direction: "backward" });
+    for (let i = 0; i < 193; i++) stepOk(run, { name: "walk", direction: "backward" });
     expect(run.status).toBe("playing");
-    for (let i = 0; i < 7; i++) run.step({ name: "walk", direction: null });
+    for (let i = 0; i < 7; i++) stepOk(run, { name: "walk", direction: null });
     expect(run.turnCount).toBe(200);
     expect(run.status).toBe("passed");
   });
@@ -247,7 +248,7 @@ describe("step", () => {
     // Standing idle next to a sludge: 3 damage a turn against 20 health.
     const run = createRun(duelConfig());
     let guard = 0;
-    while (run.status === "playing" && guard++ < 100) run.step(null);
+    while (run.status === "playing" && guard++ < 100) stepOk(run, null);
     expect(run.status).toBe("failed");
     expect(run.turnCount).toBe(7);
     expect(run.result()).toMatchObject({ passed: false, score: null, grade: null });
@@ -258,11 +259,11 @@ describe("ticking captives", () => {
   it("explodes on schedule in Powder Keep 6, killing the warrior", () => {
     const run = createRun(keep(6));
     for (let i = 0; i < 6; i++) {
-      const record = run.step(null);
+      const record = stepOk(run, null);
       expect(record.events.some((event) => event.action.type === "explode")).toBe(false);
       expect(run.status).toBe("playing");
     }
-    const record = run.step(null);
+    const record = stepOk(run, null);
     expect(record.events.some((event) => event.action.type === "explode")).toBe(true);
     expect(run.status).toBe("failed");
     expect(record.t).toBe(7);
@@ -346,6 +347,8 @@ describe("ranged abilities on a custom floor", () => {
       shoot: Shoot.with({ power: 3, range: 3 }),
     };
     const run = createRun(config);
-    expect(run.step({ name: "shoot", direction: "forward" }).events[0]?.action.type).toBe("shoot");
+    expect(stepOk(run, { name: "shoot", direction: "forward" }).events[0]?.action.type).toBe(
+      "shoot",
+    );
   });
 });

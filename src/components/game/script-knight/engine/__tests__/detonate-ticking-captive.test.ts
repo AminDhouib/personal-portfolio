@@ -7,6 +7,7 @@ import { Ticking } from "../effects";
 import { createRun } from "../run";
 import { EAST } from "../spatial";
 import { Captive } from "../units";
+import { stepOk } from "./helpers";
 
 /** Real Detonate, Captive and Ticking: the warrior stands next to a captive that is already ticking. */
 function bombedCaptiveConfig(): LevelConfig {
@@ -43,7 +44,7 @@ function bombedCaptiveConfig(): LevelConfig {
 describe("detonating a ticking captive", () => {
   it("chains the explosion instead of throwing, and ends the run cleanly", () => {
     const run = createRun(bombedCaptiveConfig());
-    const record = run.step({ name: "detonate", direction: "forward" });
+    const record = stepOk(run, { name: "detonate", direction: "forward" });
 
     const types = record.events.map((event) => event.action.type);
     expect(types).toContain("chainDetonate");
@@ -55,7 +56,7 @@ describe("detonating a ticking captive", () => {
 
   it("kills the captive once, not twice", () => {
     const run = createRun(bombedCaptiveConfig());
-    const record = run.step({ name: "detonate", direction: "forward" });
+    const record = stepOk(run, { name: "detonate", direction: "forward" });
     const captiveDeaths = record.events.filter(
       (event) => event.actor?.name === "Captive" && event.action.type === "die",
     );

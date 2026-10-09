@@ -126,7 +126,10 @@ export function playWithBot(
   const actions: TurnAction[] = [];
   while (run.status === "playing") {
     bot(run.beginTurn());
-    actions.push(run.endTurn().action);
+    const stepped = run.endTurn();
+    if (stepped.ok) {
+      actions.push(stepped.record.action);
+    }
   }
   return { actions, status: run.status, result: run.result() };
 }

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Walk } from "../abilities";
 import { loadLevel } from "../core/level";
 import { configForRef, createRun } from "../run";
+import { endOk, stepOk } from "./helpers";
 
 // The three places the port deliberately differs from WarriorJS bc68e87 (DESIGN.md register).
 
@@ -49,7 +50,7 @@ describe("2. the turn object is a frozen facade", () => {
       "use strict";
       Object.defineProperty(turn, "action", { value: ["detonate", []] });
     }).toThrow();
-    expect(run.endTurn().action).toBeNull();
+    expect(endOk(run).action).toBeNull();
     expect(run.turnCount).toBe(1);
   });
 
@@ -68,7 +69,8 @@ describe("3. events carry unit ids", () => {
     const ids = new Set<number>();
     const seen: Array<{ id: number; x: number }> = [];
     for (let i = 0; i < 12 && run.status === "playing"; i++) {
-      const record = run.step(
+      const record = stepOk(
+        run,
         i < 1 ? { name: "walk", direction: null } : { name: "attack", direction: null },
       );
       for (const event of record.events) {
@@ -95,7 +97,7 @@ describe("3. events carry unit ids", () => {
     const run = createRun(floor(1));
     const start = run.initial.floorMap[1]?.[1];
     expect(start?.unit).toMatchObject({ id: 0, name: NAME, warrior: true });
-    const record = run.step(null);
+    const record = stepOk(run, null);
     expect(record.events[0]?.actor).toMatchObject({ id: 0, warrior: true });
   });
 });
@@ -105,13 +107,13 @@ describe("one logger per run", () => {
     const a = createRun(floor(1));
     const b = createRun(floor(2));
     for (let i = 0; i < 4; i++) {
-      a.step({ name: "walk", direction: null });
-      b.step(i % 2 === 0 ? { name: "walk", direction: null } : null);
+      stepOk(a, { name: "walk", direction: null });
+      stepOk(b, i % 2 === 0 ? { name: "walk", direction: null } : null);
     }
     expect(a.turnCount).toBe(4);
     expect(b.turnCount).toBe(4);
     const solo = createRun(floor(1));
-    for (let i = 0; i < 4; i++) solo.step({ name: "walk", direction: null });
+    for (let i = 0; i < 4; i++) stepOk(solo, { name: "walk", direction: null });
     expect(a.result()).toEqual(solo.result());
     expect(a.initial.floorMap).toHaveLength(3);
     expect(b.initial.floorMap[1]).toHaveLength(10);
@@ -120,9 +122,9 @@ describe("one logger per run", () => {
   it("keeps each run's events apart", () => {
     const a = createRun(floor(1));
     const b = createRun(floor(3));
-    const recA = a.step({ name: "walk", direction: null });
-    const recB = b.step({ name: "walk", direction: null });
-    const recA2 = a.step({ name: "walk", direction: null });
+    const recA = stepOk(a, { name: "walk", direction: null });
+    const recB = stepOk(b, { name: "walk", direction: null });
+    const recA2 = stepOk(a, { name: "walk", direction: null });
     expect(recA.events).toHaveLength(1);
     expect(recB.events).toHaveLength(1);
     expect(recA.events[0]?.floorMap[1]).toHaveLength(10);
