@@ -75,6 +75,28 @@ describe("replaceRun", () => {
     expect(S.gameMode).toBe("sandbox");
   });
 
+  it("lets no inspector action through while it builds", async () => {
+    const h = makeController({ mode: "sandbox" });
+    h.place("compute", -16, 0);
+    h.controller.setTool({ kind: "select" });
+    h.aim({ x: -16, z: 0 }, "svc_1");
+    h.controller.tap(0, 0, "mouse");
+    expect(h.controller.getHud().selected?.id).toBe("svc_1");
+    // Damaged, so a repair would have something to do.
+    S.services[0]!.health = 40;
+    const before = JSON.stringify({ services: S.services, money: S.money, log: S.log });
+    const gate = deferred();
+    const pending = h.controller.replaceRun(() => gate.promise);
+    // The inspector stays mounted under a modal in the UI; each of its actions must still be inert.
+    h.controller.upgradeSelected();
+    h.controller.repairSelected();
+    h.controller.toggleAsgSelected();
+    h.controller.demolishSelected();
+    expect(JSON.stringify({ services: S.services, money: S.money, log: S.log })).toBe(before);
+    gate.resolve();
+    await pending;
+  });
+
   it("lets the game go on when the work throws, and passes the error up", async () => {
     const h = makeController();
     h.controller.start();
