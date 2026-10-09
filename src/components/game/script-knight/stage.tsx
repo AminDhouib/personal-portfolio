@@ -275,6 +275,8 @@ export function Stage({
     saveProgress(next);
   }, []);
 
+  const onTooLong = useCallback(() => setNotice(TOO_LONG_MESSAGE), []);
+
   const changeCode = useCallback(
     (value: string) => {
       const next = daily ? setDailyCode(codes, dayKey, value) : setTowerCode(codes, tower, value);
@@ -599,6 +601,8 @@ export function Stage({
           onRun={() => void run()}
           disabled={running}
           onSyntaxError={onSyntaxError}
+          maxChars={CODE_MAX_CHARS}
+          onTooLong={onTooLong}
         />
         {code.length > CODE_MAX_CHARS ? null : (
           <p className="text-right font-mono text-[11px] text-(--muted)">
