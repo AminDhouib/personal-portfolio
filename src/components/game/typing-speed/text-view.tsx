@@ -17,8 +17,9 @@ const LETTER_CLASS: Record<LetterState, string> = {
 const CARET_CLASS =
   "border-b-2 border-accent-blue shadow-[0_2px_8px_rgba(96,165,250,0.6)] animate-pulse";
 
-// The ghost is a dimmer marker than the caret: a soft block behind the letter, not an underline.
-const GHOST_CLASS = "rounded bg-(--muted)/30";
+// The ghost is a dimmer marker than the caret: an outline around the letter, so it never
+// tints behind the glyph and stays apart from the caret underline.
+const GHOST_CLASS = "rounded outline outline-1 outline-(--muted)";
 
 function letterState(word: string, typed: string, j: number, committed: boolean): LetterState {
   if (j >= word.length) return "extra";
