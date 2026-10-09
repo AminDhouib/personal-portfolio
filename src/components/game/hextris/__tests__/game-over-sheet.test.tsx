@@ -348,3 +348,78 @@ describe("Hextris game-over announcement", () => {
     expect(screen.queryByRole("region", { name: "Game over" })).toBeNull();
   });
 });
+
+describe("Hextris board fit", () => {
+  // jsdom lays nothing out, so the canvas and the sheet get a phone's boxes (390x844, the sheet
+  // in the bottom 464 px): boardFit lifts the board 232 px and scales it to 380/390.
+  const props = ["offsetLeft", "offsetTop", "offsetWidth", "offsetHeight"] as const;
+  type Box = Record<(typeof props)[number], number>;
+  const saved = props.map(
+    (key) => [key, Object.getOwnPropertyDescriptor(HTMLElement.prototype, key)] as const,
+  );
+  const CANVAS: Box = { offsetLeft: 0, offsetTop: 0, offsetWidth: 390, offsetHeight: 844 };
+  const SHEET: Box = { offsetLeft: 0, offsetTop: 380, offsetWidth: 390, offsetHeight: 464 };
+  const boxOf = (el: HTMLElement): Box | null =>
+    el.tagName === "CANVAS" ? CANVAS : el.getAttribute("aria-label") === "Game over" ? SHEET : null;
+
+  beforeEach(() => {
+    for (const key of props) {
+      Object.defineProperty(HTMLElement.prototype, key, {
+        configurable: true,
+        get(this: HTMLElement) {
+          return boxOf(this)?.[key] ?? 0;
+        },
+      });
+    }
+  });
+
+  afterEach(() => {
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, key, descriptor);
+    }
+  });
+
+  const fitted = (canvas: HTMLCanvasElement) => ({
+    translate: canvas.style.translate,
+    scale: canvas.style.scale,
+  });
+  const LIFTED = { translate: "0px -232px", scale: String(380 / 390) };
+  const PLAIN = { translate: "", scale: "" };
+
+  it("moves the board clear of the sheet when it opens", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    expect(fitted(shellCanvas(container))).toEqual(PLAIN);
+    endRun(120);
+    expect(fitted(shellCanvas(container))).toEqual(LIFTED);
+  });
+
+  it("puts the board back on Hide and moves it again on Show", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(fitted(shellCanvas(container))).toEqual(PLAIN);
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(fitted(shellCanvas(container))).toEqual(LIFTED);
+  });
+
+  it("puts the board back on Play again", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    runFrames(1);
+    expect(fitted(shellCanvas(container))).toEqual(PLAIN);
+  });
+
+  it("puts the board back on a key restart", () => {
+    const { container } = render(<HextrisGame />);
+    startRun(container);
+    endRun(120);
+    runFrames(Math.round(1500 / 16));
+    fireEvent.keyDown(window, { key: "r" });
+    runFrames(1);
+    expect(fitted(shellCanvas(container))).toEqual(PLAIN);
+  });
+});
