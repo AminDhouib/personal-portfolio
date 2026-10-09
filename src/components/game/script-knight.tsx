@@ -13,5 +13,3 @@ export function ScriptKnightGame(props: StageProps = {}) {
     </div>
   );
 }
-
-export default ScriptKnightGame;
