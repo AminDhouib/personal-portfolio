@@ -1,6 +1,6 @@
 import { encodeAction } from "../engine/codec";
 import type { LevelRef } from "../engine/level-ref";
-import { configForRef, createRun } from "../engine/run";
+import { configForRef, createRun, type RunFailure } from "../engine/run";
 import { isTowerId } from "../engine/towers";
 import { compilePlayer, playerLine } from "./compile";
 import { capTurn, describePlayerError } from "./facade";
@@ -40,6 +40,20 @@ function isRunMessage(value: unknown): value is ToWorker {
     msg.language === "javascript" &&
     isLevelRef(msg.level)
   );
+}
+
+/** The text the player sees for a typed failure that is theirs (not an engine error). */
+export function turnFailureMessage(reason: RunFailure): string {
+  switch (reason.kind) {
+    case "ungranted-action":
+      return `This floor does not give you ${reason.action} yet.`;
+    case "invalid-action":
+      return reason.message;
+    case "run-over":
+      return "The run is over.";
+    case "engine-error":
+      return reason.message;
+  }
 }
 
 /**
@@ -104,8 +118,21 @@ export function handleRun(
       return;
     }
     turn.revoke();
-    const record = run.endTurn();
-    post({ type: "turn", t, a: encodeAction(record.action), thoughts: turn.thoughts() });
+    const stepped = run.endTurn();
+    if (!stepped.ok) {
+      if (stepped.reason.kind === "engine-error") {
+        // Deliberate: an engine failure is not the player's error; the page sees a crash.
+        throw new Error(`The sandbox engine failed: ${stepped.reason.message}`);
+      }
+      post({
+        type: "player-error",
+        t,
+        message: turnFailureMessage(stepped.reason).slice(0, 500),
+        line: null,
+      });
+      return;
+    }
+    post({ type: "turn", t, a: encodeAction(stepped.record.action), thoughts: turn.thoughts() });
   }
   post({ type: "done" });
 }

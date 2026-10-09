@@ -5,7 +5,7 @@ import { decodeLog } from "../../engine/codec";
 import type { LevelRef } from "../../engine/level-ref";
 import fixtures from "../../engine/__tests__/fixtures/upstream-runs.json";
 import { parseFromWorker, type FromWorker, type ToWorker } from "../protocol";
-import { handleRun } from "../worker-core";
+import { handleRun, turnFailureMessage } from "../worker-core";
 
 const NARROW_1: LevelRef = { kind: "tower", tower: "narrow-path", level: 1, epic: false };
 const WALKER = "class Player { playTurn(warrior) { warrior.walk(); } }";
@@ -222,5 +222,38 @@ describe("handleRun", () => {
     // Walking into the wall every turn never passes: the engine ends the run at turn 200.
     expect(posted.filter((m) => m.type === "turn")).toHaveLength(200);
     expect(posted.at(-1)).toEqual({ type: "done" });
+  });
+
+  it("throws, so the page sees a crash, when the engine fails inside a turn", () => {
+    const { posted, post, scope } = harness();
+    const original = Array.prototype.forEach;
+    const code = [
+      "class Player {",
+      "  playTurn(w) {",
+      "    Array.prototype.forEach = function () { throw new Error('engine broke'); };",
+      "    w.walk();",
+      "  }",
+      "}",
+    ].join("\n");
+    try {
+      expect(() => handleRun(runMessage(code), post, scope)).toThrow(
+        "The sandbox engine failed: engine broke",
+      );
+    } finally {
+      Array.prototype.forEach = original;
+    }
+    expect(posted.some((m) => m.type === "turn" || m.type === "done")).toBe(false);
+  });
+});
+
+describe("turnFailureMessage", () => {
+  it("words each typed failure for the player", () => {
+    expect(turnFailureMessage({ kind: "ungranted-action", action: "shoot" })).toBe(
+      "This floor does not give you shoot yet.",
+    );
+    expect(
+      turnFailureMessage({ kind: "invalid-action", message: "'north' is not a direction." }),
+    ).toBe("'north' is not a direction.");
+    expect(turnFailureMessage({ kind: "run-over" })).toBe("The run is over.");
   });
 });
