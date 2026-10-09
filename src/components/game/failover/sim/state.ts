@@ -35,6 +35,7 @@ function createFinances(): Finances {
       autoRepair: 0,
       mitigation: 0,
       breach: 0,
+      dlq: 0,
       byService: zeroByService(),
       countByService: zeroByService(),
     },
@@ -117,7 +118,15 @@ export function createState(opts: ResetOptions): SimState {
     nextRequestId: 1,
     entryRR: {},
 
+    resilience: { trips: 0, retries: 0, outages: 0, drained: 0 },
+    // No GPUs yet, so only the base grid. recomputePower() is the one writer after this.
+    power: { usedKw: 0, capKw: CONFIG.power.baseCapKw },
+    regionOutage: null,
+
     events: [],
+
+    log: [],
+    logOverflow: false,
   };
 }
 

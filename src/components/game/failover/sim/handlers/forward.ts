@@ -1,4 +1,4 @@
-import { failRequest } from "../actions";
+import { failOrPark } from "../actions";
 import { TRAFFIC_TYPES } from "../config";
 import { FAIL_REASONS } from "../failure-reasons";
 import type { Request } from "../request";
@@ -37,7 +37,7 @@ export function genericForward(service: Service, job: Job): HandlerOutcome {
     service.rrIndex++;
     job.req.flyTo(target);
   } else {
-    failRequest(job.req, FAIL_REASONS.NO_ROUTE);
+    failOrPark(job.req, service, FAIL_REASONS.NO_ROUTE);
   }
   return "next";
 }

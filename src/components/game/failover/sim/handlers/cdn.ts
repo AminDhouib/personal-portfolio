@@ -17,7 +17,7 @@ export function process(service: Service, job: Job): HandlerOutcome {
     if (rand("rolls") < hitRate) {
       job.req.cached = true;
       emit({ kind: "cache-hit", id: job.req.id, serviceId: service.id });
-      finishRequest(job.req);
+      finishRequest(job.req, service);
       return "next";
     }
   }

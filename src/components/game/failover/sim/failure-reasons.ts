@@ -38,3 +38,15 @@ export const FAIL_REASONS = {
 } as const;
 
 export type FailReason = (typeof FAIL_REASONS)[keyof typeof FAIL_REASONS];
+
+// Success-side badges: the request completed and paid, but something about the
+// answer was worth flagging. Not failure reasons, so they never touch
+// failRequest or the failure tally.
+export const SOFT_BADGES = {
+  // A GPU's quiet quality tax.
+  BAD_ANSWER: "soft_bad_answer",
+  // Completed after its class's SLO: a late answer is worth less, not nothing.
+  SLOW: "soft_slow",
+} as const;
+
+export type SoftBadge = (typeof SOFT_BADGES)[keyof typeof SOFT_BADGES];

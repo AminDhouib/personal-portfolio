@@ -1,6 +1,8 @@
 import { failRequest } from "./actions";
+import { recordBreakerFailure } from "./circuit-breaker";
 import { CONFIG, type Destination, type TrafficType, type TrafficTypeConfig } from "./config";
 import { FAIL_REASONS } from "./failure-reasons";
+import { tickRetry } from "./retry";
 import { rand } from "./rng";
 import type { Service } from "./service";
 import { S } from "./state";
@@ -24,6 +26,18 @@ export class Request {
   failed = false;
   wasLate = false;
   pastSlo = false;
+  /** Shed by an API gateway: a soft failure that feeds neither the error rate nor the breaker. */
+  throttled = false;
+  /** Held in a dead-letter queue until its drain recovers it. */
+  parked = false;
+  /** A Pub/Sub delivery to one more subscriber: counted and costly, but the customer paid once. */
+  isFanoutCopy = false;
+
+  /** Retries spent, capped by CONFIG.resilience.maxRetries. */
+  retries = 0;
+  /** Game seconds of backoff left before the retry flies; above 0 the request is not in flight. */
+  retryDelay = 0;
+  retryTarget: Service | null = null;
 
   /** INFERENCE only: scales the GPU batch time. 70% short (0.6-1.0), 30% long (1.8-3.0). */
   genLength = 1;
@@ -81,7 +95,10 @@ export class Request {
   }
 
   update(dt: number): void {
+    // Age ticks BEFORE the retry early-return: a request waiting out a backoff is
+    // still a request the caller is waiting for.
     this.age += dt;
+    if (tickRetry(this, dt)) return;
 
     if (this.isMoving && this.target) {
       this.progress += dt * FLIGHT_SPEED;
@@ -95,6 +112,9 @@ export class Request {
         if (this.target.queue.length < maxQueue) {
           this.target.queue.push(this);
         } else {
+          // One of the two genuine "this node is failing" signals the breaker
+          // listens to: the target is so backed up it cannot accept an arrival.
+          recordBreakerFailure(this.target);
           failRequest(this, FAIL_REASONS.QUEUE_FULL);
         }
       }
