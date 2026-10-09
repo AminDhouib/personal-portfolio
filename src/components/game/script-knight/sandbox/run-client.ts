@@ -188,7 +188,7 @@ export function runInSandbox(
   };
 
   try {
-    worker.postMessage({ type: "run", ...req } satisfies ToWorker);
+    worker.postMessage({ ...req, type: "run" } satisfies ToWorker);
   } catch (err) {
     // silent-ok: crash() reports it, once per page, and ends the run
     crash(err);

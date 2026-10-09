@@ -272,6 +272,31 @@ describe("runInSandbox", () => {
     expect(worker.terminate).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores a message that arrives after the run has ended", async () => {
+    const { worker, turns, done } = start();
+    booted(worker);
+    worker.emit({ type: "ready" });
+    // Capture the handler before the run ends and clears it, as a late delivery would hit it.
+    const late = worker.onmessage;
+    worker.emit({ type: "done" });
+    await done;
+    late?.({ data: turnMsg(1) } as MessageEvent<unknown>);
+    late?.({ data: { bogus: true } } as MessageEvent<unknown>);
+    expect(turns).toEqual([]);
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("always posts type run, whatever the request carries", () => {
+    const worker = new FakeWorker();
+    runInSandbox(
+      { ...REQ, type: "evil" } as unknown as typeof REQ,
+      vi.fn(),
+      () => worker as unknown as Worker,
+    );
+    expect(worker.postMessage).toHaveBeenCalledWith({ ...REQ, type: "run" });
+  });
+
   it("cancel terminates and resolves, and later messages change nothing", async () => {
     const { worker, turns, done, cancel } = start();
     booted(worker);
