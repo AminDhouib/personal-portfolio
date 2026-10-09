@@ -124,6 +124,16 @@ export function tickRain(r: RainState, dtMs: number): void {
   }
 }
 
+/** The lowest falling word that starts with the buffer, if any. */
+export function rainTarget(r: RainState, buffer: string): RainWord | null {
+  if (buffer === "") return null;
+  let target: RainWord | null = null;
+  for (const w of r.words) {
+    if (w.text.startsWith(buffer) && (target === null || w.y > target.y)) target = w;
+  }
+  return target;
+}
+
 /**
  * Takes the buffer after a letter was added to it. The lowest falling word that starts with
  * it is the target, and a buffer equal to that whole word clears it. A buffer no word starts
@@ -132,10 +142,7 @@ export function tickRain(r: RainState, dtMs: number): void {
 export function typeRain(r: RainState, buffer: string): { cleared: boolean; valid: boolean } {
   if (r.status === "over" || buffer === "") return { cleared: false, valid: true };
   r.typed++;
-  let target: RainWord | null = null;
-  for (const w of r.words) {
-    if (w.text.startsWith(buffer) && (target === null || w.y > target.y)) target = w;
-  }
+  const target = rainTarget(r, buffer);
   if (target === null) {
     r.missed++;
     return { cleared: false, valid: false };
