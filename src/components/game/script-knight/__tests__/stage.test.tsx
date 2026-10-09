@@ -53,6 +53,20 @@ describe("Stage", () => {
     expect(localStorage.getItem(PROGRESS_KEY)).toBeNull();
   });
 
+  it("offers Retry when the sandbox could not start, and runs again", async () => {
+    let calls = 0;
+    const runner: Runner = () => {
+      calls += 1;
+      const outcome: RunOutcome = { kind: "timeout", log: "1:", phase: "boot", t: 1 };
+      return { done: Promise.resolve(outcome), cancel: () => {} };
+    };
+    render(<Stage runner={runner} />);
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(await screen.findByText("The sandbox could not start.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(calls).toBe(2));
+  });
+
   it("keeps Powder Keep locked until the Narrow Path is cleared", () => {
     render(<Stage runner={fakeRunner([], finished)} />);
     const keep = screen.getByRole("option", { name: /Powder Keep/ }) as HTMLOptionElement;

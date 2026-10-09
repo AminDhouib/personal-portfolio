@@ -408,6 +408,11 @@ export function Stage({
             onRetry={() => setFloorRun(null)}
           />
         ) : null}
+        {showResult && shown?.outcome?.retry ? (
+          <button type="button" onClick={() => void run()} className={BUTTON}>
+            Retry
+          </button>
+        ) : null}
         {epicSummary ? (
           <section
             aria-label="Epic result"
