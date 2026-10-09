@@ -29,18 +29,18 @@ describe("place (op 0)", () => {
     expect(S.log[0]).toEqual([0, 0, typeIndex("compute"), 4, 0]);
   });
 
-  it("is refused when the money is short, and still logged", () => {
+  it("is refused when the money is short, and not logged", () => {
     resetWorld({ money: CONFIG.services.compute.cost - 1 });
     expect(place("compute", 0)).toEqual({ ok: false, reason: "money" });
     expect(S.services).toHaveLength(0);
-    expect(S.log).toEqual([[0, 0, typeIndex("compute"), 0, 0]]);
+    expect(S.log).toEqual([]);
   });
 
   it("is refused on an occupied tile", () => {
     place("alb", 0);
     expect(place("compute", 0)).toEqual({ ok: false, reason: "occupied" });
     expect(S.services).toHaveLength(1);
-    expect(S.log).toHaveLength(2);
+    expect(S.log).toHaveLength(1);
   });
 
   it("is refused outside the board", () => {
@@ -78,7 +78,7 @@ describe("link and unlink (ops 1, 2)", () => {
     ]);
   });
 
-  it("refuses by edge rule, for each rule, and logs every attempt", () => {
+  it("refuses by edge rule, for each rule, and logs none of them", () => {
     const attempts: Array<[Action, string]> = [
       [{ op: 1, from: id(1), to: id(1) }, "self"],
       [{ op: 1, from: id(3), to: id(1) }, "invalid"],
@@ -92,7 +92,8 @@ describe("link and unlink (ops 1, 2)", () => {
     expect(dispatch({ op: 1, from: id(1), to: id(2) })).toEqual({ ok: false, reason: "exists" });
     expect(dispatch({ op: 1, from: id(2), to: id(1) })).toEqual({ ok: false, reason: "reverse" });
     expect(S.connections).toEqual([{ from: id(1), to: id(2) }]);
-    expect(S.log).toHaveLength(3 + attempts.length + 3);
+    // Three placements and the one accepted link.
+    expect(S.log).toHaveLength(4);
   });
 
   it("unlinks an existing link and refuses a missing one", () => {
@@ -101,7 +102,7 @@ describe("link and unlink (ops 1, 2)", () => {
     expect(S.connections).toEqual([]);
     expect(dispatch({ op: 2, from: id(1), to: id(2) })).toEqual({ ok: false, reason: "missing" });
     expect(S.log.slice(-2)).toEqual([
-      [0, 2, 1, 2],
+      [0, 1, 1, 2],
       [0, 2, 1, 2],
     ]);
   });
@@ -120,9 +121,9 @@ describe("demolish (op 3)", () => {
     expect(S.log.at(-1)).toEqual([0, 3, 2]);
   });
 
-  it("is refused for a service that is not there, and logged", () => {
+  it("is refused for a service that is not there, and not logged", () => {
     expect(dispatch({ op: 3, id: "svc_7" })).toEqual({ ok: false, reason: "missing" });
-    expect(S.log).toEqual([[0, 3, 7]]);
+    expect(S.log).toEqual([]);
   });
 });
 
@@ -147,7 +148,8 @@ describe("upgrade (op 4)", () => {
     expect(dispatch({ op: 4, id: id(1) })).toEqual({ ok: false, reason: "max-tier" });
     expect(dispatch({ op: 4, id: id(2) })).toEqual({ ok: false, reason: "not-upgradable" });
     expect(dispatch({ op: 4, id: "svc_9" })).toEqual({ ok: false, reason: "missing" });
-    expect(S.log).toHaveLength(2 + 1 + 2 + 3);
+    // Two placements and two upgrades; the five refusals are not logged.
+    expect(S.log).toHaveLength(4);
   });
 });
 
@@ -178,7 +180,7 @@ describe("toggleAsg (op 5)", () => {
     expect(dispatch({ op: 5, id: id(1) })).toEqual({ ok: false, reason: "not-scalable" });
     expect(S.services[0]?.asgEnabled).toBe(false);
     expect(dispatch({ op: 5, id: "svc_9" })).toEqual({ ok: false, reason: "missing" });
-    expect(S.log).toHaveLength(3);
+    expect(S.log).toHaveLength(1);
   });
 });
 
@@ -207,7 +209,7 @@ describe("repair (op 6)", () => {
     expect(dispatch({ op: 6, id: id(1) })).toEqual({ ok: false, reason: "money" });
     expect(svc.health).toBe(40);
     expect(dispatch({ op: 6, id: "svc_9" })).toEqual({ ok: false, reason: "missing" });
-    expect(S.log).toHaveLength(4);
+    expect(S.log).toHaveLength(1);
   });
 });
 
@@ -253,7 +255,7 @@ describe("the log", () => {
     expect(S.log.map((e) => e[0])).toEqual([0, 7]);
   });
 
-  it("logs a refusal exactly like another run would: same state, same result, same entry", () => {
+  it("refuses exactly like another run would, and logs only what it accepted", () => {
     const script = (): Array<{ ok: boolean; reason?: string }> => [
       place("apigw", 0),
       place("apigw", 0),
@@ -278,7 +280,8 @@ describe("the log", () => {
       "money",
       "missing",
     ]);
-    expect(firstLog).toHaveLength(6);
+    // The placement and the first link; the four refusals are not in it.
+    expect(firstLog).toHaveLength(2);
   });
 
   it("encodes each op in the compact shape", () => {

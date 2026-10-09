@@ -75,12 +75,18 @@ describe("captureSave", () => {
     expect(captureSave(NOW)).toEqual({ ok: false, reason: "too-long" });
   });
 
-  it("refuses a log the proof format cannot write (a refused off-board placement)", () => {
+  it("saves after a stray off-board click, which is a refusal and not in the log", () => {
     resetSim({ seed: "save-off", mode: "sandbox" });
     expect(dispatch({ op: 0, type: "waf", x: 4000, z: 0 })).toEqual({
       ok: false,
       reason: "bounds",
     });
+    expect(captureSave(NOW)).toMatchObject({ ok: true, save: { log: "" } });
+  });
+
+  it("refuses, as a typed result, a log the proof format cannot write (defensive)", () => {
+    resetSim({ seed: "save-bad-log", mode: "sandbox" });
+    S.log.push([0, 0, 0, 4000, 0]);
     expect(captureSave(NOW)).toEqual({ ok: false, reason: "unencodable" });
   });
 });
