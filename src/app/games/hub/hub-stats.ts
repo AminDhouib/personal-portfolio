@@ -7,7 +7,7 @@ import { isRecord } from "./guards";
  * The visitor's own bests, read from this browser and shown as a display-only glance.
  * Everything here is forgeable by design (anyone can edit their own localStorage), so none
  * of it is ever sent anywhere, written, or used for a decision. The hub reads exactly these
- * six keys: never Password Game 2 storage, never `walletCoins`, never `arcade:player:v1`.
+ * eight keys: never Password Game 2 storage, never `walletCoins`, never `arcade:player:v1`.
  * hub-stats.test.ts pins the allowlist.
  */
 export const HUB_STAT_KEYS = [
@@ -17,6 +17,8 @@ export const HUB_STAT_KEYS = [
   "svf:progress",
   "typing-high-score",
   "tower:stats",
+  "knight:progress",
+  "knight:stats",
 ] as const;
 
 type HubStatKey = (typeof HUB_STAT_KEYS)[number];
@@ -33,6 +35,8 @@ export interface DeviceStatsData {
   typingBest: number | null;
   towerDaily: number | null;
   towerFree: number | null;
+  /** Script Knight: floors cleared across both towers, and the best daily score. */
+  knight: { floors: number; daily: number | null } | null;
 }
 
 /** One chip of the "On this device" strip. `value` null means "nothing yet". */
@@ -52,9 +56,18 @@ const MAX_STAT = 10_000_000;
 // together, case by case, against the game's own schema.
 const SVF_MAX_LEVEL = 8;
 const SVF_MAX_COINS = 99_999;
+// Mirror FLOORS_PER_TOWER (nine) and the two tower ids in script-knight/progress.ts, which
+// imports zod and a storage writer. hub-stats.test.ts pins the floor count against the game's
+// own parseProgress, case by case.
+const KNIGHT_TOWERS = ["narrow-path", "powder-keep"] as const;
+const KNIGHT_FLOORS_PER_TOWER = 9;
+export const KNIGHT_FLOOR_TOTAL = KNIGHT_TOWERS.length * KNIGHT_FLOORS_PER_TOWER;
+const KNIGHT_MAX_TURNS = 200;
+const KNIGHT_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const BEST_LABEL = "Best on this device";
 const SAVED_LABEL = "Saved progress";
+const FLOORS_LABEL = "Floors cleared";
 
 export const ACHIEVEMENT_TOTAL = ACHIEVEMENTS.length;
 const KNOWN_ACHIEVEMENT_IDS: ReadonlySet<string> = new Set(
@@ -140,9 +153,60 @@ export function parseTowerStats(
   return daily === null && free === null ? null : { daily, free };
 }
 
+function isNonNegative(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+/**
+ * Script Knight's cleared floors across both towers, from `knight:progress` (a versioned
+ * record, v 1). A floor counts when its best has the shape the game's own schema accepts (a
+ * floor key 1..9 with a finite score and grade and 1..200 turns); anything else is skipped, as
+ * the game skips it. Null when the record is missing, foreign-version or not an object. Read-only:
+ * mirrors script-knight/progress.ts without importing it (that module writes).
+ */
+export function parseKnightFloors(text: string | null): number | null {
+  const parsed = parseJson(text, "hub:knight-progress");
+  if (!isRecord(parsed) || parsed.v !== 1) return null;
+  const towers = parsed.towers;
+  if (!isRecord(towers)) return 0;
+  let floors = 0;
+  for (const id of KNIGHT_TOWERS) {
+    const tower = towers[id];
+    const best = isRecord(tower) ? tower.best : null;
+    if (!isRecord(best)) continue;
+    for (const [key, entry] of Object.entries(best)) {
+      if (!/^[1-9]$/.test(key) || !isRecord(entry)) continue;
+      const { score, grade, turns } = entry;
+      const turnsOk =
+        typeof turns === "number" &&
+        Number.isInteger(turns) &&
+        turns >= 1 &&
+        turns <= KNIGHT_MAX_TURNS;
+      if (isNonNegative(score) && isNonNegative(grade) && turnsOk) floors += 1;
+    }
+  }
+  return floors;
+}
+
+/**
+ * Script Knight's best daily score from `knight:stats` (v 1), floored and clamped like the
+ * other scores here. Null for no best, a zero best, a bad day or score, or a foreign version.
+ */
+export function parseKnightBestDaily(text: string | null): number | null {
+  const parsed = parseJson(text, "hub:knight-stats");
+  if (!isRecord(parsed) || parsed.v !== 1) return null;
+  const best = parsed.bestDaily;
+  if (!isRecord(best) || typeof best.day !== "string" || !KNIGHT_DAY.test(best.day)) return null;
+  if (!isNonNegative(best.score)) return null;
+  const score = Math.min(MAX_STAT, Math.floor(best.score));
+  return score > 0 ? score : null;
+}
+
 export function buildDeviceStats(stored: RawStats): DeviceStatsData {
   const tower = parseTowerStats(stored["tower:stats"]);
   const profile = parseOrbitalProfile(stored["orbital-dodge-profile"]);
+  const floors = parseKnightFloors(stored["knight:progress"]) ?? 0;
+  const knightDaily = parseKnightBestDaily(stored["knight:stats"]);
   return {
     orbitalBest: parseScoreString(stored["space-shooter-hs"]),
     orbitalRuns: profile?.runs ?? null,
@@ -152,6 +216,7 @@ export function buildDeviceStats(stored: RawStats): DeviceStatsData {
     typingBest: parseScoreString(stored["typing-high-score"]),
     towerDaily: tower?.daily ?? null,
     towerFree: tower?.free ?? null,
+    knight: floors === 0 && knightDaily === null ? null : { floors, daily: knightDaily },
   };
 }
 
@@ -163,7 +228,8 @@ export function hasAnyStats(stats: DeviceStatsData): boolean {
     stats.voltorb !== null ||
     stats.typingBest !== null ||
     stats.towerDaily !== null ||
-    stats.towerFree !== null
+    stats.towerFree !== null ||
+    stats.knight !== null
   );
 }
 
@@ -179,7 +245,7 @@ function chip(slug: GameSlug, label: string, value: string | null, detail = ""):
   return { slug, title: GAMES_BY_SLUG[slug].title, label, value, detail };
 }
 
-/** The five chips, in display order. `null` stats (server, or not read yet) gives placeholders. */
+/** The six chips, in display order. `null` stats (server, or not read yet) gives placeholders. */
 export function statChips(stats: DeviceStatsData | null): StatChip[] {
   const runs = stats?.orbitalRuns ?? null;
   const orbitalDetail =
@@ -198,6 +264,8 @@ export function statChips(stats: DeviceStatsData | null): StatChip[] {
   ]
     .filter(Boolean)
     .join(", ");
+  const knight = stats?.knight ?? null;
+  const knightDaily = knight?.daily ?? null;
   return [
     chip("space-shooter", BEST_LABEL, bestValue(stats?.orbitalBest ?? null), orbitalDetail),
     chip("hextris", BEST_LABEL, bestValue(stats?.hextrisBest ?? null)),
@@ -211,6 +279,12 @@ export function statChips(stats: DeviceStatsData | null): StatChip[] {
     ),
     chip("typing-speed", BEST_LABEL, bestValue(stats?.typingBest ?? null)),
     chip("tower-stacker", BEST_LABEL, towerBest > 0 ? formatCount(towerBest) : null, towerDetail),
+    chip(
+      "script-knight",
+      FLOORS_LABEL,
+      knight === null ? null : `${formatCount(knight.floors)} of ${KNIGHT_FLOOR_TOTAL}`,
+      knightDaily === null ? "" : `Best daily ${formatCount(knightDaily)}`,
+    ),
   ];
 }
 
@@ -230,6 +304,8 @@ function readRawStats(): RawStats {
     "svf:progress": read("svf:progress"),
     "typing-high-score": read("typing-high-score"),
     "tower:stats": read("tower:stats"),
+    "knight:progress": read("knight:progress"),
+    "knight:stats": read("knight:stats"),
   };
 }
 

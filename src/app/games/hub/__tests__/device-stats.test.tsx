@@ -14,6 +14,11 @@ const SEEDED: Record<string, string> = {
   hextris_highscores: JSON.stringify([9100, 400]),
   "svf:progress": JSON.stringify({ currentLevel: 4, totalScore: 1200 }),
   "typing-high-score": "87",
+  "knight:progress": JSON.stringify({
+    v: 1,
+    towers: { "narrow-path": { best: { "1": { score: 90, grade: 2, turns: 12 } } } },
+  }),
+  "knight:stats": JSON.stringify({ v: 1, bestDaily: { day: "2026-10-16", score: 1250 } }),
 };
 
 const PRIVACY = "Read from this browser only. Nothing here is sent anywhere.";
@@ -37,12 +42,12 @@ describe("DeviceStats", () => {
     vi.restoreAllMocks();
   });
 
-  it("server-renders five placeholder chips and touches no storage", () => {
+  it("server-renders six placeholder chips and touches no storage", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem");
     const html = renderToString(<DeviceStats />);
     expect(html).toContain('data-state="pending"');
-    expect(html.match(/data-testid="stat-chip"/g)).toHaveLength(5);
-    expect(html.match(/None yet/g)).toHaveLength(5);
+    expect(html.match(/data-testid="stat-chip"/g)).toHaveLength(6);
+    expect(html.match(/None yet/g)).toHaveLength(6);
     expect(html).toContain(PRIVACY);
     for (const slug of [
       "space-shooter",
@@ -50,17 +55,18 @@ describe("DeviceStats", () => {
       "super-voltorb-flip",
       "typing-speed",
       "tower-stacker",
+      "script-knight",
     ]) {
       expect(html).toContain(`href="/games/${slug}"`);
     }
     expect(getItem).not.toHaveBeenCalled();
   });
 
-  it("shows the empty copy and five placeholders on a fresh device", () => {
+  it("shows the empty copy and six placeholders on a fresh device", () => {
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     expect(screen.getByTestId("hub-device-caption")).toHaveTextContent(EMPTY_COPY);
-    expect(chips()).toHaveLength(5);
+    expect(chips()).toHaveLength(6);
     for (const item of chips()) expect(item).toHaveTextContent("None yet");
   });
 
@@ -69,7 +75,7 @@ describe("DeviceStats", () => {
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "populated");
     expect(screen.getByTestId("hub-device-caption")).toHaveTextContent(PRIVACY);
-    const [orbital, hextris, voltorb, typing] = chips();
+    const [orbital, hextris, voltorb, typing, , knight] = chips();
     expect(orbital).toHaveTextContent("Orbital Dodge");
     expect(orbital).toHaveTextContent("Best on this device");
     expect(orbital).toHaveTextContent("48,210");
@@ -80,6 +86,10 @@ describe("DeviceStats", () => {
     expect(voltorb).toHaveTextContent("1,200 coins");
     expect(voltorb?.textContent?.toLowerCase()).not.toContain("best level");
     expect(typing).toHaveTextContent("87");
+    expect(knight).toHaveTextContent("Script Knight");
+    expect(knight).toHaveTextContent("Floors cleared");
+    expect(knight).toHaveTextContent("1 of 18");
+    expect(knight).toHaveTextContent("Best daily 1,250");
   });
 
   it("treats corrupt values as nothing, without an error report", () => {
@@ -91,6 +101,8 @@ describe("DeviceStats", () => {
       hextris_highscores: "{oops",
       "svf:progress": "null",
       "typing-high-score": "-4",
+      "knight:progress": "{oops",
+      "knight:stats": "null",
     });
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
@@ -148,16 +160,17 @@ describe("DeviceStats", () => {
     expect(clear).not.toHaveBeenCalled();
   });
 
-  it("keeps five chips without a lone one: spans on two columns, five across from lg", () => {
+  it("keeps six chips without a lone one: two columns, then three from sm", () => {
     const html = renderToString(<DeviceStats />)
       .replaceAll("&amp;", "&")
       .replaceAll("&gt;", ">");
     expect(html).toContain("[&>*:last-child:nth-child(odd)]:col-span-2");
     expect(html).toContain("sm:[&>*:last-child:nth-child(odd)]:col-span-1");
-    expect(html).toContain("lg:grid-cols-5");
+    expect(html).toContain("sm:grid-cols-3");
+    expect(html).not.toContain("lg:grid-cols");
   });
 
-  it("is an h2 followed by five game links of at least 44px, in order", () => {
+  it("is an h2 followed by six game links of at least 44px, in order", () => {
     seed(SEEDED);
     render(<DeviceStats />);
     expect(screen.getByRole("heading", { level: 2, name: "On this device" })).toBeInTheDocument();
@@ -169,6 +182,7 @@ describe("DeviceStats", () => {
       "/games/super-voltorb-flip",
       "/games/typing-speed",
       "/games/tower-stacker",
+      "/games/script-knight",
     ]);
     for (const link of links) {
       expect(link.className).toContain("min-h-11");

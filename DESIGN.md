@@ -317,15 +317,23 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
 - **Featured.** The `featured?: true` flag on `GameMeta` (set on `space-shooter` only; pinned by
   `games-meta.test.ts`) picks the featured game through `partitionGames`, never array position.
   `GAMES` order is the registry order and is unchanged.
-- **Today strip.** `TODAY_SOURCES` names six tiles: Password Game 2 (its daily board),
-  Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker and Typing Speed (the arcade daily boards). `useHubBoards` starts the six reads once
+- **Today strip.** `TODAY_SOURCES` names seven tiles: Password Game 2 (its daily board),
+  Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker, Typing Speed and Script Knight (the
+  arcade daily boards). `useHubBoards` starts the seven reads once
   the strip is within 200px of the viewport (immediately if `IntersectionObserver` is missing),
   never polls, and aborts on unmount. `fetchHubBoard` has its own 5 s timeout, never reports, and
   turns every failure into the "Board unavailable right now" tile.
-- **On this device.** `hub-stats.ts` reads exactly six keys (`space-shooter-hs`,
-  `orbital-dodge-profile`, `hextris_highscores`, `svf:progress`, `typing-high-score`, `tower:stats`) through
-  guarded parsers, and never writes. `hub-stats.test.ts` pins the key list and the setItem
-  absence.
+- **On this device.** `hub-stats.ts` reads exactly eight keys (`space-shooter-hs`,
+  `orbital-dodge-profile`, `hextris_highscores`, `svf:progress`, `typing-high-score`, `tower:stats`,
+  `knight:progress`, `knight:stats`) through guarded parsers, and never writes. `hub-stats.test.ts`
+  pins the key list and the setItem absence.
+- **The Script Knight chip is floors cleared, not a best.** It reads `knight:progress` for the
+  number of floors with a recorded clear across both towers (out of 18) and `knight:stats` for the
+  best daily score. `parseKnightFloors` and `parseKnightBestDaily` mirror the game's schemas
+  without importing `progress.ts` or `stats.ts` (those pull zod and a storage writer into a client
+  island); `hub-stats.test.ts` pins them against the game's own `parseProgress` and `parseStats`,
+  case by case. A foreign stored version reads as nothing. The six chips sit two across on a phone
+  and three across from `sm`, so none is ever left alone on a row.
 - **Stable height.** Each island renders the same height before data, while loading, empty,
   failed and populated (fixed-height tile bodies and chips, a reserved caption), because the
   server HTML is the placeholder state. `e2e/games-hub.spec.ts` compares every state with the
@@ -516,10 +524,10 @@ editor, the daily board and the hand pad are added without rewriting it.
   (nothing changed on the floor, in health or in score) `frameDelayMs` shows each further frame
   for 4 ms. Only playback timing changed: the engine, the scores and the log are as before, and
   the instant speed is unaffected.
-- **Hidden until launch.** The `GAMES` row carries `hidden: true`: the route serves, with
-  `noindex`, and the game is out of the sitemap, the lists, llms.txt and the hub. T7-8 removes the
-  flag together with the launch copy. The About copy and credits already describe only what the
-  code does today.
+- **Launched (T7-8).** The `GAMES` row no longer carries `hidden`, so the game is indexable, in the
+  sitemap, llms.txt, the hub grid, a Today tile and a device chip. CI's `seo.spec.ts` gates its page
+  (About copy, VideoGame/FAQPage/breadcrumb JSON-LD, its own OG image). The About copy and credits
+  describe only what the code does today. `featured` stays on Orbital Dodge.
 
 ## Intentional-design register
 
@@ -587,10 +595,10 @@ current tree on 2026-07-07.
   `NeedsWebGL` notice instead. A software-rendered context still counts as WebGL: the gate asks
   whether three.js can start, not how fast it will run. A new Canvas outside those two wrappers
   needs the same gate.
-- **The `/games` grid shows all 6 games.** No game is currently `hidden`; the flag in `games-meta.ts`
-  stays as the way to take a game out of rotation without deleting code (the route still works if
-  visited directly, but its page is `noindex` and it is left out of the sitemap and every "other
-  games" list). Tower Stacker was hidden until its first-party rebuild. `password-game` (The Password Game 2) is `external: true`: its card is live in
+- **The `/games` grid shows the 7 public games.** Failover alone is `hidden` (until its launch);
+  the flag in `games-meta.ts` is the way to take a game out of rotation without deleting code (the
+  route still works if visited directly, but its page is `noindex` and it is left out of the
+  sitemap and every "other games" list). Tower Stacker was hidden until its first-party rebuild. `password-game` (The Password Game 2) is `external: true`: its card is live in
   the grid, but it links to its own top-level route (`/games/password-game`) outside the shared
   game-loader rather than to a `[slug]` page; it is still in the sitemap. The first public game
   renders as a featured card spanning both columns, so an odd count never leaves a lone card in

@@ -58,14 +58,14 @@ describe("TodayStrip", () => {
     vi.restoreAllMocks();
   });
 
-  it("server-renders six placeholder tiles and a static reset line", () => {
+  it("server-renders seven placeholder tiles and a static reset line", () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     const html = renderToString(<TodayStrip />);
-    expect(html.match(/data-state="idle"/g)).toHaveLength(6);
+    expect(html.match(/data-state="idle"/g)).toHaveLength(7);
     expect(html).toContain('data-state="loading"');
     expect(html).toContain("Resets at 00:00 UTC");
     expect(html).not.toContain("Resets in");
-    expect(html.split("\u2014").length - 1).toBe(18);
+    expect(html.split("\u2014").length - 1).toBe(21);
     for (const source of TODAY_SOURCES) {
       expect(html).toContain(`href="/games/${source.slug}"`);
     }
@@ -91,11 +91,14 @@ describe("TodayStrip", () => {
       if (url.includes("game=super-voltorb-flip")) {
         return Promise.resolve(reply(200, arcadeBody([{ handle: "Pika", score: 384 }])));
       }
+      if (url.includes("game=script-knight")) {
+        return Promise.resolve(reply(200, arcadeBody([{ handle: "Lancelot", score: 1250 }])));
+      }
       return Promise.resolve(reply(200, arcadeBody([{ handle: "Pixel", score: 9100 }])));
     });
     render(<TodayStrip />);
     await settled();
-    const [pg2, orbital, hextris, voltorb] = tiles();
+    const [pg2, orbital, hextris, voltorb, , , knight] = tiles();
     expect(pg2).toHaveAttribute("data-state", "ready");
     expect(pg2).toHaveTextContent("Ada");
     expect(pg2).toHaveTextContent("1:23.4");
@@ -108,16 +111,21 @@ describe("TodayStrip", () => {
     expect(hextris).toHaveTextContent("9,100");
     expect(voltorb).toHaveTextContent("Pika");
     expect(voltorb).toHaveTextContent("384");
+    expect(knight).toHaveAttribute("data-slug", "script-knight");
+    expect(knight).toHaveTextContent("Script Knight");
+    expect(knight).toHaveTextContent("Lancelot");
+    expect(knight).toHaveTextContent("1,250");
   });
 
-  it("asks for the six public daily boards, from six URLs and never sends a player id", async () => {
+  it("asks for the seven public daily boards, from seven URLs and never sends a player id", async () => {
     const fn = stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     render(<TodayStrip />);
     await settled();
-    expect(fn).toHaveBeenCalledTimes(6);
+    expect(fn).toHaveBeenCalledTimes(7);
     const urls = fn.mock.calls.map((call) => String(call[0])).sort();
     expect(urls).toEqual([
       "/api/arcade/scores?game=hextris&board=daily",
+      "/api/arcade/scores?game=script-knight&board=daily",
       "/api/arcade/scores?game=space-shooter&board=daily",
       "/api/arcade/scores?game=super-voltorb-flip&board=daily",
       "/api/arcade/scores?game=tower-stacker&board=daily",
@@ -204,7 +212,7 @@ describe("TodayStrip", () => {
     const { container } = render(<TodayStrip />);
     // Every tile body has the fixed-height class in every state (the real measurement is in
     // e2e/games-hub.spec.ts).
-    expect(container.querySelectorAll("[data-tile-body]")).toHaveLength(6);
+    expect(container.querySelectorAll("[data-tile-body]")).toHaveLength(7);
     for (const body of container.querySelectorAll("[data-tile-body]")) {
       expect(body.className).toContain("h-18");
     }

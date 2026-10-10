@@ -1,6 +1,6 @@
 # Amin Dhouib — Personal Portfolio
 
-Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog, five browser games with persistent leaderboards, an AI chat assistant, and live GitHub/GA4 stats.
+Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog, seven browser games with persistent leaderboards, an AI chat assistant, and live GitHub/GA4 stats.
 
 ## Stack
 

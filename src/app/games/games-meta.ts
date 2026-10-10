@@ -109,8 +109,6 @@ export const GAMES: GameMeta[] = [
     controls: "Write JavaScript in the editor, then press Run. Ctrl or Cmd + Enter runs too.",
     accent: "#4ade80",
     accentTailwind: "accent-green",
-    // Hidden until T7-8 launches it: still served, but noindex and out of every list.
-    hidden: true,
   },
   {
     slug: "failover",
