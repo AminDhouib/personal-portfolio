@@ -40,12 +40,13 @@ export function DeviceStats() {
       >
         On this device
       </h2>
-      {/* Six chips in every state, each a fixed 144px tall, so a first visit, a returning
-          player and the server render all occupy the same space. Two columns, then three
-          from sm: six divides evenly at both, so no chip is left alone on a row. */}
+      {/* The same chips in every state, each a fixed 144px tall, so a first visit, a returning
+          player and the server render all occupy the same space. Two columns, then three from
+          sm. A last chip alone on its row spans the row: an odd last one on a phone, a 3n+1
+          last one from sm. Each rule holds only at its own width, so they never compete. */}
       <ul
         role="list"
-        className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1"
+        className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:nth-child(3n+1):last-child]:col-span-3"
       >
         {statChips(stats).map((item) => (
           <li key={item.slug} className="min-w-0">

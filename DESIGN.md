@@ -334,8 +334,12 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
   best daily score. `parseKnightFloors` and `parseKnightBestDaily` mirror the game's schemas
   without importing `progress.ts` or `stats.ts` (those pull zod and a storage writer into a client
   island); `hub-stats.test.ts` pins them against the game's own `parseProgress` and `parseStats`,
-  case by case. A foreign stored version reads as nothing. The six chips sit two across on a phone
-  and three across from `sm`, so none is ever left alone on a row.
+  case by case. A foreign stored version reads as nothing.
+- **No chip is stranded on a row.** The chips sit two across on a phone and three across from
+  `sm`. A last chip alone on its row spans the row: `last-child:nth-child(odd)` below `sm`,
+  `nth-child(3n+1):last-child` from `sm`, each scoped to its own width so the two never compete
+  (`device-stats.test.tsx` pins the classes, and `e2e/games-hub.spec.ts` measures the rows at four
+  widths).
 - **Stable height.** Each island renders the same height before data, while loading, empty,
   failed and populated (fixed-height tile bodies and chips, a reserved caption), because the
   server HTML is the placeholder state. `e2e/games-hub.spec.ts` compares every state with the

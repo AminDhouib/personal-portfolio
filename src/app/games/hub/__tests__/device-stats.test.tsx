@@ -160,13 +160,15 @@ describe("DeviceStats", () => {
     expect(clear).not.toHaveBeenCalled();
   });
 
-  it("keeps six chips without a lone one: two columns, then three from sm", () => {
+  it("never leaves a chip alone on a row: a lone last chip spans two columns, then three from sm", () => {
     const html = renderToString(<DeviceStats />)
       .replaceAll("&amp;", "&")
       .replaceAll("&gt;", ">");
-    expect(html).toContain("[&>*:last-child:nth-child(odd)]:col-span-2");
-    expect(html).toContain("sm:[&>*:last-child:nth-child(odd)]:col-span-1");
     expect(html).toContain("sm:grid-cols-3");
+    // Each rule holds only at its own width, so the two can never both match one chip.
+    expect(html).toContain("max-sm:[&>*:last-child:nth-child(odd)]:col-span-2");
+    expect(html).toContain("sm:[&>*:nth-child(3n+1):last-child]:col-span-3");
+    expect(html).not.toContain("col-span-1");
     expect(html).not.toContain("lg:grid-cols");
   });
 
