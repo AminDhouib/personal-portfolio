@@ -14,14 +14,17 @@ const FEATURED = PUBLIC_GAMES.find((game) => game.featured);
 if (!FEATURED) throw new Error("games-meta.ts must flag one public game as featured");
 const REST = PUBLIC_GAMES.filter((game) => game !== FEATURED);
 
-// The five keys the hub may read. Hard-coded on purpose: importing hub-stats would pull the
-// app's "@/" aliases into the spec, and the unit test already pins that list.
+// The keys these specs seed and check the hub leaves alone (it also reads tower:stats, which they
+// leave unset). Hard-coded on purpose: importing hub-stats would pull the app's "@/" aliases into
+// the spec, and the unit test already pins the full list.
 const HUB_KEYS = [
   "space-shooter-hs",
   "orbital-dodge-profile",
   "hextris_highscores",
   "svf:progress",
   "typing-high-score",
+  "knight:progress",
+  "knight:stats",
 ];
 
 const SEEDED: Record<string, string> = {
@@ -33,6 +36,11 @@ const SEEDED: Record<string, string> = {
   hextris_highscores: JSON.stringify([9100, 400]),
   "svf:progress": JSON.stringify({ currentLevel: 4, totalScore: 1200 }),
   "typing-high-score": "87",
+  "knight:progress": JSON.stringify({
+    v: 1,
+    towers: { "narrow-path": { best: { "1": { score: 90, grade: 2, turns: 12 } } } },
+  }),
+  "knight:stats": JSON.stringify({ v: 1, bestDaily: { day: "2026-10-16", score: 1250 } }),
 };
 
 const CORRUPT: Record<string, string> = {
@@ -41,6 +49,8 @@ const CORRUPT: Record<string, string> = {
   hextris_highscores: "{oops",
   "svf:progress": "null",
   "typing-high-score": "-4",
+  "knight:progress": "{oops",
+  "knight:stats": "null",
 };
 
 const EMPTY_COPY = "Play any game and your bests on this device show up here.";
@@ -92,8 +102,9 @@ function seeded(data: Record<string, string>) {
 function arcadeBody(slug: string, variant: Variant, longNames: boolean) {
   // Voltorb scores are coins on a board that pays at most a few hundred, so its rows step by 100.
   const voltorb = slug === "super-voltorb-flip";
-  const top = slug === "space-shooter" ? 48210 : voltorb ? 384 : 9100;
-  const first = slug === "space-shooter" ? "Nova" : voltorb ? "Pika" : "Kite";
+  const knight = slug === "script-knight";
+  const top = slug === "space-shooter" ? 48210 : voltorb ? 384 : knight ? 1250 : 9100;
+  const first = slug === "space-shooter" ? "Nova" : voltorb ? "Pika" : knight ? "Lancelot" : "Kite";
   const names = [longNames ? LONG_NAME : first, "Orbit", "Vega"];
   const entries =
     variant === "empty"
@@ -175,7 +186,7 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
-/** Scrolls the Today strip into view (which starts its reads) and waits for all six tiles to settle. */
+/** Scrolls the Today strip into view (which starts its reads) and waits for every tile to settle. */
 async function settle(page: Page) {
   const today = page.getByTestId("hub-today");
   await today.scrollIntoViewIfNeeded();
@@ -272,7 +283,7 @@ test.describe("Today strip", () => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
-    await expect(page.getByTestId("today-tile")).toHaveCount(6);
+    await expect(page.getByTestId("today-tile")).toHaveCount(7);
     await expect(tile(page, "password-game")).toHaveAttribute("data-state", "ready");
     await expect(tile(page, "password-game")).toContainText("Daily run");
     await expect(tile(page, "password-game")).toContainText("Ada");
@@ -286,6 +297,8 @@ test.describe("Today strip", () => {
     await expect(tile(page, "hextris")).toContainText("9,100");
     await expect(tile(page, "super-voltorb-flip")).toContainText("Pika");
     await expect(tile(page, "super-voltorb-flip")).toContainText("384");
+    await expect(tile(page, "script-knight")).toContainText("Lancelot");
+    await expect(tile(page, "script-knight")).toContainText("1,250");
     await expect(page.getByTestId("hub-today-reset")).toContainText("(00:00 UTC)");
   });
 
@@ -314,13 +327,14 @@ test.describe("Today strip", () => {
       storageState: seeded({ ...SEEDED, "arcade:player:v1": '{"id":"should-never-be-sent"}' }),
     });
 
-    test("asks for exactly six public reads and never passes a player id", async ({ page }) => {
+    test("asks for exactly seven public reads and never passes a player id", async ({ page }) => {
       const requested = await mockBoards(page, "populated");
       await page.goto("/games");
       await settle(page);
       expect([...requested].sort()).toEqual(
         [
           "/api/arcade/scores?game=hextris&board=daily",
+          "/api/arcade/scores?game=script-knight&board=daily",
           "/api/arcade/scores?game=space-shooter&board=daily",
           "/api/arcade/scores?game=super-voltorb-flip&board=daily",
           "/api/arcade/scores?game=tower-stacker&board=daily",
@@ -349,7 +363,7 @@ test.describe("Today strip", () => {
       expect(top, "the strip must start below the 200px preload margin").toBeGreaterThan(650);
       expect(requested).toEqual([]);
       await settle(page);
-      expect(requested).toHaveLength(6);
+      expect(requested).toHaveLength(7);
     });
   });
 });
@@ -374,6 +388,10 @@ test.describe("On this device", () => {
       await expect(chip(page, "super-voltorb-flip")).not.toContainText("best level");
       await expect(chip(page, "typing-speed")).toContainText("87");
       await expect(chip(page, "typing-speed")).toHaveAttribute("href", "/games/typing-speed");
+      await expect(chip(page, "script-knight")).toContainText("Floors cleared");
+      await expect(chip(page, "script-knight")).toContainText("1 of 18");
+      await expect(chip(page, "script-knight")).toContainText("Best daily 1,250");
+      await expect(chip(page, "script-knight")).toHaveAttribute("href", "/games/script-knight");
     });
 
     test("only reads: seeded values are unchanged and no player or wallet key appears", async ({
@@ -402,7 +420,7 @@ test.describe("On this device", () => {
     await page.goto("/games");
     await expect(page.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     await expect(page.getByTestId("hub-device-caption")).toHaveText(EMPTY_COPY);
-    await expect(page.getByTestId("stat-chip")).toHaveCount(5);
+    await expect(page.getByTestId("stat-chip")).toHaveCount(6);
   });
 
   test.describe("with corrupt stored values", () => {
@@ -418,7 +436,7 @@ test.describe("On this device", () => {
     });
   });
 
-  test("a fresh visit leaves all five keys unset", async ({ page }) => {
+  test("a fresh visit leaves every seeded key unset", async ({ page }) => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
@@ -580,7 +598,7 @@ test.describe("at phone width", () => {
     const heights = await page
       .locator('[data-testid="today-tile"] a, [data-testid="stat-chip"]')
       .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
-    expect(heights).toHaveLength(TODAY_SOURCES.length + 5);
+    expect(heights).toHaveLength(TODAY_SOURCES.length + 6);
     for (const value of heights) expect(value).toBeGreaterThanOrEqual(44);
   });
 });
@@ -588,11 +606,11 @@ test.describe("at phone width", () => {
 test.describe("at desktop width", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("lays the tiles out in three columns and the chips in five", async ({ page }) => {
+  test("lays the tiles out in three columns and the chips in three", async ({ page }) => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
     expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(3);
-    expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(5);
+    expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(3);
   });
 });

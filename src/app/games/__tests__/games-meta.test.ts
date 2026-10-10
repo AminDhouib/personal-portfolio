@@ -25,9 +25,10 @@ describe("GAMES featured flag", () => {
     ]);
   });
 
-  it("keeps Script Knight out of every public list until it launches", () => {
+  it("lists Script Knight publicly, without the featured flag", () => {
     const knight = GAMES.find((game) => game.slug === "script-knight");
-    expect(knight?.hidden).toBe(true);
+    expect(knight?.hidden).toBeUndefined();
+    expect(knight?.featured).toBeUndefined();
     expect(knight?.accent).toBe("#4ade80");
   });
 

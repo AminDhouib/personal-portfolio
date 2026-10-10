@@ -39,7 +39,7 @@ describe("/games page", () => {
     render(<GamesPage />);
     const slugs = screen.getByTestId("games-client").getAttribute("data-tag-slugs");
     expect(slugs).toBe(
-      "hextris,password-game,space-shooter,super-voltorb-flip,tower-stacker,typing-speed",
+      "hextris,password-game,script-knight,space-shooter,super-voltorb-flip,tower-stacker,typing-speed",
     );
   });
 });

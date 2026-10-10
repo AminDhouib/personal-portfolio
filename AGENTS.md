@@ -83,7 +83,7 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   `src/components/game/super-voltorb-flip/solver.ts`. See DESIGN.md's "Voltorb Flip solver".
 - Script Knight engine: `src/components/game/script-knight/engine/`, a pure TS port of WarriorJS
   (MIT) with an action-log codec, a step API and a reference bot, a Web Worker sandbox for the
-  player's code in `sandbox/`, and the game page (`stage.tsx`, hidden until launch) around them. See
+  player's code in `sandbox/`, and the game page (`stage.tsx`) around them. See
   DESIGN.md's "Script Knight" section and the Script Knight register entries. Its daily floor
   (`daily.ts`) ranks on the arcade board through a proof-verified entry that replays the action log
   on the server (DESIGN.md's "Arcade backend"). Hand mode (`use-hand-run.ts`, `hand-pad.tsx`) and

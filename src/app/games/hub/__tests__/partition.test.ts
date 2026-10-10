@@ -55,6 +55,7 @@ describe("partitionGames", () => {
       "typing-speed",
       "super-voltorb-flip",
       "password-game",
+      "script-knight",
     ]);
   });
 });

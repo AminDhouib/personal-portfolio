@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACHIEVEMENTS } from "@/components/game/achievements";
+import { parseProgress as parseKnightProgress } from "@/components/game/script-knight/progress";
+import { parseStats as parseKnightStats } from "@/components/game/script-knight/stats";
 import {
   MAX_LEVEL,
   MAX_TOTAL_SCORE,
@@ -9,8 +11,11 @@ import {
   ACHIEVEMENT_TOTAL,
   HUB_STAT_KEYS,
   buildDeviceStats,
+  KNIGHT_FLOOR_TOTAL,
   hasAnyStats,
   parseHextrisBest,
+  parseKnightBestDaily,
+  parseKnightFloors,
   parseOrbitalProfile,
   parseScoreString,
   parseTowerStats,
@@ -31,6 +36,8 @@ function raw(values: Partial<Record<Key, string>> = {}): RawStats {
     "svf:progress": values["svf:progress"] ?? null,
     "typing-high-score": values["typing-high-score"] ?? null,
     "tower:stats": values["tower:stats"] ?? null,
+    "knight:progress": values["knight:progress"] ?? null,
+    "knight:stats": values["knight:stats"] ?? null,
   };
 }
 
@@ -43,6 +50,7 @@ const EMPTY = {
   typingBest: null,
   towerDaily: null,
   towerFree: null,
+  knight: null,
 };
 
 const SEEDED = raw({
@@ -61,10 +69,12 @@ function seed(values: Partial<Record<Key, string>>) {
 }
 
 describe("HUB_STAT_KEYS", () => {
-  it("is exactly the six keys the hub may read", () => {
+  it("is exactly the eight keys the hub may read", () => {
     expect([...HUB_STAT_KEYS].sort()).toEqual(
       [
         "hextris_highscores",
+        "knight:progress",
+        "knight:stats",
         "orbital-dodge-profile",
         "space-shooter-hs",
         "svf:progress",
@@ -236,6 +246,7 @@ describe("buildDeviceStats and hasAnyStats", () => {
       typingBest: 87,
       towerDaily: null,
       towerFree: null,
+      knight: null,
     });
     expect(hasAnyStats(stats)).toBe(true);
   });
@@ -260,7 +271,7 @@ describe("buildDeviceStats and hasAnyStats", () => {
 });
 
 describe("statChips", () => {
-  it("is five placeholder chips before the browser has been read", () => {
+  it("is six placeholder chips before the browser has been read", () => {
     const chips = statChips(null);
     expect(chips.map((chip) => chip.slug)).toEqual([
       "space-shooter",
@@ -268,6 +279,7 @@ describe("statChips", () => {
       "super-voltorb-flip",
       "typing-speed",
       "tower-stacker",
+      "script-knight",
     ]);
     for (const chip of chips) {
       expect(chip.value).toBeNull();
@@ -279,6 +291,7 @@ describe("statChips", () => {
       "Saved progress",
       "Best on this device",
       "Best on this device",
+      "Floors cleared",
     ]);
   });
 
@@ -316,6 +329,13 @@ describe("statChips", () => {
         slug: "tower-stacker",
         title: "Tower Stacker",
         label: "Best on this device",
+        value: null,
+        detail: "",
+      },
+      {
+        slug: "script-knight",
+        title: "Script Knight",
+        label: "Floors cleared",
         value: null,
         detail: "",
       },
@@ -372,7 +392,7 @@ describe("readDeviceStatsSnapshot", () => {
     expect(second.orbitalBest).toBe(200);
   });
 
-  it("reads only the six hub keys and never writes", () => {
+  it("reads only the eight hub keys and never writes", () => {
     seed({ "space-shooter-hs": "100" });
     localStorage.setItem("walletCoins", "999");
     localStorage.setItem("arcade:player:v1", "{}");
@@ -443,5 +463,198 @@ describe("parseTowerStats", () => {
     const chip = statChips(readDeviceStatsSnapshot()).find((c) => c.slug === "tower-stacker");
     expect(chip?.value).toBe("480");
     expect(chip?.detail).toBe("Daily 480, free 320");
+  });
+});
+
+describe("parseKnightFloors", () => {
+  const best = (score = 120) => ({ score, grade: 3, turns: 40 });
+  const progress = (towers: Record<string, unknown>, v: unknown = 1) =>
+    JSON.stringify({ v, towers, at: { tower: "narrow-path", level: 1, epic: false } });
+
+  it("counts the cleared floors of both towers", () => {
+    expect(KNIGHT_FLOOR_TOTAL).toBe(18);
+    expect(
+      parseKnightFloors(
+        progress({
+          "narrow-path": { reached: 4, best: { "1": best(), "2": best(), "3": best() } },
+          "powder-keep": { reached: 2, best: { "1": best() } },
+        }),
+      ),
+    ).toBe(4);
+  });
+
+  it("is zero for a fresh record, and null for nothing readable", () => {
+    expect(parseKnightFloors(progress({}))).toBe(0);
+    expect(parseKnightFloors(null)).toBeNull();
+    expect(parseKnightFloors("not json")).toBeNull();
+    expect(parseKnightFloors("[]")).toBeNull();
+    expect(parseKnightFloors(progress({ "narrow-path": { best: { "1": best() } } }, 2))).toBeNull();
+  });
+
+  it("skips a malformed floor and a floor outside 1..9", () => {
+    const text = progress({
+      "narrow-path": {
+        best: {
+          "1": best(),
+          "0": best(),
+          "10": best(),
+          x: best(),
+          "2": { score: -1, grade: 1, turns: 5 },
+          "3": { score: 5, grade: 1, turns: 0 },
+          "4": { score: 5, grade: 1, turns: 201 },
+          "5": { score: "5", grade: 1, turns: 5 },
+          "6": "nope",
+        },
+      },
+    });
+    expect(parseKnightFloors(text)).toBe(1);
+  });
+
+  it("treats corrupt JSON as empty, quietly", () => {
+    const report = vi.spyOn(globalThis, "reportError");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(parseKnightFloors("{oops")).toBeNull();
+    expect(report).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    report.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  describe("parity with the game's own parseProgress", () => {
+    const CASES: unknown[] = [
+      { v: 1, towers: {}, at: {} },
+      { v: 1, towers: { "narrow-path": { best: { "1": best(), "9": best() } } } },
+      { v: 1, towers: { "narrow-path": { best: { "1": best() } }, "powder-keep": 5 } },
+      { v: 1, towers: { "powder-keep": { best: { "3": best(), "4": { score: 1 } } } } },
+      { v: 1, towers: { "narrow-path": { best: [best()] } } },
+      { v: 1, towers: { "narrow-path": { best: null } } },
+      { v: 1, towers: [] },
+      { v: 1, towers: null },
+      { v: 1 },
+      { v: 1, towers: { "narrow-path": { best: { "1": { score: 1.9, grade: 0, turns: 200 } } } } },
+      { v: 1, towers: { "narrow-path": { best: { "1": { score: 1, grade: -1, turns: 5 } } } } },
+      { v: 1, towers: { "narrow-path": { best: { "1": { score: 1, grade: 1, turns: 5.5 } } } } },
+    ];
+
+    for (const value of CASES) {
+      it(`agrees on ${JSON.stringify(value)}`, () => {
+        const game = parseKnightProgress(value);
+        const expected = Object.values(game.towers).reduce(
+          (sum, tower) => sum + Object.keys(tower.best).length,
+          0,
+        );
+        expect(parseKnightFloors(JSON.stringify(value))).toBe(expected);
+      });
+    }
+  });
+});
+
+describe("parseKnightBestDaily", () => {
+  const stats = (over: Record<string, unknown>) => JSON.stringify({ v: 1, ...over });
+
+  it("reads the best daily score", () => {
+    expect(parseKnightBestDaily(stats({ bestDaily: { day: "2026-10-16", score: 1250 } }))).toBe(
+      1250,
+    );
+  });
+
+  it("is null for no best, a zero best and nothing readable", () => {
+    expect(parseKnightBestDaily(stats({ bestDaily: null }))).toBeNull();
+    expect(parseKnightBestDaily(stats({ bestDaily: { day: "2026-10-16", score: 0 } }))).toBeNull();
+    expect(parseKnightBestDaily(null)).toBeNull();
+    expect(parseKnightBestDaily("not json")).toBeNull();
+    expect(parseKnightBestDaily("[]")).toBeNull();
+    expect(
+      parseKnightBestDaily(JSON.stringify({ v: 2, bestDaily: { day: "2026-10-16", score: 9 } })),
+    ).toBeNull();
+  });
+
+  it("clamps to the arcade cap and rejects a bad day or score", () => {
+    expect(
+      parseKnightBestDaily(stats({ bestDaily: { day: "2026-10-16", score: 99_999_999_999 } })),
+    ).toBe(10_000_000);
+    for (const bestDaily of [
+      { day: "yesterday", score: 5 },
+      { day: "2026-10-16", score: "5" },
+      { day: "2026-10-16", score: -5 },
+      { day: "2026-10-16" },
+      "5",
+    ]) {
+      expect(parseKnightBestDaily(stats({ bestDaily })), JSON.stringify(bestDaily)).toBeNull();
+    }
+  });
+
+  describe("parity with the game's own parseStats", () => {
+    const CASES: unknown[] = [
+      { v: 1, bestDaily: { day: "2026-10-16", score: 1250 } },
+      { v: 1, bestDaily: { day: "2026-10-16", score: 1250.9 } },
+      { v: 1, bestDaily: { day: "2026-10-16", score: 0 } },
+      { v: 1, bestDaily: { day: "2026-10-16", score: -1 } },
+      { v: 1, bestDaily: { day: "16/10/2026", score: 5 } },
+      { v: 1, bestDaily: null },
+      { v: 1 },
+      { v: 2, bestDaily: { day: "2026-10-16", score: 5 } },
+      { bestDaily: { day: "2026-10-16", score: 5 } },
+    ];
+
+    for (const value of CASES) {
+      it(`agrees on ${JSON.stringify(value)}`, () => {
+        const score = parseKnightStats(value).bestDaily?.score ?? 0;
+        expect(parseKnightBestDaily(JSON.stringify(value))).toBe(score > 0 ? score : null);
+      });
+    }
+  });
+});
+
+describe("the Script Knight chip", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const knightChip = () =>
+    statChips(readDeviceStatsSnapshot()).find((c) => c.slug === "script-knight");
+  const best = { score: 90, grade: 2, turns: 12 };
+
+  it("shows floors cleared of the eighteen, with the best daily score under it", () => {
+    seed({
+      "knight:progress": JSON.stringify({
+        v: 1,
+        towers: { "narrow-path": { best: { "1": best, "2": best } } },
+      }),
+      "knight:stats": JSON.stringify({ v: 1, bestDaily: { day: "2026-10-16", score: 1250 } }),
+    });
+    expect(knightChip()).toMatchObject({
+      label: "Floors cleared",
+      value: "2 of 18",
+      detail: "Best daily 1,250",
+    });
+  });
+
+  it("reads one cleared floor and leaves the detail blank without a daily", () => {
+    seed({
+      "knight:progress": JSON.stringify({
+        v: 1,
+        towers: { "narrow-path": { best: { "1": best } } },
+      }),
+    });
+    expect(knightChip()).toMatchObject({ value: "1 of 18", detail: "" });
+  });
+
+  it("counts a daily score alone as stats, with no floors cleared yet", () => {
+    seed({
+      "knight:stats": JSON.stringify({ v: 1, bestDaily: { day: "2026-10-16", score: 40 } }),
+    });
+    const stats = readDeviceStatsSnapshot();
+    expect(hasAnyStats(stats)).toBe(true);
+    expect(knightChip()).toMatchObject({ value: "0 of 18", detail: "Best daily 40" });
+  });
+
+  it("shows nothing for a fresh progress record or a foreign version", () => {
+    seed({
+      "knight:progress": JSON.stringify({ v: 1, towers: {} }),
+      "knight:stats": JSON.stringify({ v: 2, bestDaily: { day: "2026-10-16", score: 40 } }),
+    });
+    expect(hasAnyStats(readDeviceStatsSnapshot())).toBe(false);
+    expect(knightChip()?.value).toBeNull();
   });
 });

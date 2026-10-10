@@ -40,11 +40,12 @@ export function DeviceStats() {
       >
         On this device
       </h2>
-      {/* Five chips in every state, each a fixed 144px tall, so a first visit, a returning
-          player and the server render all occupy the same space. */}
+      {/* Six chips in every state, each a fixed 144px tall, so a first visit, a returning
+          player and the server render all occupy the same space. Two columns, then three
+          from sm: six divides evenly at both, so no chip is left alone on a row. */}
       <ul
         role="list"
-        className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1"
+        className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1"
       >
         {statChips(stats).map((item) => (
           <li key={item.slug} className="min-w-0">
