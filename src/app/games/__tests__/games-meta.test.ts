@@ -32,9 +32,9 @@ describe("GAMES featured flag", () => {
     expect(knight?.accent).toBe("#4ade80");
   });
 
-  it("keeps Failover out of every public list until it launches", () => {
+  it("lists Failover publicly, without the featured flag", () => {
     const failover = GAMES.find((game) => game.slug === "failover");
-    expect(failover?.hidden).toBe(true);
+    expect(failover?.hidden).toBeUndefined();
     expect(failover?.featured).toBeUndefined();
   });
 });

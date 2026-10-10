@@ -120,8 +120,6 @@ export const GAMES: GameMeta[] = [
       "Click to build and link. WASD or drag to pan, wheel to zoom, Q and E to turn, Space to pause.",
     accent: "#06b6d4",
     accentTailwind: "accent-cyan",
-    // Hidden until T8-6 launches it: still served, but noindex and out of every list.
-    hidden: true,
   },
 ];
 

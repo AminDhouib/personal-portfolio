@@ -7,7 +7,7 @@ import { isRecord } from "./guards";
  * The visitor's own bests, read from this browser and shown as a display-only glance.
  * Everything here is forgeable by design (anyone can edit their own localStorage), so none
  * of it is ever sent anywhere, written, or used for a decision. The hub reads exactly these
- * eight keys: never Password Game 2 storage, never `walletCoins`, never `arcade:player:v1`.
+ * nine keys: never Password Game 2 storage, never `walletCoins`, never `arcade:player:v1`.
  * hub-stats.test.ts pins the allowlist.
  */
 export const HUB_STAT_KEYS = [
@@ -19,6 +19,7 @@ export const HUB_STAT_KEYS = [
   "tower:stats",
   "knight:progress",
   "knight:stats",
+  "failover:stats",
 ] as const;
 
 type HubStatKey = (typeof HUB_STAT_KEYS)[number];
@@ -37,6 +38,8 @@ export interface DeviceStatsData {
   towerFree: number | null;
   /** Script Knight: floors cleared across both towers, and the best daily score. */
   knight: { floors: number; daily: number | null } | null;
+  /** Failover: the best survival score and the longest survival, in whole game seconds. */
+  failover: { score: number; seconds: number } | null;
 }
 
 /** One chip of the "On this device" strip. `value` null means "nothing yet". */
@@ -66,6 +69,11 @@ const KNIGHT_FLOORS_PER_TOWER = 9;
 export const KNIGHT_FLOOR_TOTAL = KNIGHT_TOWERS.length * KNIGHT_FLOORS_PER_TOWER;
 const KNIGHT_MAX_TURNS = 200;
 const KNIGHT_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+// Mirror the failover:stats record in failover/stats.ts (a versioned record, v 1). That module
+// writes, so the hub does not import it; hub-stats.test.ts pins parseFailoverBest against the
+// game's own parseStats, case by case.
+const FAILOVER_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const BEST_LABEL = "Best on this device";
 const SAVED_LABEL = "Saved progress";
@@ -204,6 +212,28 @@ export function parseKnightBestDaily(text: string | null): number | null {
   return score > 0 ? score : null;
 }
 
+/**
+ * Failover's best survival score and longest survival from `failover:stats` (v 1), checked as
+ * the game checks it: every count a non-negative safe integer and the daily day null or a day
+ * string, else the whole record is ignored. The score is clamped like the other scores here.
+ * Null for no best score, a foreign version or an unreadable record. Read-only.
+ */
+export function parseFailoverBest(text: string | null): { score: number; seconds: number } | null {
+  const parsed = parseJson(text, "hub:failover-stats");
+  if (!isRecord(parsed) || parsed.v !== 1) return null;
+  const { bestScore, bestSeconds, runs, lastDailyDay } = parsed;
+  const counts = [bestScore, bestSeconds, runs];
+  if (!counts.every((n) => typeof n === "number" && Number.isSafeInteger(n) && n >= 0)) return null;
+  if (
+    lastDailyDay !== null &&
+    (typeof lastDailyDay !== "string" || !FAILOVER_DAY.test(lastDailyDay))
+  ) {
+    return null;
+  }
+  const score = Math.min(MAX_STAT, bestScore as number);
+  return score > 0 ? { score, seconds: bestSeconds as number } : null;
+}
+
 export function buildDeviceStats(stored: RawStats): DeviceStatsData {
   const tower = parseTowerStats(stored["tower:stats"]);
   const profile = parseOrbitalProfile(stored["orbital-dodge-profile"]);
@@ -219,6 +249,7 @@ export function buildDeviceStats(stored: RawStats): DeviceStatsData {
     towerDaily: tower?.daily ?? null,
     towerFree: tower?.free ?? null,
     knight: floors === 0 && knightDaily === null ? null : { floors, daily: knightDaily },
+    failover: parseFailoverBest(stored["failover:stats"]),
   };
 }
 
@@ -231,8 +262,14 @@ export function hasAnyStats(stats: DeviceStatsData): boolean {
     stats.typingBest !== null ||
     stats.towerDaily !== null ||
     stats.towerFree !== null ||
-    stats.knight !== null
+    stats.knight !== null ||
+    stats.failover !== null
   );
+}
+
+/** Whole seconds as m:ss, like the game's own HUD clock. */
+function clock(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function formatCount(value: number): string {
@@ -247,7 +284,7 @@ function chip(slug: GameSlug, label: string, value: string | null, detail = ""):
   return { slug, title: GAMES_BY_SLUG[slug].title, label, value, detail };
 }
 
-/** The six chips, in display order. `null` stats (server, or not read yet) gives placeholders. */
+/** The seven chips, in display order. `null` stats (server, or not read yet) gives placeholders. */
 export function statChips(stats: DeviceStatsData | null): StatChip[] {
   const runs = stats?.orbitalRuns ?? null;
   const orbitalDetail =
@@ -268,6 +305,7 @@ export function statChips(stats: DeviceStatsData | null): StatChip[] {
     .join(", ");
   const knight = stats?.knight ?? null;
   const knightDaily = knight?.daily ?? null;
+  const failover = stats?.failover ?? null;
   return [
     chip("space-shooter", BEST_LABEL, bestValue(stats?.orbitalBest ?? null), orbitalDetail),
     chip("hextris", BEST_LABEL, bestValue(stats?.hextrisBest ?? null)),
@@ -286,6 +324,12 @@ export function statChips(stats: DeviceStatsData | null): StatChip[] {
       FLOORS_LABEL,
       knight === null ? null : `${formatCount(knight.floors)} of ${KNIGHT_FLOOR_TOTAL}`,
       knightDaily === null ? "" : `Best daily ${formatCount(knightDaily)}`,
+    ),
+    chip(
+      "failover",
+      BEST_LABEL,
+      bestValue(failover?.score ?? null),
+      failover === null ? "" : `Survived ${clock(failover.seconds)}`,
     ),
   ];
 }
@@ -308,6 +352,7 @@ function readRawStats(): RawStats {
     "tower:stats": read("tower:stats"),
     "knight:progress": read("knight:progress"),
     "knight:stats": read("knight:stats"),
+    "failover:stats": read("failover:stats"),
   };
 }
 
