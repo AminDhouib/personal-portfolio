@@ -25,8 +25,9 @@ import { VERIFY_BUSY_REASON } from "./verify-reasons";
  * further off, a malformed claim or proof, and a replay that runs out of time are always refused.
  * The change that ends the rollout is setting this to false.
  *
- * It stays on past the launch (T8-6). Turning it off is the owner's call, only after the golden
- * browser test passes in CI and Sentry shows no mismatches under SHADOW_SCOPE.
+ * It stays on past the launch (T8-6), by the owner's ruling. The coordinator, not the owner, turns
+ * it off once 3 days and at least 20 real daily runs show zero failures on legitimate runs, judged
+ * on the `failover.verify` log lines (RUNBOOK says how to count them), not on Sentry.
  */
 export const SHADOW = true;
 
@@ -56,7 +57,7 @@ export const YIELD_EVERY_TICKS = 500;
 /** The replay decides; this only bounds garbage. A scripted data-import build scored 224,349 on 2026-10-09. */
 export const MAX_PLAUSIBLE_SCORE = 1_000_000;
 
-/** The Sentry scope of every SHADOW report; the rollout is judged on this staying empty. */
+/** The Sentry scope of every SHADOW report. The rollout is judged on the `failover.verify` lines. */
 export const SHADOW_SCOPE = "arcade:failover-verify.shadow";
 
 /** One SHADOW report per reason per minute per process, so a flood of drift cannot flood Sentry. */

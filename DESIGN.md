@@ -597,10 +597,10 @@ the words are new, and the page credits the original, linked, with its licence.
   so a cross-engine drift between a player's browser and Node cannot reject an honest run while
   the release is young. A malformed claim or proof, a mismatch beyond the bounds, and a replay that
   runs out of time are refused either way. Every verification also logs one `failover.verify`
-  line (Arcade backend above; RUNBOOK says how to count them). **It stays true at launch**: only
-  the owner sets it to false, one line, after the golden browser test passes in CI and neither
-  the `failover.verify` lines nor Sentry under `SHADOW_SCOPE` show a drift. The player's actions
-  are data; no code of theirs reaches the server.
+  line (Arcade backend above; RUNBOOK says how to count them). **It stays true at launch**, by the
+  owner's ruling. The coordinator, not the owner, sets it to false, one line, once 3 days and at
+  least 20 real daily runs show zero failures on legitimate runs, judged on the `failover.verify`
+  lines. The player's actions are data; no code of theirs reaches the server.
 - **Local storage.** `failover:stats` (best seconds, best score, runs, the last daily day, v 1),
   `failover:handle` (the name last typed on the board), `failover:save:v1` (one save slot),
   `failover:gfx`, `failover:audio` and `failover:coach` (preferences). Each is versioned or
@@ -1405,8 +1405,9 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
 
 - **Failover ships with `SHADOW = true`.** The first release accepts a replay that drifts a little
   from the claim and reports it to Sentry, so the verifier cannot reject an honest run over an
-  engine difference nobody has measured in the wild. Turning it off is the owner's call; see the
-  Failover section.
+  engine difference nobody has measured in the wild. The coordinator turns it off on the owner's
+  criterion (3 days, at least 20 real daily runs, zero failures on legitimate runs, judged on the
+  `failover.verify` lines); see the Failover section.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
