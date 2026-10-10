@@ -1,6 +1,6 @@
 # Amin Dhouib — Personal Portfolio
 
-Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog, seven browser games with persistent leaderboards, an AI chat assistant, and live GitHub/GA4 stats.
+Source for [amindhou.com](https://amindhou.com): work case studies, an MDX blog, eight browser games with persistent leaderboards, an AI chat assistant, and live GitHub/GA4 stats.
 
 ## Stack
 
@@ -55,6 +55,7 @@ obtain it, and the one emergency bypass.
 src/
   app/          Next.js App Router routes: pages + API routes (chat, leaderboards, leads)
   components/   React components (blog, chat, games, layout, sections, three, ui)
+                game/failover/: the cloud-survival game (pure TS sim, three.js scene, HUD)
   data/         Static app data (e.g. Password Game 2 feed data: wordle, chess, capitals)
   lib/          Server-side utilities: GitHub stats, GA4, blog loader, leaderboard store
   test/         Vitest setup

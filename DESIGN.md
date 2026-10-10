@@ -319,22 +319,28 @@ strip, On this device, then a "More games" grid. Headings are h1 "Games", h2 fea
 - **Featured.** The `featured?: true` flag on `GameMeta` (set on `space-shooter` only; pinned by
   `games-meta.test.ts`) picks the featured game through `partitionGames`, never array position.
   `GAMES` order is the registry order and is unchanged.
-- **Today strip.** `TODAY_SOURCES` names seven tiles: Password Game 2 (its daily board),
-  Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker, Typing Speed and Script Knight (the
-  arcade daily boards). `useHubBoards` starts the seven reads once
+- **Today strip.** `TODAY_SOURCES` names eight tiles: Password Game 2 (its daily board),
+  Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker, Typing Speed, Script Knight and
+  Failover (the arcade daily boards). `useHubBoards` starts the eight reads once
   the strip is within 200px of the viewport (immediately if `IntersectionObserver` is missing),
   never polls, and aborts on unmount. `fetchHubBoard` has its own 5 s timeout, never reports, and
   turns every failure into the "Board unavailable right now" tile.
-- **On this device.** `hub-stats.ts` reads exactly eight keys (`space-shooter-hs`,
+- **On this device.** `hub-stats.ts` reads exactly nine keys (`space-shooter-hs`,
   `orbital-dodge-profile`, `hextris_highscores`, `svf:progress`, `typing-high-score`, `tower:stats`,
-  `knight:progress`, `knight:stats`) through guarded parsers, and never writes. `hub-stats.test.ts`
-  pins the key list and the setItem absence.
+  `knight:progress`, `knight:stats`, `failover:stats`) through guarded parsers, and never writes.
+  `hub-stats.test.ts` pins the key list and the setItem absence.
 - **The Script Knight chip is floors cleared, not a best.** It reads `knight:progress` for the
   number of floors with a recorded clear across both towers (out of 18) and `knight:stats` for the
   best daily score. `parseKnightFloors` and `parseKnightBestDaily` mirror the game's schemas
   without importing `progress.ts` or `stats.ts` (those pull zod and a storage writer into a client
   island); `hub-stats.test.ts` pins them against the game's own `parseProgress` and `parseStats`,
   case by case. A foreign stored version reads as nothing.
+- **The Failover chip is the best survival score, with the longest survival under it** ("Survived
+  5:42"), from `failover:stats`. `parseFailoverBest` mirrors the game's `parseStats` (a record the
+  game would reject is ignored whole) without importing `failover/stats.ts`, which writes;
+  `hub-stats.test.ts` pins it against the game's own parser, case by case. The record's
+  `lastDailyDay` is validated but never shown: neither the Today tile (a public board read) nor
+  the chip needs it, so the stored shape is unchanged by the launch.
 - **No chip is stranded on a row.** The chips sit two across on a phone and three across from
   `sm`. A last chip alone on its row spans the row: `last-child:nth-child(odd)` below `sm`,
   `nth-child(3n+1):last-child` from `sm`, each scoped to its own width so the two never compete
@@ -535,6 +541,77 @@ editor, the daily board and the hand pad are added without rewriting it.
   (About copy, VideoGame/FAQPage/breadcrumb JSON-LD, its own OG image). The About copy and credits
   describe only what the code does today. `featured` stays on Orbital Dodge.
 
+## Failover
+
+The game page is `src/components/game/failover.tsx` (the entry) over `failover/`: `sim/` is the
+simulation, `scene/` the three.js view, `controller.ts` the one object that owns the sim, the loop
+and the scene, `ui/` the React HUD, `persist/` the save slot and the shared-build codec, `daily/`
+the Daily Incident, `input/` the pointer state machine, `audio/` the synthesized sound and
+`strings.ts` every word. It is a TypeScript port of Server Survival (MIT, Kostyantyn Pshenychnyy;
+revision in `NOTICE`, licence in `failover/LICENSE-server-survival.txt`); the graphics, the sound and
+the words are new, and the page credits the original, linked, with its licence.
+
+- **Boundaries.** `sim/` is pure: no React, DOM, three.js, storage, clock or `Math.random`
+  (`sim/__tests__/purity.test.ts` bans each, plus every non-exact `Math` member, `Intl`, locale
+  string methods, `toString` with a radix, `**` and `globalThis`). It runs in a browser tab and in
+  the route process, so nothing in it may differ between engines. The scene reads the sim only
+  through `snapshot()` and the event queue (type-only imports of `sim/snapshot` and `sim/types`,
+  plus `CONFIG`); it never calls a sim function that changes state, and React never touches the
+  scene graph. The game's chunk (sim, scene, controller, three.js) loads on Play through two
+  `dynamic(..., { ssr: false })` calls; `__tests__/import-graph.test.ts` walks the static import
+  graph from the registry, the hub, the home page and the game section and fails if it reaches
+  `failover/scene`, `failover/sim` or `three`, and `scripts/check-bundle-budget.mjs` holds the
+  chunk to its gzip budget in CI. Where WebGL is missing, `WebGLOnly` shows a notice and three is
+  never fetched (`e2e/webgl-fallback.spec.ts`).
+- **The seams that make a run replayable.** Seed: `sim/rng.ts` holds three independent mulberry32
+  streams (`traffic`, `events`, `rolls`) seeded from one run seed string, so the day's traffic and
+  event schedule do not depend on what the player built, and every roll the upstream game made with
+  the global random source maps to exactly one stream. Clock: the sim has none. `step()` advances
+  exactly `TICK = 0.05` s, and `loop.ts` turns frame time into whole ticks (at most five a frame;
+  a backlog after a stall is dropped, not replayed). Math: `sim/dmath.ts` builds `exp`, `log` and
+  `pow` from `+ - * /` and `sqrt` only, because ECMAScript fixes those to exact IEEE results while
+  `Math.exp`, `Math.log` and `Math.pow` may differ by an ulp between V8, SpiderMonkey and
+  JavaScriptCore. State: one module-level object (`sim/state.ts`, `S`) with `resetSim`, so there is
+  one live simulation per JS realm; ids are counters, so a log refers to the same ids on both sides.
+- **The action log is the proof.** `sim/action-log.ts` and `sim/proof.ts` define the log (ops for
+  place, link, unlink, demolish, upgrade, auto-scaling, repair, auto-repair and retire) and its
+  compact text form; `sim/replay.ts` plays a log back through the same `dispatch` and `step`.
+  Every attempted action is logged and the sim applies or refuses it identically on both sides. At
+  most 700 actions and 12,000 characters, so the body stays inside the route's 16 KiB guard; a
+  longer run plays normally and shows "Too many actions to rank". Save slots and shared builds
+  reuse the same log.
+- **The Daily Incident and its board.** `daily/daily.ts` derives everything from the UTC day:
+  the seed is `DAILY_SEED_PREFIX` plus the day key, and one of six profiles (`profiles.ts`) is chosen
+  from it. The table and the prefix are pinned together in `daily.test.ts`; changing either retires
+  every score ranked under the old recipe, so it bumps the prefix. A run ends on zero reputation,
+  $1,000 of debt, the 900 s cap or Retire. Score is `floor(seconds) * 10` plus the sim's own total.
+  The entry is `failover` in `ARCADE_GAMES`: detail `{ day, seconds, ticks, actions }` (strict), the
+  action log as the `proof` (the proof seam under Arcade backend), `requiresProof` set.
+- **The verifier, and SHADOW (which is true).** `src/lib/arcade/failover-verify.ts` rebuilds the
+  day's run from the claimed day, replays the log in chunks of 500 ticks with a turn for the event
+  loop between chunks, behind a one-at-a-time mutex with a queue of two (a third caller is told
+  busy, a 503), and a time budget that answers busy rather than pass. It accepts a run that ends on
+  the claimed tick with exactly the claimed score. `SHADOW = true` is a rollout switch: a replay
+  that lands near the claim but not on it (`DRIFT_MAX_TICKS`, `DRIFT_MIN_SCORE`,
+  `DRIFT_SCORE_FRACTION`) is reported to Sentry under `SHADOW_SCOPE` and the score is still taken,
+  so a cross-engine drift between a player's browser and Node cannot reject an honest run while
+  the release is young. A malformed claim or proof, a mismatch beyond the bounds, and a replay that
+  runs out of time are refused either way. Every verification also logs one `failover.verify`
+  line (Arcade backend above; RUNBOOK says how to count them). **It stays true at launch**: only
+  the owner sets it to false, one line, after the golden browser test passes in CI and neither
+  the `failover.verify` lines nor Sentry under `SHADOW_SCOPE` show a drift. The player's actions
+  are data; no code of theirs reaches the server.
+- **Local storage.** `failover:stats` (best seconds, best score, runs, the last daily day, v 1),
+  `failover:handle` (the name last typed on the board), `failover:save:v1` (one save slot),
+  `failover:gfx`, `failover:audio` and `failover:coach` (preferences). Each is versioned or
+  checked by hand with no zod in the game's chunk, and an older build never overwrites a newer
+  build's record. The hub reads only `failover:stats`, and never writes.
+- **Launched (T8-6).** The `GAMES` row no longer carries `hidden`, so the page is indexable, in the
+  sitemap, llms.txt, the hub grid, a Today tile and a device chip. CI's `seo.spec.ts` gates the page
+  (About copy, VideoGame/FAQPage/breadcrumb JSON-LD, its own OG image). The About copy says what
+  the code does today: survival, the Daily Incident with a leaderboard, Sandbox Mode, saves and
+  shared builds, and no campaign. `featured` stays on Orbital Dodge.
+
 ## Intentional-design register
 
 Things that look like bugs or oversights but are deliberate. Each was verified against the
@@ -601,8 +678,8 @@ current tree on 2026-07-07.
   `NeedsWebGL` notice instead. A software-rendered context still counts as WebGL: the gate asks
   whether three.js can start, not how fast it will run. A new Canvas outside those two wrappers
   needs the same gate.
-- **The `/games` grid shows the 7 public games.** Failover alone is `hidden` (until its launch);
-  the flag in `games-meta.ts` is the way to take a game out of rotation without deleting code (the
+- **The `/games` grid shows the 8 public games.** None is currently `hidden`; the flag in
+  `games-meta.ts` is the way to take a game out of rotation without deleting code (the
   route still works if visited directly, but its page is `noindex` and it is left out of the
   sitemap and every "other games" list). Tower Stacker was hidden until its first-party rebuild. `password-game` (The Password Game 2) is `external: true`: its card is live in
   the grid, but it links to its own top-level route (`/games/password-game`) outside the shared
@@ -1303,6 +1380,33 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   plays it for fun, and nothing about a link is ranked, stored or posted; the daily board still
   takes only a verified submission from a real run. The ghost's `score` is stored beside its log
   only so a later clear can be compared with it without replaying; it is never shown or sent.
+
+- **Failover ticks at 20 Hz, not upstream's frame time.** Upstream steps by the frame's delta
+  (about 0.1 s at its own cap). The port steps a fixed `TICK = 0.05` s, so a run is a count of
+  ticks and a log can be replayed bit for bit anywhere. The finer step was re-proved winnable
+  (`sim/__tests__/campaign-reference.test.ts` and `beatability.test.ts` play upstream's own
+  reference builds at 0.05 s). Every
+  duration the sim holds is in seconds of game time and rounds to whole ticks.
+
+- **Failover's replay takes turns, and a busy answer is not a rejection.** The sim is one
+  module-level state, so the verifier runs one replay at a time and lets two wait; the next caller
+  gets a 503 and the client says the board is busy. It is not run in a worker: bundling a worker
+  under this Next is avoidable risk, and a full replay costs well under a second.
+
+- **Failover's daily has no grace across midnight.** The synchronous check requires today's UTC day
+  by the server clock (the Voltorb rule), so a run that started before 00:00 UTC and ended after is
+  not postable. The HUD's day-turnover check says so ("Today's incident closed at 00:00 UTC") and
+  offers the new day, rather than the server accepting yesterday's recipe.
+
+- **Failover's scene never writes to the sim.** It draws a snapshot and drains the event queue;
+  clicks become `dispatch` calls through the controller. That is why a sim step has no mesh to
+  update and why the whole sim runs headless on the server. A new scene feature that needs a
+  sim value adds it to `snapshot()`, not an import of sim internals.
+
+- **Failover ships with `SHADOW = true`.** The first release accepts a replay that drifts a little
+  from the claim and reports it to Sentry, so the verifier cannot reject an honest run over an
+  engine difference nobody has measured in the wild. Turning it off is the owner's call; see the
+  Failover section.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
