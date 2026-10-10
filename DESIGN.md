@@ -283,6 +283,8 @@ seconds }`. `checkTowerStacker` requires today's UTC day by the server clock (no
   `src/lib/arcade/verify.ts`). **The proof is never stored**: the schema, the store and `detail`
   are unchanged, and a test pins that no query parameter carries it (no server-side leader logs in
   v1). `useArcadeBoard`'s `submit` passes an optional `proof` through as its own body field.
+  Every Failover verification logs one `failover.verify` line (outcome pass, shadow-accepted or
+  rejected, never throttled, no proof or handle), and the SHADOW rollout is judged on those lines.
 - **Board cap: 1000 rows.** Each submit that wrote a row on a board (the upsert's `improved`)
   trims that board back to its top `BOARD_ROW_CAP` (1000) rows by `(score DESC, achieved_at ASC)`,
   in the same transaction, so a flood of fresh player ids cannot grow `arcade_scores` without

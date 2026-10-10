@@ -4,7 +4,11 @@ import { BOARD_S, MID_RUN_S } from "@/components/game/failover/sim/__tests__/scr
 import { dayNumber, DAILY_MAX_TICKS } from "@/components/game/failover/daily/daily";
 import type { LoggedAction } from "@/components/game/failover/sim/action-log";
 import { encodeProof } from "@/components/game/failover/sim/proof";
-import type { ReplayResult, replayAsync } from "@/components/game/failover/sim/replay";
+import {
+  ReplayError,
+  type ReplayResult,
+  type replayAsync,
+} from "@/components/game/failover/sim/replay";
 import { resetSim } from "@/components/game/failover/sim/state";
 import { BOARD, record, type Recorded, SHORT } from "./failover-fixtures";
 import type { ArcadeVerifyInput } from "../games";
@@ -12,7 +16,7 @@ import { VERIFY_BUSY_REASON } from "../verify";
 
 vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn(), logError: vi.fn() }));
 
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 import {
   createFailoverVerifier,
   DRIFT_MAX_TICKS,
@@ -585,5 +589,125 @@ describe("a strong honest run", () => {
     );
     expect(await verifyFailoverRun(claim)).toEqual({ ok: true });
     expect(captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe("the verification log", () => {
+  const EVENT = "failover.verify";
+  const lines = () =>
+    vi
+      .mocked(logWarn)
+      .mock.calls.filter(([, message]) => message === EVENT)
+      .map(([scope, , detail]) => ({ scope, detail: detail as Record<string, unknown> }));
+  const only = () => {
+    const all = lines();
+    expect(all).toHaveLength(1);
+    return all[0] ?? { scope: undefined, detail: {} as Record<string, unknown> };
+  };
+
+  beforeEach(() => {
+    vi.mocked(logWarn).mockClear();
+  });
+
+  const shadowed = (replay: Replay) => createFailoverVerifier({ shadow: true, replay });
+  const strictOf = (replay: Replay) => createFailoverVerifier({ shadow: false, replay });
+
+  it("logs one pass line with the claim, the replay and the duration", async () => {
+    await shadowed(answering(faithful(retires)))(input(retires));
+    expect(lines()).toHaveLength(1);
+    expect(only().scope).toBe("arcade:failover-verify");
+    expect(only().detail).toMatchObject({
+      outcome: "pass",
+      reason: null,
+      drift: false,
+      day: DAY,
+      score: retires.score,
+      ticks: retires.ticks,
+      actions: retires.actions,
+      replayedScore: retires.score,
+      replayedTicks: retires.ticks,
+    });
+    expect(only().detail.durationMs).toEqual(expect.any(Number));
+  });
+
+  it("logs one shadow-accepted line for a drift the rollout let through", async () => {
+    const verdict = await shadowed(answering(faithful(retires, { score: retires.score - 1 })))(
+      input(retires),
+    );
+    expect(verdict).toEqual({ ok: true });
+    expect(lines()).toHaveLength(1);
+    expect(only().detail).toMatchObject({
+      outcome: "shadow-accepted",
+      reason: "score does not match the replay",
+      drift: true,
+      replayedScore: retires.score - 1,
+      replayedTicks: retires.ticks,
+    });
+  });
+
+  it("logs one rejected line for a mismatch that is not drift", async () => {
+    const verdict = await shadowed(
+      answering(faithful(retires, { score: retires.score + 100_000 })),
+    )(input(retires));
+    expect(verdict.ok).toBe(false);
+    expect(lines()).toHaveLength(1);
+    expect(only().detail).toMatchObject({
+      outcome: "rejected",
+      reason: "score does not match the replay",
+      drift: false,
+      replayedScore: retires.score + 100_000,
+    });
+  });
+
+  it("logs a drift as rejected when SHADOW is off", async () => {
+    await strictOf(answering(faithful(retires, { score: retires.score - 1 })))(input(retires));
+    expect(lines()).toHaveLength(1);
+    expect(only().detail).toMatchObject({ outcome: "rejected", drift: true });
+  });
+
+  it("logs a refusal before any replay with no replayed fields", async () => {
+    const replay = vi.fn<Replay>();
+    await shadowed(replay)(input(retires, { proof: null }));
+    expect(replay).not.toHaveBeenCalled();
+    expect(lines()).toHaveLength(1);
+    expect(only().detail).toMatchObject({ outcome: "rejected", reason: "proof required" });
+    expect(only().detail).not.toHaveProperty("replayedScore");
+    expect(only().detail).not.toHaveProperty("replayedTicks");
+  });
+
+  it("logs busy as rejected with its reason", async () => {
+    await shadowed(vi.fn<Replay>())(input(retires, { deadline: Date.now() - 1 }));
+    expect(lines()).toHaveLength(1);
+    expect(only().detail).toMatchObject({
+      outcome: "rejected",
+      reason: VERIFY_BUSY_REASON,
+      drift: false,
+    });
+  });
+
+  it("logs the replay error path as rejected", async () => {
+    const broken: Replay = async () => {
+      throw new ReplayError("bad-args", 0);
+    };
+    await shadowed(broken)(input(retires));
+    expect(lines()).toHaveLength(1);
+    expect(only().detail).toMatchObject({
+      outcome: "rejected",
+      reason: "the proof cannot be played",
+    });
+  });
+
+  it("does not throttle the lines", async () => {
+    const verify = shadowed(answering(faithful(retires, { score: retires.score - 1 })));
+    for (let i = 0; i < 3; i++) await verify(input(retires));
+    expect(lines()).toHaveLength(3);
+  });
+
+  it("never carries the proof or a handle in a line", async () => {
+    await shadowed(answering(faithful(retires)))(input(retires));
+    await shadowed(vi.fn<Replay>())(input(retires, { proof: null }));
+    const text = JSON.stringify(vi.mocked(logWarn).mock.calls);
+    expect(text).not.toContain(retires.proof);
+    expect(text).not.toMatch(/handle|proof"|token/i);
   });
 });

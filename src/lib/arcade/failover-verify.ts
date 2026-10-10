@@ -7,7 +7,7 @@ import { parseProof } from "@/components/game/failover/sim/proof";
 import { ReplayError, replayAsync, type ReplayResult } from "@/components/game/failover/sim/replay";
 import { resetSim } from "@/components/game/failover/sim/state";
 import { TICK } from "@/components/game/failover/sim/config";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 import { utcDayKey } from "./boards";
 import type { ArcadeVerdict, ArcadeVerify } from "./games";
 import { VERIFY_BUSY_REASON } from "./verify-reasons";
@@ -83,6 +83,39 @@ const REPLAY_ERROR_REASON = "the proof cannot be played";
 class OutOfTime extends Error {}
 
 // ---- reporting ---------------------------------------------------------------------------
+
+/** The scope and event name of the one line every verification logs; the rollout is judged on it. */
+const VERIFY_LOG_SCOPE = "arcade:failover-verify";
+const VERIFY_LOG_EVENT = "failover.verify";
+
+/** What a verification saw on the way, for its log line. */
+type Trace = { replayed?: ReplayResult };
+
+type Outcome = "pass" | "shadow-accepted" | "rejected";
+
+/** One line per verification, never throttled. No proof, handle, address or token goes in it. */
+function logVerification(
+  outcome: Outcome,
+  finding: Finding,
+  input: Parameters<ArcadeVerify>[0],
+  trace: Trace,
+  startedAt: number,
+): void {
+  const { score, detail, now } = input;
+  logWarn(VERIFY_LOG_SCOPE, VERIFY_LOG_EVENT, {
+    outcome,
+    reason: finding.ok ? null : finding.reason,
+    drift: finding.ok ? false : finding.drift,
+    day: utcDayKey(now),
+    score,
+    ticks: detail.ticks ?? null,
+    actions: detail.actions ?? null,
+    ...(trace.replayed
+      ? { replayedScore: trace.replayed.score, replayedTicks: trace.replayed.endedAtTick }
+      : {}),
+    durationMs: Date.now() - startedAt,
+  });
+}
 
 const lastReported = new Map<string, number>();
 
@@ -171,7 +204,11 @@ export function judge(
   return { ok: true };
 }
 
-async function check(input: Parameters<ArcadeVerify>[0], replay: Replay): Promise<Finding> {
+async function check(
+  input: Parameters<ArcadeVerify>[0],
+  replay: Replay,
+  trace: Trace,
+): Promise<Finding> {
   const { score, detail, proof, now, deadline } = input;
   if (proof === null) return refuse("proof required");
   const today = utcDayKey(now);
@@ -202,6 +239,7 @@ async function check(input: Parameters<ArcadeVerify>[0], replay: Replay): Promis
         },
       },
     );
+    trace.replayed = result;
     return judge(result, score, detail);
   } catch (error) {
     if (error instanceof OutOfTime) return refuse(VERIFY_BUSY_REASON);
@@ -225,12 +263,19 @@ export function createFailoverVerifier({
   replay?: Replay;
 }): ArcadeVerify {
   return async (input) => {
-    const finding = await check(input, replay);
-    if (finding.ok) return { ok: true };
-    if (finding.drift && shadow && isPlausible(input.score, input.detail)) {
-      reportDrift(finding.reason);
+    const startedAt = Date.now();
+    const trace: Trace = {};
+    const finding = await check(input, replay, trace);
+    if (finding.ok) {
+      logVerification("pass", finding, input, trace, startedAt);
       return { ok: true };
     }
+    if (finding.drift && shadow && isPlausible(input.score, input.detail)) {
+      reportDrift(finding.reason);
+      logVerification("shadow-accepted", finding, input, trace, startedAt);
+      return { ok: true };
+    }
+    logVerification("rejected", finding, input, trace, startedAt);
     return reject(finding.reason);
   };
 }

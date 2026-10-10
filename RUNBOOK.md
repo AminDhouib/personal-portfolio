@@ -285,6 +285,11 @@ described above (drives Swarm auto-restart on a wedged/crashed process only).
 any kind. Nobody is notified if the site goes down — you find out by checking, or a visitor tells
 you.
 
+**Failover verifier (SHADOW rollout)**: every daily verification writes one `failover.verify` line
+(warn level, scope `arcade:failover-verify`, a JSON body with `outcome`, `reason`, `drift`, the
+claim and the replay). Find them by searching the app container's logs (see Logs above) for
+`failover.verify`; count `"outcome":"rejected"` and `"outcome":"shadow-accepted"` against the passes.
+
 **AI-chat run failures**: these now reach Sentry, as of 2026-07-31. CopilotKit reports them as
 `RUN_ERROR` events inside the SSE stream while still answering HTTP 200, so nothing throws
 server-side and the 2026-07 multi-day dead-chat outage produced zero Sentry events.
