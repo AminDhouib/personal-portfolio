@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { GAMES } from "../games-meta";
 import { GAME_CONTENT } from "../content";
 import { generateMetadata, generateViewport } from "../[slug]/page";
@@ -49,13 +49,6 @@ describe("game page metadata", () => {
     });
   }
 
-  for (const game of GAMES.filter((g) => g.hidden && !g.external)) {
-    it(`${game.slug}: a hidden game is noindex`, async () => {
-      const meta = await metaFor(game.slug);
-      expect(meta.robots).toEqual({ index: false, follow: true });
-    });
-  }
-
   it("password-game: search copy from GAME_CONTENT and no config images", () => {
     const content = GAME_CONTENT["password-game"];
     const meta = passwordGameMetadata as Meta;
@@ -88,4 +81,30 @@ describe("game detail viewport", () => {
       expect(await viewportFor(slug)).not.toHaveProperty("interactiveWidget");
     },
   );
+});
+
+describe("game page metadata with a hidden game", () => {
+  afterEach(() => {
+    vi.doUnmock("@/app/games/games-meta");
+    vi.resetModules();
+  });
+
+  it("makes the hidden game noindex and leaves the others indexable", async () => {
+    // No game is hidden today, so the registry gets Failover hidden.
+    vi.resetModules();
+    vi.doMock("@/app/games/games-meta", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/app/games/games-meta")>();
+      const games = actual.GAMES.map((g) => (g.slug === "failover" ? { ...g, hidden: true } : g));
+      return {
+        ...actual,
+        GAMES: games,
+        getGameMeta: (slug: string) => games.find((g) => g.slug === slug) ?? null,
+      };
+    });
+    const page = await import("../[slug]/page");
+    const meta = async (slug: string) =>
+      (await page.generateMetadata({ params: Promise.resolve({ slug }) })) as Meta;
+    expect((await meta("failover")).robots).toEqual({ index: false, follow: true });
+    expect((await meta("hextris")).robots).toBeUndefined();
+  });
 });
