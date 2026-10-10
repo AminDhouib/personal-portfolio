@@ -557,6 +557,41 @@ async function leftEdges(page: Page, selector: string): Promise<number[]> {
     .evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().left)));
 }
 
+// The slugs of items alone on their row that do not span it: a grid must never strand one.
+async function strandedItems(page: Page, selector: string): Promise<string[]> {
+  return page.locator(selector).evaluateAll((nodes) => {
+    const rows = new Map<number, Element[]>();
+    for (const node of nodes) {
+      const top = Math.round(node.getBoundingClientRect().top);
+      rows.set(top, [...(rows.get(top) ?? []), node]);
+    }
+    const stranded: string[] = [];
+    for (const row of rows.values()) {
+      const [only] = row;
+      const grid = only?.closest("ul");
+      if (row.length !== 1 || !only || !grid) continue;
+      if (Math.abs(only.getBoundingClientRect().width - grid.clientWidth) > 1) {
+        stranded.push(only.getAttribute("data-slug") ?? "");
+      }
+    }
+    return stranded;
+  });
+}
+
+// Phone, sm (chips three across), md and xl.
+for (const width of [390, 700, 1024, 1440]) {
+  test.describe(`at ${width}px wide`, () => {
+    test.use({ viewport: { width, height: 900 } });
+
+    test("leaves no chip alone on a row without spanning it", async ({ page }) => {
+      await mockBoards(page, "populated");
+      await page.goto("/games");
+      await settle(page);
+      expect(await strandedItems(page, '[data-testid="stat-chip"]')).toEqual([]);
+    });
+  });
+}
+
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
