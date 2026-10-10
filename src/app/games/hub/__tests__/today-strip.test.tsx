@@ -222,12 +222,15 @@ describe("TodayStrip", () => {
     }
   });
 
-  it("lets a lone last tile span the row at md and sits three across from xl", () => {
+  it("lets a lone last tile span the row at md and at xl, three across from xl", () => {
     const html = renderToString(<TodayStrip />)
       .replaceAll("&amp;", "&")
       .replaceAll("&gt;", ">");
-    expect(html).toContain("md:[&>*:last-child:nth-child(odd)]:col-span-2");
+    // md's span of two stops at xl: Tailwind emits the md rule after the xl ones, so an
+    // unbounded md rule would win over xl's span of three at equal specificity.
+    expect(html).toContain("md:max-xl:[&>*:last-child:nth-child(odd)]:col-span-2");
     expect(html).toContain("xl:grid-cols-3");
-    expect(html).toContain("xl:[&>*:last-child:nth-child(odd)]:col-span-1");
+    expect(html).toContain("xl:[&>*:last-child:nth-child(3n+1)]:col-span-3");
+    expect(html).not.toMatch(/(^|\s)md:\[&>\*:last-child/);
   });
 });

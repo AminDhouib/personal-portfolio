@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACHIEVEMENTS } from "@/components/game/achievements";
-import { parseProgress as parseKnightProgress } from "@/components/game/script-knight/progress";
-import { parseStats as parseKnightStats } from "@/components/game/script-knight/stats";
+import { TOWER_IDS } from "@/components/game/script-knight/engine/towers";
+import {
+  FLOORS_PER_TOWER,
+  PROGRESS_KEY,
+  parseProgress as parseKnightProgress,
+} from "@/components/game/script-knight/progress";
+import { STATS_KEY, parseStats as parseKnightStats } from "@/components/game/script-knight/stats";
 import {
   MAX_LEVEL,
   MAX_TOTAL_SCORE,
@@ -471,8 +476,19 @@ describe("parseKnightFloors", () => {
   const progress = (towers: Record<string, unknown>, v: unknown = 1) =>
     JSON.stringify({ v, towers, at: { tower: "narrow-path", level: 1, epic: false } });
 
+  it("reads the game's own keys and its tower and floor counts", () => {
+    expect(HUB_STAT_KEYS).toContain(PROGRESS_KEY);
+    expect(HUB_STAT_KEYS).toContain(STATS_KEY);
+    expect(KNIGHT_FLOOR_TOTAL).toBe(TOWER_IDS.length * FLOORS_PER_TOWER);
+    // Every floor of every tower the game has, cleared, is the hub's whole total.
+    const floors = Array.from({ length: FLOORS_PER_TOWER }, (_, i) => [String(i + 1), best()]);
+    const towers = Object.fromEntries(
+      TOWER_IDS.map((id) => [id, { reached: FLOORS_PER_TOWER, best: Object.fromEntries(floors) }]),
+    );
+    expect(parseKnightFloors(progress(towers))).toBe(KNIGHT_FLOOR_TOTAL);
+  });
+
   it("counts the cleared floors of both towers", () => {
-    expect(KNIGHT_FLOOR_TOTAL).toBe(18);
     expect(
       parseKnightFloors(
         progress({
@@ -527,6 +543,11 @@ describe("parseKnightFloors", () => {
       { v: 1, towers: { "narrow-path": { best: { "1": best() } }, "powder-keep": 5 } },
       { v: 1, towers: { "powder-keep": { best: { "3": best(), "4": { score: 1 } } } } },
       { v: 1, towers: { "narrow-path": { best: [best()] } } },
+      { v: 1, towers: { "narrow-path": { best: [best(), best()] } } },
+      { v: 1, towers: { "narrow-path": { best: [best(), "nope"] } } },
+      { v: 1, towers: { "narrow-path": { best: { "1": best(), "2": null } } } },
+      { v: 1, towers: { "narrow-path": { best: { "1": [best()] } } } },
+      { v: 1, towers: { "narrow-path": null, "powder-keep": { best: { "1": best() } } } },
       { v: 1, towers: { "narrow-path": { best: null } } },
       { v: 1, towers: [] },
       { v: 1, towers: null },
@@ -535,6 +556,21 @@ describe("parseKnightFloors", () => {
       { v: 1, towers: { "narrow-path": { best: { "1": { score: 1, grade: -1, turns: 5 } } } } },
       { v: 1, towers: { "narrow-path": { best: { "1": { score: 1, grade: 1, turns: 5.5 } } } } },
     ];
+
+    it("agrees that a foreign version holds no floors", () => {
+      const value = { v: 2, towers: { "narrow-path": { best: { "1": best() } } } };
+      const game = parseKnightProgress(value);
+      expect(Object.values(game.towers).map((tower) => Object.keys(tower.best))).toEqual([[], []]);
+      expect(parseKnightFloors(JSON.stringify(value))).toBeNull();
+    });
+
+    it("agrees on a score too large to be finite", () => {
+      const entry = '{"score":1e999,"grade":1,"turns":5}';
+      const text = `{"v":1,"towers":{"narrow-path":{"best":{"1":${entry}}}}}`;
+      const game = parseKnightProgress(JSON.parse(text));
+      expect(game.towers["narrow-path"].best).toEqual({});
+      expect(parseKnightFloors(text)).toBe(0);
+    });
 
     for (const value of CASES) {
       it(`agrees on ${JSON.stringify(value)}`, () => {
