@@ -4,8 +4,7 @@ import { blockThirdParties } from "./helpers";
 // Script Knight against the production build, with the real sandbox worker: a passing solution
 // clears floor 1, a loop that never ends is cut off and the page stays alive (the wait includes the
 // worker bundle load, so it is CI-safe rather than the 0.25 s turn limit), and the sandbox has no
-// network (fetch is undefined inside it). The page is hidden (noindex and out of every list) until
-// launch, but it is still served at its own route.
+// network (fetch is undefined inside it).
 
 const GAME_PATH = "/games/script-knight";
 

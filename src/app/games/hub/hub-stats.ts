@@ -56,9 +56,11 @@ const MAX_STAT = 10_000_000;
 // together, case by case, against the game's own schema.
 const SVF_MAX_LEVEL = 8;
 const SVF_MAX_COINS = 99_999;
-// Mirror FLOORS_PER_TOWER (nine) and the two tower ids in script-knight/progress.ts, which
-// imports zod and a storage writer. hub-stats.test.ts pins the floor count against the game's
-// own parseProgress, case by case.
+// Mirror FLOORS_PER_TOWER (nine) in script-knight/progress.ts, which imports zod and a storage
+// writer, and TOWER_IDS in its engine/towers, which pulls in every floor's level data.
+// hub-stats.test.ts pins the total to TOWER_IDS.length * FLOORS_PER_TOWER, reads a record with
+// every floor of every TOWER_IDS tower cleared, and checks the parser against the game's own
+// parseProgress, case by case.
 const KNIGHT_TOWERS = ["narrow-path", "powder-keep"] as const;
 const KNIGHT_FLOORS_PER_TOWER = 9;
 export const KNIGHT_FLOOR_TOTAL = KNIGHT_TOWERS.length * KNIGHT_FLOORS_PER_TOWER;

@@ -613,4 +613,23 @@ test.describe("at desktop width", () => {
     expect(new Set(await leftEdges(page, '[data-testid="today-tile"]')).size).toBe(3);
     expect(new Set(await leftEdges(page, '[data-testid="stat-chip"]')).size).toBe(3);
   });
+
+  test("never leaves a single narrow tile on the last Today row", async ({ page }) => {
+    await mockBoards(page, "populated");
+    await page.goto("/games");
+    await settle(page);
+    const boxes = await page.locator('[data-testid="today-tile"]').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        return { top: Math.round(rect.top), left: rect.left, right: rect.right };
+      }),
+    );
+    const lastTop = Math.max(...boxes.map((box) => box.top));
+    const lastRow = boxes.filter((box) => box.top === lastTop);
+    const span = (row: typeof boxes) =>
+      Math.max(...row.map((box) => box.right)) - Math.min(...row.map((box) => box.left));
+    // One tile in the first of three columns covers a third of the grid; a full last row, a
+    // spanning lone tile or two tiles all cover more than half.
+    expect(span(lastRow)).toBeGreaterThan(span(boxes) / 2);
+  });
 });

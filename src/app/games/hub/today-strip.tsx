@@ -134,7 +134,7 @@ export function TodayStrip() {
       <p className="mt-1 text-sm text-(--muted)">The top three on each daily board.</p>
       <ul
         role="list"
-        className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 md:[&>*:last-child:nth-child(odd)]:col-span-2 xl:[&>*:last-child:nth-child(odd)]:col-span-1"
+        className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 xl:[&>*:last-child:nth-child(3n+1)]:col-span-3 md:max-xl:[&>*:last-child:nth-child(odd)]:col-span-2"
       >
         {tiles.map((tile) => (
           <li key={tile.source.slug} className="min-w-0">
