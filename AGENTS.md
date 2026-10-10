@@ -88,6 +88,11 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   (`daily.ts`) ranks on the arcade board through a proof-verified entry that replays the action log
   on the server (DESIGN.md's "Arcade backend"). Hand mode (`use-hand-run.ts`, `hand-pad.tsx`) and
   the phone play sheet (`play-sheet.tsx`) are in the same section.
+- Failover: `src/components/game/failover/`, a TypeScript port of Server Survival (MIT): a pure
+  fixed-tick sim in `sim/`, a three.js view in `scene/` that only reads it, and a React HUD in
+  `ui/`. Its Daily Incident ranks on the arcade board through a proof-verified entry that replays
+  the action log on the server (`src/lib/arcade/failover-verify.ts`, `SHADOW` still on). See
+  DESIGN.md's "Failover" section and its register entries.
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries

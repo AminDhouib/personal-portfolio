@@ -25,8 +25,8 @@ import { VERIFY_BUSY_REASON } from "./verify-reasons";
  * further off, a malformed claim or proof, and a replay that runs out of time are always refused.
  * The change that ends the rollout is setting this to false.
  *
- * Turning it off happens at launch (T8-6), only after the golden browser test passes in CI and
- * Sentry shows no mismatches under SHADOW_SCOPE, and only with the owner's sign-off.
+ * It stays on past the launch (T8-6). Turning it off is the owner's call, only after the golden
+ * browser test passes in CI and Sentry shows no mismatches under SHADOW_SCOPE.
  */
 export const SHADOW = true;
 
