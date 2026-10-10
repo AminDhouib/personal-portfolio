@@ -1,10 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { getAllBlogPosts } from "@/lib/blog";
 import { projects } from "@/data/projects";
 import { GAMES } from "@/app/games/games-meta";
 import { SOLVER_PATH } from "@/app/games/super-voltorb-flip/solver/solver-content";
 import { PG2_HINTS_PATH } from "@/app/games/password-game/hints/hints-content";
 import sitemap from "../sitemap";
+
+// No game is hidden today, so the hidden path gets a registry with Failover hidden.
+function mockFailoverHidden() {
+  vi.resetModules();
+  vi.doMock("@/app/games/games-meta", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/app/games/games-meta")>();
+    const GAMES = actual.GAMES.map((g) => (g.slug === "failover" ? { ...g, hidden: true } : g));
+    return {
+      ...actual,
+      GAMES,
+      getGameMeta: (slug: string) => GAMES.find((g) => g.slug === slug) ?? null,
+    };
+  });
+}
 
 describe("sitemap", () => {
   const entries = sitemap();
@@ -49,5 +63,20 @@ describe("sitemap", () => {
 
   it("lists the Password Game 2 hints page", () => {
     expect(urls).toContain(`https://amindhou.com${PG2_HINTS_PATH}`);
+  });
+});
+
+describe("sitemap with a hidden game", () => {
+  afterEach(() => {
+    vi.doUnmock("@/app/games/games-meta");
+    vi.resetModules();
+  });
+
+  it("leaves the hidden game out and keeps the rest", async () => {
+    mockFailoverHidden();
+    const { default: hiddenSitemap } = await import("../sitemap");
+    const hiddenUrls = hiddenSitemap().map((e) => e.url);
+    expect(hiddenUrls).not.toContain("https://amindhou.com/games/failover");
+    expect(hiddenUrls).toContain("https://amindhou.com/games/hextris");
   });
 });

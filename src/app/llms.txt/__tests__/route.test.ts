@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { getAllBlogPosts } from "@/lib/blog";
 import { faqs } from "@/data/faq";
 import { projects } from "@/data/projects";
@@ -14,6 +14,20 @@ import {
   PG2_HINTS_PATH,
 } from "@/app/games/password-game/hints/hints-content";
 import { GET } from "../route";
+
+// No game is hidden today, so the hidden path gets a registry with Failover hidden.
+function mockFailoverHidden() {
+  vi.resetModules();
+  vi.doMock("@/app/games/games-meta", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/app/games/games-meta")>();
+    const GAMES = actual.GAMES.map((g) => (g.slug === "failover" ? { ...g, hidden: true } : g));
+    return {
+      ...actual,
+      GAMES,
+      getGameMeta: (slug: string) => GAMES.find((g) => g.slug === slug) ?? null,
+    };
+  });
+}
 
 // Runs against the real checked-in content (content/blog, src/data): the
 // point of generating llms.txt is that it can never fall behind that content.
@@ -84,11 +98,19 @@ describe("GET /llms.txt", () => {
     expect(at).toBeGreaterThan(0);
     expect(lines[at - 1]).toContain("(https://amindhou.com/games/password-game)");
   });
+});
 
-  it("never lists a hidden game", async () => {
-    const body = await GET().text();
-    for (const game of GAMES.filter((g) => g.hidden)) {
-      expect(body).not.toContain(`/games/${game.slug})`);
-    }
+describe("GET /llms.txt with a hidden game", () => {
+  afterEach(() => {
+    vi.doUnmock("@/app/games/games-meta");
+    vi.resetModules();
+  });
+
+  it("never lists the hidden game, and still lists the rest", async () => {
+    mockFailoverHidden();
+    const { GET: hiddenGET } = await import("../route");
+    const body = await hiddenGET().text();
+    expect(body).not.toContain("/games/failover)");
+    expect(body).toContain("/games/hextris)");
   });
 });
