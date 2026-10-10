@@ -19,6 +19,13 @@ const SEEDED: Record<string, string> = {
     towers: { "narrow-path": { best: { "1": { score: 90, grade: 2, turns: 12 } } } },
   }),
   "knight:stats": JSON.stringify({ v: 1, bestDaily: { day: "2026-10-16", score: 1250 } }),
+  "failover:stats": JSON.stringify({
+    v: 1,
+    bestSeconds: 342,
+    bestScore: 8420,
+    runs: 7,
+    lastDailyDay: null,
+  }),
 };
 
 const PRIVACY = "Read from this browser only. Nothing here is sent anywhere.";
@@ -42,12 +49,12 @@ describe("DeviceStats", () => {
     vi.restoreAllMocks();
   });
 
-  it("server-renders six placeholder chips and touches no storage", () => {
+  it("server-renders seven placeholder chips and touches no storage", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem");
     const html = renderToString(<DeviceStats />);
     expect(html).toContain('data-state="pending"');
-    expect(html.match(/data-testid="stat-chip"/g)).toHaveLength(6);
-    expect(html.match(/None yet/g)).toHaveLength(6);
+    expect(html.match(/data-testid="stat-chip"/g)).toHaveLength(7);
+    expect(html.match(/None yet/g)).toHaveLength(7);
     expect(html).toContain(PRIVACY);
     for (const slug of [
       "space-shooter",
@@ -56,17 +63,18 @@ describe("DeviceStats", () => {
       "typing-speed",
       "tower-stacker",
       "script-knight",
+      "failover",
     ]) {
       expect(html).toContain(`href="/games/${slug}"`);
     }
     expect(getItem).not.toHaveBeenCalled();
   });
 
-  it("shows the empty copy and six placeholders on a fresh device", () => {
+  it("shows the empty copy and seven placeholders on a fresh device", () => {
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     expect(screen.getByTestId("hub-device-caption")).toHaveTextContent(EMPTY_COPY);
-    expect(chips()).toHaveLength(6);
+    expect(chips()).toHaveLength(7);
     for (const item of chips()) expect(item).toHaveTextContent("None yet");
   });
 
@@ -75,7 +83,7 @@ describe("DeviceStats", () => {
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "populated");
     expect(screen.getByTestId("hub-device-caption")).toHaveTextContent(PRIVACY);
-    const [orbital, hextris, voltorb, typing, , knight] = chips();
+    const [orbital, hextris, voltorb, typing, , knight, failover] = chips();
     expect(orbital).toHaveTextContent("Orbital Dodge");
     expect(orbital).toHaveTextContent("Best on this device");
     expect(orbital).toHaveTextContent("48,210");
@@ -90,6 +98,10 @@ describe("DeviceStats", () => {
     expect(knight).toHaveTextContent("Floors cleared");
     expect(knight).toHaveTextContent("1 of 18");
     expect(knight).toHaveTextContent("Best daily 1,250");
+    expect(failover).toHaveTextContent("Failover");
+    expect(failover).toHaveTextContent("Best on this device");
+    expect(failover).toHaveTextContent("8,420");
+    expect(failover).toHaveTextContent("Survived 5:42");
   });
 
   it("treats corrupt values as nothing, without an error report", () => {
@@ -103,6 +115,7 @@ describe("DeviceStats", () => {
       "typing-high-score": "-4",
       "knight:progress": "{oops",
       "knight:stats": "null",
+      "failover:stats": "{oops",
     });
     render(<DeviceStats />);
     expect(screen.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
@@ -172,7 +185,7 @@ describe("DeviceStats", () => {
     expect(html).not.toContain("lg:grid-cols");
   });
 
-  it("is an h2 followed by six game links of at least 44px, in order", () => {
+  it("is an h2 followed by seven game links of at least 44px, in order", () => {
     seed(SEEDED);
     render(<DeviceStats />);
     expect(screen.getByRole("heading", { level: 2, name: "On this device" })).toBeInTheDocument();
@@ -185,6 +198,7 @@ describe("DeviceStats", () => {
       "/games/typing-speed",
       "/games/tower-stacker",
       "/games/script-knight",
+      "/games/failover",
     ]);
     for (const link of links) {
       expect(link.className).toContain("min-h-11");

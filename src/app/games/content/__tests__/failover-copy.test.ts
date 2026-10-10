@@ -22,6 +22,12 @@ describe("Failover About copy", () => {
     expect(own?.href).toBeUndefined();
   });
 
+  it("reads each credit line once: the page prints the label, so no detail repeats it", () => {
+    for (const credit of content.credits) {
+      expect(credit.detail.startsWith(`${credit.label}:`), credit.detail).toBe(false);
+    }
+  });
+
   it("does not carry the upstream game's branding", () => {
     expect(text).not.toMatch(/Survival Protocol/i);
     expect(content.seoTitle).not.toMatch(/Server Survival/);
@@ -29,9 +35,23 @@ describe("Failover About copy", () => {
 
   it("is honest about what this version has", () => {
     const scope = content.facts.find((f) => f.label === "In this version");
-    expect(scope?.value).toMatch(/free play/i);
-    expect(scope?.value).toMatch(/campaign/i);
-    expect(scope?.value).toMatch(/not in yet/i);
+    expect(scope?.value).toMatch(/daily incident/i);
+    expect(scope?.value).toMatch(/sandbox/i);
+    expect(scope?.value).toMatch(/save/i);
+    expect(scope?.value).toMatch(/campaign is not in yet/i);
+    expect(scope?.value).not.toMatch(/free play/i);
+  });
+
+  it("answers the daily and campaign question truthfully", () => {
+    const entry = content.faq.find((f) => /daily/i.test(f.question));
+    expect(entry?.answer).toMatch(/UTC day/);
+    expect(entry?.answer).toMatch(/replays/);
+    expect(entry?.answer).toMatch(/no campaign yet/i);
+  });
+
+  it("tells the player where the daily and the shared builds are", () => {
+    expect(content.howToPlay.join(" ")).toMatch(/Daily/);
+    expect(content.howToPlay.join(" ")).toMatch(/Share/);
   });
 
   it("states the numbers the sim runs on", () => {

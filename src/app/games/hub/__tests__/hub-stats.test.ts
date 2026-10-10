@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACHIEVEMENTS } from "@/components/game/achievements";
+import { parseStats as parseFailoverStats } from "@/components/game/failover/stats";
 import { TOWER_IDS } from "@/components/game/script-knight/engine/towers";
 import {
   FLOORS_PER_TOWER,
@@ -18,6 +19,7 @@ import {
   buildDeviceStats,
   KNIGHT_FLOOR_TOTAL,
   hasAnyStats,
+  parseFailoverBest,
   parseHextrisBest,
   parseKnightBestDaily,
   parseKnightFloors,
@@ -43,6 +45,7 @@ function raw(values: Partial<Record<Key, string>> = {}): RawStats {
     "tower:stats": values["tower:stats"] ?? null,
     "knight:progress": values["knight:progress"] ?? null,
     "knight:stats": values["knight:stats"] ?? null,
+    "failover:stats": values["failover:stats"] ?? null,
   };
 }
 
@@ -56,6 +59,7 @@ const EMPTY = {
   towerDaily: null,
   towerFree: null,
   knight: null,
+  failover: null,
 };
 
 const SEEDED = raw({
@@ -74,9 +78,10 @@ function seed(values: Partial<Record<Key, string>>) {
 }
 
 describe("HUB_STAT_KEYS", () => {
-  it("is exactly the eight keys the hub may read", () => {
+  it("is exactly the nine keys the hub may read", () => {
     expect([...HUB_STAT_KEYS].sort()).toEqual(
       [
+        "failover:stats",
         "hextris_highscores",
         "knight:progress",
         "knight:stats",
@@ -252,6 +257,7 @@ describe("buildDeviceStats and hasAnyStats", () => {
       towerDaily: null,
       towerFree: null,
       knight: null,
+      failover: null,
     });
     expect(hasAnyStats(stats)).toBe(true);
   });
@@ -276,7 +282,7 @@ describe("buildDeviceStats and hasAnyStats", () => {
 });
 
 describe("statChips", () => {
-  it("is six placeholder chips before the browser has been read", () => {
+  it("is seven placeholder chips before the browser has been read", () => {
     const chips = statChips(null);
     expect(chips.map((chip) => chip.slug)).toEqual([
       "space-shooter",
@@ -285,6 +291,7 @@ describe("statChips", () => {
       "typing-speed",
       "tower-stacker",
       "script-knight",
+      "failover",
     ]);
     for (const chip of chips) {
       expect(chip.value).toBeNull();
@@ -297,6 +304,7 @@ describe("statChips", () => {
       "Best on this device",
       "Best on this device",
       "Floors cleared",
+      "Best on this device",
     ]);
   });
 
@@ -341,6 +349,13 @@ describe("statChips", () => {
         slug: "script-knight",
         title: "Script Knight",
         label: "Floors cleared",
+        value: null,
+        detail: "",
+      },
+      {
+        slug: "failover",
+        title: "Failover",
+        label: "Best on this device",
         value: null,
         detail: "",
       },
@@ -397,7 +412,7 @@ describe("readDeviceStatsSnapshot", () => {
     expect(second.orbitalBest).toBe(200);
   });
 
-  it("reads only the eight hub keys and never writes", () => {
+  it("reads only the nine hub keys and never writes", () => {
     seed({ "space-shooter-hs": "100" });
     localStorage.setItem("walletCoins", "999");
     localStorage.setItem("arcade:player:v1", "{}");
@@ -692,5 +707,106 @@ describe("the Script Knight chip", () => {
     });
     expect(hasAnyStats(readDeviceStatsSnapshot())).toBe(false);
     expect(knightChip()?.value).toBeNull();
+  });
+});
+
+describe("parseFailoverBest", () => {
+  const record = (extra: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      v: 1,
+      bestSeconds: 342,
+      bestScore: 8420,
+      runs: 7,
+      lastDailyDay: "2026-10-09",
+      ...extra,
+    });
+
+  it("reads the best score and the best survival time", () => {
+    expect(parseFailoverBest(record())).toEqual({ score: 8420, seconds: 342 });
+  });
+
+  it("ignores extra fields, and rejects a record the game would reject", () => {
+    expect(parseFailoverBest(record({ extra: true }))).toEqual({ score: 8420, seconds: 342 });
+    const noDay = JSON.stringify({ v: 1, bestSeconds: 61, bestScore: 900, runs: 2 });
+    expect(parseFailoverBest(noDay)).toBeNull();
+  });
+
+  it("is null for a zero best and for nothing readable", () => {
+    expect(parseFailoverBest(record({ bestScore: 0, bestSeconds: 0, runs: 0 }))).toBeNull();
+    expect(parseFailoverBest(null)).toBeNull();
+    expect(parseFailoverBest("not json")).toBeNull();
+    expect(parseFailoverBest("[]")).toBeNull();
+    expect(parseFailoverBest(record({ v: 2 }))).toBeNull();
+  });
+
+  it("clamps to the arcade cap", () => {
+    expect(parseFailoverBest(record({ bestScore: 99_999_999_999 }))).toEqual({
+      score: 10_000_000,
+      seconds: 342,
+    });
+  });
+
+  describe("parity with the game's own parseStats", () => {
+    const base = { v: 1, bestSeconds: 342, bestScore: 8420, runs: 7, lastDailyDay: "2026-10-09" };
+    const CASES: unknown[] = [
+      base,
+      { ...base, lastDailyDay: null },
+      { ...base, bestScore: 0 },
+      { ...base, bestScore: -1 },
+      { ...base, bestScore: 1.5 },
+      { ...base, bestSeconds: "342" },
+      { ...base, runs: Infinity },
+      { ...base, lastDailyDay: "yesterday" },
+      { ...base, lastDailyDay: undefined },
+      { ...base, v: 2 },
+      { ...base, v: "1" },
+      { ...base, extra: true },
+      [base],
+      null,
+    ];
+
+    for (const value of CASES) {
+      it(`agrees on ${JSON.stringify(value)}`, () => {
+        const game = parseFailoverStats(value);
+        const expected =
+          game !== null && game.bestScore > 0
+            ? { score: game.bestScore, seconds: game.bestSeconds }
+            : null;
+        expect(parseFailoverBest(JSON.stringify(value))).toEqual(expected);
+      });
+    }
+  });
+});
+
+describe("the Failover chip", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const failoverChip = () =>
+    statChips(readDeviceStatsSnapshot()).find((c) => c.slug === "failover");
+
+  it("shows the best score with the survival time under it", () => {
+    seed({
+      "failover:stats": JSON.stringify({
+        v: 1,
+        bestSeconds: 342,
+        bestScore: 8420,
+        runs: 7,
+        lastDailyDay: null,
+      }),
+    });
+    expect(hasAnyStats(readDeviceStatsSnapshot())).toBe(true);
+    expect(failoverChip()).toMatchObject({
+      label: "Best on this device",
+      value: "8,420",
+      detail: "Survived 5:42",
+    });
+  });
+
+  it("shows nothing for a foreign version", () => {
+    seed({ "failover:stats": JSON.stringify({ v: 2, bestSeconds: 1, bestScore: 10, runs: 1 }) });
+    expect(hasAnyStats(readDeviceStatsSnapshot())).toBe(false);
+    expect(failoverChip()?.value).toBeNull();
   });
 });

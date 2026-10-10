@@ -20,4 +20,5 @@ export const TODAY_SOURCES: readonly TodaySource[] = [
   { slug: "tower-stacker", kind: "arcade" },
   { slug: "typing-speed", kind: "arcade" },
   { slug: "script-knight", kind: "arcade" },
+  { slug: "failover", kind: "arcade" },
 ];

@@ -25,6 +25,7 @@ const HUB_KEYS = [
   "typing-high-score",
   "knight:progress",
   "knight:stats",
+  "failover:stats",
 ];
 
 const SEEDED: Record<string, string> = {
@@ -41,6 +42,13 @@ const SEEDED: Record<string, string> = {
     towers: { "narrow-path": { best: { "1": { score: 90, grade: 2, turns: 12 } } } },
   }),
   "knight:stats": JSON.stringify({ v: 1, bestDaily: { day: "2026-10-16", score: 1250 } }),
+  "failover:stats": JSON.stringify({
+    v: 1,
+    bestSeconds: 342,
+    bestScore: 8420,
+    runs: 7,
+    lastDailyDay: null,
+  }),
 };
 
 const CORRUPT: Record<string, string> = {
@@ -51,6 +59,7 @@ const CORRUPT: Record<string, string> = {
   "typing-high-score": "-4",
   "knight:progress": "{oops",
   "knight:stats": "null",
+  "failover:stats": "{oops",
 };
 
 const EMPTY_COPY = "Play any game and your bests on this device show up here.";
@@ -103,8 +112,19 @@ function arcadeBody(slug: string, variant: Variant, longNames: boolean) {
   // Voltorb scores are coins on a board that pays at most a few hundred, so its rows step by 100.
   const voltorb = slug === "super-voltorb-flip";
   const knight = slug === "script-knight";
-  const top = slug === "space-shooter" ? 48210 : voltorb ? 384 : knight ? 1250 : 9100;
-  const first = slug === "space-shooter" ? "Nova" : voltorb ? "Pika" : knight ? "Lancelot" : "Kite";
+  const failover = slug === "failover";
+  const top =
+    slug === "space-shooter" ? 48210 : voltorb ? 384 : knight ? 1250 : failover ? 8420 : 9100;
+  const first =
+    slug === "space-shooter"
+      ? "Nova"
+      : voltorb
+        ? "Pika"
+        : knight
+          ? "Lancelot"
+          : failover
+            ? "Sre"
+            : "Kite";
   const names = [longNames ? LONG_NAME : first, "Orbit", "Vega"];
   const entries =
     variant === "empty"
@@ -283,7 +303,7 @@ test.describe("Today strip", () => {
     await mockBoards(page, "populated");
     await page.goto("/games");
     await settle(page);
-    await expect(page.getByTestId("today-tile")).toHaveCount(7);
+    await expect(page.getByTestId("today-tile")).toHaveCount(8);
     await expect(tile(page, "password-game")).toHaveAttribute("data-state", "ready");
     await expect(tile(page, "password-game")).toContainText("Daily run");
     await expect(tile(page, "password-game")).toContainText("Ada");
@@ -299,6 +319,8 @@ test.describe("Today strip", () => {
     await expect(tile(page, "super-voltorb-flip")).toContainText("384");
     await expect(tile(page, "script-knight")).toContainText("Lancelot");
     await expect(tile(page, "script-knight")).toContainText("1,250");
+    await expect(tile(page, "failover")).toContainText("Sre");
+    await expect(tile(page, "failover")).toContainText("8,420");
     await expect(page.getByTestId("hub-today-reset")).toContainText("(00:00 UTC)");
   });
 
@@ -327,12 +349,13 @@ test.describe("Today strip", () => {
       storageState: seeded({ ...SEEDED, "arcade:player:v1": '{"id":"should-never-be-sent"}' }),
     });
 
-    test("asks for exactly seven public reads and never passes a player id", async ({ page }) => {
+    test("asks for exactly eight public reads and never passes a player id", async ({ page }) => {
       const requested = await mockBoards(page, "populated");
       await page.goto("/games");
       await settle(page);
       expect([...requested].sort()).toEqual(
         [
+          "/api/arcade/scores?game=failover&board=daily",
           "/api/arcade/scores?game=hextris&board=daily",
           "/api/arcade/scores?game=script-knight&board=daily",
           "/api/arcade/scores?game=space-shooter&board=daily",
@@ -363,7 +386,7 @@ test.describe("Today strip", () => {
       expect(top, "the strip must start below the 200px preload margin").toBeGreaterThan(650);
       expect(requested).toEqual([]);
       await settle(page);
-      expect(requested).toHaveLength(7);
+      expect(requested).toHaveLength(8);
     });
   });
 });
@@ -392,6 +415,9 @@ test.describe("On this device", () => {
       await expect(chip(page, "script-knight")).toContainText("1 of 18");
       await expect(chip(page, "script-knight")).toContainText("Best daily 1,250");
       await expect(chip(page, "script-knight")).toHaveAttribute("href", "/games/script-knight");
+      await expect(chip(page, "failover")).toContainText("8,420");
+      await expect(chip(page, "failover")).toContainText("Survived 5:42");
+      await expect(chip(page, "failover")).toHaveAttribute("href", "/games/failover");
     });
 
     test("only reads: seeded values are unchanged and no player or wallet key appears", async ({
@@ -420,7 +446,7 @@ test.describe("On this device", () => {
     await page.goto("/games");
     await expect(page.getByTestId("hub-device")).toHaveAttribute("data-state", "empty");
     await expect(page.getByTestId("hub-device-caption")).toHaveText(EMPTY_COPY);
-    await expect(page.getByTestId("stat-chip")).toHaveCount(6);
+    await expect(page.getByTestId("stat-chip")).toHaveCount(7);
   });
 
   test.describe("with corrupt stored values", () => {
@@ -578,15 +604,16 @@ async function strandedItems(page: Page, selector: string): Promise<string[]> {
   });
 }
 
-// Phone, sm (chips three across), md and xl.
+// Phone, sm (chips three across), md (tiles two across) and xl (tiles three across).
 for (const width of [390, 700, 1024, 1440]) {
   test.describe(`at ${width}px wide`, () => {
     test.use({ viewport: { width, height: 900 } });
 
-    test("leaves no chip alone on a row without spanning it", async ({ page }) => {
+    test("leaves no tile or chip alone on a row without spanning it", async ({ page }) => {
       await mockBoards(page, "populated");
       await page.goto("/games");
       await settle(page);
+      expect(await strandedItems(page, '[data-testid="today-tile"]')).toEqual([]);
       expect(await strandedItems(page, '[data-testid="stat-chip"]')).toEqual([]);
     });
   });
@@ -633,7 +660,7 @@ test.describe("at phone width", () => {
     const heights = await page
       .locator('[data-testid="today-tile"] a, [data-testid="stat-chip"]')
       .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
-    expect(heights).toHaveLength(TODAY_SOURCES.length + 6);
+    expect(heights).toHaveLength(TODAY_SOURCES.length + 7);
     for (const value of heights) expect(value).toBeGreaterThanOrEqual(44);
   });
 });

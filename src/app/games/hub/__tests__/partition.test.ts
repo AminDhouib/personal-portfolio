@@ -56,6 +56,7 @@ describe("partitionGames", () => {
       "super-voltorb-flip",
       "password-game",
       "script-knight",
+      "failover",
     ]);
   });
 });
