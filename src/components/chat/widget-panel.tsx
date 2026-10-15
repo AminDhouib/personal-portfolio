@@ -100,14 +100,19 @@ export function ChatWidgetPanel({
   return (
     <CopilotKit runtimeUrl="/api/copilotkit" useSingleEndpoint showDevConsole={false}>
       <ChatActions pathname={pathname} />
-      <CopilotPopup
-        labels={{
-          title: "Amin AI",
-          initial: "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
-          placeholder: "Ask about Amin's projects, skills...",
-        }}
-        defaultOpen={Boolean(initiallyOpen)}
-      />
+      {/* ph-sensitive: PostHog and Sentry session replay mask the text under it, so the
+          transcript (a lead's name, email and note included) is never recorded. `contents`
+          keeps the wrapper out of layout. */}
+      <div className="ph-sensitive contents">
+        <CopilotPopup
+          labels={{
+            title: "Amin AI",
+            initial: "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
+            placeholder: "Ask about Amin's projects, skills...",
+          }}
+          defaultOpen={Boolean(initiallyOpen)}
+        />
+      </div>
     </CopilotKit>
   );
 }

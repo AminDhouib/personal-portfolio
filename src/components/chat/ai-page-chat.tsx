@@ -31,15 +31,19 @@ export function AiPageChat() {
   return (
     <CopilotKit runtimeUrl="/api/copilotkit" useSingleEndpoint showDevConsole={false}>
       <AiPageActions />
-      <CopilotChat
-        labels={{
-          title: "Amin AI",
-          initial:
-            "Hi! I'm Amin's AI assistant. Ask me anything about his work, skills, or how you can work together.",
-          placeholder: "Ask about projects, services, availability...",
-        }}
-        className="h-full"
-      />
+      {/* ph-sensitive: session replay (PostHog, Sentry) masks the text under it, so the
+          transcript is never recorded. `contents` keeps the wrapper out of layout. */}
+      <div className="ph-sensitive contents">
+        <CopilotChat
+          labels={{
+            title: "Amin AI",
+            initial:
+              "Hi! I'm Amin's AI assistant. Ask me anything about his work, skills, or how you can work together.",
+            placeholder: "Ask about projects, services, availability...",
+          }}
+          className="h-full"
+        />
+      </div>
     </CopilotKit>
   );
 }
