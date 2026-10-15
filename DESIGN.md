@@ -666,7 +666,8 @@ current tree on 2026-07-07.
   true to the code. The chat surfaces carry `ph-sensitive` so session replay masks every message
   (a test pins it). identify is persistent, as PostHog does by default (no reset): a second lead
   with a different email on an already identified browser lands on a new person without
-  merging, which is harmless.
+  merging, which is harmless. The chat masking relies on CopilotKit rendering the transcript inline
+  (no portal); re-check it on any CopilotKit upgrade, because the unit test mocks CopilotKit.
 - **`src/lib/github.ts` keeps a token-free fallback even though `GITHUB_TOKEN` is now required.**
   A classic read-only PAT (`read:user` scope) was provisioned in prod on 2026-07-14, so
   `GITHUB_TOKEN` is a `REQUIRED_ENV_VAR` and the boot gate enforces its presence; prod normally
