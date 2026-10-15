@@ -635,7 +635,9 @@ current tree on 2026-07-07.
   identifier, not a secret, so committing it is correct, not an oversight).
 - **Session replay is sampled in code for Sentry and in PostHog's settings for PostHog.**
   `instrumentation-client.ts` sets Sentry's `replaysSessionSampleRate: 0.1` and
-  `replaysOnErrorSampleRate: 1.0`, and adds `replayIntegration` on the visitor's first interaction (then an idle
+  `replaysOnErrorSampleRate: 1.0`, is enabled only for a production build on a non-loopback host
+  (CI and the local compose stack serve the same build on localhost and must not report to the live
+  project), and adds `replayIntegration` on the visitor's first interaction (then an idle
   callback) through a dynamic `import("@sentry/nextjs")`, so the recorder sits in its own chunk and stays
   out of the first-load bundle (Lighthouse audits first paint). PostHog's on-switch and ~10% rate
   live server-side in project 22; the code only sets `session_recording` masking and must not add

@@ -46,6 +46,9 @@ describe("instrumentation-client replay wiring", () => {
     posthogInit.mockClear();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+    // jsdom serves localhost, which the SDK treats as a no-report host; tests default to the
+    // real site and the loopback cases below override it.
+    vi.stubGlobal("location", { hostname: "amindhou.com" });
   });
 
   afterEach(() => {
@@ -99,4 +102,25 @@ describe("instrumentation-client replay wiring", () => {
     });
     expect(options).not.toHaveProperty("disable_session_recording");
   });
+
+  it("is enabled on the real site", async () => {
+    await loadClientInit();
+    const options = sentryInit.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(options.enabled).toBe(true);
+  });
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])(
+    "stays disabled and never starts the recorder on loopback host %s",
+    async (hostname) => {
+      vi.stubGlobal("location", { hostname });
+      vi.stubGlobal("requestIdleCallback", (cb: () => void) => cb());
+      await loadClientInit();
+      const options = sentryInit.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(options.enabled).toBe(false);
+      window.dispatchEvent(new Event("pointerdown"));
+      await flush();
+      expect(replayIntegration).not.toHaveBeenCalled();
+      expect(addIntegration).not.toHaveBeenCalled();
+    },
+  );
 });
