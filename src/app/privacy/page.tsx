@@ -5,7 +5,8 @@ import { SITE_ORIGIN, profile } from "@/data/profile";
 
 // A factual page: every sentence describes what the code does today. When the analytics,
 // monitoring, chat or leads code changes, change the matching section in the same commit
-// (the inventory lives in DESIGN.md's "Lead identification" register entry).
+// (DESIGN.md's register entry "A saved lead is identified in PostHog by its email, on
+// purpose" says which code each claim rests on).
 
 const DESCRIPTION =
   "What amindhou.com collects, where it goes, and how to ask about it: analytics, session recordings, the AI chat, contact details and the games.";
@@ -66,8 +67,9 @@ export default function PrivacyPage() {
             The site counts visits with PostHog, which we host ourselves at posthog.devino.ca. It
             records page views, when you leave a page, clicks on the page, and a few named events:
             clicking Book a Call, an email link or a social link, opening the AI chat, and sending
-            your contact details through the chat. PostHog keeps an identifier in your
-            browser&apos;s storage so it can tell repeat visits apart.
+            your contact details through the chat. PostHog keeps an identifier in a cookie and in
+            your browser&apos;s local storage so it can tell repeat visits apart. Like any website,
+            our web server and our PostHog receive your IP address with each request.
           </p>
           <p>
             While you browse, the site also notes how your visit started, for the length of that
@@ -85,21 +87,25 @@ export default function PrivacyPage() {
             with the page.
           </p>
           <p>
-            Both tools mask everything typed into input fields. Text already on the page is not
-            hidden, so text the page shows you, including chat messages, can appear in a recording.
+            Both tools mask everything typed into input fields. Messages in the AI chat are hidden
+            in recordings. Other text on the page is not hidden, so it can appear in a recording.
           </p>
           <p>
             Sentry also receives error reports: the error, the page address, and basic browser and
-            device details. Its traffic goes through this site&apos;s own /monitoring address rather
-            than straight from your browser.
+            device details. With an error it records breadcrumbs: your recent clicks, page
+            navigation and the addresses of network requests. It also collects performance timings
+            for 1 in 10 page loads, and our server reports its own errors to it. Reports from your
+            browser go through this site&apos;s own /monitoring address, and that relay does not
+            pass your IP address on.
           </p>
         </Section>
 
         <Section title="Google Analytics">
           <p>
-            The site can load Google Analytics 4 (Google&apos;s gtag.js script). When it is switched
-            on, it sends page views and the same named events to Google. Google Analytics never
-            receives your name or email from this site.
+            The site uses Google Analytics 4 (Google&apos;s gtag.js script). It sets its own cookies
+            and sends page views and the same named events to Google. Google Analytics never
+            receives your name or email from this site; the event for sending your contact details
+            carries only how you arrived and which chat you used.
           </p>
         </Section>
 
@@ -117,14 +123,21 @@ export default function PrivacyPage() {
           <p>
             The chat can ask for your name and email when you want to get in touch. If you give
             them, the site saves your name, email, an optional note, which chat you used, the page
-            you were on and the time, and emails the same details to Amin so he can reply.
+            you were on and the time, and emails the same details to Amin through our self-hosted
+            email service (UseSend) so he can reply. Saved contact details are kept until you ask us
+            to delete them.
           </p>
           <p>
             When you give your name and email through the chat to be contacted, they are saved so
-            Amin can reply, and they are linked to your visit in our own (self-hosted) analytics,
-            including how you arrived: campaign source, medium, referrer and landing page. Your
-            email identifies you in PostHog. The note you write is not sent to analytics. Google
-            Analytics never receives your name or email.
+            Amin can reply. Your email also becomes the analytics ID for this browser, so your
+            earlier and later activity on this site from the same browser (page views, clicks and
+            recordings) is tied to it in our own (self-hosted) PostHog, along with how you arrived
+            (campaign source, medium, campaign, referrer and landing page) and which chat you used.
+          </p>
+          <p>
+            Your name is stored on that analytics profile too. The note you write is not sent to
+            analytics, and chat messages are hidden in recordings. Google Analytics never receives
+            your name or email.
           </p>
         </Section>
 
@@ -137,9 +150,14 @@ export default function PrivacyPage() {
           <p>
             Posting a score sends the name you type, the score and the details of the run. The
             arcade games also create a random player ID and secret token in your browser; the server
-            stores that ID, a hash of the token, your name, your scores and when you set them, so
-            your scores stay yours. The Password Game boards store the name you enter with the time.
-            An older set of leaderboards is kept as a read-only archive.
+            stores that ID, a hash of the token, your name, your scores and the last time you
+            posted, so your scores stay yours. Once you have posted a score, your player ID is sent
+            with leaderboard reads so the board can show your own entry. The Password Game boards
+            store the name you enter with the time.
+          </p>
+          <p>
+            An older set of leaderboards is kept as a read-only archive. Its entries hold a name, a
+            score and, for some, a region text that the player&apos;s browser sent at the time.
           </p>
           <p>
             To limit abuse, the server counts requests per IP address in memory. That count is not
@@ -149,15 +167,16 @@ export default function PrivacyPage() {
 
         <Section title="Questions and deletion">
           <p>
-            To ask what is held about you, or to have your contact details removed, email{" "}
+            To ask what is held about you, or to have your data deleted, email{" "}
             <a
               href={`mailto:${profile.email}`}
               className="text-(--foreground) underline underline-offset-2"
             >
               {profile.email}
             </a>
-            . Links from this site to other sites, such as the booking page and social profiles, are
-            covered by those sites&apos; own policies.
+            . On request we delete your saved contact details and delete your data from PostHog and
+            Sentry. Links from this site to other sites, such as the booking page and social
+            profiles, are covered by those sites&apos; own policies.
           </p>
         </Section>
       </div>
