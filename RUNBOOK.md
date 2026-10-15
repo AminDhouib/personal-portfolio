@@ -273,9 +273,11 @@ task only after every step below is done and the requester has been answered. Th
 what `/privacy` promises:
 
 1. **Saved lead rows** (`leads` table: `id`, `name`, `email`, `note`, `source`, `page`,
-   `created_at`; the email is stored as typed, so match case-insensitively). Reach the prod db as
-   in Inspect / repair above, take a `pg_dump` first, SELECT, then DELETE in a transaction and
-   check the row count matches before committing:
+   `created_at`; the email is stored as typed, so match case-insensitively; double any single
+   quote in the address). Reach the prod db as in Inspect / repair above, take a `pg_dump` first,
+   SELECT, then DELETE in a transaction and check the row count matches before committing. After
+   COMMIT, re-run the SELECT and expect zero rows, then delete the dump file and any copy of it:
+   it still holds the person's data.
 
    ```sql
    SELECT id, name, email, created_at FROM leads WHERE lower(email) = lower('<email>');
@@ -284,13 +286,26 @@ what `/privacy` promises:
    -- expect the same rows as the SELECT; then COMMIT; (or ROLLBACK;)
    ```
 
-2. **Notification email copy.** Delete the lead notification from the mailbox. The repo does not
-   say whether UseSend keeps a copy, so check UseSend's sent log and remove it there too.
-3. **PostHog** (project 22): find the person whose distinct id is the lowercased email (Persons,
-   search the email), and delete the person together with their recordings.
-4. **Arcade scores**, only if the requester gives a player ID (`arcade_players.id`, a UUID). SELECT
-   first, then delete the player; `arcade_scores` rows cascade, so check the count as in the
-   Arcade boards data surgery above:
+2. **Notification email copy.** The notification has the subject `New lead from <name>` and a body
+   line `Email: <address>` (`src/app/api/leads/route.ts`). Search the mailbox for the address,
+   delete every match, and empty Trash too. The repo does not say whether UseSend keeps a copy, so
+   check UseSend's sent log and remove it there too.
+3. **PostHog** (project 22): delete the person whose distinct id is the trimmed, lowercased email,
+   WITH its events and recordings. Either use the UI (Persons, open the person, Delete person, tick
+   the options to delete events and recordings), or the API:
+   `POST /api/projects/22/persons/bulk_delete/` with JSON
+   `{"distinct_ids": ["<lowercased email>"], "delete_events": true, "delete_recordings": true}`.
+   The deletion is queued, so check later that the person, its events and its recordings are gone.
+   The anonymous ids that identify merged into that person go with it.
+4. **Arcade scores**, only if the requester can give a player ID (`arcade_players.id`, a UUID). No
+   page shows it: ask them to open the browser devtools, Application > Local Storage, key
+   `arcade:player:v1`, and send ONLY the `playerId` value, never the `token` (it lets anyone post
+   scores as them). It also appears as the `player=` query parameter on `GET /api/arcade/scores`
+   in the Network tab. If they cannot, look the player up by handle with the "Arcade boards: delete
+   one player's rows (data surgery)" recipe above; handles are not unique, so confirm the right
+   row with the requester (or by `created_at`) before deleting. SELECT first, then delete the
+   player; `arcade_scores` rows cascade. Check the count as in that recipe, and delete any dump
+   taken for it once the re-SELECT shows zero rows:
 
    ```sql
    SELECT id, handle, created_at FROM arcade_players WHERE id = '<uuid>';
