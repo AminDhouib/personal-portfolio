@@ -56,6 +56,24 @@ describe("parseVisitAttribution", () => {
     });
   });
 
+  it("builds a referrer for an app scheme whose origin is the string null", () => {
+    expect(
+      parseVisitAttribution(HOME, "android-app://com.google.android.googlequicksearchbox/"),
+    ).toMatchObject({
+      referrer: "android-app://com.google.android.googlequicksearchbox/",
+      referring_domain: "com.google.android.googlequicksearchbox",
+    });
+  });
+
+  it("treats www.amindhou.com and amindhou.com as the same site", () => {
+    expect(
+      parseVisitAttribution("https://www.amindhou.com/", "https://amindhou.com/work"),
+    ).toMatchObject({ referrer: "", referring_domain: "" });
+    expect(
+      parseVisitAttribution("https://amindhou.com/", "https://www.amindhou.com/work"),
+    ).toMatchObject({ referrer: "", referring_domain: "" });
+  });
+
   it("survives an unparseable referrer or URL", () => {
     expect(parseVisitAttribution(HOME, "not a url")).toMatchObject({ referrer: "" });
     expect(parseVisitAttribution("::::", "")).toEqual(EMPTY_VISIT_ATTRIBUTION);
