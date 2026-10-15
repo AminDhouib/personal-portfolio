@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import PrivacyPage, { metadata } from "../page";
+import { profile } from "@/data/profile";
 
 function pageText(): string {
   const { container } = render(<PrivacyPage />);
@@ -93,7 +94,9 @@ describe("/privacy", () => {
   it("gives the address for questions and deletion requests", () => {
     render(<PrivacyPage />);
     const link = screen.getByRole("link", { name: "amin@devino.ca" });
-    expect(link).toHaveAttribute("href", "mailto:amin@devino.ca");
+    expect(link).toHaveAttribute("href", "mailto:amin@devino.ca?subject=Privacy%20request");
+    expect(link.textContent).toBe(profile.email);
+    expect(pageText()).toContain('with the subject "Privacy request".');
   });
 
   it("is plain ASCII, with no emoji or smart punctuation", () => {

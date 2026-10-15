@@ -171,16 +171,17 @@ export default function PrivacyPage() {
           <p>
             To ask what is held about you, or to have your data deleted, email{" "}
             <a
-              href={`mailto:${profile.email}`}
+              href={`mailto:${profile.email}?subject=${encodeURIComponent("Privacy request")}`}
               className="text-(--foreground) underline underline-offset-2"
             >
               {profile.email}
-            </a>
-            . On request we delete your saved contact details (including the notification email
-            copy), your PostHog profile and its recordings, and, if you tell us your player ID, your
-            arcade scores. Sentry data is not tied to a person, so we can only remove it if you tell
-            us roughly when and on which page. Links from this site to other sites, such as the
-            booking page and social profiles, are covered by those sites&apos; own policies.
+            </a>{" "}
+            with the subject &quot;Privacy request&quot;. On request we delete your saved contact
+            details (including the notification email copy), your PostHog profile and its
+            recordings, and, if you tell us your player ID, your arcade scores. Sentry data is not
+            tied to a person, so we can only remove it if you tell us roughly when and on which
+            page. Links from this site to other sites, such as the booking page and social profiles,
+            are covered by those sites&apos; own policies.
           </p>
         </Section>
       </div>
