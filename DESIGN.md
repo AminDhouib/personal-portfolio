@@ -634,9 +634,8 @@ current tree on 2026-07-07.
   `instrumentation-client.ts`'s `SENTRY_DSN` constant for the pattern (a DSN is a public
   identifier, not a secret, so committing it is correct, not an oversight).
 - **Session replay is sampled in code for Sentry and in PostHog's settings for PostHog.**
-  `instrumentation-client.ts` sets Sentry's `replaysSessionSampleRate: 0.05` and
-  `replaysOnErrorSampleRate: 1.0` (5%, not 10%, until the self-hosted Sentry's old 5 envelopes/s
-  nginx limit is lifted; its redeploy is blocked by a Dokploy bug, GetItDone T-2127), and adds `replayIntegration` on the visitor's first interaction (then an idle
+  `instrumentation-client.ts` sets Sentry's `replaysSessionSampleRate: 0.1` and
+  `replaysOnErrorSampleRate: 1.0`, and adds `replayIntegration` on the visitor's first interaction (then an idle
   callback) through a dynamic `import("@sentry/nextjs")`, so the recorder sits in its own chunk and stays
   out of the first-load bundle (Lighthouse audits first paint). PostHog's on-switch and ~10% rate
   live server-side in project 22; the code only sets `session_recording` masking and must not add
