@@ -1,5 +1,3 @@
-import { combinedMonthlyUsers, formatUsersFloor } from "@/lib/user-reach";
-
 /** A labeled cluster of bullets — used when one role spans distinct tracks. */
 export interface HighlightGroup {
   label: string;
@@ -28,6 +26,13 @@ export interface ExperienceItem {
   skills: string[];
 }
 
+/**
+ * Placeholder a highlight uses for the combined monthly-users floor. The
+ * Experience section fills it with the same figure as the hero Users stat
+ * (live GA4 when the page has it), so the two never disagree.
+ */
+export const COMBINED_USERS_TOKEN = "{combinedUsers}";
+
 // Career history, newest-first (mirrors the LinkedIn ordering).
 export const experience: ExperienceItem[] = [
   {
@@ -43,7 +48,7 @@ export const experience: ExperienceItem[] = [
     highlights: [
       "Successfully generated over $1M in project revenue, working with 50+ satisfied clients and earning an average 5-star rating.",
       "Developed many great B2B relationships and long-term client partnerships.",
-      `Published several apps, including uNotes and Shorty, reaching ${formatUsersFloor(combinedMonthlyUsers())} combined monthly active users.`,
+      `Published several apps, including uNotes and Shorty, reaching ${COMBINED_USERS_TOKEN} combined monthly active users.`,
     ],
     skills: ["Leadership", "Full-Stack", "Product", "B2B Sales"],
   },
