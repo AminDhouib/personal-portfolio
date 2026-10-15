@@ -45,7 +45,7 @@ export const projects: readonly Project[] = Object.freeze([
     isOSS: false,
     contraUrl:
       "https://contra.com/p/QsA7PFlq-nextjs-figma-python-seleniumandtor-browser-ext-shorty",
-    mauFallback: 16000,
+    mauFallback: 55000,
     mauGrowth: "+50% MoM",
     gaPropertyDomain: "aishorty.com",
     platforms: [
@@ -95,7 +95,7 @@ export const projects: readonly Project[] = Object.freeze([
     url: "https://unotes.net",
     isOSS: false,
     contraUrl: "https://contra.com/p/bve7Lces-nextjs-typescript-aws-u-notes",
-    mauFallback: 185000,
+    mauFallback: 65000,
     gaPropertyDomain: "unotes.net",
     platforms: [
       {
@@ -137,7 +137,7 @@ export const projects: readonly Project[] = Object.freeze([
     githubUrl: "https://github.com/DevinoSolutions/caramel",
     contraUrl:
       "https://contra.com/p/v3Ek6YPZ-caramel-open-source-alternative-to-honey-coupon-finder",
-    mauFallback: 800,
+    mauFallback: 3000,
     gaPropertyDomain: "grabcaramel.com",
     platforms: [
       {
@@ -178,7 +178,7 @@ export const projects: readonly Project[] = Object.freeze([
     githubUrl: "https://github.com/DevinoSolutions/upup",
     contraUrl:
       "https://contra.com/p/ZQl3WYFY-g-drive-one-drive-s3-integrations-open-react-file-uploader",
-    mauFallback: 1200,
+    mauFallback: 10,
     gaPropertyDomain: "useupup.com",
     platforms: [
       {
@@ -211,14 +211,14 @@ export const projects: readonly Project[] = Object.freeze([
     logoHeight: 445,
     url: "https://nowgetitdone.com",
     isOSS: false,
-    mauFallback: 500,
+    mauFallback: 5,
     gaPropertyDomain: "nowgetitdone.com",
     platforms: [{ name: "Web", icon: "globe", url: "https://nowgetitdone.com" }],
     techStack: ["Next.js", "TypeScript", "Prisma"],
     story: [
       "GetItDone came from managing multiple development teams at Devino Solutions. Between Jira, Slack standups, time trackers, and task boards, the overhead was killing productivity.",
       "The app consolidates async standups (no more scheduling 15-minute meetings), task updates, and time tracking into a single dashboard. Teams submit daily check-ins in 2 minutes instead of meeting for 15.",
-      "Built on Next.js with Prisma for the data layer. Currently at 500 MAU with steady growth from B2B referrals.",
+      "Built on Next.js with Prisma for the data layer.",
     ],
   },
 ]);

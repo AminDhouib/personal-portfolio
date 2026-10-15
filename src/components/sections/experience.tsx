@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon, TechIcon } from "@/components/ui/tech-icon";
-import { experience } from "@/data/experience";
+import { COMBINED_USERS_TOKEN, experience } from "@/data/experience";
 
 // Translucent tint of the active role's accent (exposed as --a on each row).
 const tint = (pct: number) => `color-mix(in srgb, var(--a) ${pct}%, transparent)`;
@@ -25,7 +25,9 @@ function Bullet({ children }: { children: ReactNode }) {
   );
 }
 
-export function Experience() {
+/** `combinedUsers` fills COMBINED_USERS_TOKEN in a highlight, e.g. "130K+". */
+export function Experience({ combinedUsers }: { combinedUsers: string }) {
+  const fill = (h: string) => h.replace(COMBINED_USERS_TOKEN, combinedUsers);
   return (
     <section id="experience" className="py-24">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -174,7 +176,7 @@ export function Experience() {
                           </p>
                           <ul className="space-y-2">
                             {group.items.map((h) => (
-                              <Bullet key={h}>{h}</Bullet>
+                              <Bullet key={h}>{fill(h)}</Bullet>
                             ))}
                           </ul>
                         </div>
@@ -183,7 +185,7 @@ export function Experience() {
                   ) : (
                     <ul className="mt-3.5 space-y-2">
                       {job.highlights.map((h) => (
-                        <Bullet key={h}>{h}</Bullet>
+                        <Bullet key={h}>{fill(h)}</Bullet>
                       ))}
                     </ul>
                   )}

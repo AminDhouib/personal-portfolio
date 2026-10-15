@@ -16,7 +16,7 @@ import {
   Contact,
 } from "@/components/sections";
 import { fetchAllMAU } from "@/lib/ga4";
-import { combinedMonthlyUsers, usersFloorInThousands } from "@/lib/user-reach";
+import { combinedMonthlyUsers, formatUsersFloor, usersFloorInThousands } from "@/lib/user-reach";
 import { fetchRepoStats, fetchContributionGraph, type RepoStats } from "@/lib/github";
 import { getAllBlogPosts } from "@/lib/blog";
 import { ossProjects } from "@/data/oss-projects";
@@ -54,6 +54,8 @@ export default async function Home() {
     ossProjects.map((p, i) => [p.key, ossRepoStats[i] ?? null]),
   );
   const blogPosts = getAllBlogPosts();
+  // One figure for the hero Users stat and the experience bullet.
+  const combinedUsers = combinedMonthlyUsers(mauData);
   const jsonLd = graph(profilePageNode(), projectListNode(projects), faqPageNode(faqs));
 
   return (
@@ -66,13 +68,13 @@ export default async function Home() {
       <BackgroundFX />
       <main className="relative z-10">
         <Hero />
-        <ProofBar usersK={usersFloorInThousands(combinedMonthlyUsers(mauData))} />
+        <ProofBar usersK={usersFloorInThousands(combinedUsers)} />
         <Work mauData={mauData} />
         <OpenSource stats={ossStats} contributions={contributions} />
         <Services />
         <Reviews />
         <Background />
-        <Experience />
+        <Experience combinedUsers={formatUsersFloor(combinedUsers)} />
         <Game />
         <Blog posts={blogPosts} />
         <BeyondCode />
