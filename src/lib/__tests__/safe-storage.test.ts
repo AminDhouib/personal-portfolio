@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { asNumberArray, safeLocalSet } from "@/lib/safe-storage";
+import { asNumberArray, safeLocalSet, safeSessionSet } from "@/lib/safe-storage";
 
 describe("asNumberArray", () => {
   it("passes through an array of numbers", () => {
@@ -60,5 +60,32 @@ describe("safeLocalSet", () => {
     vi.stubGlobal("window", undefined);
     expect(() => safeLocalSet("p5-test-key", "v")).not.toThrow();
     expect(safeLocalSet("p5-test-key", "v")).toBe(false);
+  });
+});
+
+describe("safeSessionSet", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("writes through to sessionStorage when storage works", () => {
+    expect(safeSessionSet("p5-session-key", "v")).toBe(true);
+    expect(window.sessionStorage.getItem("p5-session-key")).toBe("v");
+    expect(window.localStorage.getItem("p5-session-key")).toBeNull();
+  });
+
+  it("returns false and does not throw when setItem throws", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(() => safeSessionSet("p5-session-key", "v")).not.toThrow();
+    expect(safeSessionSet("p5-session-key", "v")).toBe(false);
+  });
+
+  it("does not throw when window is unavailable", () => {
+    vi.stubGlobal("window", undefined);
+    expect(safeSessionSet("p5-session-key", "v")).toBe(false);
   });
 });

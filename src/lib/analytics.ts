@@ -8,7 +8,10 @@ import { BOOKING_URL, socialLinks } from "@/data/nav";
 // autocapture already records raw clicks; these names are what funnels and
 // GA4 key events are built on.
 
-export type ConversionEvent = "book_call_click" | "email_click" | "social_click" | "chat_open";
+// Props go to BOTH sinks, so they must never carry PII: a lead's identity goes to PostHog
+// only, from lead-analytics.ts.
+export type ConversionEvent =
+  "book_call_click" | "email_click" | "social_click" | "chat_open" | "lead_submitted";
 
 type EventProps = Record<string, string>;
 

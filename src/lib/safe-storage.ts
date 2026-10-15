@@ -28,3 +28,14 @@ export function safeLocalSet(key: string, value: string): boolean {
     return false;
   }
 }
+
+/** `safeLocalSet` for `sessionStorage`: the value lives only as long as the tab's session. */
+export function safeSessionSet(key: string, value: string): boolean {
+  try {
+    window.sessionStorage.setItem(key, value);
+    return true;
+  } catch {
+    // silent-ok: best-effort write; private mode, quota limits, blocked storage, or an absent window must not crash the caller
+    return false;
+  }
+}
