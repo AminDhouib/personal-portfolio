@@ -126,4 +126,13 @@ describe("trackLeadSubmitted", () => {
     expect(report).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
+
+  it("does not throw when reportError itself is unavailable", () => {
+    vi.stubGlobal("reportError", undefined);
+    posthogMock.identify.mockImplementation(() => {
+      throw new Error("posthog exploded");
+    });
+    expect(() => trackLeadSubmitted(LEAD)).not.toThrow();
+    vi.unstubAllGlobals();
+  });
 });

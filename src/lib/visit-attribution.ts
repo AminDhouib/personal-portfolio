@@ -48,6 +48,16 @@ function clip(value: string | null | undefined, max = VALUE_MAX): string {
   return (value ?? "").trim().slice(0, max);
 }
 
+/** Host without a leading "www.", so www.amindhou.com and amindhou.com compare equal. */
+function bareHost(host: string): string {
+  return host.replace(/^www\./, "");
+}
+
+/** URL.origin is the string "null" for schemes like android-app://; rebuild it from parts. */
+function originOf(url: URL): string {
+  return url.origin === "null" ? `${url.protocol}//${url.host}` : url.origin;
+}
+
 function parseUrl(raw: string): URL | null {
   try {
     return new URL(raw);
@@ -65,13 +75,13 @@ export function parseVisitAttribution(href: string, referrer: string): VisitAttr
   const from = referrer ? parseUrl(referrer) : null;
   // A referrer from the site itself (a link opened in a new tab) says nothing about how the
   // visitor found it.
-  const external = from && from.host !== landing.host ? from : null;
+  const external = from && bareHost(from.host) !== bareHost(landing.host) ? from : null;
 
   return {
     source: clip(landing.searchParams.get("utm_source")),
     medium: clip(landing.searchParams.get("utm_medium")),
     campaign: clip(landing.searchParams.get("utm_campaign")),
-    referrer: external ? clip(external.origin + external.pathname, URL_MAX) : "",
+    referrer: external ? clip(originOf(external) + external.pathname, URL_MAX) : "",
     referring_domain: external ? clip(external.hostname) : "",
     landing_page: clip(landing.pathname, URL_MAX),
   };

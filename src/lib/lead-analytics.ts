@@ -43,6 +43,7 @@ export function trackLeadSubmitted(lead: SavedLead): void {
     }
     track("lead_submitted", props);
   } catch (err) {
-    reportError(err);
+    // Same guard as arcade/identity.ts: the global is absent outside a browser.
+    if (typeof reportError === "function") reportError(err);
   }
 }
