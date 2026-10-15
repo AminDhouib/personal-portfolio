@@ -4,6 +4,13 @@ import { logWarn, logError } from "../log";
 const mockCaptureException = vi.hoisted(() => vi.fn());
 const mockPostHogCtor = vi.hoisted(() => vi.fn());
 
+const mockWithScope = vi.hoisted(() => vi.fn());
+
+vi.mock("@sentry/nextjs", () => ({
+  withScope: mockWithScope,
+  captureException: vi.fn(),
+}));
+
 vi.mock("posthog-node", () => ({
   PostHog: class MockPostHog {
     constructor(...args: unknown[]) {
@@ -74,6 +81,10 @@ describe("captureException", () => {
     delete process.env.POSTHOG_HOST;
     mockCaptureException.mockReset();
     mockPostHogCtor.mockReset();
+    mockWithScope.mockReset();
+    mockWithScope.mockImplementation((cb: (scope: { setTag: () => void }) => void) =>
+      cb({ setTag: () => {} }),
+    );
   });
 
   afterEach(() => {
@@ -149,6 +160,27 @@ describe("captureException", () => {
 
     expect(() => captureException("leaderboard", new Error("read failed"))).not.toThrow();
     expect(mockCaptureException).toHaveBeenCalledOnce();
+    errorSpy.mockRestore();
+  });
+
+  it("never throws when the Sentry SDK throws, still logs both failures and still reaches PostHog", async () => {
+    process.env.POSTHOG_KEY = "phc_test";
+    process.env.POSTHOG_HOST = "https://posthog.example.com";
+    mockWithScope.mockImplementation(() => {
+      throw new Error("sentry exploded");
+    });
+    vi.resetModules();
+    const { captureException } = await import("../log");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const err = new Error("pool dropped");
+    expect(() => captureException("db.pool", err)).not.toThrow();
+
+    const lines = errorSpy.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.includes("[db.pool]") && l.includes("pool dropped"))).toBe(true);
+    expect(lines.some((l) => l.includes("[sentry]") && l.includes("sentry exploded"))).toBe(true);
+    expect(mockCaptureException).toHaveBeenCalledOnce();
+    expect(mockCaptureException.mock.calls[0]?.[0]).toBe(err);
     errorSpy.mockRestore();
   });
 });

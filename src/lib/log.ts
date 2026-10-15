@@ -87,10 +87,17 @@ export function captureException(scope: string, error: unknown): void {
 
   const normalized = error instanceof Error ? error : new Error(renderDetail(error));
 
-  Sentry.withScope((sentryScope) => {
-    sentryScope.setTag("scope", scope);
-    Sentry.captureException(normalized);
-  });
+  // The logger must never throw: its callers include process-level error
+  // listeners (the pg pool 'error' handlers) where a throw is an uncaught
+  // exception. A failing Sentry SDK is logged and must not skip the PostHog send.
+  try {
+    Sentry.withScope((sentryScope) => {
+      sentryScope.setTag("scope", scope);
+      Sentry.captureException(normalized);
+    });
+  } catch (captureErr) {
+    logError("sentry", "captureException failed", captureErr);
+  }
 
   try {
     const client = getPostHogClient();
