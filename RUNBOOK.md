@@ -260,6 +260,48 @@ Remove-Item Env:ARCADE_IT_DATABASE_URL
 docker rm -f arcade-it
 ```
 
+**Privacy and deletion requests.** `/privacy` tells visitors to email the profile address
+(amin@devino.ca, a Google Workspace mailbox) with the subject "Privacy request". That is the whole
+intake: there is no form, no API route and no ticket integration. Any email asking what is held
+about the sender, or asking for deletion, counts, whatever its subject. Never send a test or demo
+request to check this path.
+
+File each request as ONE GetItDone task, by hand (GetItDone MCP or the app): workspace Devino,
+project "Personal Portfolio", assigned to Amin, name `[Portfolio] Privacy request <YYYY-MM-DD>`.
+Put the requester's address and what they asked for in the notes, not in the name. Complete the
+task only after every step below is done and the requester has been answered. The steps match
+what `/privacy` promises:
+
+1. **Saved lead rows** (`leads` table: `id`, `name`, `email`, `note`, `source`, `page`,
+   `created_at`; the email is stored as typed, so match case-insensitively). Reach the prod db as
+   in Inspect / repair above, take a `pg_dump` first, SELECT, then DELETE in a transaction and
+   check the row count matches before committing:
+
+   ```sql
+   SELECT id, name, email, created_at FROM leads WHERE lower(email) = lower('<email>');
+   BEGIN;
+   DELETE FROM leads WHERE lower(email) = lower('<email>') RETURNING id, email;
+   -- expect the same rows as the SELECT; then COMMIT; (or ROLLBACK;)
+   ```
+
+2. **Notification email copy.** Delete the lead notification from the mailbox. The repo does not
+   say whether UseSend keeps a copy, so check UseSend's sent log and remove it there too.
+3. **PostHog** (project 22): find the person whose distinct id is the lowercased email (Persons,
+   search the email), and delete the person together with their recordings.
+4. **Arcade scores**, only if the requester gives a player ID (`arcade_players.id`, a UUID). SELECT
+   first, then delete the player; `arcade_scores` rows cascade, so check the count as in the
+   Arcade boards data surgery above:
+
+   ```sql
+   SELECT id, handle, created_at FROM arcade_players WHERE id = '<uuid>';
+   BEGIN;
+   DELETE FROM arcade_players WHERE id = '<uuid>' RETURNING id, handle;
+   -- expect exactly one row; then COMMIT; (or ROLLBACK;)
+   ```
+
+5. **Sentry**, only if the requester gives a rough time and page: find the matching events in the
+   self-hosted Sentry project and delete them. Sentry data is not tied to a person.
+
 **Backup — none scheduled (owner-deferred).** Dump the database manually:
 
 ```bash
