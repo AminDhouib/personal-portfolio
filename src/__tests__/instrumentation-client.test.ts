@@ -44,10 +44,10 @@ describe("instrumentation-client replay wiring", () => {
     vi.unstubAllGlobals();
   });
 
-  it("samples 10% of sessions and every errored session", async () => {
+  it("samples 5% of sessions and every errored session", async () => {
     await loadClientInit();
     const options = sentryInit.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(options.replaysSessionSampleRate).toBe(0.1);
+    expect(options.replaysSessionSampleRate).toBe(0.05);
     expect(options.replaysOnErrorSampleRate).toBe(1.0);
     expect(options.tunnel).toBe("/monitoring");
   });
