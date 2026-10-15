@@ -94,18 +94,19 @@ export default function PrivacyPage() {
             Sentry also receives error reports: the error, the page address, and basic browser and
             device details. With an error it records breadcrumbs: your recent clicks, page
             navigation and the addresses of network requests. It also collects performance timings
-            for 1 in 10 page loads, and our server reports its own errors to it. Reports from your
-            browser go through this site&apos;s own /monitoring address, and that relay does not
-            pass your IP address on.
+            for 1 in 10 page loads and navigations, and our server reports its own errors to it.
+            Server errors also go to our PostHog, without any visitor ID. Reports from your browser
+            go through this site&apos;s own /monitoring address, and that relay does not pass your
+            IP address on.
           </p>
         </Section>
 
         <Section title="Google Analytics">
           <p>
             The site uses Google Analytics 4 (Google&apos;s gtag.js script). It sets its own cookies
-            and sends page views and the same named events to Google. Google Analytics never
-            receives your name or email from this site; the event for sending your contact details
-            carries only how you arrived and which chat you used.
+            and sends page views and the same named events to Google, and Google also receives your
+            IP address. Google Analytics never receives your name or email from this site; the event
+            for sending your contact details adds only how you arrived and which chat you used.
           </p>
         </Section>
 
@@ -132,7 +133,8 @@ export default function PrivacyPage() {
             Amin can reply. Your email also becomes the analytics ID for this browser, so your
             earlier and later activity on this site from the same browser (page views, clicks and
             recordings) is tied to it in our own (self-hosted) PostHog, along with how you arrived
-            (campaign source, medium, campaign, referrer and landing page) and which chat you used.
+            (campaign tags: source, medium and campaign name; referrer; landing page) and which chat
+            you used.
           </p>
           <p>
             Your name is stored on that analytics profile too. The note you write is not sent to
@@ -174,9 +176,11 @@ export default function PrivacyPage() {
             >
               {profile.email}
             </a>
-            . On request we delete your saved contact details and delete your data from PostHog and
-            Sentry. Links from this site to other sites, such as the booking page and social
-            profiles, are covered by those sites&apos; own policies.
+            . On request we delete your saved contact details (including the notification email
+            copy), your PostHog profile and its recordings, and, if you tell us your player ID, your
+            arcade scores. Sentry data is not tied to a person, so we can only remove it if you tell
+            us roughly when and on which page. Links from this site to other sites, such as the
+            booking page and social profiles, are covered by those sites&apos; own policies.
           </p>
         </Section>
       </div>

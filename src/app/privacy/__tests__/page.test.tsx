@@ -21,7 +21,7 @@ describe("/privacy", () => {
     // doing this, or this sentence changes, update src/lib/lead-analytics.ts and this page
     // together.
     expect(pageText()).toContain(
-      "When you give your name and email through the chat to be contacted, they are saved so Amin can reply. Your email also becomes the analytics ID for this browser, so your earlier and later activity on this site from the same browser (page views, clicks and recordings) is tied to it in our own (self-hosted) PostHog, along with how you arrived (campaign source, medium, campaign, referrer and landing page) and which chat you used.",
+      "When you give your name and email through the chat to be contacted, they are saved so Amin can reply. Your email also becomes the analytics ID for this browser, so your earlier and later activity on this site from the same browser (page views, clicks and recordings) is tied to it in our own (self-hosted) PostHog, along with how you arrived (campaign tags: source, medium and campaign name; referrer; landing page) and which chat you used.",
     );
   });
 
@@ -41,15 +41,24 @@ describe("/privacy", () => {
     expect(text).toContain("sets its own cookies");
     expect(text).toContain("receive your IP address with each request");
     expect(text).toContain("breadcrumbs");
-    expect(text).toContain("1 in 10 page loads");
+    expect(text).toContain("1 in 10 page loads and navigations");
+    expect(text).toContain("also go to our PostHog, without any visitor ID");
+    expect(text).toContain("Google also receives your IP address");
+    expect(text).toContain("adds only how you arrived and which chat you used");
     expect(text).toContain("UseSend");
   });
 
   it("states retention honestly, without inventing periods", () => {
     const text = pageText();
     expect(text).toContain("kept until you ask us to delete them");
-    expect(text).toContain("delete your data from PostHog and Sentry");
-    expect(text).not.toMatch(/d+ (days|months|years)/);
+    expect(text).toContain(
+      "we delete your saved contact details (including the notification email copy), your PostHog profile and its recordings, and, if you tell us your player ID, your arcade scores.",
+    );
+    expect(text).toContain("Sentry data is not tied to a person");
+    const period = /\d+ (days|months|years)/;
+    // The pattern has to be able to match, or the next line proves nothing.
+    expect("kept for 30 days").toMatch(period);
+    expect(text).not.toMatch(period);
   });
 
   it("does not hedge about Google Analytics being on", () => {
