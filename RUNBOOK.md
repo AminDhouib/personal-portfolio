@@ -63,6 +63,10 @@ access — it is not exposed through the Dokploy API surface available to agents
   never materialize as a Sentry event — the relay only checks the DSN header and size, not
   envelope well-formedness. Real SDK-generated events do land (observed empirically). Don't
   debug ingestion with raw curl envelopes; trigger a real error path (client or server) instead.
+- **Browser Sentry is off on loopback**: `instrumentation-client.ts` enables the SDK (and the lazy
+  replay start) only when the page's hostname is not `localhost`, `127.0.0.1` or `[::1]`, so CI's
+  Lighthouse/E2E runs and the local compose stack send nothing to the live project. To test
+  browser reporting locally, use a non-loopback hostname for the page.
 
 ### Deploy
 

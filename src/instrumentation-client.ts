@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import posthog from "posthog-js";
+import { isLoopbackHost } from "@/lib/loopback-host";
 
 // A DSN is a public identifier, not a secret — it ships in every browser
 // bundle by design. It is committed as a constant because a bare
@@ -9,10 +10,16 @@ import posthog from "posthog-js";
 // src/app/monitoring/route.ts.
 const SENTRY_DSN = "https://fd4e552a55f694418e7471d92de7873a@sentry.devino.ca/35";
 
+// On only for a production build served from a real host. Local dev would pollute the project
+// with work-in-progress errors, and CI (Lighthouse, E2E) and the local docker compose stack run
+// the same production build on localhost, so a loopback hostname is decided at runtime here: the
+// build itself is identical to what ships to amindhou.com.
+const SENTRY_ENABLED =
+  process.env.NODE_ENV === "production" && !isLoopbackHost(window.location.hostname);
+
 Sentry.init({
   dsn: SENTRY_DSN,
-  // Local dev would pollute the project with work-in-progress errors.
-  enabled: process.env.NODE_ENV === "production",
+  enabled: SENTRY_ENABLED,
   // sentry.devino.ca is not reachable from visitors' networks (and ad blockers
   // eat direct Sentry calls). Envelopes go to the same-origin /monitoring
   // relay, which forwards them server-side over the home network / tailnet.
@@ -58,7 +65,7 @@ function addReplayIntegration(): void {
 
 const REPLAY_START_EVENTS = ["pointerdown", "pointermove", "touchstart", "keydown", "scroll"];
 
-if (process.env.NODE_ENV === "production") {
+if (SENTRY_ENABLED) {
   const start = () => {
     for (const type of REPLAY_START_EVENTS) window.removeEventListener(type, start);
     if ("requestIdleCallback" in window) window.requestIdleCallback(addReplayIntegration);
