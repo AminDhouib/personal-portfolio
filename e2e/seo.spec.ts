@@ -239,9 +239,11 @@ test("the footer links every hub page from anywhere on the site", async ({ page,
       .getByRole("navigation", { name: "Site pages" })
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
-    expect.soft(hrefs, path).toEqual(["/work", "/blog", "/reviews", "/games", "/ai", "/feed.xml"]);
+    expect
+      .soft(hrefs, path)
+      .toEqual(["/work", "/blog", "/reviews", "/games", "/ai", "/privacy", "/feed.xml"]);
   }
-  for (const hub of ["/work", "/blog", "/reviews", "/games", "/ai", "/feed.xml"]) {
+  for (const hub of ["/work", "/blog", "/reviews", "/games", "/ai", "/privacy", "/feed.xml"]) {
     expect.soft((await request.get(hub)).status(), hub).toBe(200);
   }
 });

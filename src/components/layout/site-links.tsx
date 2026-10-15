@@ -9,6 +9,7 @@ const SITE_LINKS = [
   { label: "Reviews", href: "/reviews" },
   { label: "Games", href: "/games" },
   { label: "Amin AI", href: "/ai" },
+  { label: "Privacy", href: "/privacy" },
   { label: "RSS", href: "/feed.xml" },
 ] as const;
 

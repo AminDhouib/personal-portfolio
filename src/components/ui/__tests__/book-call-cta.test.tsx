@@ -27,6 +27,6 @@ describe("SiteLinks", () => {
     render(<SiteLinks />);
     const nav = screen.getByRole("navigation", { name: "Site pages" });
     const hrefs = [...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/work", "/blog", "/reviews", "/games", "/ai", "/feed.xml"]);
+    expect(hrefs).toEqual(["/work", "/blog", "/reviews", "/games", "/ai", "/privacy", "/feed.xml"]);
   });
 });
