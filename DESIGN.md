@@ -636,8 +636,8 @@ current tree on 2026-07-07.
 - **Session replay is sampled in code for Sentry and in PostHog's settings for PostHog.**
   `instrumentation-client.ts` sets Sentry's `replaysSessionSampleRate: 0.05` and
   `replaysOnErrorSampleRate: 1.0` (5%, not 10%, until the self-hosted Sentry's old 5 envelopes/s
-  nginx limit is lifted; its redeploy is blocked by a Dokploy bug, GetItDone T-2127), and adds `replayIntegration` after `load` plus an idle callback
-  through a dynamic `import("@sentry/nextjs")`, so the recorder sits in its own chunk and stays
+  nginx limit is lifted; its redeploy is blocked by a Dokploy bug, GetItDone T-2127), and adds `replayIntegration` on the visitor's first interaction (then an idle
+  callback) through a dynamic `import("@sentry/nextjs")`, so the recorder sits in its own chunk and stays
   out of the first-load bundle (Lighthouse audits first paint). PostHog's on-switch and ~10% rate
   live server-side in project 22; the code only sets `session_recording` masking and must not add
   `disable_session_recording`. Inputs are masked and `.ph-sensitive` / `.ph-no-capture` are honored

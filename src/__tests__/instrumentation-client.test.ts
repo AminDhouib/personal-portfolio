@@ -29,8 +29,17 @@ async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+// Each test re-imports the module, which registers fresh window listeners; remove them so one
+// test's interaction cannot start another test's recorder.
+const registered: Array<[string, EventListenerOrEventListenerObject]> = [];
+const realAddEventListener = window.addEventListener.bind(window);
+
 describe("instrumentation-client replay wiring", () => {
   beforeEach(() => {
+    vi.spyOn(window, "addEventListener").mockImplementation((type, listener, options) => {
+      registered.push([type, listener as EventListenerOrEventListenerObject]);
+      realAddEventListener(type, listener, options);
+    });
     sentryInit.mockClear();
     addIntegration.mockClear();
     replayIntegration.mockClear();
@@ -40,6 +49,8 @@ describe("instrumentation-client replay wiring", () => {
   });
 
   afterEach(() => {
+    for (const [type, listener] of registered.splice(0)) window.removeEventListener(type, listener);
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -52,16 +63,21 @@ describe("instrumentation-client replay wiring", () => {
     expect(options.tunnel).toBe("/monitoring");
   });
 
-  it("does not put the replay integration in init (it loads after the page has loaded)", async () => {
+  it("does not put the replay integration in init, and waits for a first interaction", async () => {
+    vi.stubGlobal("requestIdleCallback", (cb: () => void) => cb());
     await loadClientInit();
     const options = sentryInit.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(options.integrations).toBeUndefined();
+    await flush();
+    expect(replayIntegration).not.toHaveBeenCalled();
+    expect(addIntegration).not.toHaveBeenCalled();
   });
 
-  it("adds the replay integration with inputs masked and the ph classes honored", async () => {
+  it("adds the replay integration once, masked, after the first interaction", async () => {
     vi.stubGlobal("requestIdleCallback", (cb: () => void) => cb());
     await loadClientInit();
-    // jsdom reports readyState "complete", so the idle step has run by now.
+    window.dispatchEvent(new Event("pointerdown"));
+    window.dispatchEvent(new Event("keydown"));
     await flush();
     expect(replayIntegration).toHaveBeenCalledTimes(1);
     expect(replayIntegration).toHaveBeenCalledWith({

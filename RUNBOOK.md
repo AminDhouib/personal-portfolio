@@ -323,8 +323,10 @@ Masking is the same on both: every input is masked (lead details typed into the 
 inputs), an element with the class `ph-sensitive` has its text masked, and Sentry also blocks
 `ph-no-capture` elements outright (PostHog blocks that class by default). Page text and media are
 recorded as is, because the site is a public portfolio. Put `ph-sensitive` or `ph-no-capture` on
-any new element that shows private data. Sentry's replay recorder loads after the page's `load`
-event and an idle callback, in its own chunk, so it is not in the first-load bundle.
+any new element that shows private data. Sentry's replay recorder loads on the visitor's first interaction
+(pointer, touch, key or scroll), in its own chunk of about 100 KB gzipped, so it is not in the
+first-load bundle and Lighthouse runs and crawlers, which never interact, neither load it nor
+spend the replay quota.
 
 **Self-hosted storage impact.** Replays are the largest payload type either tool ingests, far
 bigger than an error event or a pageview. Sampling (5% for Sentry, about 10% for PostHog, plus
