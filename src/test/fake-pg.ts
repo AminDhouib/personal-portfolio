@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { vi } from "vitest";
 import type { Pool, PoolClient } from "pg";
 
@@ -35,13 +36,15 @@ export function createFakePool(handler: FakeHandler = () => undefined) {
     return { rows, rowCount: result?.rowCount ?? rows.length };
   }
 
-  const client = {
+  // An EventEmitter like the real pg Client, so a test can emit "error" on a checked-out
+  // client and see it throw when no listener is attached.
+  const client = Object.assign(new EventEmitter(), {
     query: vi.fn(run),
     release: vi.fn((arg?: boolean | Error) => {
       stats.released += 1;
       if (arg) stats.destroyed += 1;
     }),
-  };
+  });
   const pool = {
     connect: vi.fn(async () => {
       stats.connects += 1;
