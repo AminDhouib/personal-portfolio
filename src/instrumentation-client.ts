@@ -25,17 +25,18 @@ Sentry.init({
   // enforces its old 5 envelopes/s nginx limit (its redeploy is blocked by a Dokploy bug,
   // GetItDone T-2127), and above about 5% whole envelope bursts get rejected and the error
   // reports inside them are lost. Raise to 0.1 once the owner confirms Sentry can take it.
-  // The integration itself is added below, after load.
+  // The integration itself is added below, on first interaction.
   replaysSessionSampleRate: 0.05,
   replaysOnErrorSampleRate: 1.0,
   environment: process.env.NODE_ENV,
 });
 
 // Replay stays out of the first-load bundle: the dynamic import puts the recorder in its own
-// chunk, fetched only once the page has loaded and the main thread is idle, so it cannot
-// compete with first paint or hydration (Lighthouse audits those). Replay envelopes travel
-// through the /monitoring tunnel like every other one. The cost is that the first moments of
-// a session are not recorded, which is fine for a portfolio.
+// chunk (about 100 KB gzipped), fetched only after the visitor's first interaction (pointer,
+// touch, key or scroll) and then on an idle callback. Lighthouse and crawlers never interact,
+// so audits see no recorder cost and bots do not spend the replay quota, while a real visit
+// starts recording within moments. Replay envelopes travel through the /monitoring tunnel
+// like every other one. The cost is that a session's first moments are not recorded.
 // Privacy: this is a public site, so text and media are recorded as is, but every input is
 // masked (lead details typed into the AI chat, game inputs). Anything marked `.ph-sensitive`
 // is masked too and `.ph-no-capture` is blocked outright, the same two classes PostHog's
@@ -58,13 +59,17 @@ function addReplayIntegration(): void {
     });
 }
 
+const REPLAY_START_EVENTS = ["pointerdown", "pointermove", "touchstart", "keydown", "scroll"];
+
 if (process.env.NODE_ENV === "production") {
-  const whenIdle = () => {
+  const start = () => {
+    for (const type of REPLAY_START_EVENTS) window.removeEventListener(type, start);
     if ("requestIdleCallback" in window) window.requestIdleCallback(addReplayIntegration);
-    else setTimeout(addReplayIntegration, 2000);
+    else setTimeout(addReplayIntegration, 200);
   };
-  if (document.readyState === "complete") whenIdle();
-  else window.addEventListener("load", whenIdle, { once: true });
+  for (const type of REPLAY_START_EVENTS) {
+    window.addEventListener(type, start, { passive: true });
+  }
 }
 
 // Client-side product analytics. Gated on NEXT_PUBLIC_POSTHOG_KEY so it stays a
