@@ -18,10 +18,50 @@ Sentry.init({
   // relay, which forwards them server-side over the home network / tailnet.
   tunnel: "/monitoring",
   tracesSampleRate: 0.1,
-  replaysSessionSampleRate: 0,
-  replaysOnErrorSampleRate: 0,
+  // Session replay: 10% of sessions are recorded whole, and every session that hits an
+  // error is kept (the SDK buffers in memory and uploads only when an error fires). Replays
+  // are the largest payload type this self-hosted Sentry ingests, so the session rate is the
+  // knob to lower if storage grows. The integration itself is added below, after load.
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
   environment: process.env.NODE_ENV,
 });
+
+// Replay stays out of the first-load bundle: the dynamic import puts the recorder in its own
+// chunk, fetched only once the page has loaded and the main thread is idle, so it cannot
+// compete with first paint or hydration (Lighthouse audits those). Replay envelopes travel
+// through the /monitoring tunnel like every other one. The cost is that the first moments of
+// a session are not recorded, which is fine for a portfolio.
+// Privacy: this is a public site, so text and media are recorded as is, but every input is
+// masked (lead details typed into the AI chat, game inputs). Anything marked `.ph-sensitive`
+// is masked too and `.ph-no-capture` is blocked outright, the same two classes PostHog's
+// recorder honors, so one marker protects an element in both tools.
+function addReplayIntegration(): void {
+  void import("@sentry/nextjs")
+    .then(({ addIntegration, replayIntegration }) => {
+      addIntegration(
+        replayIntegration({
+          maskAllInputs: true,
+          maskAllText: false,
+          blockAllMedia: false,
+          mask: [".ph-sensitive"],
+          block: [".ph-no-capture"],
+        }),
+      );
+    })
+    .catch((err: unknown) => {
+      reportError(err);
+    });
+}
+
+if (process.env.NODE_ENV === "production") {
+  const whenIdle = () => {
+    if ("requestIdleCallback" in window) window.requestIdleCallback(addReplayIntegration);
+    else setTimeout(addReplayIntegration, 2000);
+  };
+  if (document.readyState === "complete") whenIdle();
+  else window.addEventListener("load", whenIdle, { once: true });
+}
 
 // Client-side product analytics. Gated on NEXT_PUBLIC_POSTHOG_KEY so it stays a
 // no-op in local dev and any deploy that has not set the key. The literal static
@@ -38,6 +78,14 @@ if (POSTHOG_KEY) {
     capture_pageleave: true,
     autocapture: true,
     person_profiles: "identified_only",
+    // Session recording is switched on and sampled (about 10%) server-side, in PostHog
+    // project 22's settings, not here; do not add disable_session_recording. These are the
+    // masking rules for whatever the project records: every input is masked, and anything
+    // marked `.ph-sensitive` has its text masked (the class Sentry's replay masks as well).
+    session_recording: {
+      maskAllInputs: true,
+      maskTextSelector: ".ph-sensitive",
+    },
   });
 }
 

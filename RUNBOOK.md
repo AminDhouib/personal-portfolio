@@ -56,7 +56,9 @@ access — it is not exposed through the Dokploy API surface available to agents
 - **Tunnel**: `sentry.devino.ca` isn't reachable from visitor networks (and ad blockers eat
   direct Sentry calls), so both client and server envelopes are relayed through `/monitoring`
   (`src/app/monitoring/route.ts`), which validates the envelope's DSN and forwards it to Sentry
-  (org `devino`, project `portfolio`) with an 8s timeout.
+  (org `devino`, project `portfolio`) with an 8s timeout. It relays the body as raw bytes (a
+  session-replay segment carries a compressed binary item that text decoding would corrupt) and
+  refuses anything over 5 MiB.
 - **Caution**: a hand-built curl envelope to `/monitoring` can get a `200` from the relay yet
   never materialize as a Sentry event — the relay only checks the DSN header and size, not
   envelope well-formedness. Real SDK-generated events do land (observed empirically). Don't
@@ -301,6 +303,36 @@ still no alerting (see above), so nobody is paged — you have to look. And a ch
 without emitting a `RUN_ERROR` frame at all would still be silent. When in doubt, verify the way
 the outage was originally caught: actually ask it something more than 60 seconds after the page's
 first copilotkit POST.
+
+### Session replay
+
+Both Sentry and PostHog record sessions, sampled at about 10%, on amindhou.com.
+
+| Tool    | Rate lives in                          | Sampling                                                         |
+| ------- | -------------------------------------- | ---------------------------------------------------------------- |
+| Sentry  | `src/instrumentation-client.ts` (code) | `replaysSessionSampleRate: 0.1`, `replaysOnErrorSampleRate: 1.0` |
+| PostHog | PostHog project 22's settings (server) | on-switch and sample rate set in the project, not in code        |
+
+Sentry keeps 10% of sessions whole and every session that raises an error (the SDK buffers in
+memory and uploads only on an error), so the error replays are the part you cannot lower without
+losing context on a real bug. To change Sentry's rates, edit the two constants and deploy. PostHog's
+recorder is never disabled in code (no `disable_session_recording`); to stop or retune it, change
+the project 22 recording settings in the PostHog UI, no deploy needed.
+
+Masking is the same on both: every input is masked (lead details typed into the AI chat, game
+inputs), an element with the class `ph-sensitive` has its text masked, and Sentry also blocks
+`ph-no-capture` elements outright (PostHog blocks that class by default). Page text and media are
+recorded as is, because the site is a public portfolio. Put `ph-sensitive` or `ph-no-capture` on
+any new element that shows private data. Sentry's replay recorder loads after the page's `load`
+event and an idle callback, in its own chunk, so it is not in the first-load bundle.
+
+**Self-hosted storage impact.** Replays are the largest payload type either tool ingests, far
+bigger than an error event or a pageview. Sampling at 10% (plus 100% of errored Sentry sessions)
+bounds the growth, but it is still the first thing to check if the Sentry or PostHog volume
+fills. PostHog project 22's recording retention is 5 years, which is the knob to lower first if
+storage grows; for Sentry, lower `replaysSessionSampleRate` or shorten the project's retention.
+Replay envelopes also pass through the app's `/monitoring` tunnel, which allows up to 5 MiB per
+envelope and 60 requests a minute per IP.
 
 ### Analytics events
 
