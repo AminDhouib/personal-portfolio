@@ -633,6 +633,16 @@ current tree on 2026-07-07.
   lookup. Client code needs the literal static read, or a committed constant — see
   `instrumentation-client.ts`'s `SENTRY_DSN` constant for the pattern (a DSN is a public
   identifier, not a secret, so committing it is correct, not an oversight).
+- **Session replay is sampled in code for Sentry and in PostHog's settings for PostHog.**
+  `instrumentation-client.ts` sets Sentry's `replaysSessionSampleRate: 0.1` and
+  `replaysOnErrorSampleRate: 1.0`, and adds `replayIntegration` after `load` plus an idle callback
+  through a dynamic `import("@sentry/nextjs")`, so the recorder sits in its own chunk and stays
+  out of the first-load bundle (Lighthouse audits first paint). PostHog's on-switch and ~10% rate
+  live server-side in project 22; the code only sets `session_recording` masking and must not add
+  `disable_session_recording`. Inputs are masked and `.ph-sensitive` / `.ph-no-capture` are honored
+  in both; text and media are not masked because the site is public. The `/monitoring` tunnel
+  relays raw bytes and allows 5 MiB, because a replay segment is compressed binary. See
+  RUNBOOK.md's "Session replay" for the storage impact and the knobs.
 - **`src/lib/github.ts` keeps a token-free fallback even though `GITHUB_TOKEN` is now required.**
   A classic read-only PAT (`read:user` scope) was provisioned in prod on 2026-07-14, so
   `GITHUB_TOKEN` is a `REQUIRED_ENV_VAR` and the boot gate enforces its presence; prod normally
