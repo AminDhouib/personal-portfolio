@@ -30,7 +30,7 @@ const staticPosts: BlogPostMeta[] = [
     slug: "devino-solutions-lessons",
     title: "From $0 to $1M: What I Learned Building Devino Solutions",
     excerpt:
-      "Five years of lessons building a software studio — pricing, hiring, retention, and the moment I almost quit.",
+      "Five years of building Devino Solutions, a software studio, from $0 to $1M: what I learned about pricing, hiring, retention, and the moment I almost quit.",
     date: "2026-03-25",
     tags: ["business"],
     readingTime: "4 min read",
