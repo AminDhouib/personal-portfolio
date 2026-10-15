@@ -1,6 +1,7 @@
 "use client";
 
 import { useCopilotAction } from "@copilotkit/react-core";
+import { trackLeadSubmitted } from "@/lib/lead-analytics";
 
 export interface LeadCollectorArgs {
   name: string;
@@ -23,6 +24,7 @@ export async function submitLead(
   source: string,
   args: LeadCollectorArgs,
 ): Promise<SubmitLeadResult> {
+  let ok: boolean;
   try {
     const res = await fetch("/api/leads", {
       method: "POST",
@@ -30,11 +32,15 @@ export async function submitLead(
       body: JSON.stringify({ ...args, source }),
       signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
     });
-    return { ok: res.ok };
+    ok = res.ok;
   } catch (err) {
     reportError(err);
     return { ok: false };
   }
+  // Outside the try: only a lead the server accepted is reported, and analytics (which never
+  // throws) cannot turn a saved lead into a failure. The note is deliberately not passed on.
+  if (ok) trackLeadSubmitted({ name: args.name, email: args.email, surface: source });
+  return { ok };
 }
 
 /**

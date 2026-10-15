@@ -92,6 +92,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { ChatWidget } from "@/components/chat/widget";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { ConversionTracker } from "@/components/analytics/conversion-tracker";
+import { VisitAttributionRecorder } from "@/components/analytics/visit-attribution-recorder";
 import {
   companyNode,
   graph,
@@ -140,6 +141,7 @@ export default function RootLayout({
           <SiteFooter />
           <ChatWidget enabled />
           <ConversionTracker />
+          <VisitAttributionRecorder />
         </Providers>
       </body>
     </html>

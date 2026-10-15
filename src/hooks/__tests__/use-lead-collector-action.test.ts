@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+
+const { trackLeadSubmitted } = vi.hoisted(() => ({ trackLeadSubmitted: vi.fn() }));
+vi.mock("@/lib/lead-analytics", () => ({ trackLeadSubmitted }));
+
 import { submitLead } from "../use-lead-collector-action";
 
 describe("submitLead", () => {
@@ -6,6 +10,7 @@ describe("submitLead", () => {
   let reportErrorMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    trackLeadSubmitted.mockReset();
     fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     reportErrorMock = vi.fn();
@@ -61,5 +66,34 @@ describe("submitLead", () => {
     const result = await submitLead("chatbot", { name: "Ada", email: "ada@example.com" });
     expect(result).toEqual({ ok: false });
     expect(reportErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a saved lead to analytics with the surface, never the note", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    await submitLead("ai-page", { name: "Ada", email: "ada@example.com", note: "private words" });
+
+    expect(trackLeadSubmitted).toHaveBeenCalledTimes(1);
+    expect(trackLeadSubmitted).toHaveBeenCalledWith({
+      name: "Ada",
+      email: "ada@example.com",
+      surface: "ai-page",
+    });
+  });
+
+  it("reports nothing to analytics when the save fails (non-ok response)", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+
+    await submitLead("chatbot", { name: "Ada", email: "ada@example.com" });
+
+    expect(trackLeadSubmitted).not.toHaveBeenCalled();
+  });
+
+  it("reports nothing to analytics when the request itself fails", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("timeout"));
+
+    await submitLead("chatbot", { name: "Ada", email: "ada@example.com" });
+
+    expect(trackLeadSubmitted).not.toHaveBeenCalled();
   });
 });
