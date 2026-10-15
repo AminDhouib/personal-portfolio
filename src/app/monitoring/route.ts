@@ -22,8 +22,11 @@ export const runtime = "nodejs";
 // cannot be used as an open relay.
 const ALLOWED_DSN = "https://fd4e552a55f694418e7471d92de7873a@sentry.devino.ca/35";
 const INGEST_URL = "https://sentry.devino.ca/api/35/envelope/";
-// Replays are disabled; error/transaction envelopes are a few KB each.
-const MAX_ENVELOPE_BYTES = 1024 * 1024;
+// Error/transaction envelopes are a few KB; session-replay segments (a compressed binary
+// `replay_recording` item next to a `replay_event`) run to hundreds of KB, and a segment
+// carrying a full DOM snapshot can pass 1 MiB, so the cap is sized for those.
+const MAX_ENVELOPE_BYTES = 5 * 1024 * 1024;
+const NEWLINE = 0x0a;
 
 export async function POST(request: NextRequest) {
   const { response: blocked } = guardRequest(request, {
@@ -33,14 +36,17 @@ export async function POST(request: NextRequest) {
   });
   if (blocked) return blocked;
 
-  const body = await request.text();
-  if (body.length > MAX_ENVELOPE_BYTES) {
+  // Read bytes, never text: a replay_recording item is compressed binary, and decoding the
+  // body as UTF-8 would replace its invalid sequences and corrupt the replay in transit.
+  const body = new Uint8Array(await request.arrayBuffer());
+  if (body.byteLength > MAX_ENVELOPE_BYTES) {
     return NextResponse.json({ error: "envelope too large" }, { status: 413 });
   }
 
-  // Envelope format: first newline-delimited line is a JSON header with `dsn`.
-  const newline = body.indexOf("\n");
-  const headerLine = newline === -1 ? body : body.slice(0, newline);
+  // Envelope format: first newline-delimited line is a JSON header with `dsn`. Only that
+  // line is decoded; everything after it is forwarded untouched.
+  const newline = body.indexOf(NEWLINE);
+  const headerLine = new TextDecoder().decode(newline === -1 ? body : body.subarray(0, newline));
   const header = safeJsonParseServer<{ dsn?: string }>(headerLine, "monitoring.envelope");
   if (!header) {
     return NextResponse.json({ error: "invalid envelope" }, { status: 400 });
