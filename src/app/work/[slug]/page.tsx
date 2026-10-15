@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import { SiIcon } from "@/components/ui/tech-icon";
 import { BookCallCta } from "@/components/ui/book-call-cta";
 import { projects } from "@/data/projects";
+import { getBlogPost } from "@/lib/blog";
 import { fetchMAU } from "@/lib/ga4";
 import { breadcrumbNode, graph, projectNode, serializeJsonLd } from "@/lib/structured-data";
 
@@ -59,7 +60,7 @@ export async function generateMetadata({
   const project = projects.find((p) => p.slug === slug);
   if (!project) return {};
   return {
-    title: project.name,
+    title: `${project.name}: ${project.tagline}`,
     description: project.description,
     alternates: {
       canonical: `${SITE_ORIGIN}/work/${slug}`,
@@ -96,6 +97,8 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
   const liveMAU = await fetchMAU(slug);
   const displayMAU = liveMAU ?? project.mauFallback;
   const isLive = liveMAU !== null;
+
+  const relatedPost = project.relatedPost ? getBlogPost(project.relatedPost) : null;
 
   const jsonLd = graph(
     projectNode(project),
@@ -226,6 +229,18 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
               </p>
             ))}
           </div>
+        )}
+
+        {relatedPost && (
+          <p className="mb-8 text-base leading-relaxed text-(--foreground)">
+            Read the full write-up:{" "}
+            <Link
+              href={`/blog/${relatedPost.slug}`}
+              className="text-accent-blue underline-offset-4 hover:underline"
+            >
+              {relatedPost.title}
+            </Link>
+          </p>
         )}
 
         {/* Figma prototype embed */}

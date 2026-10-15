@@ -15,6 +15,8 @@ export interface Project {
   isOSS: boolean;
   githubUrl?: string;
   contraUrl?: string;
+  /** Blog slug of the post that tells this project's story; the work page links to it. */
+  relatedPost?: string;
   mauFallback: number;
   mauGrowth?: string;
   gaPropertyDomain?: string;
@@ -135,6 +137,7 @@ export const projects: readonly Project[] = Object.freeze([
     url: "https://grabcaramel.com",
     isOSS: true,
     githubUrl: "https://github.com/DevinoSolutions/caramel",
+    relatedPost: "caramel-open-source-story",
     contraUrl:
       "https://contra.com/p/v3Ek6YPZ-caramel-open-source-alternative-to-honey-coupon-finder",
     mauFallback: 3000,
