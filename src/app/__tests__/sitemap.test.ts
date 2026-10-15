@@ -57,6 +57,10 @@ describe("sitemap", () => {
     }
   });
 
+  it("lists the privacy page", () => {
+    expect(urls).toContain("https://amindhou.com/privacy");
+  });
+
   it("lists the Voltorb Flip solver page", () => {
     expect(urls).toContain(`https://amindhou.com${SOLVER_PATH}`);
   });
