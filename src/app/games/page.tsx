@@ -75,6 +75,16 @@ export default function GamesPage() {
           Free browser games built for this site. No downloads, no sign-up: pick one and play. The
           daily leaderboards reset at midnight UTC, so there is always a fresh run to chase.
         </p>
+        <p className="mb-8 text-(--muted)">
+          Stuck on a Voltorb Flip board? The{" "}
+          <Link
+            href="/games/super-voltorb-flip/solver"
+            className="font-semibold underline underline-offset-2 hover:text-(--foreground)"
+          >
+            Voltorb Flip solver
+          </Link>{" "}
+          reads your row and column clues and gives the exact odds for every tile.
+        </p>
 
         {/* No Suspense boundary. One was added when GamesClient read useSearchParams (it no
             longer does), and it let React stream the whole hub as a hidden segment that only

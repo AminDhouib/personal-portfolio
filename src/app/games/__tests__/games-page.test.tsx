@@ -35,6 +35,13 @@ describe("/games page", () => {
     );
   });
 
+  it("links the Voltorb Flip solver from the server-rendered hub", () => {
+    render(<GamesPage />);
+    const link = screen.getByRole("link", { name: "Voltorb Flip solver" });
+    expect(link).toHaveAttribute("href", "/games/super-voltorb-flip/solver");
+    expect(screen.getByTestId("games-client")).not.toContainElement(link);
+  });
+
   it("hands the client the tags of public games only", () => {
     render(<GamesPage />);
     const slugs = screen.getByTestId("games-client").getAttribute("data-tag-slugs");
