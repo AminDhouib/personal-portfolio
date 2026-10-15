@@ -21,7 +21,8 @@ function makeReq(body: string | Uint8Array, headers: Record<string, string> = {}
   ipCounter += 1;
   return new NextRequest("https://portfolio.test/monitoring", {
     method: "POST",
-    body,
+    // Copy into a plain ArrayBuffer-backed view: a Node Buffer's wider buffer type is not a BodyInit.
+    body: typeof body === "string" ? body : new Uint8Array(body),
     headers: {
       origin: "https://portfolio.test",
       host: "portfolio.test",

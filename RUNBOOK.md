@@ -306,14 +306,14 @@ first copilotkit POST.
 
 ### Session replay
 
-Both Sentry and PostHog record sessions, sampled at about 10%, on amindhou.com.
+Both Sentry and PostHog record sessions, on amindhou.com: Sentry at 5% for now (see below), PostHog at about 10%.
 
-| Tool    | Rate lives in                          | Sampling                                                         |
-| ------- | -------------------------------------- | ---------------------------------------------------------------- |
-| Sentry  | `src/instrumentation-client.ts` (code) | `replaysSessionSampleRate: 0.1`, `replaysOnErrorSampleRate: 1.0` |
-| PostHog | PostHog project 22's settings (server) | on-switch and sample rate set in the project, not in code        |
+| Tool    | Rate lives in                          | Sampling                                                          |
+| ------- | -------------------------------------- | ----------------------------------------------------------------- |
+| Sentry  | `src/instrumentation-client.ts` (code) | `replaysSessionSampleRate: 0.05`, `replaysOnErrorSampleRate: 1.0` |
+| PostHog | PostHog project 22's settings (server) | on-switch and sample rate set in the project, not in code         |
 
-Sentry keeps 10% of sessions whole and every session that raises an error (the SDK buffers in
+Sentry keeps 5% of sessions whole and every session that raises an error (the SDK buffers in
 memory and uploads only on an error), so the error replays are the part you cannot lower without
 losing context on a real bug. To change Sentry's rates, edit the two constants and deploy. PostHog's
 recorder is never disabled in code (no `disable_session_recording`); to stop or retune it, change
@@ -327,12 +327,18 @@ any new element that shows private data. Sentry's replay recorder loads after th
 event and an idle callback, in its own chunk, so it is not in the first-load bundle.
 
 **Self-hosted storage impact.** Replays are the largest payload type either tool ingests, far
-bigger than an error event or a pageview. Sampling at 10% (plus 100% of errored Sentry sessions)
-bounds the growth, but it is still the first thing to check if the Sentry or PostHog volume
-fills. PostHog project 22's recording retention is 5 years, which is the knob to lower first if
-storage grows; for Sentry, lower `replaysSessionSampleRate` or shorten the project's retention.
-Replay envelopes also pass through the app's `/monitoring` tunnel, which allows up to 5 MiB per
-envelope and 60 requests a minute per IP.
+bigger than an error event or a pageview. Sampling (5% for Sentry, about 10% for PostHog, plus
+100% of errored Sentry sessions) bounds the growth, but it is still the first thing to check if
+the Sentry or PostHog volume fills. PostHog project 22's recording retention is 5 years, which is
+the knob to lower first if storage grows; for Sentry, lower `replaysSessionSampleRate` or shorten
+the project's retention.
+
+Sentry is held at 5% rather than 10% because the self-hosted instance still enforces the old
+5 envelopes/s nginx limit (its redeploy is blocked by a Dokploy bug, GetItDone T-2127); above
+about 5%, whole envelope bursts get rejected and the error reports inside them are lost. Raise
+`replaysSessionSampleRate` to `0.1` once the owner says Sentry can take it. Replay envelopes also
+pass through the app's `/monitoring` tunnel, which allows up to 5 MiB per envelope and 60
+requests a minute per IP.
 
 ### Analytics events
 
