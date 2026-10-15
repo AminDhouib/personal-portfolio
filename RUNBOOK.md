@@ -345,15 +345,26 @@ requests a minute per IP.
 ### Analytics events
 
 Pageviews and autocapture go to PostHog (project "Amin Personal") and GA4. On top of those, the
-site sends four named conversion events, each to both PostHog (`posthog.capture`) and GA4
+site sends five named conversion events, each to both PostHog (`posthog.capture`) and GA4
 (`gtag("event", ...)`), from `src/lib/analytics.ts`:
 
-| Event             | Fires when                                 | Properties                     |
-| ----------------- | ------------------------------------------ | ------------------------------ |
-| `book_call_click` | any link to `BOOKING_URL` is clicked       | `placement`, `path`            |
-| `email_click`     | any `mailto:` link is clicked              | `placement`, `path`            |
-| `social_click`    | any link to a `socialLinks` URL is clicked | `network`, `placement`, `path` |
-| `chat_open`       | the Amin AI launcher opens the chat panel  | `path`                         |
+| Event             | Fires when                                            | Properties                                                                                     |
+| ----------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `book_call_click` | any link to `BOOKING_URL` is clicked                  | `placement`, `path`                                                                            |
+| `email_click`     | any `mailto:` link is clicked                         | `placement`, `path`                                                                            |
+| `social_click`    | any link to a `socialLinks` URL is clicked            | `network`, `placement`, `path`                                                                 |
+| `chat_open`       | the Amin AI launcher opens the chat panel             | `path`                                                                                         |
+| `lead_submitted`  | `/api/leads` accepted a lead sent through the AI chat | `source`, `medium`, `campaign`, `referrer`, `referring_domain`, `landing_page`, `lead_surface` |
+
+`lead_submitted` carries the visit's first-touch attribution (a property is absent when it has no
+value) and `lead_surface` (`chatbot` for the widget, `ai-page` for `/ai`). Only PostHog also
+gets an identity: the same call runs `posthog.identify` with the lead's lowercased email as the
+distinct id and `email` / `name` person properties, so in PostHog (project 22, Persons) a lead
+is a person whose distinct id is their email, and their earlier anonymous pageviews merge into
+it. Find the leads with an Events query on `lead_submitted`, or open Persons and search the email.
+GA4 gets the event and its attribution props, never the email or name; the free-text note goes
+to neither. This is the owner's 2026-10-15 ruling; see DESIGN.md's register entry, and `/privacy`
+describes it to visitors. The site has no consent gate.
 
 `placement` is the `id` of the enclosing `<section>` (`hero`, `services`, `contact`, ...), or
 `navbar`, `footer`, or `page`. The first three come from one delegated listener

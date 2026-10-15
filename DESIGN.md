@@ -644,6 +644,26 @@ current tree on 2026-07-07.
   in both; text and media are not masked because the site is public. The `/monitoring` tunnel
   relays raw bytes and allows 5 MiB, because a replay segment is compressed binary. See
   RUNBOOK.md's "Session replay" for the storage impact and the knobs.
+- **A saved lead is identified in PostHog by its email, on purpose (owner ruling, Amin,
+  2026-10-15).** `submitLead` (`src/hooks/use-lead-collector-action.ts`) calls
+  `trackLeadSubmitted` (`src/lib/lead-analytics.ts`) only after `/api/leads` answered ok. That
+  runs `posthog.identify(<trimmed, lowercased email>, { email, name })`, then sends
+  `lead_submitted` through `track()` with the visit's first-touch `source` / `medium` /
+  `campaign` (UTM), `referrer` (origin and path, no query), `referring_domain`, `landing_page`
+  and `lead_surface` (the `source` label sent to `/api/leads`: widget or `/ai`). The reasoning:
+  the person handed over their email to be contacted, and PostHog is self-hosted. Three lines
+  hold it in place. (1) **GA4 never gets PII**: `track()` fans out to PostHog and gtag, so the
+  event's props are attribution only; identify is PostHog-only, and the email and name appear
+  in no event property. (2) **The free-text note never reaches analytics**: it is not a
+  parameter of `trackLeadSubmitted`. (3) **No consent gate exists**: the site has no cookie
+  banner or consent state, and none was invented; `trackLeadSubmitted` is the single place a
+  future gate would plug in (check it first, before `identify`). First-touch values come from
+  `src/lib/visit-attribution.ts`, recorded by `VisitAttributionRecorder` on the root layout's
+  first mount into `sessionStorage` (with a memory copy), not from posthog-js's persisted
+  initial-referrer and initial-UTM properties: those describe the browser's first visit ever,
+  not this one, and have no public getter. `/privacy` states the lead linking in words and a
+  test pins that sentence; change code and page together, and keep every claim on that page
+  true to the code.
 - **`src/lib/github.ts` keeps a token-free fallback even though `GITHUB_TOKEN` is now required.**
   A classic read-only PAT (`read:user` scope) was provisioned in prod on 2026-07-14, so
   `GITHUB_TOKEN` is a `REQUIRED_ENV_VAR` and the boot gate enforces its presence; prod normally
