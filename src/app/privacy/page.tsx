@@ -82,9 +82,9 @@ export default function PrivacyPage() {
         <Section title="Session recordings and error monitoring">
           <p>
             PostHog records a share of visits (about 1 in 10) as a replay of the page, so we can see
-            how the site is used. Sentry, also hosted by us, records 5% of visits the same way, plus
-            any visit where an error happens. Sentry starts recording after your first interaction
-            with the page.
+            how the site is used. Sentry, also hosted by us, records about 1 in 10 visits the same
+            way, plus any visit where an error happens. Sentry starts recording after your first
+            interaction with the page.
           </p>
           <p>
             Both tools mask everything typed into input fields. Messages in the AI chat are hidden

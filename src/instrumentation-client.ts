@@ -18,15 +18,12 @@ Sentry.init({
   // relay, which forwards them server-side over the home network / tailnet.
   tunnel: "/monitoring",
   tracesSampleRate: 0.1,
-  // Session replay: 5% of sessions are recorded whole, and every session that hits an
+  // Session replay: 10% of sessions are recorded whole, and every session that hits an
   // error is kept (the SDK buffers in memory and uploads only when an error fires). Replays
   // are the largest payload type this self-hosted Sentry ingests, so the session rate is the
-  // knob to lower if storage grows. 5%, not 10%, on purpose: the self-hosted Sentry still
-  // enforces its old 5 envelopes/s nginx limit (its redeploy is blocked by a Dokploy bug,
-  // GetItDone T-2127), and above about 5% whole envelope bursts get rejected and the error
-  // reports inside them are lost. Raise to 0.1 once the owner confirms Sentry can take it.
+  // knob to lower if storage grows.
   // The integration itself is added below, on first interaction.
-  replaysSessionSampleRate: 0.05,
+  replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   environment: process.env.NODE_ENV,
 });

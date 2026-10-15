@@ -56,6 +56,7 @@ describe("/privacy", () => {
       "we delete your saved contact details (including the notification email copy), your PostHog profile and its recordings, and, if you tell us your player ID, your arcade scores.",
     );
     expect(text).toContain("Sentry data is not tied to a person");
+    expect(text).toContain("Sentry, also hosted by us, records about 1 in 10 visits");
     const period = /\d+ (days|months|years)/;
     // The pattern has to be able to match, or the next line proves nothing.
     expect("kept for 30 days").toMatch(period);
