@@ -663,7 +663,10 @@ current tree on 2026-07-07.
   initial-referrer and initial-UTM properties: those describe the browser's first visit ever,
   not this one, and have no public getter. `/privacy` states the lead linking in words and a
   test pins that sentence; change code and page together, and keep every claim on that page
-  true to the code.
+  true to the code. The chat surfaces carry `ph-sensitive` so session replay masks every message
+  (a test pins it). identify is persistent, as PostHog does by default (no reset): a second lead
+  with a different email on an already identified browser lands on a new person without
+  merging, which is harmless.
 - **`src/lib/github.ts` keeps a token-free fallback even though `GITHUB_TOKEN` is now required.**
   A classic read-only PAT (`read:user` scope) was provisioned in prod on 2026-07-14, so
   `GITHUB_TOKEN` is a `REQUIRED_ENV_VAR` and the boot gate enforces its presence; prod normally
