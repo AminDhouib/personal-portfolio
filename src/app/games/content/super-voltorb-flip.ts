@@ -102,7 +102,7 @@ export const superVoltorbFlipContent: GameContent = {
     {
       question: "Is there a Voltorb Flip solver?",
       answer:
-        "No. This page is a game, not a solver. The strategy tips above show how to read the clues yourself.",
+        "Yes. The Voltorb Flip solver page takes a board's row and column clue numbers and shows the odds for every tile. This page is the game itself.",
     },
     {
       question: "Can I stop a round and keep my coins?",
