@@ -177,6 +177,8 @@ describe("each profile on the sim", () => {
   });
 
   it("changes the run it is played in, and replays the same every time", () => {
+    // This replays three 6000-tick runs per daily profile, which runs near the 5 s default
+    // timeout under coverage on CI, so it carries an explicit 30 s timeout.
     // The serverless board lasts 300 s, so every incident before that lands on a live run.
     const log = play("daily-board", "survival", BOARD_S, 0).log;
     for (const profile of PROFILES) {
@@ -190,7 +192,7 @@ describe("each profile on the sim", () => {
       const again = replay({ ...dailyReplayOptions(day), log, ticks: 6000 });
       expect(again, profile.id).toEqual(withDay);
     }
-  });
+  }, 30_000);
 });
 
 // The serialized profile table, hashed. A profile edit changes what a day means exactly as a
