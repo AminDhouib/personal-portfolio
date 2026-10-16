@@ -28,17 +28,20 @@ const SERVER_DISTINCT_ID = "server";
 
 /** Message + first stack line only — never dump a full stack into a log line. */
 function renderDetail(detail: unknown): string {
-  if (detail instanceof Error) {
-    const firstStackLine = detail.stack?.split("\n")[1]?.trim();
-    return firstStackLine ? `${detail.message} (${firstStackLine})` : detail.message;
-  }
-  if (typeof detail === "string") return detail;
   try {
+    if (detail instanceof Error) {
+      const stack = typeof detail.stack === "string" ? detail.stack : undefined;
+      const firstStackLine = stack?.split("\n")[1]?.trim();
+      const message = String(detail.message);
+      return firstStackLine ? `${message} (${firstStackLine})` : message;
+    }
+    if (typeof detail === "string") return detail;
     // JSON.stringify returns undefined (not a string) for a function or symbol.
     return JSON.stringify(detail) ?? String(detail);
   } catch {
-    // silent-ok: this is the logger's own formatter; a stringify failure (e.g.
-    // circular ref) falls back to String() -- reporting here would recurse.
+    // silent-ok: this is the logger's own formatter; any failure while
+    // rendering (circular ref, throwing getter, revoked Proxy) falls back to
+    // String() -- reporting here would recurse.
     try {
       return String(detail);
     } catch {
@@ -92,7 +95,14 @@ function getPostHogClient(): PostHog | null {
 export function captureException(scope: string, error: unknown): void {
   logError(scope, "captured exception", error);
 
-  const normalized = error instanceof Error ? error : new Error(renderDetail(error));
+  let normalized: Error;
+  try {
+    normalized = error instanceof Error ? error : new Error(renderDetail(error));
+  } catch {
+    // silent-ok: `instanceof` throws on a revoked Proxy; the logger must never
+    // throw, so report a fixed placeholder error instead.
+    normalized = new Error("[unrenderable detail]");
+  }
 
   // The logger must never throw: its callers include process-level error
   // listeners (the pg pool 'error' handlers) where a throw is an uncaught
