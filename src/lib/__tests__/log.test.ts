@@ -5,10 +5,22 @@ const mockCaptureException = vi.hoisted(() => vi.fn());
 const mockPostHogCtor = vi.hoisted(() => vi.fn());
 
 const mockWithScope = vi.hoisted(() => vi.fn());
+const mockSentryCapture = vi.hoisted(() => vi.fn());
+const mockSetTag = vi.hoisted(() => vi.fn());
+
+// A null-prototype object whose toJSON throws: JSON.stringify throws and so does
+// String() (no toString on the prototype chain).
+function unrenderable(): unknown {
+  const bad = Object.create(null) as Record<string, unknown>;
+  bad.toJSON = () => {
+    throw new Error("no json");
+  };
+  return bad;
+}
 
 vi.mock("@sentry/nextjs", () => ({
   withScope: mockWithScope,
-  captureException: vi.fn(),
+  captureException: mockSentryCapture,
 }));
 
 vi.mock("posthog-node", () => ({
@@ -57,6 +69,23 @@ describe("logWarn / logError", () => {
     spy.mockRestore();
   });
 
+  it("logError never throws when the detail cannot be stringified or converted", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => logError("scope", "bad detail", unrenderable())).not.toThrow();
+    const [line] = spy.mock.calls[0] as [string];
+    expect(line).toBe("[scope] bad detail :: [unrenderable detail]");
+    spy.mockRestore();
+  });
+
+  it("logWarn renders a function detail as a string instead of undefined", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    logWarn("scope", "fn detail", function named() {});
+    const [line] = spy.mock.calls[0] as [string];
+    expect(line).toContain("[scope] fn detail :: ");
+    expect(line).not.toContain("undefined");
+    spy.mockRestore();
+  });
+
   it("omits the detail suffix entirely when no detail is passed", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     logWarn("scope", "just a message");
@@ -82,8 +111,10 @@ describe("captureException", () => {
     mockCaptureException.mockReset();
     mockPostHogCtor.mockReset();
     mockWithScope.mockReset();
-    mockWithScope.mockImplementation((cb: (scope: { setTag: () => void }) => void) =>
-      cb({ setTag: () => {} }),
+    mockSentryCapture.mockReset();
+    mockSetTag.mockReset();
+    mockWithScope.mockImplementation((cb: (scope: { setTag: typeof mockSetTag }) => void) =>
+      cb({ setTag: mockSetTag }),
     );
   });
 
@@ -181,6 +212,35 @@ describe("captureException", () => {
     expect(lines.some((l) => l.includes("[sentry]") && l.includes("sentry exploded"))).toBe(true);
     expect(mockCaptureException).toHaveBeenCalledOnce();
     expect(mockCaptureException.mock.calls[0]?.[0]).toBe(err);
+    errorSpy.mockRestore();
+  });
+
+  it("never throws for a non-Error whose rendering throws, and still reaches Sentry and PostHog", async () => {
+    process.env.POSTHOG_KEY = "phc_test";
+    process.env.POSTHOG_HOST = "https://posthog.example.com";
+    vi.resetModules();
+    const { captureException } = await import("../log");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(() => captureException("db.pool", unrenderable())).not.toThrow();
+    expect(mockWithScope).toHaveBeenCalledOnce();
+    expect(mockSentryCapture).toHaveBeenCalledOnce();
+    expect(mockCaptureException).toHaveBeenCalledOnce();
+    errorSpy.mockRestore();
+  });
+
+  it("tags the Sentry scope and captures the same Error on the happy path", async () => {
+    vi.resetModules();
+    const { captureException } = await import("../log");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const err = new Error("boom");
+    captureException("some:scope", err);
+
+    expect(mockWithScope).toHaveBeenCalledOnce();
+    expect(mockSetTag).toHaveBeenCalledWith("scope", "some:scope");
+    expect(mockSentryCapture).toHaveBeenCalledOnce();
+    expect(mockSentryCapture.mock.calls[0]?.[0]).toBe(err);
     errorSpy.mockRestore();
   });
 });
