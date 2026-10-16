@@ -34,11 +34,18 @@ function renderDetail(detail: unknown): string {
   }
   if (typeof detail === "string") return detail;
   try {
-    return JSON.stringify(detail);
+    // JSON.stringify returns undefined (not a string) for a function or symbol.
+    return JSON.stringify(detail) ?? String(detail);
   } catch {
     // silent-ok: this is the logger's own formatter; a stringify failure (e.g.
     // circular ref) falls back to String() -- reporting here would recurse.
-    return String(detail);
+    try {
+      return String(detail);
+    } catch {
+      // silent-ok: String() can throw too (null-prototype object, throwing
+      // toString); the logger must never throw, so a fixed placeholder it is.
+      return "[unrenderable detail]";
+    }
   }
 }
 
