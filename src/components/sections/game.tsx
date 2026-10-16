@@ -15,7 +15,15 @@ const SpaceShooterGame = dynamic(
   { ssr: false },
 );
 
-const FEATURED_BELOW_SHOOTER = ["super-voltorb-flip", "hextris"] as const;
+// Script Knight and Failover are here for crawl discovery: on 2026-10-15 Search Console had never
+// fetched either URL, and the home page (position 4, the site's strongest) is the best place to
+// link them from. Every card is one plain anchor to /games/<slug>.
+const FEATURED_BELOW_SHOOTER = [
+  "super-voltorb-flip",
+  "hextris",
+  "script-knight",
+  "failover",
+] as const;
 
 export function Game() {
   return (
