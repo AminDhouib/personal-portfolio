@@ -77,6 +77,35 @@ describe("logWarn / logError", () => {
     spy.mockRestore();
   });
 
+  it("logError never throws when an Error stack getter throws", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const err = new Error("boom");
+      Object.defineProperty(err, "stack", {
+        get() {
+          throw new Error("stack exploded");
+        },
+      });
+      expect(() => logError("scope", "bad stack", err)).not.toThrow();
+      expect(spy).toHaveBeenCalledOnce();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("logError still logs the message when an Error stack is not a string", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const err = new Error("boom");
+      (err as unknown as { stack: unknown }).stack = 123;
+      expect(() => logError("scope", "numeric stack", err)).not.toThrow();
+      const [line] = spy.mock.calls[0] as [string];
+      expect(line).toContain("boom");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("logWarn renders a function detail as a string instead of undefined", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     logWarn("scope", "fn detail", function named() {});
@@ -242,5 +271,22 @@ describe("captureException", () => {
     expect(mockSentryCapture).toHaveBeenCalledOnce();
     expect(mockSentryCapture.mock.calls[0]?.[0]).toBe(err);
     errorSpy.mockRestore();
+  });
+
+  it("never throws for a revoked Proxy, and still reaches Sentry and PostHog", async () => {
+    process.env.POSTHOG_KEY = "phc_test";
+    process.env.POSTHOG_HOST = "https://posthog.example.com";
+    vi.resetModules();
+    const { captureException } = await import("../log");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { proxy, revoke } = Proxy.revocable({}, {});
+      revoke();
+      expect(() => captureException("db.pool", proxy)).not.toThrow();
+      expect(mockSentryCapture).toHaveBeenCalledOnce();
+      expect(mockCaptureException).toHaveBeenCalledOnce();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
