@@ -316,24 +316,40 @@ test("/games is a CollectionPage whose ItemList names every public game in order
   );
 });
 
-test("the sitemap and llms.txt cover every public game and no hidden one; hidden games are noindex", async ({
-  page,
+test("the sitemap and llms.txt list exactly the public games, no more and no fewer", async ({
   request,
 }) => {
   // Guard the derived lists: a wrong `hidden` flag must not pass silently.
   expect(publicGames.length).toBeGreaterThan(1);
   expect(GAMES.find((g) => g.slug === "tower-stacker")?.hidden).toBeUndefined();
   expect(GAMES.find((g) => g.slug === "failover")?.hidden).toBeUndefined();
-  const sitemapPaths = (await sitemapUrls(request)).map(pathOf);
-  const llms = await (await request.get("/llms.txt")).text();
+  const expected = publicGames.map((g) => g.slug).sort();
 
-  for (const game of publicGames) {
-    expect.soft(sitemapPaths, `${game.slug} in sitemap`).toContain(`/games/${game.slug}`);
-    expect.soft(llms, `${game.slug} in llms.txt`).toContain(`/games/${game.slug})`);
-  }
+  // Set equality, not containment: a hidden game leaking into either surface and a public one
+  // missing from it both fail, and the check holds whether zero or many games are hidden. Only
+  // the one-segment /games/<slug> entries count; sub-pages such as a solver or hints page are
+  // separate entries with their own tests.
+  const sitemapSlugs = (await sitemapUrls(request))
+    .map(pathOf)
+    .flatMap((path) => /^\/games\/([^/?#]+)$/.exec(path)?.[1] ?? [])
+    .sort();
+  expect(sitemapSlugs, "game pages in sitemap.xml").toEqual(expected);
+
+  const llms = await (await request.get("/llms.txt")).text();
+  const llmsSlugs = [...llms.matchAll(/\/games\/([^/)\s]+)\)/g)]
+    .flatMap((match) => (match[1] ? [match[1]] : []))
+    .sort();
+  expect(llmsSlugs, "game pages in llms.txt").toEqual(expected);
+});
+
+test("hidden game pages are noindex", async ({ page }) => {
+  // No game is hidden today, so this loop would iterate over nothing and pass without checking
+  // anything. This spec runs against a real production build, which a registry mock cannot
+  // reach; the unit tests cover the hidden path with a mocked registry. Skip loudly so the
+  // report says nothing was tested, and the test starts checking once a game is hidden.
+  test.skip(hiddenGames.length === 0, "no game is hidden in the registry today; nothing to check");
+
   for (const game of hiddenGames) {
-    expect.soft(sitemapPaths, `${game.slug} not in sitemap`).not.toContain(`/games/${game.slug}`);
-    expect.soft(llms, `${game.slug} not in llms.txt`).not.toContain(`/games/${game.slug})`);
     await page.goto(`/games/${game.slug}`, { waitUntil: "domcontentloaded" });
     await expect
       .soft(page.locator('meta[name="robots"]'), `${game.slug} noindex`)
