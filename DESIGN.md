@@ -1439,6 +1439,17 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   update and why the whole sim runs headless on the server. A new scene feature that needs a
   sim value adds it to `snapshot()`, not an import of sim internals.
 
+- **The `watchdog` service mounts `/var/run/docker.sock`, on purpose.** The socket is
+  root-equivalent on the host, so the service is boxed in: `network_mode: none` (no network, so
+  nothing can reach it and, like `db`, it is restored at boot), no ports, no domain, no env
+  secrets, a read-only rootfs, every capability dropped, and a fixed command that only ever runs
+  `docker start` on containers of its own compose project with `service=app`, and only when they
+  are exited with code 255. It exists because a host reboot leaves `app` (the one service Dokploy
+  attaches to the external `dokploy-network` overlay) at `Exited (255)` and the restart policy
+  never retries; see RUNBOOK.md's Restart section. Do not give it a network, a port, a broader
+  filter, or a `docker` verb other than `start`, and do not add `depends_on` to or from `app`.
+  `src/lib/__tests__/compose-watchdog.test.ts` pins the shape.
+
 - **Failover ships with `SHADOW = true`.** The first release accepts a replay that drifts a little
   from the claim and reports it to Sentry, so the verifier cannot reject an honest run over an
   engine difference nobody has measured in the wild. The coordinator turns it off on the owner's

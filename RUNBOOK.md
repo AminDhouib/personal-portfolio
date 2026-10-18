@@ -157,6 +157,22 @@ server) both exist and would be the lighter choice for a wedged process whose de
 fine — e.g. after manually repairing data in the db — but neither has been exercised here; treat
 them like the panel rollback (unverified) and fall back to `compose.deploy` if in doubt.
 
+**After a host reboot, the `watchdog` service brings `app` back.** Dokploy attaches `app` to the
+external Swarm overlay `dokploy-network`, and at boot the Docker daemon cannot attach that overlay
+yet: `db` comes back, `app` stays `Exited (255)` and `restart: unless-stopped` never retries
+(2026-10-16: down two hours, no new log lines). `watchdog` (`compose.yml`, the `docker:29-cli`
+image, no network) wakes every ~25 s and runs `docker start` on this compose project's `app`
+container only when it is exited with code 255, the daemon-shutdown signature. A deploy, a
+compose Stop or a SIGTERM exits 0 or 143, so the watchdog never undoes a deliberate stop, and a
+Stop takes the watchdog down with the rest of the stack anyway. Its log is one line per action
+(`docker.getContainers` for the full name, then `docker logs <name>` on the server, or the panel's
+log view): `guarding service=app in project=<name>` at start, then `started <id> (exited 255)` or
+`start of <id> failed: <reason>`. A quiet log is the healthy state. If `app` is down after a reboot
+and the log shows repeated failures, the overlay is still not attachable; the manual
+`docker start <app container>` is the same call. The watchdog does not cover a rebooted host where
+the `watchdog` container itself is missing (a stack deployed before this service existed gets it
+on the next `compose.deploy`).
+
 ### Data
 
 All persisted data lives in **Postgres**, not on disk. Compose defines a `db` service

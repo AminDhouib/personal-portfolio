@@ -80,5 +80,69 @@ services:
       start_period: 20s
       retries: 3
 
+  # Brings `app` back after a HOST REBOOT. Dokploy rewrites this file at deploy
+  # time and attaches `app` (the service with a domain) to the external
+  # `dokploy-network`, a Swarm-scoped attachable overlay. At boot the Docker
+  # daemon restores `db` (default network only) but cannot attach that overlay
+  # yet, so `app` stays `Exited (255)` and `restart: unless-stopped` never
+  # retries a failed start (seen 2026-10-16: down 2 h with no new log lines).
+  # This service has NO networks (`network_mode: none`), so like `db` it comes
+  # back at boot; every ~25 s it runs `docker start` on this project's `app`
+  # container, and ONLY when that container is exited with code 255, the
+  # daemon-shutdown signature. A deploy, `compose stop` or SIGTERM exits 0 or
+  # 143, so a deliberate stop is never undone.
+  #
+  # Security trade-off: /var/run/docker.sock is root-equivalent on the host. It
+  # is mitigated by `network_mode: none` (nothing can reach this container), no
+  # ports, no env secrets, a read-only rootfs with every capability dropped, and
+  # a fixed command that only ever runs `docker start` on this project's `app`.
+  # See DESIGN.md's register entry on the docker.sock mount before changing it.
+  watchdog:
+    image: docker:29-cli@sha256:1a4c7cb63513f349bdad01fcc6e0f3f2f67d37b9da86f14dc0d4a0942eecda00
+    restart: unless-stopped
+    network_mode: none
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 64
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"
+    # `$$` is compose's escape for a literal `$` (it is not interpolated here).
+    # The project name comes from this container's own compose label, so the
+    # same file works under any project name (Dokploy's, or a local one).
+    # Every docker call is allowed to fail: it logs and the loop carries on.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        log() { echo "$$(date -u +%Y-%m-%dT%H:%M:%SZ) watchdog: $$*"; }
+        project=""
+        while true; do
+          if [ -z "$$project" ]; then
+            project=$$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$$HOSTNAME" 2>/dev/null) || project=""
+            [ -n "$$project" ] && log "guarding service=app in project=$$project"
+          fi
+          if [ -n "$$project" ]; then
+            if ids=$$(docker ps -aq --filter "label=com.docker.compose.project=$$project" --filter "label=com.docker.compose.service=app" --filter "label=com.docker.compose.oneoff=False" --filter status=exited --filter exited=255 2>&1); then
+              for id in $$ids; do
+                if out=$$(docker start "$$id" 2>&1); then
+                  log "started $$id (exited 255)"
+                else
+                  log "start of $$id failed: $$out"
+                fi
+              done
+            else
+              log "docker ps failed: $$ids"
+            fi
+          fi
+          sleep 25
+        done
+
 volumes:
   db-data:
