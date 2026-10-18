@@ -157,6 +157,32 @@ server) both exist and would be the lighter choice for a wedged process whose de
 fine — e.g. after manually repairing data in the db — but neither has been exercised here; treat
 them like the panel rollback (unverified) and fall back to `compose.deploy` if in doubt.
 
+#### After a host reboot
+
+On 2026-10-16 (07:22Z) `devino-first` rebooted: `db` came back, but `app-1` stayed `Exited (255)`
+for about 2 h. The docker journal (07:24:54Z) shows why: `failed to start swarm container ...
+failed to set up container networking: attaching to network failed ... context deadline
+exceeded`. Dokploy attaches every service that has a domain to `dokploy-network` (a swarm overlay,
+for Traefik); at daemon boot that attach can time out before swarm is ready, and the daemon does
+not retry a failed start even with `restart: unless-stopped`. It is host-wide (other stacks'
+domain services hit it too) and is not `depends_on`, the healthcheck, or this repo's compose file;
+`isolatedDeployment` does not avoid it. Do not add a per-stack watchdog service here; the owner
+chose one host-level fix.
+
+Fix, outside this repo: the systemd unit `swarm-attach-reconcile.service` on `devino-first`
+(enabled, `WantedBy=docker.service`, installed 2026-10-17) runs
+`/usr/local/sbin/swarm-attach-reconcile.sh`. It waits for swarm to be active, settles 90 s, then
+makes up to 3 passes 60 s apart, `docker start`ing exited containers whose restart policy is
+`always`/`unless-stopped` and whose `State.Error` contains `attaching to network failed`. The
+app container matches. It has not yet been exercised by a real boot.
+
+After any reboot, wait about 5 min for those passes, then check with
+`docker inspect -f '{{.State.Status}} {{.State.ExitCode}} {{.State.Error}}'
+compose-index-multi-byte-microchip-5usn3s-app-1` and `journalctl -u swarm-attach-reconcile`. If
+the app is still `Exited (255)`, run `compose.start` (panel Start or the API pattern above): that
+brought the app back on 2026-10-16 at 09:09Z, same container, `/api/health` 200, so it is an
+exercised path. Never restart the host or docker to test any of this.
+
 ### Data
 
 All persisted data lives in **Postgres**, not on disk. Compose defines a `db` service
