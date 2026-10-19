@@ -456,6 +456,42 @@ describes it to visitors. The site has no consent gate.
 bookings as conversions in GA4, mark `book_call_click` as a key event in the GA4 admin UI; that
 is a one-time manual step, not code.
 
+### Analytics proxy (first-party PostHog)
+
+The browser does not call posthog.devino.ca. It posts to `/_p/4qe/...` on amindhou.com; Next
+rewrites that to PostHog server-side (`next.config.ts`), and `src/proxy.ts` sends capture requests
+(`/e`, `/batch`, `/i/v0`, `/capture`) over an internal hop so PostHog records the visitor's real
+IP instead of this server's. Why and how: DESIGN.md's register entries on the proxy path, the
+capture hop and trailing slashes.
+
+**Host dependency (outside this repo).** The hop lands on a Traefik file-provider router on the
+prod host, owned by the Uptimely repo: `/etc/dokploy/traefik/dynamic/posthog-capture-internal.yml`,
+router `Host(posthog-capture.internal)` restricted to `ClientIP(10.0.0.0/8)` or
+`ClientIP(172.16.0.0/12)` on entrypoint `web`, service `capture@docker`. The compose
+`extra_hosts: ["posthog-capture.internal:host-gateway"]` on the app service makes the name
+resolve to the docker host, and the `web` entrypoint trusts forwarded headers from private ranges
+only, so the proxy's `X-Forwarded-For` survives and nothing public can reach the router. Do not
+edit that file from here and never remove the Cloudflare rule that strips `X-Forwarded-For` on
+posthog.devino.ca; it is the anti-spoof reason the hop exists.
+
+**Verify after a deploy** (more than a minute after load, with an ad blocker on if you have one):
+
+1. Browser network tab: POSTs to `/_p/4qe/e/` (or `/i/v0/e/`) answer 200, and nothing is sent to
+   posthog.devino.ca.
+2. `curl -sI https://amindhou.com/about/` answers 308 with `location: /about`.
+3. PostHog project 22, a fresh event: its geo properties (`$geoip_city_name`,
+   `$geoip_country_name`) match where you are, not the prod host's city.
+
+**Symptoms and fallback.** If browser events stop and the network tab shows `/_p/4qe/e/` failing
+with 404 from Traefik, the host router file is missing or the container lost the `extra_hosts`
+mapping (see "After a host reboot" for the related network-attach failure). Fastest fix: set
+`POSTHOG_CAPTURE_INTERNAL_ORIGIN=` (blank) in the Dokploy compose env and redeploy; capture then
+takes the public route, events flow again, and every visitor appears at the host's IP until the
+router is restored. The variable is read at request time, so it is a restart, not a rebuild.
+Pageviews working but wrong geo means the hop is off or `CF-Connecting-IP` is not reaching the
+app (check the Cloudflare proxy status of the amindhou.com record). A local stack has no such
+router: set the variable blank in `.env` if it captures at all.
+
 ## Development environment (maintainer's Windows/OneDrive machine)
 
 The following are pitfalls specific to this machine's setup (Windows 11, OneDrive-synced working

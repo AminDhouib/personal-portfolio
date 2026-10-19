@@ -93,6 +93,10 @@ pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm t
   `ui/`. Its Daily Incident ranks on the arcade board through a proof-verified entry that replays
   the action log on the server (`src/lib/arcade/failover-verify.ts`, `SHADOW` still on). See
   DESIGN.md's "Failover" section and its register entries.
+- First-party PostHog: the browser posts to `/_p/4qe` (`src/lib/posthog-proxy.ts` holds the path
+  and rewrites), `src/proxy.ts` (Next 16's `middleware`) hops capture to an internal origin for
+  the visitor's IP and re-creates the trailing-slash 308 that `skipTrailingSlashRedirect` turned
+  off. See DESIGN.md's register and RUNBOOK.md's "Analytics proxy".
 - AI chat: CopilotKit + OpenRouter, proxied through `src/app/api/copilotkit/route.ts`.
 
 ## Hard boundaries
