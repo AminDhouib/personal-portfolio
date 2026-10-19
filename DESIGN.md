@@ -1498,7 +1498,7 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   trailing-slash 308 breaks them; Next has no per-path switch. With the flag on, Next stops
   redirecting for EVERY path, which would leave each page answering 200 at a duplicate `/about/`
   (an SEO regression for a site that lives on its search presence). So `src/proxy.ts` answers 308
-  to the slashless form, query kept, host-relative like Next's own, for every path except the
+  to the slashless form, query kept, as an absolute URL cloned from the request (a hand-built relative `Location` makes the Next server throw and answer 500), for every path except the
   PostHog proxy path (the root `/` is untouched, and a run of trailing slashes collapses in one
   hop; leading slashes are collapsed so the target is never protocol-relative). This matches the
   default for `trailingSlash: false`, including dotted last segments (`/gcc.git/`). Nothing in the
