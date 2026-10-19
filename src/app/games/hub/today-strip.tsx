@@ -36,7 +36,7 @@ function TileBody({
   // The body is always exactly three 24px rows tall, so loading, populated, empty and error
   // tiles are the same height and the page never shifts when a read lands.
   return (
-    <div data-tile-body="" aria-busy={state === "idle"} className="mt-3 h-18">
+    <div data-tile-body="" aria-busy={state === "idle"} aria-live="polite" className="mt-3 h-18">
       {state === "idle" && (
         <>
           <p className="sr-only">Loading</p>
@@ -51,7 +51,7 @@ function TileBody({
         </>
       )}
       {state === "ready" && result?.status === "ok" && (
-        <ol role="list">
+        <ol role="list" className="motion-fade-in">
           {result.rows.map((row) => (
             <li key={row.rank} className="flex h-6 items-center gap-2 text-sm">
               <span className="w-4 shrink-0 text-(--muted) tabular-nums">{row.rank}</span>
@@ -64,12 +64,12 @@ function TileBody({
         </ol>
       )}
       {state === "empty" && (
-        <p className="flex h-full items-center text-sm text-(--muted)">
+        <p className="motion-fade-in flex h-full items-center text-sm text-(--muted)">
           No runs yet today. Be the first.
         </p>
       )}
       {state === "error" && (
-        <p className="flex h-full items-center text-sm text-(--muted)">
+        <p className="motion-fade-in flex h-full items-center text-sm text-(--muted)">
           Board unavailable right now
         </p>
       )}

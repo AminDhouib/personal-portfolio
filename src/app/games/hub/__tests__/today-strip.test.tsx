@@ -143,6 +143,36 @@ describe("TodayStrip", () => {
     for (const url of urls) expect(url).not.toContain("player");
   });
 
+  it("fades the landed content in, announces it politely, and leaves the placeholder static", async () => {
+    stubFetch((url) =>
+      Promise.resolve(
+        url.includes("password-game-2")
+          ? reply(500, { error: "x" })
+          : url.includes("game=space-shooter")
+            ? reply(200, arcadeBody([{ handle: "Nova", score: 1 }]))
+            : reply(200, { entries: [] }),
+      ),
+    );
+    const html = renderToString(<TodayStrip />);
+    expect(html).not.toContain("motion-fade-in");
+    const { container } = render(<TodayStrip />);
+    for (const body of container.querySelectorAll("[data-tile-body]")) {
+      expect(body).toHaveAttribute("aria-live", "polite");
+      expect(body.querySelector(".motion-fade-in")).toBeNull();
+    }
+    await settled();
+    const [pg2, orbital, hextris] = tiles();
+    expect(pg2).toHaveAttribute("data-state", "error");
+    expect(orbital).toHaveAttribute("data-state", "ready");
+    expect(hextris).toHaveAttribute("data-state", "empty");
+    for (const tile of [pg2, orbital, hextris]) {
+      expect(tile!.querySelector("[data-tile-body] .motion-fade-in")).not.toBeNull();
+    }
+    for (const body of container.querySelectorAll("[data-tile-body]")) {
+      expect(body).toHaveAttribute("aria-live", "polite");
+    }
+  });
+
   it("says so when nobody has played today", async () => {
     stubFetch(() => Promise.resolve(reply(200, { entries: [] })));
     render(<TodayStrip />);
