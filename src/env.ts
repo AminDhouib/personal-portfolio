@@ -28,6 +28,10 @@ const schema = z.object({
   // a no-op when unset, never a boot/build failure, so NOT in REQUIRED_ENV_VARS.
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.preprocess(emptyToUndefined, z.url().optional()),
+  // Internal origin the first-party PostHog proxy (src/proxy.ts) sends capture requests to, so
+  // PostHog sees the visitor's IP. Server-side, read at request time. Optional: blank or unset
+  // disables the hop and capture takes the public route (see RUNBOOK.md, Analytics proxy).
+  POSTHOG_CAPTURE_INTERNAL_ORIGIN: z.preprocess(emptyToUndefined, z.url().optional()),
   // Google Analytics gtag.js measurement ID (G-XXXXXXXXXX), read server-side
   // through the env proxy and injected into the gtag script tags. Revives the
   // previously-dead NEXT_PUBLIC_GA4_ID prod var (see DESIGN.md known debt) by
