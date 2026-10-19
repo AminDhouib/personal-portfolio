@@ -19,6 +19,9 @@ export default defineConfig({
   forbidOnly: ci,
   retries: ci ? 1 : 0,
   reporter: ci ? [["dot"], ["html", { open: "never" }]] : [["list"]],
+  // Screenshot assertions capture with CSS animations and transitions finished, so a motion
+  // pass cannot flake a baseline.
+  expect: { toHaveScreenshot: { animations: "disabled" } },
   use: {
     baseURL,
     channel,

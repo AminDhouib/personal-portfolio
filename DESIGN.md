@@ -704,6 +704,16 @@ current tree on 2026-07-07.
   `frameloop="demand"`, and its `useFrame` callbacks skip any frame that is not an `"always"`
   frame, so it draws one still pose and redraws it only on resize. The embedded Orbital Dodge
   keeps moving.
+- **Motion tokens and the global reduced-motion net** (`globals.css`, from the subtle-motion pass,
+  audit in `docs/motion-audit.md`). `--motion-dur-fast/base/slow` (120/180/240 ms) and
+  `--motion-ease-out` live in a plain `:root` block; no `--ease-*` is ever defined (it would
+  override Tailwind's built-ins). A `prefers-reduced-motion` net zeroes CSS animation and
+  transition durations site-wide except `.animate-spin` and anything inside a
+  `[data-motion-exempt]` element. The exemption is the same ruling as the inversion above: games
+  keep their motion, so each game mount point wraps its content in
+  `<div data-motion-exempt className="contents">` (`game-loader.tsx`, `sections/game.tsx`,
+  `games/password-game/page.tsx`). New game mount points need the attribute. The net does not
+  remove end-state transforms, so new transforms still go under `motion-safe:`.
 - **Every react-three-fiber Canvas mounts behind `WebGLOnly`** (`components/three/webgl-only.tsx`).
   three.js needs a WebGL2 context. Without one, its renderer throws "Error creating WebGL
   context." inside R3F's async Canvas setup: an unhandled rejection no error boundary catches,

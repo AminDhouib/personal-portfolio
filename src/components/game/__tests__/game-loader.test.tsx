@@ -11,6 +11,19 @@ vi.mock("next/navigation", () => ({
 
 const renderableGames = GAMES.filter((g) => !g.external);
 
+/** GameLoader returns <div data-motion-exempt className="contents"><MotionConfig>...</MotionConfig></div>. */
+function unwrapExempt(element: ReactElement): ReactElement {
+  expect(element.type).toBe("div");
+  const props = element.props as {
+    "data-motion-exempt"?: boolean;
+    className?: string;
+    children: ReactElement;
+  };
+  expect(props["data-motion-exempt"]).toBe(true);
+  expect(props.className).toBe("contents");
+  return props.children;
+}
+
 describe("GameLoader", () => {
   afterEach(() => {
     cleanup();
@@ -18,12 +31,13 @@ describe("GameLoader", () => {
   });
 
   it.each(renderableGames.map((g) => [g.slug, g] as const))(
-    "wraps slug %s in a MotionConfig pinned to reducedMotion=never (games are exempt)",
+    "wraps slug %s in a data-motion-exempt wrapper and a MotionConfig pinned to reducedMotion=never (games are exempt)",
     (_slug, game) => {
       const element = GameLoader({ slug: game.slug }) as ReactElement;
       expect(element).not.toBeNull();
-      expect(element.type).toBe(MotionConfig);
-      const props = element.props as ComponentProps<typeof MotionConfig>;
+      const config = unwrapExempt(element);
+      expect(config.type).toBe(MotionConfig);
+      const props = config.props as ComponentProps<typeof MotionConfig>;
       expect(props.reducedMotion).toBe("never");
     },
   );
@@ -53,7 +67,7 @@ describe("GameLoader", () => {
 
   it("maps the renderable slugs to distinct component identities inside the MotionConfig wrapper", () => {
     const types = renderableGames.map((g) => {
-      const element = GameLoader({ slug: g.slug }) as ReactElement;
+      const element = unwrapExempt(GameLoader({ slug: g.slug }) as ReactElement);
       const props = element.props as ComponentProps<typeof MotionConfig>;
       return (props.children as ReactElement).type;
     });

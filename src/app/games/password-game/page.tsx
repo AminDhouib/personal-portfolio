@@ -123,7 +123,10 @@ export default function PasswordGamePage() {
               </Link>
             </p>
           </div>
-          <PasswordGame2Loader />
+          {/* data-motion-exempt: the global reduced-motion net skips the game (globals.css). */}
+          <div data-motion-exempt className="contents">
+            <PasswordGame2Loader />
+          </div>
         </div>
 
         <div className="mx-auto max-w-5xl">
