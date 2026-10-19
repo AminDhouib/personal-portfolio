@@ -47,30 +47,36 @@ function StarField({ density = 40, color = "white" }: { density?: number; color?
 export function SpaceShooterBanner() {
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0a0a1a" }}>
-      {/* Biome nebula glow — drifts slowly downward for parallax */}
+      {/* Every vertical drift below animates a transform translate, not `top`:
+          the element is parked at top-0 and `y` percentages resolve against the
+          element's own height, so a drift of T% of the banner is T / h * 100%
+          of an element that is h% of the banner tall. Small sprites sit inside
+          a full-height wrapper so one "100%" is one banner height. */}
+      {/* Biome nebula glow — drifts slowly downward for parallax (-20%..80% of the banner, h-[80%]) */}
       <motion.div
-        className="absolute h-[80%] w-[70%] rounded-full blur-3xl"
+        className="absolute top-0 h-[80%] w-[70%] rounded-full blur-3xl"
         style={{
           right: "-15%",
           background: "radial-gradient(circle, #b4540030 0%, #facc1518 40%, transparent 70%)",
         }}
-        animate={{ top: ["-20%", "80%"] }}
+        animate={{ y: ["-25%", "100%"] }}
         transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
       />
+      {/* 10%..110% of the banner, h-[60%] */}
       <motion.div
-        className="absolute h-[60%] w-[50%] rounded-full blur-3xl"
+        className="absolute top-0 h-[60%] w-[50%] rounded-full blur-3xl"
         style={{
           left: "-10%",
           background: "radial-gradient(circle, #a78bfa15 0%, transparent 65%)",
         }}
-        animate={{ top: ["10%", "110%"] }}
+        animate={{ y: ["16.667%", "183.333%"] }}
         transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
       />
-      {/* Starfield scrolling slowly downward — parallax layer behind everything */}
+      {/* Starfield scrolling slowly downward — parallax layer behind everything (0%..50% of the banner, h-[200%]) */}
       <motion.div
-        className="absolute left-0 w-full"
-        style={{ height: "200%", top: 0 }}
-        animate={{ top: ["0%", "50%"] }}
+        className="absolute top-0 left-0 w-full"
+        style={{ height: "200%" }}
+        animate={{ y: ["0%", "25%"] }}
         transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
       >
         <StarField density={60} color="#94a3b8" />
@@ -83,7 +89,7 @@ export function SpaceShooterBanner() {
         return (
           <motion.div
             key={i}
-            className="absolute"
+            className="absolute top-0"
             style={{
               left: `${x}%`,
               width: 1,
@@ -91,7 +97,7 @@ export function SpaceShooterBanner() {
               background:
                 "linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent)",
             }}
-            animate={{ top: ["-15%", "110%"] }}
+            animate={{ y: [`${(-15 / len) * 100}%`, `${(110 / len) * 100}%`] }}
             transition={{
               duration: 0.5 + (i % 5) * 0.12,
               repeat: Infinity,
@@ -110,34 +116,40 @@ export function SpaceShooterBanner() {
         { x: 48, size: 22, faces: ["#4c1d95", "#6d28d9", "#8b5cf6"], spd: 2.8, delay: 1.5 },
         { x: 90, size: 30, faces: ["#134e4a", "#0f766e", "#2dd4bf"], spd: 3.3, delay: 2.5 },
       ].map((a, i) => (
-        <motion.svg
+        <motion.div
           key={i}
-          className="absolute"
-          style={{ left: `${a.x}%`, width: a.size, height: a.size }}
-          viewBox="-14 -14 28 28"
-          animate={{
-            top: ["-12%", "110%"],
-            rotate: [0, 360],
-            scale: [0.6, 1.2],
-          }}
-          transition={{
-            duration: a.spd,
-            repeat: Infinity,
-            delay: a.delay,
-            ease: "linear",
-          }}
+          className="pointer-events-none absolute top-0 h-full"
+          style={{ left: `${a.x}%`, width: a.size }}
+          animate={{ y: ["-12%", "110%"] }}
+          transition={{ duration: a.spd, repeat: Infinity, delay: a.delay, ease: "linear" }}
         >
-          <polygon points="0,-12 12,0 0,2" fill={a.faces[0]} />
-          <polygon points="0,-12 -12,0 0,2" fill={a.faces[1]} />
-          <polygon points="0,12 12,0 0,2" fill={a.faces[2]} />
-          <polygon points="0,12 -12,0 0,2" fill={a.faces[1]} />
-          <polygon
-            points="0,-12 12,0 0,12 -12,0"
-            fill="none"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth="0.5"
-          />
-        </motion.svg>
+          <motion.svg
+            className="block"
+            style={{ width: a.size, height: a.size }}
+            viewBox="-14 -14 28 28"
+            animate={{
+              rotate: [0, 360],
+              scale: [0.6, 1.2],
+            }}
+            transition={{
+              duration: a.spd,
+              repeat: Infinity,
+              delay: a.delay,
+              ease: "linear",
+            }}
+          >
+            <polygon points="0,-12 12,0 0,2" fill={a.faces[0]} />
+            <polygon points="0,-12 -12,0 0,2" fill={a.faces[1]} />
+            <polygon points="0,12 12,0 0,2" fill={a.faces[2]} />
+            <polygon points="0,12 -12,0 0,2" fill={a.faces[1]} />
+            <polygon
+              points="0,-12 12,0 0,12 -12,0"
+              fill="none"
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth="0.5"
+            />
+          </motion.svg>
+        </motion.div>
       ))}
       {/* Ship (positioned off-center like in gameplay) */}
       <motion.svg
@@ -192,15 +204,19 @@ export function SpaceShooterBanner() {
       ].map((b, i) => (
         <motion.div
           key={i}
-          className="absolute h-2 w-2 rounded-full"
-          style={{
-            left: b.x,
-            background: "#22d3ee",
-            boxShadow: "0 0 6px 2px #22d3ee, 0 0 14px #22d3ee66",
-          }}
-          animate={{ top: ["42%", "0%"], opacity: [1, 0] }}
+          className="pointer-events-none absolute top-0 h-full w-2"
+          style={{ left: b.x }}
+          animate={{ y: ["42%", "0%"], opacity: [1, 0] }}
           transition={{ duration: 0.5, repeat: Infinity, delay: b.d, ease: "linear" }}
-        />
+        >
+          <div
+            className="h-2 w-2 rounded-full"
+            style={{
+              background: "#22d3ee",
+              boxShadow: "0 0 6px 2px #22d3ee, 0 0 14px #22d3ee66",
+            }}
+          />
+        </motion.div>
       ))}
       {/* Gold coins flowing down like asteroids */}
       {[
@@ -210,19 +226,24 @@ export function SpaceShooterBanner() {
       ].map((c, i) => (
         <motion.div
           key={i}
-          className="absolute h-3.5 w-3.5 rounded-full"
-          style={{
-            left: c.x,
-            background: "radial-gradient(circle at 35% 35%, #fde68a, #d97706)",
-            boxShadow: "0 0 10px #facc1566",
-          }}
-          animate={{
-            top: ["-5%", "110%"],
-            scale: [0.5, 1.1],
-            rotate: [0, 360],
-          }}
+          className="pointer-events-none absolute top-0 h-full w-3.5"
+          style={{ left: c.x }}
+          animate={{ y: ["-5%", "110%"] }}
           transition={{ duration: c.spd, repeat: Infinity, delay: c.delay, ease: "linear" }}
-        />
+        >
+          <motion.div
+            className="h-3.5 w-3.5 rounded-full"
+            style={{
+              background: "radial-gradient(circle at 35% 35%, #fde68a, #d97706)",
+              boxShadow: "0 0 10px #facc1566",
+            }}
+            animate={{
+              scale: [0.5, 1.1],
+              rotate: [0, 360],
+            }}
+            transition={{ duration: c.spd, repeat: Infinity, delay: c.delay, ease: "linear" }}
+          />
+        </motion.div>
       ))}
       {/* Vignette — dark edges like the actual PostFx */}
       <div
@@ -669,14 +690,10 @@ export function TypingSpeedBanner() {
       {correctColors.map((c, i) => (
         <motion.div
           key={i}
-          className="absolute h-1.5 w-1.5 rounded-full"
-          style={{
-            left: `${20 + i * 15}%`,
-            background: c,
-            boxShadow: `0 0 6px ${c}`,
-          }}
+          className="pointer-events-none absolute top-0 h-full w-1.5"
+          style={{ left: `${20 + i * 15}%` }}
           animate={{
-            top: ["55%", "35%"],
+            y: ["55%", "35%"],
             opacity: [0, 1, 0],
             x: [(i % 2 === 0 ? -1 : 1) * 10, (i % 2 === 0 ? 1 : -1) * 15],
           }}
@@ -685,7 +702,12 @@ export function TypingSpeedBanner() {
             repeat: Infinity,
             delay: i * 0.3 + 0.5,
           }}
-        />
+        >
+          <div
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: c, boxShadow: `0 0 6px ${c}` }}
+          />
+        </motion.div>
       ))}
     </div>
   );
