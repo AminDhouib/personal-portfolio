@@ -141,31 +141,31 @@ describe("proxy: trailing slashes on ordinary paths", () => {
   ])("answers 308 for %s, to the slashless form %s", async (path, target) => {
     const response = await proxy(request(path));
     expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe(target);
+    expect(response.headers.get("location")).toBe(`${ORIGIN}${target}`);
   });
 
   it("keeps the query string on the redirect", async () => {
     const response = await proxy(request("/games/?utm_source=x&a=1"));
     expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe("/games?utm_source=x&a=1");
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/games?utm_source=x&a=1`);
   });
 
   it("keeps the method-preserving status for non-GET requests", async () => {
     const response = await proxy(request("/api/leads/", { method: "POST" }));
     expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe("/api/leads");
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/api/leads`);
   });
 
-  it("the redirect is host-relative, so it can never point at an internal origin", async () => {
-    const response = await proxy(request("/about/", { headers: { host: "localhost:3000" } }));
-    expect(response.headers.get("location")).toBe("/about");
-    expect(response.headers.get("location")).not.toMatch(/^[a-z]+:/i);
+  it("the redirect is an absolute URL on the origin the visitor used (a relative Location 500s in Next's server)", async () => {
+    const response = await proxy(request("/about/"));
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/about`);
+    expect(response.headers.get("location")).toMatch(/^https:\/\/amindhou\.com\//);
   });
 
-  it("cannot be turned into a protocol-relative redirect", async () => {
+  it("cannot be turned into a protocol-relative or foreign-host redirect", async () => {
     const response = await proxy(request("//evil.example.com/"));
     const location = response.headers.get("location");
-    expect(location === null || !location.startsWith("//")).toBe(true);
+    expect(location === null || new URL(location).origin === ORIGIN).toBe(true);
   });
 
   it.each(["/", "/about", "/games/hextris", "/sitemap.xml", "/llms.txt"])(

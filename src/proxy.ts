@@ -32,11 +32,13 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   // 2. Next's default trailing-slash redirect, which skipTrailingSlashRedirect switched off for
-  // the whole site. 308 to the slashless form, query kept, host-relative like Next's own, so a
-  // page never answers 200 on a duplicate `/about/` URL.
+  // the whole site. 308 to the slashless form, query kept, so a page never answers 200 on a
+  // duplicate `/about/` URL. The target is resolved against the request's own URL (same scheme and
+  // host the visitor used): a hand-built relative Location header makes the Next server throw
+  // "Invalid URL" and answer 500, found by the standalone-server check.
   const target = slashlessRedirectTarget(pathname);
   if (target) {
-    return new NextResponse(null, { status: 308, headers: { location: `${target}${search}` } });
+    return NextResponse.redirect(new URL(`${target}${search}`, request.url), 308);
   }
 
   return NextResponse.next();
