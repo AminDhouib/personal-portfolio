@@ -201,7 +201,7 @@ export function OpenSource({ stats, contributions }: Props) {
                 return (
                   <div
                     key={`${col}-${row}`}
-                    className="aspect-square min-w-[10px] cursor-pointer rounded-sm transition-shadow hover:ring-1 hover:ring-(--foreground) hover:ring-inset"
+                    className="aspect-square min-w-[10px] cursor-pointer rounded-sm hover:ring-1 hover:ring-(--foreground) hover:ring-inset"
                     style={{ backgroundColor: levelColor[day.level] }}
                     onMouseEnter={(e) => {
                       const r = e.currentTarget.getBoundingClientRect();
