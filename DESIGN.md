@@ -1484,7 +1484,8 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   does not load), `/batch` and `/capture`. When a posthog-js upgrade adds a call, add its path to
   `POSTHOG_ALLOWED_PATHS` in `src/lib/posthog-proxy.ts` (a pinned test lists every rule). The path
   is also kept out of search: `Disallow: /_p/` in `robots.ts` and an `X-Robots-Tag: noindex`
-  header from `next.config.ts`. Destinations are `NEXT_PUBLIC_POSTHOG_HOST` (default
+  header from `next.config.ts` (on the app's own 404s only; proxied PostHog responses carry
+  upstream headers). Destinations are `NEXT_PUBLIC_POSTHOG_HOST` (default
   `https://posthog.devino.ca`, trailing slash trimmed; it is a build arg, so the destination is
   fixed at build time). Server-side capture (`src/lib/log.ts`,
   `POSTHOG_HOST`) stays DIRECT to PostHog: no blocker on a server, and a hop through our own app
