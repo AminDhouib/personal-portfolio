@@ -134,6 +134,8 @@ function posthogInternalCaptureOrigin(configured: string | null | undefined): st
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     return url.origin;
   } catch {
+    // silent-ok: an unparseable origin means "no internal hop"; capture falls back to the public
+    // route, which is the documented behaviour for a blank value too (RUNBOOK.md).
     return null;
   }
 }
