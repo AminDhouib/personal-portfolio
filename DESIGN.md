@@ -1467,6 +1467,50 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   criterion (3 days, at least 20 real daily runs, zero failures on legitimate runs, judged on the
   `failover.verify` lines); see the Failover section.
 
+- **Browser PostHog talks to a meaningless same-origin path, `/_p/4qe`.** `src/lib/posthog-proxy.ts`
+  holds the one constant (`POSTHOG_PROXY_PATH`) and everything derives from it: the SDK's
+  `api_host`, the three `rewrites()` in `next.config.ts`, the proxy's matching. Ad blockers match
+  `posthog.devino.ca` by host and `/ingest`, `/analytics`, `/posthog`, `/collect` by path, so the
+  path is deliberately none of those; do not "tidy" it into a readable name. `ui_host` stays the
+  real instance so toolbar links work. The rewrites go `static`, then `array`, then the catch-all
+  (the SDK bundle and its remote config must not be swallowed by the catch-all) to
+  `NEXT_PUBLIC_POSTHOG_HOST` (default `https://posthog.devino.ca`, trailing slash trimmed; it is a
+  build arg, so the destination is fixed at build time). Server-side capture (`src/lib/log.ts`,
+  `POSTHOG_HOST`) stays DIRECT to PostHog: no blocker on a server, and a hop through our own app
+  could only fail. There is no CSP in `next.config.ts`, so no `connect-src` entry is needed.
+- **Capture takes an internal hop so PostHog sees the visitor's IP.** PostHog's capture service
+  reads only the LEFTMOST `X-Forwarded-For`, and the devino.ca Cloudflare zone strips
+  `X-Forwarded-For` on posthog.devino.ca on purpose (anti-spoof; never work around it). Through
+  the public rewrite every event would arrive from this server's address and geo-IP would collapse
+  to one city. So `src/proxy.ts` rewrites capture sub-paths (`/e`, `/batch`, `/i/v0`, `/capture`
+  and below, exact prefix match, no lookalikes) to `POSTHOG_CAPTURE_INTERNAL_ORIGIN` (compose
+  default `http://posthog-capture.internal`, mapped by `extra_hosts: host-gateway`), where a
+  Traefik router (host infra owned by the Uptimely repo, see RUNBOOK.md) answers over the bridge.
+  It sets `X-Forwarded-For` to the visitor's `CF-Connecting-IP` (shape-validated; Cloudflare
+  overwrites it, so a visitor cannot forge it) and drops whatever `X-Forwarded-For` arrived; no
+  `CF-Connecting-IP` means no `X-Forwarded-For` at all. Everything else (SDK bundle, remote config,
+  flags) keeps the public rewrite because only capture records an IP. A blank or invalid
+  `POSTHOG_CAPTURE_INTERNAL_ORIGIN` disables the hop; compose uses the no-colon `${VAR-default}`
+  form so an explicit blank stays blank (the local-stack setting and the fallback if the router is
+  lost). Pinned by `src/lib/__tests__/posthog-proxy.test.ts` and `src/__tests__/proxy.test.ts`.
+- **`skipTrailingSlashRedirect: true` is global, and `src/proxy.ts` puts the redirect back.**
+  PostHog's endpoints are slash-terminated (`/e/`, `/i/v0/e/`, `/flags/`) and Next's default
+  trailing-slash 308 breaks them; Next has no per-path switch. With the flag on, Next stops
+  redirecting for EVERY path, which would leave each page answering 200 at a duplicate `/about/`
+  (an SEO regression for a site that lives on its search presence). So `src/proxy.ts` answers 308
+  to the slashless form, query kept, host-relative like Next's own, for every path except the
+  PostHog proxy path (the root `/` is untouched, and a run of trailing slashes collapses in one
+  hop; leading slashes are collapsed so the target is never protocol-relative). This matches the
+  default for `trailingSlash: false`, including dotted last segments (`/gcc.git/`). Nothing in the
+  repo links with trailing slashes. Execution order, from the installed docs: config `redirects`,
+  then proxy, then `beforeFiles` rewrites, then the filesystem, so the proxy sees the request
+  before the PostHog rewrites. Cost: the proxy runs on every request except `_next/static`,
+  `_next/image`, `favicon.ico` and static files by extension (the matcher in `src/proxy.ts`), a
+  few string checks and no I/O; the site has no other proxy logic, so this is its only per-request
+  overhead. If the proxy file is ever removed, remove `skipTrailingSlashRedirect` with it or pages
+  duplicate. The proxy is `src/proxy.ts` (Next 16's rename of `middleware.ts`; Node runtime), and
+  it reads the internal origin through `@/env`, not `process.env`.
+
 ## Adversarial standoffs (restated from the audit's final report)
 
 These went through two rounds of adversarial review and were not fully resolved either way —
