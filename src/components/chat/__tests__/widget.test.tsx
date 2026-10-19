@@ -123,7 +123,9 @@ describe("ChatWidget shell", () => {
     const idle = screen.getByRole("button", { name: /open amin ai chat/i });
     expect(idle).not.toBeDisabled();
     expect(idle).not.toHaveAttribute("aria-busy");
-    expect(idle.querySelector("svg")?.getAttribute("class")).not.toContain("animate-pulse");
+    const idleIcon = idle.querySelector("svg")!;
+    expect(idleIcon.classList.contains("text-accent-blue")).toBe(true);
+    expect(idleIcon.classList.contains("motion-safe:animate-pulse")).toBe(false);
     const idleClass = idle.className;
 
     panelState.pending = true;
@@ -131,9 +133,9 @@ describe("ChatWidget shell", () => {
     const pending = screen.getByRole("button", { name: /open amin ai chat/i });
     expect(pending).toBeDisabled();
     expect(pending).toHaveAttribute("aria-busy", "true");
-    expect(pending.querySelector("svg")?.getAttribute("class")).toContain(
-      "motion-safe:animate-pulse",
-    );
+    const pendingIcon = pending.querySelector("svg")!;
+    expect(pendingIcon.classList.contains("text-accent-blue")).toBe(true);
+    expect(pendingIcon.classList.contains("motion-safe:animate-pulse")).toBe(true);
     // Same fixed box as the idle launcher, and never a bare transition.
     expect(pending.className).toBe(idleClass);
     expect(pending.className).toContain("transition-colors");

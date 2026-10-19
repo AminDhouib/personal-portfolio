@@ -22,7 +22,7 @@ function ChatLauncher({ pending = false, onClick }: { pending?: boolean; onClick
       aria-label="Open Amin AI chat"
     >
       <Sparkles
-        className={`h-4 w-4 text-accent-blue${pending ? "motion-safe:animate-pulse" : ""}`}
+        className={`h-4 w-4 text-accent-blue ${pending ? "motion-safe:animate-pulse" : ""}`}
         aria-hidden
       />
       <span className="sr-only sm:not-sr-only">Amin AI</span>
