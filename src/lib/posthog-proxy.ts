@@ -83,6 +83,11 @@ export function posthogProxyRewrites(
  * The proxy path holds PostHog's responses, not pages: keep it out of search indexes. robots.txt
  * disallows `/_p/` as well, but a blocked URL can still be indexed from a link, and this header
  * is what actually says "do not index" on a response a crawler did fetch.
+ *
+ * Checked against a production build: this header lands on the app's own answers under the path
+ * (the 404s). A response proxied from PostHog carries the upstream's headers only, and neither
+ * `headers()` nor `src/proxy.ts` can add one to it. Those URLs are not discoverable (nothing
+ * links to them) and robots.txt disallows them, so the gap is accepted.
  */
 export function posthogProxyHeaders(): Array<{
   source: string;
