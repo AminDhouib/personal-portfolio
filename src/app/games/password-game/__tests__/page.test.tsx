@@ -52,6 +52,13 @@ describe("/games/password-game page", () => {
     expect(link.compareDocumentPosition(loader) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("wraps the game in a data-motion-exempt contents element (reduced-motion net)", () => {
+    render(<PasswordGamePage />);
+    const wrapper = screen.getByTestId("loader").parentElement!;
+    expect(wrapper).toHaveAttribute("data-motion-exempt");
+    expect(wrapper.className).toBe("contents");
+  });
+
   it("still carries the game JSON-LD", () => {
     const { container } = render(<PasswordGamePage />);
     const text = container.querySelector('script[type="application/ld+json"]')?.textContent ?? "";

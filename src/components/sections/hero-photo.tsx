@@ -107,6 +107,7 @@ export function HeroPhoto() {
               fetchPriority="low"
               aria-hidden={!ouch}
               data-testid="hero-photo-ouch"
+              data-motion-fade
               className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-120 motion-reduce:duration-300 ${ouch ? "opacity-100" : "opacity-0"}`}
             />
           )}
@@ -116,6 +117,7 @@ export function HeroPhoto() {
       {/* Speech bubble: decorative, the status line below carries the text for AT. */}
       <div
         aria-hidden="true"
+        data-motion-fade
         className={`pointer-events-none absolute top-2 right-0 origin-bottom-left translate-x-1/4 transition-[opacity,scale] duration-180 motion-reduce:scale-100 motion-reduce:duration-300 sm:top-4 ${ouch ? "scale-100 opacity-100" : "scale-60 opacity-0"}`}
       >
         <div className="relative rounded-2xl bg-white px-3 py-1.5 font-display text-base font-black text-black shadow-lg sm:text-lg">

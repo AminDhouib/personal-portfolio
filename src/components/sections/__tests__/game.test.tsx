@@ -30,4 +30,11 @@ describe("Game section", () => {
       "/games",
     ]);
   });
+
+  it("wraps the playable game in a data-motion-exempt contents element (reduced-motion net)", () => {
+    render(<Game />);
+    const wrapper = screen.getByTestId("shooter").closest("[data-motion-exempt]");
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.className).toBe("contents");
+  });
 });
