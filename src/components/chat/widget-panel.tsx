@@ -12,13 +12,6 @@ import { useLeadCollectorAction } from "@/hooks/use-lead-collector-action";
 // built from the typed site data in src/lib/amin-ai-prompt.ts and injected
 // server-side in src/app/api/copilotkit/route.ts instead.
 
-const HIGHLIGHT_CLASSES = [
-  "amin-ai-hl-purple",
-  "amin-ai-hl-indigo",
-  "amin-ai-hl-blue",
-  "amin-ai-hl-pink",
-];
-
 function ChatActions({ pathname }: { pathname: string }) {
   useCopilotReadable({
     description: "The page the visitor is currently viewing on amindhou.com",
@@ -39,30 +32,34 @@ function ChatActions({ pathname }: { pathname: string }) {
   return null;
 }
 
+const ATTENTION_CLASS = "chat-attention";
+const REDUCED_MOTION_RING_MS = 600;
+
+// One attention ring, once: .chat-attention (globals.css) animates a pseudo-element's
+// opacity 0 -> 1 -> 0. The class comes off on animationend so a later re-click can
+// retrigger it; under reduced motion the ring is static and a timeout removes it.
 function pulseOpenWindow() {
   const win = document.querySelector<HTMLElement>(".copilotKitWindow");
   if (!win) return () => {};
 
-  let i = 0;
-  const tick = () => {
-    win.classList.remove(...HIGHLIGHT_CLASSES);
-    const cls = HIGHLIGHT_CLASSES[i % HIGHLIGHT_CLASSES.length];
-    if (cls) win.classList.add(cls);
-    i++;
+  let timer = 0;
+  const clear = () => {
+    win.classList.remove(ATTENTION_CLASS);
+    win.removeEventListener("animationend", clear);
+    window.clearTimeout(timer);
   };
 
-  tick();
-  const cycleInterval = window.setInterval(tick, 280);
-  const cleanupTimer = window.setTimeout(() => {
-    window.clearInterval(cycleInterval);
-    win.classList.remove(...HIGHLIGHT_CLASSES);
-  }, 1400);
+  win.classList.remove(ATTENTION_CLASS);
+  void win.offsetWidth; // force reflow so re-adding the class restarts the animation
+  win.classList.add(ATTENTION_CLASS);
 
-  return () => {
-    window.clearInterval(cycleInterval);
-    window.clearTimeout(cleanupTimer);
-    win.classList.remove(...HIGHLIGHT_CLASSES);
-  };
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    timer = window.setTimeout(clear, REDUCED_MOTION_RING_MS);
+  } else {
+    win.addEventListener("animationend", clear);
+  }
+
+  return clear;
 }
 
 function openOrHighlightCopilot() {

@@ -27,6 +27,14 @@ describe("Faq section", () => {
     expect(first.open).toBe(true);
   });
 
+  it("tags each answer for the open-only rise-in and gates the icon transition on motion-safe", () => {
+    const { container } = render(<Faq faqs={faqs} />);
+    for (const d of container.querySelectorAll("details")) {
+      expect(d.querySelector(":scope > p")).toHaveClass("motion-rise-in");
+      expect(d.querySelector("svg")).toHaveClass("motion-safe:transition-transform");
+    }
+  });
+
   it("points unanswered questions at Amin AI", () => {
     render(<Faq faqs={faqs} />);
     expect(screen.getByRole("link", { name: "Ask Amin AI" })).toHaveAttribute("href", "/ai");

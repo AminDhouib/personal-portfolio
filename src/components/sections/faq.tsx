@@ -20,10 +20,12 @@ export function Faq({ faqs }: { faqs: readonly FaqEntry[] }) {
                 <h3 className="font-display text-lg font-bold tracking-tight">{faq.question}</h3>
                 <Plus
                   aria-hidden="true"
-                  className="h-5 w-5 shrink-0 text-(--muted) transition-transform group-open:rotate-45"
+                  className="h-5 w-5 shrink-0 text-(--muted) duration-(--motion-dur-fast) group-open:rotate-45 motion-safe:transition-transform"
                 />
               </summary>
-              <p className="pb-6 text-base leading-relaxed text-(--muted)">{faq.answer}</p>
+              <p className="motion-rise-in pb-6 text-base leading-relaxed text-(--muted)">
+                {faq.answer}
+              </p>
             </details>
           ))}
         </div>
