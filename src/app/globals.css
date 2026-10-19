@@ -1112,17 +1112,9 @@ details[open] > .motion-rise-in {
     transform: translateY(0);
   }
 }
-@keyframes motion-fade-only {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   details[open] > .motion-rise-in {
-    animation-name: motion-fade-only;
+    animation-name: motion-fade-in;
   }
 }
 
