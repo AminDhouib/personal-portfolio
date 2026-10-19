@@ -104,7 +104,7 @@ export function Experience({ combinedUsers }: { combinedUsers: string }) {
                 </div>
 
                 {/* Role card */}
-                <div className="relative flex-1 overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-5 pl-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--a)] hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.7)]">
+                <div className="relative flex-1 overflow-hidden rounded-2xl border border-(--border) bg-(--card) p-5 pl-6 transition-[border-color,translate] duration-(--motion-dur-base) ease-(--motion-ease-out) hover:border-[var(--a)] hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.7)] motion-safe:hover:-translate-y-0.5">
                   {/* Accent spine tying the card back to its medallion. */}
                   <span
                     className="absolute inset-y-0 left-0 w-[3px]"

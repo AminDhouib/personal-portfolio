@@ -238,7 +238,7 @@ export function Navbar() {
             {isGames ? (
               <Link
                 href="/"
-                className="hidden items-center gap-2 rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-sm font-semibold text-(--foreground) transition-all hover:border-accent-green hover:bg-(--surface-hover) sm:inline-flex"
+                className="hidden items-center gap-2 rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-sm font-semibold text-(--foreground) transition-colors hover:border-accent-green hover:bg-(--surface-hover) sm:inline-flex"
               >
                 Who made these games?
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -248,7 +248,7 @@ export function Navbar() {
                 href={BOOKING_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden items-center gap-2 rounded-lg bg-accent-green px-4 py-2 text-sm font-semibold text-black transition-all hover:brightness-110 sm:inline-flex"
+                className="hidden items-center gap-2 rounded-lg bg-accent-green px-4 py-2 text-sm font-semibold text-black hover:brightness-110 sm:inline-flex"
               >
                 Book a Call
                 <ArrowRight className="h-3.5 w-3.5" />

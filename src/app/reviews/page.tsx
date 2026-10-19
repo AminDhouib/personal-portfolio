@@ -76,7 +76,7 @@ export default function ReviewsPage() {
               href={BOOKING_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-(--foreground) px-7 py-3 text-sm font-semibold text-(--background) transition-all hover:brightness-110"
+              className="inline-flex items-center gap-2 rounded-full bg-(--foreground) px-7 py-3 text-sm font-semibold text-(--background) hover:brightness-110"
             >
               Let&apos;s Talk
               <ArrowRight className="h-3.5 w-3.5" />

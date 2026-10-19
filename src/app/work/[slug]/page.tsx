@@ -311,7 +311,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
             href={project.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-5 py-2.5 text-sm font-semibold text-black transition-all hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-5 py-2.5 text-sm font-semibold text-black hover:brightness-110"
           >
             Visit {project.name}
           </a>

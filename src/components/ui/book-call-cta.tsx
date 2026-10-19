@@ -33,7 +33,7 @@ export function BookCallCta({ title, body, showAvatar }: BookCallCtaProps) {
         href={BOOKING_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent-green px-5 py-2.5 text-sm font-semibold text-black transition-all hover:brightness-110"
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent-green px-5 py-2.5 text-sm font-semibold text-black hover:brightness-110"
       >
         Book a Call
         <ArrowRight className="h-4 w-4" />
