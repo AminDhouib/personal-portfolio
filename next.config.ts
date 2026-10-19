@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 // Relative, not the `@/` alias: Next's own config loader reads this file before any tsconfig
 // path mapping is in play.
-import { posthogProxyRewrites } from "./src/lib/posthog-proxy";
+import { posthogProxyHeaders, posthogProxyRewrites } from "./src/lib/posthog-proxy";
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -34,7 +34,8 @@ const nextConfig: NextConfig = {
   },
   // First-party PostHog path: the browser SDK posts to a same-origin path and these rules
   // forward it to PostHog, so an ad blocker has no third-party host to match. The path and the
-  // rules live in src/lib/posthog-proxy.ts; src/proxy.ts handles the capture hop.
+  // rules (an allow-list of what the SDK calls, not a catch-all) live in
+  // src/lib/posthog-proxy.ts; src/proxy.ts handles the capture hop.
   // `skipTrailingSlashRedirect` is GLOBAL and required: PostHog's `/e/` endpoints are
   // slash-terminated and Next's default 308 would break them. src/proxy.ts re-creates the
   // default (308 to the slashless form) for every path that is not the PostHog path, so pages
@@ -49,6 +50,8 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      // The PostHog proxy path answers with PostHog's responses, not pages: noindex.
+      ...posthogProxyHeaders(),
       {
         // Immutable cache for hashed Next.js static assets
         source: "/_next/static/(.*)",

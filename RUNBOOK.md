@@ -460,9 +460,20 @@ is a one-time manual step, not code.
 
 The browser does not call posthog.devino.ca. It posts to `/_p/4qe/...` on amindhou.com; Next
 rewrites that to PostHog server-side (`next.config.ts`), and `src/proxy.ts` sends capture requests
-(`/e`, `/batch`, `/i/v0`, `/capture`) over an internal hop so PostHog records the visitor's real
-IP instead of this server's. Why and how: DESIGN.md's register entries on the proxy path, the
-capture hop and trailing slashes.
+(`/e`, `/i/v0`) over an internal hop so PostHog records the visitor's real IP instead of this
+server's. Why and how: DESIGN.md's register entries on the proxy path, the capture hop and
+trailing slashes.
+
+**Allowed paths.** Only what posthog-js calls is forwarded (`POSTHOG_ALLOWED_PATHS` in
+`src/lib/posthog-proxy.ts`), each also with or without its trailing slash: `/_p/4qe/e/`,
+`/_p/4qe/i/...` (`/i/v0/e/`, `/i/v1/logs`, `/i/v1/metrics`), `/_p/4qe/s/` (session recording),
+`/_p/4qe/flags/` (`?v=2`), `/_p/4qe/static/...`, `/_p/4qe/array/...`, and the exact reads
+`/_p/4qe/api/surveys/`, `/api/web_experiments/`, `/api/product_tours/`,
+`/api/early_access_features/`. Anything else under `/_p/4qe` (the bare path, `/login`, `/admin`,
+other `/api/...`) answers 404 from this app by design. If a new PostHog feature "stops working"
+behind the proxy (a 404 on a `/_p/4qe/...` URL in the network tab), the SDK is calling a path
+that is not on the list: add it there, with a test. The path carries `X-Robots-Tag: noindex` and
+is disallowed in robots.txt.
 
 **Host dependency (outside this repo).** The hop lands on a Traefik file-provider router on the
 prod host, owned by the Uptimely repo: `/etc/dokploy/traefik/dynamic/posthog-capture-internal.yml`,
@@ -478,7 +489,9 @@ posthog.devino.ca; it is the anti-spoof reason the hop exists.
 
 1. Browser network tab: POSTs to `/_p/4qe/e/` (or `/i/v0/e/`) answer 200, and nothing is sent to
    posthog.devino.ca.
-2. `curl -sI https://amindhou.com/about/` answers 308 with `location: /about`.
+2. `curl -sI https://amindhou.com/about/` answers 308 with `location: /about` (the proxy builds an
+   absolute URL; Next sends it relative to the request's own origin). `curl -sI
+https://amindhou.com/_p/4qe/login` answers 404.
 3. PostHog project 22, a fresh event: its geo properties (`$geoip_city_name`,
    `$geoip_country_name`) match where you are, not the prod host's city.
 
