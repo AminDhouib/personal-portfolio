@@ -147,7 +147,7 @@ export default async function BlogPage({
                       />
                     </Link>
                   )}
-                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-(--muted) transition-all group-hover:translate-x-1 group-hover:text-accent-blue" />
+                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-(--muted) transition-[color,translate] group-hover:text-accent-blue motion-safe:group-hover:translate-x-1" />
                 </div>
                 {post.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">

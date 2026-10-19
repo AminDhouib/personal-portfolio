@@ -101,7 +101,7 @@ export default function WorkPage() {
                     {project.description}
                   </p>
                 </div>
-                <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-(--muted) transition-all group-hover:translate-x-1 group-hover:text-accent-blue" />
+                <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-(--muted) transition-[color,translate] group-hover:text-accent-blue motion-safe:group-hover:translate-x-1" />
               </Link>
             </li>
           ))}

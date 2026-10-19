@@ -65,7 +65,7 @@ export function Services() {
             href={BOOKING_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-green transition-all hover:brightness-110"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-green hover:brightness-110"
           >
             Book a Call
             <ArrowRight className="h-4 w-4" />

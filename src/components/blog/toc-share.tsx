@@ -5,6 +5,9 @@ import { useState, useEffect } from "react";
 
 export function ShareButton({ title }: { title: string }) {
   const [copied, setCopied] = useState(false);
+  // The label fades in on every change after the first click, but not on first paint: the
+  // server-rendered "Share" must never start at opacity 0.
+  const [touched, setTouched] = useState(false);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -17,30 +20,50 @@ export function ShareButton({ title }: { title: string }) {
       }
     }
     await navigator.clipboard.writeText(url);
+    setTouched(true);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // min-w-28 (7rem) is wider than the longer state ("Copied!" with its icon, padding and
+  // border is about 6.2rem at text-sm), so the button never changes width and the row it
+  // sits in never shifts. The same width holds in the header and footer placements.
+  // The live region is a sibling, not a child: a button's children are presentational for
+  // assistive tech, so a status role inside it would not be announced reliably.
   return (
-    <button
-      onClick={() => {
-        void handleShare();
-      }}
-      className="inline-flex items-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) transition-all hover:border-(--muted)/40 hover:text-(--foreground)"
-      title="Share this post"
-    >
-      {copied ? (
-        <>
-          <Check className="h-3.5 w-3.5 text-accent-green" />
-          <span className="text-accent-green">Copied!</span>
-        </>
-      ) : (
-        <>
-          <Share2 className="h-3.5 w-3.5" />
-          Share
-        </>
-      )}
-    </button>
+    <>
+      <button
+        onClick={() => {
+          void handleShare();
+        }}
+        className="inline-flex min-w-28 items-center justify-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) transition-[color,border-color,scale] duration-100 hover:border-(--muted)/40 hover:text-(--foreground) motion-safe:active:scale-[0.98]"
+        title="Share this post"
+      >
+        <span
+          key={copied ? "copied" : "idle"}
+          className={
+            touched
+              ? "motion-fade-in inline-flex items-center gap-2"
+              : "inline-flex items-center gap-2"
+          }
+        >
+          {copied ? (
+            <>
+              <Check className="h-3.5 w-3.5 text-accent-green" />
+              <span className="text-accent-green">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="h-3.5 w-3.5" />
+              Share
+            </>
+          )}
+        </span>
+      </button>
+      <span role="status" className="sr-only">
+        {copied ? "Link copied" : ""}
+      </span>
+    </>
   );
 }
 

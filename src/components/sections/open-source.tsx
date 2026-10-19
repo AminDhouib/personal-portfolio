@@ -164,7 +164,7 @@ export function OpenSource({ stats, contributions }: Props) {
                   ))}
                 </div>
 
-                <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green transition-all group-hover:gap-2">
+                <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green group-hover:gap-2">
                   View on GitHub
                   <ArrowRight className="h-3.5 w-3.5" />
                 </div>

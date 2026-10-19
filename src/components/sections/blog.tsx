@@ -74,7 +74,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
                     )}
                   </div>
                 </div>
-                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-(--muted) transition-all group-hover:translate-x-1 group-hover:text-accent-blue" />
+                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-(--muted) transition-[color,translate] group-hover:text-accent-blue motion-safe:group-hover:translate-x-1" />
               </Link>
             </motion.div>
           ))}
@@ -89,7 +89,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
         >
           <Link
             href="/blog"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-blue transition-all hover:brightness-110"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-accent-blue hover:brightness-110"
           >
             View all posts
             <ArrowRight className="h-4 w-4" />

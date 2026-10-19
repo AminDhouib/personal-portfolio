@@ -29,7 +29,7 @@ export function Contact() {
             href={BOOKING_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-8 py-4 text-lg font-bold text-black transition-all hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-green px-8 py-4 text-lg font-bold text-black hover:brightness-110"
           >
             Book a Call
             <ArrowRight className="h-5 w-5" />
