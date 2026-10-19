@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 
-const { mockUsePathname } = vi.hoisted(() => ({
+const { mockUsePathname, panelState } = vi.hoisted(() => ({
   mockUsePathname: vi.fn(() => "/"),
+  panelState: { pending: false },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -11,7 +12,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/dynamic", () => ({
-  default: () =>
+  default: (_loader: unknown, options?: { loading?: () => React.ReactNode }) =>
     function DynamicChatPanel({
       pathname,
       initiallyOpen,
@@ -21,6 +22,7 @@ vi.mock("next/dynamic", () => ({
       initiallyOpen?: boolean;
       openSignal?: number;
     }) {
+      if (panelState.pending) return <>{options?.loading?.()}</>;
       return (
         <div
           data-testid="lazy-panel"
@@ -73,6 +75,7 @@ import { ChatWidgetPanel } from "../widget-panel";
 describe("ChatWidget shell", () => {
   beforeEach(() => {
     capturedAction = null;
+    panelState.pending = false;
     mockUsePathname.mockReturnValue("/");
     vi.clearAllMocks();
   });
@@ -113,6 +116,32 @@ describe("ChatWidget shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /open amin ai chat/i }));
     expect(screen.getByTestId("lazy-panel").getAttribute("data-pathname")).toBe("/");
     expect(screen.getByTestId("lazy-panel").getAttribute("data-initially-open")).toBe("true");
+  });
+
+  it("keeps a busy, disabled launcher in place while the panel chunk loads", () => {
+    render(<ChatWidget enabled />);
+    const idle = screen.getByRole("button", { name: /open amin ai chat/i });
+    expect(idle).not.toBeDisabled();
+    expect(idle).not.toHaveAttribute("aria-busy");
+    expect(idle.querySelector("svg")?.getAttribute("class")).not.toContain("animate-pulse");
+    const idleClass = idle.className;
+
+    panelState.pending = true;
+    fireEvent.click(idle);
+    const pending = screen.getByRole("button", { name: /open amin ai chat/i });
+    expect(pending).toBeDisabled();
+    expect(pending).toHaveAttribute("aria-busy", "true");
+    expect(pending.querySelector("svg")?.getAttribute("class")).toContain(
+      "motion-safe:animate-pulse",
+    );
+    // Same fixed box as the idle launcher, and never a bare transition.
+    expect(pending.className).toBe(idleClass);
+    expect(pending.className).toContain("transition-colors");
+    expect(pending.className).not.toMatch(/(^|\s)transition(\s|$)/);
+    expect(screen.queryByTestId("lazy-panel")).toBeNull();
+
+    panelState.pending = false;
+    fireEvent.click(document.body);
   });
 
   it("records a chat_open conversion when the launcher opens the chat", () => {
