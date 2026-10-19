@@ -70,7 +70,7 @@ describe("proxy: capture requests", () => {
   it("refuses a CF-Connecting-IP that is not an address", async () => {
     vi.stubEnv("POSTHOG_CAPTURE_INTERNAL_ORIGIN", INTERNAL);
     const response = await proxy(
-      request(`${POSTHOG_PROXY_PATH}/batch/`, {
+      request(`${POSTHOG_PROXY_PATH}/e/`, {
         method: "POST",
         headers: { "cf-connecting-ip": "evil.example.com", "x-forwarded-for": "6.6.6.6" },
       }),
@@ -156,7 +156,10 @@ describe("proxy: trailing slashes on ordinary paths", () => {
     expect(response.headers.get("location")).toBe(`${ORIGIN}/api/leads`);
   });
 
-  it("the redirect is an absolute URL on the origin the visitor used (a relative Location 500s in Next's server)", async () => {
+  // The proxy hands Next an absolute URL because a hand-built relative Location makes the server
+  // throw "Invalid URL" and answer 500. Next then relativises an absolute Location on its own
+  // origin before it goes out, so the value on the wire is `/about` (RUNBOOK.md's curl check).
+  it("builds the redirect as an absolute URL on the origin the visitor used", async () => {
     const response = await proxy(request("/about/"));
     expect(response.headers.get("location")).toBe(`${ORIGIN}/about`);
     expect(response.headers.get("location")).toMatch(/^https:\/\/amindhou\.com\//);
@@ -202,6 +205,7 @@ describe("proxy: matcher", () => {
       "/api/health",
       `${POSTHOG_PROXY_PATH}/e/`,
       "/robots.txt/",
+      "/favicon.ico/",
       "/sitemap.xml",
       "/llms.txt",
     ]) {

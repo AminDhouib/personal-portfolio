@@ -1,11 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/env";
-import {
-  isPosthogProxyPath,
-  planPosthogProxyForward,
-  posthogUpstreamHeaders,
-  slashlessRedirectTarget,
-} from "@/lib/posthog-proxy";
+import { isPosthogProxyPath, slashlessRedirectTarget } from "@/lib/posthog-proxy";
+import { planPosthogProxyForward, posthogUpstreamHeaders } from "@/lib/posthog-proxy-forward";
 
 // Next 16's renamed middleware (the file convention is `proxy`, Node runtime). It does two jobs,
 // both because next.config.ts sets `skipTrailingSlashRedirect: true`; DESIGN.md's register
@@ -45,9 +41,11 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  // Everything except build assets and static files by extension. A trailing-slash request for
-  // a file (`/robots.txt/`) still runs, because the slash keeps it from ending in the extension.
+  // Everything except build assets and static files by extension (`/favicon.ico` is one: `.ico`).
+  // A trailing-slash request for a file (`/robots.txt/`, `/favicon.ico/`) still runs, because the
+  // slash keeps it from ending in the extension. The `_next/` prefixes are deliberately open-ended:
+  // nothing there is a page, and the hot path should not run the proxy for it.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|woff2?|map|webmanifest)$).*)",
+    "/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|woff2?|map|webmanifest)$).*)",
   ],
 };

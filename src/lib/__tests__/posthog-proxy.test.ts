@@ -4,14 +4,11 @@ import {
   POSTHOG_DEFAULT_UPSTREAM_HOST,
   POSTHOG_PROXY_PATH,
   isPosthogProxyPath,
-  planPosthogProxyForward,
+  posthogProxyHeaders,
   posthogProxyRewrites,
-  posthogUpstreamHeaders,
   posthogUpstreamHost,
   slashlessRedirectTarget,
 } from "@/lib/posthog-proxy";
-
-const INTERNAL = "http://posthog-capture.internal";
 
 describe("the proxy path", () => {
   it("is a short, meaningless path that ad-blocker rules do not match", () => {
@@ -49,23 +46,109 @@ describe("posthogUpstreamHost", () => {
   });
 });
 
+// A stand-in for Next's matcher, enough for the two source shapes the rules use: a literal path
+// (matched with or without a trailing slash, like path-to-regexp's non-strict default) and a
+// literal prefix ending in `/:path*` (the prefix itself, or anything beneath it). The real thing
+// is checked against a running build (RUNBOOK.md, "Analytics proxy").
+function resolveRewrite(
+  rules: ReturnType<typeof posthogProxyRewrites>,
+  pathname: string,
+): string | null {
+  for (const rule of rules) {
+    const wildcard = rule.source.endsWith("/:path*");
+    const base = wildcard ? rule.source.slice(0, -"/:path*".length) : rule.source;
+    const rest = pathname.startsWith(base) ? pathname.slice(base.length) : null;
+    if (rest === null) continue;
+    if (wildcard) {
+      if (rest !== "" && !rest.startsWith("/")) continue;
+      return rule.destination.replace(":path*", rest.replace(/^\//u, ""));
+    }
+    if (rest === "" || rest === "/") return rule.destination;
+  }
+  return null;
+}
+
 describe("posthogProxyRewrites", () => {
-  it("lists static, then array, then the catch-all, so the SDK bundle is not swallowed", () => {
-    const rules = posthogProxyRewrites("https://ph.example.com");
-    expect(rules).toEqual([
-      {
-        source: `${POSTHOG_PROXY_PATH}/static/:path*`,
-        destination: "https://ph.example.com/static/:path*",
-      },
-      {
-        source: `${POSTHOG_PROXY_PATH}/array/:path*`,
-        destination: "https://ph.example.com/array/:path*",
-      },
-      {
-        source: `${POSTHOG_PROXY_PATH}/:path*`,
-        destination: "https://ph.example.com/:path*",
-      },
+  const UPSTREAM = "https://ph.example.com";
+  const rules = posthogProxyRewrites(UPSTREAM);
+  const rewrite = (subPath: string) => resolveRewrite(rules, `${POSTHOG_PROXY_PATH}${subPath}`);
+
+  it("lists exactly the allowed paths, one rule each, all under the proxy path", () => {
+    expect(rules.map((rule) => rule.source.slice(POSTHOG_PROXY_PATH.length))).toEqual([
+      "/e",
+      "/i/:path*",
+      "/s",
+      "/flags",
+      "/static/:path*",
+      "/array/:path*",
+      "/api/surveys",
+      "/api/web_experiments",
+      "/api/product_tours",
+      "/api/early_access_features",
     ]);
+    expect(rules.every((rule) => rule.source.startsWith(`${POSTHOG_PROXY_PATH}/`))).toBe(true);
+  });
+
+  it.each([
+    // capture
+    ["/e/", "/e/"],
+    ["/e", "/e/"],
+    ["/i/v0/e/", "/i/v0/e/"],
+    ["/i/v1/logs", "/i/v1/logs"],
+    ["/i/v1/metrics", "/i/v1/metrics"],
+    // session recording
+    ["/s/", "/s/"],
+    ["/s", "/s/"],
+    // flags and remote config
+    ["/flags/", "/flags/"],
+    ["/flags", "/flags/"],
+    // the SDK's bundles and remote config
+    ["/static/recorder.js", "/static/recorder.js"],
+    ["/static/1.399.2/surveys.js", "/static/1.399.2/surveys.js"],
+    ["/array/phc_key/config", "/array/phc_key/config"],
+    ["/array/phc_key/config.js", "/array/phc_key/config.js"],
+    // token-scoped public reads
+    ["/api/surveys/", "/api/surveys/"],
+    ["/api/surveys", "/api/surveys/"],
+    ["/api/web_experiments/", "/api/web_experiments/"],
+    ["/api/product_tours/", "/api/product_tours/"],
+    ["/api/early_access_features/", "/api/early_access_features/"],
+  ])("forwards %s to %s on the upstream", (subPath, upstreamPath) => {
+    expect(rewrite(subPath)).toBe(`${UPSTREAM}${upstreamPath}`);
+  });
+
+  it.each([
+    "",
+    "/",
+    "/login",
+    "/login/",
+    "/admin",
+    "/admin/",
+    "/api/projects/",
+    "/api/projects/1/",
+    "/api/",
+    "/api/surveys/1/",
+    "/api/surveys/../projects/",
+    "/api/conversations/v1/widget/message",
+    "/batch",
+    "/batch/",
+    "/capture",
+    "/capture/",
+    "/decide/",
+    "/engage/",
+    "/ee/",
+    "/events/",
+    "/ex/",
+    "/flagsx/",
+    "/statics/x.js",
+    "/arrays/x.js",
+  ])("does not forward %j (the app answers 404)", (subPath) => {
+    expect(rewrite(subPath)).toBeNull();
+  });
+
+  it("never forwards a path outside the proxy path, or a lookalike prefix of it", () => {
+    expect(resolveRewrite(rules, "/e/")).toBeNull();
+    expect(resolveRewrite(rules, `${POSTHOG_PROXY_PATH}x/e/`)).toBeNull();
   });
 
   it("defaults the destination host and trims its trailing slash", () => {
@@ -78,148 +161,14 @@ describe("posthogProxyRewrites", () => {
   });
 });
 
-describe("planPosthogProxyForward", () => {
-  const plan = (
-    subPath: string,
-    over: Partial<Parameters<typeof planPosthogProxyForward>[0]> = {},
-  ) =>
-    planPosthogProxyForward({
-      pathname: `${POSTHOG_PROXY_PATH}${subPath}`,
-      search: "",
-      cfConnectingIp: "203.0.113.9",
-      internalCaptureOrigin: INTERNAL,
-      ...over,
-    });
-
-  it.each(["/e", "/e/", "/batch", "/batch/", "/i/v0/e/", "/i/v0", "/capture", "/capture/"])(
-    "sends capture path %s over the internal hop, slash kept",
-    (subPath) => {
-      expect(plan(subPath).internalRewrite).toBe(`${INTERNAL}${subPath}`);
-    },
-  );
-
-  it("keeps the query string on the internal hop", () => {
-    expect(plan("/e/", { search: "?ip=0&_=1&ver=1.2" }).internalRewrite).toBe(
-      `${INTERNAL}/e/?ip=0&_=1&ver=1.2`,
-    );
-  });
-
-  it.each([
-    "/static/recorder.js",
-    "/array/phc_key/config.js",
-    "/flags/",
-    "/decide/",
-    "/",
-    "",
-    "/ee/",
-    "/engage/",
-    // lookalikes of capture prefixes: not capture
-    "/event/",
-    "/ex/",
-    "/batches/",
-    "/captured/",
-    "/capture-x/",
-    "/i/v1/e/",
-    "/i/v0x/",
-  ])("leaves %s to the public rewrite", (subPath) => {
-    expect(plan(subPath).internalRewrite).toBeNull();
-  });
-
-  it("never takes the hop for a path outside the proxy path, even if it looks like capture", () => {
-    expect(
-      planPosthogProxyForward({
-        pathname: "/e/",
-        search: "",
-        cfConnectingIp: "203.0.113.9",
-        internalCaptureOrigin: INTERNAL,
-      }).internalRewrite,
-    ).toBeNull();
-    expect(
-      planPosthogProxyForward({
-        pathname: `${POSTHOG_PROXY_PATH}x/e/`,
-        search: "",
-        cfConnectingIp: "203.0.113.9",
-        internalCaptureOrigin: INTERNAL,
-      }).internalRewrite,
-    ).toBeNull();
-  });
-
-  it.each([undefined, null, "", "   ", "not a url", "ftp://posthog-capture.internal"])(
-    "a blank or unusable internal origin (%j) disables the hop",
-    (origin) => {
-      expect(plan("/e/", { internalCaptureOrigin: origin }).internalRewrite).toBeNull();
-    },
-  );
-
-  it("normalises the internal origin to scheme and host so a stray path or slash cannot leak in", () => {
-    expect(plan("/e/", { internalCaptureOrigin: `${INTERNAL}/` }).internalRewrite).toBe(
-      `${INTERNAL}/e/`,
-    );
-    expect(plan("/e/", { internalCaptureOrigin: `${INTERNAL}/extra` }).internalRewrite).toBe(
-      `${INTERNAL}/e/`,
-    );
-  });
-
-  it("forwards the visitor's CF-Connecting-IP as the forwarded-for", () => {
-    expect(plan("/e/").forwardedFor).toBe("203.0.113.9");
-    expect(plan("/e/", { cfConnectingIp: " 203.0.113.9 " }).forwardedFor).toBe("203.0.113.9");
-    expect(plan("/e/", { cfConnectingIp: "2001:db8::1" }).forwardedFor).toBe("2001:db8::1");
-    expect(plan("/e/", { cfConnectingIp: "::ffff:203.0.113.9" }).forwardedFor).toBe(
-      "::ffff:203.0.113.9",
-    );
-  });
-
-  it.each([
-    undefined,
-    null,
-    "",
-    "   ",
-    "unknown",
-    "1.2.3",
-    "1.2.3.4.5",
-    "1.2.3.4, 5.6.7.8",
-    "1.2.3.4:80",
-    "999.1.1.1",
-    "::ffff:999.1.1.1",
-    "evil.example.com",
-    "1.2.3.4\r\nx-injected: 1",
-    "<script>",
-    "::::::::::::::::::::::::::::::::::::::::::::::::",
-    "abc",
-    "1111",
-  ])("refuses a CF-Connecting-IP that is not shaped like an address (%j)", (value) => {
-    expect(plan("/e/", { cfConnectingIp: value }).forwardedFor).toBeNull();
-  });
-
-  it("still plans a forwarded-for for a non-capture proxy path (the public route needs it too)", () => {
-    const result = plan("/array/phc_key/config.js");
-    expect(result.internalRewrite).toBeNull();
-    expect(result.forwardedFor).toBe("203.0.113.9");
-  });
-});
-
-describe("posthogUpstreamHeaders", () => {
-  it("replaces whatever X-Forwarded-For arrived with the visitor's address", () => {
-    const incoming = new Headers({
-      "x-forwarded-for": "6.6.6.6, 10.0.0.2",
-      "content-type": "text/plain",
-      "user-agent": "ua",
-    });
-    const out = posthogUpstreamHeaders(incoming, "203.0.113.9");
-    expect(out.get("x-forwarded-for")).toBe("203.0.113.9");
-    expect(out.get("content-type")).toBe("text/plain");
-    expect(out.get("user-agent")).toBe("ua");
-  });
-
-  it("sends no X-Forwarded-For at all when there is no trusted visitor address", () => {
-    const out = posthogUpstreamHeaders(new Headers({ "x-forwarded-for": "6.6.6.6" }), null);
-    expect(out.has("x-forwarded-for")).toBe(false);
-  });
-
-  it("does not mutate the incoming headers", () => {
-    const incoming = new Headers({ "x-forwarded-for": "6.6.6.6" });
-    posthogUpstreamHeaders(incoming, "203.0.113.9");
-    expect(incoming.get("x-forwarded-for")).toBe("6.6.6.6");
+describe("posthogProxyHeaders", () => {
+  it("marks everything under the proxy path, and the path itself, noindex", () => {
+    expect(posthogProxyHeaders()).toEqual([
+      {
+        source: `${POSTHOG_PROXY_PATH}/:path*`,
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
+    ]);
   });
 });
 
@@ -237,7 +186,7 @@ describe("slashlessRedirectTarget", () => {
     expect(slashlessRedirectTarget("/robots.txt/")).toBe("/robots.txt");
   });
 
-  it("collapses a run of trailing slashes in one hop", () => {
+  it("collapses a run of trailing slashes in its target", () => {
     expect(slashlessRedirectTarget("/about///")).toBe("/about");
   });
 

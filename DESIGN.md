@@ -1469,25 +1469,38 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
 
 - **Browser PostHog talks to a meaningless same-origin path, `/_p/4qe`.** `src/lib/posthog-proxy.ts`
   holds the one constant (`POSTHOG_PROXY_PATH`) and everything derives from it: the SDK's
-  `api_host`, the three `rewrites()` in `next.config.ts`, the proxy's matching. Ad blockers match
+  `api_host`, the `rewrites()` and `headers()` in `next.config.ts`, the proxy's matching. Ad blockers match
   `posthog.devino.ca` by host and `/ingest`, `/analytics`, `/posthog`, `/collect` by path, so the
   path is deliberately none of those; do not "tidy" it into a readable name. `ui_host` stays the
-  real instance so toolbar links work. The rewrites go `static`, then `array`, then the catch-all
-  (the SDK bundle and its remote config must not be swallowed by the catch-all) to
-  `NEXT_PUBLIC_POSTHOG_HOST` (default `https://posthog.devino.ca`, trailing slash trimmed; it is a
-  build arg, so the destination is fixed at build time). Server-side capture (`src/lib/log.ts`,
+  real instance so toolbar links work. The rewrites are an ALLOW-LIST, not a catch-all, because a
+  catch-all would put PostHog's whole app (`/login`, `/admin`, the private `/api/projects/...`)
+  on our origin. Read from posthog-js 1.399.x's `endpointFor` calls, the allowed paths are `/e`,
+  `/i/:path*` (`/i/v0/e/`, `/i/v1/logs`, `/i/v1/metrics`), `/s` (session recording), `/flags`,
+  `/static/:path*`, `/array/:path*`, and four token-scoped public reads by exact path
+  (`/api/surveys`, `/api/web_experiments`, `/api/product_tours`, `/api/early_access_features`);
+  exact paths are forwarded WITH the slash PostHog expects. Everything else under the proxy path
+  (the bare path, `/login`, other `/api/...`) is not rewritten and answers the app's 404. Not
+  allowed on purpose: the conversations widget (`/api/conversations/v1/widget/*`, which this site
+  does not load), `/batch` and `/capture`. When a posthog-js upgrade adds a call, add its path to
+  `POSTHOG_ALLOWED_PATHS` in `src/lib/posthog-proxy.ts` (a pinned test lists every rule). The path
+  is also kept out of search: `Disallow: /_p/` in `robots.ts` and an `X-Robots-Tag: noindex`
+  header from `next.config.ts`. Destinations are `NEXT_PUBLIC_POSTHOG_HOST` (default
+  `https://posthog.devino.ca`, trailing slash trimmed; it is a build arg, so the destination is
+  fixed at build time). Server-side capture (`src/lib/log.ts`,
   `POSTHOG_HOST`) stays DIRECT to PostHog: no blocker on a server, and a hop through our own app
   could only fail. There is no CSP in `next.config.ts`, so no `connect-src` entry is needed.
 - **Capture takes an internal hop so PostHog sees the visitor's IP.** PostHog's capture service
   reads only the LEFTMOST `X-Forwarded-For`, and the devino.ca Cloudflare zone strips
   `X-Forwarded-For` on posthog.devino.ca on purpose (anti-spoof; never work around it). Through
   the public rewrite every event would arrive from this server's address and geo-IP would collapse
-  to one city. So `src/proxy.ts` rewrites capture sub-paths (`/e`, `/batch`, `/i/v0`, `/capture`
-  and below, exact prefix match, no lookalikes) to `POSTHOG_CAPTURE_INTERNAL_ORIGIN` (compose
+  to one city. So `src/proxy.ts` rewrites capture sub-paths (`/e` and `/i/v0` and below, exact
+  prefix match, no lookalikes; both are on the allow-list above) to `POSTHOG_CAPTURE_INTERNAL_ORIGIN` (compose
   default `http://posthog-capture.internal`, mapped by `extra_hosts: host-gateway`), where a
   Traefik router (host infra owned by the Uptimely repo, see RUNBOOK.md) answers over the bridge.
   It sets `X-Forwarded-For` to the visitor's `CF-Connecting-IP` (shape-validated; Cloudflare
-  overwrites it, so a visitor cannot forge it) and drops whatever `X-Forwarded-For` arrived; no
+  overwrites it, so a visitor cannot forge it; `node:net`'s `isIP` decides what is an address, so
+  that logic lives in the server-only `src/lib/posthog-proxy-forward.ts`, which the browser
+  bundle never imports) and drops whatever `X-Forwarded-For` arrived; no
   `CF-Connecting-IP` means no `X-Forwarded-For` at all. Everything else (SDK bundle, remote config,
   flags) keeps the public rewrite because only capture records an IP. A blank or invalid
   `POSTHOG_CAPTURE_INTERNAL_ORIGIN` disables the hop; compose uses the no-colon `${VAR-default}`
@@ -1499,8 +1512,10 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   redirecting for EVERY path, which would leave each page answering 200 at a duplicate `/about/`
   (an SEO regression for a site that lives on its search presence). So `src/proxy.ts` answers 308
   to the slashless form, query kept, as an absolute URL cloned from the request (a hand-built relative `Location` makes the Next server throw and answer 500), for every path except the
-  PostHog proxy path (the root `/` is untouched, and a run of trailing slashes collapses in one
-  hop; leading slashes are collapsed so the target is never protocol-relative). This matches the
+  PostHog proxy path (the root `/` is untouched; the target drops every trailing slash, and leading
+  slashes are collapsed so it is never protocol-relative. On the wire `/about///` takes two hops:
+  Next's own repeated-slash normaliser answers first (`/about///` to `/about/`), then the proxy
+  308s `/about/` to `/about`). This matches the
   default for `trailingSlash: false`, including dotted last segments (`/gcc.git/`). Nothing in the
   repo links with trailing slashes. Execution order, from the installed docs: config `redirects`,
   then proxy, then `beforeFiles` rewrites, then the filesystem, so the proxy sees the request

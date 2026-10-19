@@ -8,8 +8,9 @@
  * `/analytics`, `/posthog` and `/collect` are what the blockers' generic rules match on.
  *
  * Pure and import-free on purpose: next.config.ts loads it through Next's own config loader
- * (no tsconfig path mapping, so no `@/` alias in here), and so do `src/proxy.ts` and the browser
- * bundle (`src/instrumentation-client.ts`).
+ * (no tsconfig path mapping, so no `@/` alias in here), and so does the browser bundle
+ * (`src/instrumentation-client.ts`), which is why nothing server-only (`node:net`) may be imported
+ * here; the visitor-IP forwarding lives in `posthog-proxy-forward.ts`.
  *
  * Server-side capture (`src/lib/log.ts`) stays DIRECT to PostHog: there is no ad blocker on a
  * server, and routing it through its own app would add a hop that can fail.
@@ -30,26 +31,67 @@ export function posthogUpstreamHost(configuredHost: string | null | undefined): 
 }
 
 /**
- * The rewrite rules, in the order that matters: `static` and `array` before the catch-all so
- * the SDK bundle and its remote config are not swallowed by it. A self-hosted PostHog serves
- * both from the same host as the API, so all three rules share one upstream.
+ * What the SDK may reach through the proxy: an allow-list grounded in posthog-js (1.399.x),
+ * where every request goes through `endpointFor` (`api_host` is the proxy path). Nothing else
+ * under the proxy path is forwarded: a catch-all would expose PostHog's whole app surface
+ * (`/login`, `/admin`, the private `/api/projects/...`) on this origin.
+ *
+ *  - `/e` and `/i/:path*`: capture (`/e/`, `/i/v0/e/`) plus the logs and metrics ingest
+ *    (`/i/v1/logs`, `/i/v1/metrics`).
+ *  - `/s`: session recording snapshots (recording is switched on in the PostHog project).
+ *  - `/flags`: feature flags and remote config (`/flags/?v=2`).
+ *  - `/static/:path*` and `/array/:path*`: the SDK's lazy bundles and its remote config.
+ *  - four token-scoped public reads under `/api` (surveys, web experiments, product tours, early
+ *    access features), listed by exact path, never `/api/:path*`.
+ *
+ * Not allowed on purpose: `/api/conversations/v1/widget/*` (the conversations widget; this site
+ * does not load it), `/batch` and `/capture` (the SDK never calls them), and anything else.
+ *
+ * Exact paths are written without a trailing slash and forwarded WITH one, because PostHog's
+ * endpoints are slash-terminated; Next matches the slashless source against both spellings.
+ */
+const POSTHOG_ALLOWED_PATHS: ReadonlyArray<{ subPath: string; upstream: string }> = [
+  { subPath: "/e", upstream: "/e/" },
+  { subPath: "/i/:path*", upstream: "/i/:path*" },
+  { subPath: "/s", upstream: "/s/" },
+  { subPath: "/flags", upstream: "/flags/" },
+  { subPath: "/static/:path*", upstream: "/static/:path*" },
+  { subPath: "/array/:path*", upstream: "/array/:path*" },
+  { subPath: "/api/surveys", upstream: "/api/surveys/" },
+  { subPath: "/api/web_experiments", upstream: "/api/web_experiments/" },
+  { subPath: "/api/product_tours", upstream: "/api/product_tours/" },
+  { subPath: "/api/early_access_features", upstream: "/api/early_access_features/" },
+];
+
+/**
+ * The rewrite rules: one per allowed path, to the same path on PostHog. A self-hosted PostHog
+ * serves the SDK bundle and its remote config from the same host as the API, so every rule shares
+ * one upstream. A request under the proxy path that matches none of them is not rewritten and
+ * falls through to the app's own 404.
  */
 export function posthogProxyRewrites(
   configuredHost: string | null | undefined,
 ): PosthogProxyRewrite[] {
   const upstream = posthogUpstreamHost(configuredHost);
+  return POSTHOG_ALLOWED_PATHS.map(({ subPath, upstream: destination }) => ({
+    source: `${POSTHOG_PROXY_PATH}${subPath}`,
+    destination: `${upstream}${destination}`,
+  }));
+}
+
+/**
+ * The proxy path holds PostHog's responses, not pages: keep it out of search indexes. robots.txt
+ * disallows `/_p/` as well, but a blocked URL can still be indexed from a link, and this header
+ * is what actually says "do not index" on a response a crawler did fetch.
+ */
+export function posthogProxyHeaders(): Array<{
+  source: string;
+  headers: Array<{ key: string; value: string }>;
+}> {
   return [
     {
-      source: `${POSTHOG_PROXY_PATH}/static/:path*`,
-      destination: `${upstream}/static/:path*`,
-    },
-    {
-      source: `${POSTHOG_PROXY_PATH}/array/:path*`,
-      destination: `${upstream}/array/:path*`,
-    },
-    {
       source: `${POSTHOG_PROXY_PATH}/:path*`,
-      destination: `${upstream}/:path*`,
+      headers: [{ key: "X-Robots-Tag", value: "noindex" }],
     },
   ];
 }
@@ -77,100 +119,4 @@ export function slashlessRedirectTarget(pathname: string): string | null {
   if (!pathname.endsWith("/")) return null;
   const trimmed = pathname.replace(/\/+$/u, "").replace(/^\/{2,}/u, "/");
   return trimmed === "" ? null : trimmed;
-}
-
-/**
- * The visitor's IP. Through the rewrites above, every event would reach PostHog from THIS
- * server, so PostHog would record the host's own address for every visitor and geo-IP would
- * collapse to one city. Forwarding the visitor's address is not enough on its own: PostHog's
- * capture service reads only the LEFTMOST `X-Forwarded-For` entry, and the devino.ca Cloudflare
- * zone strips `X-Forwarded-For` on posthog.devino.ca on purpose (an anti-spoof rule that must
- * never be worked around), so a header sent through Cloudflare never arrives.
- *
- * Capture therefore takes a second route when one is configured: straight to PostHog's capture
- * service over the host's own bridge, never leaving the box (`POSTHOG_CAPTURE_INTERNAL_ORIGIN`,
- * set by compose; the Traefik router behind it is host infra, see RUNBOOK.md). Everything else
- * (the SDK bundle, remote config, flags) keeps the public route above, because only capture
- * records an IP.
- */
-
-/** Capture's own paths, exactly the PathPrefix list of PostHog's capture router. */
-const POSTHOG_CAPTURE_PREFIXES = ["/e", "/batch", "/i/v0", "/capture"];
-
-/** Is this proxied sub-path (the part after the proxy path) a capture endpoint? */
-function isPosthogCapturePath(subPath: string): boolean {
-  return POSTHOG_CAPTURE_PREFIXES.some(
-    (prefix) => subPath === prefix || subPath.startsWith(`${prefix}/`),
-  );
-}
-
-/**
- * The visitor's IP as Cloudflare saw it. `CF-Connecting-IP` is the one header a visitor cannot
- * set: Cloudflare overwrites it on every request. A value that is not shaped like an address is
- * refused, never forwarded.
- */
-function trustedVisitorIp(cfConnectingIp: string | null | undefined): string | null {
-  const value = cfConnectingIp?.trim();
-  if (!value) return null;
-  const dottedQuad = (text: string) =>
-    /^\d{1,3}(?:\.\d{1,3}){3}$/u.test(text) &&
-    text.split(".").every((octet) => Number(octet) <= 255);
-  if (dottedQuad(value)) return value;
-  // IPv6, optionally ending in an embedded IPv4 (`::ffff:203.0.113.9`). Only hex digits and
-  // colons before that tail, so `1.2.3.4:80` (an address with a port) is not one.
-  const embedded = /^([0-9A-Fa-f:]+:)(\d{1,3}(?:\.\d{1,3}){3})$/u.exec(value);
-  const head = embedded ? embedded[1] : value;
-  const tailOk = embedded ? dottedQuad(embedded[2] ?? "") : true;
-  const ipv6 = /^[0-9A-Fa-f:]{2,45}$/u.test(head ?? "") && (head ?? "").includes(":") && tailOk;
-  return ipv6 && value.length <= 45 ? value : null;
-}
-
-/** The internal capture origin, or null when unset, blank or not an http(s) URL. */
-function posthogInternalCaptureOrigin(configured: string | null | undefined): string | null {
-  const value = configured?.trim();
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    return url.origin;
-  } catch {
-    // silent-ok: an unparseable origin means "no internal hop"; capture falls back to the public
-    // route, which is the documented behaviour for a blank value too (RUNBOOK.md).
-    return null;
-  }
-}
-
-type PosthogProxyForward = {
-  /** Absolute URL to rewrite to over the internal hop, or null to leave the request to the rewrites above. */
-  internalRewrite: string | null;
-  /** The `X-Forwarded-For` to send upstream: the visitor alone, or null to send none. */
-  forwardedFor: string | null;
-};
-
-/**
- * What the proxy does with one PostHog request. The incoming `X-Forwarded-For` is never passed
- * on: its leftmost entry is whatever the visitor typed, and PostHog believes the leftmost entry.
- */
-export function planPosthogProxyForward(input: {
-  pathname: string;
-  search: string;
-  cfConnectingIp: string | null | undefined;
-  internalCaptureOrigin: string | null | undefined;
-}): PosthogProxyForward {
-  const forwardedFor = trustedVisitorIp(input.cfConnectingIp);
-  const origin = posthogInternalCaptureOrigin(input.internalCaptureOrigin);
-  const subPath = input.pathname.slice(POSTHOG_PROXY_PATH.length);
-  const internalRewrite =
-    origin && isPosthogProxyPath(input.pathname) && isPosthogCapturePath(subPath)
-      ? `${origin}${subPath}${input.search}`
-      : null;
-  return { internalRewrite, forwardedFor };
-}
-
-/** The request headers to send upstream, given the plan's forwarded-for. */
-export function posthogUpstreamHeaders(incoming: Headers, forwardedFor: string | null): Headers {
-  const headers = new Headers(incoming);
-  if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
-  else headers.delete("x-forwarded-for");
-  return headers;
 }
