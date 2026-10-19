@@ -1046,33 +1046,66 @@ button[aria-label="Copy to clipboard"] {
   background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 255, 255, 0.7), transparent 70%);
 }
 
-/* ── Amin AI chat highlight ──────────────────────────────────── */
-/* Discrete color classes with a fast transition. JS cycles through
-   them (purple → indigo → blue → pink → off) so we don't rely on
-   CSS animations (those get throttled when the tab is briefly
-   backgrounded, freezing the effect at 0%). */
-.copilotKitWindow {
-  transition: box-shadow 0.18s ease-out;
+/* ── Amin AI chat attention ring ─────────────────────────────── */
+/* One pulse, once, on a re-click while the chat is already open: a ring on a
+   pseudo-element whose opacity (only) goes 0 -> 1 -> 0. widget-panel.tsx adds
+   .chat-attention and removes it on animationend (or after ~600 ms under
+   reduced motion, where the ring shows statically). .copilotKitWindow is
+   position: fixed, so the absolute ::after anchors to it. */
+.copilotKitWindow.chat-attention::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px var(--color-accent-purple);
+  animation: chat-attention-ring var(--motion-dur-slow) var(--motion-ease-out) both;
 }
-.copilotKitWindow.amin-ai-hl-purple {
-  box-shadow:
-    0 0 0 3px rgb(168, 85, 247),
-    0 0 40px 12px rgba(168, 85, 247, 0.6);
+@keyframes chat-attention-ring {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
 }
-.copilotKitWindow.amin-ai-hl-indigo {
-  box-shadow:
-    0 0 0 3px rgb(99, 102, 241),
-    0 0 40px 12px rgba(99, 102, 241, 0.6);
+@media (prefers-reduced-motion: reduce) {
+  .copilotKitWindow.chat-attention::after {
+    animation: none;
+    opacity: 1;
+  }
 }
-.copilotKitWindow.amin-ai-hl-blue {
-  box-shadow:
-    0 0 0 3px rgb(59, 130, 246),
-    0 0 40px 12px rgba(59, 130, 246, 0.6);
+
+/* FAQ answer rise-in: opacity + a 4px rise, on open only (closing stays
+   instant). Applied to the answer inside a native <details>; a closed answer
+   is not rendered by the browser, so nothing is painted at opacity 0.
+   Reduced motion swaps in an opacity-only keyframe (no translate). */
+details[open] > .motion-rise-in {
+  animation: motion-rise-in var(--motion-dur-base) var(--motion-ease-out) both;
 }
-.copilotKitWindow.amin-ai-hl-pink {
-  box-shadow:
-    0 0 0 3px rgb(236, 72, 153),
-    0 0 40px 12px rgba(236, 72, 153, 0.6);
+@keyframes motion-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes motion-fade-only {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  details[open] > .motion-rise-in {
+    animation-name: motion-fade-only;
+  }
 }
 
 /* Reduced-motion net: under the OS preference, every page-chrome animation and
