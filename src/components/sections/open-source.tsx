@@ -111,7 +111,7 @@ export function OpenSource({ stats, contributions }: Props) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-all hover:border-accent-green/30"
+                className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-colors hover:border-accent-green/30"
               >
                 <div className="mb-4 flex items-start gap-4">
                   <div
@@ -164,9 +164,9 @@ export function OpenSource({ stats, contributions }: Props) {
                   ))}
                 </div>
 
-                <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green group-hover:gap-2">
+                <div className="inline-flex items-center gap-1 text-sm font-medium text-accent-green">
                   View on GitHub
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5 transition-[color,translate] motion-safe:group-hover:translate-x-1" />
                 </div>
               </motion.a>
             );

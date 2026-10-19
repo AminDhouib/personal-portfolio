@@ -36,7 +36,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
-                className={`group relative overflow-hidden rounded-xl border border-(--border) bg-(--card) transition-all hover:border-(--muted)/30 ${
+                className={`group relative overflow-hidden rounded-xl border border-(--border) bg-(--card) transition-colors hover:border-(--muted)/30 ${
                   project.slug === "getitdone" ? "md:col-span-2" : ""
                 }`}
               >
