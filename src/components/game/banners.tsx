@@ -1,6 +1,13 @@
 "use client";
 
-import { motion, useMotionValue, animate } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  animate,
+  type TargetAndTransition,
+  type Transition,
+} from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { BurstFrame } from "./super-voltorb-flip/art/frames";
 import { BURST_FRAMES, CORE_SCALE } from "./super-voltorb-flip/art/fx";
@@ -8,6 +15,28 @@ import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { ORB } from "./super-voltorb-flip/art/sprites";
 
 // ---------- shared ----------
+
+// Props for a layer that drifts by transform. With motion on it loops through
+// `moving` exactly as before. Under reduced motion `MotionConfig` would skip a
+// transform animation by jumping to its FINAL keyframe, which for a drift is
+// off-screen, so the layer instead renders STATIC at `still`, a fixed
+// in-view position. `initial` is always the first keyframe, so the server
+// render (where useReducedMotion is null) and the client agree and hydration
+// sees the same tree.
+function drift(
+  reduce: boolean | null,
+  moving: Record<string, readonly (string | number)[]>,
+  still: Record<string, string | number>,
+  transition: Transition,
+) {
+  return {
+    initial: Object.fromEntries(
+      Object.entries(moving).map(([key, frames]) => [key, frames[0]]),
+    ) as TargetAndTransition,
+    animate: (reduce ? still : moving) as TargetAndTransition,
+    transition: reduce ? { duration: 0 } : transition,
+  };
+}
 
 function StarField({ density = 40, color = "white" }: { density?: number; color?: string }) {
   const stars = [];
@@ -44,7 +73,14 @@ function StarField({ density = 40, color = "white" }: { density?: number; color?
 // solid flat-shaded polyhedra asteroids (not wireframe), diagonal warp
 // streaks, cyan ship with engine trail, vignette + bloom feel.
 
+// Reduced-motion resting y per sprite index, as % of the banner (full-height
+// wrapper). Picked so sprites spread out and stay clear of the ship column.
+const ASTEROID_STILL_Y = [12, 38, 66, 22, 6, 52];
+const BULLET_STILL_Y = [30, 18, 6];
+const COIN_STILL_Y = [35, 60, 12];
+
 export function SpaceShooterBanner() {
+  const reduce = useReducedMotion();
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: "#0a0a1a" }}>
       {/* Every vertical drift below animates a transform translate, not `top`:
@@ -59,8 +95,12 @@ export function SpaceShooterBanner() {
           right: "-15%",
           background: "radial-gradient(circle, #b4540030 0%, #facc1518 40%, transparent 70%)",
         }}
-        animate={{ y: ["-25%", "100%"] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+        {...drift(
+          reduce,
+          { y: ["-25%", "100%"] },
+          { y: "20%" },
+          { duration: 18, repeat: Infinity, ease: "linear" },
+        )}
       />
       {/* 10%..110% of the banner, h-[60%] */}
       <motion.div
@@ -69,15 +109,23 @@ export function SpaceShooterBanner() {
           left: "-10%",
           background: "radial-gradient(circle, #a78bfa15 0%, transparent 65%)",
         }}
-        animate={{ y: ["16.667%", "183.333%"] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+        {...drift(
+          reduce,
+          { y: ["16.667%", "183.333%"] },
+          { y: "50%" },
+          { duration: 22, repeat: Infinity, ease: "linear" },
+        )}
       />
       {/* Starfield scrolling slowly downward — parallax layer behind everything (0%..50% of the banner, h-[200%]) */}
       <motion.div
         className="absolute top-0 left-0 w-full"
         style={{ height: "200%" }}
-        animate={{ y: ["0%", "25%"] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+        {...drift(
+          reduce,
+          { y: ["0%", "25%"] },
+          { y: "0%" },
+          { duration: 12, repeat: Infinity, ease: "linear" },
+        )}
       >
         <StarField density={60} color="#94a3b8" />
       </motion.div>
@@ -97,13 +145,18 @@ export function SpaceShooterBanner() {
               background:
                 "linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent)",
             }}
-            animate={{ y: [`${(-15 / len) * 100}%`, `${(110 / len) * 100}%`] }}
-            transition={{
-              duration: 0.5 + (i % 5) * 0.12,
-              repeat: Infinity,
-              delay: i * 0.07,
-              ease: "linear",
-            }}
+            {...drift(
+              reduce,
+              { y: [`${(-15 / len) * 100}%`, `${(110 / len) * 100}%`] },
+              // Spread down the banner by index (top edge 0..80%), never random.
+              { y: `${(((i * 37) % 80) / len) * 100}%` },
+              {
+                duration: 0.5 + (i % 5) * 0.12,
+                repeat: Infinity,
+                delay: i * 0.07,
+                ease: "linear",
+              },
+            )}
           />
         );
       })}
@@ -120,8 +173,12 @@ export function SpaceShooterBanner() {
           key={i}
           className="pointer-events-none absolute top-0 h-full"
           style={{ left: `${a.x}%`, width: a.size }}
-          animate={{ y: ["-12%", "110%"] }}
-          transition={{ duration: a.spd, repeat: Infinity, delay: a.delay, ease: "linear" }}
+          {...drift(
+            reduce,
+            { y: ["-12%", "110%"] },
+            { y: `${ASTEROID_STILL_Y[i] ?? 20}%` },
+            { duration: a.spd, repeat: Infinity, delay: a.delay, ease: "linear" },
+          )}
         >
           <motion.svg
             className="block"
@@ -206,8 +263,12 @@ export function SpaceShooterBanner() {
           key={i}
           className="pointer-events-none absolute top-0 h-full w-2"
           style={{ left: b.x }}
-          animate={{ y: ["42%", "0%"], opacity: [1, 0] }}
-          transition={{ duration: 0.5, repeat: Infinity, delay: b.d, ease: "linear" }}
+          {...drift(
+            reduce,
+            { y: ["42%", "0%"], opacity: [1, 0] },
+            { y: `${BULLET_STILL_Y[i] ?? 20}%`, opacity: 1 },
+            { duration: 0.5, repeat: Infinity, delay: b.d, ease: "linear" },
+          )}
         >
           <div
             className="h-2 w-2 rounded-full"
@@ -228,8 +289,12 @@ export function SpaceShooterBanner() {
           key={i}
           className="pointer-events-none absolute top-0 h-full w-3.5"
           style={{ left: c.x }}
-          animate={{ y: ["-5%", "110%"] }}
-          transition={{ duration: c.spd, repeat: Infinity, delay: c.delay, ease: "linear" }}
+          {...drift(
+            reduce,
+            { y: ["-5%", "110%"] },
+            { y: `${COIN_STILL_Y[i] ?? 30}%` },
+            { duration: c.spd, repeat: Infinity, delay: c.delay, ease: "linear" },
+          )}
         >
           <motion.div
             className="h-3.5 w-3.5 rounded-full"
@@ -631,6 +696,7 @@ export function TowerStackerBanner() {
 export function TypingSpeedBanner() {
   const text = "THE QUICK FOX";
   const correctColors = ["#22c55e", "#60a5fa", "#f59e0b", "#a78bfa", "#ec4899"];
+  const reduce = useReducedMotion();
   return (
     <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#0a0f1a] via-[#111827] to-[#0a0f1a]">
       {/* WPM display in corner */}
@@ -692,16 +758,17 @@ export function TypingSpeedBanner() {
           key={i}
           className="pointer-events-none absolute top-0 h-full w-1.5"
           style={{ left: `${20 + i * 15}%` }}
-          animate={{
-            y: ["55%", "35%"],
-            opacity: [0, 1, 0],
-            x: [(i % 2 === 0 ? -1 : 1) * 10, (i % 2 === 0 ? 1 : -1) * 15],
-          }}
-          transition={{
-            duration: 0.8,
-            repeat: Infinity,
-            delay: i * 0.3 + 0.5,
-          }}
+          {...drift(
+            reduce,
+            {
+              y: ["55%", "35%"],
+              opacity: [0, 1, 0],
+              x: [(i % 2 === 0 ? -1 : 1) * 10, (i % 2 === 0 ? 1 : -1) * 15],
+            },
+            // Resting confetti: staggered heights by index, fully visible.
+            { y: `${40 + (i % 3) * 6}%`, opacity: 0.9, x: (i % 2 === 0 ? -1 : 1) * 4 },
+            { duration: 0.8, repeat: Infinity, delay: i * 0.3 + 0.5 },
+          )}
         >
           <div
             className="h-1.5 w-1.5 rounded-full"

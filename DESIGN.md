@@ -714,6 +714,18 @@ current tree on 2026-07-07.
   `<div data-motion-exempt className="contents">` (`game-loader.tsx`, `sections/game.tsx`,
   `games/password-game/page.tsx`). New game mount points need the attribute. The net does not
   remove end-state transforms, so new transforms still go under `motion-safe:`.
+- **Game banners render static at representative positions under reduced motion** (the Orbital
+  Dodge and Typing Speed drifts in `components/game/banners.tsx`, via `useReducedMotion()` and the
+  `drift()` helper). With motion on, each layer loops a transform `y` exactly as before. Under the
+  OS preference it gets one fixed in-view `y` (and `x`/`opacity` for the confetti), spread by
+  sprite index and never `Math.random`, so the card stays about as dense as a mid-animation frame.
+  This is not "freeze on the last keyframe" on purpose: the chrome-level
+  `<MotionConfig reducedMotion="user">` skips a transform animation by jumping to its FINAL
+  keyframe, and a drift's final keyframe is off-card (110 percent or more), which emptied the
+  banner. `initial` is always the first keyframe so the server render (`useReducedMotion` is null
+  there) and the client share one tree. The opacity-only pulses (star twinkle, engine trail, WPM,
+  chaos badge) keep running, since the brief allows looping opacity. Do not "simplify" the helper
+  back to a bare `animate` array.
 - **Every react-three-fiber Canvas mounts behind `WebGLOnly`** (`components/three/webgl-only.tsx`).
   three.js needs a WebGL2 context. Without one, its renderer throws "Error creating WebGL
   context." inside R3F's async Canvas setup: an unhandled rejection no error boundary catches,
