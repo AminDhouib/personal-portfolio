@@ -53,11 +53,13 @@ export function Game() {
 
           {/* This embed is the real playable game, not a teaser; exempt from
               reduced-motion by ruling like the /games/space-shooter route. */}
-          <MotionConfig reducedMotion="never">
-            <WebGLOnly fallback={<NeedsWebGL />}>
-              <SpaceShooterGame />
-            </WebGLOnly>
-          </MotionConfig>
+          <div data-motion-exempt className="contents">
+            <MotionConfig reducedMotion="never">
+              <WebGLOnly fallback={<NeedsWebGL />}>
+                <SpaceShooterGame />
+              </WebGLOnly>
+            </MotionConfig>
+          </div>
 
           <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
             {FEATURED_BELOW_SHOOTER.map((slug) => (

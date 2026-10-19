@@ -18,5 +18,11 @@ export function GameLoader({ slug }: { slug: GameSlug }) {
 
   // Games are exempt from reduced-motion by ruling; "never" pins full motion
   // regardless of the OS preference honored by the root MotionConfig (providers.tsx).
-  return <MotionConfig reducedMotion="never">{entry.render({ towerSeed })}</MotionConfig>;
+  // data-motion-exempt keeps the global reduced-motion net (globals.css) off the game's CSS
+  // animations; `contents` means the wrapper generates no box.
+  return (
+    <div data-motion-exempt className="contents">
+      <MotionConfig reducedMotion="never">{entry.render({ towerSeed })}</MotionConfig>
+    </div>
+  );
 }

@@ -73,6 +73,17 @@
   --color-accent-red: #991b1b;
 }
 
+/* Motion tokens. A plain :root block, not @theme: they are consumed as
+   duration-[var(--motion-dur-base)] / ease-[var(--motion-ease-out)], and
+   @theme would add nothing for them. No --ease-* is defined anywhere: that
+   namespace would override Tailwind's built-in easing curves. */
+:root {
+  --motion-dur-fast: 120ms;
+  --motion-dur-base: 180ms;
+  --motion-dur-slow: 240ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ...but a SOLID accent fill is the opposite problem: it is a background with
    black text on top, so darkening it makes that pairing worse, not better.
    The primary CTA (bg-accent-green + text-black, 8 buttons) measures 9.22:1
@@ -1062,6 +1073,27 @@ button[aria-label="Copy to clipboard"] {
   box-shadow:
     0 0 0 3px rgb(236, 72, 153),
     0 0 40px 12px rgba(236, 72, 153, 0.6);
+}
+
+/* Reduced-motion net: under the OS preference, every page-chrome animation and
+   transition collapses to an instant change, so no future utility has to
+   remember to opt in. Games are exempt, on purpose: DESIGN.md's "Reduced-motion
+   is inverted between chrome and games" ruling keeps motion as gameplay there,
+   and a 0.01ms duration would snap their CSS animations to the end state. Each
+   game mount point carries data-motion-exempt (a `display: contents` wrapper,
+   so it adds no box); a new game mount point needs the attribute. Spinners stay
+   animated. The net does not remove end-state transforms, so transforms in new
+   code still go under motion-safe:. It sits above the block below because the
+   CopilotKit rules earlier in the file carry !important too and the later rule
+   wins the tie. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin, [data-motion-exempt], [data-motion-exempt] *),
+  *:not([data-motion-exempt] *)::before,
+  *:not([data-motion-exempt] *)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Reduced motion: quiet the remaining page-chrome animations. Game animations
