@@ -1051,11 +1051,14 @@ button[aria-label="Copy to clipboard"] {
    pseudo-element whose opacity (only) goes 0 -> 1 -> 0. widget-panel.tsx adds
    .chat-attention and removes it on animationend (or after ~600 ms under
    reduced motion, where the ring shows statically). .copilotKitWindow is
-   position: fixed, so the absolute ::after anchors to it. */
+   position: fixed, so the absolute ::after anchors to it. z-index 3 lifts it
+   over CopilotKit's header (z-index 2) and message list (z-index 1), which
+   otherwise paint over the inset ring everywhere but the input row. */
 .copilotKitWindow.chat-attention::after {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 3;
   border-radius: inherit;
   pointer-events: none;
   box-shadow: inset 0 0 0 2px var(--color-accent-purple);
