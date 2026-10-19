@@ -1,7 +1,6 @@
 "use client";
 
 import { ChevronDown, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
 import { BOOKING_URL } from "@/data/nav";
 import { HeroPhoto } from "./hero-photo";
 
@@ -13,11 +12,7 @@ export function Hero() {
       <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
         <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-2 md:gap-10 lg:gap-12">
           {/* Left: Text content */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
+          <div>
             <p className="mb-6 text-sm tracking-widest text-(--muted) uppercase">
               Portfolio / {currentYear}
             </p>
@@ -75,17 +70,12 @@ export function Hero() {
                 <ChevronDown className="h-4 w-4" />
               </a>
             </div>
-          </motion.div>
+          </div>
 
           {/* Right: Profile photo — order-first so it appears above text on mobile */}
-          <motion.div
-            className="order-first flex justify-center md:order-last md:justify-end"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          >
+          <div className="order-first flex justify-center md:order-last md:justify-end">
             <HeroPhoto />
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>
