@@ -36,8 +36,10 @@ export function posthogUpstreamHost(configuredHost: string | null | undefined): 
  * under the proxy path is forwarded: a catch-all would expose PostHog's whole app surface
  * (`/login`, `/admin`, the private `/api/projects/...`) on this origin.
  *
- *  - `/e` and `/i/:path*`: capture (`/e/`, `/i/v0/e/`) plus the logs and metrics ingest
- *    (`/i/v1/logs`, `/i/v1/metrics`).
+ *  - `/e` and `/i/v0/e`: capture. `/i/v1/:path*`: the logs and metrics ingest (`/i/v1/logs`,
+ *    `/i/v1/metrics`). `/i/v0/e` is its own literal rule, not part of a `/i/:path*` wildcard,
+ *    because a `:path*` source swallows the final slash of what it matches and `/i/v0/e/` must
+ *    reach PostHog with it (see the next paragraph).
  *  - `/s`: session recording snapshots (recording is switched on in the PostHog project).
  *  - `/flags`: feature flags and remote config (`/flags/?v=2`).
  *  - `/static/:path*` and `/array/:path*`: the SDK's lazy bundles and its remote config.
@@ -48,11 +50,16 @@ export function posthogUpstreamHost(configuredHost: string | null | undefined): 
  * does not load it), `/batch` and `/capture` (the SDK never calls them), and anything else.
  *
  * Exact paths are written without a trailing slash and forwarded WITH one, because PostHog's
- * endpoints are slash-terminated; Next matches the slashless source against both spellings.
+ * endpoints are slash-terminated. Next matches the slashless source against both spellings (its
+ * `modifyRouteRegex` appends an optional slash to every rewrite source). A wildcard source's
+ * `:path*` swallows a trailing slash, so wildcards are used only where the SDK's URLs carry none
+ * (`/static/...`, `/array/...`, `/i/v1/...`). `__tests__/posthog-proxy.test.ts` runs Next's real
+ * matcher over this list to pin all of it.
  */
 const POSTHOG_ALLOWED_PATHS: ReadonlyArray<{ subPath: string; upstream: string }> = [
   { subPath: "/e", upstream: "/e/" },
-  { subPath: "/i/:path*", upstream: "/i/:path*" },
+  { subPath: "/i/v0/e", upstream: "/i/v0/e/" },
+  { subPath: "/i/v1/:path*", upstream: "/i/v1/:path*" },
   { subPath: "/s", upstream: "/s/" },
   { subPath: "/flags", upstream: "/flags/" },
   { subPath: "/static/:path*", upstream: "/static/:path*" },

@@ -16,7 +16,8 @@ export function isLocalhost(baseURL: string | undefined): boolean {
 /**
  * Keeps a run inside the app under test: aborts every request to another
  * origin (Google Analytics, PostHog, the booking page, images on CDNs), the
- * Sentry tunnel, and the AI chat proxy (each chat turn costs money). Returns
+ * Sentry tunnel, the AI chat proxy (each chat turn costs money), and the first-party PostHog
+ * path (`/_p/`, which the app forwards to PostHog). Returns
  * the live list of blocked URLs so a test can assert a navigation was
  * attempted without it ever leaving the machine.
  */
@@ -31,7 +32,8 @@ export async function blockThirdParties(
     const internal =
       url.origin === origin &&
       !url.pathname.startsWith("/monitoring") &&
-      !url.pathname.startsWith("/api/copilotkit");
+      !url.pathname.startsWith("/api/copilotkit") &&
+      !url.pathname.startsWith("/_p/");
     if (internal) return route.continue();
     blocked.push(url.href);
     return route.abort("blockedbyclient");
