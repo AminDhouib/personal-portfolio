@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { modifyRouteRegex } from "next/dist/lib/redirect-status";
+import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
+import { prepareDestination } from "next/dist/shared/lib/router/utils/prepare-destination";
 import { describe, expect, it } from "vitest";
 import {
   POSTHOG_DEFAULT_UPSTREAM_HOST,
@@ -46,24 +49,35 @@ describe("posthogUpstreamHost", () => {
   });
 });
 
-// A stand-in for Next's matcher, enough for the two source shapes the rules use: a literal path
-// (matched with or without a trailing slash, like path-to-regexp's non-strict default) and a
-// literal prefix ending in `/:path*` (the prefix itself, or anything beneath it). The real thing
-// is checked against a running build (RUNBOOK.md, "Analytics proxy").
+// Next's own matcher, not a stand-in. A non-internal rewrite source is compiled by
+// `buildCustomRoute` (next/dist/server/lib/router-utils/filesystem.js) with `getPathMatch`
+// (next/dist/shared/lib/router/utils/path-match.js: strict, unnamed params removed, insensitive)
+// whose regex goes through `modifyRouteRegex` (next/dist/lib/redirect-status.js), which appends an
+// optional trailing slash. `resolveRoutes` (server/lib/router-utils/resolve-routes.js) then runs
+// the first matching rule's destination through `prepareDestination` with `appendParamsToQuery`.
+// This runs exactly those functions of the installed Next (16.3.8 at the time of writing), so
+// the rule list is checked against what Next really does, including that optional-slash modifier:
+// a `:path*` source swallows the final slash of the path it matches.
 function resolveRewrite(
   rules: ReturnType<typeof posthogProxyRewrites>,
   pathname: string,
 ): string | null {
   for (const rule of rules) {
-    const wildcard = rule.source.endsWith("/:path*");
-    const base = wildcard ? rule.source.slice(0, -"/:path*".length) : rule.source;
-    const rest = pathname.startsWith(base) ? pathname.slice(base.length) : null;
-    if (rest === null) continue;
-    if (wildcard) {
-      if (rest !== "" && !rest.startsWith("/")) continue;
-      return rule.destination.replace(":path*", rest.replace(/^\//u, ""));
-    }
-    if (rest === "" || rest === "/") return rule.destination;
+    const match = getPathMatch(rule.source, {
+      strict: true,
+      removeUnnamedParams: true,
+      sensitive: false,
+      regexModifier: (regex: string) => modifyRouteRegex(regex),
+    });
+    const params = match(pathname);
+    if (params === false) continue;
+    const { parsedDestination } = prepareDestination({
+      appendParamsToQuery: true,
+      destination: rule.destination,
+      params,
+      query: {},
+    });
+    return `${parsedDestination.origin}${parsedDestination.pathname}`;
   }
   return null;
 }
@@ -76,7 +90,8 @@ describe("posthogProxyRewrites", () => {
   it("lists exactly the allowed paths, one rule each, all under the proxy path", () => {
     expect(rules.map((rule) => rule.source.slice(POSTHOG_PROXY_PATH.length))).toEqual([
       "/e",
-      "/i/:path*",
+      "/i/v0/e",
+      "/i/v1/:path*",
       "/s",
       "/flags",
       "/static/:path*",
@@ -94,6 +109,7 @@ describe("posthogProxyRewrites", () => {
     ["/e/", "/e/"],
     ["/e", "/e/"],
     ["/i/v0/e/", "/i/v0/e/"],
+    ["/i/v0/e", "/i/v0/e/"],
     ["/i/v1/logs", "/i/v1/logs"],
     ["/i/v1/metrics", "/i/v1/metrics"],
     // session recording
@@ -130,6 +146,10 @@ describe("posthogProxyRewrites", () => {
     "/api/surveys/1/",
     "/api/surveys/../projects/",
     "/api/conversations/v1/widget/message",
+    "/i/",
+    "/i/v0/",
+    "/i/v0/x/",
+    "/i/v2/logs",
     "/batch",
     "/batch/",
     "/capture",

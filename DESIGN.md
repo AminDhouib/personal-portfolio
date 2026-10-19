@@ -1475,10 +1475,14 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   real instance so toolbar links work. The rewrites are an ALLOW-LIST, not a catch-all, because a
   catch-all would put PostHog's whole app (`/login`, `/admin`, the private `/api/projects/...`)
   on our origin. Read from posthog-js 1.399.x's `endpointFor` calls, the allowed paths are `/e`,
-  `/i/:path*` (`/i/v0/e/`, `/i/v1/logs`, `/i/v1/metrics`), `/s` (session recording), `/flags`,
+  `/i/v0/e` and `/i/v1/:path*` (`/i/v0/e/`, `/i/v1/logs`, `/i/v1/metrics`), `/s` (session recording), `/flags`,
   `/static/:path*`, `/array/:path*`, and four token-scoped public reads by exact path
   (`/api/surveys`, `/api/web_experiments`, `/api/product_tours`, `/api/early_access_features`);
-  exact paths are forwarded WITH the slash PostHog expects. Everything else under the proxy path
+  exact paths are forwarded WITH the slash PostHog expects. Matching a slashless source against
+  both spellings relies on Next's internal optional-slash modifier (`modifyRouteRegex`, 16.3.8),
+  which also makes a `:path*` source swallow the final slash, so wildcards are used only where
+  the SDK's URLs carry none; `src/lib/__tests__/posthog-proxy.test.ts` pins it by running Next's
+  real matcher over the rule list. Everything else under the proxy path
   (the bare path, `/login`, other `/api/...`) is not rewritten and answers the app's 404. Not
   allowed on purpose: the conversations widget (`/api/conversations/v1/widget/*`, which this site
   does not load), `/batch` and `/capture`. When a posthog-js upgrade adds a call, add its path to
