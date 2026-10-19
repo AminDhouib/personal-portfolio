@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { POSTHOG_PROXY_PATH } from "@/lib/posthog-proxy";
 
 // Pins the browser-side monitoring wiring: Sentry's replay sampling and masking, the lazy add
 // of the replay integration, and PostHog's recording masks. The tunnel's own behavior lives in
@@ -101,6 +102,31 @@ describe("instrumentation-client replay wiring", () => {
       maskTextSelector: ".ph-sensitive",
     });
     expect(options).not.toHaveProperty("disable_session_recording");
+  });
+
+  it("sends PostHog through the first-party path and keeps the real host for the UI", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "");
+    await loadClientInit();
+    expect(posthogInit).toHaveBeenCalledTimes(1);
+    expect(posthogInit.mock.calls[0]?.[0]).toBe("phc_test");
+    const options = posthogInit.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(options.api_host).toBe(POSTHOG_PROXY_PATH);
+    expect(options.api_host).toMatch(/^\/[^/]/);
+    expect(options.ui_host).toBe("https://posthog.devino.ca");
+  });
+
+  it("uses the configured host for the UI link, never as the api host", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://ph.example.com");
+    await loadClientInit();
+    const options = posthogInit.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(options.api_host).toBe(POSTHOG_PROXY_PATH);
+    expect(options.ui_host).toBe("https://ph.example.com");
+  });
+
+  it("does not init PostHog without a key", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
+    await loadClientInit();
+    expect(posthogInit).not.toHaveBeenCalled();
   });
 
   it("is enabled on the real site", async () => {

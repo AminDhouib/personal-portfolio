@@ -85,6 +85,15 @@ describe("/privacy", () => {
     );
   });
 
+  it("says analytics requests go through this site's own address on their way to PostHog", () => {
+    const text = pageText();
+    expect(text).toContain(
+      "Your browser sends these analytics requests to this site's own address (amindhou.com), and this site's server passes them on to our PostHog together with your IP address.",
+    );
+    // The host is still named, as the instance that receives them.
+    expect(text).toContain("which we host ourselves at posthog.devino.ca");
+  });
+
   it("covers the tools by name", () => {
     const text = pageText();
     for (const name of ["PostHog", "Sentry", "OpenRouter", "posthog.devino.ca"]) {

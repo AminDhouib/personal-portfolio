@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import posthog from "posthog-js";
 import { isLoopbackHost } from "@/lib/loopback-host";
+import { POSTHOG_PROXY_PATH, posthogUpstreamHost } from "@/lib/posthog-proxy";
 
 // A DSN is a public identifier, not a secret — it ships in every browser
 // bundle by design. It is committed as a constant because a bare
@@ -86,7 +87,12 @@ const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 
 if (POSTHOG_KEY) {
   posthog.init(POSTHOG_KEY, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://posthog.devino.ca",
+    // First-party: the SDK posts to a same-origin path that next.config.ts rewrites to PostHog
+    // (and src/proxy.ts hops capture over the host's internal route), so ad blockers have no
+    // posthog host to match. ui_host stays the real instance so toolbar and "open in PostHog"
+    // links point at the actual app. The static read is what Next inlines (see above).
+    api_host: POSTHOG_PROXY_PATH,
+    ui_host: posthogUpstreamHost(process.env.NEXT_PUBLIC_POSTHOG_HOST),
     capture_pageview: true,
     capture_pageleave: true,
     autocapture: true,

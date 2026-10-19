@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+// Relative, not the `@/` alias: Next's own config loader reads this file before any tsconfig
+// path mapping is in play.
+import { posthogProxyRewrites } from "./src/lib/posthog-proxy";
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -28,6 +31,17 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "@radix-ui/react-dialog"],
+  },
+  // First-party PostHog path: the browser SDK posts to a same-origin path and these rules
+  // forward it to PostHog, so an ad blocker has no third-party host to match. The path and the
+  // rules live in src/lib/posthog-proxy.ts; src/proxy.ts handles the capture hop.
+  // `skipTrailingSlashRedirect` is GLOBAL and required: PostHog's `/e/` endpoints are
+  // slash-terminated and Next's default 308 would break them. src/proxy.ts re-creates the
+  // default (308 to the slashless form) for every path that is not the PostHog path, so pages
+  // do not start answering 200 on a trailing-slash duplicate. DESIGN.md has the register entry.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return posthogProxyRewrites(process.env.NEXT_PUBLIC_POSTHOG_HOST);
   },
   async headers() {
     return [
