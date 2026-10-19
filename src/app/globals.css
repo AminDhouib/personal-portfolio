@@ -1073,7 +1073,7 @@ button[aria-label="Copy to clipboard"] {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: 0 0 0 2px var(--color-accent-purple);
+  box-shadow: inset 0 0 0 2px var(--color-accent-purple);
   animation: chat-attention-ring var(--motion-dur-slow) var(--motion-ease-out) both;
 }
 @keyframes chat-attention-ring {

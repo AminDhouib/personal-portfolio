@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotReadable } from "@copilotkit/react-core";
 import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
@@ -43,9 +43,14 @@ function pulseOpenWindow() {
   if (!win) return () => {};
 
   let timer = 0;
+  // animationend bubbles, so a reply fading in inside the window must not end the ring:
+  // only the ring's own animation on the window itself does.
+  const onEnd = (e: AnimationEvent) => {
+    if (e.target === win && e.animationName === "chat-attention-ring") clear();
+  };
   const clear = () => {
     win.classList.remove(ATTENTION_CLASS);
-    win.removeEventListener("animationend", clear);
+    win.removeEventListener("animationend", onEnd);
     window.clearTimeout(timer);
   };
 
@@ -56,17 +61,17 @@ function pulseOpenWindow() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     timer = window.setTimeout(clear, REDUCED_MOTION_RING_MS);
   } else {
-    win.addEventListener("animationend", clear);
+    win.addEventListener("animationend", onEnd);
   }
 
   return clear;
 }
 
-function openOrHighlightCopilot() {
+function openOrHighlightCopilot(skipPulse: boolean) {
   const btn = document.querySelector<HTMLElement>(".copilotKitButton");
   if (!btn) return () => {};
   if (btn.classList.contains("open")) {
-    return pulseOpenWindow();
+    return skipPulse ? () => {} : pulseOpenWindow();
   }
   btn.click();
   return () => {};
@@ -81,18 +86,24 @@ export function ChatWidgetPanel({
   initiallyOpen?: boolean;
   openSignal?: number;
 }) {
+  // The panel first mounts already open when a click created it (initiallyOpen), so the
+  // first signal of a mount is the open itself, not a re-click: no ring for it.
+  const firstSignalHandled = useRef(false);
+
   useEffect(() => {
     if (!openSignal) return;
     let cleanup = () => {};
     const timer = window.setTimeout(() => {
-      cleanup = openOrHighlightCopilot();
+      const skipPulse = Boolean(initiallyOpen) && !firstSignalHandled.current;
+      firstSignalHandled.current = true;
+      cleanup = openOrHighlightCopilot(skipPulse);
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
       cleanup();
     };
-  }, [openSignal]);
+  }, [openSignal, initiallyOpen]);
 
   return (
     <CopilotKit runtimeUrl="/api/copilotkit" useSingleEndpoint showDevConsole={false}>
