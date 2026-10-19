@@ -1082,12 +1082,24 @@ button[aria-label="Copy to clipboard"] {
    and a 0.01ms duration would snap their CSS animations to the end state. Each
    game mount point carries data-motion-exempt (a `display: contents` wrapper,
    so it adds no box); a new game mount point needs the attribute. Spinners stay
-   animated. The net does not remove end-state transforms, so transforms in new
-   code still go under motion-safe:. It sits above the block below because the
-   CopilotKit rules earlier in the file carry !important too and the later rule
-   wins the tie. */
+   animated (.animate-spin and CopilotKit's .copilotKitSpinner). data-motion-fade
+   is for an element whose reduced-motion behaviour is an opacity-only fade it
+   sets itself (e.g. motion-reduce:duration-*); it must not transition a
+   transform under motion-reduce. The net does not remove end-state transforms,
+   so transforms in new code still go under motion-safe:. The net's specificity
+   is (0,1,0), so it beats earlier !important rules of equal specificity
+   (.copilotKitInput, .copilotKitButton, .copilotKitSuggestion), while
+   higher-specificity !important rules such as `.copilotKitSuggestions button`
+   keep their colour-only transitions, which is acceptable. It sits above the
+   final reduced-motion block so that block still wins its own ties. */
 @media (prefers-reduced-motion: reduce) {
-  *:not(.animate-spin, [data-motion-exempt], [data-motion-exempt] *),
+  *:not(
+    .animate-spin,
+    .copilotKitSpinner,
+    [data-motion-fade],
+    [data-motion-exempt],
+    [data-motion-exempt] *
+  ),
   *:not([data-motion-exempt] *)::before,
   *:not([data-motion-exempt] *)::after {
     animation-duration: 0.01ms !important;
