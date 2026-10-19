@@ -107,11 +107,19 @@ export function Navbar() {
   }, [theme, setTheme]);
 
   return (
-    <nav
-      className={`fixed top-0 right-0 left-0 z-70 transition-[background-color,backdrop-filter] duration-500 ease-out ${
-        scrolled ? "bg-(--background)/80 backdrop-blur-xl" : "bg-transparent"
-      }`}
-    >
+    <nav className="fixed top-0 right-0 left-0 z-70">
+      {/* Blur + tint layer. Always blurred; only its opacity changes on
+          scroll, so no backdrop-filter is ever transitioned. It is a sibling
+          of the mobile panel, not an ancestor, and the nav itself carries no
+          filter, so the panel's `fixed` positioning still resolves against
+          the viewport. -z-10 keeps it behind the nav content (the nav is its
+          own stacking context via fixed + z-70). */}
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 -z-10 bg-(--background)/80 backdrop-blur-xl transition-opacity duration-(--motion-dur-base) ease-(--motion-ease-out) ${
+          scrolled ? "opacity-100" : "opacity-0"
+        }`}
+      />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo — "AMIN GAMES" with subtle rainbow shimmer on /games */}
@@ -274,10 +282,11 @@ export function Navbar() {
       <AnimatePresence>
         {!isGames && mobileOpen && (
           <>
-            {/* Backdrop — viewport-sized via w-screen/h-screen because the
-                navbar's `backdrop-blur` makes the nav itself a containing
-                block for fixed descendants, which would otherwise clip the
-                backdrop and panel to the navbar's 64px height. */}
+            {/* Backdrop — viewport-sized via w-screen/h-screen. The nav no
+                longer carries `backdrop-blur` (it lives on the sibling layer
+                above), so it is not a containing block for these fixed
+                descendants; keep it that way or they clip to the navbar's
+                64px height. */}
             <motion.div
               className="fixed top-0 left-0 z-60 h-screen w-screen bg-black/60 xl:hidden"
               initial={{ opacity: 0 }}
