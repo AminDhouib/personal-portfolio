@@ -58,7 +58,7 @@ export default function PrivacyPage() {
           <h1 className="mb-2 font-display text-4xl font-black tracking-tight">Privacy</h1>
           <p className="text-(--muted)">
             This page lists what amindhou.com collects and where it goes. The site is run by Amin
-            Dhouib and hosted on his own servers. Last updated October 15, 2026.
+            Dhouib and hosted on his own servers. Last updated October 18, 2026.
           </p>
         </div>
 
@@ -68,8 +68,10 @@ export default function PrivacyPage() {
             records page views, when you leave a page, clicks on the page, and a few named events:
             clicking Book a Call, an email link or a social link, opening the AI chat, and sending
             your contact details through the chat. PostHog keeps an identifier in a cookie and in
-            your browser&apos;s local storage so it can tell repeat visits apart. Like any website,
-            our web server and our PostHog receive your IP address with each request.
+            your browser&apos;s local storage so it can tell repeat visits apart. Your browser sends
+            these analytics requests to this site&apos;s own address (amindhou.com), and this
+            site&apos;s server passes them on to our PostHog together with your IP address. Like any
+            website, our web server and our PostHog receive your IP address with each request.
           </p>
           <p>
             While you browse, the site also notes how your visit started, for the length of that

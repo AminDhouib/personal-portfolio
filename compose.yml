@@ -51,6 +51,11 @@ services:
       RESEND_BASE_URL: ${RESEND_BASE_URL:-https://usesend.devino.ca/api/v1}
       POSTHOG_KEY: ${POSTHOG_KEY:-}
       POSTHOG_HOST: ${POSTHOG_HOST:-}
+      # Internal origin for the first-party PostHog proxy's capture hop (src/proxy.ts), mapped
+      # by extra_hosts below. NO-COLON default form on purpose: unset gets the default, but an
+      # explicit blank stays blank, which disables the hop (the fallback if the host Traefik
+      # router is missing, and the right setting for a local stack). RUNBOOK.md, Analytics proxy.
+      POSTHOG_CAPTURE_INTERNAL_ORIGIN: ${POSTHOG_CAPTURE_INTERNAL_ORIGIN-http://posthog-capture.internal}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GA4_SERVICE_ACCOUNT_KEY: ${GA4_SERVICE_ACCOUNT_KEY:-}
       GA4_PROPERTY_SHORTY: ${GA4_PROPERTY_SHORTY:-}
@@ -64,6 +69,10 @@ services:
       # missing required var. Wired here so the override can actually reach the
       # container -- without this line it would be silently unreachable in prod.
       DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: ${DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION:-}
+    # Resolves the internal capture origin above to the docker host, where Traefik's
+    # posthog-capture-internal router (host infra, owned by the Uptimely repo) answers it.
+    extra_hosts:
+      - "posthog-capture.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
