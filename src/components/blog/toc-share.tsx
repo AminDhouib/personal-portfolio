@@ -36,7 +36,7 @@ export function ShareButton({ title }: { title: string }) {
         onClick={() => {
           void handleShare();
         }}
-        className="inline-flex min-w-28 items-center justify-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) transition-[color,border-color,scale] duration-100 hover:border-(--muted)/40 hover:text-(--foreground) motion-safe:active:scale-[0.98]"
+        className="inline-flex min-w-28 items-center justify-center gap-2 rounded-lg border border-(--border) px-3 py-1.5 text-sm text-(--muted) transition-[color,border-color,scale] duration-(--motion-dur-fast) hover:border-(--muted)/40 hover:text-(--foreground) motion-safe:active:scale-[0.98]"
         title="Share this post"
       >
         <span
