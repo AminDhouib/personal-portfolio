@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { ArrowRight, Clock } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -46,13 +46,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
 
         <div className="space-y-0">
           {displayPosts.map((post, i) => (
-            <motion.div
-              key={post.slug}
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: i * 0.1 }}
-            >
+            <Reveal key={post.slug} y={10} duration={0.4} delay={i * 0.1}>
               <Link
                 href={`/blog/${post.slug}`}
                 className="group flex items-start justify-between border-b border-(--border) py-6 transition-colors hover:border-accent-blue/30"
@@ -76,17 +70,11 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
                 </div>
                 <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-(--muted) transition-[color,translate] group-hover:text-accent-blue motion-safe:group-hover:translate-x-1" />
               </Link>
-            </motion.div>
+            </Reveal>
           ))}
         </div>
 
-        <motion.div
-          className="mt-8"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
+        <Reveal className="mt-8" delay={0.3}>
           <Link
             href="/blog"
             className="inline-flex items-center gap-2 text-sm font-semibold text-accent-blue hover:brightness-110"
@@ -94,7 +82,7 @@ export function Blog({ posts }: { posts?: BlogPostMeta[] }) {
             View all posts
             <ArrowRight className="h-4 w-4" />
           </Link>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );

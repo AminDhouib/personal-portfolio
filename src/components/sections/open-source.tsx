@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { GitFork, Star, ArrowRight, EyeOff, BellRing, Cloud, LayoutGrid } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -102,15 +102,14 @@ export function OpenSource({ stats, contributions }: Props) {
           {projects.map((project, i) => {
             const Icon = project.icon ? iconMap[project.icon] : undefined;
             return (
-              <motion.a
+              <Reveal
+                as="a"
                 key={project.name}
                 href={`https://github.com/${project.owner}/${project.repo}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
+                y={20}
+                delay={i * 0.1}
                 className="group rounded-xl border border-(--border) bg-(--card) p-6 transition-colors hover:border-accent-green/30"
               >
                 <div className="mb-4 flex items-start gap-4">
@@ -168,18 +167,15 @@ export function OpenSource({ stats, contributions }: Props) {
                   View on GitHub
                   <ArrowRight className="h-3.5 w-3.5 transition-[color,translate] motion-safe:group-hover:translate-x-1" />
                 </div>
-              </motion.a>
+              </Reveal>
             );
           })}
         </div>
 
         {/* GitHub Contribution Graph */}
-        <motion.div
+        <Reveal
           className="mb-8 overflow-x-auto rounded-xl border border-(--border) bg-(--card) p-6"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          duration={0.6}
         >
           <h3 className="mb-4 text-sm font-semibold tracking-wider text-(--muted) uppercase">
             Contribution Graph
@@ -240,7 +236,7 @@ export function OpenSource({ stats, contributions }: Props) {
                 document.body,
               )
             : null}
-        </motion.div>
+        </Reveal>
 
         {/* CI Stack */}
         <div className="flex flex-wrap items-center justify-center gap-3">

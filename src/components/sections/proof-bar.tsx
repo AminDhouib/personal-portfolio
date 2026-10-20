@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion, useInView, useMotionValue, useTransform, animate } from "framer-motion";
 import { Star, Server } from "lucide-react";
+import { Reveal } from "@/components/ui/reveal";
 
 interface CounterProps {
   target: number;
@@ -109,11 +110,11 @@ export function ProofBar({ usersK }: { usersK: number }) {
   return (
     <section ref={ref} className="border-y border-(--border) py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
+        <Reveal
           className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:grid-cols-5"
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
+          y={20}
+          margin={-100}
+          duration={0.6}
         >
           {metrics.map((m) => (
             <div key={m.label} className="flex flex-col items-center">
@@ -148,14 +149,14 @@ export function ProofBar({ usersK }: { usersK: number }) {
               )}
             </div>
           ))}
-        </motion.div>
+        </Reveal>
 
         {/* Self-hosted callout */}
-        <motion.div
+        <Reveal
           className="mt-12 flex flex-col items-center gap-2 text-center"
-          initial={{ opacity: 0 }}
-          animate={inView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          margin={-100}
+          duration={0.6}
+          delay={0.4}
         >
           <div className="flex items-center gap-2 text-(--muted)">
             <Server className="h-4 w-4 shrink-0" />
@@ -164,7 +165,7 @@ export function ProofBar({ usersK }: { usersK: number }) {
           <p className="text-xs text-(--muted)">
             Docker Swarm &nbsp;/&nbsp; Tailscale &nbsp;/&nbsp; Cloudflared
           </p>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );

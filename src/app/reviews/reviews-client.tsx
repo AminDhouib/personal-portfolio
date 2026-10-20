@@ -2,8 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, type CSSProperties } from "react";
 import { Star } from "lucide-react";
 import { reviews, type Review } from "@/data/reviews";
 import { SiIcon } from "@/components/ui/tech-icon";
@@ -174,15 +173,15 @@ export function ReviewsClient() {
   const sorted = [...reviews].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      className="w-full columns-1 md:columns-2"
+    // CSS entrance (the reveal-in keyframe in globals.css) instead of a framer-motion
+    // opacity:0 initial, so the reviews are visible in the server HTML and with JS off.
+    <div
+      style={{ "--reveal-y": "24px" } as CSSProperties}
+      className="w-full columns-1 motion-safe:animate-[reveal-in_0.5s_var(--motion-ease-out)_backwards] md:columns-2"
     >
       {sorted.map((review, i) => (
         <ReviewCard key={`${review.name}-${i}`} review={review} />
       ))}
-    </motion.div>
+    </div>
   );
 }

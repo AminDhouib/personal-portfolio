@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { TechIcon } from "@/components/ui/tech-icon";
 import { services } from "@/data/services";
@@ -17,12 +17,12 @@ export function Services() {
           {services.map((service, i) => {
             const Icon = service.icon;
             return (
-              <motion.div
+              <Reveal
                 key={service.title}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
+                x={-20}
+                margin={-50}
+                duration={0.4}
+                delay={i * 0.1}
                 className="group flex items-start gap-5 border-b border-(--border) py-6 last:border-b-0"
               >
                 {/* Accent bar + icon */}
@@ -48,19 +48,13 @@ export function Services() {
                     ))}
                   </div>
                 </div>
-              </motion.div>
+              </Reveal>
             );
           })}
         </div>
 
         {/* CTA */}
-        <motion.div
-          className="mt-12 flex justify-center"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
+        <Reveal className="mt-12 flex justify-center" delay={0.3}>
           <a
             href={BOOKING_URL}
             target="_blank"
@@ -70,7 +64,7 @@ export function Services() {
             Book a Call
             <ArrowRight className="h-4 w-4" />
           </a>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );

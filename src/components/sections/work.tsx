@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { Globe, AppWindow } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon } from "@/components/ui/tech-icon";
@@ -30,12 +30,11 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
             const liveMAU = mauData?.[project.slug] ?? null;
             const displayMAU = liveMAU ?? project.mauFallback;
             return (
-              <motion.div
+              <Reveal
                 key={project.slug}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
+                y={20}
+                margin={-50}
+                delay={i * 0.1}
                 className={`group relative overflow-hidden rounded-xl border border-(--border) bg-(--card) transition-colors hover:border-(--muted)/30 ${
                   project.slug === "getitdone" ? "md:col-span-2" : ""
                 }`}
@@ -123,7 +122,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                   </div>
                   {/* /p-6 */}
                 </Link>
-              </motion.div>
+              </Reveal>
             );
           })}
         </div>

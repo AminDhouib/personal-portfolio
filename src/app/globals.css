@@ -1118,6 +1118,40 @@ details[open] > .motion-rise-in {
   }
 }
 
+/* Scroll reveals (components/ui/reveal.tsx). Content is visible in the server
+   HTML; the Reveal component's layout effect sets data-reveal="armed" only on
+   elements that start below the fold, and "shown" when one scrolls into view.
+   Armed hides without a transition (nothing animates the hide); shown plays a
+   one-shot keyframe that ends on the element's own styles, so no transform or
+   transition lingers on cards that have hover states. The reduced-motion
+   guard is a backstop: the component already arms nothing under the OS
+   preference. */
+[data-reveal="armed"] {
+  opacity: 0;
+  transform: translate(var(--reveal-x, 0px), var(--reveal-y, 0px));
+}
+[data-reveal="shown"] {
+  animation: reveal-in var(--reveal-dur, 0.5s) var(--motion-ease-out) var(--reveal-delay, 0s)
+    backwards;
+}
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--reveal-x, 0px), var(--reveal-y, 0px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
 /* Reduced-motion net: under the OS preference, every page-chrome animation and
    transition collapses to an instant change, so no future utility has to
    remember to opt in. Games are exempt, on purpose: DESIGN.md's "Reduced-motion

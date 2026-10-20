@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { motion, MotionConfig } from "framer-motion";
+import { MotionConfig } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { Gamepad2, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -31,12 +32,7 @@ export function Game() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading number="09" title="The Game" color="var(--color-accent-pink)" />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
+        <Reveal y={20}>
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-display text-xl font-bold">Orbital Dodge</h3>
@@ -77,7 +73,7 @@ export function Game() {
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );

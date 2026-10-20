@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { Target, Palette, Dumbbell, Rocket } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 
@@ -21,12 +21,11 @@ export function BeyondCode() {
           {interests.map((item, i) => {
             const Icon = item.icon;
             return (
-              <motion.div
+              <Reveal
                 key={item.label}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
+                y={10}
+                duration={0.4}
+                delay={i * 0.1}
                 className="flex flex-col gap-3 rounded-xl border border-(--border) bg-(--card) p-5"
               >
                 <Icon className="h-5 w-5 text-accent-amber" />
@@ -34,7 +33,7 @@ export function BeyondCode() {
                   <p className="font-display text-sm font-bold">{item.label}</p>
                   {item.detail && <p className="mt-0.5 text-xs text-(--muted)">{item.detail}</p>}
                 </div>
-              </motion.div>
+              </Reveal>
             );
           })}
         </div>

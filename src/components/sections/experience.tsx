@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { MapPin } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon, TechIcon } from "@/components/ui/tech-icon";
@@ -50,12 +50,13 @@ export function Experience({ combinedUsers }: { combinedUsers: string }) {
 
           <ol className="space-y-4">
             {experience.map((job, i) => (
-              <motion.li
+              <Reveal
+                as="li"
                 key={`${job.company}-${job.role}`}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.45, delay: Math.min(i * 0.05, 0.3) }}
+                y={24}
+                margin={-60}
+                duration={0.45}
+                delay={Math.min(i * 0.05, 0.3)}
                 className="relative flex gap-4 sm:gap-5"
                 style={{ "--a": job.accent } as CSSProperties}
               >
@@ -201,7 +202,7 @@ export function Experience({ combinedUsers }: { combinedUsers: string }) {
                     ))}
                   </div>
                 </div>
-              </motion.li>
+              </Reveal>
             ))}
           </ol>
         </div>
