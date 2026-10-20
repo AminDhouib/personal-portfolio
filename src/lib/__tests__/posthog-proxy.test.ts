@@ -1,4 +1,6 @@
 // @vitest-environment node
+// The three next/dist imports below are Next internals (no public API runs the rewrite matcher
+// offline). Re-check this test, and that they still resolve and behave, on every Next upgrade.
 import { modifyRouteRegex } from "next/dist/lib/redirect-status";
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { prepareDestination } from "next/dist/shared/lib/router/utils/prepare-destination";

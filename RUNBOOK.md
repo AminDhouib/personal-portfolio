@@ -472,9 +472,10 @@ trailing slashes.
 `/api/early_access_features/`. Anything else under `/_p/4qe` (the bare path, `/login`, `/admin`,
 other `/api/...`) answers 404 from this app by design. If a new PostHog feature "stops working"
 behind the proxy (a 404 on a `/_p/4qe/...` URL in the network tab), the SDK is calling a path
-that is not on the list: add it there, with a test. The path is disallowed in robots.txt, and the
-app's own answers under it (the 404s) carry `X-Robots-Tag: noindex`; a response proxied from
-PostHog carries only PostHog's headers (checked on a production build).
+that is not on the list: add it there, with a test. The path is disallowed in robots.txt (`/_p/`,
+derived from the first segment of the path constant), and the app's own answers under it (the
+404s) carry `X-Robots-Tag: noindex`; a response proxied from PostHog carries only PostHog's
+headers (checked on a production build).
 
 **Host dependency (outside this repo).** The hop lands on a Traefik file-provider router on the
 prod host, owned by the Uptimely repo: `/etc/dokploy/traefik/dynamic/posthog-capture-internal.yml`,
