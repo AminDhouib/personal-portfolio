@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { Resend } from "resend";
 import { appendLead } from "@/lib/leads-store";
 import { guardedJsonRoute } from "@/lib/route-guard";
 import { captureException } from "@/lib/log";
+import { sendSendlyEmail } from "@/lib/sendly";
 import { env } from "@/env";
 
 export interface LeadPayload {
@@ -98,16 +98,15 @@ export async function POST(req: NextRequest) {
   );
 
   let emailOk = false;
-  if (env.RESEND_API_KEY) {
+  if (env.SENDLY_API_KEY) {
     try {
-      // Sends through self-hosted UseSend, not Resend cloud. resend@6 has no
-      // base-URL constructor option; it reads process.env.RESEND_BASE_URL at
-      // import time (must include UseSend's /api/v1 path), so the redirect
-      // lives in env config (both vars are required at boot — see src/env.ts).
-      const resend = new Resend(env.RESEND_API_KEY);
-      const { error } = await resend.emails.send({
-        from: "Amin AI <leads@amindhou.com>",
+      await sendSendlyEmail({
+        apiKey: env.SENDLY_API_KEY,
+        from: { email: "hello@amindhou.com", name: "Amin AI" },
         to: "amin@devino.ca",
+        // One-click answer to the lead. Sendly validates `reply` with a stricter email check than
+        // this route's, and a 422 would drop the whole notification, so only pass a clean address.
+        reply: z.email().safeParse(input.email).success ? input.email : undefined,
         subject: `New lead from ${input.name}`,
         text: [
           `Name: ${input.name}`,
@@ -117,13 +116,13 @@ export async function POST(req: NextRequest) {
           `Page: ${input.page || "-"}`,
           `Time: ${persisted?.createdAt ?? new Date().toISOString()}`,
         ].join("\n"),
+        // The lead id makes a retry of this same send a no-op at Sendly.
+        idempotencyKey: persisted?.id,
       });
-      // send() resolves with a non-null `error` (it does NOT throw) on
-      // API-level failures — a bad key, wrong base URL, unverified sender.
-      // Surface it instead of recording a false success.
-      if (error) captureException("leads.email", error);
-      else emailOk = true;
+      emailOk = true;
     } catch (err) {
+      // A non-2xx (bad key, unverified domain, rate limit), a network error
+      // and the deadline all land here; the lead is already persisted.
       captureException("leads.email", err);
     }
   }

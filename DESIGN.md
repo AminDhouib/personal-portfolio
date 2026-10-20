@@ -1721,7 +1721,7 @@ trigger revisiting it.
   `readAllLeads()` in `src/lib/leads-store.ts` (lenient per-line, used by the restore drill) —
   but there is no in-app way to view leads. The documented design when it is built: a
   `GET /api/leads` handler gated by an `ADMIN_TOKEN` bearer check, returning `readAllLeads()`
-  output; no UI page. Until then the owner reads the Resend email or the JSONL file directly.
+  output; no UI page. Until then the owner reads the notification email or the JSONL file directly.
 - **Space-shooter-private settings/profile modules** (audit refs CT-009, CT-010, DD4-002, from the
   P5/P8 plan notes): the reduce-motion change-trace measurement (32 files touched) surfaced that
   cross-cutting client concerns — including space-shooter's own settings/profile state — have no

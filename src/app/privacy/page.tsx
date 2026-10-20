@@ -126,9 +126,9 @@ export default function PrivacyPage() {
           <p>
             The chat can ask for your name and email when you want to get in touch. If you give
             them, the site saves your name, email, an optional note, which chat you used, the page
-            you were on and the time, and emails the same details to Amin through our self-hosted
-            email service (UseSend) so he can reply. Saved contact details are kept until you ask us
-            to delete them.
+            you were on and the time, and emails the same details to Amin through our own email
+            service (Sendly) so he can reply. Saved contact details are kept until you ask us to
+            delete them.
           </p>
           <p>
             When you give your name and email through the chat to be contacted, they are saved so
