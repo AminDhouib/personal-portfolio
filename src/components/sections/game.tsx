@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { MotionConfig } from "framer-motion";
+import { useRef } from "react";
+import { MotionConfig, useInView } from "framer-motion";
 import { Reveal } from "@/components/ui/reveal";
 import { Gamepad2, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -9,12 +10,48 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { GameCard } from "@/components/game/game-card";
 import { GAMES_BY_SLUG } from "@/app/games/games-meta";
 import { NeedsWebGL } from "@/components/game/space-shooter/needs-webgl";
+import { canvasLayout, SHOOTER_CAPTION } from "@/components/game/space-shooter/canvas-layout";
 import { WebGLOnly } from "@/components/three/webgl-only";
 
+/**
+ * Holds the game's place: the canvas box at the canvas's own size plus the caption the game
+ * renders under it, so nothing below moves when the game swaps in.
+ */
+function ShooterPlaceholder() {
+  const layout = canvasLayout("embed", false);
+  return (
+    <div>
+      <div
+        data-testid="shooter-placeholder"
+        className={`mx-auto rounded-xl border border-(--border) ${layout.sizeClass}`}
+        style={{ maxWidth: "min(100%, calc(100vh * 21 / 9))", maxHeight: layout.maxHeight }}
+      />
+      <p className="text-xs text-(--muted)">{SHOOTER_CAPTION}</p>
+    </div>
+  );
+}
+
+// The placeholder also covers the chunk download, so the section never collapses in between.
 const SpaceShooterGame = dynamic(
   () => import("@/components/game/space-shooter").then((m) => m.SpaceShooterGame),
-  { ssr: false },
+  { ssr: false, loading: () => <ShooterPlaceholder /> },
 );
+
+// How far ahead of the viewport the embed mounts: about a phone screen and a half, so the chunk
+// has loaded and the scene is drawing by the time a visitor scrolls to it.
+const SHOOTER_MOUNT_MARGIN = "1200px 0px";
+
+/**
+ * Mounts Orbital Dodge only once the section nears the viewport. Mounted at page load, the game
+ * (its chunk, a second WebGL context with post-processing, an AudioContext) was most of the home
+ * page's main-thread work on a phone, for a section eight screens down. Until then
+ * ShooterPlaceholder holds its place, so the page below does not jump when the game arrives.
+ */
+function ShooterWhenNear() {
+  const ref = useRef<HTMLDivElement>(null);
+  const near = useInView(ref, { once: true, margin: SHOOTER_MOUNT_MARGIN });
+  return <div ref={ref}>{near ? <SpaceShooterGame /> : <ShooterPlaceholder />}</div>;
+}
 
 // Script Knight and Failover are here for crawl discovery: on 2026-10-15 Search Console had never
 // fetched either URL, and the home page (position 4, the site's strongest) is the best place to
@@ -52,7 +89,7 @@ export function Game() {
           <div data-motion-exempt className="contents">
             <MotionConfig reducedMotion="never">
               <WebGLOnly fallback={<NeedsWebGL />}>
-                <SpaceShooterGame />
+                <ShooterWhenNear />
               </WebGLOnly>
             </MotionConfig>
           </div>

@@ -68,7 +68,7 @@ import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/pos
 import { shareRun } from "./space-shooter/share";
 import { CountdownOverlay } from "./space-shooter/countdown-overlay";
 import { useCountdown } from "./space-shooter/use-countdown";
-import { canvasLayout, type CanvasVariant } from "./space-shooter/canvas-layout";
+import { canvasLayout, SHOOTER_CAPTION, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
@@ -2267,10 +2267,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
         )}
       </div>
 
-      <p className="text-xs text-(--muted)">
-        Endless run. Pick up power-ups for temporary firepower or shield. Biome shifts every 35s —
-        and the asteroids get meaner the longer you survive.
-      </p>
+      <p className="text-xs text-(--muted)">{SHOOTER_CAPTION}</p>
     </div>
   );
 }
