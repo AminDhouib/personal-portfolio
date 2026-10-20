@@ -106,3 +106,49 @@ describe("Navbar blur layer", () => {
     expect(panel?.closest("nav")).toBe(layer.parentElement);
   });
 });
+
+describe("Navbar mobile menu keyboard", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  function openMenu() {
+    vi.stubGlobal("IntersectionObserver", NoopObserver);
+    render(<Navbar />);
+    const toggle = screen.getByRole("button", { name: "Toggle menu" });
+    fireEvent.click(toggle);
+    return toggle;
+  }
+
+  function panelOpen() {
+    return Array.from(document.querySelectorAll<HTMLElement>("nav div.fixed")).some((el) =>
+      el.classList.contains("w-72"),
+    );
+  }
+
+  it("closes the menu on Escape and returns focus to the toggle", () => {
+    const toggle = openMenu();
+    expect(panelOpen()).toBe(true);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(toggle).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Toggle menu" })).toBe(toggle);
+    expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
+  it("ignores other keys while open", () => {
+    openMenu();
+    fireEvent.keyDown(document, { key: "Enter" });
+    expect(panelOpen()).toBe(true);
+  });
+
+  it("does not steal focus on Escape when the menu is closed", () => {
+    vi.stubGlobal("IntersectionObserver", NoopObserver);
+    render(<Navbar />);
+    const toggle = screen.getByRole("button", { name: "Toggle menu" });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle).not.toHaveFocus();
+  });
+});
