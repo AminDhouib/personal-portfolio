@@ -15,11 +15,17 @@ let tmp;
 let main;
 let worktree;
 
+// Without the caller's GIT_* variables (a hook sets GIT_DIR / GIT_INDEX_FILE),
+// so the throwaway repo can never be confused with the real one.
+const CLEAN_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+);
+
 function git(cwd, ...args) {
   const res = spawnSync(
     "git",
     ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args],
-    { cwd, encoding: "utf-8" },
+    { cwd, encoding: "utf-8", env: CLEAN_ENV },
   );
   if (res.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${res.stderr}`);
   return res.stdout;
@@ -33,7 +39,7 @@ function replaceGitFile(cwd, text) {
 }
 
 function runCheck(cwd) {
-  const res = spawnSync(process.execPath, [SCRIPT], { cwd, encoding: "utf-8" });
+  const res = spawnSync(process.execPath, [SCRIPT], { cwd, encoding: "utf-8", env: CLEAN_ENV });
   return { status: res.status, out: res.stdout + res.stderr };
 }
 
@@ -51,7 +57,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(tmp, { recursive: true, force: true });
+  // Windows can hold the fresh repo's files briefly (EBUSY / EPERM).
+  rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 describe("check-root-files", () => {
@@ -72,7 +79,7 @@ describe("check-root-files", () => {
     expect(res.out).toContain("STRAY UNTRACKED ROOT FILE: stray.txt");
   });
 
-  it("rejects a .git pointer that does not name this worktree's git dir", () => {
+  it("rejects a .git pointer at a repository's main git dir", () => {
     replaceGitFile(worktree, `gitdir: ${path.join(main, ".git")}\n`);
     const res = runCheck(worktree);
     expect(res.status).toBe(1);
