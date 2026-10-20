@@ -135,7 +135,32 @@ describe("Navbar mobile menu keyboard", () => {
 
     expect(toggle).toHaveFocus();
     expect(screen.getByRole("button", { name: "Toggle menu" })).toBe(toggle);
+    // AnimatePresence keeps the exiting panel in the DOM under jsdom, so the closed state is read
+    // from the scroll lock, which only releases once mobileOpen is false.
     expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
+  it("removes the Escape listener once the menu has closed", () => {
+    const toggle = openMenu();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle).toHaveFocus();
+
+    toggle.blur();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle).not.toHaveFocus();
+  });
+
+  it("leaves an Escape that another handler already consumed alone", () => {
+    const toggle = openMenu();
+    const consume = (e: KeyboardEvent) => e.preventDefault();
+    document.addEventListener("keydown", consume, { capture: true });
+    try {
+      fireEvent.keyDown(document, { key: "Escape" });
+    } finally {
+      document.removeEventListener("keydown", consume, { capture: true });
+    }
+    expect(toggle).not.toHaveFocus();
+    expect(document.body.style.overflow).toBe("hidden");
   });
 
   it("ignores other keys while open", () => {
