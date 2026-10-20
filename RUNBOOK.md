@@ -316,10 +316,12 @@ what `/privacy` promises:
    -- expect the same rows as the SELECT; then COMMIT; (or ROLLBACK;)
    ```
 
-2. **Notification email copy.** The notification has the subject `New lead from <name>` and a body
-   line `Email: <address>` (`src/app/api/leads/route.ts`). Search the mailbox for the address,
-   delete every match, and empty Trash too. The repo does not say whether UseSend keeps a copy, so
-   check UseSend's sent log and remove it there too.
+2. **Notification email copy.** The notification goes out through Sendly (Devino project, sending
+   domain amindhou.com) with `SENDLY_API_KEY`, a key scoped to `emails:send` only. It has the
+   subject `New lead from <name>` and a body line `Email: <address>`
+   (`src/app/api/leads/route.ts`). Search the mailbox for the address, delete every match, and
+   empty Trash too. The repo does not say whether Sendly keeps a copy, so check Sendly's email log
+   and remove it there too.
 3. **PostHog** (project 22): delete the person whose distinct id is the trimmed, lowercased email,
    WITH its events and recordings. Either use the UI (Persons, open the person, Delete person, tick
    the options to delete events and recordings), or the API:

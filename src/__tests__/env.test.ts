@@ -88,10 +88,10 @@ describe("validateRequiredEnv (strict boot gate)", () => {
   it("lists ALL missing variables, not just the first", async () => {
     const mod = await armAllRequired();
     delete process.env.SENTRY_DSN;
-    delete process.env.RESEND_API_KEY;
+    delete process.env.SENDLY_API_KEY;
     delete process.env.GA4_PROPERTY_UPUP;
     expect(() => mod.validateRequiredEnv()).toThrow(
-      /SENTRY_DSN, RESEND_API_KEY[\s\S]*GA4_PROPERTY_UPUP/,
+      /SENTRY_DSN, SENDLY_API_KEY[\s\S]*GA4_PROPERTY_UPUP/,
     );
   });
 

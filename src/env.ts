@@ -37,8 +37,7 @@ const schema = z.object({
   // previously-dead NEXT_PUBLIC_GA4_ID prod var (see DESIGN.md known debt) by
   // giving it a real consumer; no-op when unset.
   NEXT_PUBLIC_GA4_ID: z.string().optional(),
-  RESEND_API_KEY: z.string().optional(),
-  RESEND_BASE_URL: z.preprocess(emptyToUndefined, z.url().optional()),
+  SENDLY_API_KEY: z.string().optional(),
   OPENROUTER_KEY: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   SENTRY_DSN: z.preprocess(emptyToUndefined, z.url().optional()),
@@ -77,8 +76,7 @@ export const REQUIRED_ENV_VARS = [
   "DATABASE_URL",
   "OPENROUTER_KEY",
   "SENTRY_DSN",
-  "RESEND_API_KEY",
-  "RESEND_BASE_URL",
+  "SENDLY_API_KEY",
   "POSTHOG_KEY",
   "POSTHOG_HOST",
   "GITHUB_TOKEN",

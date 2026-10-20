@@ -173,7 +173,7 @@ describe("captureException", () => {
     const { captureException } = await import("../log");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    expect(() => captureException("leads.email", new Error("resend down"))).not.toThrow();
+    expect(() => captureException("leads.email", new Error("email provider down"))).not.toThrow();
     expect(mockPostHogCtor).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
     errorSpy.mockRestore();

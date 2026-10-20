@@ -46,7 +46,7 @@ describe("/privacy", () => {
     expect(text).toContain("also go to our PostHog, without any visitor ID");
     expect(text).toContain("Google also receives your IP address");
     expect(text).toContain("adds only how you arrived and which chat you used");
-    expect(text).toContain("UseSend");
+    expect(text).toContain("Sendly");
   });
 
   it("states retention honestly, without inventing periods", () => {
