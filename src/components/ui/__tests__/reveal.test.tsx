@@ -96,6 +96,16 @@ describe("Reveal on the client", () => {
     expect(el.dataset.reveal).toBe("shown");
   });
 
+  it("drops the armed state on unmount so a re-run never strands a hidden node", () => {
+    stubEnvironment({ reduced: false });
+    placeBelowFold();
+    const { unmount } = render(<Reveal y={20}>Unmounted</Reveal>);
+    const el = screen.getByText("Unmounted");
+    expect(el.dataset.reveal).toBe("armed");
+    unmount();
+    expect(el.dataset.reveal).toBeUndefined();
+  });
+
   it("leaves an element that is already on screen visible and unarmed", () => {
     stubEnvironment({ reduced: false });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({

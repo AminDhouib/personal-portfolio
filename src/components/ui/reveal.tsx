@@ -16,6 +16,8 @@ type RevealProps<T extends RevealTag> = {
   /**
    * Px inset on the viewport's bottom edge only; negative reveals later. Bottom only, so an
    * element that overlaps the top edge after a jump scroll is never stranded in a dead zone.
+   * Only use a negative margin mid-page: an armed element must be able to scroll more than
+   * |margin| px above the viewport bottom, which the last element on a page may never do.
    */
   margin?: number;
 } & Omit<ComponentPropsWithoutRef<T>, "as">;
@@ -61,7 +63,11 @@ export function Reveal<T extends RevealTag = "div">({
       { rootMargin: `0px 0px ${margin}px 0px` },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      // Never leave a node hidden with no observer: a re-run decides afresh from its position.
+      if (el.dataset.reveal === "armed") delete el.dataset.reveal;
+    };
   }, [margin]);
 
   const vars = {

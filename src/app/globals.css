@@ -1123,9 +1123,9 @@ details[open] > .motion-rise-in {
    elements that start below the fold, and "shown" when one scrolls into view.
    Armed hides without a transition (nothing animates the hide); shown plays a
    one-shot keyframe that ends on the element's own styles, so no transform or
-   transition lingers on cards that have hover states. The reduced-motion
-   guard is a backstop: the component already arms nothing under the OS
-   preference. */
+   transition lingers on cards that have hover states. Print shows every
+   section, scrolled through or not. The reduced-motion guard is a backstop:
+   the component already arms nothing under the OS preference. */
 [data-reveal="armed"] {
   opacity: 0;
   transform: translate(var(--reveal-x, 0px), var(--reveal-y, 0px));
@@ -1144,7 +1144,7 @@ details[open] > .motion-rise-in {
     transform: translate(0, 0);
   }
 }
-@media (prefers-reduced-motion: reduce) {
+@media print, (prefers-reduced-motion: reduce) {
   [data-reveal] {
     opacity: 1;
     transform: none;
