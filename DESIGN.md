@@ -1490,7 +1490,8 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   is also kept out of search: `Disallow: /_p/` in `robots.ts` (derived from the first segment of
   the constant, so robots.txt does not publish the full path; a robots test fails if a forwarded
   path ever falls outside it) and an `X-Robots-Tag: noindex` header from `next.config.ts` (on
-  the app's own 404s only; proxied PostHog responses carry upstream headers). Destinations are `NEXT_PUBLIC_POSTHOG_HOST` (default
+  the app's own 404s only; proxied PostHog responses carry upstream headers). Destinations are
+  `NEXT_PUBLIC_POSTHOG_HOST` (default
   `https://posthog.devino.ca`, trailing slash trimmed; it is a build arg, so the destination is
   fixed at build time). Server-side capture (`src/lib/log.ts`,
   `POSTHOG_HOST`) stays DIRECT to PostHog: no blocker on a server, and a hop through our own app
@@ -1513,12 +1514,14 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   form so an explicit blank stays blank (the local-stack setting and the fallback if the router is
   lost). Pinned by `src/lib/__tests__/posthog-proxy.test.ts` and `src/__tests__/proxy.test.ts`.
   Known, accepted: a capture response carries
-  `x-middleware-rewrite: http://posthog-capture.internal/...` to the browser. That header IS how a proxy.ts rewrite is expressed, and Next 16.3.8 re-adds it on
-  the final response after the middleware has run (`resolve-routes.js` sets
-  `resHeaders['x-middleware-rewrite']` on purpose, `router-server.js` applies it before proxying), so
-  nothing in `proxy.ts`, `headers()` or `NextResponse` can strip it. It names an unroutable
-  docker-host alias, not a secret; the only removal that does not lean on Next internals is outside
-  the app (a Traefik response-header rule on the public router, host infra owned elsewhere).
+  `x-middleware-rewrite: http://posthog-capture.internal/...` to the browser. That header IS how a
+  proxy.ts rewrite is expressed, and Next 16.3.8 re-adds it on the final response after the
+  middleware has run (`resolve-routes.js` sets `resHeaders['x-middleware-rewrite']` on purpose,
+  `router-server.js` applies it before proxying), so nothing in `proxy.ts`, `headers()` or
+  `NextResponse` can strip it. It publishes `POSTHOG_CAPTURE_INTERNAL_ORIGIN` verbatim: with the
+  compose default that is an unroutable docker-host alias, so never put credentials or a real
+  internal address in that variable. The only removal that does not lean on Next internals is
+  outside the app (a Traefik response-header rule on the public router, host infra owned elsewhere).
   Re-check on a Next upgrade.
 - **`skipTrailingSlashRedirect: true` is global, and `src/proxy.ts` puts the redirect back.**
   PostHog's endpoints are slash-terminated (`/e/`, `/i/v0/e/`, `/flags/`) and Next's default
