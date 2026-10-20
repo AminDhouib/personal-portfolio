@@ -13,12 +13,11 @@ describe("reduced-motion leftovers", () => {
     expect(work).not.toMatch(/(?<!motion-safe:)group-hover:scale-105/);
   });
 
-  it("opens the chat popup in place, fading only, under reduced motion", () => {
+  it("opens the chat popup in place under reduced motion", () => {
     const css = read("src/app/globals.css");
-    const block =
-      /@media \(prefers-reduced-motion: reduce\) \{\s*\.copilotKitWindow,\s*\.copilotKitWindow\.open \{([^}]*)\}/.exec(
-        css,
-      );
+    // The rule lives in the final reduced-motion block, which must stay last in the file.
+    const finalBlock = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    const block = /\.copilotKitWindow,\s*\.copilotKitWindow\.open \{([^}]*)\}/.exec(finalBlock);
     expect(block).not.toBeNull();
     expect(block?.[1]).toContain("transform: none !important");
     expect(block?.[1]).toContain("transition-property: opacity !important");
