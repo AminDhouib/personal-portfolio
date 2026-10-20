@@ -714,6 +714,19 @@ current tree on 2026-07-07.
   `<div data-motion-exempt className="contents">` (`game-loader.tsx`, `sections/game.tsx`,
   `games/password-game/page.tsx`). New game mount points need the attribute. The net does not
   remove end-state transforms, so new transforms still go under `motion-safe:`.
+- **Scroll reveals are visible in the server HTML; use `Reveal`, never `initial={{ opacity: 0 }}`
+  plus `whileInView`** (`components/ui/reveal.tsx`, `[data-reveal]` rules in `globals.css`; closes
+  the motion audit's V2). A framer-motion reveal renders `opacity:0` inline in the SSR output, so
+  no-JS clients, crawlers and link previews saw nothing until hydration plus a scroll. `Reveal`
+  renders no hidden state on the server or on the first client render (so no hydration mismatch).
+  A layout effect then writes `data-reveal="armed"` on the DOM node only for elements that start
+  below the fold and only when `prefers-reduced-motion` is not set; an IntersectionObserver flips
+  it to `"shown"`, which plays a one-shot CSS keyframe. Elements already on screen at hydration
+  are never hidden, so there is no hide-then-show flash. A layout effect (not an inline script or
+  a `<html class="js">` marker) was chosen because it needs no extra markup, the hide lands before
+  first paint, and a no-JS client simply never reaches it. Do not move the hidden state back into
+  a render-time style or prop. The hero is not a `Reveal` on purpose: above-the-fold content is
+  not hidden at all.
 - **Game banners render static at representative positions under reduced motion** (the Orbital
   Dodge and Typing Speed drifts in `components/game/banners.tsx`, via `useReducedMotion()` and the
   `drift()` helper). With motion on, each layer loops a transform `y` exactly as before. Under the

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { GraduationCap, Languages } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { SiIcon } from "@/components/ui/tech-icon";
@@ -40,12 +40,7 @@ export function Background() {
 
         <div className="mb-16 grid grid-cols-1 gap-12 md:grid-cols-2">
           {/* Education */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
+          <Reveal y={20}>
             <div className="mb-4 flex items-center gap-3">
               <GraduationCap className="h-5 w-5 text-accent-cyan" />
               <h3 className="font-display text-lg font-bold">Education</h3>
@@ -66,15 +61,10 @@ export function Background() {
                 <p className="mt-1 text-sm font-medium text-accent-green">Summa Cum Laude (A+)</p>
               </div>
             </div>
-          </motion.div>
+          </Reveal>
 
           {/* Languages */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
+          <Reveal y={20} delay={0.1}>
             <div className="mb-4 flex items-center gap-3">
               <Languages className="h-5 w-5 text-accent-cyan" />
               <h3 className="font-display text-lg font-bold">Languages</h3>
@@ -85,7 +75,7 @@ export function Background() {
             <p className="mt-1 text-sm text-(--muted)">
               <span className="font-medium text-(--foreground)">Working:</span> Arabic
             </p>
-          </motion.div>
+          </Reveal>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/ui/reveal";
 import { ArrowRight, Heart } from "lucide-react";
 import { BOOKING_URL } from "@/data/nav";
 import { SocialLinks } from "@/components/ui/social-links";
@@ -12,12 +12,7 @@ export function Contact() {
   return (
     <section id="contact" className="section-gradient py-32">
       <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
+        <Reveal y={30} duration={0.6}>
           <p className="mb-6 text-sm tracking-widest text-(--muted) uppercase">13 — Contact</p>
           <h2 className="mb-8 font-display text-6xl leading-[0.9] font-black tracking-tighter sm:text-7xl lg:text-8xl">
             LET&apos;S
@@ -34,7 +29,7 @@ export function Contact() {
             Book a Call
             <ArrowRight className="h-5 w-5" />
           </a>
-        </motion.div>
+        </Reveal>
 
         {/* Social icons */}
         <SocialLinks
