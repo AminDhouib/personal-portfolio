@@ -172,9 +172,9 @@ function ReviewCard({ review }: { review: Review }) {
 export function ReviewsClient() {
   const sorted = [...reviews].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
 
+  // CSS entrance (the reveal-in keyframe in globals.css) instead of a framer-motion
+  // opacity:0 initial, so the reviews are visible in the server HTML and with JS off.
   return (
-    // CSS entrance (the reveal-in keyframe in globals.css) instead of a framer-motion
-    // opacity:0 initial, so the reviews are visible in the server HTML and with JS off.
     <div
       style={{ "--reveal-y": "24px" } as CSSProperties}
       className="w-full columns-1 motion-safe:animate-[reveal-in_0.5s_var(--motion-ease-out)_backwards] md:columns-2"

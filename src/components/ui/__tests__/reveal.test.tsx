@@ -36,15 +36,23 @@ describe("Reveal server HTML", () => {
     expect(html).not.toMatch(/opacity\s*:\s*0(?![.\d])/);
     expect(html).not.toMatch(/transform\s*:\s*translate/);
   });
+
+  it("keeps the reviews entrance behind motion-safe", () => {
+    expect(renderToString(<ReviewsClient />)).toContain(
+      "motion-safe:animate-[reveal-in_0.5s_var(--motion-ease-out)_backwards]",
+    );
+  });
 });
 
 describe("Reveal on the client", () => {
   let fireIntersect: ((isIntersecting: boolean) => void) | null = null;
+  let disconnects = 0;
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     fireIntersect = null;
+    disconnects = 0;
   });
 
   function stubEnvironment({ reduced }: { reduced: boolean }) {
@@ -64,7 +72,9 @@ describe("Reveal on the client", () => {
             target = el;
           },
           unobserve: () => undefined,
-          disconnect: () => undefined,
+          disconnect: () => {
+            disconnects += 1;
+          },
         });
       }),
     );
@@ -92,8 +102,12 @@ describe("Reveal on the client", () => {
     const el = screen.getByText("Below");
     expect(el.dataset.reveal).toBe("armed");
 
+    act(() => fireIntersect?.(false));
+    expect(el.dataset.reveal).toBe("armed");
+
     act(() => fireIntersect?.(true));
     expect(el.dataset.reveal).toBe("shown");
+    expect(disconnects).toBeGreaterThan(0);
   });
 
   it("drops the armed state on unmount so a re-run never strands a hidden node", () => {
@@ -104,6 +118,18 @@ describe("Reveal on the client", () => {
     expect(el.dataset.reveal).toBe("armed");
     unmount();
     expect(el.dataset.reveal).toBeUndefined();
+  });
+
+  it.each([
+    [-30, "armed"],
+    [-60, undefined],
+  ])("with margin -50, arms by the same inset (top at innerHeight %ipx)", (offset, expected) => {
+    stubEnvironment({ reduced: false });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      top: window.innerHeight + offset,
+    } as DOMRect);
+    render(<Reveal margin={-50}>Edge</Reveal>);
+    expect(screen.getByText("Edge").dataset.reveal).toBe(expected);
   });
 
   it("leaves an element that is already on screen visible and unarmed", () => {
