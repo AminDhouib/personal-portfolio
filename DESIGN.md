@@ -724,8 +724,9 @@ current tree on 2026-07-07.
   it to `"shown"`, which plays a one-shot CSS keyframe. Elements already on screen at hydration
   are never hidden, so there is no hide-then-show flash. A layout effect (not an inline script or
   a `<html class="js">` marker) was chosen because it needs no extra markup, the hide lands before
-  first paint, and a no-JS client simply never reaches it. Do not move the hidden state back into
-  a render-time style or prop. The hero is not a `Reveal` on purpose: above-the-fold content is
+  the element can be on screen (only below-fold elements are armed; the SSR paint comes earlier
+  but shows nothing hidden), and a no-JS client simply never reaches it. Do not move the hidden
+  state back into a render-time style or prop. The hero is not a `Reveal` on purpose: above-the-fold content is
   not hidden at all.
 - **Game banners render static at representative positions under reduced motion** (the Orbital
   Dodge and Typing Speed drifts in `components/game/banners.tsx`, via `useReducedMotion()` and the
