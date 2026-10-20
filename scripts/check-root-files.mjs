@@ -14,8 +14,10 @@
  *
  * One non-allowlisted entry passes: in a linked git worktree the root `.git` is a
  * one-line "gitdir:" pointer file, not a directory. It is accepted only when it
- * is exactly that pointer and names this worktree's own git dir (see
- * isOwnWorktreePointer); any other `.git` entry is still a stray.
+ * is exactly that pointer, git resolves through it, and the git dir it names is
+ * a linked-worktree dir rather than a repository's main one (see
+ * isOwnWorktreePointer); any other `.git` entry is still a stray. A `.git`
+ * entry can never be committed, so this exemption cannot hide a tracked file.
  *
  * Adding a legitimate root file: append it to ROOT_ALLOWLIST with a one-line
  * comment saying what it is, in the same commit that introduces the file.
