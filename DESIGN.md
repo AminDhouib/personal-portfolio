@@ -750,6 +750,16 @@ current tree on 2026-07-07.
   `NeedsWebGL` notice instead. A software-rendered context still counts as WebGL: the gate asks
   whether three.js can start, not how fast it will run. A new Canvas outside those two wrappers
   needs the same gate.
+- **The home page's Orbital Dodge embed mounts only near the viewport** (`ShooterWhenNear` in
+  `components/sections/game.tsx`, framer-motion's `useInView`, once, 1200 px ahead). Mounted at
+  load, the game (its chunk, a second WebGL context with post-processing, an AudioContext) was
+  over half of the home page's long-task time in a mobile Lighthouse trace, for a section eight
+  screens down; deferring it took local mobile TBT from about 930 ms to 400 ms (T-4601). Until
+  then, and while the chunk downloads (it is also `dynamic`'s `loading`), `ShooterPlaceholder`
+  holds its place: a box of the canvas's size (`canvasLayout("embed")`) plus the caption
+  (`SHOOTER_CAPTION`) the game renders under it, so the swap moves nothing. The gate sits inside
+  `WebGLOnly`, so a browser without WebGL still gets the notice at once. Do not move the game back
+  to mount-at-load, and give any new heavy embed below the fold the same treatment.
 - **The `/games` grid shows the 8 public games.** None is currently `hidden`; the flag in
   `games-meta.ts` is the way to take a game out of rotation without deleting code (the
   route still works if visited directly, but its page is `noindex` and it is left out of the
