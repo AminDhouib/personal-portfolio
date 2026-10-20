@@ -74,11 +74,12 @@ export function Navbar() {
   }, [mobileOpen]);
 
   // Escape closes the open menu and hands focus back to the burger so
-  // keyboard users land where they started.
+  // keyboard users land where they started. An Escape another overlay already
+  // consumed (defaultPrevented) is left to that overlay.
   useEffect(() => {
     if (!mobileOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       setMobileOpen(false);
       toggleRef.current?.focus();
     };
