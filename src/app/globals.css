@@ -1169,13 +1169,13 @@ details[open] > .motion-rise-in {
   .copilotKitAssistantMessage {
     animation: none !important;
   }
-}
-
-/* Chat popup open: CopilotKit starts the window at scale(.95) translateY(20px) and
-   transitions the transform on open. Under reduced motion it opens in place and
-   only fades (opacity), so no ~20px slide or scale plays. Kept in the final
-   block so it wins ties; the !important matches the other CopilotKit overrides. */
-@media (prefers-reduced-motion: reduce) {
+  /* Chat popup: CopilotKit offsets the closed window by scale(.95)
+     translateY(20px) and transitions the transform on open. The net above
+     already makes that transition instant; this drops the offset itself, so the
+     popup opens in place even if the net's duration ever changes, and leaves
+     only opacity to transition. Closed stays hidden by CopilotKit's opacity: 0
+     and pointer-events: none. The site mounts only CopilotPopup: the sidebar
+     variant hides with translateX(100%), which this rule would undo. */
   .copilotKitWindow,
   .copilotKitWindow.open {
     transform: none !important;
