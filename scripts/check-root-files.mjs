@@ -12,11 +12,17 @@
  * committed. Closes the DESIGN.md known-debt item "a root-level junk gate has
  * been proposed but not built". Runs in CI (mirrors check-env-drift.mjs).
  *
+ * One non-allowlisted entry passes: in a linked git worktree the root `.git` is a
+ * one-line "gitdir:" pointer file, not a directory. It is accepted only when it
+ * is exactly that pointer and names this worktree's own git dir (see
+ * isOwnWorktreePointer); any other `.git` entry is still a stray.
+ *
  * Adding a legitimate root file: append it to ROOT_ALLOWLIST with a one-line
  * comment saying what it is, in the same commit that introduces the file.
  */
 import { execFileSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import path from "node:path";
 
 const ROOT_ALLOWLIST = new Set([
   ".dockerignore",
@@ -71,10 +77,27 @@ function isGitignored(file) {
   }
 }
 
+function gitOutput(...args) {
+  return execFileSync("git", args, { encoding: "utf-8" }).trim();
+}
+
+function isOwnWorktreePointer() {
+  try {
+    const match = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(readFileSync(".git", "utf-8"));
+    if (!match) return false;
+    const gitDir = realpathSync(gitOutput("rev-parse", "--absolute-git-dir"));
+    const commonDir = realpathSync(path.resolve(gitOutput("rev-parse", "--git-common-dir")));
+    return realpathSync(path.resolve(match[1])) === gitDir && gitDir !== commonDir;
+  } catch {
+    return false;
+  }
+}
+
 const trackedSet = new Set(trackedRootFiles);
 for (const entry of readdirSync(".")) {
   if (ROOT_ALLOWLIST.has(entry) || trackedSet.has(entry)) continue;
   if (statSync(entry).isDirectory()) continue;
+  if (entry === ".git" && isOwnWorktreePointer()) continue;
   if (isGitignored(entry)) continue;
   console.error(`STRAY UNTRACKED ROOT FILE: ${entry} (gitignore it, move it, or allowlist it)`);
   ok = false;
