@@ -475,7 +475,9 @@ behind the proxy (a 404 on a `/_p/4qe/...` URL in the network tab), the SDK is c
 that is not on the list: add it there, with a test. The path is disallowed in robots.txt (`/_p/`,
 derived from the first segment of the path constant), and the app's own answers under it (the
 404s) carry `X-Robots-Tag: noindex`; a response proxied from PostHog carries only PostHog's
-headers (checked on a production build).
+headers (checked on a production build). Capture responses also carry
+`x-middleware-rewrite` naming `POSTHOG_CAPTURE_INTERNAL_ORIGIN`; that is expected (DESIGN.md's
+register explains why Next re-adds it), so keep that variable free of anything sensitive.
 
 **Host dependency (outside this repo).** The hop lands on a Traefik file-provider router on the
 prod host, owned by the Uptimely repo: `/etc/dokploy/traefik/dynamic/posthog-capture-internal.yml`,
