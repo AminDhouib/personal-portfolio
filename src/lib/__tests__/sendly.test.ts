@@ -60,6 +60,21 @@ describe("sendSendlyEmail", () => {
     expect(sent(1)).not.toHaveProperty("reply");
   });
 
+  it("refuses redirects so a replayed GET can never look like a sent email", async () => {
+    await sendSendlyEmail(base);
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(init.redirect).toBe("error");
+  });
+
+  it("still resolves when cancelling the response body rejects", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 202,
+      body: { cancel: () => Promise.reject(new Error("cancel failed")) },
+    });
+    await expect(sendSendlyEmail(base)).resolves.toBeUndefined();
+  });
+
   it("omits the Idempotency-Key header unless one is given", async () => {
     await sendSendlyEmail(base);
     const init = mockFetch.mock.calls[0]?.[1] as RequestInit;
