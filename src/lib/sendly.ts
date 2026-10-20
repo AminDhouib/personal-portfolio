@@ -1,3 +1,4 @@
+import { logWarn } from "@/lib/log";
 import { createDeadlineFetch } from "@/lib/upstream-fetch";
 
 // Sendly (our own email service, Devino project) transactional send. One POST, no SDK.
@@ -79,6 +80,8 @@ export async function sendSendlyEmail(args: {
   const deadlineFetch = createDeadlineFetch({ timeoutMs: SENDLY_TIMEOUT_MS });
   const res = await deadlineFetch(SENDLY_EMAILS_URL, {
     method: "POST",
+    // A redirect would replay as a GET and could answer 200 for a send that never happened.
+    redirect: "error",
     headers: {
       Authorization: `Bearer ${args.apiKey}`,
       "content-type": "application/json",
@@ -93,5 +96,9 @@ export async function sendSendlyEmail(args: {
     }),
   });
   if (!res.ok) throw new SendlyError(res.status, await errorCode(res));
-  await res.body?.cancel();
+  // Release the unread body. The send was already accepted, so a failing cancel is logged and
+  // must not turn it into a reported failure.
+  await res.body?.cancel().catch((err: unknown) => {
+    logWarn("sendly", "response body cancel failed after an accepted send", err);
+  });
 }
