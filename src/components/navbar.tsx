@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -40,6 +40,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const isHome = pathname === "/";
@@ -70,6 +71,19 @@ export function Navbar() {
     return () => {
       document.body.style.overflow = prev;
     };
+  }, [mobileOpen]);
+
+  // Escape closes the open menu and hands focus back to the burger so
+  // keyboard users land where they started.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMobileOpen(false);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
 
   // Close the menu automatically on route change so the panel never
@@ -267,6 +281,7 @@ export function Navbar() {
             {/* Mobile burger — visible on all non-games pages */}
             {!isGames && (
               <button
+                ref={toggleRef}
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="rounded-lg p-2 text-(--muted) hover:text-(--foreground) xl:hidden"
                 aria-label="Toggle menu"
