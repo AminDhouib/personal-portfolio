@@ -1170,3 +1170,15 @@ details[open] > .motion-rise-in {
     animation: none !important;
   }
 }
+
+/* Chat popup open: CopilotKit starts the window at scale(.95) translateY(20px) and
+   transitions the transform on open. Under reduced motion it opens in place and
+   only fades (opacity), so no ~20px slide or scale plays. Kept in the final
+   block so it wins ties; the !important matches the other CopilotKit overrides. */
+@media (prefers-reduced-motion: reduce) {
+  .copilotKitWindow,
+  .copilotKitWindow.open {
+    transform: none !important;
+    transition-property: opacity !important;
+  }
+}

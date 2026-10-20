@@ -48,7 +48,7 @@ export function Work({ mauData }: { mauData?: Record<string, number | null> }) {
                         src={project.heroImage}
                         alt={`${project.name} screenshot`}
                         fill
-                        className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        className="object-cover object-top transition-transform duration-500 motion-safe:group-hover:scale-105"
                         sizes="(max-width: 768px) 100vw, 50vw"
                         priority={i === 0}
                       />
