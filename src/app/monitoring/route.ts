@@ -31,8 +31,9 @@ const NEWLINE = 0x0a;
 // BODY_IDLE_TIMEOUT_MS ends it) and must finish within BODY_TOTAL_TIMEOUT_MS overall, so a slow
 // but moving replay upload survives while a stalled or trickling client cannot hold the handler
 // open. The relay to Sentry then gets UPSTREAM_TIMEOUT_MS (unchanged from the original 8s).
-// Caveat: while src/proxy.ts matches this path, Next buffers the body before this handler runs,
-// so the body deadlines only bite once the matcher excludes /monitoring (see RUNBOOK.md).
+// These deadlines only work because src/proxy.ts's matcher excludes /monitoring: Next buffers a
+// request body in the proxy layer before the handler runs, so a matched path would answer only
+// after the upload had finished. Keep the two in step (DESIGN.md's register entry).
 const BODY_IDLE_TIMEOUT_MS = 10_000;
 const BODY_TOTAL_TIMEOUT_MS = 30_000;
 const UPSTREAM_TIMEOUT_MS = 8000;
