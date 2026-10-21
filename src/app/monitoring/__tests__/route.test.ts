@@ -354,6 +354,54 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
       expect(b.state.cancelled).toBe(true);
     });
 
+    it("logs declaredBytes null (not 0) when a stalled body has no content-length", () =>
+      withFakeTimers(async () => {
+        vi.stubGlobal("fetch", vi.fn());
+        const b = streamBody();
+
+        const pending = POST(reqWithStream(b.stream));
+        await vi.advanceTimersByTimeAsync(IDLE_MS);
+        const res = await pending;
+
+        expect(res.status).toBe(408);
+        expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({
+          cause: "body-timeout",
+          declaredBytes: null,
+        });
+      }));
+
+    it("answers 413 from a content-length over the cap without reading, and cancels the body", async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      const b = streamBody();
+      const getReader = vi.spyOn(b.stream, "getReader");
+
+      const res = await POST(reqWithStream(b.stream, { "content-length": String(MAX_BYTES + 1) }));
+
+      expect(res.status).toBe(413);
+      expect(getReader).not.toHaveBeenCalled();
+      expect(b.state.cancelled).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("relays a body of exactly the cap and refuses one byte more", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+      vi.stubGlobal("fetch", fetchSpy);
+      const head = Buffer.from(`${JSON.stringify({ dsn: ALLOWED_DSN })}
+`);
+      const exact = Buffer.concat([head, Buffer.alloc(MAX_BYTES - head.byteLength, 0x78)]);
+      expect(exact.byteLength).toBe(MAX_BYTES);
+
+      const ok = await POST(makeReq(exact));
+      expect(ok.status).toBe(200);
+      const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect((init.body as Uint8Array).byteLength).toBe(MAX_BYTES);
+
+      const over = await POST(makeReq(Buffer.concat([exact, Buffer.from("x")])));
+      expect(over.status).toBe(413);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
     it("answers 400 body-read-error, not 408, when the stream breaks (client abort, reset)", async () => {
       const fetchSpy = vi.fn();
       vi.stubGlobal("fetch", fetchSpy);
