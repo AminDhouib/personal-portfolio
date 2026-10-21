@@ -26,6 +26,12 @@ const BUDGET = 5_000_000;
 const TARGET_TOTAL_MS = 1500;
 const TARGET_CHUNK_MS = 40;
 const MARGIN = 4;
+// A chunk's cost is a maximum over ~180 chunks, so one GC pause or a scheduler hiccup on a
+// loaded CI box can push a single run past the budget (it once read 160.4 ms against 160 ms)
+// without the code having changed. The assertion is on the median of the per-run maxima:
+// with 5 runs, two outlier runs are needed to fail it, while a real regression slows every
+// run and still trips it. The budget itself stays at 4x the dev-machine target.
+const CHUNK_RUNS = 5;
 // Records one run and replays it three times; coverage instrumentation triples that.
 const TEST_TIMEOUT_MS = 60_000;
 
@@ -178,18 +184,24 @@ describe("replay cost (go / no-go spike)", () => {
       // The first pass is cold (a fresh server process); later passes are warm.
       const cold = await measure(log, endedLive, CHUNK);
       const warm = await measure(log, endedLive, CHUNK);
-      const small = await measure(log, endedLive, CHUNK_SMALL);
+      const smallRuns: Measured[] = [];
+      for (let i = 0; i < CHUNK_RUNS; i++)
+        smallRuns.push(await measure(log, endedLive, CHUNK_SMALL));
+      const small = smallRuns[0] ?? warm;
+      const maxChunkSorted = smallRuns.map((m) => m.maxChunkMs).sort((x, y) => x - y);
+      const medianMaxChunkMs = maxChunkSorted[Math.floor(CHUNK_RUNS / 2)] ?? 0;
       console.info(
         `replay cost: ${endedLive} ticks (${endedLive * 0.05} s), ${log.length} actions, ` +
           `ends '${cold.endReason}'\n` +
           `  cold ${CHUNK}-tick chunks: ${fmt(cold)}\n` +
           `  warm ${CHUNK}-tick chunks: ${fmt(warm)}\n` +
-          `  warm ${CHUNK_SMALL}-tick chunks: ${fmt(small)}`,
+          `  warm ${CHUNK_SMALL}-tick chunks: ${fmt(small)}\n` +
+          `  max chunk over ${CHUNK_RUNS} runs: ${maxChunkSorted.map((v) => v.toFixed(1)).join(", ")} ms`,
       );
 
       expect(cold.endedAt).toBe(endedLive);
       expect(cold.wallMs).toBeLessThan(TARGET_TOTAL_MS * MARGIN);
-      expect(small.maxChunkMs).toBeLessThan(TARGET_CHUNK_MS * MARGIN);
+      expect(medianMaxChunkMs).toBeLessThan(TARGET_CHUNK_MS * MARGIN);
     },
     TEST_TIMEOUT_MS,
   );
