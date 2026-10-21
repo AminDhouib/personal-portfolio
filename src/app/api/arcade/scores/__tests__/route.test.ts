@@ -4,6 +4,8 @@ import { dailyText } from "@/components/game/typing-speed/engine/daily";
 import { makeJsonPostRequest, uniqueIp } from "@/test/api-route-helpers";
 import { createFakePool } from "@/test/fake-pg";
 import { record, type Recorded, SHORT } from "@/lib/arcade/__tests__/failover-fixtures";
+import { REPLAY_PER_CLIENT_LIMIT } from "@/lib/arcade/failover-gates";
+import { BOARD_S } from "@/components/game/failover/sim/__tests__/scripted";
 
 // Same shape as the legacy route test: the pool is the only thing replaced. Here it is an
 // in-memory emulation of the arcade statements (the store's, plus the legacy import the
@@ -764,6 +766,73 @@ describe("POST /api/arcade/scores", () => {
           message: "failover replay disagrees: score does not match the replay",
         }),
       );
+    });
+  });
+
+  describe("Failover replay cost", () => {
+    const DAY_NUMBER = 20261015;
+    /** Honest runs that differ only in the tick the player retires on, so each is its own replay. */
+    const runs = (count: number) =>
+      Array.from({ length: count }, (_, i) =>
+        record("2026-10-15", [...BOARD_S, [400 + i * 20, { op: 8 }]]),
+      );
+    const failoverOf = (run: Recorded) =>
+      body({
+        game: "failover",
+        score: run.score,
+        detail: { day: DAY_NUMBER, seconds: run.seconds, ticks: run.ticks, actions: run.actions },
+        proof: run.proof,
+      });
+
+    beforeEach(() => {
+      vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+    });
+
+    it("answers 429 with Retry-After once a client has had its replays, and writes nothing more", async () => {
+      const ip = uniqueIp();
+      const all = runs(REPLAY_PER_CLIENT_LIMIT + 1);
+      for (const run of all.slice(0, REPLAY_PER_CLIENT_LIMIT)) {
+        const res = await post(failoverOf(run), { ip });
+        expect(res.status).toBe(200);
+      }
+      const written = emu.scores().length;
+      const last = all[REPLAY_PER_CLIENT_LIMIT];
+      if (!last) throw new Error("fixture");
+      const res = await post(failoverOf(last), { ip });
+      expect(res.status).toBe(429);
+      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThanOrEqual(1);
+      expect(await res.json()).toEqual({
+        error: "too many requests",
+        reason: "too many replays, try again shortly",
+      });
+      expect(emu.scores()).toHaveLength(written);
+    });
+
+    it("does not count a proof it has already replayed against that cap", async () => {
+      const ip = uniqueIp();
+      const [run] = runs(1);
+      if (!run) throw new Error("fixture");
+      for (let i = 0; i < REPLAY_PER_CLIENT_LIMIT + 3; i++) {
+        const res = await post(failoverOf(run), { ip });
+        expect(res.status).toBe(200);
+      }
+    });
+
+    it("refuses a hostile full-length claim with 422 and does not spend a replay on it", async () => {
+      const ip = uniqueIp();
+      const hostile = body({
+        game: "failover",
+        score: 9_000,
+        detail: { day: DAY_NUMBER, seconds: 900, ticks: 18_000, actions: 0 },
+        proof: "",
+      });
+      for (let i = 0; i < REPLAY_PER_CLIENT_LIMIT + 2; i++) {
+        const res = await post(hostile, { ip });
+        expect(res.status).toBe(422);
+      }
+      const [run] = runs(1);
+      if (!run) throw new Error("fixture");
+      expect((await post(failoverOf(run), { ip })).status).toBe(200);
     });
   });
 
