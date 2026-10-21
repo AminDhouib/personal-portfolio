@@ -4,8 +4,11 @@ import { describe, it, expect } from "vitest";
 import { dailySeed, dailySeedForDay } from "@/components/game/password-game-2/engine/rng";
 import {
   DAILY_GRACE_MS,
+  MAX_TOTAL_ROWS,
   PG2_SCHEMA_STATEMENTS,
+  PROTECTED_TOP_ROWS,
   SEED_MAX,
+  acceptedDailySeeds,
   isAcceptedDailySeed,
   parseSeedParam,
 } from "../pg2-leaderboard";
@@ -69,6 +72,36 @@ describe("isAcceptedDailySeed", () => {
     const yesterday = dailySeedForDay("2026-10-20");
     expect(isAcceptedDailySeed(yesterday, new Date(midnight + DAILY_GRACE_MS - 1))).toBe(true);
     expect(isAcceptedDailySeed(yesterday, new Date(midnight + DAILY_GRACE_MS))).toBe(false);
+  });
+});
+
+describe("acceptedDailySeeds", () => {
+  const today = dailySeedForDay("2026-10-21");
+  const yesterday = dailySeedForDay("2026-10-20");
+
+  it("is today's seed alone outside the grace window", () => {
+    expect(acceptedDailySeeds(new Date("2026-10-21T12:00:00.000Z"))).toEqual([today]);
+  });
+
+  it("adds yesterday's seed, after today's, inside the grace window", () => {
+    expect(acceptedDailySeeds(new Date("2026-10-21T00:10:00.000Z"))).toEqual([today, yesterday]);
+  });
+
+  it("agrees with isAcceptedDailySeed at the window's edges", () => {
+    const midnight = Date.parse("2026-10-21T00:00:00.000Z");
+    for (const offset of [0, DAILY_GRACE_MS - 1, DAILY_GRACE_MS, DAILY_GRACE_MS + 1]) {
+      const now = new Date(midnight + offset);
+      for (const seed of [today, yesterday, 7]) {
+        expect(acceptedDailySeeds(now).includes(seed)).toBe(isAcceptedDailySeed(seed, now));
+      }
+    }
+  });
+});
+
+describe("cap constants", () => {
+  it("protects far fewer rows than the cap", () => {
+    expect(PROTECTED_TOP_ROWS).toBe(100);
+    expect(MAX_TOTAL_ROWS).toBe(20_000);
   });
 });
 

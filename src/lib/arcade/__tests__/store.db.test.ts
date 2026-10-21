@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { dailySeed, dailySeedForDay } from "@/components/game/password-game-2/engine/rng";
+import { MAX_TOTAL_ROWS, PG2_SCHEMA_STATEMENTS, enforceTotalCap } from "@/lib/pg2-leaderboard";
 import { assertArcadeItUrl } from "@/test/arcade-it-guard";
 import { ensureArcadeSchema } from "../schema";
 import { BOARD_ROW_CAP, readBoard, submitScore } from "../store";
@@ -676,5 +678,97 @@ describe.skipIf(!url)("arcade store against a real Postgres", () => {
         await pool.query(readFileSync(path.resolve(process.cwd(), "db/init.sql"), "utf8"));
       }
     });
+  });
+});
+
+// The PG2 leaderboard's whole-table cap, against the same throwaway arcade_it database (the
+// guard above has already refused anything else). The cap is plain SQL, so the unit tests'
+// in-memory fake cannot prove it: this seeds the table past the cap and checks which rows live.
+describe.skipIf(!url)("pg2 leaderboard cap against a real Postgres", () => {
+  let pool: Pool;
+  const NOW = new Date("2026-10-21T12:00:00.000Z");
+  const TODAY = dailySeed(NOW);
+  const YESTERDAY = dailySeedForDay("2026-10-20");
+
+  async function reset() {
+    for (const statement of PG2_SCHEMA_STATEMENTS) await pool.query(statement);
+    await pool.query("TRUNCATE pg2_leaderboard_entries RESTART IDENTITY");
+  }
+
+  /** Insert `count` rows with ids following the table's sequence; seed and time come from SQL. */
+  async function seedRows(count: number, seedSql: string, timeSql: string, daily = false) {
+    await pool.query(
+      `INSERT INTO pg2_leaderboard_entries (name, seed, time_ms, daily)
+       SELECT 'x', ${seedSql}, ${timeSql}, $2::boolean FROM generate_series(1, $1::int) AS g`,
+      [count, daily],
+    );
+  }
+
+  const ids = async () =>
+    new Set(
+      (await pool.query("SELECT id FROM pg2_leaderboard_entries")).rows.map((r) => Number(r.id)),
+    );
+
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: url, max: 2 });
+    await reset();
+  });
+
+  afterAll(async () => {
+    await pool.end();
+  });
+
+  beforeEach(reset);
+
+  it("does nothing at or under the cap", async () => {
+    await seedRows(MAX_TOTAL_ROWS, "1000000 + g", "100000 + g");
+    await expect(enforceTotalCap(pool, NOW)).resolves.toBe(false);
+    expect((await ids()).size).toBe(MAX_TOTAL_ROWS);
+  });
+
+  it("evicts the oldest unprotected rows past the cap and keeps the daily seeds and the global top 100", async () => {
+    // Ids 1..100: the fastest rows overall (global top 100), oldest. 101..130: today's daily
+    // runs, slow. 131..140: yesterday's seed, slow (grace window is NOT open at noon). 141..500:
+    // plain slow rows. Then MAX_TOTAL_ROWS - 0 newer plain rows, so 500 rows are past the cap.
+    await seedRows(100, "2000000 + g", "10000 + g");
+    await seedRows(30, String(TODAY), "900000", true);
+    await seedRows(10, String(YESTERDAY), "900000", true);
+    await seedRows(360, "3000000 + g", "800000");
+    await seedRows(MAX_TOTAL_ROWS, "4000000 + g", "700000 + g");
+
+    await expect(enforceTotalCap(pool, NOW)).resolves.toBe(true);
+
+    const live = await ids();
+    for (let id = 1; id <= 130; id++) expect(live.has(id)).toBe(true); // top 100 + today's seed
+    for (let id = 131; id <= 500; id++) expect(live.has(id)).toBe(false); // yesterday's + plain
+    for (let id = 501; id <= 500 + MAX_TOTAL_ROWS; id++) {
+      if (!live.has(id)) throw new Error(`newest row ${id} was evicted`);
+    }
+    expect(live.size).toBe(MAX_TOTAL_ROWS + 130);
+  });
+
+  it("protects yesterday's seed too while the grace window after midnight UTC is open", async () => {
+    const inGrace = new Date("2026-10-21T00:10:00.000Z");
+    await seedRows(30, String(dailySeedForDay("2026-10-21")), "900000", true);
+    await seedRows(10, String(YESTERDAY), "900000", true);
+    await seedRows(MAX_TOTAL_ROWS, "4000000 + g", "700000 + g");
+
+    await expect(enforceTotalCap(pool, inGrace)).resolves.toBe(true);
+
+    const live = await ids();
+    for (let id = 1; id <= 40; id++) expect(live.has(id)).toBe(true);
+    expect(live.size).toBe(MAX_TOTAL_ROWS + 40);
+  });
+
+  it("keeps legit daily rows when a forged-fast flood fills the table", async () => {
+    await seedRows(50, String(TODAY), "900000", true);
+    await seedRows(100, "3000000 + g", "800000");
+    await seedRows(MAX_TOTAL_ROWS, "5000000 + g", "10000 + g");
+
+    await enforceTotalCap(pool, NOW);
+
+    const live = await ids();
+    for (let id = 1; id <= 50; id++) expect(live.has(id)).toBe(true);
+    for (let id = 51; id <= 150; id++) expect(live.has(id)).toBe(false);
   });
 });
