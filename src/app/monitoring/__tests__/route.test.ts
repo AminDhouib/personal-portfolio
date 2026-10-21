@@ -47,7 +47,7 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
   });
 
   it("relays a valid envelope to the self-hosted ingest endpoint", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+    const fetchSpy = vi.fn().mockResolvedValue({ status: 200, headers: new Headers() } as Response);
     vi.stubGlobal("fetch", fetchSpy);
     const body = envelope(ALLOWED_DSN);
 
@@ -65,7 +65,7 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
   // payload is a compressed (non-UTF8) binary blob. The relay must pass those bytes through
   // untouched; decoding the body as text would replace invalid sequences and corrupt the replay.
   it("relays a binary replay envelope byte-for-byte", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+    const fetchSpy = vi.fn().mockResolvedValue({ status: 200, headers: new Headers() } as Response);
     vi.stubGlobal("fetch", fetchSpy);
     const head = Buffer.from(
       `${JSON.stringify({ dsn: ALLOWED_DSN })}\n{"type":"replay_event"}\n{"segment_id":0}\n{"type":"replay_recording","length":6}\n`,
@@ -82,7 +82,7 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
   });
 
   it("relays a replay-sized envelope above the old 1 MiB cap", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+    const fetchSpy = vi.fn().mockResolvedValue({ status: 200, headers: new Headers() } as Response);
     vi.stubGlobal("fetch", fetchSpy);
     const head = Buffer.from(
       `${JSON.stringify({ dsn: ALLOWED_DSN })}\n{"type":"replay_recording"}\n`,
@@ -192,7 +192,10 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     });
 
     it("passes an upstream 5xx through and logs cause=upstream-status with the status", async () => {
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 503 } as Response));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ status: 503, headers: new Headers() } as Response),
+      );
 
       const res = await POST(makeReq(envelope(ALLOWED_DSN)));
 
@@ -259,27 +262,49 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
       });
     });
 
-    it("does not copy the rate-limit headers onto a non-429 status", async () => {
+    // The SDK's transport applies X-Sentry-Rate-Limits to every response whatever its status
+    // (@sentry/core transports/base.js), so that header crosses on any status; Retry-After is
+    // only meaningful on a 429 and stays there.
+    it("passes X-Sentry-Rate-Limits on a 503 and a 200 but not Retry-After", async () => {
+      const limits = "9:error:key";
+      for (const status of [503, 200]) {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            status,
+            headers: new Headers({ "retry-after": "9", "x-sentry-rate-limits": limits }),
+          } as Response),
+        );
+
+        const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+        expect(res.status).toBe(status);
+        expect(res.headers.get("x-sentry-rate-limits")).toBe(limits);
+        expect(res.headers.has("retry-after")).toBe(false);
+      }
+    });
+
+    it("adds no headers to a non-429 status when upstream sent no rate limits", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({
-          status: 503,
-          headers: new Headers({ "retry-after": "9", "x-sentry-rate-limits": "9:error:key" }),
+          status: 200,
+          headers: new Headers({ "x-request-id": "abc" }),
         } as Response),
       );
 
       const res = await POST(makeReq(envelope(ALLOWED_DSN)));
 
-      expect(res.status).toBe(503);
-      expect(res.headers.has("retry-after")).toBe(false);
       expect(res.headers.has("x-sentry-rate-limits")).toBe(false);
+      expect(res.headers.has("retry-after")).toBe(false);
+      expect(res.headers.has("x-request-id")).toBe(false);
     });
 
     it("stays quiet for a 2xx and for a 4xx the SDK caused (no log noise per dropped envelope)", async () => {
       const fetchSpy = vi
         .fn()
-        .mockResolvedValueOnce({ status: 200 } as Response)
-        .mockResolvedValueOnce({ status: 400 } as Response);
+        .mockResolvedValueOnce({ status: 200, headers: new Headers() } as Response)
+        .mockResolvedValueOnce({ status: 400, headers: new Headers() } as Response);
       vi.stubGlobal("fetch", fetchSpy);
 
       expect((await POST(makeReq(envelope(ALLOWED_DSN)))).status).toBe(200);
@@ -368,7 +393,9 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
 
     it("lets a slow but progressing upload finish: the idle deadline resets on every chunk", () =>
       withFakeTimers(async () => {
-        const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+        const fetchSpy = vi
+          .fn()
+          .mockResolvedValue({ status: 200, headers: new Headers() } as Response);
         vi.stubGlobal("fetch", fetchSpy);
         const b = streamBody();
         const head = Buffer.from(`${JSON.stringify({ dsn: ALLOWED_DSN })}\n`);
@@ -458,7 +485,9 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     });
 
     it("relays a body of exactly the cap and refuses one byte more", async () => {
-      const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+      const fetchSpy = vi
+        .fn()
+        .mockResolvedValue({ status: 200, headers: new Headers() } as Response);
       vi.stubGlobal("fetch", fetchSpy);
       const head = Buffer.from(`${JSON.stringify({ dsn: ALLOWED_DSN })}
 `);
@@ -513,7 +542,10 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
 
     it("leaves no timer running after a prompt body and a successful relay", () =>
       withFakeTimers(async () => {
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 } as Response));
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({ status: 200, headers: new Headers() } as Response),
+        );
 
         const res = await POST(makeReq(envelope(ALLOWED_DSN)));
 
