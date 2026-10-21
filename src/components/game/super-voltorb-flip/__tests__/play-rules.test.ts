@@ -82,6 +82,26 @@ describe("tileRisk", () => {
     expect(tileRisk(g, 3, 1, 0, 0)).toEqual({ definitive: false, highRisk: true });
     expect(tileRisk(g, 1, 3, 0, 0)).toEqual({ definitive: false, highRisk: true });
   });
+  it("reads the column on its own at a non-zero (row, col)", () => {
+    // column 2 has two flipped (3 voltorbs over 2 left = 150%); row stays at 1 over 3 = 33%
+    const g = grid(4, [
+      [1, 2],
+      [2, 2],
+    ]);
+    expect(tileRisk(g, 1, 3, 2, 2)).toEqual({ definitive: false, highRisk: true });
+    expect(tileRisk(g, 1, 3, 1, 2)).toEqual({ definitive: false, highRisk: true });
+    // aimed at an untouched column the same voltorb count is only 50%
+    expect(tileRisk(g, 1, 2, 1, 0)).toEqual({ definitive: false, highRisk: false });
+  });
+  it("reads the row on its own at a non-zero (row, col)", () => {
+    // row 2 has two flipped (3 voltorbs over 2 left = 150%); column stays at 1 over 3 = 33%
+    const g = grid(4, [
+      [2, 1],
+      [2, 3],
+    ]);
+    expect(tileRisk(g, 3, 1, 2, 1)).toEqual({ definitive: false, highRisk: true });
+    expect(tileRisk(g, 2, 1, 0, 1)).toEqual({ definitive: false, highRisk: false });
+  });
   it("treats 0% and 100% lines as definitive, never high risk", () => {
     expect(tileRisk(grid(5), 3, 0, 0, 0)).toEqual({ definitive: true, highRisk: false });
     expect(tileRisk(grid(5), 5, 4, 0, 0)).toEqual({ definitive: true, highRisk: false });
@@ -114,6 +134,7 @@ describe("tallyStride and payoutPlan", () => {
     expect(payoutPlan(30)).toEqual({ coinsPerTick: 1, iterations: 30 });
     expect(payoutPlan(100)).toEqual({ coinsPerTick: 1, iterations: 100 });
     expect(payoutPlan(250)).toEqual({ coinsPerTick: 3, iterations: 84 });
+    expect(payoutPlan(0)).toEqual({ coinsPerTick: 1, iterations: 0 });
     expect(payoutPlan(10000)).toEqual({ coinsPerTick: 100, iterations: 100 });
   });
 });
