@@ -53,29 +53,30 @@ access — it is not exposed through the Dokploy API surface available to agents
   (`src/lib/report-game-error.ts`) wraps the error and callers pass it to the browser's native
   `reportError()` DOM global — not a custom function — which the already-installed Sentry client
   SDK picks up via its own `window.onerror` listener.
-- **Tunnel**: `sentry.devino.ca` isn't reachable from visitor networks (and ad blockers eat
-  direct Sentry calls), so browser envelopes are relayed through `/monitoring`
-  (`tunnel: "/monitoring"` in `src/instrumentation-client.ts`). Server-side and edge envelopes do
-  not use it: `Sentry.init` in `src/instrumentation.ts` sets no `tunnel`, so the server posts
-  straight to Sentry from the host. The route (`src/app/monitoring/route.ts`) validates the envelope's DSN and forwards it to Sentry
+- **Tunnel**: `sentry.devino.ca` isn't reachable from visitor networks (and ad blockers eat direct
+  Sentry calls), so browser envelopes are relayed through `/monitoring` (`tunnel: "/monitoring"` in
+  `src/instrumentation-client.ts`). Server-side and edge envelopes do not use it: `Sentry.init` in
+  `src/instrumentation.ts` sets no `tunnel`, so the server posts straight to Sentry from the host.
+  The route (`src/app/monitoring/route.ts`) validates the envelope's DSN and forwards it to Sentry
   (org `devino`, project `portfolio`) with an 8s upstream timeout. The browser's upload is read
-  chunk by chunk under a 10s idle deadline (it resets on every chunk) and a 30s overall cap, and the 5 MiB
-  limit is enforced as bytes arrive (413, stream cancelled), and a declared Content-Length over it
-  is refused with 413 before any read. It relays the body as raw bytes (a
-  session-replay segment carries a compressed binary item that text decoding would corrupt).
-  Failures log one warn line, scope `monitoring`, with a JSON body: `cause` plus `durationMs`
-  and `bytes`. Causes and statuses: `body-timeout` (408; also `deadline` idle or total and
-  `declaredBytes`, the Content-Length), `body-read-error` (400; client abort or reset; also logs `code`),
-  `timeout` (504; upstream deadline), `network` (502; `code` is the underlying errno, e.g.
-  ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT), `upstream-status` (a Sentry 5xx or 429 passed
-  through; a 429 also carries upstream's `Retry-After` and `X-Sentry-Rate-Limits`, verbatim). Search the container logs for `[monitoring]`; the lines are never captured to
-  Sentry, so a tunnel outage cannot feed itself.
-  `/monitoring` is excluded from `src/proxy.ts`'s matcher on purpose: Next buffers a request
-  body in the proxy layer before the handler runs, which hid a stalled upload from the deadlines
-  above (measured on a standalone build, 2026-10-21: a 15s pause mid-body answered at 15s, not
-  408 at 10s). Check: a raw socket sending `Content-Length: 1000` and 5 bytes, then silence,
-  should get 408 at about 10s. `e2e/monitoring-tunnel.spec.ts` automates this (and the early 413 on an
-  oversize Content-Length) in CI over a raw socket against the production build.
+  chunk by chunk under a 10s idle deadline (it resets on every chunk) and a 30s overall cap, and the
+  5 MiB limit is enforced as bytes arrive (413, stream cancelled), and a declared Content-Length
+  over it is refused with 413 before any read. It relays the body as raw bytes (a session-replay
+  segment carries a compressed binary item that text decoding would corrupt). Failures log one warn
+  line, scope `monitoring`, with a JSON body: `cause` plus `durationMs` and `bytes`. Causes and
+  statuses: `body-timeout` (408; also `deadline` idle or total and `declaredBytes`, the
+  Content-Length), `body-read-error` (400; client abort or reset; also logs `code`), `timeout` (504;
+  upstream deadline), `network` (502; `code` is the underlying errno, e.g. ECONNREFUSED, ENOTFOUND,
+  UND_ERR_CONNECT_TIMEOUT), `upstream-status` (a Sentry 5xx or 429 passed through; every relayed
+  response also carries upstream's `X-Sentry-Rate-Limits` when present, and a 429 its `Retry-After`,
+  verbatim). Search the container logs for `[monitoring]`; the lines are never captured to Sentry,
+  so a tunnel outage cannot feed itself.
+  `/monitoring` is excluded from `src/proxy.ts`'s matcher on purpose: Next buffers a request body in
+  the proxy layer before the handler runs, which hid a stalled upload from the deadlines above
+  (measured on a standalone build, 2026-10-21: a 15s pause mid-body answered at 15s, not 408 at
+  10s). Check: a raw socket sending `Content-Length: 1000` and 5 bytes, then silence, should get 408
+  at about 10s. `e2e/monitoring-tunnel.spec.ts` automates this (and the early 413 on an oversize
+  Content-Length) in CI over a raw socket against the production build.
 - **Caution**: a hand-built curl envelope to `/monitoring` can get a `200` from the relay yet
   never materialize as a Sentry event — the relay only checks the DSN header and size, not
   envelope well-formedness. Real SDK-generated events do land (observed empirically). Don't

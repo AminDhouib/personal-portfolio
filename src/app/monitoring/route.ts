@@ -132,14 +132,17 @@ function failureCause(err: unknown): "timeout" | "network" {
 }
 
 /**
- * The two headers the browser SDK reads to back off after a 429 (X-Sentry-Rate-Limits first,
- * Retry-After second), copied verbatim from upstream. Nothing else crosses, and nothing is made
+ * The rate-limit headers the browser SDK reads to back off, copied verbatim from upstream.
+ * X-Sentry-Rate-Limits crosses on every status (the SDK's transport applies it to any
+ * response); Retry-After, its fallback, only on a 429. Nothing else crosses, and nothing is made
  * up when upstream sent neither.
  */
-function rateLimitHeaders(upstream: Headers): Headers {
+function rateLimitHeaders(upstream: Response): Headers {
   const headers = new Headers();
-  for (const name of ["retry-after", "x-sentry-rate-limits"]) {
-    const value = upstream.get(name);
+  const names =
+    upstream.status === 429 ? ["retry-after", "x-sentry-rate-limits"] : ["x-sentry-rate-limits"];
+  for (const name of names) {
+    const value = upstream.headers.get(name);
     if (value !== null) headers.set(name, value);
   }
   return headers;
@@ -226,7 +229,7 @@ export async function POST(request: NextRequest) {
     }
     return new NextResponse(null, {
       status: upstream.status,
-      headers: upstream.status === 429 ? rateLimitHeaders(upstream.headers) : undefined,
+      headers: rateLimitHeaders(upstream),
     });
   } catch (err) {
     // logWarn, not captureException: if the tunnel cannot reach Sentry, the
