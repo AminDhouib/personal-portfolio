@@ -275,3 +275,57 @@ describe("guardedJsonRoute body-size cap", () => {
     if (!guard.ok) expect(guard.response.status).toBe(429);
   });
 });
+
+describe("guardRequest client identity (T-5524)", () => {
+  /** A same-origin POST as it arrives behind Cloudflare: CF-Connecting-IP plus a client-typed XFF. */
+  function behindCloudflare(cfIp: string, spoofedLeftmost: string): Request {
+    return new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: {
+        origin: "https://amindhou.com",
+        "x-forwarded-host": "amindhou.com",
+        "cf-connecting-ip": cfIp,
+        "x-forwarded-for": `${spoofedLeftmost}, ${cfIp}, 172.18.0.2`,
+      },
+    });
+  }
+
+  it("keeps answering 429 for an exhausted CF-Connecting-IP while X-Forwarded-For rotates", () => {
+    const cfIp = uniqueIp();
+    const opts = { key: "rg-cf-spoof", limit: 3, windowMs: 60_000 };
+
+    for (let i = 0; i < 3; i++) {
+      expect(guardRequest(behindCloudflare(cfIp, `203.0.113.${i + 1}`), opts).response).toBeNull();
+    }
+    for (let i = 0; i < 20; i++) {
+      const res = guardRequest(behindCloudflare(cfIp, `198.51.100.${i + 1}`), opts);
+      expect(res.response?.status).toBe(429);
+    }
+  });
+
+  it("still gives a different CF-Connecting-IP its own budget", () => {
+    const opts = { key: "rg-cf-separate", limit: 1, windowMs: 60_000 };
+    const first = uniqueIp();
+    expect(guardRequest(behindCloudflare(first, "6.6.6.6"), opts).response).toBeNull();
+    expect(guardRequest(behindCloudflare(first, "6.6.6.7"), opts).response?.status).toBe(429);
+    expect(guardRequest(behindCloudflare(uniqueIp(), "6.6.6.6"), opts).response).toBeNull();
+  });
+
+  it("does not let a rotating leftmost X-Forwarded-For escape the limit without a CF header", () => {
+    const opts = { key: "rg-no-cf-spoof", limit: 2, windowMs: 60_000 };
+    const hop = uniqueIp();
+    const make = (leftmost: string) =>
+      new Request("https://amindhou.com/api/test", {
+        method: "POST",
+        headers: {
+          origin: "https://amindhou.com",
+          "x-forwarded-host": "amindhou.com",
+          "x-forwarded-for": `${leftmost}, ${hop}`,
+        },
+      });
+    expect(guardRequest(make("1.1.1.1"), opts).response).toBeNull();
+    expect(guardRequest(make("2.2.2.2"), opts).response).toBeNull();
+    expect(guardRequest(make("3.3.3.3"), opts).response?.status).toBe(429);
+    expect(guardRequest(make("4.4.4.4"), opts).response?.status).toBe(429);
+  });
+});
