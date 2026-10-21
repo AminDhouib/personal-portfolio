@@ -59,7 +59,7 @@ describe("conversionForLink", () => {
     ).toMatchObject({ props: { placement: "navbar", path: "/blog" } });
     expect(
       conversionForLink(
-        anchorIn(`<footer><a href="mailto:amin@devino.ca">Email</a></footer>`),
+        anchorIn(`<footer><a href="mailto:hello@amindhou.com">Email</a></footer>`),
         "/",
       ),
     ).toEqual({ event: "email_click", props: { placement: "footer", path: "/" } });

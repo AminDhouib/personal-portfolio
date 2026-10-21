@@ -11,7 +11,7 @@ export const profile = Object.freeze({
   jobTitle: "CEO & CTO",
   summary:
     "Full-stack software engineer and founder based in Ottawa, Canada. CEO and CTO of Devino Solutions.",
-  email: "amin@devino.ca",
+  email: "hello@amindhou.com",
   // Square 900x900 headshot. /profile.png is the transparent hero cutout,
   // which renders as a black square in most previews.
   image: `${SITE_ORIGIN}/profile.jpg`,

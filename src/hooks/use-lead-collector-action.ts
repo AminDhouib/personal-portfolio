@@ -79,7 +79,7 @@ export function useLeadCollectorAction(source: string) {
       if (result.ok) {
         return `Lead saved for ${name} (${email}). Amin will be in touch soon!`;
       }
-      return "Sorry, there was an issue saving your contact details. Please try emailing amin@devino.ca directly.";
+      return "Sorry, there was an issue saving your contact details. Please try emailing hello@amindhou.com directly.";
     },
   });
 }

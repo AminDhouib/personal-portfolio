@@ -37,7 +37,7 @@ describe("buildAminAiSystemPrompt", () => {
   });
 
   it("includes the contact email and every social link", () => {
-    expect(prompt).toContain("amin@devino.ca");
+    expect(prompt).toContain("hello@amindhou.com");
     for (const social of socialLinks) {
       expect(prompt).toContain(social.url);
     }
