@@ -1,5 +1,24 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { checkRateLimit, getClientIp, isSameOrigin } from "../rate-limit";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+vi.mock("@/lib/log", () => ({
+  captureException: vi.fn(),
+  logWarn: vi.fn(),
+  logError: vi.fn(),
+}));
+
+import { captureException, logWarn } from "@/lib/log";
+import { checkRateLimit, getClientIp, isSameOrigin, resetRateLimitForTests } from "../rate-limit";
+
+// Module state (the bucket map, the missing-header warning throttle) must not leak between tests.
+beforeEach(() => {
+  resetRateLimitForTests();
+  vi.mocked(logWarn).mockClear();
+  vi.mocked(captureException).mockClear();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("checkRateLimit", () => {
   afterEach(() => {
@@ -102,8 +121,8 @@ describe("getClientIp", () => {
       expect([...keys]).toEqual(["203.0.113.7"]);
     });
 
-    it("accepts an IPv6 address", () => {
-      expect(getClientIp(req({ "cf-connecting-ip": "2001:db8::1" }))).toBe("2001:db8::1");
+    it("buckets an IPv6 address by its /64", () => {
+      expect(getClientIp(req({ "cf-connecting-ip": "2001:db8::1" }))).toBe("2001:db8:0:0::/64");
     });
 
     it("trims whitespace", () => {
@@ -142,16 +161,16 @@ describe("getClientIp", () => {
       expect(getClientIp(req({ "x-forwarded-for": "  203.0.113.7  " }))).toBe("203.0.113.7");
     });
 
-    it("accepts an IPv6 hop", () => {
-      expect(getClientIp(req({ "x-forwarded-for": "9.9.9.9, 2001:db8::5" }))).toBe("2001:db8::5");
+    it("buckets an IPv6 hop by its /64", () => {
+      expect(getClientIp(req({ "x-forwarded-for": "9.9.9.9, 2001:db8::5" }))).toBe(
+        "2001:db8:0:0::/64",
+      );
     });
 
     it("never skips a bad rightmost entry to reach a client-chosen one", () => {
       // A rightmost entry that is not an address means no proxy appended it, so everything to
       // its left is client-controlled.
-      expect(
-        getClientIp(req({ "x-forwarded-for": "6.6.6.6, not-an-ip", "x-real-ip": "198.51.100.9" })),
-      ).toBe("198.51.100.9");
+      expect(getClientIp(req({ "x-forwarded-for": "6.6.6.6, not-an-ip" }))).toBe("unknown");
       expect(getClientIp(req({ "x-forwarded-for": "6.6.6.6, fe80::1%eth0" }))).toBe("unknown");
     });
 
@@ -160,18 +179,148 @@ describe("getClientIp", () => {
     });
   });
 
-  describe("x-real-ip and unknown", () => {
-    it("falls back to x-real-ip when x-forwarded-for is absent", () => {
-      expect(getClientIp(req({ "x-real-ip": "198.51.100.5" }))).toBe("198.51.100.5");
-    });
-
-    it("ignores an invalid x-real-ip", () => {
-      expect(getClientIp(req({ "x-real-ip": "198.51.100.5%eth0" }))).toBe("unknown");
-      expect(getClientIp(req({ "x-real-ip": "<script>" }))).toBe("unknown");
+  describe("nothing usable", () => {
+    it("ignores x-real-ip: the Next server always supplies x-forwarded-for, so it is never needed", () => {
+      expect(getClientIp(req({ "x-real-ip": "198.51.100.5" }))).toBe("unknown");
     });
 
     it('returns "unknown" when no forwarding headers are present', () => {
       expect(getClientIp(new Request("http://localhost/"))).toBe("unknown");
+    });
+  });
+
+  describe("IPv6 canonicalisation", () => {
+    const viaCf = (ip: string) => getClientIp(req({ "cf-connecting-ip": ip }));
+
+    it("gives two addresses in one /64 the same key", () => {
+      expect(viaCf("2001:db8:1:2::1")).toBe(viaCf("2001:0db8:0001:0002:ffff:ffff:ffff:ffff"));
+    });
+
+    it("gives every spelling of one /64 the same key", () => {
+      const keys = new Set(
+        [
+          "2001:db8:1:2::",
+          "2001:DB8:1:2::abcd",
+          "2001:db8:1:2:0:0:0:1",
+          "2001:db8:1:2:1:2:3:4",
+          "2001:0db8:0001:0002::",
+        ].map(viaCf),
+      );
+      expect([...keys]).toEqual(["2001:db8:1:2::/64"]);
+    });
+
+    it("gives different /64s different keys", () => {
+      expect(viaCf("2001:db8:1:2::1")).not.toBe(viaCf("2001:db8:1:3::1"));
+      expect(viaCf("2001:db8:1:2::1")).not.toBe(viaCf("2001:db8:2:2::1"));
+      expect(viaCf("2001:db8:1:2::1")).not.toBe(viaCf("2002:db8:1:2::1"));
+    });
+
+    it("does not let rotating the host half of a v6 address mint new buckets", () => {
+      const keys = new Set<string>();
+      for (let i = 0; i < 100; i++) keys.add(viaCf(`2001:db8:aa:bb::${i.toString(16)}:${i}`));
+      expect(keys.size).toBe(1);
+    });
+
+    it("expands an embedded-IPv4 tail before taking the /64", () => {
+      expect(viaCf("64:ff9b::1.2.3.4")).toBe("64:ff9b:0:0::/64");
+      expect(viaCf("2001:db8:1:2::1.2.3.4")).toBe(viaCf("2001:db8:1:2::9"));
+    });
+
+    it("handles the unspecified and loopback addresses", () => {
+      expect(viaCf("::")).toBe("0:0:0:0::/64");
+      expect(viaCf("::1")).toBe("0:0:0:0::/64");
+    });
+
+    it("maps an IPv4-mapped address onto the plain IPv4 key", () => {
+      expect(viaCf("::ffff:203.0.113.7")).toBe("203.0.113.7");
+      expect(viaCf("::FFFF:203.0.113.7")).toBe("203.0.113.7");
+      expect(viaCf("0:0:0:0:0:ffff:cb00:7107")).toBe("203.0.113.7");
+      expect(viaCf("::ffff:cb00:7107")).toBe(viaCf("203.0.113.7"));
+    });
+
+    it("keeps IPv4 as a full address, never grouped", () => {
+      expect(viaCf("203.0.113.7")).toBe("203.0.113.7");
+      expect(viaCf("203.0.113.7")).not.toBe(viaCf("203.0.113.8"));
+    });
+
+    it("canonicalises the x-forwarded-for fallback the same way", () => {
+      expect(getClientIp(req({ "x-forwarded-for": "1.1.1.1, ::ffff:198.51.100.5" }))).toBe(
+        "198.51.100.5",
+      );
+      expect(getClientIp(req({ "x-forwarded-for": "1.1.1.1, 2001:db8:1:2::77" }))).toBe(
+        "2001:db8:1:2::/64",
+      );
+    });
+  });
+
+  describe("missing CF-Connecting-IP warning", () => {
+    const WARN_INTERVAL_MS = 60_000;
+    const noCf = () => req({ "x-forwarded-for": "198.51.100.5" });
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      vi.stubEnv("NODE_ENV", "production");
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("logs a structured warning through logWarn when the header is missing in production", () => {
+      getClientIp(noCf());
+      expect(logWarn).toHaveBeenCalledTimes(1);
+      const [scope, message, detail] = vi.mocked(logWarn).mock.calls[0] ?? [];
+      expect(scope).toBe("rate-limit");
+      expect(message).toMatch(/CF-Connecting-IP/);
+      expect(detail).toMatchObject({ fallback: "x-forwarded-for" });
+    });
+
+    it("reports the fallback in use and never logs an address", () => {
+      getClientIp(new Request("http://localhost/"));
+      expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({ fallback: "unknown" });
+      vi.setSystemTime(1_000_000 + WARN_INTERVAL_MS);
+      getClientIp(req({ "cf-connecting-ip": "not-an-ip", "x-forwarded-for": "198.51.100.5" }));
+      expect(logWarn).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(vi.mocked(logWarn).mock.calls)).not.toContain("198.51.100.5");
+    });
+
+    it("warns at most once per minute however many requests arrive", () => {
+      for (let i = 0; i < 500; i++) getClientIp(noCf());
+      expect(logWarn).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(1_000_000 + WARN_INTERVAL_MS - 1);
+      getClientIp(noCf());
+      expect(logWarn).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(1_000_000 + WARN_INTERVAL_MS);
+      for (let i = 0; i < 500; i++) getClientIp(noCf());
+      expect(logWarn).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not warn when a valid CF-Connecting-IP is present", () => {
+      getClientIp(req({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "198.51.100.5" }));
+      expect(logWarn).not.toHaveBeenCalled();
+    });
+
+    it("does not warn outside production", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      getClientIp(noCf());
+      vi.stubEnv("NODE_ENV", "test");
+      getClientIp(noCf());
+      expect(logWarn).not.toHaveBeenCalled();
+    });
+
+    it("never reaches Sentry or PostHog: no captureException", () => {
+      for (let i = 0; i < 5; i++) getClientIp(noCf());
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    it("starts a fresh throttle window after the module state is reset", () => {
+      getClientIp(noCf());
+      resetRateLimitForTests();
+      getClientIp(noCf());
+      expect(logWarn).toHaveBeenCalledTimes(2);
     });
   });
 });
