@@ -74,30 +74,170 @@ describe("checkRateLimit", () => {
 });
 
 describe("getClientIp", () => {
-  it("uses the first hop of x-forwarded-for", () => {
-    const req = new Request("http://localhost/", {
-      headers: { "x-forwarded-for": "203.0.113.7, 70.41.3.18, 150.172.238.178" },
+  const req = (headers: Record<string, string>) => new Request("http://localhost/", { headers });
+
+  describe("CF-Connecting-IP", () => {
+    it("keys on CF-Connecting-IP and ignores a spoofed leftmost x-forwarded-for", () => {
+      expect(
+        getClientIp(
+          req({
+            "cf-connecting-ip": "203.0.113.7",
+            "x-forwarded-for": "6.6.6.6, 203.0.113.7, 172.18.0.2",
+          }),
+        ),
+      ).toBe("203.0.113.7");
     });
-    expect(getClientIp(req)).toBe("203.0.113.7");
+
+    it("gives the same key however the x-forwarded-for prefix is spoofed", () => {
+      const keys = new Set(
+        ["1.1.1.1", "2.2.2.2, 3.3.3.3", "garbage", "::1"].map((spoof) =>
+          getClientIp(
+            req({
+              "cf-connecting-ip": "203.0.113.7",
+              "x-forwarded-for": `${spoof}, 203.0.113.7, 172.18.0.2`,
+            }),
+          ),
+        ),
+      );
+      expect([...keys]).toEqual(["203.0.113.7"]);
+    });
+
+    it("accepts an IPv6 address", () => {
+      expect(getClientIp(req({ "cf-connecting-ip": "2001:db8::1" }))).toBe("2001:db8::1");
+    });
+
+    it("trims whitespace", () => {
+      expect(getClientIp(req({ "cf-connecting-ip": "  203.0.113.7  " }))).toBe("203.0.113.7");
+    });
+
+    it.each([
+      ["a hostname", "evil.example"],
+      ["an IPv6 zone id", "fe80::1%eth0"],
+      ["a list", "203.0.113.7, 198.51.100.1"],
+      ["an over-long value", `${"1".repeat(60)}`],
+      ["an out-of-range octet", "256.1.1.1"],
+    ])("ignores %s and falls through to the next source", (_label, bad) => {
+      expect(
+        getClientIp(req({ "cf-connecting-ip": bad, "x-forwarded-for": "9.9.9.9, 198.51.100.5" })),
+      ).toBe("198.51.100.5");
+    });
   });
 
-  it("falls back to x-real-ip when x-forwarded-for is absent", () => {
-    const req = new Request("http://localhost/", {
-      headers: { "x-real-ip": "198.51.100.5" },
+  describe("x-forwarded-for without CF-Connecting-IP", () => {
+    it("keys on the RIGHTMOST hop, the one the nearest proxy appended", () => {
+      expect(
+        getClientIp(req({ "x-forwarded-for": "203.0.113.7, 70.41.3.18, 150.172.238.178" })),
+      ).toBe("150.172.238.178");
     });
-    expect(getClientIp(req)).toBe("198.51.100.5");
+
+    it("does not create a new key per request when the client rotates the leftmost entry", () => {
+      const keys = new Set<string>();
+      for (let i = 0; i < 50; i++) {
+        keys.add(getClientIp(req({ "x-forwarded-for": `10.200.0.${i}, 198.51.100.5` })));
+      }
+      expect([...keys]).toEqual(["198.51.100.5"]);
+    });
+
+    it("trims whitespace around the hop", () => {
+      expect(getClientIp(req({ "x-forwarded-for": "  203.0.113.7  " }))).toBe("203.0.113.7");
+    });
+
+    it("accepts an IPv6 hop", () => {
+      expect(getClientIp(req({ "x-forwarded-for": "9.9.9.9, 2001:db8::5" }))).toBe("2001:db8::5");
+    });
+
+    it("never skips a bad rightmost entry to reach a client-chosen one", () => {
+      // A rightmost entry that is not an address means no proxy appended it, so everything to
+      // its left is client-controlled.
+      expect(
+        getClientIp(req({ "x-forwarded-for": "6.6.6.6, not-an-ip", "x-real-ip": "198.51.100.9" })),
+      ).toBe("198.51.100.9");
+      expect(getClientIp(req({ "x-forwarded-for": "6.6.6.6, fe80::1%eth0" }))).toBe("unknown");
+    });
+
+    it("ignores a trailing comma (empty rightmost entry)", () => {
+      expect(getClientIp(req({ "x-forwarded-for": "6.6.6.6," }))).toBe("unknown");
+    });
   });
 
-  it('returns "unknown" when no forwarding headers are present', () => {
-    const req = new Request("http://localhost/");
-    expect(getClientIp(req)).toBe("unknown");
+  describe("x-real-ip and unknown", () => {
+    it("falls back to x-real-ip when x-forwarded-for is absent", () => {
+      expect(getClientIp(req({ "x-real-ip": "198.51.100.5" }))).toBe("198.51.100.5");
+    });
+
+    it("ignores an invalid x-real-ip", () => {
+      expect(getClientIp(req({ "x-real-ip": "198.51.100.5%eth0" }))).toBe("unknown");
+      expect(getClientIp(req({ "x-real-ip": "<script>" }))).toBe("unknown");
+    });
+
+    it('returns "unknown" when no forwarding headers are present', () => {
+      expect(getClientIp(new Request("http://localhost/"))).toBe("unknown");
+    });
+  });
+});
+
+describe("bucket cap", () => {
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("trims whitespace around the forwarded IP", () => {
-    const req = new Request("http://localhost/", {
-      headers: { "x-forwarded-for": "  203.0.113.7  " },
-    });
-    expect(getClientIp(req)).toBe("203.0.113.7");
+  const opts = { limit: 1, windowMs: 3_600_000 };
+
+  it("evicts the oldest live keys once a flood of unique keys passes the cap", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const tag = `flood-${Math.random()}`;
+    expect(checkRateLimit(`${tag}-first`, opts).allowed).toBe(true);
+    expect(checkRateLimit(`${tag}-first`, opts).allowed).toBe(false);
+
+    for (let i = 0; i < 12_000; i++) {
+      checkRateLimit(`${tag}-${i}`, opts);
+    }
+
+    // The oldest bucket was dropped to keep the map bounded, so it starts a fresh budget...
+    expect(checkRateLimit(`${tag}-first`, opts).allowed).toBe(true);
+    // ...while a recent bucket is still enforced.
+    expect(checkRateLimit(`${tag}-11999`, opts).allowed).toBe(false);
+  });
+
+  it("drops expired keys before evicting live ones when the cap is reached", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const tag = `expiry-${Math.random()}`;
+    const live = `${tag}-live`;
+    expect(checkRateLimit(live, opts).allowed).toBe(true);
+
+    vi.setSystemTime(1);
+    for (let i = 0; i < 9_000; i++) {
+      checkRateLimit(`${tag}-short-${i}`, { limit: 1, windowMs: 1 });
+    }
+    vi.setSystemTime(2_000);
+    for (let i = 0; i < 9_000; i++) {
+      checkRateLimit(`${tag}-next-${i}`, { limit: 1, windowMs: 1 });
+    }
+
+    // 18k keys went through but the 9k short-window ones had expired, so the live key was never
+    // the oldest-and-live victim: its one-hit budget is still spent.
+    expect(checkRateLimit(live, opts).allowed).toBe(false);
+  });
+
+  it("does not rescan the whole map on every request while it is over the prune threshold", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000_000);
+    const tag = `scan-${Math.random()}`;
+    // 6000 live keys sit above the prune threshold; none is expired, so a prune frees nothing.
+    for (let i = 0; i < 6_000; i++) checkRateLimit(`${tag}-${i}`, opts);
+
+    const spy = vi.spyOn(Map.prototype, "entries");
+    const iter = vi.spyOn(Map.prototype, Symbol.iterator as unknown as "entries");
+    try {
+      for (let i = 0; i < 200; i++) checkRateLimit(`${tag}-more-${i}`, opts);
+      // At most one throttled prune pass for the whole burst (all at the same instant).
+      expect(spy.mock.calls.length + iter.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      spy.mockRestore();
+      iter.mockRestore();
+    }
   });
 });
 

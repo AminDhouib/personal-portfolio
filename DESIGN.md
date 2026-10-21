@@ -1575,6 +1575,27 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   the tunnel is POST-only so the slashless 308 has no page duplicate to stop. The matcher skips
   the exact path (`monitoring$`); `/monitoring/` and lookalikes still run it, pinned in
   `src/__tests__/proxy.test.ts`. Do not widen it.
+- **Rate limits key on `CF-Connecting-IP`, never on the leftmost `X-Forwarded-For`.** Production
+  is Cloudflare (proxied) to Traefik to the app. Cloudflare APPENDS the real client to whatever
+  `X-Forwarded-For` the client sent, and Traefik trusts its peer so it passes the header through;
+  the leftmost entry is therefore whatever the visitor typed, and keying on it made every limit
+  (leads, arcade scores, copilotkit, PG2 leaderboard, monitoring) bypassable by sending a fresh
+  `X-Forwarded-For` per request (confirmed on prod 2026-10-21). `getClientIp`
+  (`src/lib/rate-limit.ts`) now picks, in order: a valid `CF-Connecting-IP` (Cloudflare overwrites
+  it, so a visitor cannot forge it); the RIGHTMOST `X-Forwarded-For` entry only (the hop the
+  nearest proxy wrote; a rightmost entry that is not an address is never skipped, because walking
+  left reaches client-typed text); a valid `X-Real-Ip`; else the shared bucket `"unknown"`. Every
+  candidate goes through `parseIpAddress` (`src/lib/ip-address.ts`: `isIP`, no `%zone`, 45-char
+  cap), the same check `posthog-proxy-forward.ts` uses. The bucket map is bounded: at most 10,000
+  keys, expired buckets pruned at most once a second, then least-recently-used buckets evicted
+  (eviction forgives that key's spent budget, the price of a bounded map). Local and e2e runs have
+  no `CF-Connecting-IP`, so a test that needs its own bucket must send a distinct `CF-Connecting-IP`
+  (a random `X-Forwarded-For` no longer separates callers). Pinned in
+  `src/lib/__tests__/rate-limit.test.ts`. Residual risk, accepted until T-5533: the origin is
+  reachable without Cloudflare, and a request sent straight to it can carry any
+  `CF-Connecting-IP`, so a direct-to-origin attacker can still choose their key. The fix is
+  infrastructure (restrict the origin to Cloudflare's ranges or use authenticated origin pulls),
+  not application code.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
