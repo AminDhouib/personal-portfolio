@@ -58,7 +58,11 @@ function formatTenths(ms: number): string {
 }
 
 type PostState =
-  { kind: "idle" } | { kind: "sending" } | { kind: "sent"; rank: number } | { kind: "unavailable" };
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "sent"; rank: number }
+  | { kind: "unplaced" }
+  | { kind: "unavailable" };
 
 export function ReceiptCard({
   g,
@@ -137,7 +141,13 @@ export function ReceiptCard({
         setPost({ kind: "unavailable" });
         return;
       }
-      const body = (await res.json()) as { rank?: number };
+      const body = (await res.json()) as { rank?: number; stored?: boolean };
+      // stored:false = the server accepted the run but it did not make the board (the per-seed
+      // board was already full of faster runs). An older server omits the field: treat as stored.
+      if (body.stored === false) {
+        setPost({ kind: "unplaced" });
+        return;
+      }
       setPost({ kind: "sent", rank: body.rank ?? 0 });
       setRefreshKey((k) => k + 1); // re-read the board so the player's row appears
     } catch {
@@ -270,6 +280,10 @@ export function ReceiptCard({
           {post.kind === "sent" ? (
             <p className="pg2-postrun__rank">
               Rank #{post.rank} {daily ? "on today’s board" : "for this seed"}.
+            </p>
+          ) : post.kind === "unplaced" ? (
+            <p className="pg2-postrun__note">
+              Your run did not place on the board this time. It still counts.
             </p>
           ) : (
             <div className="pg2-postrun__entry">

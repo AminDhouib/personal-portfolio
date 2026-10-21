@@ -1311,20 +1311,29 @@ The following Password Game 2 entries were verified against the current tree on 
   The tile says "(UTC)". On deploy day the seed moves for players outside UTC (their local date
   and the UTC date differ for part of each day), so that day's daily board mixes the old and new
   puzzles. No migration is needed; the board turns over at 00:00 UTC.
-  The server now ties the board to that seed: `?daily=1` also filters `seed = dailySeed()`, and a
-  `daily: true` POST is rejected (400) unless its seed is today's, or yesterday's inside
-  `DAILY_GRACE_MS` after midnight UTC (a run stamped with the day it started). That is a
-  consistency check, not anti-cheat; the board stays display-only and forgeable.
+  The server now ties the board to that seed: `?daily=1` also filters `seed = ANY(acceptedDailySeeds())`
+  (today's seed, plus yesterday's while inside `DAILY_GRACE_MS` after 00:00 UTC, so a run that
+  started before midnight still lists), and a `daily: true` POST is rejected (400) unless its
+  seed is one of those. That is a consistency check, not anti-cheat; the board stays display-only
+  and forgeable.
 - **The Password Game 2 leaderboard is bounded in growth and read cost, still not in trust**
   (`src/app/api/password-game-2/leaderboard/route.ts`, `src/lib/pg2-leaderboard.ts`). A seed is
-  any 32-bit integer, so the per-seed top 500 alone never capped the table; the insert, the
-  per-seed trim and a whole-table cap (`MAX_TOTAL_ROWS` = 20,000, slowest evicted first so the
-  all-time board and fast daily runs survive) now run in one transaction under an advisory
-  lock. Reads are limited to 60 a minute per IP and a malformed `?seed=` is a 400, never a
-  500 or a Sentry event. Two indexes serve every read: `(seed, time_ms)` for `?seed=` and the
-  daily board (which filters on the daily seed), `(time_ms, id)` for the unfiltered top 50 and the
-  cap delete. Both are created at runtime by the route's ensure step (prod's volume predates
-  them) and mirrored in `db/init.sql`; a test fails if the two drift.
+  any 32-bit integer, so the per-seed top 500 alone never capped the table. The insert, the
+  per-seed trim and a whole-table cap (`enforceTotalCap`, `MAX_TOTAL_ROWS` = 20,000) run in one
+  transaction under an advisory lock. The cap evicts the OLDEST rows (lowest id) past the newest
+  20,000, never rows on a live daily seed and never the 100 fastest rows overall
+  (`PROTECTED_TOP_ROWS`), so a flood of forged-fast rows cannot push real runs out of the daily
+  board or the all-time top; it is skipped after one cheap `SELECT 1 ... OFFSET $1 LIMIT 1` probe
+  while the table is under the cap, and the table can overshoot by at most the protected rows
+  (a seed holds at most 500). The cap SQL is proven against a real Postgres by the CI-only
+  `store.db.test.ts`. If the per-seed trim drops the run just inserted, the POST answers
+  `{ ok: true, stored: false }` with no rank (the receipt card says it did not place) rather than
+  a rank for a row that is gone. Reads are limited to 60 a minute per IP and a malformed
+  `?seed=` is a 400, never a 500 or a Sentry event. Two indexes serve every read: `(seed,
+time_ms)` for `?seed=` and the daily board, `(time_ms, id)` for the unfiltered top 50
+  (ordered `time_ms, id`) and the top-100 protection. Both are created at runtime by the route's
+  ensure step (prod's volume predates them) and mirrored in `db/init.sql`; a test fails if the two
+  drift.
 - **Read cost of the hub.** One visit that reaches the strip issues five arcade reads and
   one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
   who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an

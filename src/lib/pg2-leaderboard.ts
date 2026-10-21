@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { dailySeed } from "@/components/game/password-game-2/engine/rng";
 
 /** PG2 seeds are unsigned 32-bit integers (the generator is `>>> 0`, the daily seed an FNV-1a hash). */
@@ -14,6 +15,9 @@ export const MAX_ENTRIES_PER_SEED = 500;
  * which keeps the all-time board's fastest runs and today's competitive daily times.
  */
 export const MAX_TOTAL_ROWS = 20_000;
+
+/** The fastest rows overall (by time_ms, id) that the whole-table cap never evicts. */
+export const PROTECTED_TOP_ROWS = 100;
 
 /**
  * How long past midnight UTC the previous day's daily seed still posts. The shell stamps a run
@@ -40,10 +44,59 @@ export function parseSeedParam(raw: string): number | null {
  * today's UTC seed, or yesterday's during the grace window after midnight UTC.
  */
 export function isAcceptedDailySeed(seed: number, now: Date = new Date()): boolean {
-  if (seed === dailySeed(now)) return true;
+  return acceptedDailySeeds(now).includes(seed);
+}
+
+/**
+ * The daily seeds that are live at `now`: today's UTC seed, plus yesterday's while still inside
+ * DAILY_GRACE_MS after midnight UTC. The daily board reads these, the daily POST accepts these, and
+ * the whole-table cap never evicts rows on them.
+ */
+export function acceptedDailySeeds(now: Date = new Date()): number[] {
+  const seeds = [dailySeed(now)];
   const startOfDay = now.getTime() - (now.getTime() % DAY_MS);
-  if (now.getTime() - startOfDay >= DAILY_GRACE_MS) return false;
-  return seed === dailySeed(new Date(startOfDay - 1));
+  if (now.getTime() - startOfDay < DAILY_GRACE_MS) {
+    seeds.push(dailySeed(new Date(startOfDay - 1)));
+  }
+  return seeds;
+}
+
+/**
+ * Enforce MAX_TOTAL_ROWS: when any row sits past the cap, delete the OLDEST rows (lowest id) beyond
+ * the newest MAX_TOTAL_ROWS, except rows on a live daily seed and the PROTECTED_TOP_ROWS fastest
+ * rows overall. Evicting by age, not by time, means a flood of forged-fast rows cannot push real
+ * runs out of the daily board or the all-time top; both protections are bounded (a seed holds at
+ * most MAX_ENTRIES_PER_SEED rows, so the table overshoots the cap by at most the protected rows).
+ * Call it inside the writer's transaction. Returns whether a delete ran.
+ */
+export async function enforceTotalCap(
+  client: Pick<PoolClient, "query">,
+  now: Date = new Date(),
+): Promise<boolean> {
+  // Cheap guard first: one row exists past the cap, or there is nothing to do.
+  const over = await client.query(
+    `SELECT 1 FROM pg2_leaderboard_entries
+      OFFSET $1 LIMIT 1`,
+    [MAX_TOTAL_ROWS],
+  );
+  if (over.rows.length === 0) return false;
+
+  await client.query(
+    `DELETE FROM pg2_leaderboard_entries
+      WHERE id IN (
+        SELECT id FROM pg2_leaderboard_entries
+         ORDER BY id DESC
+         OFFSET $1
+      )
+        AND NOT (seed = ANY($2::bigint[]))
+        AND id NOT IN (
+          SELECT id FROM pg2_leaderboard_entries
+           ORDER BY time_ms ASC, id ASC
+           LIMIT $3
+        )`,
+    [MAX_TOTAL_ROWS, acceptedDailySeeds(now), PROTECTED_TOP_ROWS],
+  );
+  return true;
 }
 
 /**
@@ -54,7 +107,7 @@ export function isAcceptedDailySeed(seed: number, now: Date = new Date()): boole
  *
  * Read paths and the index each uses:
  * - `?seed=N` and `?daily=1` (filtered to today's daily seed): (seed, time_ms)
- * - the unfiltered top 50 and the global-cap delete: (time_ms, id)
+ * - the unfiltered top 50 and the global top-100 protection in the cap delete: (time_ms, id)
  */
 export const PG2_SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS pg2_leaderboard_entries (
