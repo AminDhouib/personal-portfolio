@@ -106,6 +106,14 @@ async function readBody(request: NextRequest): Promise<Uint8Array<ArrayBuffer>> 
   return body;
 }
 
+/** The declared Content-Length, or null when absent or not a number (chunked, malformed). */
+function declaredLength(request: NextRequest): number | null {
+  const raw = request.headers.get("content-length");
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Node's `cause.code` (ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT, ...), when present. */
 function errorCode(err: unknown): string | undefined {
   const cause = typeof err === "object" && err !== null ? (err as { cause?: unknown }).cause : null;
@@ -131,6 +139,15 @@ export async function POST(request: NextRequest) {
   });
   if (blocked) return blocked;
 
+  // A declared length over the cap is refused before a byte is read.
+  const declared = declaredLength(request);
+  if (declared !== null && declared > MAX_ENVELOPE_BYTES) {
+    request.body?.cancel().catch((cancelErr: unknown) => {
+      logWarn("monitoring", "request body cancel failed", cancelErr);
+    });
+    return NextResponse.json({ error: "envelope too large" }, { status: 413 });
+  }
+
   // Read bytes, never text: a replay_recording item is compressed binary, and decoding the
   // body as UTF-8 would replace its invalid sequences and corrupt the replay in transit.
   const readStarted = performance.now();
@@ -143,13 +160,12 @@ export async function POST(request: NextRequest) {
     }
     const durationMs = Math.round(performance.now() - readStarted);
     if (err instanceof BodyTimeoutError) {
-      const declared = Number(request.headers.get("content-length"));
       logWarn("monitoring", "request body read timed out", {
         cause: "body-timeout",
         deadline: err.deadline,
         durationMs,
         bytes: err.bytesReceived,
-        declaredBytes: Number.isFinite(declared) ? declared : null,
+        declaredBytes: declared,
       });
       return new NextResponse(null, { status: 408 });
     }

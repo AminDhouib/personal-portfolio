@@ -58,11 +58,12 @@ access — it is not exposed through the Dokploy API surface available to agents
   (`src/app/monitoring/route.ts`), which validates the envelope's DSN and forwards it to Sentry
   (org `devino`, project `portfolio`) with an 8s upstream timeout. The browser's upload is read
   chunk by chunk under a 10s idle deadline (it resets on every chunk) and a 30s overall cap, and the 5 MiB
-  limit is enforced as bytes arrive (413, stream cancelled). It relays the body as raw bytes (a
+  limit is enforced as bytes arrive (413, stream cancelled), and a declared Content-Length over it
+  is refused with 413 before any read. It relays the body as raw bytes (a
   session-replay segment carries a compressed binary item that text decoding would corrupt).
   Failures log one warn line, scope `monitoring`, with a JSON body: `cause` plus `durationMs`
   and `bytes`. Causes and statuses: `body-timeout` (408; also `deadline` idle or total and
-  `declaredBytes`, the Content-Length), `body-read-error` (400; client abort or reset),
+  `declaredBytes`, the Content-Length), `body-read-error` (400; client abort or reset; also logs `code`),
   `timeout` (504; upstream deadline), `network` (502; `code` is the underlying errno, e.g.
   ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT), `upstream-status` (a Sentry 5xx or 429 passed
   through). Search the container logs for `[monitoring]`; the lines are never captured to
