@@ -32,6 +32,7 @@ test("the solver page server-renders its copy, JSON-LD and its own share image",
 
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.locator("h1")).toHaveText("Voltorb Flip Solver");
+    await expect(page).toHaveTitle(/^Voltorb Flip Solver and Calculator: Tile Odds/);
     await expect(
       page.getByRole("heading", { level: 2, name: "How to read the clues" }),
     ).toHaveCount(1);
