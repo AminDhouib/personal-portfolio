@@ -56,9 +56,13 @@ access — it is not exposed through the Dokploy API surface available to agents
 - **Tunnel**: `sentry.devino.ca` isn't reachable from visitor networks (and ad blockers eat
   direct Sentry calls), so both client and server envelopes are relayed through `/monitoring`
   (`src/app/monitoring/route.ts`), which validates the envelope's DSN and forwards it to Sentry
-  (org `devino`, project `portfolio`) with an 8s timeout. It relays the body as raw bytes (a
-  session-replay segment carries a compressed binary item that text decoding would corrupt) and
-  refuses anything over 5 MiB.
+  (org `devino`, project `portfolio`) with an 8s upstream timeout and a 10s deadline on reading
+  the browser's body (408 when it expires). It relays the body as raw bytes (a session-replay
+  segment carries a compressed binary item that text decoding would corrupt) and refuses anything
+  over 5 MiB. Failures log one warn line, scope `monitoring`, with a JSON body: `cause`
+  (`body-timeout`, `timeout` -> 504, `network` -> 502, or `upstream-status` for a Sentry 5xx/429
+  passed through), `durationMs`, `bytes`. Search the container logs for `[monitoring]`; the
+  lines are never captured to Sentry, so a tunnel outage cannot feed itself.
 - **Caution**: a hand-built curl envelope to `/monitoring` can get a `200` from the relay yet
   never materialize as a Sentry event — the relay only checks the DSN header and size, not
   envelope well-formedness. Real SDK-generated events do land (observed empirically). Don't
