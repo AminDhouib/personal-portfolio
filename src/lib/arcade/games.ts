@@ -63,7 +63,8 @@ export type LegacyArcadeGameSlug = (typeof LEGACY_ARCADE_GAME_SLUGS)[number];
 /** The legacy score ceiling (src/app/api/leaderboard/route.ts SCORE_CAP). */
 export const ARCADE_SCORE_CAP = 10_000_000;
 
-type Verdict = { ok: true } | { ok: false; reason: string };
+/** `retryAfterSeconds` rides on a reject the client may retry (the rate-limited one). */
+type Verdict = { ok: true } | { ok: false; reason: string; retryAfterSeconds?: number };
 
 /** What a check or a verifier decides: accept, or reject with a short stable reason. */
 export type ArcadeVerdict = Verdict;
@@ -90,6 +91,8 @@ export interface ArcadeVerifyInput {
   now: Date;
   /** Epoch milliseconds after which the verdict is discarded; check it between chunks. */
   deadline: number;
+  /** The caller's address, for a verifier that caps how often one caller may cost it work. */
+  client?: string;
 }
 
 /** A game's server-side re-simulation of the run its proof describes. Never receives code. */
