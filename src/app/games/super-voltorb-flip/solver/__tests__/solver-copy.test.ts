@@ -6,11 +6,13 @@ import { SOLVER_DESCRIPTION, SOLVER_FAQ, SOLVER_INTRO, SOLVER_TITLE } from "../s
 // on the game page at positions 22-47 because this page never said "calculator". These pin the
 // words in the title, description, intro and FAQ, and the length budgets that keep the snippet
 // intact.
+const TITLE_SUFFIX_LENGTH = 14;
+
 describe("Voltorb Flip solver search copy", () => {
   it("names the solver and the calculator in the title, within the visible-title budget", () => {
     expect(SOLVER_TITLE).toMatch(/^Voltorb Flip Solver and Calculator\b/);
-    // The layout appends " — Amin Dhouib" (14 characters); Google shows about 60.
-    expect(SOLVER_TITLE.length + 14).toBeLessThanOrEqual(60);
+    // The layout appends a 14-character suffix; Google shows about 60 characters.
+    expect(SOLVER_TITLE.length + TITLE_SUFFIX_LENGTH).toBeLessThanOrEqual(60);
   });
 
   it("keeps the description at 110-160 characters and says online and calculator", () => {
