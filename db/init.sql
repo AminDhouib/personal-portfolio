@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS pg2_leaderboard_entries (
 CREATE INDEX IF NOT EXISTS idx_pg2_leaderboard_seed_time
   ON pg2_leaderboard_entries (seed, time_ms ASC);
 
+CREATE INDEX IF NOT EXISTS idx_pg2_leaderboard_time_id
+  ON pg2_leaderboard_entries (time_ms ASC, id ASC);
+
 CREATE TABLE IF NOT EXISTS leads (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   name        TEXT        NOT NULL,

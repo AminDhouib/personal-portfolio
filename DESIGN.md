@@ -1311,10 +1311,25 @@ The following Password Game 2 entries were verified against the current tree on 
   The tile says "(UTC)". On deploy day the seed moves for players outside UTC (their local date
   and the UTC date differ for part of each day), so that day's daily board mixes the old and new
   puzzles. No migration is needed; the board turns over at 00:00 UTC.
+  The server now ties the board to that seed: `?daily=1` also filters `seed = dailySeed()`, and a
+  `daily: true` POST is rejected (400) unless its seed is today's, or yesterday's inside
+  `DAILY_GRACE_MS` after midnight UTC (a run stamped with the day it started). That is a
+  consistency check, not anti-cheat; the board stays display-only and forgeable.
+- **The Password Game 2 leaderboard is bounded in growth and read cost, still not in trust**
+  (`src/app/api/password-game-2/leaderboard/route.ts`, `src/lib/pg2-leaderboard.ts`). A seed is
+  any 32-bit integer, so the per-seed top 500 alone never capped the table; the insert, the
+  per-seed trim and a whole-table cap (`MAX_TOTAL_ROWS` = 20,000, slowest evicted first so the
+  all-time board and fast daily runs survive) now run in one transaction under an advisory
+  lock. Reads are limited to 60 a minute per IP and a malformed `?seed=` is a 400, never a
+  500 or a Sentry event. Two indexes serve every read: `(seed, time_ms)` for `?seed=` and the
+  daily board (which filters on the daily seed), `(time_ms, id)` for the unfiltered top 50 and the
+  cap delete. Both are created at runtime by the route's ensure step (prod's volume predates
+  them) and mirrored in `db/init.sql`; a test fails if the two drift.
 - **Read cost of the hub.** One visit that reaches the strip issues five arcade reads and
   one Password Game 2 read. The arcade read is rate limited (120 per minute per IP), so a visitor
   who reloads dozens of times sees "Board unavailable right now" on the arcade tiles, not an
-  error; the Password Game 2 read has no rate limit. Both are cacheable for 10 s at the edge.
+  error; the Password Game 2 read is limited to 60 per minute per IP. Both are cacheable for 10 s
+  at the edge.
 - **The Voltorb tile reads the same public daily arcade board the other two do.** The Voltorb daily
   board is keyed by the UTC day on the server, the same day the game seeds from, so unlike Password
   Game 2 the tile is exactly today's board. The strip is one column on phones, two at md and three from xl; a lone last tile
