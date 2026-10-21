@@ -45,7 +45,19 @@ import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-r
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { isTextEntryTarget } from "./text-entry";
 import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
+import { translations, type Language } from "./super-voltorb-flip/translations";
 import { afterPageLoad } from "./super-voltorb-flip/startup";
+import {
+  clampBoardSize,
+  isRoundLive,
+  isRoundOver,
+  padDigits,
+  parseBoardSize,
+  payoutPlan,
+  roundStatsResult,
+  tallyStride,
+  tileRisk,
+} from "./super-voltorb-flip/play-rules";
 import { isCursorKey, memoKeyFlag, moveCursor, type Cursor } from "./super-voltorb-flip/cursor";
 import { MemoBar, type MemoFlag, type MemoFlagSet } from "./super-voltorb-flip/memo-button";
 import { isUndoKey, type MemoChange } from "./super-voltorb-flip/memo-undo";
@@ -72,7 +84,7 @@ import { SettingsPanel } from "./super-voltorb-flip/settings-panel";
 import { StatsPanel } from "./super-voltorb-flip/stats-panel";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
-import { COLORS, type Cell, type FlagValues } from "./super-voltorb-flip/types";
+import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
 import {
   VoltorbIcon,
@@ -114,9 +126,7 @@ function initialGameSize() {
   // Game logic is scaled proportionally but authored for 5x5 — use at your
   // own risk for "real" play.
   if (typeof window === "undefined") return 5;
-  const q = new URLSearchParams(window.location.search).get("size");
-  const n = q ? parseInt(q, 10) : NaN;
-  return Number.isFinite(n) && n >= 2 && n <= 10 ? n : 5;
+  return parseBoardSize(window.location.search);
 }
 
 const useGame = () => {
@@ -131,7 +141,7 @@ const useGame = () => {
   }
 
   function setGameSize(n: number) {
-    const clamped = Math.max(2, Math.min(10, Math.round(n)));
+    const clamped = clampBoardSize(n);
     setSize(clamped);
     setGame(new VoltorbFlip(clamped));
   }
@@ -542,7 +552,7 @@ const RowColCard = ({ coins, voltorbs, index }: RowColCardProps) => {
           className="absolute right-0 text-end tracking-widest"
           style={{ top: "calc(var(--svf-tile) * -0.22)" }}
         >
-          {coins.toString().padStart(2, "0")}
+          {padDigits(coins, 2)}
         </div>
         <div
           className="absolute w-full outline outline-2 outline-gray-200"
@@ -667,10 +677,7 @@ const Gameboard = ({
   const quitButtonRef = useRef<HTMLButtonElement | null>(null);
   // Quit is only offered while a round is live: not during a risk fanfare, an
   // open confirmation, or the end-of-round sequence.
-  const canQuit =
-    (game.gameStatus === "playing" || game.gameStatus === "memo") &&
-    !warningTile &&
-    !quitConfirmOpen;
+  const canQuit = isRoundLive(game.gameStatus) && !warningTile && !quitConfirmOpen;
   // Level shown while the round was live; the engine moves currentLevel the
   // instant the round ends, so the "from" side has to be remembered.
   const roundStartLevelRef = useRef(game.currentLevel);
@@ -679,7 +686,7 @@ const Gameboard = ({
   const continueRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (game.gameStatus === "playing" || game.gameStatus === "memo") {
+    if (isRoundLive(game.gameStatus)) {
       roundStartLevelRef.current = game.currentLevel;
     }
   }, [game.gameStatus, game.currentLevel]);
@@ -727,7 +734,7 @@ const Gameboard = ({
     if (!game) return;
     // Once the round is settled (voltorb hit or all valuable coins found),
     // the board freezes until restartGame() runs from the win/lose flow.
-    if (game.gameStatus === "lose" || game.gameStatus === "win" || game.gameStatus === "quit") {
+    if (isRoundOver(game.gameStatus)) {
       return;
     }
     // The quit confirmation is modal over the board.
@@ -778,18 +785,9 @@ const Gameboard = ({
     // direction means the tile is a guaranteed coin, and a 100%-voltorb
     // direction means it's a guaranteed Voltorb — in either case the
     // outcome isn't "uncertain", so the warning would just feel wrong.
-    const N = game.cells.length;
-    const colCells = game.cells.map((r) => r[col]).filter((c): c is Cell => c !== undefined);
-    const flippedInRow = rowCells.filter((c) => c.isFlipped).length;
-    const flippedInCol = colCells.filter((c) => c.isFlipped).length;
     const voltorbsInRow = game.rowValues[row]?.voltorbs ?? 0;
     const voltorbsInCol = game.colValues[col]?.voltorbs ?? 0;
-    const remainingRow = Math.max(1, N - flippedInRow);
-    const remainingCol = Math.max(1, N - flippedInCol);
-    const rowRisk = (voltorbsInRow * 100) / remainingRow;
-    const colRisk = (voltorbsInCol * 100) / remainingCol;
-    const definitive = rowRisk === 0 || rowRisk === 100 || colRisk === 0 || colRisk === 100;
-    const highRisk = !definitive && (rowRisk >= 75 || colRisk >= 75);
+    const { highRisk } = tileRisk(game.cells, voltorbsInRow, voltorbsInCol, row, col);
 
     onFirstInteraction();
 
@@ -844,7 +842,7 @@ const Gameboard = ({
   // Memo mark by keyboard: toggles one flag on a tile without touching the
   // memo-bar selection. Same gates as a tap (round over, quit dialog, risk hold).
   function toggleMemoAt(row: number, col: number, flag: MemoFlag) {
-    if (game.gameStatus === "lose" || game.gameStatus === "win" || game.gameStatus === "quit") {
+    if (isRoundOver(game.gameStatus)) {
       return;
     }
     if (quitConfirmOpen || warningTileRef.current) return;
@@ -1178,9 +1176,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
         <p
           className={`${scoreFont.className} drop-shadow-soft flex text-3xl text-gray-700 sm:text-6xl`}
         >
-          {totalScore
-            .toString()
-            .padStart(5, "0")
+          {padDigits(totalScore, 5)
             .split("")
             .map((d, i) => (
               <span key={i} className="inline-block text-center" style={{ width: "0.5em" }}>
@@ -1199,9 +1195,7 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
         <p
           className={`${scoreFont.className} drop-shadow-soft flex text-3xl text-gray-700 sm:text-6xl`}
         >
-          {currentScore
-            .toString()
-            .padStart(5, "0")
+          {padDigits(currentScore, 5)
             .split("")
             .map((d, i) => (
               <span key={i} className="inline-block text-center" style={{ width: "0.5em" }}>
@@ -1217,50 +1211,6 @@ const Scoreboard = ({ currentScore, totalScore }: ScoreboardProps) => {
 // ---------------------------------------------------------------------------
 // src/components/InstructionsModal.tsx (1:1 port).
 // ---------------------------------------------------------------------------
-
-type Language = "en" | "pt-BR";
-
-type Translations = {
-  howToPlayTitle: string;
-  instructions: string[];
-  tipsTitle: string;
-  tips: string[];
-};
-
-const translations: Record<Language, Translations> = {
-  en: {
-    howToPlayTitle: "How to play",
-    instructions: [
-      "Click on the cards to reveal them.",
-      "The colored cards show how many Coins and Voltorbs are there per row or column.",
-      "The goal is to find all the x2 and x3 Coins on each Level while avoiding Voltorbs.",
-      "There are 8 Levels. Clearing a round moves you up one Level, and five good rounds in a row open Level 8.",
-      "Hit a Voltorb and you drop to the number of cards you flipped. Press Quit to stop and keep your Coins, which drops you the same way.",
-      "Have fun!",
-    ],
-    tipsTitle: "Tips:",
-    tips: [
-      "Avoid the rows and columns you know that can only have either a x1 Coin or a Voltorb.",
-      "Reveal the rows and columns with 0 Voltorbs first.",
-    ],
-  },
-  "pt-BR": {
-    howToPlayTitle: "Como jogar",
-    instructions: [
-      "Clique nos cards para revelá-los.",
-      "Os cards coloridos mostram quantas Moedas e Voltorbs existem em cada linha e coluna.",
-      "O objetivo é achar todas as Moedas x2 e x3 em cada Level, evitando achar os Voltorbs.",
-      "Sao 8 Levels. Vencer uma rodada sobe um Level, e cinco boas rodadas seguidas abrem o Level 8.",
-      "Se achar um Voltorb, voce desce para o numero de cards que virou. Use Quit para parar e ficar com as Moedas, descendo do mesmo jeito.",
-      "Divirta-se!",
-    ],
-    tipsTitle: "Dicas:",
-    tips: [
-      "Evite linhas e colunas que podem ter apenas uma Moeda x1 ou um Voltorb.",
-      "Revele todas as linhas e colunas com 0 Voltorbs primeiro.",
-    ],
-  },
-};
 
 type InstructionsModalProps = {
   language: Language;
@@ -1571,7 +1521,7 @@ function DailyGame({
   const headingRef = useRef<HTMLHeadingElement>(null);
   // Held by a risk fanfare (reported by Gameboard): no undo while the board is locked.
   const [locked, setLocked] = useState(false);
-  const live = d.game.gameStatus === "playing" || d.game.gameStatus === "memo";
+  const live = isRoundLive(d.game.gameStatus);
 
   const undo = useCallback(() => {
     if (!memoUndoEnabled || !live || locked) return;
@@ -1744,12 +1694,11 @@ export function SuperVoltorbFlipGame() {
     mode === "play" &&
     settings.memoUndo &&
     !!game &&
-    (game.gameStatus === "playing" || game.gameStatus === "memo") &&
+    isRoundLive(game.gameStatus) &&
     !overlayOpen &&
     !boardLocked;
   // Only between rounds of the main game: a round-end sequence is mid-flight otherwise.
-  const canSwitchMode =
-    !!game && (game.gameStatus === "playing" || game.gameStatus === "memo") && !boardLocked;
+  const canSwitchMode = !!game && isRoundLive(game.gameStatus) && !boardLocked;
 
   const undoMemo = useCallback(() => {
     if (!undoAllowed || !game) return;
@@ -1918,7 +1867,7 @@ export function SuperVoltorbFlipGame() {
     // Stride scales with the rollup target (matches the drain formula),
     // so a 1→500 climb takes ~100 ticks instead of dragging out the
     // last 100 coins one at a time as a gap-based stride would.
-    const stride = Math.max(1, Math.ceil(targetCurrent / 100));
+    const stride = tallyStride(targetCurrent);
     tallyTimerRef.current = window.setTimeout(() => {
       tallyTimerRef.current = null;
       setDisplayCurrent((prev) => Math.min(prev + stride, targetCurrent));
@@ -2053,9 +2002,7 @@ export function SuperVoltorbFlipGame() {
     // drain time bounded at ~1.7s regardless of how big "earned" is,
     // while small earnings still tick one coin per step like HG/SS.
     const tickMs = 17;
-    const MAX_ITERATIONS = 100;
-    const coinsPerTick = Math.max(1, Math.ceil(earned / MAX_ITERATIONS));
-    const iterations = Math.ceil(earned / coinsPerTick);
+    const { coinsPerTick, iterations } = payoutPlan(earned);
     const tick = () => new Promise<void>((r) => window.setTimeout(r, tickMs));
 
     let didSkip = false;
@@ -2162,8 +2109,7 @@ export function SuperVoltorbFlipGame() {
       resetMemoUndo();
       const now = Date.now();
       recordStats({
-        outcome: cur === "win" ? "won" : cur === "lose" ? "lost" : "quit",
-        coins: cur === "lose" ? 0 : game.currentScore,
+        ...roundStatsResult(cur, game.currentScore),
         level: roundStartLevelRef.current,
         levelAfter: game.currentLevel,
         assisted: assistedRoundRef.current,
@@ -2185,7 +2131,7 @@ export function SuperVoltorbFlipGame() {
   // while the result banner is up affects the next round, not the one just over.
   useEffect(() => {
     if (!game) return;
-    const live = game.gameStatus === "playing" || game.gameStatus === "memo";
+    const live = isRoundLive(game.gameStatus);
     if (live && settings.assist) assistedRoundRef.current = true;
   }, [game, game?.gameStatus, settings.assist]);
 
@@ -2352,9 +2298,7 @@ export function SuperVoltorbFlipGame() {
                           </span>
                         </div>
                         <span className={`${scoreFont.className} flex text-xl`}>
-                          {displayTotal
-                            .toString()
-                            .padStart(5, "0")
+                          {padDigits(displayTotal, 5)
                             .split("")
                             .map((d, i) => (
                               <span
@@ -2376,9 +2320,7 @@ export function SuperVoltorbFlipGame() {
                           </span>
                         </div>
                         <span className={`${scoreFont.className} flex text-xl`}>
-                          {displayCurrent
-                            .toString()
-                            .padStart(5, "0")
+                          {padDigits(displayCurrent, 5)
                             .split("")
                             .map((d, i) => (
                               <span
