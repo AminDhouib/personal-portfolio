@@ -74,7 +74,8 @@ access — it is not exposed through the Dokploy API surface available to agents
   body in the proxy layer before the handler runs, which hid a stalled upload from the deadlines
   above (measured on a standalone build, 2026-10-21: a 15s pause mid-body answered at 15s, not
   408 at 10s). Check: a raw socket sending `Content-Length: 1000` and 5 bytes, then silence,
-  should get 408 at about 10s.
+  should get 408 at about 10s. `e2e/monitoring-tunnel.spec.ts` automates this (and the early 413 on an
+  oversize Content-Length) in CI over a raw socket against the production build.
 - **Caution**: a hand-built curl envelope to `/monitoring` can get a `200` from the relay yet
   never materialize as a Sentry event — the relay only checks the DSN header and size, not
   envelope well-formedness. Real SDK-generated events do land (observed empirically). Don't
