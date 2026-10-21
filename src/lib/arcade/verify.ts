@@ -3,7 +3,7 @@ import { ARCADE_VERIFY_BUDGET_MS, type ArcadeVerdict, type ArcadeVerify } from "
 /** The reason a client sees when a verifier fails closed; the real cause is reported, not sent. */
 export const VERIFY_FAILED_REASON = "could not verify the run";
 
-export { VERIFY_BUSY_REASON } from "./verify-reasons";
+export { VERIFY_BUSY_REASON, VERIFY_RATE_LIMITED_REASON } from "./verify-reasons";
 
 export type VerifyOutcome = ArcadeVerdict | { ok: false; reason: string; error: Error };
 
@@ -28,7 +28,13 @@ function failure(error: Error): VerifyOutcome {
  */
 export async function runVerifier(
   verify: ArcadeVerify,
-  input: { score: number; detail: Record<string, number>; proof: string | null; now: Date },
+  input: {
+    score: number;
+    detail: Record<string, number>;
+    proof: string | null;
+    now: Date;
+    client?: string;
+  },
   budgetMs: number = ARCADE_VERIFY_BUDGET_MS,
 ): Promise<VerifyOutcome> {
   const deadline = Date.now() + budgetMs;

@@ -808,14 +808,17 @@ describe("POST /api/arcade/scores", () => {
       expect(emu.scores()).toHaveLength(written);
     });
 
-    it("does not count a proof it has already replayed against that cap", async () => {
+    it("does not count a refused proof it has already replayed against that cap", async () => {
       const ip = uniqueIp();
       const [run] = runs(1);
       if (!run) throw new Error("fixture");
+      // A score far past the drift allowance: refused by the replay once, then from memory.
+      const wrong = failoverOf({ ...run, score: run.score + 5_000 });
       for (let i = 0; i < REPLAY_PER_CLIENT_LIMIT + 3; i++) {
-        const res = await post(failoverOf(run), { ip });
-        expect(res.status).toBe(200);
+        const res = await post(wrong, { ip });
+        expect(res.status).toBe(422);
       }
+      expect((await post(failoverOf(run), { ip })).status).toBe(200);
     });
 
     it("refuses a hostile full-length claim with 422 and does not spend a replay on it", async () => {
@@ -978,6 +981,7 @@ describe("proof seam", () => {
       detail: SS_DETAIL,
       proof: MARK,
       now: NOW,
+      client: expect.any(String),
       deadline: NOW.getTime() + ARCADE_VERIFY_BUDGET_MS,
     });
     expect(allParams()).not.toContain(MARK);

@@ -11,7 +11,7 @@ import {
   validateArcadeSubmission,
 } from "@/lib/arcade/games";
 import { readBoard, submitScore } from "@/lib/arcade/store";
-import { runVerifier, VERIFY_BUSY_REASON } from "@/lib/arcade/verify";
+import { runVerifier, VERIFY_BUSY_REASON, VERIFY_RATE_LIMITED_REASON } from "@/lib/arcade/verify";
 import { captureException } from "@/lib/log";
 import { sanitizePlayerName } from "@/lib/player-name";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -112,12 +112,26 @@ export async function POST(req: Request) {
   if (entry.verify) {
     const outcome = await runVerifier(
       entry.verify,
-      { score: body.score, detail: verdict.detail, proof: body.proof ?? null, now },
+      {
+        score: body.score,
+        detail: verdict.detail,
+        proof: body.proof ?? null,
+        now,
+        client: getClientIp(req),
+      },
       entry.verifyBudgetMs,
     );
     if (!outcome.ok) {
       if ("error" in outcome) captureException("api:arcade-scores.verify", outcome.error);
       // Busy is the server's state, not the run's fault: the client may try again shortly.
+      // Over the replay cap: refused before any replay started, with the seconds until it frees up.
+      if (outcome.reason === VERIFY_RATE_LIMITED_REASON) {
+        const wait = "retryAfterSeconds" in outcome ? outcome.retryAfterSeconds : undefined;
+        return NextResponse.json(
+          { error: "too many requests", reason: outcome.reason },
+          { status: 429, headers: { "Retry-After": String(wait ?? 60) } },
+        );
+      }
       if (outcome.reason === VERIFY_BUSY_REASON) {
         return NextResponse.json(
           { error: "busy", reason: outcome.reason },

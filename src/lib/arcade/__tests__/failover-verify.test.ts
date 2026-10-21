@@ -17,6 +17,7 @@ import { VERIFY_BUSY_REASON } from "../verify";
 vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn(), logError: vi.fn() }));
 
 import { captureException, logWarn } from "@/lib/log";
+import { clearReplayCache } from "../failover-gates";
 import {
   createFailoverVerifier,
   DRIFT_MAX_TICKS,
@@ -341,11 +342,15 @@ describe("the rollout switch", () => {
 
   describe("the score allowance, max(50, 2%) of the replay's score, on both sides", () => {
     // Fixed replays, so the edge is exact: 2% of 10,000 is 200; of 1,000 the floor of 50 rules.
-    const claim = (replayScore: number, claimed: number) =>
-      createFailoverVerifier({
+    // Each claim has its own fixed replay for the same proof, so none may be answered from the
+    // memory of a refused one (failover-gates.test.ts covers that).
+    const claim = (replayScore: number, claimed: number) => {
+      clearReplayCache();
+      return createFailoverVerifier({
         shadow: true,
         replay: answering(faithful(retires, { score: replayScore })),
       })(input(retires, { score: claimed }));
+    };
 
     it("accepts a claim up to the allowance above the replay and refuses one past it", async () => {
       expect(await claim(10_000, 10_200)).toEqual({ ok: true });
@@ -446,7 +451,11 @@ describe("reporting", () => {
   it("tells Sentry of one reason at most once a minute, and each reason on its own", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
-    const run = () => input(retires, { deadline: Date.now() + GENEROUS_MS });
+    // The two fixed replays disagree with each other about one proof: none is answered from memory.
+    const run = () => {
+      clearReplayCache();
+      return input(retires, { deadline: Date.now() + GENEROUS_MS });
+    };
     await drifting(run());
     await drifting(run());
     expect(captureException).toHaveBeenCalledTimes(1);

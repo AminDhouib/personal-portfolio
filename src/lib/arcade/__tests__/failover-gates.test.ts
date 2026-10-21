@@ -211,12 +211,36 @@ describe("structuralReason", () => {
     const ticks = NO_ENTRY_LINK_MAX_TICKS + 1;
     const score = 10 * Math.floor(ticks / 20);
     expect(structuralReason(placeOnly ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
-    expect(structuralReason([], score, DAILY_MAX_TICKS)).toBe(TICKS_MISMATCH_REASON);
+    expect(structuralReason([], 10 * (DAILY_MAX_TICKS / 20), DAILY_MAX_TICKS)).toBe(
+      TICKS_MISMATCH_REASON,
+    );
     // A link that does not start at the Internet is not an entry link.
     const inner = parseProof(encodeProof([[0, 1, 1, 2]]));
     expect(structuralReason(inner ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
-    // One link from the Internet is enough to pass the gate.
-    const linked = parseProof(encodeProof([[0, 1, 0, 1]]));
+    // A link from the Internet to a service nobody has placed (yet) is not one either.
+    const unplaced = parseProof(encodeProof([[0, 1, 0, 1]]));
+    expect(structuralReason(unplaced ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    const early = parseProof(
+      encodeProof([
+        [0, 1, 0, 1],
+        [1, 0, 0, 0, 0],
+      ]),
+    );
+    expect(structuralReason(early ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    const beyond = parseProof(
+      encodeProof([
+        [0, 0, 0, 0, 0],
+        [1, 1, 0, 2],
+      ]),
+    );
+    expect(structuralReason(beyond ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    // A placement and a link from the Internet to it is enough to pass the gate.
+    const linked = parseProof(
+      encodeProof([
+        [0, 0, 0, 0, 0],
+        [1, 1, 0, 1],
+      ]),
+    );
     expect(structuralReason(linked ?? [], score, ticks)).toBeNull();
   });
 });
@@ -243,8 +267,9 @@ describe("the verifier refuses hostile shapes without replaying", () => {
     [
       "an action after the claimed end",
       () => {
-        const half = Math.floor(dies.ticks / 2);
-        return claim(dies.proof, { ticks: half, score: 10 * Math.floor(half / 20) + 5 });
+        // The end claimed one tick before the last action in the log.
+        const before = (dies.log.at(-1)?.[0] ?? 2) - 1;
+        return claim(dies.proof, { ticks: before, score: 10 * Math.floor(before / 20) + 5 });
       },
       REPLAY_ERROR_REASON,
     ],
@@ -394,8 +419,14 @@ describe("remembered replays", () => {
   it("does not answer one day's proof from another day's memory", async () => {
     const spy = vi.fn(replayAsync);
     const strict = createFailoverVerifier({ shadow: false, replay: spy });
-    expect(await strict(input(retires))).toEqual({ ok: true });
+    // Refused, so remembered under its own day.
+    expect(await strict(input(retires, { score: retires.score + 500 })).then((v) => v.ok)).toBe(
+      false,
+    );
     const other = record("2026-10-16", SHORT);
+    // The same actions on another day: the proof text and the ticks are the same, the day is not.
+    expect(other.proof).toBe(retires.proof);
+    expect(other.ticks).toBe(retires.ticks);
     const verdict = await strict(
       input(other, {
         now: new Date("2026-10-16T01:00:00Z"),
@@ -416,9 +447,9 @@ describe("remembered replays", () => {
 
 describe("the replay-attempt cap", () => {
   beforeEach(() => {
-    // The limiter's buckets live for the process: move the clock so each test starts clean.
+    // clearReplayCache (top-level beforeEach) starts new limiter keys; the clock is the test's to move.
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(Date.now() + 24 * 3_600_000 * (1 + Math.random() * 1_000));
+    vi.setSystemTime(NOW);
   });
 
   it("allows an honest player's few attempts a minute", () => {
@@ -481,8 +512,10 @@ describe("the replay-attempt cap", () => {
     const strict = createFailoverVerifier({ shadow: false, replay: spy, admit });
     await strict(claim("", { ticks: DAILY_MAX_TICKS, score: 9_000 }));
     expect(admit).not.toHaveBeenCalled();
-    await strict(input(retires, { client: "10.5.0.2" }));
-    await strict(input(retires, { client: "10.5.0.2" }));
+    // A refused claim is remembered, and asking again is not a new replay.
+    const wrong = input(retires, { client: "10.5.0.2", score: retires.score + 5_000 });
+    await strict(wrong);
+    await strict(wrong);
     expect(admit).toHaveBeenCalledTimes(1);
   });
 

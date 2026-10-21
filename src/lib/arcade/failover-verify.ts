@@ -9,14 +9,29 @@ import { resetSim } from "@/components/game/failover/sim/state";
 import { TICK } from "@/components/game/failover/sim/config";
 import { captureException, logWarn } from "@/lib/log";
 import { utcDayKey } from "./boards";
+import {
+  type Admission,
+  admitReplay,
+  clearReplayCache,
+  recentReplay,
+  rememberReplay,
+  REPLAY_ERROR_REASON,
+  replayKey,
+  structuralReason,
+  TICKS_MISMATCH_REASON,
+} from "./failover-gates";
 import type { ArcadeVerdict, ArcadeVerify } from "./games";
-import { VERIFY_BUSY_REASON } from "./verify-reasons";
+import { VERIFY_BUSY_REASON, VERIFY_RATE_LIMITED_REASON } from "./verify-reasons";
 
 // Failover's Daily Incident, the real check. The page records the actions the player took; this
 // plays them again from the day's seed through the same sim and accepts the score only if the
 // replay ends on the claimed tick with exactly the claimed score. The sim is one module-level
 // state, so replays take turns (a mutex with a short queue) and give the event loop a turn every
 // 500 ticks. The player's actions are data; no code of theirs reaches the server.
+//
+// A replay is the costly step, so three things stand in front of it (failover-gates.ts): claims no
+// recorded run can make are refused on their face, a claim already replayed is answered from
+// memory, and the replays one client, and the process, may start in a minute are capped.
 
 /**
  * Rollout switch. While true, a replay that lands close to the claim but not on it is reported to
@@ -63,8 +78,10 @@ export const SHADOW_SCOPE = "arcade:failover-verify.shadow";
 /** One SHADOW report per reason per minute per process, so a flood of drift cannot flood Sentry. */
 const REPORT_EVERY_MS = 60_000;
 
-function reject(reason: string): ArcadeVerdict {
-  return { ok: false, reason };
+function reject(reason: string, retryAfterSeconds?: number): ArcadeVerdict {
+  return retryAfterSeconds === undefined
+    ? { ok: false, reason }
+    : { ok: false, reason, retryAfterSeconds };
 }
 
 /** Under the ceilings no honest run can pass: a bound on a claim, not proof of it. */
@@ -73,13 +90,16 @@ export function isPlausible(score: number, detail: Record<string, number>): bool
 }
 
 type Replay = typeof replayAsync;
+type Admit = (client: string | undefined) => Admission;
 
-/** `drift` marks a mismatch close enough to the claim to be taken as cross-engine drift. */
-type Finding = { ok: true } | { ok: false; reason: string; drift: boolean };
+/**
+ * `drift` marks a mismatch close enough to the claim to be taken as cross-engine drift.
+ * `retryAfterSeconds` rides on the rate-limited refusal only.
+ */
+type Finding =
+  { ok: true } | { ok: false; reason: string; drift: boolean; retryAfterSeconds?: number };
 
 const refuse = (reason: string): Finding => ({ ok: false, reason, drift: false });
-
-const REPLAY_ERROR_REASON = "the proof cannot be played";
 
 class OutOfTime extends Error {}
 
@@ -134,13 +154,15 @@ let running = false;
 const waiting: Array<{ grant: () => void; abandon: () => void }> = [];
 
 /**
- * Test-only: clear the mutex, the queue (waiters are told busy) and the report throttle, so one
- * test can never leave the next a held mutex or a full queue.
+ * Test-only: clear the mutex, the queue (waiters are told busy), the report throttle, the
+ * remembered replays and the replay caps, so one test can never leave the next a held mutex, a full
+ * queue or an answer from memory.
  */
 export function resetVerifierForTests(): void {
   for (const waiter of waiting.splice(0)) waiter.abandon();
   running = false;
   lastReported.clear();
+  clearReplayCache();
 }
 
 /** Resolves true when it is this caller's turn, false when the queue is full or time ran out. */
@@ -196,7 +218,7 @@ export function judge(
     Math.abs(result.score - score) <=
       Math.max(DRIFT_MIN_SCORE, DRIFT_SCORE_FRACTION * result.score);
   const disagree = (reason: string): Finding => ({ ok: false, reason, drift });
-  if (result.endedAtTick !== ticks) return disagree("ticks do not match the replay");
+  if (result.endedAtTick !== ticks) return disagree(TICKS_MISMATCH_REASON);
   // Alive at the last tick is a finished run only when that tick is the 900 s cap.
   if (result.endReason === "time" && result.endedAtTick !== DAILY_MAX_TICKS) {
     return disagree("the run was still going at that tick");
@@ -208,9 +230,10 @@ export function judge(
 async function check(
   input: Parameters<ArcadeVerify>[0],
   replay: Replay,
+  admit: Admit,
   trace: Trace,
 ): Promise<Finding> {
-  const { score, detail, proof, now, deadline } = input;
+  const { score, detail, proof, now, deadline, client } = input;
   if (proof === null) return refuse("proof required");
   const today = utcDayKey(now);
   if (detail.day !== dayNumber(today)) return refuse("not today's run");
@@ -224,12 +247,39 @@ async function check(
   if (log === null) return refuse("unreadable proof");
   if (log.length !== detail.actions) return refuse("action count does not match the proof");
 
+  // Before anything is queued or replayed: what no recorded run can claim, then what was already
+  // played (judged afresh, so the verdict is the replay's), then the caps. A refusal here costs
+  // next to nothing, and only a replay that is about to start spends an admission.
+  const structural = structuralReason(log, score, ticks);
+  if (structural !== null) return refuse(structural);
+  const key = replayKey(today, ticks, proof);
+  const remembered = recentReplay(key);
+  if (remembered) {
+    trace.replayed = remembered;
+    return judge(remembered, score, detail);
+  }
+  const admission = admit(client);
+  if (!admission.allowed) {
+    return {
+      ok: false,
+      reason: VERIFY_RATE_LIMITED_REASON,
+      drift: false,
+      retryAfterSeconds: admission.retryAfterSeconds,
+    };
+  }
+
   // Busy covers a full queue, a deadline that passed in the line and a replay that ran long: the
   // client may retry, and none of them is ever taken as a pass.
   if (!(await takeTurn(deadline))) return refuse(VERIFY_BUSY_REASON);
   try {
     // Time spent waiting counts against the budget; do not start a replay nobody will hear of.
     if (Date.now() > deadline) return refuse(VERIFY_BUSY_REASON);
+    // The same claim may have been played while this one waited for its turn.
+    const meanwhile = recentReplay(key);
+    if (meanwhile) {
+      trace.replayed = meanwhile;
+      return judge(meanwhile, score, detail);
+    }
     const result = await replay(
       { ...dailyReplayOptions(today), log, ticks },
       {
@@ -241,7 +291,10 @@ async function check(
       },
     );
     trace.replayed = result;
-    return judge(result, score, detail);
+    const finding = judge(result, score, detail);
+    // A refused claim may come again, as the same proof with another score or another client.
+    if (!finding.ok) rememberReplay(key, result);
+    return finding;
   } catch (error) {
     if (error instanceof OutOfTime) return refuse(VERIFY_BUSY_REASON);
     if (error instanceof ReplayError) return refuse(REPLAY_ERROR_REASON);
@@ -258,15 +311,18 @@ async function check(
 export function createFailoverVerifier({
   shadow,
   replay = replayAsync,
+  admit = admitReplay,
 }: {
   shadow: boolean;
   /** The replay to run; tests pass a controllable one so timing does not decide the outcome. */
   replay?: Replay;
+  /** Whether a replay may start for this client now; tests pass a fixed answer. */
+  admit?: Admit;
 }): ArcadeVerify {
   return async (input) => {
     const startedAt = Date.now();
     const trace: Trace = {};
-    const finding = await check(input, replay, trace);
+    const finding = await check(input, replay, admit, trace);
     if (finding.ok) {
       logVerification("pass", finding, input, trace, startedAt);
       return { ok: true };
@@ -277,7 +333,7 @@ export function createFailoverVerifier({
       return { ok: true };
     }
     logVerification("rejected", finding, input, trace, startedAt);
-    return reject(finding.reason);
+    return reject(finding.reason, finding.retryAfterSeconds);
   };
 }
 
