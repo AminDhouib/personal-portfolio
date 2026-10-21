@@ -44,8 +44,12 @@ export const config = {
   // Everything except build assets and static files by extension (`/favicon.ico` is one: `.ico`).
   // A trailing-slash request for a file (`/robots.txt/`, `/favicon.ico/`) still runs, because the
   // slash keeps it from ending in the extension. The `_next/` prefixes are deliberately open-ended:
-  // nothing there is a page, and the hot path should not run the proxy for it.
+  // nothing there is a page, and the hot path should not run the proxy for it. `monitoring$` is
+  // the Sentry tunnel, and only that exact path: Next buffers a request body in the proxy layer
+  // before the route handler runs, which would defeat the tunnel's read deadlines. The proxy does
+  // nothing the tunnel needs (no PostHog path, and the tunnel is POST-only so no page duplicate);
+  // `/monitoring/` still runs and gets its slashless 308.
   matcher: [
-    "/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|woff2?|map|webmanifest)$).*)",
+    "/((?!_next/static|_next/image|monitoring$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|woff2?|map|webmanifest)$).*)",
   ],
 };

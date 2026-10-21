@@ -67,12 +67,11 @@ access — it is not exposed through the Dokploy API surface available to agents
   ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT), `upstream-status` (a Sentry 5xx or 429 passed
   through). Search the container logs for `[monitoring]`; the lines are never captured to
   Sentry, so a tunnel outage cannot feed itself.
-  **Known gap (measured 2026-10-21, standalone build):** `src/proxy.ts`'s matcher covers
-  `/monitoring`, and Next buffers the whole request body in the proxy layer before the handler
-  runs, so the body deadlines above only fire after the upload has already completed. A body
-  split by a 15s pause was answered 403 at 15s, not 408 at 10s, and a stalled upload got no
-  answer for 45s. Until `/monitoring` is excluded from the proxy matcher, Node's own request
-  timeout is the real bound on a stalled upload.
+  `/monitoring` is excluded from `src/proxy.ts`'s matcher on purpose: Next buffers a request
+  body in the proxy layer before the handler runs, which hid a stalled upload from the deadlines
+  above (measured on a standalone build, 2026-10-21: a 15s pause mid-body answered at 15s, not
+  408 at 10s). Check: a raw socket sending `Content-Length: 1000` and 5 bytes, then silence,
+  should get 408 at about 10s.
 - **Caution**: a hand-built curl envelope to `/monitoring` can get a `200` from the relay yet
   never materialize as a Sentry event — the relay only checks the DSN header and size, not
   envelope well-formedness. Real SDK-generated events do land (observed empirically). Don't

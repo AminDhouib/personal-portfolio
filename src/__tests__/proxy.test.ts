@@ -138,6 +138,7 @@ describe("proxy: trailing slashes on ordinary paths", () => {
     ["/api/health/", "/api/health"],
     ["/robots.txt/", "/robots.txt"],
     ["/about///", "/about"],
+    ["/monitoring/", "/monitoring"],
   ])("answers 308 for %s, to the slashless form %s", async (path, target) => {
     const response = await proxy(request(path));
     expect(response.status).toBe(308);
@@ -208,6 +209,24 @@ describe("proxy: matcher", () => {
       "/favicon.ico/",
       "/sitemap.xml",
       "/llms.txt",
+    ]) {
+      expect(matches(path), path).toBe(true);
+    }
+  });
+
+  // Next buffers a request body in the proxy layer before the route handler runs, which would
+  // defeat the Sentry tunnel's idle and overall read deadlines (src/app/monitoring/route.ts).
+  // Only the exact tunnel path skips the proxy; lookalikes and the trailing-slash form still run.
+  it("skips exactly the Sentry tunnel path, so its body is not buffered ahead of the handler", () => {
+    expect(matches("/monitoring")).toBe(false);
+    for (const path of [
+      "/monitoring/",
+      "/monitoringx",
+      "/monitoring-extra",
+      "/monitoring/x",
+      "/api/monitoring",
+      "/x/monitoring",
+      "/Monitoring",
     ]) {
       expect(matches(path), path).toBe(true);
     }
