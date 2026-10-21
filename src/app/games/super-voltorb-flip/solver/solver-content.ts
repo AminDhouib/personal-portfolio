@@ -6,12 +6,12 @@ import type { FaqEntry } from "@/data/faq";
 export const SOLVER_PATH = "/games/super-voltorb-flip/solver";
 export const GAME_PATH = "/games/super-voltorb-flip";
 
-export const SOLVER_TITLE = "Voltorb Flip Solver: Tile Odds From Your Clues";
+export const SOLVER_TITLE = "Voltorb Flip Solver and Calculator: Tile Odds";
 export const SOLVER_DESCRIPTION =
-  "Free Voltorb Flip solver. Enter the row and column clues from your board and see the exact Voltorb odds for every tile, plus the safest tile to flip next.";
+  "Free online Voltorb Flip solver and odds calculator. Enter your row and column clues to see the exact Voltorb chance of every tile and the safest tile to flip.";
 
 export const SOLVER_INTRO =
-  "Type the ten clue pairs from your Voltorb Flip board and this solver shows, for every tile, the chance it is a Voltorb, a 1, a 2 or a 3. It marks the tiles that are safe, the tiles that can only be a 1 or a Voltorb, and the best tile to flip next. It runs in your browser and nothing you type is sent anywhere.";
+  "Type the ten clue pairs from your Voltorb Flip board and this solver and odds calculator shows, for every tile, the chance it is a Voltorb, a 1, a 2 or a 3. It marks the tiles that are safe, the tiles that can only be a 1 or a Voltorb, and the best tile to flip next. It runs in your browser and nothing you type is sent anywhere.";
 
 export const SOLVER_DISCLAIMER =
   "Fan recreation of the Voltorb Flip minigame from Pokemon HeartGold and SoulSilver. Not affiliated with or endorsed by Nintendo, Creatures Inc. or GAME FREAK inc.";
@@ -69,6 +69,11 @@ export const SOLVER_SECTIONS: SolverSection[] = [
 ];
 
 export const SOLVER_FAQ: FaqEntry[] = [
+  {
+    question: "Is this a Voltorb Flip calculator?",
+    answer:
+      "Yes. Enter the ten clues and it calculates the exact chance that each tile is a Voltorb, a 1, a 2 or a 3, then marks the safest tile to flip next. It runs in your browser, so there is nothing to download.",
+  },
   {
     question: "Is this Voltorb Flip solver free?",
     answer:
