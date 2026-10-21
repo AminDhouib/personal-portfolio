@@ -131,6 +131,20 @@ function failureCause(err: unknown): "timeout" | "network" {
   return name === "TimeoutError" || name === "AbortError" ? "timeout" : "network";
 }
 
+/**
+ * The two headers the browser SDK reads to back off after a 429 (X-Sentry-Rate-Limits first,
+ * Retry-After second), copied verbatim from upstream. Nothing else crosses, and nothing is made
+ * up when upstream sent neither.
+ */
+function rateLimitHeaders(upstream: Headers): Headers {
+  const headers = new Headers();
+  for (const name of ["retry-after", "x-sentry-rate-limits"]) {
+    const value = upstream.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  return headers;
+}
+
 export async function POST(request: NextRequest) {
   const { response: blocked } = guardRequest(request, {
     key: "monitoring",
@@ -210,7 +224,10 @@ export async function POST(request: NextRequest) {
         bytes: body.byteLength,
       });
     }
-    return new NextResponse(null, { status: upstream.status });
+    return new NextResponse(null, {
+      status: upstream.status,
+      headers: upstream.status === 429 ? rateLimitHeaders(upstream.headers) : undefined,
+    });
   } catch (err) {
     // logWarn, not captureException: if the tunnel cannot reach Sentry, the
     // server-side capture path is likely down too — console is the sink that
