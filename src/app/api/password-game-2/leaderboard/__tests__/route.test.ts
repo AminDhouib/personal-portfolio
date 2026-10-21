@@ -16,6 +16,7 @@ let nextId = 1;
 // NOT reset between tests: the runtime ensure runs once per process, so the
 // CREATE TABLE count must stay 1 across the whole file.
 let createTableCalls = 0;
+const createStatements: string[] = [];
 
 vi.mock("@/lib/db", () => ({
   getPool: () => ({
@@ -24,6 +25,7 @@ vi.mock("@/lib/db", () => ({
       const text = sql.trim().toUpperCase();
 
       if (text.startsWith("CREATE")) {
+        createStatements.push(sql);
         if (text.includes("CREATE TABLE")) createTableCalls += 1;
         return { rows: [] };
       }
@@ -263,6 +265,21 @@ describe("/api/password-game-2/leaderboard", () => {
       const res = await POST(makeJsonPostRequest("{not json"));
       expect(res.status).toBe(400);
     });
+  });
+
+  it("ensures the (seed, time_ms) index alongside the table", async () => {
+    await GET(new Request("https://amindhou.com/api/password-game-2/leaderboard"));
+    const sql = createStatements.join(" ");
+    expect(sql).toContain("idx_pg2_leaderboard_seed_time");
+    expect(sql).toContain("(seed, time_ms ASC)");
+  });
+
+  it("stores the sanitized name, seed, time and a strict daily:true in insert order", async () => {
+    await POST(
+      makeJsonPostRequest(validBody({ name: "Ada", seed: 77, timeMs: 61_000, daily: true })),
+    );
+    const insert = captured.find((q) => q.sql.trim().toUpperCase().startsWith("INSERT"));
+    expect(insert?.params).toEqual(["Ada", 77, 61_000, true]);
   });
 
   it("runs the runtime ensure (CREATE TABLE) exactly once per process", async () => {
