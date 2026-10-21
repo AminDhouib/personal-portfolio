@@ -146,4 +146,107 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     expect(res.status).toBe(502);
     expect(logWarn).toHaveBeenCalledTimes(1);
   });
+
+  // The failure line is the only evidence the next occurrence leaves behind, so it has to say
+  // which failure it was (timeout vs network vs upstream status), how long it took and how big
+  // the envelope was. The detail is a plain object so it renders as greppable JSON.
+  describe("failure diagnostics", () => {
+    function lastDetail(): Record<string, unknown> {
+      const call = vi.mocked(logWarn).mock.calls.at(-1);
+      expect(call?.[0]).toBe("monitoring");
+      return call?.[2] as Record<string, unknown>;
+    }
+
+    it("answers 504 and logs cause=timeout, duration and bytes when the upstream deadline fires", async () => {
+      const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout));
+      const body = envelope(ALLOWED_DSN);
+
+      const res = await POST(makeReq(body));
+
+      expect(res.status).toBe(504);
+      expect(logWarn).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logWarn).mock.calls[0]?.[1]).toBe("envelope relay to Sentry failed");
+      const detail = lastDetail();
+      expect(detail).toMatchObject({ cause: "timeout", bytes: Buffer.byteLength(body) });
+      expect(typeof detail.durationMs).toBe("number");
+      expect(detail.error).toContain("timeout");
+    });
+
+    it("answers 502 and logs cause=network for a connection failure", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+
+      const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+      expect(res.status).toBe(502);
+      expect(lastDetail()).toMatchObject({ cause: "network", error: "fetch failed" });
+    });
+
+    it("passes an upstream 5xx through and logs cause=upstream-status with the status", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 503 } as Response));
+
+      const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+      expect(res.status).toBe(503);
+      expect(logWarn).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logWarn).mock.calls[0]?.[1]).toBe("envelope relay got an error status");
+      expect(lastDetail()).toMatchObject({ cause: "upstream-status", status: 503 });
+    });
+
+    it("stays quiet for a 2xx and for a 4xx the SDK caused (no log noise per dropped envelope)", async () => {
+      const fetchSpy = vi
+        .fn()
+        .mockResolvedValueOnce({ status: 200 } as Response)
+        .mockResolvedValueOnce({ status: 400 } as Response);
+      vi.stubGlobal("fetch", fetchSpy);
+
+      expect((await POST(makeReq(envelope(ALLOWED_DSN)))).status).toBe(200);
+      expect((await POST(makeReq(envelope(ALLOWED_DSN)))).status).toBe(400);
+
+      expect(logWarn).not.toHaveBeenCalled();
+    });
+
+    it("never captures a relay failure as a Sentry event (no loop through the tunnel)", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+
+      await POST(makeReq(envelope(ALLOWED_DSN)));
+
+      expect(captureException).not.toHaveBeenCalled();
+    });
+  });
+
+  // request.arrayBuffer() had no deadline: a client that opens the POST and trickles (or stalls)
+  // the body held the handler open indefinitely, outside the 8s upstream timeout.
+  describe("request body deadline", () => {
+    it("answers 408 and never relays when the body does not arrive in time", async () => {
+      vi.useFakeTimers();
+      try {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal("fetch", fetchSpy);
+        const req = makeReq(envelope(ALLOWED_DSN));
+        vi.spyOn(req, "arrayBuffer").mockReturnValue(new Promise<ArrayBuffer>(() => {}));
+
+        const pending = POST(req);
+        await vi.advanceTimersByTimeAsync(10_000);
+        const res = await pending;
+
+        expect(res.status).toBe(408);
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(logWarn).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(logWarn).mock.calls[0]?.[1]).toBe("request body read timed out");
+        expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({ cause: "body-timeout" });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not trip the deadline for a body that arrives promptly", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 } as Response));
+
+      const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+      expect(res.status).toBe(200);
+      expect(logWarn).not.toHaveBeenCalled();
+    });
+  });
 });
