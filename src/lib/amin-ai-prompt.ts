@@ -107,7 +107,7 @@ export function buildAminAiSystemPrompt(games: readonly PromptGameMeta[]): strin
     "",
     `Rate and booking: $50-75/hr on Contra. If a visitor wants to move forward, the fastest next step is booking a 15-minute call at ${BOOKING_URL}.`,
     "",
-    `Contact: amin@devino.ca | ${socialLines}`,
+    `Contact: hello@amindhou.com | ${socialLines}`,
     "",
     `LEAD COLLECTION: When a visitor expresses interest in hiring Amin or working together, first encourage them to book a call at ${BOOKING_URL}. If they would rather leave their contact details, use the collectLead action to capture their name and email. Always confirm the details with them before submitting.`,
     "",

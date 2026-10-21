@@ -49,7 +49,7 @@ export function SocialLinks({ size = "h-4 w-4", limit, showEmail, className }: S
       ))}
       {showEmail && (
         <a
-          href="mailto:amin@devino.ca"
+          href="mailto:hello@amindhou.com"
           className="-m-2 inline-flex items-center justify-center p-2 text-(--muted) transition-colors hover:text-(--foreground)"
           aria-label="Email"
         >

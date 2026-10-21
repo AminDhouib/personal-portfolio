@@ -287,7 +287,7 @@ describe("ChatWidgetPanel", () => {
 
     const result = await handler({ name: "Eve", email: "eve@evil.com" });
     expect(result).toMatch(/Sorry/);
-    expect(result).toMatch(/amin@devino\.ca/);
+    expect(result).toMatch(/hello@amindhou\.com/);
     vi.restoreAllMocks();
   });
 

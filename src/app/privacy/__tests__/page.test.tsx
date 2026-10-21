@@ -103,8 +103,8 @@ describe("/privacy", () => {
 
   it("gives the address for questions and deletion requests", () => {
     render(<PrivacyPage />);
-    const link = screen.getByRole("link", { name: "amin@devino.ca" });
-    expect(link).toHaveAttribute("href", "mailto:amin@devino.ca?subject=Privacy%20request");
+    const link = screen.getByRole("link", { name: "hello@amindhou.com" });
+    expect(link).toHaveAttribute("href", "mailto:hello@amindhou.com?subject=Privacy%20request");
     expect(link.textContent).toBe(profile.email);
     expect(pageText()).toContain('with the subject "Privacy request".');
   });

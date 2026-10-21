@@ -291,7 +291,7 @@ docker rm -f arcade-it
 ```
 
 **Privacy and deletion requests.** `/privacy` tells visitors to email the profile address
-(amin@devino.ca, a Google Workspace mailbox) with the subject "Privacy request". That is the whole
+(hello@amindhou.com, a hosted mailbox) with the subject "Privacy request". That is the whole
 intake: there is no form, no API route and no ticket integration. Any email asking what is held
 about the sender, or asking for deletion, counts, whatever its subject. Never send a test or demo
 request to check this path.
