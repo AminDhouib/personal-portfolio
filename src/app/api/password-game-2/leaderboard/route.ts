@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { dailySeed } from "@/components/game/password-game-2/engine/rng";
 import { withTransaction } from "@/lib/arcade/tx";
 import { getPool } from "@/lib/db";
 import { sanitizePlayerName } from "@/lib/player-name";
 import {
   MAX_ENTRIES_PER_SEED,
-  MAX_TOTAL_ROWS,
   PG2_SCHEMA_STATEMENTS,
   SEED_MAX,
   TIME_MS_MAX,
   TIME_MS_MIN,
+  acceptedDailySeeds,
+  enforceTotalCap,
   isAcceptedDailySeed,
   parseSeedParam,
 } from "@/lib/pg2-leaderboard";
@@ -107,23 +107,24 @@ export async function GET(req: Request) {
       );
       rows = result.rows;
     } else if (dailyParam === "1") {
-      // Pinned to the server's own UTC-day seed: a forged daily=TRUE row on another seed never
-      // lists, and the seed equality lets (seed, time_ms) serve the read.
+      // Pinned to the server's own daily seeds (today's, plus yesterday's inside the grace window
+      // so a run that started before midnight still lists): a forged daily=TRUE row on another
+      // seed never lists, and the seed match lets (seed, time_ms) serve the read.
       const result = await pool.query(
         `SELECT ${SELECT_COLUMNS}
            FROM pg2_leaderboard_entries
-          WHERE daily = TRUE AND seed = $1
+          WHERE daily = TRUE AND seed = ANY($1::bigint[])
             AND (created_at AT TIME ZONE 'UTC')::date = (now() AT TIME ZONE 'UTC')::date
           ORDER BY time_ms ASC
           LIMIT $2`,
-        [dailySeed(), RETURN_LIMIT],
+        [acceptedDailySeeds(), RETURN_LIMIT],
       );
       rows = result.rows;
     } else {
       const result = await pool.query(
         `SELECT ${SELECT_COLUMNS}
            FROM pg2_leaderboard_entries
-          ORDER BY time_ms ASC
+          ORDER BY time_ms ASC, id ASC
           LIMIT $1`,
         [RETURN_LIMIT],
       );
@@ -177,14 +178,16 @@ export async function POST(req: Request) {
 
     // One transaction: the insert and both trims land together or not at all, and the advisory
     // lock keeps concurrent writers from interleaving their deletes.
-    const rank = await withTransaction(pool, async (client) => {
+    const outcome = await withTransaction(pool, async (client) => {
       await client.query("SELECT pg_advisory_xact_lock($1)", [PG2_WRITE_LOCK_ID]);
 
-      await client.query(
+      const inserted = await client.query(
         `INSERT INTO pg2_leaderboard_entries (name, seed, time_ms, daily)
-         VALUES ($1, $2, $3, $4)`,
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
         [name, seed, timeMs, daily],
       );
+      const insertedId = inserted.rows[0].id as number;
 
       // Rank is position within the same seed: how many runs of this seed are
       // strictly faster, plus one.
@@ -209,25 +212,24 @@ export async function POST(req: Request) {
         [seed, MAX_ENTRIES_PER_SEED],
       );
 
-      // Whole-table cap. A seed is any 32-bit integer, so the per-seed trim alone does not bound
-      // the table. Everything past the first MAX_TOTAL_ROWS rows by (time_ms, id) is evicted: the
-      // slowest go, so the all-time board and today's fast daily runs survive. A no-op (the
-      // OFFSET subselect is empty) while the table is under the cap; served by
-      // idx_pg2_leaderboard_time_id.
-      await client.query(
-        `DELETE FROM pg2_leaderboard_entries
-          WHERE id IN (
-            SELECT id FROM pg2_leaderboard_entries
-             ORDER BY time_ms ASC, id ASC
-             OFFSET $1
-          )`,
-        [MAX_TOTAL_ROWS],
-      );
+      // Whole-table cap (see enforceTotalCap): a seed is any 32-bit integer, so the per-seed trim
+      // alone does not bound the table. A no-op, after one cheap probe, while under the cap.
+      await enforceTotalCap(client);
 
-      return Number(rankRows[0].rank);
+      // The run may not have survived: the per-seed trim drops it when 500 faster runs share
+      // its seed. Say so instead of reporting a rank for a row that is gone.
+      const kept = await client.query(
+        `SELECT 1 FROM pg2_leaderboard_entries
+          WHERE id = $1`,
+        [insertedId],
+      );
+      return kept.rows.length > 0
+        ? { stored: true as const, rank: Number(rankRows[0].rank) }
+        : { stored: false as const };
     });
 
-    return NextResponse.json({ ok: true, rank });
+    if (!outcome.stored) return NextResponse.json({ ok: true, stored: false });
+    return NextResponse.json({ ok: true, stored: true, rank: outcome.rank });
   } catch (err) {
     captureException("api:pg2-leaderboard.write", err);
     return NextResponse.json({ error: "could not save score" }, { status: 500 });
