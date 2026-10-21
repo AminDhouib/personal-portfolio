@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { parseIpAddress } from "@/lib/ip-address";
 import { POSTHOG_PROXY_PATH, isPosthogProxyPath } from "@/lib/posthog-proxy";
 
 /**
@@ -34,19 +34,13 @@ function isPosthogCapturePath(subPath: string): boolean {
   );
 }
 
-/** The longest textual IPv6 address (an embedded IPv4 tail included) is 45 characters. */
-const MAX_IP_LENGTH = 45;
-
 /**
  * The visitor's IP as Cloudflare saw it. `CF-Connecting-IP` is the one header a visitor cannot
  * set: Cloudflare overwrites it on every request. A value that is not an address is refused,
- * never forwarded. `isIP` does the parsing; a `%zone` suffix (which it accepts on IPv6) is
- * refused too, since no real client address carries one.
+ * never forwarded (`parseIpAddress` validates it, zone ids included).
  */
 function trustedVisitorIp(cfConnectingIp: string | null | undefined): string | null {
-  const value = cfConnectingIp?.trim();
-  if (!value || value.length > MAX_IP_LENGTH || value.includes("%")) return null;
-  return isIP(value) === 0 ? null : value;
+  return parseIpAddress(cfConnectingIp);
 }
 
 /** The internal capture origin, or null when unset, blank or not an http(s) URL. */
