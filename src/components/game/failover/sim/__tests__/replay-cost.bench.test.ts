@@ -29,11 +29,15 @@ const MARGIN = 4;
 // A chunk's cost is a maximum over ~180 chunks, so one GC pause or a scheduler hiccup on a
 // loaded CI box can push a single run past the budget (it once read 160.4 ms against 160 ms)
 // without the code having changed. The assertion is on the median of the per-run maxima:
-// with 5 runs, two outlier runs are needed to fail it, while a real regression slows every
-// run and still trips it. The budget itself stays at 4x the dev-machine target.
-const CHUNK_RUNS = 5;
-// Records one run and replays it three times; coverage instrumentation triples that.
-const TEST_TIMEOUT_MS = 60_000;
+// with 3 runs, two outlier runs are needed to fail it, while a real regression slows every
+// run and still trips it. Three, not more, because each run is a full replay and coverage
+// instrumentation roughly triples it against TEST_TIMEOUT_MS. The budget itself stays at 4x
+// the dev-machine target.
+const CHUNK_RUNS = 3;
+// Records one run and replays it five times (cold, warm, CHUNK_RUNS small-chunk); coverage
+// instrumentation roughly triples that (about 17 s uncovered on the dev box).
+const TEST_TIMEOUT_MS = 120_000;
+const SAVE_TEST_TIMEOUT_MS = 120_000; // unchanged: the save-load test does not repeat replays
 
 interface Placed {
   type: ServiceType;
@@ -229,6 +233,6 @@ describe("replay cost (go / no-go spike)", () => {
       // Twice the 15 minute replay budget for twice the ticks, with the same 4x margin.
       expect(wallMs).toBeLessThan(2 * TARGET_TOTAL_MS * MARGIN);
     },
-    2 * TEST_TIMEOUT_MS,
+    SAVE_TEST_TIMEOUT_MS,
   );
 });
