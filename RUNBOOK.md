@@ -54,8 +54,10 @@ access — it is not exposed through the Dokploy API surface available to agents
   `reportError()` DOM global — not a custom function — which the already-installed Sentry client
   SDK picks up via its own `window.onerror` listener.
 - **Tunnel**: `sentry.devino.ca` isn't reachable from visitor networks (and ad blockers eat
-  direct Sentry calls), so both client and server envelopes are relayed through `/monitoring`
-  (`src/app/monitoring/route.ts`), which validates the envelope's DSN and forwards it to Sentry
+  direct Sentry calls), so browser envelopes are relayed through `/monitoring`
+  (`tunnel: "/monitoring"` in `src/instrumentation-client.ts`). Server-side and edge envelopes do
+  not use it: `Sentry.init` in `src/instrumentation.ts` sets no `tunnel`, so the server posts
+  straight to Sentry from the host. The route (`src/app/monitoring/route.ts`) validates the envelope's DSN and forwards it to Sentry
   (org `devino`, project `portfolio`) with an 8s upstream timeout. The browser's upload is read
   chunk by chunk under a 10s idle deadline (it resets on every chunk) and a 30s overall cap, and the 5 MiB
   limit is enforced as bytes arrive (413, stream cancelled), and a declared Content-Length over it
@@ -66,7 +68,7 @@ access — it is not exposed through the Dokploy API surface available to agents
   `declaredBytes`, the Content-Length), `body-read-error` (400; client abort or reset; also logs `code`),
   `timeout` (504; upstream deadline), `network` (502; `code` is the underlying errno, e.g.
   ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT), `upstream-status` (a Sentry 5xx or 429 passed
-  through). Search the container logs for `[monitoring]`; the lines are never captured to
+  through; a 429 also carries upstream's `Retry-After` and `X-Sentry-Rate-Limits`, verbatim). Search the container logs for `[monitoring]`; the lines are never captured to
   Sentry, so a tunnel outage cannot feed itself.
   `/monitoring` is excluded from `src/proxy.ts`'s matcher on purpose: Next buffers a request
   body in the proxy layer before the handler runs, which hid a stalled upload from the deadlines
