@@ -1582,16 +1582,23 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   (leads, arcade scores, copilotkit, PG2 leaderboard, monitoring) bypassable by sending a fresh
   `X-Forwarded-For` per request (confirmed on prod 2026-10-21). `getClientIp`
   (`src/lib/rate-limit.ts`) now picks, in order: a valid `CF-Connecting-IP` (Cloudflare overwrites
-  it, so a visitor cannot forge it); the RIGHTMOST `X-Forwarded-For` entry only (the hop the
-  nearest proxy wrote; a rightmost entry that is not an address is never skipped, because walking
-  left reaches client-typed text); a valid `X-Real-Ip`; else the shared bucket `"unknown"`. Every
-  candidate goes through `parseIpAddress` (`src/lib/ip-address.ts`: `isIP`, no `%zone`, 45-char
-  cap), the same check `posthog-proxy-forward.ts` uses. The bucket map is bounded: at most 10,000
-  keys, expired buckets pruned at most once a second, then least-recently-used buckets evicted
-  (eviction forgives that key's spent budget, the price of a bounded map). Local and e2e runs have
-  no `CF-Connecting-IP`, so a test that needs its own bucket must send a distinct `CF-Connecting-IP`
-  (a random `X-Forwarded-For` no longer separates callers). Pinned in
-  `src/lib/__tests__/rate-limit.test.ts`. Residual risk, accepted until T-5533: the origin is
+  it, so a visitor cannot forge it); else the RIGHTMOST `X-Forwarded-For` entry only, which is
+  whatever the nearest proxy wrote (Traefik's peer, or the client itself on a direct hit; a
+  rightmost entry that is not an address is never skipped, because walking left reaches
+  client-typed text); else the shared bucket `"unknown"`. `X-Real-Ip` is not read: the Next server
+  fills `X-Forwarded-For` from the socket when absent. Every candidate goes through
+  `parseIpAddress` (`src/lib/ip-address.ts`: `isIP`, no `%zone`, 45-char cap, shared with
+  `posthog-proxy-forward.ts`), then `ipRateLimitKey`: IPv4 stays whole, IPv6 is keyed by its /64
+  in one canonical spelling, and an IPv4-mapped `::ffff:a.b.c.d` folds onto plain IPv4 (a host
+  owns a whole /64, so a full v6 address would be free to rotate). With no valid
+  `CF-Connecting-IP` in production, `getClientIp` logs a `logWarn` at most once a minute (never
+  `captureException`, so no Sentry or PostHog event): that line means the edge was bypassed. The
+  bucket map is bounded: at most 10,000 keys, expired buckets pruned at most once a second, then
+  least-recently-used buckets evicted (eviction forgives that key's spent budget, the price of a
+  bounded map). Local and e2e runs have no `CF-Connecting-IP`, so a test that needs its own bucket
+  must send a distinct `CF-Connecting-IP` (a random `X-Forwarded-For` no longer separates
+  callers). Pinned in `src/lib/__tests__/rate-limit.test.ts` and, at the guard level, in
+  `src/lib/__tests__/route-guard.test.ts`. Residual risk, accepted until T-5533: the origin is
   reachable without Cloudflare, and a request sent straight to it can carry any
   `CF-Connecting-IP`, so a direct-to-origin attacker can still choose their key. The fix is
   infrastructure (restrict the origin to Cloudflare's ranges or use authenticated origin pulls),
