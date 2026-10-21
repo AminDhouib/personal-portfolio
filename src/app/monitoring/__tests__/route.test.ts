@@ -173,13 +173,22 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
       expect(detail.error).toContain("timeout");
     });
 
-    it("answers 502 and logs cause=network for a connection failure", async () => {
-      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    it("answers 502 and logs cause=network with the underlying error code", async () => {
+      // undici reports every connect failure as "fetch failed"; the real reason is cause.code.
+      const refused = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new TypeError("fetch failed", { cause: refused })),
+      );
 
       const res = await POST(makeReq(envelope(ALLOWED_DSN)));
 
       expect(res.status).toBe(502);
-      expect(lastDetail()).toMatchObject({ cause: "network", error: "fetch failed" });
+      expect(lastDetail()).toMatchObject({
+        cause: "network",
+        error: "fetch failed",
+        code: "ECONNREFUSED",
+      });
     });
 
     it("passes an upstream 5xx through and logs cause=upstream-status with the status", async () => {
@@ -215,38 +224,181 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     });
   });
 
-  // request.arrayBuffer() had no deadline: a client that opens the POST and trickles (or stalls)
-  // the body held the handler open indefinitely, outside the 8s upstream timeout.
-  describe("request body deadline", () => {
-    it("answers 408 and never relays when the body does not arrive in time", async () => {
+  // The body used to be read with request.arrayBuffer() and no deadline: a client that opened
+  // the POST and stalled (or trickled) held the handler open outside the upstream timeout.
+  describe("request body read", () => {
+    const IDLE_MS = 10_000;
+    const TOTAL_MS = 30_000;
+
+    /** A controllable request body; `cancelled` flips when the route releases the stream. */
+    function streamBody() {
+      const state = { cancelled: false };
+      let controller!: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
+        start(c) {
+          controller = c;
+        },
+        cancel() {
+          state.cancelled = true;
+        },
+      });
+      return {
+        stream,
+        state,
+        push: (b: Uint8Array) => controller.enqueue(new Uint8Array(b)),
+        close: () => controller.close(),
+        fail: (e: unknown) => controller.error(e),
+      };
+    }
+
+    function reqWithStream(
+      stream: ReadableStream<Uint8Array<ArrayBuffer>>,
+      headers: Record<string, string> = {},
+    ) {
+      const req = makeReq("x", headers);
+      vi.spyOn(req, "body", "get").mockReturnValue(stream);
+      return req;
+    }
+
+    async function withFakeTimers(run: () => Promise<void>) {
       vi.useFakeTimers();
       try {
+        await run();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+
+    it("answers 408, cancels the stream and logs bytes and declaredBytes after an idle gap", () =>
+      withFakeTimers(async () => {
         const fetchSpy = vi.fn();
         vi.stubGlobal("fetch", fetchSpy);
-        const req = makeReq(envelope(ALLOWED_DSN));
-        vi.spyOn(req, "arrayBuffer").mockReturnValue(new Promise<ArrayBuffer>(() => {}));
+        const b = streamBody();
+        b.push(Buffer.from("abc"));
 
-        const pending = POST(req);
-        await vi.advanceTimersByTimeAsync(10_000);
+        const pending = POST(reqWithStream(b.stream, { "content-length": "1000" }));
+        await vi.advanceTimersByTimeAsync(IDLE_MS);
         const res = await pending;
 
         expect(res.status).toBe(408);
         expect(fetchSpy).not.toHaveBeenCalled();
+        expect(b.state.cancelled).toBe(true);
         expect(logWarn).toHaveBeenCalledTimes(1);
         expect(vi.mocked(logWarn).mock.calls[0]?.[1]).toBe("request body read timed out");
-        expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({ cause: "body-timeout" });
-      } finally {
-        vi.useRealTimers();
-      }
+        expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({
+          cause: "body-timeout",
+          deadline: "idle",
+          bytes: 3,
+          declaredBytes: 1000,
+        });
+      }));
+
+    it("lets a slow but progressing upload finish: the idle deadline resets on every chunk", () =>
+      withFakeTimers(async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({ status: 200 } as Response);
+        vi.stubGlobal("fetch", fetchSpy);
+        const b = streamBody();
+        const head = Buffer.from(`${JSON.stringify({ dsn: ALLOWED_DSN })}\n`);
+
+        const pending = POST(reqWithStream(b.stream));
+        b.push(head);
+        // Four gaps of 6s: 24s in total, past the 10s idle limit if it did not reset.
+        for (let i = 0; i < 4; i += 1) {
+          await vi.advanceTimersByTimeAsync(6_000);
+          b.push(Buffer.from("x"));
+        }
+        b.close();
+        const res = await pending;
+
+        expect(res.status).toBe(200);
+        const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+        expect((init.body as Uint8Array).byteLength).toBe(head.byteLength + 4);
+        expect(logWarn).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      }));
+
+    it("stops a trickling upload at the overall cap even though it never goes idle", () =>
+      withFakeTimers(async () => {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal("fetch", fetchSpy);
+        const b = streamBody();
+
+        const pending = POST(reqWithStream(b.stream));
+        for (let elapsed = 0; elapsed < TOTAL_MS; elapsed += 6_000) {
+          b.push(Buffer.from("x"));
+          await vi.advanceTimersByTimeAsync(6_000);
+        }
+        const res = await pending;
+
+        expect(res.status).toBe(408);
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(b.state.cancelled).toBe(true);
+        expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({
+          cause: "body-timeout",
+          deadline: "total",
+        });
+      }));
+
+    it("answers 413 as soon as the cap is crossed and cancels instead of buffering the rest", async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      const b = streamBody();
+      const chunk = new Uint8Array(1024 * 1024).fill(0x78);
+
+      const pending = POST(reqWithStream(b.stream));
+      for (let i = 0; i < 6; i += 1) b.push(chunk);
+      const res = await pending;
+
+      expect(res.status).toBe(413);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(b.state.cancelled).toBe(true);
     });
 
-    it("does not trip the deadline for a body that arrives promptly", async () => {
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 } as Response));
+    it("answers 400 body-read-error, not 408, when the stream breaks (client abort, reset)", async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      const b = streamBody();
 
-      const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+      const pending = POST(reqWithStream(b.stream));
+      b.fail(new TypeError("terminated"));
+      const res = await pending;
 
-      expect(res.status).toBe(200);
-      expect(logWarn).not.toHaveBeenCalled();
+      expect(res.status).toBe(400);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(vi.mocked(logWarn).mock.calls[0]?.[1]).toBe("request body read failed");
+      expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({
+        cause: "body-read-error",
+        error: "terminated",
+      });
     });
+
+    it("treats a missing body as an empty envelope (400 invalid envelope), as before", async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      const req = new NextRequest("https://portfolio.test/monitoring", {
+        method: "POST",
+        headers: {
+          origin: "https://portfolio.test",
+          host: "portfolio.test",
+          "x-forwarded-for": "10.9.1.1",
+        },
+      });
+
+      const res = await POST(req);
+
+      expect(res.status).toBe(400);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("leaves no timer running after a prompt body and a successful relay", () =>
+      withFakeTimers(async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 } as Response));
+
+        const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+        expect(res.status).toBe(200);
+        expect(logWarn).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      }));
   });
 });

@@ -27,28 +27,90 @@ const INGEST_URL = "https://sentry.devino.ca/api/35/envelope/";
 // carrying a full DOM snapshot can pass 1 MiB, so the cap is sized for those.
 const MAX_ENVELOPE_BYTES = 5 * 1024 * 1024;
 const NEWLINE = 0x0a;
-// Two deadlines, one per hop. The browser's upload must finish within BODY_READ_TIMEOUT_MS
-// (a stalled or trickling client would otherwise hold the handler open with no bound at all),
-// and the relay to Sentry within UPSTREAM_TIMEOUT_MS (unchanged from the original single 8s).
-const BODY_READ_TIMEOUT_MS = 10_000;
+// Three deadlines. The browser's upload must keep making progress (an idle gap longer than
+// BODY_IDLE_TIMEOUT_MS ends it) and must finish within BODY_TOTAL_TIMEOUT_MS overall, so a slow
+// but moving replay upload survives while a stalled or trickling client cannot hold the handler
+// open. The relay to Sentry then gets UPSTREAM_TIMEOUT_MS (unchanged from the original 8s).
+// Caveat: while src/proxy.ts matches this path, Next buffers the body before this handler runs,
+// so the body deadlines only bite once the matcher excludes /monitoring (see RUNBOOK.md).
+const BODY_IDLE_TIMEOUT_MS = 10_000;
+const BODY_TOTAL_TIMEOUT_MS = 30_000;
 const UPSTREAM_TIMEOUT_MS = 8000;
 
-class BodyTimeoutError extends Error {}
+class BodyTimeoutError extends Error {
+  constructor(
+    readonly deadline: "idle" | "total",
+    readonly bytesReceived: number,
+  ) {
+    super(`request body ${deadline} deadline exceeded`);
+  }
+}
+class BodyTooLargeError extends Error {}
 
-/** request.arrayBuffer() under a deadline; rejects with BodyTimeoutError when it expires. */
-async function readBodyWithDeadline(request: NextRequest): Promise<Uint8Array<ArrayBuffer>> {
+/** One read, or `null` when `ms` passes first. The timer never outlives the call. */
+async function readWithin(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  ms: number,
+): Promise<ReadableStreamReadResult<Uint8Array> | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new BodyTimeoutError("request body read timed out")),
-      BODY_READ_TIMEOUT_MS,
-    );
+  const expired = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
   });
   try {
-    return new Uint8Array(await Promise.race([request.arrayBuffer(), deadline]));
+    return await Promise.race([reader.read(), expired]);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Read the browser's body chunk by chunk: an idle deadline that resets on every chunk, an
+ * overall cap, and MAX_ENVELOPE_BYTES enforced as bytes arrive (so an oversize upload is cut
+ * off early instead of buffered first). The stream is cancelled on every non-success exit.
+ */
+async function readBody(request: NextRequest): Promise<Uint8Array<ArrayBuffer>> {
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const startedAt = performance.now();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const remaining = BODY_TOTAL_TIMEOUT_MS - (performance.now() - startedAt);
+      const result = await readWithin(reader, Math.min(BODY_IDLE_TIMEOUT_MS, remaining));
+      if (!result) {
+        throw new BodyTimeoutError(remaining < BODY_IDLE_TIMEOUT_MS ? "total" : "idle", received);
+      }
+      if (result.done) break;
+      received += result.value.byteLength;
+      if (received > MAX_ENVELOPE_BYTES) throw new BodyTooLargeError("envelope too large");
+      chunks.push(result.value);
+    }
+  } catch (err) {
+    // A stream that errored is already dead; only cancel one we are abandoning. Not awaited:
+    // cancelling a stalled upload can itself wait on the socket.
+    if (err instanceof BodyTimeoutError || err instanceof BodyTooLargeError) {
+      reader.cancel().catch((cancelErr: unknown) => {
+        logWarn("monitoring", "request body cancel failed", cancelErr);
+      });
+    }
+    throw err;
+  }
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+/** Node's `cause.code` (ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT, ...), when present. */
+function errorCode(err: unknown): string | undefined {
+  const cause = typeof err === "object" && err !== null ? (err as { cause?: unknown }).cause : null;
+  const code =
+    typeof cause === "object" && cause !== null ? (cause as { code?: unknown }).code : undefined;
+  return typeof code === "string" ? code : undefined;
 }
 
 /** Timeout (AbortSignal.timeout) vs everything else (DNS, TLS, reset, refused). */
@@ -73,17 +135,31 @@ export async function POST(request: NextRequest) {
   const readStarted = performance.now();
   let body: Uint8Array<ArrayBuffer>;
   try {
-    body = await readBodyWithDeadline(request);
+    body = await readBody(request);
   } catch (err) {
-    logWarn("monitoring", "request body read timed out", {
-      cause: "body-timeout",
-      durationMs: Math.round(performance.now() - readStarted),
+    if (err instanceof BodyTooLargeError) {
+      return NextResponse.json({ error: "envelope too large" }, { status: 413 });
+    }
+    const durationMs = Math.round(performance.now() - readStarted);
+    if (err instanceof BodyTimeoutError) {
+      const declared = Number(request.headers.get("content-length"));
+      logWarn("monitoring", "request body read timed out", {
+        cause: "body-timeout",
+        deadline: err.deadline,
+        durationMs,
+        bytes: err.bytesReceived,
+        declaredBytes: Number.isFinite(declared) ? declared : null,
+      });
+      return new NextResponse(null, { status: 408 });
+    }
+    // The client went away or the stream broke (undici "terminated", a reset): not a timeout.
+    logWarn("monitoring", "request body read failed", {
+      cause: "body-read-error",
+      durationMs,
       error: err instanceof Error ? err.message : String(err),
+      code: errorCode(err),
     });
-    return new NextResponse(null, { status: 408 });
-  }
-  if (body.byteLength > MAX_ENVELOPE_BYTES) {
-    return NextResponse.json({ error: "envelope too large" }, { status: 413 });
+    return new NextResponse(null, { status: 400 });
   }
 
   // Envelope format: first newline-delimited line is a JSON header with `dsn`. Only that
@@ -128,6 +204,7 @@ export async function POST(request: NextRequest) {
       durationMs: Math.round(performance.now() - started),
       bytes: body.byteLength,
       error: err instanceof Error ? err.message : String(err),
+      code: errorCode(err),
     });
     return new NextResponse(null, { status: cause === "timeout" ? 504 : 502 });
   }
