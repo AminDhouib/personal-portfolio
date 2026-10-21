@@ -59,20 +59,40 @@ function run(sql: string, params?: unknown[]): { rows: unknown[] } {
       daily: params?.[3],
       createdAt: new Date().toISOString(),
     });
-    return { rows: [] };
+    return { rows: [{ id: entries.at(-1)!.id }] };
+  }
+  if (text.startsWith("SELECT 1") && text.includes("OFFSET")) {
+    // Cheap over-the-cap pre-check: is there any row past the first `offset`?
+    txLog.push("PRECHECK");
+    const offset = params?.[0] as number;
+    return { rows: entries.length > offset ? [{ "?column?": 1 }] : [] };
+  }
+  if (text.startsWith("SELECT 1") && text.includes("WHERE ID = $1")) {
+    txLog.push("STORED");
+    return { rows: entries.some((e) => e.id === params?.[0]) ? [{ "?column?": 1 }] : [] };
   }
   if (text.startsWith("DELETE") && text.includes("OFFSET")) {
-    // Global cap: everything after the first `offset` rows by (time_ms, id).
+    // Global cap, simulated from its parameters: the rows past the newest `offset` by id,
+    // minus the protected daily seeds and the fastest `topN` by (time_ms, id).
     txLog.push("CAP");
-    const offset = params?.[0] as number;
-    const doomed = new Set(
+    const [offset, seeds, topN] = params as [number, number[], number];
+    const beyond = new Set(
       [...entries]
-        .sort((a, b) => (a.timeMs as number) - (b.timeMs as number) || a.id - b.id)
+        .sort((a, b) => b.id - a.id)
         .slice(offset)
         .map((e) => e.id),
     );
+    const top = new Set(
+      [...entries]
+        .sort((a, b) => (a.timeMs as number) - (b.timeMs as number) || a.id - b.id)
+        .slice(0, topN)
+        .map((e) => e.id),
+    );
     for (let i = entries.length - 1; i >= 0; i--) {
-      if (doomed.has(entries[i]!.id)) entries.splice(i, 1);
+      const e = entries[i]!;
+      if (beyond.has(e.id) && !seeds.includes(e.seed as number) && !top.has(e.id)) {
+        entries.splice(i, 1);
+      }
     }
     return { rows: [] };
   }
@@ -94,10 +114,10 @@ function run(sql: string, params?: unknown[]): { rows: unknown[] } {
     return { rows: [] };
   }
   if (text.startsWith("SELECT") && text.includes("DAILY = TRUE")) {
-    const seed = params?.[0] as number;
+    const seeds = params?.[0] as number[];
     const limit = params?.[1] as number;
     const filtered = entries
-      .filter((e) => e.daily === true && e.seed === seed)
+      .filter((e) => e.daily === true && seeds.includes(e.seed as number))
       .sort((a, b) => (a.timeMs as number) - (b.timeMs as number));
     return { rows: filtered.slice(0, limit) };
   }
@@ -189,10 +209,10 @@ describe("/api/password-game-2/leaderboard", () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as Pg2GetResponse;
       expect(body.entries.map((e) => e.name)).toEqual(["B", "C", "A"]);
-      const select = dataSelects().at(-1);
+      const select = captured.find((q) => q.sql.trim().toUpperCase().startsWith("SELECT"));
       expect(select?.sql.toUpperCase()).not.toContain("WHERE");
-      // Matches the (time_ms, id) index: ordered by the leading column, limited.
-      expect(select?.sql.toUpperCase()).toContain("ORDER BY TIME_MS ASC");
+      // Ordered exactly as idx_pg2_leaderboard_time_id, so ties are deterministic.
+      expect(select?.sql.toUpperCase()).toContain("ORDER BY TIME_MS ASC, ID ASC");
     });
 
     it("seed: filters by ?seed= and orders by timeMs", async () => {
@@ -209,6 +229,8 @@ describe("/api/password-game-2/leaderboard", () => {
     });
 
     it("daily: ?daily=1 shows only today's daily-seed runs, not other daily=TRUE rows", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-21T12:00:00.000Z"));
       const today = dailySeed();
       entries.push(
         { id: 1, name: "A", seed: today, timeMs: 30_000, daily: true, createdAt: "" },
@@ -221,9 +243,35 @@ describe("/api/password-game-2/leaderboard", () => {
       const body = (await res.json()) as Pg2GetResponse;
       expect(body.entries.map((e) => e.name)).toEqual(["C", "A"]);
       const select = captured.find((q) => q.sql.toUpperCase().includes("DAILY = TRUE"));
-      expect(select?.params).toEqual([today, 50]);
-      // The seed equality is what lets the (seed, time_ms) index serve this read.
-      expect(select?.sql.toUpperCase()).toContain("SEED = $1");
+      expect(select?.params).toEqual([[today], 50]);
+      // The seed match is what lets the (seed, time_ms) index serve this read.
+      expect(select?.sql.toUpperCase()).toContain("SEED = ANY($1");
+    });
+
+    it("daily: inside the grace window after midnight UTC the board also lists yesterday's seed", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const yesterday = dailySeedForDay("2026-10-20");
+      const today = dailySeedForDay("2026-10-21");
+      entries.push(
+        { id: 1, name: "Late", seed: yesterday, timeMs: 30_000, daily: true, createdAt: "" },
+        { id: 2, name: "Now", seed: today, timeMs: 40_000, daily: true, createdAt: "" },
+        {
+          id: 3,
+          name: "Old",
+          seed: dailySeedForDay("2026-10-19"),
+          timeMs: 20_000,
+          daily: true,
+          createdAt: "",
+        },
+      );
+
+      vi.setSystemTime(new Date("2026-10-21T00:10:00.000Z"));
+      const early = (await (await get("?daily=1")).json()) as Pg2GetResponse;
+      expect(early.entries.map((e) => e.name)).toEqual(["Late", "Now"]);
+
+      vi.setSystemTime(new Date("2026-10-21T03:00:00.000Z"));
+      const late = (await (await get("?daily=1")).json()) as Pg2GetResponse;
+      expect(late.entries.map((e) => e.name)).toEqual(["Now"]);
     });
 
     it("filters the daily board by the UTC calendar day, not the session timezone", async () => {
@@ -341,7 +389,7 @@ describe("/api/password-game-2/leaderboard", () => {
       const insert = captured.find((q) => q.sql.trim().toUpperCase().startsWith("INSERT"));
       const storedName = insert?.params?.[0] as string;
       expect(storedName.length).toBeLessThanOrEqual(16);
-      expect(storedName).not.toContain(" ");
+      expect(storedName).not.toContain(" ");
     });
 
     it("defaults daily to false when a non-boolean is sent", async () => {
@@ -418,13 +466,35 @@ describe("/api/password-game-2/leaderboard", () => {
     });
 
     describe("bounded growth", () => {
-      it("runs lock, insert, per-seed trim and global cap in ONE transaction, in order", async () => {
+      const NOON = new Date("2026-10-21T12:00:00.000Z");
+      const row = (id: number, over: Partial<Entry> = {}): Entry => ({
+        id,
+        name: "x",
+        seed: 1_000_000 + id,
+        timeMs: 3_000_000 - id,
+        daily: false,
+        createdAt: "",
+        ...over,
+      });
+      const fill = (n: number, make: (id: number) => Entry = row) => {
+        for (let i = 0; i < n; i++) entries.push(make(nextId++));
+      };
+
+      it("runs lock, insert, per-seed trim, cap pre-check and stored check in ONE transaction", async () => {
         await POST(makeJsonPostRequest(validBody({ seed: 5, timeMs: 40_000 })));
-        expect(txLog).toEqual(["BEGIN", "LOCK", "INSERT", "SEED_TRIM", "CAP", "COMMIT"]);
+        expect(txLog).toEqual([
+          "BEGIN",
+          "LOCK",
+          "INSERT",
+          "SEED_TRIM",
+          "PRECHECK",
+          "STORED",
+          "COMMIT",
+        ]);
       });
 
       it("rolls the whole write back and reports a real server failure with a 500", async () => {
-        failOn = "OFFSET";
+        failOn = "RETURNING";
         const res = await POST(makeJsonPostRequest(validBody({ seed: 5 })));
         expect(res.status).toBe(500);
         expect(txLog.at(-1)).toBe("ROLLBACK");
@@ -432,34 +502,86 @@ describe("/api/password-game-2/leaderboard", () => {
         expect(captureExceptionMock).toHaveBeenCalledTimes(1);
       });
 
-      it("caps the table at 20,000 rows by evicting the slowest, oldest-last", async () => {
-        for (let i = 0; i < 20_000; i++) {
-          entries.push({
-            id: nextId++,
-            name: "x",
-            seed: i,
-            timeMs: 20_000 + i,
-            daily: false,
-            createdAt: "",
-          });
-        }
-        // A fast run displaces the slowest row, so the all-time top of the table is preserved.
-        await POST(makeJsonPostRequest(validBody({ seed: 90_000, timeMs: 10_000 })));
-        expect(entries).toHaveLength(20_000);
-        expect(entries.some((e) => e.timeMs === 10_000)).toBe(true);
-        expect(entries.some((e) => e.timeMs === 20_000 + 19_999)).toBe(false);
-
-        // A run slower than everything stored is itself the one evicted.
-        await POST(makeJsonPostRequest(validBody({ seed: 90_001, timeMs: 3_000_000 })));
-        expect(entries).toHaveLength(20_000);
-        expect(entries.some((e) => e.timeMs === 3_000_000)).toBe(false);
+      it("pre-checks with a cheap SELECT 1 ... OFFSET $1 LIMIT 1 and skips the delete under the cap", async () => {
+        await POST(makeJsonPostRequest(validBody({ seed: 8 })));
+        const pre = captured.find((q) => /^SELECT 1\b[\s\S]*OFFSET/i.test(q.sql.trim()));
+        expect(pre?.sql.replace(/s+/g, " ").toUpperCase()).toContain("OFFSET $1 LIMIT 1");
+        expect(pre?.params).toEqual([20_000]);
+        expect(txLog).not.toContain("CAP");
+        expect(captured.some((q) => /^DELETE[\s\S]*OFFSET/i.test(q.sql.trim()))).toBe(false);
       });
 
-      it("passes the cap as the OFFSET parameter, so under the cap nothing is deleted", async () => {
-        await POST(makeJsonPostRequest(validBody({ seed: 8 })));
-        const cap = captured.find((q) => /OFFSET/i.test(q.sql));
-        expect(cap?.params).toEqual([20_000]);
-        expect(entries).toHaveLength(1);
+      it("pins the cap SQL: oldest by id past the cap, minus the daily seeds and the global top 100", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(NOON);
+        fill(20_000);
+        await POST(makeJsonPostRequest(validBody({ seed: 5, timeMs: 40_000 })));
+        const cap = captured.find((q) => /^DELETE[\s\S]*OFFSET/i.test(q.sql.trim()));
+        const sql = (cap?.sql ?? "").replace(/\s+/g, " ").toUpperCase();
+        expect(sql).toContain("SELECT ID FROM PG2_LEADERBOARD_ENTRIES ORDER BY ID DESC OFFSET $1");
+        expect(sql).toContain("AND NOT (SEED = ANY($2::BIGINT[]))");
+        expect(sql).toContain(
+          "AND ID NOT IN ( SELECT ID FROM PG2_LEADERBOARD_ENTRIES ORDER BY TIME_MS ASC, ID ASC LIMIT $3 )",
+        );
+        expect(cap?.params).toEqual([20_000, [dailySeed(NOON)], 100]);
+      });
+
+      it("protects yesterday's seed too while the grace window is open", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-10-21T00:10:00.000Z"));
+        fill(20_000);
+        await POST(makeJsonPostRequest(validBody({ seed: 5, timeMs: 40_000 })));
+        const cap = captured.find((q) => /^DELETE[\s\S]*OFFSET/i.test(q.sql.trim()));
+        expect(cap?.params?.[1]).toEqual([
+          dailySeedForDay("2026-10-21"),
+          dailySeedForDay("2026-10-20"),
+        ]);
+      });
+
+      it("over the cap, evicts the OLDEST unprotected rows and keeps the table at the cap", async () => {
+        fill(20_000);
+        // Times fall as ids rise, so the global top 100 are the newest rows and id 1 is plain.
+        const res = await POST(makeJsonPostRequest(validBody({ seed: 5, timeMs: 500_000 })));
+        expect(res.status).toBe(200);
+        expect(entries).toHaveLength(20_000);
+        expect(entries.some((e) => e.id === 1)).toBe(false);
+        expect(entries.some((e) => e.id === 2)).toBe(true);
+        expect(((await res.json()) as { stored?: boolean }).stored).toBe(true);
+      });
+
+      it("never evicts today's daily-seed rows or the global top 100, even under a forged-fast flood", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(NOON);
+        const today = dailySeed(NOON);
+        // 50 legit daily runs, the oldest rows, all slow.
+        fill(50, (id) => row(id, { seed: today, daily: true, timeMs: 900_000 }));
+        // 100 legit plain runs, also old and slow: these are the ones to lose.
+        fill(100, (id) => row(id, { timeMs: 800_000 }));
+        // A flood of 20,000 forged-fast rows.
+        fill(20_000, (id) => row(id, { timeMs: 10_000 + id }));
+
+        await POST(makeJsonPostRequest(validBody({ seed: 5, timeMs: 500_000 })));
+
+        const survivors = new Set(entries.map((e) => e.id));
+        for (let id = 1; id <= 50; id++) expect(survivors.has(id)).toBe(true); // daily rows
+        for (let id = 51; id <= 150; id++) expect(survivors.has(id)).toBe(false); // old plain rows
+        // Id 151 is the oldest of the 100 fastest rows overall: protected though past the cap.
+        expect(survivors.has(151)).toBe(true);
+        expect(entries).toHaveLength(20_051);
+      });
+
+      it("answers stored:false, with no rank, when the run is evicted by the per-seed trim", async () => {
+        fill(500, (id) => row(id, { seed: 5, timeMs: 20_000 }));
+        const res = await POST(makeJsonPostRequest(validBody({ seed: 5, timeMs: 900_000 })));
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { ok?: boolean; stored?: boolean; rank?: number };
+        expect(body).toEqual({ ok: true, stored: false });
+        expect(entries.some((e) => e.timeMs === 900_000)).toBe(false);
+      });
+
+      it("answers stored:true with the rank when the run is kept", async () => {
+        const res = await POST(makeJsonPostRequest(validBody({ seed: 6 })));
+        expect(await res.json()).toEqual({ ok: true, stored: true, rank: 1 });
       });
     });
   });

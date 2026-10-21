@@ -178,3 +178,45 @@ describe("ReceiptCard share", () => {
     expect(writeText).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ReceiptCard post", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  function mountWithPostReply(reply: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) =>
+        init?.method === "POST" ? Response.json(reply) : Response.json({ entries: [] }),
+      ),
+    );
+    const g = createRun({ seed: 7, daily: false, nowHHMM: () => "12:00" });
+    return render(
+      <ReceiptCard
+        g={g}
+        seed={7}
+        daily={false}
+        startDay="2026-10-09"
+        onCopySeed={() => {}}
+        onPlayAgain={() => {}}
+        onPlayDaily={() => {}}
+      />,
+    );
+  }
+
+  it("shows the rank when the server stored the run", async () => {
+    const { getByRole, findByText } = mountWithPostReply({ ok: true, stored: true, rank: 3 });
+    fireEvent.click(getByRole("button", { name: /post to leaderboard/i }));
+    expect(await findByText(/Rank #3/)).toBeTruthy();
+  });
+
+  it("says so, and never prints a rank, when the server did not store the run", async () => {
+    const { container, getByRole, findByText } = mountWithPostReply({ ok: true, stored: false });
+    fireEvent.click(getByRole("button", { name: /post to leaderboard/i }));
+    expect(await findByText(/did not place on the board/i)).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Rank #/);
+    expect(container.querySelector("input.pg2-postrun__name")).toBeNull();
+  });
+});
