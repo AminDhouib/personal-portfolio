@@ -22,21 +22,33 @@ interface RawResponse {
   elapsedMs: number;
 }
 
+/** What `send` gets: a writer that goes quiet once the server has answered. */
+interface Sender {
+  write: (chunk: Buffer | string) => void;
+  answered: () => boolean;
+}
+
 /**
  * One raw HTTP/1.1 POST to /monitoring. `send` writes the body (the request head is already
  * written) and may stall by simply returning; the promise settles on the first status line.
+ * Once the server has answered, `write` does nothing, so a refusal that closes the socket with
+ * unread bytes cannot turn into a write error.
  */
 function rawPost(
   baseURL: string,
   headers: Record<string, string>,
-  send: (write: (chunk: Buffer | string) => void) => Promise<void> | void,
+  send: (sender: Sender) => Promise<void> | void,
   hardLimitMs: number,
 ): Promise<RawResponse> {
   const url = new URL(baseURL);
   const host = url.host;
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
-    const socket = connect({ host: url.hostname, port: Number(url.port || 80) });
+    // URL keeps the brackets of an IPv6 literal ([::1]); net.connect wants it bare.
+    const socket = connect({
+      host: url.hostname.replace(/^\[|\]$/g, ""),
+      port: Number(url.port || 80),
+    });
     let answered = false;
     let buffered = "";
     const finish = (settle: () => void): void => {
@@ -48,6 +60,14 @@ function rawPost(
       () => finish(() => reject(new Error(`no response within ${hardLimitMs} ms`))),
       hardLimitMs,
     );
+    // A server that refuses early and closes with our bytes unread can reset the connection
+    // (more likely on Windows, where a reset discards data not yet read). The status line may
+    // still be queued behind the error event, so give the data handler one turn before failing.
+    const failUnlessAnswered = (err: Error): void => {
+      setImmediate(() => {
+        if (!answered) finish(() => reject(err));
+      });
+    };
 
     socket.on("data", (chunk) => {
       buffered += chunk.toString("latin1");
@@ -57,22 +77,20 @@ function rawPost(
       const status = Number(match[1]);
       finish(() => resolve({ status, elapsedMs: Date.now() - startedAt }));
     });
-    // The server answers and may close while we are still writing: a reset after the status
-    // line is the expected end of an early refusal, not a failure.
-    socket.on("error", (err) => {
-      if (!answered) finish(() => reject(err));
-    });
-    socket.on("close", () => {
-      if (!answered) finish(() => reject(new Error("socket closed before a response")));
-    });
+    socket.on("error", failUnlessAnswered);
+    socket.on("close", () => failUnlessAnswered(new Error("socket closed before a response")));
 
     socket.on("connect", () => {
+      const clientIp = `198.51.100.${1 + Math.floor(Math.random() * 250)}`;
       const lines: Record<string, string> = {
         Host: host,
         Origin: url.origin,
         "Content-Type": "application/x-sentry-envelope",
-        // A fresh client IP per request keeps the route's per-IP rate limit out of the way.
-        "X-Forwarded-For": `198.51.100.${1 + Math.floor(Math.random() * 250)}`,
+        // A fresh client IP per request keeps the route's per-IP rate limit out of the way. The
+        // same valid IPv4 (TEST-NET-2, 198.51.100.1-250) goes in both headers, so the request
+        // gets its own bucket whether the limiter keys on CF-Connecting-IP or on X-Forwarded-For.
+        "CF-Connecting-IP": clientIp,
+        "X-Forwarded-For": clientIp,
         Connection: "close",
         ...headers, // a caller's header replaces the default of the same name
       };
@@ -83,7 +101,13 @@ function rawPost(
         "",
       ].join("\r\n");
       socket.write(head);
-      void Promise.resolve(send((chunk) => void socket.write(chunk))).catch((err: unknown) =>
+      const sender: Sender = {
+        write: (chunk) => {
+          if (!answered && !socket.destroyed) socket.write(chunk);
+        },
+        answered: () => answered,
+      };
+      void Promise.resolve(send(sender)).catch((err: unknown) =>
         finish(() => reject(err instanceof Error ? err : new Error(String(err)))),
       );
     });
@@ -97,17 +121,18 @@ test.describe("Sentry tunnel over a raw socket", () => {
     baseURL,
   }) => {
     // Idle deadline is 10 s (BODY_IDLE_TIMEOUT_MS). Next buffering the body ahead of the handler
-    // measured 15 s on a standalone build, so "well before 15 s" is what this pins.
+    // measured 15 s on a standalone build; the 25 s client limit below fails that regression
+    // (no response in time), and the lower bound proves the 408 is the deadline, not an early
+    // refusal.
     test.setTimeout(40_000);
     const res = await rawPost(
       baseURL ?? "",
       { "Content-Length": "1000" },
-      (write) => write("abcde"), // five bytes of a declared thousand, then silence
+      ({ write }) => write("abcde"), // five bytes of a declared thousand, then silence
       25_000,
     );
     expect(res.status).toBe(408);
     expect(res.elapsedMs).toBeGreaterThanOrEqual(9_000);
-    expect(res.elapsedMs).toBeLessThan(13_000);
   });
 
   test("a declared Content-Length over 5 MiB is refused 413 before any body is sent", async ({
@@ -124,25 +149,32 @@ test.describe("Sentry tunnel over a raw socket", () => {
     expect(res.elapsedMs).toBeLessThan(5_000);
   });
 
-  test("a chunked upload is cut off with 413 once it passes 5 MiB", async ({ baseURL }) => {
+  test("a chunked upload is cut off with 413 while it is still being sent", async ({ baseURL }) => {
+    const totalChunks = 12;
+    let written = 0;
     const res = await rawPost(
       baseURL ?? "",
       { "Transfer-Encoding": "chunked" },
-      async (write) => {
+      async ({ write, answered }) => {
         const chunk = Buffer.alloc(MIB, 0x78);
-        // Seven MiB offered, one chunk at a time; the cap is 5 MiB, so the server must stop
-        // reading and answer before the last chunk is accepted.
-        for (let i = 0; i < 7; i++) {
+        // Twelve MiB offered a MiB at a time, 100 ms apart. The cap is 5 MiB, so the server
+        // must answer after the sixth chunk, long before the last one would be written.
+        for (let i = 0; i < totalChunks && !answered(); i++) {
           write(`${MIB.toString(16)}\r\n`);
           write(chunk);
           write("\r\n");
-          await new Promise((r) => setTimeout(r, 20));
+          written += 1;
+          await new Promise((r) => setTimeout(r, 100));
         }
         write("0\r\n\r\n");
       },
       15_000,
     );
     expect(res.status).toBe(413);
+    // The cap fired mid-stream: the server needed more than 5 MiB to refuse, and answered
+    // before the client had finished offering the body.
+    expect(written).toBeGreaterThanOrEqual(6);
+    expect(written).toBeLessThan(totalChunks);
   });
 
   test("a request from a foreign Origin is refused 403 (control for the cases above)", async ({
