@@ -202,6 +202,79 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
       expect(lastDetail()).toMatchObject({ cause: "upstream-status", status: 503 });
     });
 
+    // The browser SDK reads X-Sentry-Rate-Limits first and Retry-After second to decide how long
+    // to stop sending; without them it backs off on its own default. Only these two headers, only
+    // verbatim from upstream.
+    describe("upstream 429", () => {
+      function upstream429(headers: Record<string, string>): Response {
+        return { status: 429, headers: new Headers(headers) } as Response;
+      }
+
+      it("passes Retry-After and X-Sentry-Rate-Limits back verbatim and logs upstream-status", async () => {
+        const limits = "60:error;transaction:organization:quota_exceeded:org";
+        vi.stubGlobal(
+          "fetch",
+          vi
+            .fn()
+            .mockResolvedValue(
+              upstream429({ "retry-after": "37", "x-sentry-rate-limits": limits }),
+            ),
+        );
+
+        const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+        expect(res.status).toBe(429);
+        expect(res.headers.get("retry-after")).toBe("37");
+        expect(res.headers.get("x-sentry-rate-limits")).toBe(limits);
+        expect(logWarn).toHaveBeenCalledTimes(1);
+        expect(lastDetail()).toMatchObject({ cause: "upstream-status", status: 429 });
+      });
+
+      it("passes only the one that upstream sent", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(upstream429({ "retry-after": "5" })));
+
+        const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+        expect(res.status).toBe(429);
+        expect(res.headers.get("retry-after")).toBe("5");
+        expect(res.headers.has("x-sentry-rate-limits")).toBe(false);
+      });
+
+      it("invents nothing when upstream sent neither header, and drops its other headers", async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi
+            .fn()
+            .mockResolvedValue(
+              upstream429({ "x-request-id": "abc", "content-type": "text/plain" }),
+            ),
+        );
+
+        const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+        expect(res.status).toBe(429);
+        expect(res.headers.has("retry-after")).toBe(false);
+        expect(res.headers.has("x-sentry-rate-limits")).toBe(false);
+        expect(res.headers.has("x-request-id")).toBe(false);
+      });
+    });
+
+    it("does not copy the rate-limit headers onto a non-429 status", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          status: 503,
+          headers: new Headers({ "retry-after": "9", "x-sentry-rate-limits": "9:error:key" }),
+        } as Response),
+      );
+
+      const res = await POST(makeReq(envelope(ALLOWED_DSN)));
+
+      expect(res.status).toBe(503);
+      expect(res.headers.has("retry-after")).toBe(false);
+      expect(res.headers.has("x-sentry-rate-limits")).toBe(false);
+    });
+
     it("stays quiet for a 2xx and for a 4xx the SDK caused (no log noise per dropped envelope)", async () => {
       const fetchSpy = vi
         .fn()
