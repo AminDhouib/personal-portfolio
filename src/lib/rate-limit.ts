@@ -6,6 +6,8 @@
  * a module-level Map and resets on redeploy, which is fine for abuse throttling.
  */
 
+import { parseIpAddress } from "@/lib/ip-address";
+
 export interface RateLimitOptions {
   /** Maximum number of requests permitted within the window. */
   limit: number;
@@ -34,10 +36,46 @@ const buckets = new Map<string, Bucket>();
  */
 const PRUNE_THRESHOLD = 5000;
 
+/**
+ * Hard ceiling on tracked keys. Keys are validated client IPs, so a flood of unique keys needs a
+ * flood of source addresses; the cap still bounds memory (and the work a request can trigger)
+ * whatever an attacker manages.
+ */
+const MAX_BUCKETS = 10_000;
+
+/** A full scan is O(n), so it runs at most this often however fast requests arrive. */
+const PRUNE_INTERVAL_MS = 1000;
+
+let lastPruneAt = Number.NEGATIVE_INFINITY;
+
 function prune(now: number): void {
+  lastPruneAt = now;
   for (const [key, bucket] of buckets) {
     if (bucket.expiresAt <= now) buckets.delete(key);
   }
+}
+
+/**
+ * Make room for one new key. Expired buckets go first (a throttled scan); if the map is still at
+ * the cap, the least recently used live buckets are evicted. `Map` iterates in insertion order and
+ * every update re-inserts its key, so the front of the map is the least recently used, and each
+ * eviction is O(1). Evicting a live bucket forgives that caller's spent budget, which is the
+ * price of a bounded map.
+ */
+function makeRoom(now: number): void {
+  if (now - lastPruneAt >= PRUNE_INTERVAL_MS) prune(now);
+  while (buckets.size >= MAX_BUCKETS) {
+    const oldest = buckets.keys().next();
+    // Unreachable: the loop only runs while the map holds at least MAX_BUCKETS entries.
+    if (oldest.done) break;
+    buckets.delete(oldest.value);
+  }
+}
+
+/** Store a bucket as the most recently used (delete first so `Map` re-inserts it at the back). */
+function setBucket(key: string, bucket: Bucket): void {
+  buckets.delete(key);
+  buckets.set(key, bucket);
 }
 
 /**
@@ -48,9 +86,10 @@ export function checkRateLimit(key: string, opts: RateLimitOptions): RateLimitRe
   const now = Date.now();
   const windowStart = now - opts.windowMs;
 
-  if (buckets.size > PRUNE_THRESHOLD) prune(now);
+  if (buckets.size > PRUNE_THRESHOLD && now - lastPruneAt >= PRUNE_INTERVAL_MS) prune(now);
 
   const existing = buckets.get(key);
+  if (!existing && buckets.size >= MAX_BUCKETS) makeRoom(now);
   const hits = existing ? existing.hits.filter((t) => t > windowStart) : [];
 
   if (hits.length >= opts.limit) {
@@ -61,28 +100,53 @@ export function checkRateLimit(key: string, opts: RateLimitOptions): RateLimitRe
       return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil(opts.windowMs / 1000)) };
     }
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + opts.windowMs - now) / 1000));
-    buckets.set(key, { hits, expiresAt: newest + opts.windowMs });
+    setBucket(key, { hits, expiresAt: newest + opts.windowMs });
     return { allowed: false, retryAfterSeconds };
   }
 
   hits.push(now);
-  buckets.set(key, { hits, expiresAt: now + opts.windowMs });
+  setBucket(key, { hits, expiresAt: now + opts.windowMs });
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
 /**
- * Best-effort client IP for rate-limit keying. Traefik forwards the real client
- * as the first hop of x-forwarded-for; x-real-ip is the fallback.
+ * The client IP used to key rate limits. Every candidate is validated as a bare IP address
+ * (`parseIpAddress`: `isIP`, no `%zone`, length-capped), and the order is chosen so a client
+ * cannot pick the result:
+ *
+ * 1. `CF-Connecting-IP`. Production sits behind Cloudflare (proxied), which overwrites this
+ *    header with the address it saw on every request, discarding any client-sent value. Traefik
+ *    only passes it through. This is the one value a client cannot choose.
+ * 2. The RIGHTMOST `X-Forwarded-For` entry. Each proxy APPENDS the address it received the
+ *    request from, so the right end is written by the nearest proxy and the left end is whatever
+ *    the client typed. Cloudflare appends the real client and Traefik (which trusts its peer and so
+ *    keeps the incoming header) appends the hop it heard from, so behind Cloudflare the rightmost
+ *    entry is an infrastructure hop, not the visitor: that is why step 1 comes first, and why
+ *    this step is only reached for requests that bypass Cloudflare. A direct connection to
+ *    Traefik is untrusted, so Traefik discards the client's header and writes the peer address,
+ *    which is exactly the rightmost entry. Only the last entry is considered: if it is not an
+ *    address nothing appended it, and walking left would land on client-typed text.
+ * 3. `X-Real-Ip`, for a bare process with no proxy at all (local dev). Behind Traefik
+ *    `X-Forwarded-For` is always present, so this is never reached in production.
+ * 4. "unknown", one shared bucket for everything unattributable.
+ *
+ * Residual risk: the origin is reachable without Cloudflare (tracked as T-5533), and a request
+ * sent straight to it can carry any `CF-Connecting-IP`. Closing that is an infrastructure fix
+ * (firewall the origin to Cloudflare's ranges, or authenticated origin pulls); this function
+ * cannot tell a real Cloudflare header from a forged one.
  */
 export function getClientIp(request: Request): string {
+  const cloudflare = parseIpAddress(request.headers.get("cf-connecting-ip"));
+  if (cloudflare) return cloudflare;
+
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = forwardedFor.split(",");
+    const nearestProxy = parseIpAddress(hops[hops.length - 1]);
+    if (nearestProxy) return nearestProxy;
   }
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-  return "unknown";
+
+  return parseIpAddress(request.headers.get("x-real-ip")) ?? "unknown";
 }
 
 /**
