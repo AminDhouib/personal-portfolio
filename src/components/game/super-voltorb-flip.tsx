@@ -1996,9 +1996,9 @@ export function SuperVoltorbFlipGame() {
     }
 
     // 17ms/step ≈ NDS 60Hz frame rate; SE every 4 steps matches
-    // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381. We cap the loop
-    // at MAX_ITERATIONS so a 10k-coin haul doesn't take 170s — instead
-    // each iteration drains ceil(earned / 100) coins. That keeps total
+    // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381. payoutPlan caps
+    // the loop at 100 iterations so a 10k-coin haul doesn't take 170s —
+    // instead each iteration drains ceil(earned / 100) coins. That keeps total
     // drain time bounded at ~1.7s regardless of how big "earned" is,
     // while small earnings still tick one coin per step like HG/SS.
     const tickMs = 17;
