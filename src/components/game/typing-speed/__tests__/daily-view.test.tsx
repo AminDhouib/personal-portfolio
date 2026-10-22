@@ -6,6 +6,11 @@ import { dailyScore, dailyText } from "../engine/daily";
 import { SENTINEL as S } from "../engine/input";
 import { STATS_KEY, emptyStats } from "../stats";
 import { fakeVV, getInput, restoreViewport, stubViewportClass, typeInto } from "./phone-helpers";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole Typing Speed view in jsdom and type a daily text; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 // Typing a whole 180-360 char passage through the game re-renders it per key and
 // overruns the default 5 s test timeout, so the typing tests play a short prefix of the

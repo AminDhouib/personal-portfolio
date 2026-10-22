@@ -5,6 +5,11 @@ import { playWithBot } from "../engine/reference-bot";
 import { configForRef } from "../engine/run";
 import type { LevelConfig } from "../engine/core/level-config";
 import { DAILY_RECIPE, dailyFloor, dayNumber, fallbackFloor, generateFloor } from "../daily";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// The "year of days" test plays the reference bot through 365 generated floors; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 afterEach(() => vi.restoreAllMocks());
 

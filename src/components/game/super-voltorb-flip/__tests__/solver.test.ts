@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { vi, describe, it, expect } from "vitest";
 import { BOARD_CONFIGS, generateLayout, isRejected } from "../hgss";
 import { ACCEPT_RATE, layoutCount } from "../solver-prior";
 import {
@@ -10,6 +10,11 @@ import {
   type SolverInput,
 } from "../solver";
 import type { CellValue } from "../types";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// The deal-weighting test solves 2500 generated boards; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
