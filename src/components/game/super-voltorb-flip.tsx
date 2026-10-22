@@ -85,11 +85,10 @@ import { SettingsPanel } from "./super-voltorb-flip/settings-panel";
 import { StatsPanel } from "./super-voltorb-flip/stats-panel";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import {
-  SPRITE_NO_GRAB_STYLE,
   VOLTORB_FACE_SCALE,
-  VOLTORB_TILE_SRC,
   preloadOriginalSprites,
 } from "./super-voltorb-flip/art/original-sprites";
+import { VoltorbSprite } from "./super-voltorb-flip/art/voltorb-sprite";
 import { GLYPHS } from "./super-voltorb-flip/art/sprites";
 import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
@@ -503,12 +502,16 @@ const Card = ({
                           : "items-end justify-end",
                   ].join(" ")}
                 >
-                  <PixelSprite
-                    sprite={GLYPHS[f]}
-                    cssSize={flagSize}
-                    outline="#1f2937"
-                    style={{ color: "#fff" }}
-                  />
+                  {f === "V" ? (
+                    <VoltorbSprite cssSize={flagSize} />
+                  ) : (
+                    <PixelSprite
+                      sprite={GLYPHS[f]}
+                      cssSize={flagSize}
+                      outline="#1f2937"
+                      style={{ color: "#fff" }}
+                    />
+                  )}
                 </div>
               ) : null,
             )}
@@ -1089,21 +1092,9 @@ const Gameboard = ({
                       {cell.value === "V" ? (
                         // The original Voltorb sprite (22 px, salmon face baked in), so the burst
                         // frames, which carry the same Voltorb, land exactly on it.
-                        // eslint-disable-next-line @next/next/no-img-element -- a 22 px pixel sprite, scaled with CSS and never optimized
-                        <img
-                          src={VOLTORB_TILE_SRC}
-                          alt=""
-                          draggable={false}
+                        <VoltorbSprite
+                          cssSize={`calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`}
                           className="picture-outline voltorb"
-                          style={{
-                            ...SPRITE_NO_GRAB_STYLE,
-                            imageRendering: "pixelated",
-                            width: `calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`,
-                            height: `calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`,
-                            maxWidth: "none",
-                            maxHeight: "none",
-                            display: "block",
-                          }}
                         />
                       ) : (
                         cell.value

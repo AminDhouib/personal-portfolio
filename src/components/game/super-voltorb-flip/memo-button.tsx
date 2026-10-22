@@ -1,7 +1,8 @@
 "use client";
 
 import { PixelSprite } from "./art/pixel-sprite";
-import { GLYPHS, GLYPH_CLEAR, GLYPH_UNDO } from "./art/sprites";
+import { GLYPHS, GLYPH_CLEAR, GLYPH_UNDO, type Sprite } from "./art/sprites";
+import { VoltorbSprite } from "./art/voltorb-sprite";
 
 export type MemoFlag = 1 | 2 | 3 | "V";
 
@@ -19,22 +20,20 @@ const FACE_OFF =
 const FACE_ON =
   "flex items-center justify-center rounded-[4px] border-2 border-[#b87512] bg-[#efa539]";
 
-function MemoFace({
-  sprite,
-  active,
-  size,
-}: {
-  sprite: (typeof GLYPHS)[MemoFlag] | typeof GLYPH_CLEAR;
-  active: boolean;
-  size: number;
-}) {
+// A face shows a glyph (the digits, the clear and undo marks, drawn as inline SVG) or, with no
+// sprite, the Voltorb: the original sprite, at the same 62% of the face the glyphs use.
+function MemoFace({ sprite, active, size }: { sprite?: Sprite; active: boolean; size: number }) {
   return (
     <span className={active ? FACE_ON : FACE_OFF} style={{ width: size, height: size }}>
-      <PixelSprite
-        sprite={sprite}
-        cssSize="62%"
-        style={{ color: active ? "#1f2937" : "#4b5563" }}
-      />
+      {sprite ? (
+        <PixelSprite
+          sprite={sprite}
+          cssSize="62%"
+          style={{ color: active ? "#1f2937" : "#4b5563" }}
+        />
+      ) : (
+        <VoltorbSprite cssSize="62%" />
+      )}
     </span>
   );
 }
@@ -84,7 +83,7 @@ export function MemoBar({
             title={`Tag tiles as ${f}`}
             className="rounded-sm transition-opacity hover:opacity-80"
           >
-            <MemoFace sprite={GLYPHS[f]} active={active} size={size} />
+            <MemoFace sprite={f === "V" ? undefined : GLYPHS[f]} active={active} size={size} />
           </button>
         );
       })}

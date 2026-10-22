@@ -9,10 +9,9 @@ import {
   type Transition,
 } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { BurstFrame } from "./super-voltorb-flip/art/frames";
-import { BURST_FRAMES, CORE_SCALE } from "./super-voltorb-flip/art/fx";
-import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
-import { ORB } from "./super-voltorb-flip/art/sprites";
+import { BURST_FRAMES } from "./super-voltorb-flip/art/fx";
+import { preloadOriginalSprites } from "./super-voltorb-flip/art/original-sprites";
+import { ExplodeFrameImg, VoltorbSprite } from "./super-voltorb-flip/art/voltorb-sprite";
 import {
   pickCellValue,
   pickCellValueSeeded,
@@ -789,17 +788,16 @@ export function TypingSpeedBanner() {
 // ---------- Super Voltorb Flip ----------
 // Pixel-accurate match: #58a66c/#448563 checkerboard tile backs, salmon
 // #bd8c84 face-up tiles, gray-200 outlines, colored clue cards from the
-// COLORS array, the game's original spark-orb sprite, connector bars between
-// tiles. The orb and the burst are the same art the game uses
+// COLORS array, the game's original Voltorb sprite, connector bars between
+// tiles. The Voltorb and the burst are the same art the game uses
 // (super-voltorb-flip/art/).
 //
 // The burst plays over the tile for 9 frames at 60ms each with an 80ms hold
-// after the last, then a 200ms cross-fade. It is drawn with its own orb core
-// (the tile's static orb is hidden while it plays), at a scale that makes the
-// core match the 22px static orb, so the hand-off back to the static orb does
-// not snap.
+// after the last, then a 200ms cross-fade. The original frames are drawn at their
+// native pixel size, so the Voltorb baked into them is the 22px sprite exactly (the
+// tile's static sprite is hidden while it plays), and the hand-off back to the static
+// sprite does not snap.
 const BURST_BOX_PX = 64;
-const BURST_CORE_MATCH_SCALE = 22 / (11 * CORE_SCALE);
 const FRAME_DURATION_MS = 60;
 const FRAME_HOLD_MS = 80;
 const FADE_DURATION_MS = 200;
@@ -835,6 +833,7 @@ function ExplosionFrames({ onFadeStart, onDone }: { onFadeStart: () => void; onD
   return (
     <div
       style={{
+        position: "relative",
         width: BURST_BOX_PX,
         height: BURST_BOX_PX,
         pointerEvents: "none",
@@ -842,32 +841,30 @@ function ExplosionFrames({ onFadeStart, onDone }: { onFadeStart: () => void; onD
         transition: `opacity ${FADE_DURATION_MS}ms ease-out`,
       }}
     >
-      <BurstFrame frame={frame} cssSize="100%" core />
+      <ExplodeFrameImg frame={frame} />
     </div>
   );
 }
 
-// Bomb tile face: the orb at the tile's face size. The burst plays in a
+// Bomb tile face: the Voltorb sprite at its native size. The burst plays in a
 // separate overlay at the tile-outer level (see BombExplosionOverlay).
 function BombFaceUp({ size }: { size: number }) {
-  return <PixelSprite sprite={ORB} size={size} style={{ pointerEvents: "none" }} />;
+  return <VoltorbSprite size={size} style={{ pointerEvents: "none" }} />;
 }
 
 // Sibling-of-tile-inner overlay rendered ON TOP of the tile (z=5 vs the
-// tile-inner's z=1). Scaled so the burst's own orb core matches the tile's
-// static orb, and the outer debris ring overflows past the tile boundary
-// into the gap. After onDone fires, the overlay unmounts and the static orb
-// in the tile-inner is visible again at full size.
+// tile-inner's z=1). The burst's baked-in Voltorb matches the tile's static
+// sprite pixel for pixel, and the outer debris ring overflows past the tile
+// boundary into the gap. After onDone fires, the overlay unmounts and the
+// static sprite in the tile-inner is visible again.
 // One-shot explosion overlay. The owning cell remounts this with a fresh
 // `key` at each new cycle (or when its value flips to "bomb" again), so a
 // single-fire timer is sufficient — no internal interval.
 function BombExplosionOverlay({
   flipDelayMs,
-  scale,
   onExplodingChange,
 }: {
   flipDelayMs: number;
-  scale: number;
   onExplodingChange: (e: boolean) => void;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -893,8 +890,7 @@ function BombExplosionOverlay({
         position: "absolute",
         top: "50%",
         left: "50%",
-        transform: `translate(-50%, -50%) scale(${scale})`,
-        transformOrigin: "center",
+        transform: "translate(-50%, -50%)",
         zIndex: 5,
         pointerEvents: "none",
       }}
@@ -1041,7 +1037,6 @@ function BoardCell({
         <BombExplosionOverlay
           key={`bomb-${cycleTick}`}
           flipDelayMs={explosionDelayMs}
-          scale={BURST_CORE_MATCH_SCALE}
           onExplodingChange={setExploding}
         />
       )}
@@ -1111,6 +1106,10 @@ function VoltorbBannerTileBack() {
 }
 
 export function SuperVoltorbFlipBanner() {
+  // The bomb tiles and their burst are images: have them cached before the first bomb.
+  useEffect(() => {
+    preloadOriginalSprites();
+  }, []);
   const TILE = 28;
   const GAP = 12;
   const OUTLINE = 3;

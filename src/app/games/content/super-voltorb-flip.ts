@@ -146,13 +146,13 @@ export const superVoltorbFlipContent: GameContent = {
     {
       label: "Voltorb sprites",
       detail:
-        "The Voltorb on a revealed tile and its explosion are the original sprites from Pokemon HeartGold and SoulSilver, the property of Nintendo, Creatures Inc. and GAME FREAK inc., used here in an unofficial, non-commercial fan recreation. The sprite files come from samualtnorman's voltorb-flip recreation, GPL-3.0.",
+        "The Voltorb, wherever the game shows it (the tiles, the clue cards, the memo mark, the legend), and its explosion are the original sprites from Pokemon HeartGold and SoulSilver, the property of Nintendo, Creatures Inc. and GAME FREAK inc., used here in an unofficial, non-commercial fan recreation. The sprite files come from samualtnorman's voltorb-flip recreation, GPL-3.0.",
       href: "https://github.com/samualtnorman/voltorb-flip",
     },
     {
       label: "Sound effects and other artwork",
       detail:
-        "Original: the sound effects and the risk warning are generated in your browser, and every other piece of art (the clue cards, the legend, the memo marks, the coin and the sparkle) is drawn for this site.",
+        "Original: the sound effects and the risk warning are generated in your browser, and every other piece of art (the memo digits and marks, the coin and the sparkle, and the layout around the Voltorb) is drawn for this site.",
     },
   ],
 };

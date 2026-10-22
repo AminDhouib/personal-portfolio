@@ -871,26 +871,35 @@ current tree on 2026-07-07.
   allowlist (below): any audio file that is not the four originals or the three kept CC0 tracks
   fails it. The muted clear wait is `LEVEL_WIN_MS`, not a literal (T2d-1): `audio-timing.test.tsx`
   runs the clear wait in both modes and pins the payout start at exactly that length.
-- **Super Voltorb Flip shows the original Voltorb creature art in two places and draws everything
-  else itself.** The revealed Voltorb tile is `sprites/tile/voltorb.png` and the bomb burst plays
-  `sprites/tile/explode_0..8.png` (`art/original-sprites.ts`, `effects/default.tsx`), restored on
-  Amin's 2026-10-22 instruction (T-6535) after the 2026-10-07 cleanup had removed all cartridge
-  sprites. They are the GPL-3.0 sprites from samualtnorman/voltorb-flip, shipped with their
+- **Super Voltorb Flip draws its Voltorb as the original creature sprite everywhere, and
+  draws everything else itself.** The Voltorb is `sprites/tile/voltorb.png` and the bomb burst is
+  `sprites/tile/explode_0..8.png` (`art/original-sprites.ts`, drawn by `art/voltorb-sprite.tsx`):
+  on the revealed tile and its burst (`effects/default.tsx`), on the row and column clue cards, the
+  Voltorb memo flag on the memo bar and on tiles, the How to play button and modal icons, the legend
+  cards with their looping burst (`chrome.tsx`), and the hub banner's bomb tiles and burst
+  (`banners.tsx`). It was restored on Amin's 2026-10-22 instruction (T-6535) after the 2026-10-07
+  cleanup had removed all cartridge sprites, and widened on his ruling for #174: "switch the legend
+  rows, clue cards and memo flags to the real Voltorb too, one consistent sprite everywhere". The
+  indigo orb (`ORB`), the burst geometry and the orb-core burst are deleted. They are the GPL-3.0 sprites from samualtnorman/voltorb-flip, shipped with their
   `LICENSE` and `NOTICE.md`; the creature belongs to Nintendo, Game Freak and Creatures Inc. and is
   shown in an unofficial non-commercial fan recreation. The ten files are preloaded when the game
   mounts, and the images carry `draggable={false}` and `SPRITE_NO_GRAB_STYLE` (no iOS long-press
   Save Image sheet, no selection). The burst frames grow from 22 px to 64 px
   with the Voltorb baked into the middle at one fixed pixel size, so each frame is scaled by the
-  same factor as the 22 px tile sprite (`explodeFrameCssSize`) and the baked Voltorb lands exactly
-  on the face underneath; `original-art.test.tsx` pins the paths, the native sizes (read from the PNG
-  headers) and that scaling. Nothing else is a sprite image, on purpose, and a standing owner rule
-  keeps it so: the CSS legend rows, the clue cards, the memo glyphs (`art/sprites.ts`, inline SVG
-  through `PixelSprite`), `CoinSpinner`, the chrome and the responsive text labels never become
+  same factor as the 22 px tile sprite (`explodeFrameCssSize` on the board; native size in the
+  legend and the banner) and the baked Voltorb lands exactly on the face underneath;
+  `original-art.test.tsx` pins the paths, the native sizes (read from the PNG headers) and that
+  scaling, and `voltorb-everywhere.test.tsx` pins every call site. Icon boxes keep their exact size
+  and draw the sprite at a whole multiple of its 22 px (`crispIconSize`: a 28 px box gets 22 px), the
+  clue-card sprite stays on its tile-relative size, and the memo face keeps its size with the
+  sprite at 62% of it. The sprite file carries its own salmon square and dark border, so it reads
+  as a small tile on the clue cards and legend cards; that is the accepted look. Nothing else is a
+  sprite image, on purpose, and a standing owner rule keeps it so: the CSS legend layout and colours,
+  `CoinSpinner`, the chrome, the frames, the text labels and the other memo glyphs (1, 2, 3, the
+  clear X and the undo arrow, `art/sprites.ts`, inline SVG through `PixelSprite`) never become
   sprites, and the number, memo, chrome, coin and button sprites of the old set stay deleted. The
-  indigo orb (`ORB`) is therefore still what the legend, the clue cards, the memo flags and the hub
-  banner draw; it is deliberately not the creature, and swapping any of those to the sprite is the
-  owner's call, not a cleanup. The success sparkle and the spinning coin are still pure frame
-  geometry in `art/fx.ts` drawn by `art/frames.tsx`. The game keeps its CSS look and the "Super
+  success sparkle and the spinning coin are still pure frame geometry in `art/fx.ts` drawn by
+  `art/frames.tsx`. The game keeps its CSS look and the "Super
   Voltorb Flip" name, and shows an unofficial-fan-recreation disclaimer in the About credits and
   in the How to play modal, which now also say the Voltorb sprites and the music are the originals.
   `__tests__/assets-guard.test.ts` is an explicit allowlist of exactly the restored files (ten

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { BurstFrame, CoinFrame, SparkleFrame } from "./art/frames";
+import { CoinFrame, SparkleFrame } from "./art/frames";
 import { BURST_FRAMES, COIN_FRAMES, SPARKLE_FRAMES } from "./art/fx";
-import { PixelSprite } from "./art/pixel-sprite";
-import { ORB } from "./art/sprites";
+import { crispIconSize } from "./art/original-sprites";
+import { ExplodeFrameImg, VoltorbSprite } from "./art/voltorb-sprite";
 
 // ---------------------------------------------------------------------------
-// The orb icon: the original spark-orb sprite (art/sprites.ts) used wherever
+// The Voltorb icon: the original tile sprite (art/voltorb-sprite.tsx) used wherever
 // the game shows its hazard, on the clue cards, in the legend and as the
 // How to play icon.
 // ---------------------------------------------------------------------------
@@ -21,7 +21,23 @@ export function VoltorbIcon({
   cssSize?: string;
   className?: string;
 }) {
-  return <PixelSprite sprite={ORB} size={size} cssSize={cssSize} className={className} />;
+  // A CSS length (the clue cards, which scale with the tile) is used as given. A pixel box keeps
+  // its exact size, with the sprite drawn at a whole multiple of its 22 px art inside it.
+  if (cssSize) return <VoltorbSprite cssSize={cssSize} className={className} />;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        width: size,
+        height: size,
+      }}
+    >
+      <VoltorbSprite size={crispIconSize(size)} className={className} />
+    </span>
+  );
 }
 
 function LoopingFrames({
@@ -53,6 +69,7 @@ function LoopingFrames({
     <span
       aria-hidden="true"
       style={{
+        position: "relative",
         display: "inline-block",
         flexShrink: 0,
         width: size,
@@ -65,15 +82,16 @@ function LoopingFrames({
   );
 }
 
-// The legend and modal draw these over a card that already shows the orb, so
-// the burst carries no orb of its own.
+// The legend and modal draw the original burst frames over a card that already shows the sprite.
+// Each frame is at its native pixel size, so the Voltorb baked into it is the icon's 22 px sprite
+// exactly, and the larger frames overflow the box (it is only the layout footprint).
 export const LoopingExplosion = ({ size }: { size: number }) => (
   <LoopingFrames
     count={BURST_FRAMES}
     size={size}
     interval={70}
     pauseMs={500}
-    render={(f) => <BurstFrame frame={f} cssSize="100%" />}
+    render={(f) => <ExplodeFrameImg frame={f} />}
   />
 );
 
