@@ -18,7 +18,7 @@ describe("planPosthogProxyForward", () => {
       ...over,
     });
 
-  it.each(["/e", "/e/", "/i/v0/e/", "/i/v0"])(
+  it.each(["/e", "/e/", "/i/v0/e", "/i/v0/e/"])(
     "sends capture path %s over the internal hop, slash kept",
     (subPath) => {
       expect(plan(subPath).internalRewrite).toBe(`${INTERNAL}${subPath}`);
@@ -53,6 +53,13 @@ describe("planPosthogProxyForward", () => {
     "/capture-x/",
     "/i/v1/e/",
     "/i/v0x/",
+    // under a capture prefix but not one of the allowed capture paths
+    "/i/v0",
+    "/i/v0/",
+    "/i/v0/e/x",
+    "/i/v0/other/",
+    "/e/x",
+    "/e//",
   ])("leaves %s to the public rewrite", (subPath) => {
     expect(plan(subPath).internalRewrite).toBeNull();
   });
@@ -164,6 +171,22 @@ describe("posthogUpstreamHeaders", () => {
   it("sends no X-Forwarded-For at all when there is no trusted visitor address", () => {
     const out = posthogUpstreamHeaders(new Headers({ "x-forwarded-for": "6.6.6.6" }), null);
     expect(out.has("x-forwarded-for")).toBe(false);
+  });
+
+  it("strips the client-set address headers whatever the forwarded-for decision", () => {
+    const incoming = new Headers({
+      "x-real-ip": "6.6.6.6",
+      forwarded: "for=6.6.6.6",
+      "cf-connecting-ip": "6.6.6.6",
+      "user-agent": "ua",
+    });
+    for (const decision of ["203.0.113.9", null]) {
+      const out = posthogUpstreamHeaders(incoming, decision);
+      expect(out.has("x-real-ip")).toBe(false);
+      expect(out.has("forwarded")).toBe(false);
+      expect(out.has("cf-connecting-ip")).toBe(false);
+      expect(out.get("user-agent")).toBe("ua");
+    }
   });
 
   it("does not mutate the incoming headers", () => {
