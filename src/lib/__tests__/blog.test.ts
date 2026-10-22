@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractToc, getAllBlogSlugs } from "../blog";
+import { extractToc, getAllBlogPosts, getAllBlogSlugs, getBlogPost } from "../blog";
 
 describe("extractToc", () => {
   it("returns empty array for empty string", () => {
@@ -43,5 +43,42 @@ describe("getAllBlogSlugs", () => {
   it("returns an array (empty if content/blog dir missing)", () => {
     const result = getAllBlogSlugs();
     expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// T-6264. getBlogPost joined the slug straight into a path, so "../" segments walked out of
+// content/blog and read any .md or .mdx file the process could see (the repo's own README.md and
+// AGENTS.md, a dependency's docs). Tests run from the repo root, the same cwd the app uses.
+describe("getBlogPost slug validation", () => {
+  it.each(getAllBlogSlugs())("still serves the real post %s", (slug) => {
+    expect(getBlogPost(slug)?.slug).toBe(slug);
+  });
+
+  it.each([
+    "../../README",
+    "../../AGENTS",
+    "../../../README",
+    "../blog/caramel-open-source-story",
+    "./caramel-open-source-story",
+    "caramel-open-source-story/../caramel-open-source-story",
+    "/etc/passwd",
+    "..\..\README",
+    "..%2F..%2FREADME",
+    "%2e%2e%2f%2e%2e%2fREADME",
+    "caramel-open-source-story%00",
+    `caramel-open-source-story${String.fromCharCode(0)}.x`,
+    "Caramel-Open-Source-Story",
+    "-caramel",
+    "",
+    ".",
+    "..",
+  ])("refuses the slug %j", (slug) => {
+    expect(getBlogPost(slug)).toBeNull();
+  });
+
+  it("does not turn a refused slug into a listing entry or a read", () => {
+    expect(getAllBlogPosts().map((p) => p.slug)).toEqual(
+      expect.arrayContaining(["caramel-open-source-story"]),
+    );
   });
 });
