@@ -950,6 +950,39 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   code's own comment calls it out as the same class of theater `env.ts`'s honesty pass removed
   elsewhere. The real control is an in-handler 60-second deadline via `createDeadlineFetch`,
   merged with the inbound request's own abort signal.
+- **The chat route reads the request body itself and forwards a rebuilt copy** (T-5525,
+  `src/app/api/copilotkit/route.ts`, `src/lib/copilot-envelope.ts`). The route is an open LLM
+  proxy: before this, one request could carry a ~700 KB envelope (~175k input tokens) and could
+  bring its own tools and system messages. After the origin check, rate limit and key check it now
+  stream-reads the body against 512 KiB (`readCappedBody`; 413, chunked bodies included), parses
+  the single-route envelope, and, on a run body, refuses more than 100 messages or 120,000
+  characters of message JSON or 8,000 of application context (413), drops `system` and
+  `developer` messages, and drops every client tool except the two the site really registers
+  (`collectLead` from `use-lead-collector-action.ts`, and `copilotkitSuggest`, which CopilotKit
+  attaches to a suggestions run; dropping either would break lead capture or the suggested
+  prompts) when its definition is about as large as the real one. The runtime then gets a new
+  `Request` (same URL, method, headers minus the old framing headers, same abort signal). The caps
+  come from the site's own chat: a long real conversation is a few tens of KB and the test fixture of
+  40 turns (80 messages) is well under every cap. The
+  grounding prompt is still injected server-side (`applySystemPrompt`); this only removes the
+  client's ability to add to it. Application context (`useCopilotReadable`) is capped, not dropped,
+  because the site sends the page path through it. Deliberately untouched, a different lane:
+  `maxOutputTokens`, the model, retries and the agent config (BuiltInAgent has no overridable
+  properties, so `forwardedProps` cannot change the model). Not restricted: the envelope's `method`
+  (the runtime also serves `transcribe`, `resource/request` and the inspector methods; the byte cap
+  bounds them, but nothing here narrows them to the three the site uses). Re-check the tool allow-list
+  on a CopilotKit upgrade and whenever a new `useCopilotAction` is added.
+- **Chat errors never reach the visitor verbatim** (T-5532, `src/lib/copilot-error-sanitizer.ts`).
+  A `RUN_ERROR` frame's `message`, and the body of a runtime 4xx/5xx, carry upstream and
+  internal text (an OpenRouter error body, a stack-shaped string). The route wraps the response
+  after `tapRunErrors`: every `RUN_ERROR` frame becomes `{ type, message: <generic>, code:
+"chat_error" }` as it streams (all other frames byte for byte; a line it cannot scan within 1 MB is
+  dropped, not passed), a runtime error body becomes `{ error: <generic> }` with the status kept, and
+  a throw out of `handleRequest` becomes a generic 500 after `captureException`. The detail goes to
+  Sentry through the tap for stream errors and through `logError` for response bodies. The order
+  matters: the sanitiser must wrap the tap, because the tap reads the raw frames.
+  The 503 `OPENROUTER_KEY not configured` body predates this and is unchanged; it names a variable,
+  not a value.
 - **Super Voltorb Flip deals and scores by the HGSS rules** (`super-voltorb-flip/hgss.ts`,
   ported from pret/pokeheartgold 9d8b759). The 80 board layouts, the free-multiplier re-roll
   (including its quirks: a deal is accepted after 1000 rejections, and a placement call gives up

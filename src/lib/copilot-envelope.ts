@@ -1,0 +1,142 @@
+/**
+ * Validates and trims the JSON envelope the chat client POSTs to /api/copilotkit, before the
+ * CopilotKit runtime sees it. The route is an open LLM proxy behind an origin check and a rate
+ * limit; without this, one request could carry an arbitrarily large conversation (a ~700 KB
+ * envelope is ~175k input tokens) and could bring its own tools and system messages, so the
+ * client, not the server, would decide what the model is told and allowed to call.
+ *
+ * What it enforces:
+ *   - message count, total message size and application-context size caps (413 over);
+ *   - system / developer messages in the client's history are dropped: the grounding prompt is
+ *     injected server-side (route.ts, amin-ai-prompt.ts) and is the only system text;
+ *   - client tools are dropped unless the site itself registers them (the allow-list below) and the
+ *     definition is about as big as the real one.
+ *
+ * The envelope is the single-route shape `{ method, params?, body? }`, where `body` is an AG-UI
+ * RunAgentInput (see route.integration.test.ts for the real shapes). Anything that is not a run
+ * body (info, stop) passes through untouched, and the rest of the envelope is forwarded as the
+ * client sent it.
+ *
+ * Cap values come from the site's own chat. The client resends the whole history every turn, so a
+ * long real conversation is ~15-20 turns of ~200-character questions and answers of up to
+ * ~1,500 characters (an estimate from the answer style, not logged data): a few tens of KB. The
+ * test fixture of 40 turns (80 messages, ~72 KB of message JSON) is far past what a visitor
+ * produces and still passes under every cap, and each cap is a comfortable multiple above that,
+ * so none of them trims a conversation a person actually has.
+ */
+
+/** Hard ceiling on the request body, read as a stream (see read-capped-body.ts). */
+// English chat JSON is ~1 byte per character; 512 KiB also holds the message-character cap below
+// written in CJK at 3 bytes per character (360 KB) plus tools and context, and stays under the
+// ~700 KB abusive envelope this guards against.
+export const COPILOT_MAX_BODY_BYTES = 512 * 1024;
+
+/** Messages forwarded after system messages are dropped: 50 turns, vs ~15-20 in a long real chat. */
+export const COPILOT_MAX_MESSAGES = 100;
+
+/** Characters of message JSON, summed. 120k is ~30k tokens (Haiku's window is far larger). */
+export const COPILOT_MAX_MESSAGE_CHARS = 120_000;
+
+/**
+ * Characters of application context (useCopilotReadable). The site sends one short entry, the page
+ * path, about 150 characters. The runtime turns context into a system message, so it is capped
+ * instead of dropped: 8,000 is more than 50 times the real use.
+ */
+export const COPILOT_MAX_CONTEXT_CHARS = 8000;
+
+/**
+ * Client tools the site really registers: `collectLead` (use-lead-collector-action.ts) and the
+ * `copilotkitSuggest` tool CopilotKit attaches to a chat-suggestions run. Dropping these would
+ * break lead capture and the suggested prompts; everything else is dropped.
+ */
+const ALLOWED_CLIENT_TOOLS = new Set(["collectLead", "copilotkitSuggest"]);
+
+/** The real definitions serialise to ~0.8 KB (collectLead) and ~1 KB (suggest). */
+const MAX_TOOL_DEFINITION_CHARS = 8000;
+
+const SERVER_ONLY_ROLES = new Set(["system", "developer"]);
+
+export type EnvelopeResult =
+  | {
+      ok: true;
+      /** The envelope to forward, serialised. */
+      body: string;
+      /** Names (or "?") of client tools that were removed. */
+      droppedTools: string[];
+      droppedSystemMessages: number;
+    }
+  | { ok: false; status: 400 | 413; error: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isServerOnlyRole(message: unknown): boolean {
+  return (
+    isRecord(message) &&
+    typeof message.role === "string" &&
+    SERVER_ONLY_ROLES.has(message.role.trim().toLowerCase())
+  );
+}
+
+function serializedLength(value: unknown): number {
+  return JSON.stringify(value)?.length ?? 0;
+}
+
+function toolName(tool: unknown): string | null {
+  return isRecord(tool) && typeof tool.name === "string" ? tool.name : null;
+}
+
+export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(text);
+  } catch {
+    // silent-ok: a body that is not JSON is a client error, answered as the 400 below
+    return { ok: false, status: 400, error: "invalid json" };
+  }
+  if (!isRecord(envelope)) return { ok: false, status: 400, error: "invalid json" };
+
+  const droppedTools: string[] = [];
+  let droppedSystemMessages = 0;
+  const run = envelope.body;
+
+  if (isRecord(run)) {
+    if (Array.isArray(run.messages)) {
+      const kept = run.messages.filter((message) => !isServerOnlyRole(message));
+      droppedSystemMessages = run.messages.length - kept.length;
+      if (kept.length > COPILOT_MAX_MESSAGES) {
+        return { ok: false, status: 413, error: "conversation too long" };
+      }
+      const chars = kept.reduce((sum: number, message) => sum + serializedLength(message), 0);
+      if (chars > COPILOT_MAX_MESSAGE_CHARS) {
+        return { ok: false, status: 413, error: "conversation too long" };
+      }
+      run.messages = kept;
+    }
+
+    if (Array.isArray(run.context) && serializedLength(run.context) > COPILOT_MAX_CONTEXT_CHARS) {
+      return { ok: false, status: 413, error: "context too large" };
+    }
+
+    if ("tools" in run) {
+      const tools = Array.isArray(run.tools) ? run.tools : [];
+      run.tools = tools.filter((tool) => {
+        const name = toolName(tool);
+        const allowed =
+          name !== null &&
+          ALLOWED_CLIENT_TOOLS.has(name) &&
+          serializedLength(tool) <= MAX_TOOL_DEFINITION_CHARS;
+        if (!allowed) droppedTools.push(name ?? "?");
+        return allowed;
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    body: JSON.stringify(envelope),
+    droppedTools,
+    droppedSystemMessages,
+  };
+}
