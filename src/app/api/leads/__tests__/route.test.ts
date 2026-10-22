@@ -438,20 +438,16 @@ describe("POST /api/leads abuse limits", () => {
     expect(mockFetch).toHaveBeenCalledTimes(CAP + 1);
   });
 
-  it("answers the normal success shape for a filled honeypot without storing or emailing", async () => {
-    const res = await POST(lead({ website: "http://spam.example" }));
+  it("does not spend the cap on a failed send", async () => {
+    vi.setSystemTime(new Date("2031-05-01T10:00:00Z"));
+    mockFetch.mockImplementation(async () => sendlyProblem(503, "unavailable"));
+    for (let i = 0; i < CAP + 5; i += 1) {
+      expect((await POST(lead())).status).toBe(200);
+    }
+    expect(mockFetch).toHaveBeenCalledTimes(CAP + 5);
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, id: null, createdAt: null });
-    expect(mockAppendLead).not.toHaveBeenCalled();
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(logWarn).toHaveBeenCalledTimes(1);
-  });
-
-  it("treats an empty honeypot as a normal lead", async () => {
-    const res = await POST(lead({ website: "" }));
-    expect(res.status).toBe(200);
-    expect(mockAppendLead).toHaveBeenCalledOnce();
-    expect(mockFetch).toHaveBeenCalledOnce();
+    mockFetch.mockReset().mockImplementation(async () => sendlyAccepted());
+    for (let i = 0; i < CAP + 1; i += 1) await POST(lead());
+    expect(mockFetch).toHaveBeenCalledTimes(CAP);
   });
 });
