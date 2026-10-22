@@ -225,6 +225,32 @@ describe("sanitizeCopilotEnvelope: client tools", () => {
     expect(result.droppedTools).toEqual([]);
   });
 
+  // Every entry with a registered name becomes a ~630-byte server copy, so without a limit a
+  // 29-byte `{"name":"copilotkitSuggest"}` grows 21x: RUN_STARTED echoes the input back in the
+  // response and the thread store keeps it. At most one copy of each name is forwarded.
+  it("forwards one copy of a tool however many times the client lists it", () => {
+    const tools = Array.from({ length: 1000 }, () => ({ name: "collectLead" }));
+    const result = ok(JSON.stringify(runEnvelope({ messages: [turn(0)], tools })));
+    expect(result.parsed.body.tools).toEqual([COLLECT_LEAD_TOOL]);
+    expect(result.body.length).toBeLessThan(5000);
+  });
+
+  it("forwards one of each registered tool from a mixed, repeating list, in first-seen order", () => {
+    const tools = [
+      { name: "collectLead" },
+      { name: "copilotkitSuggest" },
+      { name: "collectLead" },
+      { name: "x" },
+      { name: "copilotkitSuggest" },
+      { name: "x" },
+    ];
+    const result = ok(JSON.stringify(runEnvelope({ messages: [turn(0)], tools })));
+    expect(result.parsed.body.tools).toEqual([COLLECT_LEAD_TOOL, SUGGEST_TOOL]);
+    // A repeat of a registered tool is not dropped content (the site can list a tool twice), so
+    // only the unregistered one is reported, and reported once per entry as before.
+    expect(result.droppedTools).toEqual(["x", "x"]);
+  });
+
   it("keeps the server's copies identical to what the site's own client sends", () => {
     // If CopilotKit or use-lead-collector-action.ts changes a definition, the model would be
     // offered a stale one: this is where that surfaces.
