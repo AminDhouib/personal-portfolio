@@ -78,10 +78,14 @@ The site is self-hosted via [Dokploy](https://dokploy.com/) (Docker) on a home s
 
 **Persistent data.** Game leaderboards, the Password Game 2 leaderboard, and contact-form leads are stored in Postgres, not on disk. Compose defines a `db` service (`postgres:17-alpine`) whose data lives on the `db-data` named volume; the schema is created once, on the volume's first start, from `db/init.sql`. Without that volume the data would be wiped on every redeploy. See RUNBOOK.md's data section for the table list and the schema-change procedure.
 
-**CI/CD.** `.github/workflows/ci.yml` runs on every push and pull request:
+**CI/CD.** `.github/workflows/ci.yml` runs on every push and pull request, except changes that touch only root-level `*.md`, `docs/**`, `audit/**`, `LICENSE`, `NOTICE` or `.claude/**` (those skip the whole workflow, `deploy` included). Nested markdown such as `public/**/CREDITS.md` still runs it.
 
-1. `quality` job — install, typecheck, lint, test, build.
-2. `deploy` job — runs only on push to `main`, and only after `quality` passes. It checks for four repository secrets (`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DOKPLOY_URL`, `DOKPLOY_TOKEN`); if any are missing it prints `deploy skipped: secrets not configured` and exits cleanly. Otherwise it joins the tailnet via `tailscale/github-action` (OAuth client tagged `tag:ci`) and calls the Dokploy API to trigger a deploy.
+1. `lint-and-test` job — install, format, lint, typecheck, drift and pin checks, knip, tests with coverage. It does not build.
+2. `build` job — one production build (with a throwaway `NEXT_PUBLIC_GA4_ID`), the bundle budget check, and a standalone tarball artifact that `e2e` downloads instead of rebuilding.
+3. `lighthouse` job — keeps its own build without the GA4 id, because the gtag bootstrap cost the homepage performance score (0.48 to 0.41).
+4. `e2e` job — Playwright against the artifact from `build`.
+5. `db-integration` job — the arcade store against a throwaway Postgres service container.
+6. `deploy` job — runs only on push to `main`, and only after the jobs above pass. It checks for four repository secrets (`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DOKPLOY_URL`, `DOKPLOY_TOKEN`); if any are missing it prints `deploy skipped: secrets not configured` and exits cleanly. Otherwise it joins the tailnet via `tailscale/github-action` (OAuth client tagged `tag:ci`) and calls the Dokploy API to trigger a deploy.
 
 This exists because Dokploy's built-in GitHub `autoDeploy` webhook **cannot** work here: the Dokploy panel is reachable only over Tailscale, and GitHub's servers can't reach into the tailnet to deliver a webhook. Instead, the GitHub Actions runner joins the tailnet itself and pushes the deploy trigger from inside it.
 
