@@ -1,0 +1,1 @@
+space-shooter 5s after load: console errors 0 (only warn THREE.Clock deprecated), resources with status>=400: none, canvas 1
