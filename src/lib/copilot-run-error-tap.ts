@@ -57,7 +57,70 @@ interface RunErrorFrame {
   code?: string;
 }
 
+// Sampling (T-6263). Every RUN_ERROR frame used to become a Sentry event, so a client that can make
+// runs fail (a malformed or oversized request the upstream rejects) could burn the Sentry quota.
+// Captures are limited per error code: the first of each code in a window always goes through, at
+// most RUN_ERROR_CAPTURES_PER_WINDOW do, and the rest are only counted. The count is logged when
+// suppression starts and again, with the total, when the next window opens. Distinct failures keep
+// distinct codes and so keep their own first capture; the number of tracked codes is bounded
+// (MAX_TRACKED_CODES), with later codes sharing one overflow bucket. State is per process, in
+// memory: a restart loosens it, which is harmless.
+const RUN_ERROR_CAPTURES_PER_WINDOW = 5;
+const RUN_ERROR_WINDOW_MS = 10 * 60_000;
+const MAX_TRACKED_CODES = 20;
+const OVERFLOW_BUCKET = "(other)";
+const NO_CODE_BUCKET = "(none)";
+
+interface SampleBucket {
+  windowStart: number;
+  captured: number;
+  suppressed: number;
+}
+
+const buckets = new Map<string, SampleBucket>();
+
+/** Test hook: forget all sampling state. */
+export function resetRunErrorSamplingForTests(): void {
+  buckets.clear();
+}
+
+function bucketKey(code: string | undefined): string {
+  const key = code ? code.slice(0, 64) : NO_CODE_BUCKET;
+  if (buckets.has(key) || buckets.size < MAX_TRACKED_CODES) return key;
+  return OVERFLOW_BUCKET;
+}
+
+/** True when this frame should be captured; counts and logs it otherwise. */
+function admit(code: string | undefined): boolean {
+  const key = bucketKey(code);
+  const now = Date.now();
+  let bucket = buckets.get(key);
+  if (!bucket || now - bucket.windowStart >= RUN_ERROR_WINDOW_MS) {
+    if (bucket && bucket.suppressed > 0) {
+      logWarn(SCOPE, "suppressed RUN_ERROR captures in the previous window", {
+        code: key,
+        suppressed: bucket.suppressed,
+      });
+    }
+    bucket = { windowStart: now, captured: 0, suppressed: 0 };
+    buckets.set(key, bucket);
+  }
+  if (bucket.captured < RUN_ERROR_CAPTURES_PER_WINDOW) {
+    bucket.captured += 1;
+    return true;
+  }
+  bucket.suppressed += 1;
+  if (bucket.suppressed === 1) {
+    logWarn(SCOPE, "suppressing further RUN_ERROR captures for this code until the window ends", {
+      code: key,
+      perWindow: RUN_ERROR_CAPTURES_PER_WINDOW,
+    });
+  }
+  return false;
+}
+
 function reportRunError(frame: RunErrorFrame): void {
+  if (!admit(frame.code)) return;
   const code = frame.code ? ` [${frame.code}]` : "";
   const error = new Error(
     `CopilotKit chat run failed${code}: ${frame.message ?? "no message provided"}`,
