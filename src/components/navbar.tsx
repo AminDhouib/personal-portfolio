@@ -286,6 +286,8 @@ export function Navbar() {
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="rounded-lg p-2 text-(--muted) hover:text-(--foreground) xl:hidden"
                 aria-label="Toggle menu"
+                aria-expanded={mobileOpen}
+                aria-controls="mobile-menu-panel"
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
@@ -313,6 +315,7 @@ export function Navbar() {
             {/* Panel — h-screen + inline backgroundColor for guaranteed
                 full-height solid fill regardless of containing-block quirks. */}
             <motion.div
+              id="mobile-menu-panel"
               className="fixed top-0 right-0 z-70 flex h-screen w-72 flex-col border-l border-(--border) xl:hidden"
               style={{ backgroundColor: "var(--background)" }}
               initial={{ x: "100%" }}

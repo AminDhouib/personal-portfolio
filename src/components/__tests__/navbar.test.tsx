@@ -127,6 +127,20 @@ describe("Navbar mobile menu keyboard", () => {
     );
   }
 
+  it("reflects the open state on the toggle with aria-expanded and aria-controls", () => {
+    vi.stubGlobal("IntersectionObserver", NoopObserver);
+    render(<Navbar />);
+    const toggle = screen.getByRole("button", { name: "Toggle menu" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const controlled = toggle.getAttribute("aria-controls");
+    expect(controlled).toBeTruthy();
+    expect(document.getElementById(controlled as string)).not.toBeNull();
+  });
+
   it("closes the menu on Escape and returns focus to the toggle", () => {
     const toggle = openMenu();
     expect(panelOpen()).toBe(true);
