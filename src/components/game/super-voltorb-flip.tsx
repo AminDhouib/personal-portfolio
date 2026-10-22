@@ -84,7 +84,8 @@ import { ModeRow } from "./super-voltorb-flip/mode-row";
 import { SettingsPanel } from "./super-voltorb-flip/settings-panel";
 import { StatsPanel } from "./super-voltorb-flip/stats-panel";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
-import { GLYPHS, ORB } from "./super-voltorb-flip/art/sprites";
+import { VOLTORB_FACE_SCALE, VOLTORB_TILE_SRC } from "./super-voltorb-flip/art/original-sprites";
+import { GLYPHS } from "./super-voltorb-flip/art/sprites";
 import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
 import {
@@ -1081,11 +1082,21 @@ const Gameboard = ({
                       }
                     >
                       {cell.value === "V" ? (
-                        <PixelSprite
-                          sprite={ORB}
-                          cssSize="calc(var(--svf-tile) * 0.95)"
+                        // The original Voltorb sprite (22 px, salmon face baked in), so the burst
+                        // frames, which carry the same Voltorb, land exactly on it.
+                        // eslint-disable-next-line @next/next/no-img-element -- a 22 px pixel sprite, scaled with CSS and never optimized
+                        <img
+                          src={VOLTORB_TILE_SRC}
+                          alt=""
                           className="picture-outline voltorb"
-                          style={{ maxWidth: "none", maxHeight: "none" }}
+                          style={{
+                            imageRendering: "pixelated",
+                            width: `calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`,
+                            height: `calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`,
+                            maxWidth: "none",
+                            maxHeight: "none",
+                            display: "block",
+                          }}
                         />
                       ) : (
                         cell.value
@@ -1371,7 +1382,9 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
 
           <p className="text-xs leading-snug text-gray-500">
             Unofficial fan recreation. Not affiliated with or endorsed by Nintendo, Creatures Inc.
-            or GAME FREAK inc. Pokemon and Voltorb are trademarks of their owners.
+            or GAME FREAK inc. The Voltorb sprites and the music are the originals from Pokemon
+            HeartGold and SoulSilver, the property of those companies, used here in a non-commercial
+            fan project. Pokemon and Voltorb are trademarks of their owners.
           </p>
         </div>
       </div>

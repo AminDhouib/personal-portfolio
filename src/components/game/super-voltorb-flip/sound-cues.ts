@@ -5,6 +5,9 @@
 // converted once at load. Cue lengths (`ms`) are a gameplay timing contract:
 // the win sequence waits for `levelClear`, and the risk fanfare gates the board
 // for exactly RISK_WARNING_MS (the same figure the muted path waits).
+// The round-cleared and round-lost jingles are now the original recordings (music.ts, T-6535):
+// the `levelClear` and `gameOver` tables below no longer sound, and only their `ms` is used,
+// as the round flow's timing.
 
 export type Wave = "sine" | "square" | "triangle" | "sawtooth";
 

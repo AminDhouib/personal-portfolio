@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { EffectProps, EffectTheme } from ".";
-import { BurstFrame, SparkleFrame } from "../art/frames";
+import { SparkleFrame } from "../art/frames";
 import { BURST_FRAMES, SPARKLE_FRAMES } from "../art/fx";
+import { EXPLODE_FRAME_SRCS, explodeFrameCssSize } from "../art/original-sprites";
 
 // Both overlays sit centred over the revealed tile and overflow its edges. The
-// orb stays visible underneath (the tile's own face), so the burst has no core.
+// Voltorb stays visible underneath (the tile's own face); the burst frames carry
+// the same Voltorb in their middle, at the same scale.
 const overlayBox = (scale: number): CSSProperties => ({
   position: "absolute",
   left: "50%",
@@ -26,11 +28,26 @@ function ExplosionSprite({ onDone }: EffectProps) {
     const t = setTimeout(() => setFrame((f) => f + 1), 60);
     return () => clearTimeout(t);
   }, [frame, onDone]);
-  // Larger than the tile so the blast radius can extend past the cell.
+  // The original frames grow from the tile's size to well past the cell, so the blast radius
+  // extends past it; each frame is sized from its native pixels (explodeFrameCssSize).
   return (
-    <div style={overlayBox(2.4)}>
-      <BurstFrame frame={frame} cssSize="100%" />
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element -- original pixel-art frames, scaled with CSS and never optimized
+    <img
+      src={EXPLODE_FRAME_SRCS[frame]}
+      alt=""
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        width: explodeFrameCssSize(frame),
+        height: explodeFrameCssSize(frame),
+        maxWidth: "none",
+        maxHeight: "none",
+        imageRendering: "pixelated",
+        pointerEvents: "none",
+      }}
+    />
   );
 }
 
