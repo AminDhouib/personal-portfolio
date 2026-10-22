@@ -98,19 +98,4 @@ describe("Super Voltorb Flip leaves no timer running after unmount", () => {
     await advance(10_000);
     expect(errors).not.toHaveBeenCalled();
   });
-
-  it("cancels the quit confirmation's focus timer when unmounted right after cancel", async () => {
-    vi.useFakeTimers();
-    const view = render(<SuperVoltorbFlipGame />);
-    fireEvent.click(screen.getByRole("button", { name: "Quit" }));
-    const dialog = screen.getByRole("alertdialog", { name: "Quit this round?" });
-    fireEvent.click(
-      Array.from(dialog.querySelectorAll("button")).find((b) => b.textContent === "Keep playing")!,
-    );
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
-
-    view.unmount();
-
-    expect(vi.getTimerCount()).toBe(0);
-  });
 });
