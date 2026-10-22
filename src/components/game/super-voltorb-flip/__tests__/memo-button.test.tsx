@@ -5,13 +5,13 @@ import { MemoBar, type MemoFlag, type MemoFlagSet } from "../memo-button";
 afterEach(cleanup);
 
 describe("MemoBar", () => {
-  it("renders four flag buttons and a clear button, with no images", () => {
+  it("renders four flag buttons and a clear button, the Voltorb flag as the only image", () => {
     const { container } = render(
       <MemoBar activeFlags={new Set() as MemoFlagSet} onToggle={() => {}} onClear={() => {}} />,
     );
     expect(screen.getAllByRole("button")).toHaveLength(5);
-    expect(container.querySelector("img")).toBeNull();
-    expect(container.querySelectorAll("svg")).toHaveLength(5);
+    expect(container.querySelectorAll("img")).toHaveLength(1);
+    expect(container.querySelectorAll("svg")).toHaveLength(4);
   });
 
   it("reflects the active set in aria-pressed", () => {
