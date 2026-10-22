@@ -417,7 +417,7 @@ describe("/api/password-game-2/leaderboard", () => {
       // The inner keep-set subselect is also scoped to the same seed.
       expect(del?.sql.toUpperCase().match(/WHERE SEED = \$1/g)?.length).toBe(2);
       // Older rows win ties, matching the strictly-faster rank.
-      expect(del?.sql.replace(/s+/g, " ").toUpperCase()).toContain(
+      expect(del?.sql.replace(/\s+/g, " ").toUpperCase()).toContain(
         "ORDER BY TIME_MS ASC, ID ASC LIMIT $2",
       );
       expect(del?.params?.[0]).toBe(123);
@@ -509,7 +509,7 @@ describe("/api/password-game-2/leaderboard", () => {
       it("pre-checks with a cheap SELECT 1 ... OFFSET $1 LIMIT 1 and skips the delete under the cap", async () => {
         await POST(makeJsonPostRequest(validBody({ seed: 8 })));
         const pre = captured.find((q) => /^SELECT 1\b[\s\S]*OFFSET/i.test(q.sql.trim()));
-        expect(pre?.sql.replace(/s+/g, " ").toUpperCase()).toContain("OFFSET $1 LIMIT 1");
+        expect(pre?.sql.replace(/\s+/g, " ").toUpperCase()).toContain("OFFSET $1 LIMIT 1");
         expect(pre?.params).toEqual([20_000]);
         expect(txLog).not.toContain("CAP");
         expect(captured.some((q) => /^DELETE[\s\S]*OFFSET/i.test(q.sql.trim()))).toBe(false);
