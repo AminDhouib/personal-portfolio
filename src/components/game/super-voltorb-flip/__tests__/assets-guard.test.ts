@@ -171,7 +171,18 @@ describe("Super Voltorb Flip assets", () => {
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) expect(path).toBe("super-voltorb-flip/sprites/tile");
     expect(sourceText).not.toMatch(/sprites\/upstream/);
-    expect(sourceText).not.toMatch(/samualtnorman/);
+  });
+
+  it("names the sprite source repo only in the About credits", () => {
+    const credits = join("src", "app", "games", "content", "super-voltorb-flip.ts");
+    for (const file of sourceFiles()) {
+      const path = relative(ROOT, file);
+      if (path === credits) continue;
+      expect(readFileSync(file, "utf8"), `${path} names the sprite source repo`).not.toMatch(
+        /samualtnorman/,
+      );
+    }
+    expect(readFileSync(join(ROOT, credits), "utf8")).toMatch(/samualtnorman/);
   });
 
   it("has no script, e2e spec or workflow that targets the sprites", () => {
