@@ -28,6 +28,12 @@ vi.mock("../effects/context", () => ({
 }));
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+import { firstButton } from "@/test/first-button";
+
+// These tests render the whole Super Voltorb Flip board in jsdom; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 afterEach(() => {
   cleanup();
@@ -38,7 +44,7 @@ describe("SuperVoltorbFlip how to play", () => {
   it("lists the level rules and Quit", () => {
     render(<SuperVoltorbFlipGame />);
     // The phone and desktop layouts each render the button.
-    const [openButton] = screen.getAllByRole("button", { name: "How to play" });
+    const openButton = firstButton("How to play");
     if (!openButton) throw new Error("no How to play button");
     fireEvent.click(openButton);
     const modal = screen.getByRole("dialog", { name: "How to play" });
@@ -48,7 +54,7 @@ describe("SuperVoltorbFlip how to play", () => {
 
   it("carries the unofficial fan-recreation disclaimer", () => {
     render(<SuperVoltorbFlipGame />);
-    const [openButton] = screen.getAllByRole("button", { name: "How to play" });
+    const openButton = firstButton("How to play");
     if (!openButton) throw new Error("no How to play button");
     fireEvent.click(openButton);
     const modal = screen.getByRole("dialog", { name: "How to play" });

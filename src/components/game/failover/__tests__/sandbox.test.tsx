@@ -5,6 +5,11 @@ import type { FailoverScene } from "../scene/scene";
 import { dispatch } from "../sim/action-log";
 import { CONFIG } from "../sim/config";
 import { S, resetSim } from "../sim/state";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole Failover game in jsdom and start runs; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 // Sandbox, from Settings: a big budget and no failure, no score, no device
 // record and nothing ranked, labelled as Sandbox wherever the run shows.
