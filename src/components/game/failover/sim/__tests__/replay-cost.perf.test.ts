@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
 import { stateHash } from "../hash";
-import type { LoggedAction } from "../action-log";
+import { MAX_LOGGED_ACTIONS, type LoggedAction } from "../action-log";
 import { captureSave, loadSave } from "../../persist/save";
 import { MAX_SAVE_BUDGET, MAX_SAVE_TICKS } from "../../persist/save-schema";
 import { replayAsync } from "../replay";
 import { resetSim, S } from "../state";
-import { BUDGET, CHUNK, CHUNK_SMALL, SEED, recordRun } from "./replay-cost-fixture";
+import { BUDGET, CHUNK, CHUNK_SMALL, SEED, TICKS, recordRun } from "./replay-cost-fixture";
 
 afterEach(() => resetSim({ seed: "after-bench" }));
 
