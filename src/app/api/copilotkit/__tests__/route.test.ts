@@ -135,7 +135,7 @@ describe("POST /api/copilotkit", () => {
     const mockResponse = new Response("ok", { status: 200 });
     mockHandleRequest.mockResolvedValueOnce(mockResponse);
 
-    const req = makeReq({ message: "hello" }, { ip: "10.30.0.3" });
+    const req = makeReq({ method: "info" }, { ip: "10.30.0.3" });
     const response = await POST(req);
 
     expect(mockHandleRequest).toHaveBeenCalledOnce();
@@ -144,7 +144,7 @@ describe("POST /api/copilotkit", () => {
     expect(forwarded.method).toBe("POST");
     expect(forwarded.url).toBe(req.url);
     expect(forwarded.headers.get("origin")).toBe("https://amindhou.com");
-    expect(await forwarded.json()).toEqual({ message: "hello" });
+    expect(await forwarded.json()).toEqual({ method: "info" });
     expect(response).toBe(mockResponse);
   });
 
@@ -158,7 +158,7 @@ describe("POST /api/copilotkit", () => {
     process.env.OPENROUTER_KEY = "test-key-abc";
     mockHandleRequest.mockResolvedValueOnce(new Response("ok", { status: 200 }));
 
-    await POST(makeReq({ message: "hello" }, { ip: "10.30.0.6" }));
+    await POST(makeReq({ method: "info" }, { ip: "10.30.0.6" }));
 
     expect(mockCreateOpenAI).toHaveBeenCalledOnce();
     const call = mockCreateOpenAI.mock.calls[0];
@@ -177,8 +177,8 @@ describe("POST /api/copilotkit", () => {
     process.env.OPENROUTER_KEY = "test-key-abc";
     mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
 
-    await POST(makeReq({ message: "first" }, { ip: "10.30.0.7" }));
-    await POST(makeReq({ message: "second" }, { ip: "10.30.0.8" }));
+    await POST(makeReq({ method: "info" }, { ip: "10.30.0.7" }));
+    await POST(makeReq({ method: "info" }, { ip: "10.30.0.8" }));
 
     expect(mockCopilotRuntime).toHaveBeenCalledTimes(2);
   });
@@ -187,8 +187,8 @@ describe("POST /api/copilotkit", () => {
     process.env.OPENROUTER_KEY = "test-key-abc";
     mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
 
-    await POST(makeReq({ message: "first" }, { ip: "10.30.0.9" }));
-    await POST(makeReq({ message: "second" }, { ip: "10.30.0.10" }));
+    await POST(makeReq({ method: "info" }, { ip: "10.30.0.9" }));
+    await POST(makeReq({ method: "info" }, { ip: "10.30.0.10" }));
 
     expect(mockEndpoint).toHaveBeenCalledTimes(2);
     const [first, second] = mockEndpoint.mock.calls as unknown as [
@@ -360,6 +360,82 @@ describe("POST /api/copilotkit: cost bounds (T-5525)", () => {
     const cross = makeReq({}, { origin: "https://evil.example", ip: "10.31.0.8" });
     expect((await POST(cross)).status).toBe(403);
     expect(cross.bodyUsed).toBe(false);
+  });
+});
+
+describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)", () => {
+  beforeEach(() => {
+    process.env.OPENROUTER_KEY = "test-key-abc";
+    mockHandleRequest.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.OPENROUTER_KEY;
+  });
+
+  it.each([
+    { method: "resource/request", params: { path: "/threads?agentId=default", httpMethod: "GET" } },
+    { method: "resource/request", params: { path: "/threads/clear", httpMethod: "POST" } },
+    { method: "resource/request", params: { path: "/threads/abc/messages", httpMethod: "GET" } },
+    { method: "transcribe", body: {} },
+  ])("answers 400 and never reaches the runtime for $method", async (envelope) => {
+    const response = await POST(makeRawReq(JSON.stringify(envelope), "10.33.0.1"));
+    expect(response.status).toBe(400);
+    expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 for a run whose body is a JSON string, however big its contents", async () => {
+    const inner = JSON.stringify({
+      threadId: "t",
+      runId: "r",
+      state: { notes: "s".repeat(100_000) },
+      messages: Array.from({ length: 301 }, (_, i) => ({
+        id: String(i),
+        role: "user",
+        content: "x",
+      })),
+      tools: [{ name: "runShell", description: "x", parameters: {} }],
+      context: [],
+      forwardedProps: {},
+    });
+    const text = JSON.stringify({
+      method: "agent/run",
+      params: { agentId: "default" },
+      body: inner,
+    });
+    const response = await POST(makeRawReq(text, "10.33.0.2"));
+    expect(response.status).toBe(400);
+    expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
+  it("answers 413 for an oversized state", async () => {
+    const envelope = runBody({ state: { notes: "s".repeat(100_000) } });
+    const response = await POST(makeRawReq(JSON.stringify(envelope), "10.33.0.3"));
+    expect(response.status).toBe(413);
+    expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
+  it.each(["info", "inspector/metadata"])("still forwards %s to the runtime", async (method) => {
+    mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
+    const response = await POST(makeRawReq(JSON.stringify({ method }), "10.33.0.4"));
+    expect(response.status).toBe(200);
+    expect(mockHandleRequest).toHaveBeenCalledOnce();
+  });
+
+  it("still forwards a normal run, connect and stop", async () => {
+    mockHandleRequest.mockImplementation(async () => new Response("ok"));
+    const run = runBody({});
+    const connect = { ...runBody({}), method: "agent/connect" };
+    const stop = {
+      method: "agent/stop",
+      params: { agentId: "default", threadId: "t" },
+      body: { runId: "r" },
+    };
+    for (const [i, envelope] of [run, connect, stop].entries()) {
+      const response = await POST(makeRawReq(JSON.stringify(envelope), `10.33.0.${10 + i}`));
+      expect(response.status).toBe(200);
+    }
+    expect(mockHandleRequest).toHaveBeenCalledTimes(3);
   });
 });
 

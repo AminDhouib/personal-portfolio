@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   COPILOT_MAX_BODY_BYTES,
   COPILOT_MAX_CONTEXT_CHARS,
+  COPILOT_MAX_FORWARDED_PROPS_CHARS,
   COPILOT_MAX_MESSAGES,
   COPILOT_MAX_MESSAGE_CHARS,
+  COPILOT_MAX_STATE_CHARS,
   sanitizeCopilotEnvelope,
 } from "../copilot-envelope";
 
@@ -255,5 +257,159 @@ describe("sanitizeCopilotEnvelope: malformed input", () => {
   it("passes through a run body whose messages field is not an array for the runtime to reject", () => {
     const envelope = runEnvelope({ messages: "hello" });
     expect(ok(JSON.stringify(envelope)).parsed).toEqual(envelope);
+  });
+});
+
+// T-6255. The runtime serves more than the chat needs, and one of its methods (resource/request)
+// reads and wipes the process-wide thread store every visitor shares. The methods below are the
+// ones the site's own client sends: info and inspector/metadata on load, agent/connect when the
+// chat mounts, agent/run per turn, agent/stop on the stop button.
+describe("sanitizeCopilotEnvelope: method allow-list", () => {
+  it.each(["info", "inspector/metadata", "agent/run", "agent/connect", "agent/stop"])(
+    "lets %s through",
+    (method) => {
+      const envelope =
+        method === "agent/run" || method === "agent/connect"
+          ? runEnvelope({ messages: [turn(0)] })
+          : { params: { agentId: "default", threadId: "t" } };
+      const result = sanitizeCopilotEnvelope(JSON.stringify({ ...envelope, method }));
+      expect(result).toMatchObject({ ok: true });
+    },
+  );
+
+  it.each([
+    "resource/request",
+    "agent/suggest",
+    "transcribe",
+    "inspector/learning",
+    "trajectory/connect",
+    "memories/create",
+    "nope",
+    "",
+    "Agent/Run",
+    " info",
+    "agent/run ",
+  ])("answers 400 for method %j", (method) => {
+    const result = sanitizeCopilotEnvelope(JSON.stringify({ ...runEnvelope({}), method }));
+    expect(result).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it.each([undefined, null, 7, true, ["info"], { name: "info" }])(
+    "answers 400 when method is %j",
+    (method) => {
+      const result = sanitizeCopilotEnvelope(JSON.stringify({ method, params: {} }));
+      expect(result).toMatchObject({ ok: false, status: 400 });
+    },
+  );
+
+  it("answers 400 for the thread-store read that listed every visitor's thread ids", () => {
+    const text = JSON.stringify({
+      method: "resource/request",
+      params: { path: "/threads?agentId=default", httpMethod: "GET" },
+    });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("answers 400 for the thread-store wipe", () => {
+    const text = JSON.stringify({
+      method: "resource/request",
+      params: { path: "/threads/clear", httpMethod: "POST" },
+    });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+});
+
+describe("sanitizeCopilotEnvelope: the run body must be a plain object", () => {
+  it.each(["agent/run", "agent/connect"])(
+    "answers 400 for a JSON-string body on %s (the cap bypass)",
+    (method) => {
+      const inner = JSON.stringify({
+        threadId: "t",
+        runId: "r",
+        state: { notes: "s".repeat(100_000) },
+        context: [],
+        forwardedProps: {},
+        tools: [{ name: "runShell", description: "x", parameters: {} }],
+        messages: [
+          { id: "s", role: "system", content: "x" },
+          ...Array.from({ length: COPILOT_MAX_MESSAGES + 201 }, (_, i) => turn(i)),
+        ],
+      });
+      const text = JSON.stringify({ method, params: { agentId: "default" }, body: inner });
+      expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+    },
+  );
+
+  it.each([
+    ["an array", []],
+    ["a number", 5],
+    ["null", null],
+    ["a boolean", true],
+    ["a missing body", undefined],
+  ])("answers 400 for %s as the body of agent/run", (_label, body) => {
+    const text = JSON.stringify({ method: "agent/run", params: { agentId: "default" }, body });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("answers 400 for a string body on agent/stop too", () => {
+    const text = JSON.stringify({
+      method: "agent/stop",
+      params: { agentId: "default", threadId: "t" },
+      body: '{"runId":"r"}',
+    });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("lets agent/stop carry an object body or none", () => {
+    const params = { agentId: "default", threadId: "t" };
+    const withBody = JSON.stringify({ method: "agent/stop", params, body: { runId: "r" } });
+    expect(sanitizeCopilotEnvelope(withBody)).toMatchObject({ ok: true });
+    const without = JSON.stringify({ method: "agent/stop", params });
+    expect(sanitizeCopilotEnvelope(without)).toMatchObject({ ok: true });
+  });
+});
+
+describe("sanitizeCopilotEnvelope: state and forwardedProps caps", () => {
+  it("answers 413 for a run whose state is over the cap", () => {
+    const state = { notes: "s".repeat(COPILOT_MAX_STATE_CHARS) };
+    const result = sanitizeCopilotEnvelope(
+      JSON.stringify(runEnvelope({ messages: [turn(0)], state })),
+    );
+    expect(result).toMatchObject({ ok: false, status: 413 });
+  });
+
+  it("answers 413 for a run whose forwardedProps are over the cap", () => {
+    const forwardedProps = { blob: "f".repeat(COPILOT_MAX_FORWARDED_PROPS_CHARS) };
+    const result = sanitizeCopilotEnvelope(
+      JSON.stringify(runEnvelope({ messages: [turn(0)], forwardedProps })),
+    );
+    expect(result).toMatchObject({ ok: false, status: 413 });
+  });
+
+  it("applies the same caps to agent/connect", () => {
+    const text = JSON.stringify({
+      ...runEnvelope({ state: { notes: "s".repeat(COPILOT_MAX_STATE_CHARS) } }),
+      method: "agent/connect",
+    });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 413 });
+  });
+
+  it("accepts the state and forwardedProps the site really sends", () => {
+    const envelope = runEnvelope({
+      messages: [turn(0)],
+      state: {},
+      forwardedProps: { toolChoice: { type: "function", function: { name: "copilotkitSuggest" } } },
+    });
+    expect(ok(JSON.stringify(envelope)).parsed).toEqual(envelope);
+  });
+
+  it("accepts state and forwardedProps just under their caps", () => {
+    expect(COPILOT_MAX_STATE_CHARS).toBeGreaterThan(0);
+    const state = { n: "s".repeat(COPILOT_MAX_STATE_CHARS - 20) };
+    const forwardedProps = { n: "f".repeat(COPILOT_MAX_FORWARDED_PROPS_CHARS - 20) };
+    const result = sanitizeCopilotEnvelope(
+      JSON.stringify(runEnvelope({ messages: [turn(0)], state, forwardedProps })),
+    );
+    expect(result).toMatchObject({ ok: true });
   });
 });

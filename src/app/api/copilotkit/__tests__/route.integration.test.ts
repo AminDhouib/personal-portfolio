@@ -277,6 +277,41 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     expect(sent).toContain("Who is Amin?");
   });
 
+  // T-6255: with the real runtime, resource/request reached the process-wide thread store.
+  it("does not let a visitor list, read or wipe the shared thread store", async () => {
+    for (const params of [
+      { path: "/threads?agentId=default", httpMethod: "GET" },
+      { path: "/threads/clear", httpMethod: "POST" },
+    ]) {
+      const response = await POST(makeReq({ method: "resource/request", params }));
+      expect(response.status).toBe(400);
+    }
+    expect(upstreamCalls).toHaveLength(0);
+  });
+
+  it("answers 400 for a run whose body is a JSON string", async () => {
+    const envelope = runEnvelope("hi");
+    const response = await POST(makeReq({ ...envelope, body: JSON.stringify(envelope.body) }));
+    expect(response.status).toBe(400);
+    expect(upstreamCalls).toHaveLength(0);
+  });
+
+  it("serves inspector/metadata and agent/connect, which the chat sends on load", async () => {
+    const metadata = await POST(makeReq({ method: "inspector/metadata" }));
+    expect(metadata.status).toBe(204);
+
+    const connect = await POST(
+      makeReq({
+        method: "agent/connect",
+        params: { agentId: "default" },
+        body: { ...runEnvelope("hi").body, messages: [] },
+      }),
+    );
+    expect(connect.status).toBe(200);
+    await readBody(connect);
+    expect(upstreamCalls).toHaveLength(0);
+  });
+
   it("refuses an oversized conversation before any upstream call", async () => {
     const envelope = runEnvelope("hi");
     envelope.body.messages = Array.from({ length: 150 }, (_, i) => ({
