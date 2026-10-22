@@ -40,6 +40,8 @@ import {
   EXPLODE_FRAME_PX,
   EXPLODE_FRAME_SRCS,
   SPRITE_NO_GRAB_STYLE,
+  VOLTORB_ICON_PX,
+  VOLTORB_ICON_SRC,
   VOLTORB_TILE_SRC,
   crispIconSize,
   explodeFrameCssSize,
@@ -65,19 +67,28 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-function expectOriginalSprite(img: HTMLImageElement | null) {
+// The small icons are the bare body (voltorb-icon.png); the face-up tile uses the whole tile.
+function expectOriginalSprite(img: HTMLImageElement | null, src = VOLTORB_ICON_SRC) {
   expect(img).not.toBeNull();
-  expect(img!.getAttribute("src")).toBe(VOLTORB_TILE_SRC);
+  expect(img!.getAttribute("src")).toBe(src);
   expect(img!.getAttribute("draggable")).toBe("false");
   expect(img!.style.imageRendering).toBe("pixelated");
   expect(img!.style.userSelect).toBe("none");
 }
 
 describe("VoltorbSprite", () => {
+  it("is the bare icon on request and the whole tile by default", () => {
+    const icon = render(<VoltorbSprite variant="icon" size={16} />);
+    expect(icon.container.querySelector("img")!.getAttribute("src")).toBe(VOLTORB_ICON_SRC);
+    cleanup();
+    const tile = render(<VoltorbSprite size={22} />);
+    expect(tile.container.querySelector("img")!.getAttribute("src")).toBe(VOLTORB_TILE_SRC);
+  });
+
   it("is the original tile sprite: decorative, crisp, not draggable", () => {
     const { container } = render(<VoltorbSprite size={22} />);
     const img = container.querySelector("img");
-    expectOriginalSprite(img);
+    expectOriginalSprite(img, VOLTORB_TILE_SRC);
     expect(img!.getAttribute("alt")).toBe("");
     expect(img!.style.width).toBe("22px");
     expect(img!.style.height).toBe("22px");
@@ -129,15 +140,16 @@ describe("ExplodeFrameImg", () => {
 });
 
 describe("crispIconSize", () => {
-  it("snaps an icon box to a whole multiple of the 22 px art, never below 1x", () => {
-    expect(crispIconSize(20)).toBe(22);
-    expect(crispIconSize(22)).toBe(22);
-    expect(crispIconSize(24)).toBe(22);
-    expect(crispIconSize(28)).toBe(22);
-    expect(crispIconSize(36)).toBe(22);
-    expect(crispIconSize(44)).toBe(44);
-    expect(crispIconSize(46)).toBe(44);
-    expect(crispIconSize(66)).toBe(66);
+  it("snaps an icon box to a whole multiple of the 16 px icon, never below 1x", () => {
+    expect(VOLTORB_ICON_PX).toBe(16);
+    expect(crispIconSize(20)).toBe(16);
+    expect(crispIconSize(22)).toBe(16);
+    expect(crispIconSize(24)).toBe(16);
+    expect(crispIconSize(28)).toBe(16);
+    expect(crispIconSize(31)).toBe(16);
+    expect(crispIconSize(36)).toBe(32);
+    expect(crispIconSize(44)).toBe(32);
+    expect(crispIconSize(48)).toBe(48);
   });
 });
 
@@ -147,7 +159,7 @@ describe("VoltorbIcon", () => {
     expect(container.querySelector("svg")).toBeNull();
     const img = container.querySelector<HTMLImageElement>("img");
     expectOriginalSprite(img);
-    expect(img!.style.width).toBe("22px");
+    expect(img!.style.width).toBe("16px");
     const box = img!.parentElement as HTMLElement;
     expect(box.style.width).toBe("28px");
     expect(box.style.height).toBe("28px");
@@ -256,7 +268,8 @@ describe("the board", () => {
     // 10 clue cards, the memo bar (the phone and desktop columns each render one) and the How to
     // play button.
     expect(imgs.length).toBeGreaterThanOrEqual(11);
-    for (const img of imgs) expect(img.getAttribute("src")).toBe(VOLTORB_TILE_SRC);
+    // Nothing is face-up yet, so every Voltorb is the small bare icon.
+    for (const img of imgs) expect(img.getAttribute("src")).toBe(VOLTORB_ICON_SRC);
   });
 
   it("keeps the clue-card sprite on the tile-relative size the orb had", () => {
@@ -294,7 +307,7 @@ describe("the board", () => {
     const modal = screen.getByRole("dialog", { name: "How to play" });
     expect(modal.querySelector(ORB_SVG)).toBeNull();
     const sprites = [...modal.querySelectorAll<HTMLImageElement>("img")].filter(
-      (img) => img.getAttribute("src") === VOLTORB_TILE_SRC,
+      (img) => img.getAttribute("src") === VOLTORB_ICON_SRC,
     );
     // The title icon and the two legend cards.
     expect(sprites.length).toBeGreaterThanOrEqual(3);
@@ -321,7 +334,7 @@ describe("the hub banner", () => {
     const { container } = render(<SuperVoltorbFlipBanner />);
     expect(container.querySelector(ORB_SVG)).toBeNull();
     expect([...new Set(requested)].sort()).toEqual(
-      [VOLTORB_TILE_SRC, ...EXPLODE_FRAME_SRCS].sort(),
+      [VOLTORB_TILE_SRC, VOLTORB_ICON_SRC, ...EXPLODE_FRAME_SRCS].sort(),
     );
   });
 

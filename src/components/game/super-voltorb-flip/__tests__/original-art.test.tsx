@@ -31,6 +31,8 @@ import {
   EXPLODE_FRAME_SRCS,
   SPRITE_NO_GRAB_STYLE,
   VOLTORB_FACE_SCALE,
+  VOLTORB_ICON_PX,
+  VOLTORB_ICON_SRC,
   VOLTORB_TILE_PX,
   VOLTORB_TILE_SRC,
   explodeFrameCssSize,
@@ -82,6 +84,29 @@ describe("original sprite paths", () => {
     EXPLODE_FRAME_SRCS.forEach((src, i) =>
       expect(size(src)).toEqual([EXPLODE_FRAME_PX[i], EXPLODE_FRAME_PX[i]]),
     );
+  });
+
+  it("derives the bare icon crisply from the tile sprite: a palette PNG, no partial alpha", () => {
+    expect(VOLTORB_ICON_SRC).toBe(`${SPRITES.replace("/tile", "")}/voltorb-icon.png`);
+    const png = readFileSync(join(process.cwd(), "public", VOLTORB_ICON_SRC));
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([
+      VOLTORB_ICON_PX,
+      VOLTORB_ICON_PX,
+    ]);
+    expect(png[25]).toBe(3); // colour type 3: palette
+    // Walk the chunks: tRNS must exist and hold only fully transparent or fully opaque entries.
+    let offset = 8;
+    let trns: Buffer | null = null;
+    while (offset < png.length) {
+      const length = png.readUInt32BE(offset);
+      if (png.toString("ascii", offset + 4, offset + 8) === "tRNS") {
+        trns = png.subarray(offset + 8, offset + 8 + length);
+      }
+      offset += 12 + length;
+    }
+    expect(trns).not.toBeNull();
+    for (const alpha of trns!) expect([0, 255]).toContain(alpha);
+    expect([...trns!].filter((a) => a === 0)).toHaveLength(1);
   });
 
   it("grows the burst from the tile size up to its largest frame", () => {
@@ -152,7 +177,7 @@ describe("sprite preload", () => {
     );
     render(<SuperVoltorbFlipGame />);
     expect([...new Set(requested)].sort()).toEqual(
-      [VOLTORB_TILE_SRC, ...EXPLODE_FRAME_SRCS].sort(),
+      [VOLTORB_TILE_SRC, VOLTORB_ICON_SRC, ...EXPLODE_FRAME_SRCS].sort(),
     );
   });
 });
