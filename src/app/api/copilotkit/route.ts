@@ -4,9 +4,13 @@ import {
   copilotRuntimeNextJSAppRouterEndpoint,
 } from "@copilotkit/runtime";
 import { createOpenAI } from "@ai-sdk/openai";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { guardRequest } from "@/lib/route-guard";
+import { readCappedBody } from "@/lib/read-capped-body";
+import { COPILOT_MAX_BODY_BYTES, sanitizeCopilotEnvelope } from "@/lib/copilot-envelope";
+import { GENERIC_CHAT_ERROR, sanitizeCopilotErrors } from "@/lib/copilot-error-sanitizer";
 import { tapRunErrors } from "@/lib/copilot-run-error-tap";
+import { captureException, logWarn } from "@/lib/log";
 import { createDeadlineFetch } from "@/lib/upstream-fetch";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
 import {
@@ -43,8 +47,8 @@ const AMIN_AI_SYSTEM_PROMPT = buildAminAiSystemPrompt(GAMES);
 export const POST = async (req: NextRequest) => {
   // Guard the open LLM proxy before any work: reject cross-origin callers and
   // throttle per client IP so the OpenRouter key can't be drained by abuse.
-  // guardRequest reads only headers, never the body -- CopilotKit reads the
-  // body itself inside handleRequest below.
+  // guardRequest reads only headers, never the body; the body is read (capped)
+  // and sanitised further down, once the cheap rejections have had their say.
   const { response: blocked } = guardRequest(req, {
     key: "copilotkit",
     limit: 20,
@@ -59,6 +63,43 @@ export const POST = async (req: NextRequest) => {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // T-5525: bound what one request can make the model read. The body is stream-read against a
+  // byte cap (a chunked upload is cut off, not buffered), the envelope's message count and size
+  // are capped, and client-supplied system messages and unregistered tools are dropped, so the
+  // server's grounding prompt and the site's own tool are the only instructions the model gets.
+  // The runtime is then handed a rebuilt request, because a Request body can be read only once.
+  const read = await readCappedBody(req, COPILOT_MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === "too-large"
+      ? NextResponse.json({ error: "payload too large" }, { status: 413 })
+      : NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+  const envelope = sanitizeCopilotEnvelope(read.text);
+  if (!envelope.ok) {
+    return NextResponse.json({ error: envelope.error }, { status: envelope.status });
+  }
+  if (envelope.droppedTools.length > 0 || envelope.droppedSystemMessages > 0) {
+    // Names only, clipped: the text of a dropped message is attacker-chosen and not worth logging.
+    logWarn(
+      "copilotkit:envelope",
+      "dropped client-supplied content",
+      `tools=${envelope.droppedTools
+        .slice(0, 5)
+        .map((name) => name.slice(0, 60))
+        .join(",")} systemMessages=${envelope.droppedSystemMessages}`,
+    );
+  }
+  const headers = new Headers(req.headers);
+  // The body was rewritten, so the old framing headers no longer describe it.
+  headers.delete("content-length");
+  headers.delete("transfer-encoding");
+  const forwarded = new Request(req.url, {
+    method: req.method,
+    headers,
+    body: envelope.body,
+    signal: req.signal,
+  });
 
   const adapter = new OpenAIAdapter({
     openai: {
@@ -124,9 +165,21 @@ export const POST = async (req: NextRequest) => {
     endpoint: "/api/copilotkit",
   });
 
+  let response: Response;
+  try {
+    response = await handleRequest(forwarded);
+  } catch (error) {
+    // T-5532: the thrown message and stack are the server's business, not the visitor's.
+    captureException("copilotkit:handler", error);
+    return NextResponse.json({ error: GENERIC_CHAT_ERROR }, { status: 500 });
+  }
+
   // A failed chat run still answers 200 and reports itself as a RUN_ERROR frame
   // inside the SSE body, so nothing here throws and Sentry would never hear
-  // about it. tapRunErrors mirrors the stream and forwards those frames; the
-  // response the client gets is unchanged.
-  return tapRunErrors(await handleRequest(req));
+  // about it. tapRunErrors mirrors the stream and forwards those frames, detail
+  // and all, to Sentry; sanitizeCopilotErrors then runs on what the client
+  // would receive and swaps every error message (RUN_ERROR frames and runtime
+  // error bodies) for one generic line (T-5532). Order matters: the tap must see
+  // the raw response, so the sanitiser wraps it, not the other way round.
+  return await sanitizeCopilotErrors(tapRunErrors(response));
 };
