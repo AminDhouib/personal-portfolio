@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
   const { name, email, note, source, website } = parsed.data;
 
-  if (typeof website === "string" ? website !== "" : website != null) {
+  if (typeof website === "string" ? website !== "" : website !== undefined && website !== null) {
     logWarn("leads", "honeypot field filled, lead dropped");
     return NextResponse.json({ ok: true, id: null, createdAt: null });
   }
