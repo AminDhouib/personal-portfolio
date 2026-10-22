@@ -977,7 +977,7 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   `developer` messages, and drops every client tool except the two the site really registers
   (`collectLead` from `use-lead-collector-action.ts`, and `copilotkitSuggest`, which CopilotKit
   attaches to a suggestions run; dropping either would break lead capture or the suggested
-  prompts) when its definition is about as large as the real one. The runtime then gets a new
+  prompts) as the server's own copy of the definition (T-6364, below). The runtime then gets a new
   `Request` (same URL, method, headers minus the old framing headers, same abort signal). The caps
   come from the site's own chat: a long real conversation is a few tens of KB and the test fixture of
   40 turns (80 messages) is well under every cap. The
@@ -1024,10 +1024,27 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   (ef0dd228); `context` and `tools` are safe because the runtime defaults them. It is rejected, not
   stripped (a unicode-escaped spelling parses to the same key, so the parsed object is walked, never
   the text); `constructor` and `prototype` keys stay legal, they copy as ordinary own properties.
-  The same walk caps nesting at depth 32 (400 "nested too deeply"; the site's deepest real request
-  is 7): `JSON.stringify`, behind every size measurement, overflows the stack on a few thousand
-  levels, a 10 KB body, which used to escape the route as an unhandled 500. A throw from the
-  measurements is mapped to 400 as a backstop.
+  The same walk caps nesting at depth 32 (400 "nested too deeply"). Depth counts objects and arrays
+  only, so 32 nested objects pass and 33 fail whatever the leaf; the site's deepest real request is
+  the suggestions tool at 10 (a tool-call message is 7), so the cap is more than three times it.
+  `JSON.stringify`, behind every size measurement, overflows the stack on a few thousand levels, a
+  10 KB body, which used to escape the route as an unhandled 500. A throw from the measurements is
+  mapped to 400 as a backstop.
+  (4) T-6364: a tool the site registers is no longer forwarded as the client wrote it; the envelope
+  swaps in the server's own copy (`COPILOT_TOOL_DEFINITIONS`) and drops every other tool. The
+  runtime turns each client tool's `parameters` into `new Validator(parameters, "7")`
+  (`@copilotkit/runtime/dist/agent/index.mjs`, `convertToolsToVercelAITools`), and
+  `@cfworker/json-schema` runs `new RegExp(pattern, "u")` (and `patternProperties` keys) on the
+  model's tool-call arguments in-process: with `"^(a+)+$"` and 28 `a`s plus `!` that blocked the
+  event loop for 1.2 s, doubling per character, and the previous check (name allow-list plus a size
+  cap) let it through under the name `collectLead`. The visitor can steer the model to emit such an
+  argument. Replacing the definition was chosen over rejecting `pattern`/`patternProperties`
+  because a keyword blacklist is open-ended (`$ref` chains, `enum` and `description` size, the
+  next keyword that takes a regex) and the description is client-written model instructions too; the
+  cost is that the copies must track the client. A test pins them equal to the definitions the
+  client sends (`collectLead` from `use-lead-collector-action.ts`, `copilotkitSuggest` verbatim from
+  `SUGGEST_TOOL` in `@copilotkit/core`), so a CopilotKit upgrade or a changed action fails there.
+  Not covered: `format` keywords run fixed regexes the client cannot choose.
   Re-check the method list against the client on a CopilotKit upgrade (`route.integration.test.ts`
   runs the real runtime).
 - **Chat errors never reach the visitor verbatim** (T-5532, `src/lib/copilot-error-sanitizer.ts`).
