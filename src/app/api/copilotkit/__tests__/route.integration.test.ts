@@ -121,7 +121,7 @@ function makeReq(envelope: unknown, signal?: AbortSignal): NextRequest {
       "x-forwarded-host": "amindhou.com",
       "x-forwarded-for": `10.77.0.${ipCounter}`,
     },
-    body: JSON.stringify(envelope),
+    body: typeof envelope === "string" ? envelope : JSON.stringify(envelope),
     ...(signal ? { signal } : {}),
   });
 }
@@ -300,6 +300,29 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     expect(response.status).toBe(400);
     expect(upstreamCalls).toHaveLength(0);
   });
+
+  // The bypass that outlived the resume check: a body key literally named "__proto__" is kept by
+  // JSON.parse and forwarded by JSON.stringify, and the runtime's schema parse made it the prototype
+  // of the run input, so resume (here 300 KB) reached the model prompt with an HTTP 200.
+  it.each(["resume", "state", "forwardedProps"])(
+    "does not let a __proto__ key smuggle %s past the checks",
+    async (field) => {
+      const envelope = runEnvelope("hi");
+      const big = "y".repeat(300_000);
+      const carried =
+        field === "resume"
+          ? { resume: [{ interruptId: "call1", status: "resolved", payload: { x: big } }] }
+          : { [field]: { blob: big } };
+      const text = JSON.stringify({ ...envelope, body: { ...envelope.body, __pr0to__: carried } })
+        .split("__pr0to__")
+        .join("__proto__");
+      expect(text).toContain('"__proto__"');
+
+      const response = await POST(makeReq(text));
+      expect(response.status).toBe(400);
+      expect(upstreamCalls).toHaveLength(0);
+    },
+  );
 
   it("answers 400 for a run whose body is a JSON string", async () => {
     const envelope = runEnvelope("hi");

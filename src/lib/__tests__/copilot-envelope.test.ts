@@ -398,6 +398,78 @@ describe("sanitizeCopilotEnvelope: resume", () => {
   });
 });
 
+// T-6255 round 3. JSON.parse keeps a key literally named "__proto__" as an own property and
+// JSON.stringify writes it back out; the runtime's schema parse then turns it into the prototype
+// of the object it validates, so fields missing from the body (resume, state, forwardedProps)
+// were read from it and walked past every check here. An object literal cannot carry such a key
+// (it sets the prototype), so the tests write "__pr0to__" and rename it in the JSON text.
+const withProtoKey = (value: unknown): string =>
+  JSON.stringify(value).split("__pr0to__").join("__proto__");
+
+describe("sanitizeCopilotEnvelope: __proto__ keys", () => {
+  const big = "y".repeat(COPILOT_MAX_STATE_CHARS + 1000);
+  const resume = [{ interruptId: "c1", status: "resolved", payload: { x: big } }];
+
+  it.each([
+    ["resume", { resume }],
+    ["state", { state: { notes: big } }],
+    ["forwardedProps", { forwardedProps: { blob: big } }],
+  ])("answers 400 for a __proto__ on the run body carrying %s", (_name, carried) => {
+    const body = { ...runEnvelope({ messages: [turn(0)] }).body, __pr0to__: carried };
+    const text = withProtoKey({ method: "agent/run", params: { agentId: "default" }, body });
+    expect(text).toContain('"__proto__"');
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it.each(["agent/run", "agent/connect"])(
+    "answers 400 for a body-level __proto__ on %s",
+    (method) => {
+      const body = { ...runEnvelope({ messages: [turn(0)] }).body, __pr0to__: { resume } };
+      const text = withProtoKey({ method, params: { agentId: "default" }, body });
+      expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+    },
+  );
+
+  it("answers 400 for a __proto__ at the top of the envelope", () => {
+    const text = withProtoKey({ ...runEnvelope({ messages: [turn(0)] }), __pr0to__: { resume } });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("answers 400 for a __proto__ nested inside a message", () => {
+    const messages = [{ ...turn(0), __pr0to__: { content: big } }];
+    const text = withProtoKey(runEnvelope({ messages }));
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("answers 400 for a __proto__ nested inside state, inside an array, and deep down", () => {
+    const deep = (n: number): unknown => (n === 0 ? { __pr0to__: { x: 1 } } : { a: [deep(n - 1)] });
+    for (const run of [
+      { state: { notes: { __pr0to__: { x: big } } } },
+      { context: [{ description: "page", value: "v", __pr0to__: {} }] },
+      { forwardedProps: deep(50) },
+    ]) {
+      const text = withProtoKey(runEnvelope({ messages: [turn(0)], ...run }));
+      expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+    }
+  });
+
+  it("finds a __proto__ below a very deep nest without overflowing the stack", () => {
+    let nested = '{"__proto__":{}}';
+    for (let i = 0; i < 20_000; i++) nested = '{"a":' + nested + "}";
+    const text =
+      '{"method":"agent/run","params":{"agentId":"default"},"body":{"state":' + nested + "}}";
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false });
+  });
+
+  it("does not mistake the string __proto__ or other lookalike keys for the key", () => {
+    const run = runEnvelope({
+      messages: [{ ...turn(0), content: "talk about __proto__ and prototype" }],
+      state: { constructor: "c", prototype: "p", proto: "q" },
+    });
+    expect(sanitizeCopilotEnvelope(JSON.stringify(run))).toMatchObject({ ok: true });
+  });
+});
+
 describe("sanitizeCopilotEnvelope: state and forwardedProps caps", () => {
   it("answers 413 for a run whose state is over the cap", () => {
     const state = { notes: "s".repeat(COPILOT_MAX_STATE_CHARS) };
