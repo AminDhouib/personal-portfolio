@@ -179,12 +179,6 @@ describe("POST /api/copilotkit", () => {
     expect(typeof options.fetch).toBe("function");
   });
 
-  // Regression pin for the dead-chat bug: a module-scope `new CopilotRuntime()`
-  // let CopilotKit bind its lazily-created default agent to the FIRST request's
-  // serviceAdapter, whose grounded fetch closes over that request's one-shot
-  // 60s deadline signal. Every run after that signal fired was born aborted
-  // (instant TimeoutError -> SSE RUN_ERROR), so chat only worked for ~60s after
-  // each deploy. The runtime must be constructed per request.
   // The default runner keeps up to 1000 threads, 100 runs each, 512 MiB of attacker-chosen
   // content in memory (T-6259). The route must hand the runtime a bounded one.
   it("builds the runtime with a bounded in-memory thread store", async () => {
@@ -200,6 +194,12 @@ describe("POST /api/copilotkit", () => {
     expect(mockCopilotRuntime).toHaveBeenCalledWith({ runner: expect.any(mockInMemoryRunner) });
   });
 
+  // Regression pin for the dead-chat bug: a module-scope `new CopilotRuntime()`
+  // let CopilotKit bind its lazily-created default agent to the FIRST request's
+  // serviceAdapter, whose grounded fetch closes over that request's one-shot
+  // 60s deadline signal. Every run after that signal fired was born aborted
+  // (instant TimeoutError -> SSE RUN_ERROR), so chat only worked for ~60s after
+  // each deploy. The runtime must be constructed per request.
   it("constructs a fresh CopilotRuntime per request", async () => {
     process.env.OPENROUTER_KEY = "test-key-abc";
     mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
