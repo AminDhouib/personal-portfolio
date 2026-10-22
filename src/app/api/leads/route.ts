@@ -26,7 +26,7 @@ const PAGE_MAX = 200;
 // still stored but no email is sent. One client could still spend that whole cap and silence the
 // notification for everyone, so each client also gets a small share (3) of it. A client over its
 // share is stored without email and spends none of the global budget. The response body and status
-// are identical in every case, but the timing is not: a request that takes a slot awaits the send
+// are identical whether or not a cap applies, as long as the lead is stored, but the timing is not: a request that takes a slot awaits the send
 // (up to 10 s) while an over-share or over-cap one returns at once, so timing tells sent from
 // capped. That is accepted (DESIGN.md, "The lead email caps are soft"). The client key is the rate limiter's
 // (getClientIp), so the share is only as strong as that key: a spoofed CF-Connecting-IP (T-5533,
