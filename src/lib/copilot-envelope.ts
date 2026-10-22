@@ -6,16 +6,22 @@
  * client, not the server, would decide what the model is told and allowed to call.
  *
  * What it enforces:
- *   - message count, total message size and application-context size caps (413 over);
+ *   - the envelope's `method` must be one the site's own client sends (the allow-list below);
+ *     the runtime also serves a thread store shared by every visitor (resource/request), a
+ *     transcription endpoint and others, none of which the chat uses (T-6255);
+ *   - a run's `body` must be a plain object: the runtime also accepts it as a JSON string and
+ *     parses it later, which would walk past every check here (T-6255);
+ *   - message count, total message size, application-context, `state` and `forwardedProps` size
+ *     caps (413 over);
  *   - system / developer messages in the client's history are dropped: the grounding prompt is
  *     injected server-side (route.ts, amin-ai-prompt.ts) and is the only system text;
  *   - client tools are dropped unless the site itself registers them (the allow-list below) and the
  *     definition is about as big as the real one.
  *
  * The envelope is the single-route shape `{ method, params?, body? }`, where `body` is an AG-UI
- * RunAgentInput (see route.integration.test.ts for the real shapes). Anything that is not a run
- * body (info, stop) passes through untouched, and the rest of the envelope is forwarded as the
- * client sent it.
+ * RunAgentInput (see route.integration.test.ts for the real shapes). Methods that carry no run
+ * (info, inspector/metadata, stop) pass through after the method check, and the rest of the
+ * envelope is forwarded as the client sent it.
  *
  * Cap values come from the site's own chat. The client resends the whole history every turn, so a
  * long real conversation is ~15-20 turns of ~200-character questions and answers of up to
@@ -45,6 +51,43 @@ export const COPILOT_MAX_MESSAGE_CHARS = 120_000;
  * instead of dropped: 8,000 is more than 50 times the real use.
  */
 export const COPILOT_MAX_CONTEXT_CHARS = 8000;
+
+/**
+ * `state` is injected into the agent's system prompt by the runtime, so it is the same channel as
+ * `context` and gets the same cap. The site keeps no shared agent state: the client sends `{}`.
+ */
+export const COPILOT_MAX_STATE_CHARS = 8000;
+
+/**
+ * `forwardedProps` can only override agent properties the server marks overridable (none are), so
+ * the cap is about size alone. The client sends `{}`, or one `toolChoice` (~80 characters) on a
+ * suggestions run; 2,000 is 25 times that.
+ */
+export const COPILOT_MAX_FORWARDED_PROPS_CHARS = 2000;
+
+/**
+ * The single-route methods the site's own client sends (CopilotKit 1.77, `useSingleEndpoint`):
+ *   - `info` and `inspector/metadata` when the provider mounts (the latter answers 204 here, there
+ *     being no Intelligence backend);
+ *   - `agent/connect` when CopilotChat mounts (it replays a thread's history; none exists here);
+ *   - `agent/run` for each turn and for the suggestions run;
+ *   - `agent/stop` from the stop button.
+ * Everything else the runtime serves is refused: `resource/request` (the thread list, thread
+ * messages and events, and `POST /threads/clear`, all on a store shared by every visitor),
+ * `transcribe`, `agent/suggest` (the stateless suggestions route; the client uses agent/run on a
+ * single endpoint), `inspector/learning`, `trajectory/connect` and memories. Exact string match,
+ * as the runtime's own router does.
+ */
+export const COPILOT_ALLOWED_METHODS: ReadonlySet<string> = new Set([
+  "info",
+  "inspector/metadata",
+  "agent/run",
+  "agent/connect",
+  "agent/stop",
+]);
+
+/** Methods whose `body` is a RunAgentInput: it must be a plain object, and is capped. */
+const RUN_METHODS: ReadonlySet<string> = new Set(["agent/run", "agent/connect"]);
 
 /**
  * Client tools the site really registers: `collectLead` (use-lead-collector-action.ts) and the
@@ -95,11 +138,23 @@ export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
   const envelope = safeJsonParse<unknown>(text, "copilotkit:envelope", null, () => undefined);
   if (!isRecord(envelope)) return { ok: false, status: 400, error: "invalid json" };
 
+  const { method } = envelope;
+  if (typeof method !== "string" || !COPILOT_ALLOWED_METHODS.has(method)) {
+    return { ok: false, status: 400, error: "unsupported method" };
+  }
+
   const droppedTools: string[] = [];
   let droppedSystemMessages = 0;
   const run = envelope.body;
 
-  if (isRecord(run)) {
+  // A body that is not a plain object is refused outright rather than passed through: the runtime
+  // would parse a JSON string body itself, after this function has looked at nothing.
+  const carriesRun = RUN_METHODS.has(method);
+  if ((carriesRun || run !== undefined) && !isRecord(run)) {
+    return { ok: false, status: 400, error: "invalid body" };
+  }
+
+  if (carriesRun && isRecord(run)) {
     if (Array.isArray(run.messages)) {
       const kept = run.messages.filter((message) => !isServerOnlyRole(message));
       droppedSystemMessages = run.messages.length - kept.length;
@@ -113,8 +168,16 @@ export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
       run.messages = kept;
     }
 
-    if (Array.isArray(run.context) && serializedLength(run.context) > COPILOT_MAX_CONTEXT_CHARS) {
+    if (serializedLength(run.context) > COPILOT_MAX_CONTEXT_CHARS) {
       return { ok: false, status: 413, error: "context too large" };
+    }
+
+    if (serializedLength(run.state) > COPILOT_MAX_STATE_CHARS) {
+      return { ok: false, status: 413, error: "state too large" };
+    }
+
+    if (serializedLength(run.forwardedProps) > COPILOT_MAX_FORWARDED_PROPS_CHARS) {
+      return { ok: false, status: 413, error: "forwardedProps too large" };
     }
 
     if ("tools" in run) {
