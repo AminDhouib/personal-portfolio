@@ -17,15 +17,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 export const REPLAY_ERROR_REASON = "the proof cannot be played";
 /** What judge() answers when the run did not end on the claimed tick. */
 export const TICKS_MISMATCH_REASON = "ticks do not match the replay";
-/** What judge() answers when the score is not the replay's. */
-export const SCORE_FLOOR_REASON = "score does not match the replay";
 
 // ---- structure ---------------------------------------------------------------------------
 
 const TICKS_PER_SECOND = Math.round(1 / TICK);
-
-/** sim/score.ts scoreOf(): ten points for each whole second survived, plus points banked. */
-const POINTS_PER_SECOND = 10;
 
 /**
  * Reputation a daily run starts with (sim/state.ts, resetSim: `reputation: 100`). A request that
@@ -75,30 +70,24 @@ function linksTheInternet(log: readonly LoggedAction[]): boolean {
 
 /**
  * A reason to refuse this claim without playing it, or null. Pure. `log` is a parsed proof, `ticks`
- * and `score` the claim. Three facts, none of which a run the game recorded can break:
+ * is the claimed end. Two facts, neither of which a run the game recorded can break, and neither of
+ * which changes a verdict the replay (or SHADOW's drift allowance) would have given:
  *
  *  1. Every entry decodes and none is later than the claimed end. The replay plans the whole log
  *     first and refuses it on exactly these (replay.ts plan(): tick-range, bad-args, unknown-op),
  *     so this is the same answer, reached before the queue instead of after it. The game writes
  *     its log through encodeAction, which decodeAction reads back, at ticks the run reached.
- *  2. The score is at least ten points for each whole second of the claimed ticks. The score is
- *     that plus the points banked, and the points are floored at zero (score.ts scoreOf), so the
- *     page's own number is never below it, on any engine.
- *  3. A claim of more than NO_ENTRY_LINK_MAX_TICKS needs a link from the Internet in the log.
+ *  2. A claim of more than NO_ENTRY_LINK_MAX_TICKS needs a link from the Internet in the log. The
+ *     replay would end such a board far short of the claim, by more than the drift bound.
  *
- * Not bounded here, on purpose: the score above (the sim has no arrival ceiling, config.ts
- * survival.maxRPS is Infinity; the 1,000,000 bound is the existing plausibility check), and the
+ * Not bounded here, on purpose: the score (the sim has no arrival ceiling, config.ts
+ * survival.maxRPS is Infinity, and the replay judges it, with SHADOW's drift allowance), and the
  * log length against the ticks (many actions may share one tick).
  */
-export function structuralReason(
-  log: readonly LoggedAction[],
-  score: number,
-  ticks: number,
-): string | null {
+export function structuralReason(log: readonly LoggedAction[], ticks: number): string | null {
   for (const entry of log) {
     if (entry[0] > ticks || !decodeAction(entry).ok) return REPLAY_ERROR_REASON;
   }
-  if (score < POINTS_PER_SECOND * Math.floor(ticks / TICKS_PER_SECOND)) return SCORE_FLOOR_REASON;
   if (ticks > NO_ENTRY_LINK_MAX_TICKS && !linksTheInternet(log)) return TICKS_MISMATCH_REASON;
   return null;
 }

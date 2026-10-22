@@ -10,7 +10,7 @@ import { PROFILES } from "@/components/game/failover/daily/profiles";
 import { encodeAction, type LoggedAction } from "@/components/game/failover/sim/action-log";
 import { CONFIG, TICK } from "@/components/game/failover/sim/config";
 import { encodeProof, parseProof } from "@/components/game/failover/sim/proof";
-import { replay, replayAsync } from "@/components/game/failover/sim/replay";
+import { replay, replayAsync, type ReplayResult } from "@/components/game/failover/sim/replay";
 import { resetSim, S } from "@/components/game/failover/sim/state";
 import {
   BOARD_A,
@@ -36,11 +36,10 @@ import {
   REPLAY_WINDOW_MS,
   replayKey,
   rememberReplay,
-  SCORE_FLOOR_REASON,
   structuralReason,
   TICKS_MISMATCH_REASON,
 } from "../failover-gates";
-import { createFailoverVerifier, resetVerifierForTests } from "../failover-verify";
+import { createFailoverVerifier, MAX_WAITING, resetVerifierForTests } from "../failover-verify";
 import { VERIFY_RATE_LIMITED_REASON } from "../verify-reasons";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
@@ -148,7 +147,7 @@ describe("the bounds come from the sim", () => {
 describe("structuralReason", () => {
   it("passes every honest run, at its own claim", () => {
     for (const run of [dies, retires]) {
-      expect(structuralReason(logOf(run), run.score, run.ticks), run.endReason).toBeNull();
+      expect(structuralReason(logOf(run), run.ticks), run.endReason).toBeNull();
     }
   });
 
@@ -158,26 +157,21 @@ describe("structuralReason", () => {
       for (const day of ["2026-10-15", "2026-10-16", "2026-11-02"]) {
         for (const until of [200, 1200]) {
           const run = record(day, board, until);
-          expect(
-            structuralReason(logOf(run), run.score, run.ticks),
-            `${name} ${day} ${until}`,
-          ).toBeNull();
+          expect(structuralReason(logOf(run), run.ticks), `${name} ${day} ${until}`).toBeNull();
         }
       }
     }
   });
 
   it("passes an honest log claimed alive at the 900 s cap with the score it earned by then", () => {
-    // The gate is pure on (log, score, ticks): a board that links the Internet may claim any end.
+    // The gate is pure on (log, ticks): a board that links the Internet may claim any end.
     const run = record(DAY, BOARD_S, 400);
-    expect(structuralReason(logOf(run), 10 * (DAILY_MAX_TICKS / 20), DAILY_MAX_TICKS)).toBeNull();
+    expect(structuralReason(logOf(run), DAILY_MAX_TICKS)).toBeNull();
   });
 
   it("passes an empty log that claims a death inside the no-entry-link bound", () => {
-    expect(structuralReason([], 10, 20)).toBeNull();
-    expect(
-      structuralReason([], 10 * (NO_ENTRY_LINK_MAX_TICKS / 20), NO_ENTRY_LINK_MAX_TICKS),
-    ).toBeNull();
+    expect(structuralReason([], 20)).toBeNull();
+    expect(structuralReason([], NO_ENTRY_LINK_MAX_TICKS)).toBeNull();
   });
 
   it("refuses an action later than the claimed end, as the replay would", () => {
@@ -185,8 +179,8 @@ describe("structuralReason", () => {
       [0, 8],
       [100, 8],
     ];
-    expect(structuralReason(log, 100, 99)).toBe(REPLAY_ERROR_REASON);
-    expect(structuralReason(log, 100, 100)).toBeNull();
+    expect(structuralReason(log, 99)).toBe(REPLAY_ERROR_REASON);
+    expect(structuralReason(log, 100)).toBeNull();
   });
 
   it("refuses an entry the game could not have logged, as the replay would", () => {
@@ -194,46 +188,36 @@ describe("structuralReason", () => {
     for (const proof of ["0,3,0", "0,4,0", "0,7,2", "0,5,0", "0,6,0"]) {
       const log = parseProof(proof);
       expect(log, proof).not.toBeNull();
-      expect(structuralReason(log ?? [], 100, 100), proof).toBe(REPLAY_ERROR_REASON);
+      expect(structuralReason(log ?? [], 100), proof).toBe(REPLAY_ERROR_REASON);
     }
-  });
-
-  it("refuses a score under the ten points a second survived pay", () => {
-    expect(structuralReason(logOf(dies), 10 * Math.floor(dies.ticks / 20) - 1, dies.ticks)).toBe(
-      SCORE_FLOOR_REASON,
-    );
-    expect(structuralReason(logOf(dies), 10 * Math.floor(dies.ticks / 20), dies.ticks)).toBeNull();
   });
 
   it("refuses a run past the no-entry-link bound whose log never links the Internet", () => {
     const placeOnly = parseProof(encodeProof([[0, 0, 0, 0, 0]]));
     expect(placeOnly).not.toBeNull();
     const ticks = NO_ENTRY_LINK_MAX_TICKS + 1;
-    const score = 10 * Math.floor(ticks / 20);
-    expect(structuralReason(placeOnly ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
-    expect(structuralReason([], 10 * (DAILY_MAX_TICKS / 20), DAILY_MAX_TICKS)).toBe(
-      TICKS_MISMATCH_REASON,
-    );
+    expect(structuralReason(placeOnly ?? [], ticks)).toBe(TICKS_MISMATCH_REASON);
+    expect(structuralReason([], DAILY_MAX_TICKS)).toBe(TICKS_MISMATCH_REASON);
     // A link that does not start at the Internet is not an entry link.
     const inner = parseProof(encodeProof([[0, 1, 1, 2]]));
-    expect(structuralReason(inner ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    expect(structuralReason(inner ?? [], ticks)).toBe(TICKS_MISMATCH_REASON);
     // A link from the Internet to a service nobody has placed (yet) is not one either.
     const unplaced = parseProof(encodeProof([[0, 1, 0, 1]]));
-    expect(structuralReason(unplaced ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    expect(structuralReason(unplaced ?? [], ticks)).toBe(TICKS_MISMATCH_REASON);
     const early = parseProof(
       encodeProof([
         [0, 1, 0, 1],
         [1, 0, 0, 0, 0],
       ]),
     );
-    expect(structuralReason(early ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    expect(structuralReason(early ?? [], ticks)).toBe(TICKS_MISMATCH_REASON);
     const beyond = parseProof(
       encodeProof([
         [0, 0, 0, 0, 0],
         [1, 1, 0, 2],
       ]),
     );
-    expect(structuralReason(beyond ?? [], score, ticks)).toBe(TICKS_MISMATCH_REASON);
+    expect(structuralReason(beyond ?? [], ticks)).toBe(TICKS_MISMATCH_REASON);
     // A placement and a link from the Internet to it is enough to pass the gate.
     const linked = parseProof(
       encodeProof([
@@ -241,7 +225,7 @@ describe("structuralReason", () => {
         [1, 1, 0, 1],
       ]),
     );
-    expect(structuralReason(linked ?? [], score, ticks)).toBeNull();
+    expect(structuralReason(linked ?? [], ticks)).toBeNull();
   });
 });
 
@@ -277,11 +261,6 @@ describe("the verifier refuses hostile shapes without replaying", () => {
       "an entry the game could not have logged",
       () => claim("0,3,0", { ticks: 100, score: 50 }),
       REPLAY_ERROR_REASON,
-    ],
-    [
-      "a long run with a score under what its seconds pay",
-      () => claim(retires.proof, { ticks: DAILY_MAX_TICKS, score: 1 }),
-      SCORE_FLOOR_REASON,
     ],
   ];
 
@@ -404,6 +383,32 @@ describe("remembered replays", () => {
   });
 
   it("does not remember a replay that ran out of time, or one that threw", async () => {
+    // Out of time: the clock passes the deadline in the middle of the first replay.
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
+    let first = true;
+    const slow = vi.fn(async (...args: Parameters<typeof replayAsync>) => {
+      if (first) {
+        first = false;
+        vi.setSystemTime(NOW.getTime() + 10_000);
+        await args[1].yieldFn();
+      }
+      return replayAsync(...args);
+    });
+    const patient = createFailoverVerifier({ shadow: false, replay: slow });
+    expect(await patient(input(retires, { deadline: NOW.getTime() + 8_000 }))).toEqual({
+      ok: false,
+      reason: VERIFY_BUSY_REASON,
+    });
+    // Not remembered: the same claim is replayed again, and passes.
+    expect(await patient(input(retires, { deadline: NOW.getTime() + 600_000 }))).toEqual({
+      ok: true,
+    });
+    expect(slow).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+
+    // A replay that threw.
+    clearReplayCache();
     const calls: string[] = [];
     const flaky = vi.fn(async (...args: Parameters<typeof replayAsync>) => {
       calls.push("call");
@@ -529,7 +534,34 @@ describe("the replay-attempt cap", () => {
     expect(admit).toHaveBeenLastCalledWith(undefined);
   });
 
-  it("answers busy, not rate limited, when the queue is what is full", () => {
-    expect(VERIFY_RATE_LIMITED_REASON).not.toBe(VERIFY_BUSY_REASON);
+  it("answers busy, not rate limited, when the queue is what is full", async () => {
+    const started: Array<(result: ReplayResult) => void> = [];
+    const held = vi.fn(
+      () => new Promise<ReplayResult>((resolve) => started.push(resolve)),
+    ) as unknown as typeof replayAsync;
+    const verify = createFailoverVerifier({ shadow: false, replay: held });
+    // One replay runs and MAX_WAITING wait; the next caller is turned away at the door.
+    const calls = Array.from({ length: MAX_WAITING + 2 }, () => verify(input(retires)));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(await calls[MAX_WAITING + 1]).toEqual({ ok: false, reason: VERIFY_BUSY_REASON });
+    expect(VERIFY_BUSY_REASON).not.toBe(VERIFY_RATE_LIMITED_REASON);
+    expect(held).toHaveBeenCalledTimes(1);
+    // Let the rest finish so nothing is left waiting.
+    const result: ReplayResult = {
+      endedAtTick: retires.ticks,
+      endReason: "retired",
+      seconds: retires.seconds,
+      score: retires.score,
+      hash: 0,
+    };
+    for (let i = 0; i <= MAX_WAITING; i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+      started[i]?.(result);
+    }
+    expect(await Promise.all(calls.slice(0, MAX_WAITING + 1))).toEqual([
+      { ok: true },
+      { ok: true },
+      { ok: true },
+    ]);
   });
 });

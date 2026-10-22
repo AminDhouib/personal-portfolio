@@ -1478,8 +1478,7 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
 - **Failover's replay gates sit in front of the replay and decide nothing the replay would decide
   differently.** `src/lib/arcade/failover-gates.ts`: (1) `structuralReason` refuses, before the
   queue, a log the replay's planner would refuse (an entry that does not decode, one later than the
-  claimed end), a score under ten points a second of the claimed ticks (the page's own score is
-  never below it), and a claim of more than `NO_ENTRY_LINK_MAX_TICKS` (4,040) whose log never links
+  claimed end), and a claim of more than `NO_ENTRY_LINK_MAX_TICKS` (4,040) whose log never links
   the Internet to a placed service (such a board loses its 100 reputation to unrouted requests in at
   most 4,000 ticks; measured 437 to 589 on the six profiles). The reasons are the replay's own. It
   does not bound the score from above (the sim has no arrival ceiling) or the log length against
@@ -1489,9 +1488,8 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   6 times a minute and for the process 30, through `checkRateLimit`, before the queue; over either is
   a 429 with `Retry-After`, never a pass. The first two do not spend the cap; busy is still a 503. A
   bound added here must come from the sim or the codec, and be pinned against a real recorded run in
-  `failover-gates.test.ts`. SHADOW is untouched: the gates refuse what the replay refused too, or
-  what no run the game recorded can claim (the score floor is the one that SHADOW's drift allowance
-  would have taken before).
+  `failover-gates.test.ts`. SHADOW is untouched: no gate changes a verdict the replay, or SHADOW's
+  drift allowance, would have given.
 
 - **Failover's daily has no grace across midnight.** The synchronous check requires today's UTC day
   by the server clock (the Voltorb rule), so a run that started before 00:00 UTC and ended after is

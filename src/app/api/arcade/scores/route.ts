@@ -123,7 +123,6 @@ export async function POST(req: Request) {
     );
     if (!outcome.ok) {
       if ("error" in outcome) captureException("api:arcade-scores.verify", outcome.error);
-      // Busy is the server's state, not the run's fault: the client may try again shortly.
       // Over the replay cap: refused before any replay started, with the seconds until it frees up.
       if (outcome.reason === VERIFY_RATE_LIMITED_REASON) {
         const wait = "retryAfterSeconds" in outcome ? outcome.retryAfterSeconds : undefined;
@@ -132,6 +131,7 @@ export async function POST(req: Request) {
           { status: 429, headers: { "Retry-After": String(wait ?? 60) } },
         );
       }
+      // Busy is the server's state, not the run's fault: the client may try again shortly.
       if (outcome.reason === VERIFY_BUSY_REASON) {
         return NextResponse.json(
           { error: "busy", reason: outcome.reason },
