@@ -7,7 +7,7 @@ import { EXPLODE_FRAME_MAX_PX, EXPLODE_FRAME_PX, crispIconSize } from "./art/ori
 import { ExplodeFrameImg, VoltorbSprite } from "./art/voltorb-sprite";
 
 // ---------------------------------------------------------------------------
-// The Voltorb icon: the original tile sprite (art/voltorb-sprite.tsx) used wherever
+// The Voltorb icon: the bare body cut from the original tile sprite (art/voltorb-sprite.tsx) used wherever
 // the game shows its hazard, on the clue cards, in the legend and as the
 // How to play icon.
 // ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ export function VoltorbIcon({
 }) {
   // A CSS length (the clue cards, which scale with the tile) is used as given. A pixel box keeps
   // its exact size, with the sprite drawn at a whole multiple of its 22 px art inside it.
-  if (cssSize) return <VoltorbSprite cssSize={cssSize} className={className} />;
+  if (cssSize) return <VoltorbSprite variant="icon" cssSize={cssSize} className={className} />;
   return (
     <span
       style={{
@@ -35,7 +35,7 @@ export function VoltorbIcon({
         height: size,
       }}
     >
-      <VoltorbSprite size={crispIconSize(size)} className={className} />
+      <VoltorbSprite variant="icon" size={crispIconSize(size)} className={className} />
     </span>
   );
 }

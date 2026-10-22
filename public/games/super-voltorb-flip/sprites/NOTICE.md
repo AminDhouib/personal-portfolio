@@ -19,3 +19,5 @@ Only the Voltorb creature art is shipped from this set: `tile/voltorb.png` (the 
 tile) and `tile/explode_0.png` to `tile/explode_8.png` (the bomb burst). The number, memo, chrome,
 coin and button sprites of the original set are not shipped. The original music is credited in
 `../music/CREDITS.md`.
+
+`voltorb-icon.png` is `tile/voltorb.png` with the tile background made transparent.

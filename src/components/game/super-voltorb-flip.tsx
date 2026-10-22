@@ -503,7 +503,7 @@ const Card = ({
                   ].join(" ")}
                 >
                   {f === "V" ? (
-                    <VoltorbSprite cssSize={flagSize} />
+                    <VoltorbSprite variant="icon" cssSize={flagSize} />
                   ) : (
                     <PixelSprite
                       sprite={GLYPHS[f]}

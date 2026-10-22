@@ -32,7 +32,7 @@ function MemoFace({ sprite, active, size }: { sprite?: Sprite; active: boolean; 
           style={{ color: active ? "#1f2937" : "#4b5563" }}
         />
       ) : (
-        <VoltorbSprite cssSize="62%" />
+        <VoltorbSprite variant="icon" cssSize="62%" />
       )}
     </span>
   );
