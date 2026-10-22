@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const mockCaptureException = vi.hoisted(() => vi.fn());
 const mockLogWarn = vi.hoisted(() => vi.fn());
@@ -8,7 +8,7 @@ vi.mock("@/lib/log", () => ({
   logWarn: mockLogWarn,
 }));
 
-import { tapRunErrors } from "../copilot-run-error-tap";
+import { resetRunErrorSamplingForTests, tapRunErrors } from "../copilot-run-error-tap";
 
 /** Exactly what @ag-ui/encoder puts on the wire: `data: <json>\n\n`. */
 function frame(event: unknown): string {
@@ -69,6 +69,7 @@ const CLEAN_RUN = [
 
 describe("tapRunErrors", () => {
   beforeEach(() => {
+    resetRunErrorSamplingForTests();
     mockCaptureException.mockReset();
     mockLogWarn.mockReset();
   });
@@ -175,5 +176,76 @@ describe("tapRunErrors", () => {
 
     expect(mockLogWarn).toHaveBeenCalledOnce();
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  describe("tapRunErrors sampling (T-6263)", () => {
+    // Mirrors RUN_ERROR_CAPTURES_PER_WINDOW, RUN_ERROR_WINDOW_MS and MAX_TRACKED_CODES.
+    const PER_WINDOW = 5;
+    const WINDOW_MS = 10 * 60_000;
+    const MAX_CODES = 20;
+
+    beforeEach(() => {
+      resetRunErrorSamplingForTests();
+      mockCaptureException.mockClear();
+      mockLogWarn.mockClear();
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2031-01-01T00:00:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function run(event: Record<string, unknown>): Promise<void> {
+      const res = tapRunErrors(sseResponse([frame(event)]));
+      await readAll(res);
+      await settle();
+    }
+
+    it("captures at most PER_WINDOW of one error code per window, the first always, and logs the suppression", async () => {
+      for (let i = 0; i < PER_WINDOW + 7; i += 1) {
+        await run({ ...RUN_ERROR, message: `m${i}` });
+      }
+      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+      const warned = mockLogWarn.mock.calls.filter(([, msg]) => /suppress/i.test(String(msg)));
+      expect(warned).toHaveLength(1);
+    });
+
+    it("gives every distinct error code its own first capture", async () => {
+      for (const code of ["abort", "timeout", "rate_limit", "upstream", "bad_request"]) {
+        await run({ ...RUN_ERROR, code });
+      }
+      expect(mockCaptureException).toHaveBeenCalledTimes(5);
+    });
+
+    it("buckets frames without a code together", async () => {
+      for (let i = 0; i < PER_WINDOW + 3; i += 1) {
+        await run({ type: "RUN_ERROR", message: `no code ${i}` });
+      }
+      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+    });
+
+    it("starts a new window after WINDOW_MS and reports how many captures were suppressed", async () => {
+      for (let i = 0; i < PER_WINDOW + 4; i += 1) await run(RUN_ERROR);
+      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+
+      vi.setSystemTime(new Date(Date.now() + WINDOW_MS + 1));
+      mockLogWarn.mockClear();
+      await run(RUN_ERROR);
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW + 1);
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        "copilotkit:run-error",
+        expect.stringMatching(/suppressed/i),
+        expect.objectContaining({ code: "abort", suppressed: 4 }),
+      );
+    });
+
+    it("bounds the codes it tracks: codes beyond MAX_CODES share one overflow bucket", async () => {
+      for (let i = 0; i < MAX_CODES + 20; i += 1) {
+        await run({ ...RUN_ERROR, code: `code-${i}` });
+      }
+      expect(mockCaptureException).toHaveBeenCalledTimes(MAX_CODES + PER_WINDOW);
+    });
   });
 });
