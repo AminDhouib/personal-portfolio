@@ -20,7 +20,7 @@
  *
  * The envelope is the single-route shape `{ method, params?, body? }`, where `body` is an AG-UI
  * RunAgentInput (see route.integration.test.ts for the real shapes). Methods that carry no run
- * (info, inspector/metadata, stop) pass through after the method check, and the rest of the
+ * (info, stop) pass through after the method check, and the rest of the
  * envelope is forwarded as the client sent it.
  *
  * Cap values come from the site's own chat. The client resends the whole history every turn, so a
@@ -73,8 +73,8 @@ export const COPILOT_MAX_FORWARDED_PROPS_CHARS = 2000;
  *   - `agent/stop` from the stop button.
  * Everything else the runtime serves is refused: `resource/request` (the thread list, thread
  * messages and events, and `POST /threads/clear`, all on a store shared by every visitor),
- * `inspector/metadata` (the client also asks for it on load, but treats any non-OK answer as "no
- * metadata", and this runtime has none to give), `transcribe`, `agent/suggest` (the stateless suggestions route; the client uses agent/run on a
+ * `inspector/metadata` (the client sends it only when `info` reports `inspectorMetadata: true`,
+ * which only an Intelligence runtime does, so this route's `info` never triggers it), `transcribe`, `agent/suggest` (the stateless suggestions route; the client uses agent/run on a
  * single endpoint), `inspector/learning`, `trajectory/connect` and memories. Exact string match,
  * as the runtime's own router does.
  */
@@ -170,6 +170,12 @@ export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
     if (serializedLength(run.context) > COPILOT_MAX_CONTEXT_CHARS) {
       return { ok: false, status: 413, error: "context too large" };
     }
+
+    // `resume` carries resolved interrupts into the model prompt and nothing else bounds it. It
+    // belongs to CopilotKit's interrupt flow, which the site does not use (collectLead is a plain
+    // handler), so it is refused rather than capped or stripped: a client that sends one is not our
+    // client.
+    if ("resume" in run) return { ok: false, status: 400, error: "unsupported field" };
 
     if (serializedLength(run.state) > COPILOT_MAX_STATE_CHARS) {
       return { ok: false, status: 413, error: "state too large" };
