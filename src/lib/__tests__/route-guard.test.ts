@@ -329,3 +329,98 @@ describe("guardRequest client identity (T-5524)", () => {
     expect(guardRequest(make("4.4.4.4"), opts).response?.status).toBe(429);
   });
 });
+
+describe("guardedJsonRoute chunked bodies (T-5526)", () => {
+  // A chunked upload carries no Content-Length, so the declared-size pre-check cannot see it.
+  // The body read itself must stop at the cap instead of buffering the whole upload first.
+  function chunkedRequest(chunkCount: number, observe: { pulls: number }): Request {
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        observe.pulls += 1;
+        if (sent >= chunkCount) {
+          controller.close();
+          return;
+        }
+        sent += 1;
+        controller.enqueue(new Uint8Array(1024).fill(120));
+      },
+    });
+    return new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body,
+      duplex: "half",
+    } as RequestInit);
+  }
+
+  it("413s a chunked body past the cap without pulling the rest of the stream", async () => {
+    const observe = { pulls: 0 };
+    const req = chunkedRequest(10_000, observe);
+    expect(req.headers.get("content-length")).toBeNull();
+
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-chunked-a",
+      limit: 10,
+      windowMs: 60_000,
+      maxBytes: 4096,
+    });
+
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(413);
+    expect(observe.pulls).toBeLessThan(20);
+  });
+
+  it("still parses a chunked body under the cap", async () => {
+    const encoder = new TextEncoder();
+    const parts = [encoder.encode('{"hello"'), encoder.encode(':"world"}')];
+    let index = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = parts[index];
+        index += 1;
+        if (next === undefined) controller.close();
+        else controller.enqueue(next);
+      },
+    });
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body,
+      duplex: "half",
+    } as RequestInit);
+
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-chunked-b",
+      limit: 10,
+      windowMs: 60_000,
+    });
+    expect(guard.ok).toBe(true);
+    if (guard.ok) expect(guard.body).toEqual({ hello: "world" });
+  });
+
+  it("answers 400 invalid json, not a crash, when the stream errors mid-body", async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("{"));
+      },
+      pull(controller) {
+        controller.error(new Error("socket reset"));
+      },
+    });
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      headers: { origin: "https://amindhou.com", "x-forwarded-host": "amindhou.com" },
+      body,
+      duplex: "half",
+    } as RequestInit);
+
+    const guard = await guardedJsonRoute(req, {
+      key: "gjr-chunked-c",
+      limit: 10,
+      windowMs: 60_000,
+    });
+    expect(guard.ok).toBe(false);
+    if (!guard.ok) expect(guard.response.status).toBe(400);
+  });
+});
