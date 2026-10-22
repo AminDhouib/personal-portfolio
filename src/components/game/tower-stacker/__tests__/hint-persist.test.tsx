@@ -1,6 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { freeSeed } from "../daily";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// The first test re-imports the whole Stage module graph (vi.resetModules) and renders it in jsdom;
+// see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 const realGetContext =
   Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext") ?? {};
