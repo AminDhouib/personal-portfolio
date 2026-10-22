@@ -296,9 +296,11 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     expect(upstreamCalls).toHaveLength(0);
   });
 
-  it("serves inspector/metadata and agent/connect, which the chat sends on load", async () => {
+  // The client asks for inspector metadata on load, but treats any non-OK answer as "none"
+  // (core refreshInspectorMetadata), so it is refused rather than served.
+  it("refuses inspector/metadata and still serves agent/connect, which the chat sends on load", async () => {
     const metadata = await POST(makeReq({ method: "inspector/metadata" }));
-    expect(metadata.status).toBe(204);
+    expect(metadata.status).toBe(400);
 
     const connect = await POST(
       makeReq({

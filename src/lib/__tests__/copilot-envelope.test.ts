@@ -265,20 +265,18 @@ describe("sanitizeCopilotEnvelope: malformed input", () => {
 // ones the site's own client sends: info and inspector/metadata on load, agent/connect when the
 // chat mounts, agent/run per turn, agent/stop on the stop button.
 describe("sanitizeCopilotEnvelope: method allow-list", () => {
-  it.each(["info", "inspector/metadata", "agent/run", "agent/connect", "agent/stop"])(
-    "lets %s through",
-    (method) => {
-      const envelope =
-        method === "agent/run" || method === "agent/connect"
-          ? runEnvelope({ messages: [turn(0)] })
-          : { params: { agentId: "default", threadId: "t" } };
-      const result = sanitizeCopilotEnvelope(JSON.stringify({ ...envelope, method }));
-      expect(result).toMatchObject({ ok: true });
-    },
-  );
+  it.each(["info", "agent/run", "agent/connect", "agent/stop"])("lets %s through", (method) => {
+    const envelope =
+      method === "agent/run" || method === "agent/connect"
+        ? runEnvelope({ messages: [turn(0)] })
+        : { params: { agentId: "default", threadId: "t" } };
+    const result = sanitizeCopilotEnvelope(JSON.stringify({ ...envelope, method }));
+    expect(result).toMatchObject({ ok: true });
+  });
 
   it.each([
     "resource/request",
+    "inspector/metadata",
     "agent/suggest",
     "transcribe",
     "inspector/learning",

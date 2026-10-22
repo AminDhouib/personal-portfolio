@@ -378,6 +378,7 @@ describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)"
     { method: "resource/request", params: { path: "/threads/clear", httpMethod: "POST" } },
     { method: "resource/request", params: { path: "/threads/abc/messages", httpMethod: "GET" } },
     { method: "transcribe", body: {} },
+    { method: "inspector/metadata" },
   ])("answers 400 and never reaches the runtime for $method", async (envelope) => {
     const response = await POST(makeRawReq(JSON.stringify(envelope), "10.33.0.1"));
     expect(response.status).toBe(400);
@@ -415,7 +416,7 @@ describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)"
     expect(mockHandleRequest).not.toHaveBeenCalled();
   });
 
-  it.each(["info", "inspector/metadata"])("still forwards %s to the runtime", async (method) => {
+  it.each(["info"])("still forwards %s to the runtime", async (method) => {
     mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
     const response = await POST(makeRawReq(JSON.stringify({ method }), "10.33.0.4"));
     expect(response.status).toBe(200);
