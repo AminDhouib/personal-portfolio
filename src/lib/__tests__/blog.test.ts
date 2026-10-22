@@ -62,7 +62,7 @@ describe("getBlogPost slug validation", () => {
     "./caramel-open-source-story",
     "caramel-open-source-story/../caramel-open-source-story",
     "/etc/passwd",
-    "..\..\README",
+    ["..", "..", "README"].join(String.fromCharCode(92)),
     "..%2F..%2FREADME",
     "%2e%2e%2f%2e%2e%2fREADME",
     "caramel-open-source-story%00",
