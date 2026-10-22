@@ -1,0 +1,7 @@
+Dokploy deploy record (as supplied by the lead)
+deploymentId: OtF4LUIbrMGnQzB153bQG
+Commit: 45b9948dbaa786475e7042a3f21147cf75543ae1
+status: done
+started: 13:37:16Z
+finished: 13:39:15Z
+CI: run 39780875034 (CI #458) on main, commit 45b9948d, success, 11m 38s; jobs all green: Lint Typecheck Test, Build (standalone artifact for e2e), Lighthouse (all public pages), Postgres integration (arcade store), E2E (Playwright, production build), Deploy to Dokploy.
