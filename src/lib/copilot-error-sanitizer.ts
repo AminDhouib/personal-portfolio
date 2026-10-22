@@ -108,6 +108,8 @@ function sanitizeStream(body: ReadableStream<SseChunk>): ReadableStream<SseChunk
         }
       },
       flush(controller) {
+        // Flush the decoder too, so a multi-byte sequence cut off at the end is not dropped.
+        if (binary) pending += decoder.decode();
         if (!discarding && pending !== "") emit(controller, sanitizeLine(pending));
       },
     }),

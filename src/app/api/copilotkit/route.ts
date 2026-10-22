@@ -44,6 +44,15 @@ const MODEL = "anthropic/claude-haiku-4.5";
 // than having lib import from a route directory.
 const AMIN_AI_SYSTEM_PROMPT = buildAminAiSystemPrompt(GAMES);
 
+// A dropped tool's name is attacker-chosen text headed for a log line, so control characters
+// (a newline would forge a log line) are replaced before it is logged.
+function printable(name: string): string {
+  return Array.from(name.slice(0, 60), (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 0x20 || code === 0x7f ? "?" : ch;
+  }).join("");
+}
+
 export const POST = async (req: NextRequest) => {
   // Guard the open LLM proxy before any work: reject cross-origin callers and
   // throttle per client IP so the OpenRouter key can't be drained by abuse.
@@ -86,7 +95,7 @@ export const POST = async (req: NextRequest) => {
       "dropped client-supplied content",
       `tools=${envelope.droppedTools
         .slice(0, 5)
-        .map((name) => name.slice(0, 60))
+        .map(printable)
         .join(",")} systemMessages=${envelope.droppedSystemMessages}`,
     );
   }

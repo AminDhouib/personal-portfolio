@@ -27,9 +27,10 @@ export async function readCappedBody(req: Request, maxBytes: number): Promise<Ca
       if (done) break;
       received += value.byteLength;
       if (received > maxBytes) {
-        // The reader is cancelled so the rest of the upload is not pulled; a failed cancel changes
-        // nothing about the 413 we are about to return.
-        await reader.cancel().catch(() => undefined);
+        // The reader is cancelled so the rest of the upload is not pulled. Not awaited, as in the
+        // monitoring tunnel: cancelling a stalled upload can wait on the socket, and the 413 must
+        // not wait with it. A failed cancel changes nothing about the answer.
+        void reader.cancel().catch(() => undefined);
         return { ok: false, reason: "too-large" };
       }
       chunks.push(value);
