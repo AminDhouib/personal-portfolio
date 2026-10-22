@@ -1,29 +1,67 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 
-// Regression guard for Super Voltorb Flip's assets: nothing ripped, nothing
+// Regression guard for Super Voltorb Flip's assets: nothing unlisted, nothing
 // unreferenced, nothing unattributed. Walks the real tree, so it fails the day
 // someone drops a file in public/games/super-voltorb-flip or loads a removed path.
+//
+// On 2026-10-22 Amin asked for the original Voltorb creature sprites and the original
+// HeartGold/SoulSilver music back ("we need to use those assets to make the right
+// recreation", T-6535), reversing part of the 2026-10-07 cleanup. This guard is therefore an
+// explicit allowlist of exactly the restored files, not a blanket ban: any other image, any
+// other audio file, any sprites/upstream path, any sfx folder and any asset-prep script still
+// fails. Widening the lists below needs the owner's say-so and a comment saying whose.
 
 const ROOT = process.cwd();
 const GAME_DIR = join(ROOT, "public", "games", "super-voltorb-flip");
 const PUBLIC = join(ROOT, "public");
 const SRC = join(ROOT, "src");
 const AUDIO_EXT = /\.(mp3|ogg|wav|m4a|flac)$/i;
+const IMAGE_EXT = /\.(png|gif|jpe?g|webp|svg)$/i;
 
-// The only audio under public/ besides this game's music folder: none. Kept as a list so
-// a future exception needs a justifying comment here.
-const OTHER_AUDIO_ALLOWED: string[] = [];
+// The original Voltorb creature art (T-6535): the revealed-tile Voltorb and the nine bomb-burst
+// frames. Number, memo, chrome, coin and button sprites stay gone.
+const RESTORED_SPRITES = [
+  "sprites/tile/voltorb.png",
+  ...Array.from({ length: 9 }, (_, i) => `sprites/tile/explode_${i}.png`),
+];
 
-// CC0 tracks for the abandoned skin variants. Kept on purpose (owner ruling:
-// the existing CC0 music stays); nothing plays them, so the "referenced from
-// source" check skips exactly these. The credits check still covers them.
+// The licence and notice that travel with the sprites. Documents, never loaded by code.
+const SPRITE_NOTICES = ["sprites/LICENSE", "sprites/NOTICE.md"];
+
+// The original music and jingles (T-6535): intro then loop in the background, a clear jingle
+// and a lost-round jingle.
+const RESTORED_AUDIO = [
+  "audio/music_intro.mp3",
+  "audio/music_loop.mp3",
+  "audio/music_level_win.mp3",
+  "audio/game_over.mp3",
+];
+
+// CC0 tracks for the abandoned skin variants. Kept on purpose (owner ruling: the existing CC0
+// music stays); nothing plays them, so the "referenced from source" check skips exactly these.
+// The credits check still covers them.
 const KEPT_UNWIRED_MUSIC = [
   "music/theme-classic.mp3",
   "music/theme-meadow.mp3",
   "music/theme-twilight.mp3",
 ];
+
+// Not assets: placeholder files and the credits table.
+const NON_ASSETS = [".gitkeep", "music/.gitkeep", "music/CREDITS.md"];
+
+const ALLOWED_FILES = [
+  ...RESTORED_SPRITES,
+  ...SPRITE_NOTICES,
+  ...RESTORED_AUDIO,
+  ...KEPT_UNWIRED_MUSIC,
+  ...NON_ASSETS,
+].sort();
+
+// The only audio under public/ outside this game's own audio/ and music/ folders: none. Kept as
+// a list so a future exception needs a justifying comment here (Tower Stacker relies on it).
+const OTHER_AUDIO_ALLOWED: string[] = [];
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -35,18 +73,11 @@ function walk(dir: string): string[] {
   return out;
 }
 
+/** Shipped files as forward-slash paths relative to the game's public folder. */
 function shippedFiles(): string[] {
-  return walk(GAME_DIR);
-}
-
-function isAsset(file: string): boolean {
-  const name = basename(file);
-  return name !== ".gitkeep" && name !== "CREDITS.md";
-}
-
-function isKeptUnwired(file: string): boolean {
-  const path = file.replaceAll("\\", "/");
-  return KEPT_UNWIRED_MUSIC.some((k) => path.endsWith(`/${k}`));
+  return walk(GAME_DIR)
+    .map((f) => relative(GAME_DIR, f).replaceAll("\\", "/"))
+    .sort();
 }
 
 function sourceFiles(): string[] {
@@ -64,14 +95,27 @@ const sourceText = sourceFiles()
 const sourceCode = sourceText.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 describe("Super Voltorb Flip assets", () => {
-  it("ships no ripped audio folders", () => {
-    expect(existsSync(join(GAME_DIR, "audio"))).toBe(false);
-    expect(existsSync(join(GAME_DIR, "sfx"))).toBe(false);
+  it("ships exactly the allowlisted files and nothing else", () => {
+    expect(shippedFiles()).toEqual(ALLOWED_FILES);
   });
 
-  it("ships only music tracks and the credits file", () => {
-    for (const file of shippedFiles().filter(isAsset)) {
-      expect(file.replaceAll("\\", "/")).toMatch(/\/music\/[^/]+\.mp3$/);
+  it("ships no image except the restored Voltorb sprites", () => {
+    const images = shippedFiles().filter((f) => IMAGE_EXT.test(f));
+    expect(images).toEqual([...RESTORED_SPRITES].sort());
+  });
+
+  it("ships no audio except the restored originals and the kept CC0 tracks", () => {
+    const audio = shippedFiles().filter((f) => AUDIO_EXT.test(f));
+    expect(audio).toEqual([...RESTORED_AUDIO, ...KEPT_UNWIRED_MUSIC].sort());
+  });
+
+  it("ships no sfx folder, no sprites/upstream and no other sprite", () => {
+    expect(existsSync(join(GAME_DIR, "sfx"))).toBe(false);
+    expect(existsSync(join(GAME_DIR, "sprites", "upstream"))).toBe(false);
+    for (const file of shippedFiles().filter((f) => f.startsWith("sprites/"))) {
+      expect(file, `${file} is a sprite that was not restored`).toMatch(
+        /^sprites\/(tile\/(voltorb|explode_[0-8])\.png|LICENSE|NOTICE\.md)$/,
+      );
     }
   });
 
@@ -79,51 +123,62 @@ describe("Super Voltorb Flip assets", () => {
     const strays = walk(PUBLIC)
       .map((f) => f.replaceAll("\\", "/"))
       .filter((f) => AUDIO_EXT.test(f))
-      .filter((f) => !f.includes("/public/games/super-voltorb-flip/music/"))
+      .filter(
+        (f) =>
+          !f.includes("/public/games/super-voltorb-flip/music/") &&
+          !f.includes("/public/games/super-voltorb-flip/audio/"),
+      )
       .filter((f) => !OTHER_AUDIO_ALLOWED.some((d) => f.includes(`/public/${d}/`)));
     expect(strays).toEqual([]);
   });
 
-  it("references every shipped file from code, not just a comment", () => {
-    for (const file of shippedFiles().filter(isAsset)) {
-      if (isKeptUnwired(file)) continue;
-      const name = basename(file);
-      expect(sourceCode, `${name} is shipped but no code loads a path ending /${name}`).toContain(
+  it("references every served file from code, not just a comment", () => {
+    for (const file of [...RESTORED_SPRITES, ...RESTORED_AUDIO]) {
+      // The nine burst frames are built from one `explode_${i}.png` template.
+      const name = basename(file).replace(/explode_\d\.png$/, "explode_");
+      expect(sourceCode, `${file} is shipped but no code loads a path ending /${name}`).toContain(
         `/${name}`,
       );
     }
   });
 
-  it("credits every music track in a CREDITS.md table row", () => {
+  it("credits every music track and jingle in a CREDITS.md table row", () => {
     const credits = readFileSync(join(GAME_DIR, "music", "CREDITS.md"), "utf8");
-    for (const file of shippedFiles().filter(isAsset)) {
+    for (const file of [...RESTORED_AUDIO, ...KEPT_UNWIRED_MUSIC]) {
       const name = basename(file);
       expect(credits, `${name} has no credits table row`).toContain(`| \`${name}\` |`);
     }
   });
 
-  it("loads no removed audio path from source", () => {
-    expect(sourceText).not.toMatch(/super-voltorb-flip\/(audio|sfx)\//);
-  });
-
-  it("ships no sprite folder or image files", () => {
-    expect(existsSync(join(GAME_DIR, "sprites"))).toBe(false);
-    for (const file of shippedFiles()) {
-      expect(file).not.toMatch(/\.(png|gif|jpe?g|webp|svg)$/i);
+  it("names the rights holders of the restored originals in the credits and the notice", () => {
+    const credits = readFileSync(join(GAME_DIR, "music", "CREDITS.md"), "utf8");
+    const notice = readFileSync(join(GAME_DIR, "sprites", "NOTICE.md"), "utf8");
+    for (const text of [credits, notice]) {
+      expect(text).toMatch(/Nintendo/);
+      expect(text).toMatch(/Game Freak/i);
+      expect(text).toMatch(/Creatures/);
     }
   });
 
-  it("loads nothing from a sprites or upstream path", () => {
-    expect(sourceText).not.toMatch(/super-voltorb-flip\/sprites/);
+  it("loads no sfx path and no audio path outside the audio folder from source", () => {
+    expect(sourceText).not.toMatch(/super-voltorb-flip\/sfx/);
+    const bases = sourceText.match(/super-voltorb-flip\/audio[^"'`\s]*/g) ?? [];
+    for (const base of bases) expect(base).toBe("super-voltorb-flip/audio");
+  });
+
+  it("loads only the restored Voltorb tile sprites from source", () => {
+    const paths = sourceText.match(/super-voltorb-flip\/sprites[^"'`\s]*/g) ?? [];
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) expect(path).toBe("super-voltorb-flip/sprites/tile");
     expect(sourceText).not.toMatch(/sprites\/upstream/);
     expect(sourceText).not.toMatch(/samualtnorman/);
   });
 
-  it("has no script, e2e spec or workflow that targets the removed sprites", () => {
+  it("has no script, e2e spec or workflow that targets the sprites", () => {
     for (const dir of ["scripts", "e2e", ".github"]) {
       for (const file of walk(join(ROOT, dir))) {
         const text = readFileSync(file, "utf8");
-        expect(text, `${file} still targets super-voltorb-flip sprites`).not.toMatch(
+        expect(text, `${file} targets super-voltorb-flip sprites`).not.toMatch(
           /super-voltorb-flip\/sprites/,
         );
       }

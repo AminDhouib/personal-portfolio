@@ -1,41 +1,38 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { MUSIC_BANDS, musicTrackForLevel } from "../music";
+import {
+  GAME_OVER_JINGLE,
+  LEVEL_WIN_JINGLE,
+  MUSIC_INTRO,
+  MUSIC_LOOP,
+  MUSIC_SEQUENCE,
+} from "../music";
 
-const BASE = "/games/super-voltorb-flip/music/";
+const BASE = "/games/super-voltorb-flip/audio/";
 
-describe("musicTrackForLevel", () => {
-  it("plays rookie on levels 1-3, veteran on 4-6, master on 7-8", () => {
-    for (const level of [1, 2, 3]) expect(musicTrackForLevel(level).src).toBe(`${BASE}rookie.mp3`);
-    for (const level of [4, 5, 6]) expect(musicTrackForLevel(level).src).toBe(`${BASE}veteran.mp3`);
-    for (const level of [7, 8]) expect(musicTrackForLevel(level).src).toBe(`${BASE}master.mp3`);
+describe("background music", () => {
+  it("plays the original intro once, then the original loop, at every level", () => {
+    expect(MUSIC_INTRO.src).toBe(`${BASE}music_intro.mp3`);
+    expect(MUSIC_LOOP.src).toBe(`${BASE}music_loop.mp3`);
+    expect(MUSIC_SEQUENCE).toEqual([MUSIC_INTRO, MUSIC_LOOP]);
   });
 
-  it("clamps out-of-range and non-finite levels", () => {
-    expect(musicTrackForLevel(9).src).toBe(`${BASE}master.mp3`);
-    expect(musicTrackForLevel(500).src).toBe(`${BASE}master.mp3`);
-    expect(musicTrackForLevel(0).src).toBe(`${BASE}rookie.mp3`);
-    expect(musicTrackForLevel(-4).src).toBe(`${BASE}rookie.mp3`);
-    expect(musicTrackForLevel(Number.NaN).src).toBe(`${BASE}rookie.mp3`);
+  it("maps the round-cleared and round-lost jingles to the original files", () => {
+    expect(LEVEL_WIN_JINGLE.src).toBe(`${BASE}music_level_win.mp3`);
+    expect(GAME_OVER_JINGLE.src).toBe(`${BASE}game_over.mp3`);
   });
 
   it("keeps volumes audible and below full scale", () => {
-    for (const band of MUSIC_BANDS) {
-      expect(band.track.volume).toBeGreaterThan(0.05);
-      expect(band.track.volume).toBeLessThanOrEqual(0.6);
+    for (const track of [MUSIC_INTRO, MUSIC_LOOP, LEVEL_WIN_JINGLE, GAME_OVER_JINGLE]) {
+      expect(track.volume).toBeGreaterThan(0.05);
+      expect(track.volume).toBeLessThanOrEqual(0.6);
     }
   });
 
   it("only names files that exist under public/", () => {
-    for (const band of MUSIC_BANDS) {
-      expect(existsSync(join(process.cwd(), "public", band.track.src))).toBe(true);
+    for (const track of [MUSIC_INTRO, MUSIC_LOOP, LEVEL_WIN_JINGLE, GAME_OVER_JINGLE]) {
+      expect(existsSync(join(process.cwd(), "public", track.src))).toBe(true);
     }
-  });
-
-  it("orders the bands by their ceilings", () => {
-    const ceilings = MUSIC_BANDS.map((b) => b.maxLevel);
-    expect([...ceilings].sort((a, b) => a - b)).toEqual(ceilings);
-    expect(ceilings[ceilings.length - 1]).toBe(Number.POSITIVE_INFINITY);
   });
 });
