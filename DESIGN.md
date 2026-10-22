@@ -839,10 +839,17 @@ current tree on 2026-07-07.
 - **Super Voltorb Flip's background music and round jingles are the original recordings; its
   effects are synthesized; and its cue lengths are a timing contract.** On 2026-10-22 Amin asked
   for the original music back ("we need to use those assets to make the right recreation", T-6535),
-  reversing the 2026-10-07 cleanup for the music only. `audio/music_intro.mp3` plays once and then
-  `audio/music_loop.mp3` loops, at every level (`music.ts`; one `HTMLAudioElement` carries both so the
-  loop starts without a fresh gesture), and `audio/music_level_win.mp3` and `audio/game_over.mp3` are
-  the round-cleared and round-lost jingles (`audio.ts`). The recordings belong to Nintendo, Game
+  reversing the 2026-10-07 cleanup for the music only. `audio/music_intro.mp3` plays once per real
+  start and then `audio/music_loop.mp3` loops, at every level (`music.ts`; one `HTMLAudioElement`
+  carries both so the loop starts without a fresh gesture). A "real start" is the first `playMusic`
+  after a `stopMusic` (page open, unmount, hidden tab); the fade between rounds does not reset it,
+  so the next round restarts straight on the loop, as the original game's music carries on across
+  rounds. A few seconds into the intro the loop is fetched once into the HTTP cache so the
+  hand-over does not go silent on a slow link. `audio/music_level_win.mp3` and
+  `audio/game_over.mp3` are the round-cleared and round-lost jingles (`audio.ts`): one persistent
+  element each, created with the first music or jingle, unlocked on the first gesture with a muted
+  play-then-pause (iOS Safari only lets an element play from a timer once it has played from a
+  gesture), then replayed from 0 every round. The recordings belong to Nintendo, Game
   Freak and Creatures Inc. and are used in an unofficial non-commercial fan recreation; the
   About credits, the How to play disclaimer and `public/games/super-voltorb-flip/music/CREDITS.md`
   say so. The sound effects and the risk-warning fanfare are still generated at runtime with Web
@@ -856,7 +863,8 @@ current tree on 2026-07-07.
   with no `AudioContext`. A jingle's end timer is its cue's `ms`, not the file's length: the clear
   jingle is 2.02 s against 2000 ms (inside the ~300 ms tolerance), the game-over jingle is 4.06 s
   against `GAME_OVER_MS` 2600, so it plays out under the next screen until `stopGameOver()` or a
-  restart silences it, and a mute reaches it in flight. The `levelClear` and `gameOver` note
+  restart silences it, a mute reaches it in flight, and, since nothing awaits it, it arms no
+  timer. The `levelClear` and `gameOver` note
   tables no longer sound and only supply those lengths. Changing a cue length is a gameplay-timing
   change, not a sound tweak. The synth helpers are copied from Password Game 2's rather than
   imported, by the cross-game convention. `__tests__/assets-guard.test.ts` is an explicit
@@ -869,7 +877,9 @@ current tree on 2026-07-07.
   Amin's 2026-10-22 instruction (T-6535) after the 2026-10-07 cleanup had removed all cartridge
   sprites. They are the GPL-3.0 sprites from samualtnorman/voltorb-flip, shipped with their
   `LICENSE` and `NOTICE.md`; the creature belongs to Nintendo, Game Freak and Creatures Inc. and is
-  shown in an unofficial non-commercial fan recreation. The burst frames grow from 22 px to 64 px
+  shown in an unofficial non-commercial fan recreation. The ten files are preloaded when the game
+  mounts, and the images carry `draggable={false}` and `SPRITE_NO_GRAB_STYLE` (no iOS long-press
+  Save Image sheet, no selection). The burst frames grow from 22 px to 64 px
   with the Voltorb baked into the middle at one fixed pixel size, so each frame is scaled by the
   same factor as the 22 px tile sprite (`explodeFrameCssSize`) and the baked Voltorb lands exactly
   on the face underneath; `original-art.test.tsx` pins the paths, the native sizes (read from the PNG

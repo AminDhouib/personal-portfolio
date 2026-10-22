@@ -16,6 +16,25 @@ export const EXPLODE_FRAME_SRCS: readonly string[] = Array.from(
   (_, i) => `${SPRITES}/explode_${i}.png`,
 );
 
+/**
+ * Spread onto each sprite <img>: no iOS long-press "Save Image" sheet and no text selection
+ * highlight. (The images also carry draggable={false} against the desktop ghost drag.)
+ */
+export const SPRITE_NO_GRAB_STYLE = { WebkitTouchCallout: "none", userSelect: "none" } as const;
+
+// Held so a browser cannot drop a request it considers unreferenced.
+const preloaded: HTMLImageElement[] = [];
+
+/** Warm the ten sprite files into the HTTP cache so the first bomb of a visit does not stall frame by frame. */
+export function preloadOriginalSprites(): void {
+  if (typeof Image === "undefined") return;
+  for (const src of [VOLTORB_TILE_SRC, ...EXPLODE_FRAME_SRCS]) {
+    const img = new Image();
+    img.src = src;
+    preloaded.push(img);
+  }
+}
+
 /** Native size (px, square) of the Voltorb tile sprite. */
 export const VOLTORB_TILE_PX = 22;
 

@@ -84,7 +84,12 @@ import { ModeRow } from "./super-voltorb-flip/mode-row";
 import { SettingsPanel } from "./super-voltorb-flip/settings-panel";
 import { StatsPanel } from "./super-voltorb-flip/stats-panel";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
-import { VOLTORB_FACE_SCALE, VOLTORB_TILE_SRC } from "./super-voltorb-flip/art/original-sprites";
+import {
+  SPRITE_NO_GRAB_STYLE,
+  VOLTORB_FACE_SCALE,
+  VOLTORB_TILE_SRC,
+  preloadOriginalSprites,
+} from "./super-voltorb-flip/art/original-sprites";
 import { GLYPHS } from "./super-voltorb-flip/art/sprites";
 import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
@@ -1088,8 +1093,10 @@ const Gameboard = ({
                         <img
                           src={VOLTORB_TILE_SRC}
                           alt=""
+                          draggable={false}
                           className="picture-outline voltorb"
                           style={{
+                            ...SPRITE_NO_GRAB_STYLE,
                             imageRendering: "pixelated",
                             width: `calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`,
                             height: `calc(var(--svf-tile) * ${VOLTORB_FACE_SCALE})`,
@@ -1827,6 +1834,11 @@ export function SuperVoltorbFlipGame() {
   useEffect(() => {
     setMusicMuted(muted);
   }, [muted]);
+
+  // The first bomb of a visit should not stall on ten network round trips.
+  useEffect(() => {
+    preloadOriginalSprites();
+  }, []);
 
   useEffect(() => {
     return () => {
