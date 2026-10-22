@@ -54,6 +54,9 @@ export function crispIconSize(box: number): number {
   return Math.max(VOLTORB_TILE_PX, VOLTORB_TILE_PX * Math.floor(box / VOLTORB_TILE_PX));
 }
 
+/** The largest burst frame (px): the size a burst scaled to fit a box is scaled from. */
+export const EXPLODE_FRAME_MAX_PX = Math.max(...EXPLODE_FRAME_PX);
+
 /** How much of the tile the revealed Voltorb sprite fills. */
 export const VOLTORB_FACE_SCALE = 0.95;
 
