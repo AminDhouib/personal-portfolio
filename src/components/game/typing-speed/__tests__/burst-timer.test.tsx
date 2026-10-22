@@ -16,6 +16,10 @@ vi.mock("../engine/text", async (importOriginal) => ({
 const BURST_MS = 700;
 
 let clock = 0;
+// Ids of the timers the game armed with the burst delay, and the ids it has cancelled. framer-motion
+// arms timers of its own, so the burst timers are told apart by their delay.
+let burstTimers: unknown[] = [];
+let cleared: unknown[] = [];
 
 function typeText(text: string) {
   let value = "";
@@ -28,9 +32,21 @@ function typeText(text: string) {
 
 beforeEach(() => {
   clock = 0;
+  burstTimers = [];
+  cleared = [];
   vi.spyOn(performance, "now").mockImplementation(() => clock);
-  // Only the timer pair is faked, so vi.getTimerCount() counts exactly the game's own timers.
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+    const id = realSet(fn, ms);
+    if (ms === BURST_MS) burstTimers.push(id);
+    return id;
+  }) as unknown as typeof setTimeout);
+  vi.spyOn(globalThis, "clearTimeout").mockImplementation(((id: unknown) => {
+    cleared.push(id);
+    realClear(id as never);
+  }) as unknown as typeof clearTimeout);
   window.localStorage.clear();
   window.localStorage.setItem(STATS_KEY, JSON.stringify({ ...emptyStats(), lastMode: "quote" }));
 });
@@ -43,34 +59,37 @@ afterEach(() => {
 });
 
 describe("the combo burst timer", () => {
-  it("is armed by a 10-key streak and settles on its own after 700 ms", () => {
+  it("is armed by a 10-key streak, and the burst leaves on its own when the timer fires", () => {
     render(<TypingSpeedGame />);
     typeText("abcdefghij");
-    expect(vi.getTimerCount()).toBe(1);
+    expect(burstTimers).toHaveLength(1);
 
+    // Firing it must not throw, and a fired timer needs no cancelling afterwards.
     act(() => {
       vi.advanceTimersByTime(BURST_MS);
     });
-    expect(vi.getTimerCount()).toBe(0);
+    cleanup();
+    expect(cleared).not.toContain(burstTimers[0]);
   });
 
-  it("is cancelled when the game unmounts inside the window, so nothing fires afterwards", () => {
+  it("is cancelled when the game unmounts inside the window", () => {
     const view = render(<TypingSpeedGame />);
     typeText("abcdefghij");
-    expect(vi.getTimerCount()).toBe(1);
+    expect(burstTimers).toHaveLength(1);
+    expect(cleared).not.toContain(burstTimers[0]);
 
     view.unmount();
 
-    expect(vi.getTimerCount()).toBe(0);
+    expect(cleared).toContain(burstTimers[0]);
   });
 
   it("cancels every pending burst, not only the last", () => {
     const view = render(<TypingSpeedGame />);
     typeText("abcdefghij klmnopqrst"); // streaks of 10 and 20 inside one window
-    expect(vi.getTimerCount()).toBe(2);
+    expect(burstTimers).toHaveLength(2);
 
     view.unmount();
 
-    expect(vi.getTimerCount()).toBe(0);
+    for (const id of burstTimers) expect(cleared).toContain(id);
   });
 });
