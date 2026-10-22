@@ -84,24 +84,40 @@ export function resetRunErrorSamplingForTests(): void {
   buckets.clear();
 }
 
-function bucketKey(code: string | undefined): string {
+/** Logs what a bucket suppressed; used when its window rolls and when it is evicted. */
+function reportSuppressed(key: string, bucket: SampleBucket): void {
+  if (bucket.suppressed > 0) {
+    logWarn(SCOPE, "suppressed RUN_ERROR captures in the previous window", {
+      code: key,
+      suppressed: bucket.suppressed,
+    });
+  }
+}
+
+/**
+ * The bucket a code is counted in. When the map is full and the code is new, buckets whose window
+ * has ended are evicted first (so a failure type first seen weeks after twenty others still gets
+ * its own first capture); the shared overflow bucket is used only while all of them are active.
+ */
+function bucketKey(code: string | undefined, now: number): string {
   const key = code ? code.slice(0, 64) : NO_CODE_BUCKET;
   if (buckets.has(key) || buckets.size < MAX_TRACKED_CODES) return key;
-  return OVERFLOW_BUCKET;
+  for (const [other, bucket] of buckets) {
+    if (other !== OVERFLOW_BUCKET && now - bucket.windowStart >= RUN_ERROR_WINDOW_MS) {
+      reportSuppressed(other, bucket);
+      buckets.delete(other);
+    }
+  }
+  return buckets.size < MAX_TRACKED_CODES ? key : OVERFLOW_BUCKET;
 }
 
 /** True when this frame should be captured; counts and logs it otherwise. */
 function admit(code: string | undefined): boolean {
-  const key = bucketKey(code);
   const now = Date.now();
+  const key = bucketKey(code, now);
   let bucket = buckets.get(key);
   if (!bucket || now - bucket.windowStart >= RUN_ERROR_WINDOW_MS) {
-    if (bucket && bucket.suppressed > 0) {
-      logWarn(SCOPE, "suppressed RUN_ERROR captures in the previous window", {
-        code: key,
-        suppressed: bucket.suppressed,
-      });
-    }
+    if (bucket) reportSuppressed(key, bucket);
     bucket = { windowStart: now, captured: 0, suppressed: 0 };
     buckets.set(key, bucket);
   }
