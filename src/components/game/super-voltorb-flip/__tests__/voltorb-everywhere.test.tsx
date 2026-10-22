@@ -33,12 +33,13 @@ vi.mock("../effects/context", () => ({
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 import { SuperVoltorbFlipBanner } from "../../banners";
 import { MemoBar, type MemoFlagSet } from "../memo-button";
-import { InstructionsBtns, LoopingExplosion, VoltorbIcon } from "../chrome";
+import { InstructionsBtns, LegendVoltorb, VoltorbIcon } from "../chrome";
 import { ExplodeFrameImg, VoltorbSprite } from "../art/voltorb-sprite";
 import {
   EXPLODE_FRAME_MAX_PX,
   EXPLODE_FRAME_PX,
   EXPLODE_FRAME_SRCS,
+  LEGEND_BURST_FRAMES,
   SPRITE_NO_GRAB_STYLE,
   VOLTORB_ICON_PX,
   VOLTORB_ICON_SRC,
@@ -185,46 +186,107 @@ describe("VoltorbIcon", () => {
   });
 });
 
-describe("LoopingExplosion", () => {
-  it("loops the original explode frames, holding the first, in a box that keeps its size", async () => {
-    const { container } = render(<LoopingExplosion size={36} />);
-    const box = container.firstElementChild as HTMLElement;
-    expect(box.style.width).toBe("36px");
-    expect(box.style.height).toBe("36px");
-    expect(container.querySelector("svg")).toBeNull();
-    expect(container.querySelector("img")!.getAttribute("src")).toBe(EXPLODE_FRAME_SRCS[0]);
+describe("LegendVoltorb", () => {
+  const holdOf = (container: HTMLElement) =>
+    container.querySelector<HTMLImageElement>(`img[src="${VOLTORB_ICON_SRC}"]`)!;
+  const burstOf = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLImageElement>("img")].find((img) =>
+      EXPLODE_FRAME_SRCS.includes(img.getAttribute("src") ?? ""),
+    );
+  const iconVisibility = (container: HTMLElement) =>
+    (holdOf(container).closest("span[style*='visibility']") as HTMLElement | null)?.style
+      .visibility;
 
+  it("only plays the burst frames that are transparent, never the opaque tile frames", () => {
+    expect(LEGEND_BURST_FRAMES).toEqual([3, 4, 5, 6, 7, 8]);
+  });
+
+  it("holds the bare icon for the pause, with no burst on screen", () => {
+    const { container } = render(<LegendVoltorb size={24} burstSize={36} />);
+    expect(burstOf(container)).toBeUndefined();
+    expect(iconVisibility(container)).toBe("visible");
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("then plays frames 3 to 8 in order and returns to the icon, looping", async () => {
+    const { container } = render(<LegendVoltorb size={24} burstSize={36} />);
+    const played: string[] = [];
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
-    expect(container.querySelector("img")!.getAttribute("src")).toBe(EXPLODE_FRAME_SRCS[1]);
-    for (let f = 2; f < EXPLODE_FRAME_SRCS.length; f++) {
+    for (let i = 0; i < LEGEND_BURST_FRAMES.length; i++) {
+      played.push(burstOf(container)!.getAttribute("src")!);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(70);
       });
-      expect(container.querySelector("img")!.getAttribute("src")).toBe(EXPLODE_FRAME_SRCS[f]);
+    }
+    expect(played).toEqual(LEGEND_BURST_FRAMES.map((f) => EXPLODE_FRAME_SRCS[f]));
+    expect(burstOf(container)).toBeUndefined();
+    expect(iconVisibility(container)).toBe("visible");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(burstOf(container)!.getAttribute("src")).toBe(EXPLODE_FRAME_SRCS[3]);
+  });
+
+  it("renders no opaque tile frame (explode_0 to explode_2) at any point of the loop", async () => {
+    const { container } = render(<LegendVoltorb size={22} burstSize={38} />);
+    const opaque = new Set(EXPLODE_FRAME_SRCS.slice(0, 3));
+    for (let t = 0; t < 40; t++) {
+      for (const img of container.querySelectorAll("img")) {
+        expect(opaque.has(img.getAttribute("src") ?? "")).toBe(false);
+      }
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(40);
+      });
     }
   });
 
+  it("hides the static icon, keeping its box, whenever a burst frame shows", async () => {
+    const { container } = render(<LegendVoltorb size={24} burstSize={36} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    for (let i = 0; i < LEGEND_BURST_FRAMES.length; i++) {
+      expect(burstOf(container)).toBeDefined();
+      expect(iconVisibility(container)).toBe("hidden");
+      expect(holdOf(container)).not.toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(70);
+      });
+    }
+    expect(iconVisibility(container)).toBe("visible");
+  });
+
   it.each([36, 38])(
-    "scales every frame by box/64 so the burst never leaves its %ipx box",
-    async (size) => {
+    "scales every burst frame by box/64 so the burst never leaves its %ipx box",
+    async (burstSize) => {
       expect(EXPLODE_FRAME_MAX_PX).toBe(64);
-      const { container } = render(<LoopingExplosion size={size} />);
-      for (let f = 0; f < EXPLODE_FRAME_SRCS.length; f++) {
-        const img = container.querySelector("img")!;
+      const { container } = render(<LegendVoltorb size={22} burstSize={burstSize} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      for (const f of LEGEND_BURST_FRAMES) {
+        const img = burstOf(container)!;
         const width = parseFloat(img.style.width);
         expect(img.style.width.endsWith("px")).toBe(true);
-        expect(width).toBeCloseTo((EXPLODE_FRAME_PX[f]! * size) / EXPLODE_FRAME_MAX_PX, 1);
-        expect(width).toBeLessThanOrEqual(size);
+        expect(width).toBeCloseTo((EXPLODE_FRAME_PX[f]! * burstSize) / EXPLODE_FRAME_MAX_PX, 1);
+        expect(width).toBeLessThanOrEqual(burstSize);
         expect(img.style.height).toBe(img.style.width);
         expect(img.style.imageRendering).toBe("pixelated");
         await act(async () => {
-          await vi.advanceTimersByTimeAsync(f === 0 ? 500 : 70);
+          await vi.advanceTimersByTimeAsync(70);
         });
       }
     },
   );
+
+  it("keeps the icon box size, so the card layout does not change", () => {
+    const { container } = render(<LegendVoltorb size={24} burstSize={36} />);
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.style.width).toBe("24px");
+    expect(box.style.height).toBe("24px");
+  });
 });
 
 describe("MemoBar", () => {
@@ -311,10 +373,16 @@ describe("the board", () => {
     );
     // The title icon and the two legend cards.
     expect(sprites.length).toBeGreaterThanOrEqual(3);
-    const bursts = [...modal.querySelectorAll<HTMLImageElement>("img")].filter((img) =>
-      EXPLODE_FRAME_SRCS.includes(img.getAttribute("src") ?? ""),
-    );
-    expect(bursts).toHaveLength(2);
+    // Both legend cards hold the bare icon first: no burst frame is on screen until the pause ends.
+    const burstImgs = () =>
+      [...modal.querySelectorAll<HTMLImageElement>("img")].filter((img) =>
+        EXPLODE_FRAME_SRCS.includes(img.getAttribute("src") ?? ""),
+      );
+    expect(burstImgs()).toHaveLength(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(burstImgs()).toHaveLength(2);
     // The coin sparkle is still inline SVG.
     expect(modal.querySelector("svg")).not.toBeNull();
   });

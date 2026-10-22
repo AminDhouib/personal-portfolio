@@ -29,6 +29,7 @@ import { theme } from "../effects/default";
 import {
   EXPLODE_FRAME_PX,
   EXPLODE_FRAME_SRCS,
+  LEGEND_BURST_FRAMES,
   SPRITE_NO_GRAB_STYLE,
   VOLTORB_FACE_SCALE,
   VOLTORB_ICON_PX,
@@ -107,6 +108,19 @@ describe("original sprite paths", () => {
     expect(trns).not.toBeNull();
     for (const alpha of trns!) expect([0, 255]).toContain(alpha);
     expect([...trns!].filter((a) => a === 0)).toHaveLength(1);
+  });
+
+  it("tells the opaque tile frames from the transparent burst frames by their tRNS chunk", () => {
+    const hasTrns = (src: string) => {
+      const png = readFileSync(join(process.cwd(), "public", src));
+      for (let offset = 8; offset < png.length; offset += 12 + png.readUInt32BE(offset)) {
+        if (png.toString("ascii", offset + 4, offset + 8) === "tRNS") return true;
+      }
+      return false;
+    };
+    // Frames 0 to 2 are opaque tile shake frames; 3 to 8 are the burst on transparency.
+    EXPLODE_FRAME_SRCS.forEach((src, i) => expect(hasTrns(src), `explode_${i}`).toBe(i >= 3));
+    expect(LEGEND_BURST_FRAMES.every((f) => hasTrns(EXPLODE_FRAME_SRCS[f]!))).toBe(true);
   });
 
   it("grows the burst from the tile size up to its largest frame", () => {
