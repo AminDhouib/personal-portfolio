@@ -13,6 +13,12 @@ import { BurstFrame } from "./super-voltorb-flip/art/frames";
 import { BURST_FRAMES, CORE_SCALE } from "./super-voltorb-flip/art/fx";
 import { PixelSprite } from "./super-voltorb-flip/art/pixel-sprite";
 import { ORB } from "./super-voltorb-flip/art/sprites";
+import {
+  pickCellValue,
+  pickCellValueSeeded,
+  randomFlipDelay,
+  seededFlipDelay,
+} from "./banners/cell-values";
 
 // ---------- shared ----------
 
@@ -898,29 +904,6 @@ function BombExplosionOverlay({
   );
 }
 
-// 15% chance of bomb, 85% chance of number 1/2/3. With a 6×3 = 18 cell
-// board this averages ~2.7 bombs visible at any given moment. Each cell
-// rolls independently so the bomb positions wander as cycles tick.
-function pickCellValue(): number | "bomb" {
-  if (Math.random() < 0.15) return "bomb";
-  return 1 + Math.floor(Math.random() * 3);
-}
-
-// Deterministic per-cell seed for SSR — derives a stable pseudo-random
-// number from grid coordinates so server and client render the same
-// initial state. After mount the cell re-rolls via Math.random() in
-// useEffect, where SSR/client divergence is expected and harmless.
-function seededFromCoords(r: number, c: number): number {
-  const h = ((r * 73856093) ^ (c * 19349663)) >>> 0;
-  return (h % 1000) / 1000;
-}
-function pickCellValueSeeded(r: number, c: number): number | "bomb" {
-  const a = seededFromCoords(r, c);
-  if (a < 0.15) return "bomb";
-  const b = seededFromCoords(c, r);
-  return 1 + Math.floor(b * 3);
-}
-
 // Per-cell tile component. Maintains its own value state that re-rolls at
 // each cell cycle (so bombs and numbers appear in different positions over
 // time without forcing a global board reset). The flip animation runs
@@ -953,9 +936,7 @@ function BoardCell({
 }) {
   // Stable per-cell flip delay — derived deterministically from (r,c) so
   // SSR matches client hydration. Re-roll happens in useEffect post-mount.
-  const [flipDelay, setFlipDelay] = useState(
-    () => seededFromCoords(r + 1, c + 1) * (FLIP_CYCLE_S - 1.5),
-  );
+  const [flipDelay, setFlipDelay] = useState(() => seededFlipDelay(r, c, FLIP_CYCLE_S));
   // cycleTick increments at the start of each cell cycle (face-down moment
   // between flip-down and the next flip-up). The BombExplosionOverlay's
   // React key includes cycleTick, so it remounts cleanly each cycle when
@@ -965,7 +946,7 @@ function BoardCell({
   // Post-hydration: replace deterministic seeds with real randomness so the
   // banner doesn't repeat the same starting pattern on every page load.
   useEffect(() => {
-    setFlipDelay(Math.random() * (FLIP_CYCLE_S - 1.5));
+    setFlipDelay(randomFlipDelay(FLIP_CYCLE_S));
     setValue(pickCellValue());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
