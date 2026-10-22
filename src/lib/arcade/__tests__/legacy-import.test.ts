@@ -244,9 +244,9 @@ describe("importLegacyLeaderboard: what is imported", () => {
   });
 
   it("skips a row whose score is outside 0..ARCADE_SCORE_CAP, counted as implausible", async () => {
-    // A long, busy run whose detail makes the ceiling check pass for any score in range, so
-    // only the range guard can reject these.
-    const long = { seconds: 80_000, kills: 90_000, distance: 900_000 };
+    // A long, busy Hextris run (its quadratic envelope admits any score in range within the
+    // two-hour length bound), so only the range guard can reject these.
+    const long = { game: "hextris", seconds: 7_200, kills: 90_000, level: 35 };
     const fake = scripted([
       legacyRow({ id: 1, name: "Neg", score: -5 }),
       legacyRow({ id: 2, name: "Big", score: ARCADE_SCORE_CAP + 1, ...long }),
