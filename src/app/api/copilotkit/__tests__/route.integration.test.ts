@@ -33,6 +33,7 @@ vi.mock("@/lib/log", () => ({
   logError: mockLogError,
 }));
 
+import { ɵGLOBAL_STORE } from "@copilotkit/runtime/v2";
 import { POST } from "../route";
 import { GAMES } from "@/app/games/games-meta";
 import { buildAminAiSystemPrompt } from "@/lib/amin-ai-prompt";
@@ -208,6 +209,18 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }
+  });
+
+  // Proves the real library applies the route's thread-store bounds (T-6259); the mocked route test
+  // cannot. Relies on the u-prefixed internal ɵGLOBAL_STORE.ɵlimits, so an upgrade that moves it
+  // fails loudly here, which is intended. The values mirror THREAD_STORE_* in route.ts (a route
+  // file cannot export extra constants).
+  it("applies the bounded thread-store limits to the runtime's process-global store", () => {
+    expect(ɵGLOBAL_STORE.ɵlimits).toEqual({
+      maxThreads: 200,
+      maxRunsPerThread: 20,
+      maxBytes: 32 * 1024 * 1024,
+    });
   });
 
   it("answers the info discovery request with the default agent", async () => {
