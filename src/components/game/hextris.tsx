@@ -29,6 +29,7 @@ import {
   type FeedbackMemo,
   type HapticPattern,
 } from "./hextris/feedback";
+import { shakeOffset } from "./hextris/shake";
 import { arcadeSubmission, isRecordableRun, recordHighScore, runSeed } from "./hextris/session";
 import { hextrisKeyAction } from "./hextris/input";
 import { shareRun } from "./hextris/share";
@@ -590,8 +591,7 @@ export function HextrisGame() {
     function applyShake(now: number) {
       const amp = shakeAmplitude(shakePeak, now - shakeStartedAt);
       if (amp > 0) {
-        const dx = (Math.random() * 2 - 1) * amp;
-        const dy = (Math.random() * 2 - 1) * amp;
+        const { dx, dy } = shakeOffset(amp);
         canvas!.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
         shaking = true;
       } else if (shaking) {
