@@ -10,7 +10,7 @@ import { getInput, typeInto } from "./phone-helpers";
 // died on "window is not defined" from react-dom, one run in many, depending on timing.
 vi.mock("../engine/text", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../engine/text")>()),
-  passageAt: () => ({ id: "t-1", source: "austen-pp", text: "abcdefghijklmnopqrst" }),
+  passageAt: () => ({ id: "t-1", source: "austen-pp", text: "abcdefghijklmnopqrstuvwxyzabcd" }),
 }));
 
 const BURST_MS = 700;
@@ -85,7 +85,7 @@ describe("the combo burst timer", () => {
 
   it("cancels every pending burst, not only the last", () => {
     const view = render(<TypingSpeedGame />);
-    typeText("abcdefghijklmnopqrst"); // streaks of 10 and 20 inside one window
+    typeText("abcdefghijklmnopqrst"); // streaks of 10 and 20, the run still unfinished
     expect(burstTimers).toHaveLength(2);
 
     view.unmount();
