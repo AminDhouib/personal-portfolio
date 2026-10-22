@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "**/*.md"
+      - "*.md"
       - "docs/**"
       - "audit/**"
       - LICENSE
@@ -12,7 +12,7 @@ on:
       - ".claude/**"
   pull_request:
     paths-ignore:
-      - "**/*.md"
+      - "*.md"
       - "docs/**"
       - "audit/**"
       - LICENSE
@@ -71,13 +71,14 @@ jobs:
       - name: Vitest unit + integration tests
         run: pnpm test:coverage
 
-  # Builds once; lighthouse and e2e download the tarball instead of rebuilding. Built with a
+  # Builds once for e2e, which downloads the tarball instead of rebuilding. Lighthouse keeps its
+  # own build without the GA4 id: the gtag bootstrap cost the homepage performance score. Built with a
   # valid-format but unregistered GA4 id so the real gtag bootstrap renders and the e2e
   # conversion specs can read dataLayer (the specs block googletagmanager.com, so nothing is
   # ever sent). NEXT_PUBLIC_* is inlined at build time, so the id has to be set here.
   # A tarball, not raw paths: upload-artifact drops hidden files (.next) and symlinks.
   build:
-    name: Build (shared standalone artifact)
+    name: Build (standalone artifact for e2e)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -119,7 +120,6 @@ jobs:
 
   lighthouse:
     name: Lighthouse (all public pages)
-    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -138,13 +138,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Download build artifact
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: next-build
-
-      - name: Unpack standalone bundle
-        run: tar -xzf next-build.tgz
+      - name: Next.js production build
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
 
       # Assemble and boot the standalone bundle the same way the Dockerfile
       # does. CI has no secrets, so the boot uses the env gate's designed
