@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { appendLead } from "@/lib/leads-store";
 import { guardedJsonRoute } from "@/lib/route-guard";
+import { getClientIp } from "@/lib/rate-limit";
 import { captureException, logWarn } from "@/lib/log";
 import { sendSendlyEmail } from "@/lib/sendly";
 import { env } from "@/env";
@@ -20,29 +21,62 @@ const NOTE_MAX = 5000;
 const SOURCE_MAX = 100;
 const PAGE_MAX = 200;
 
-// Process-wide ceiling on notification emails per UTC day. The per-IP limit (5/min) alone lets a
-// botnet turn every lead into a Sendly email; past this many, leads are still stored but no email
-// is sent. The response is identical either way so the cap is not an oracle. The counter is
-// in-memory and resets on restart, which only ever loosens it by a handful of emails.
+// Ceilings on notification emails per UTC day. The per-IP rate limit (5/min) alone lets a botnet turn
+// every lead into a Sendly email, so a process-wide cap (50) bounds the day; past it, leads are
+// still stored but no email is sent. One client could still spend that whole cap and silence the
+// notification for everyone, so each client also gets a small share (3) of it. A client over its
+// share is stored without email and spends none of the global budget. The visitor-facing response
+// is identical in every case, so neither cap is an oracle. The client key is the rate limiter's
+// (getClientIp), so the share is only as strong as that key: a spoofed CF-Connecting-IP (T-5533,
+// T-6260) mints fresh shares, and every request with no usable address shares the one "unknown"
+// share. Counters are in memory and reset on restart, which only ever loosens them by a handful
+// of emails.
 const LEAD_EMAIL_DAILY_CAP = 50;
+const LEAD_EMAIL_PER_IP_DAILY_CAP = 3;
+// Bounds the per-client map. When it is full a client not yet in it gets no email, never a crash.
+const MAX_TRACKED_CLIENTS = 5000;
 let emailDay = "";
 let emailsToday = 0;
+const clientEmailsToday = new Map<string, number>();
 
-/** Reserves one email slot for today (UTC) and returns its day key; null once the cap is spent. */
-function takeEmailSlot(): string | null {
+function rollDay(): string {
   const day = new Date().toISOString().slice(0, 10);
   if (day !== emailDay) {
     emailDay = day;
     emailsToday = 0;
+    clientEmailsToday.clear();
   }
-  if (emailsToday >= LEAD_EMAIL_DAILY_CAP) return null;
-  emailsToday += 1;
   return day;
 }
 
+/**
+ * Reserves one email slot for today (UTC) and returns its day key; null once the client's share or
+ * the global cap is spent. `reason` says which, for the log.
+ */
+function takeEmailSlot(client: string): { day: string } | { day: null; reason: string } {
+  const day = rollDay();
+  const used = clientEmailsToday.get(client);
+  if (
+    (used === undefined && clientEmailsToday.size >= MAX_TRACKED_CLIENTS) ||
+    (used ?? 0) >= LEAD_EMAIL_PER_IP_DAILY_CAP
+  ) {
+    return { day: null, reason: "per-client share" };
+  }
+  if (emailsToday >= LEAD_EMAIL_DAILY_CAP) return { day: null, reason: "daily" };
+  emailsToday += 1;
+  clientEmailsToday.set(client, (used ?? 0) + 1);
+  return { day };
+}
+
 /** Gives back a slot whose send failed, so an outage cannot spend the day's budget. */
-function releaseEmailSlot(day: string): void {
-  if (day === emailDay && emailsToday > 0) emailsToday -= 1;
+function releaseEmailSlot(day: string, client: string): void {
+  if (day !== emailDay) return;
+  if (emailsToday > 0) emailsToday -= 1;
+  const used = clientEmailsToday.get(client);
+  if (used !== undefined) {
+    if (used <= 1) clientEmailsToday.delete(client);
+    else clientEmailsToday.set(client, used - 1);
+  }
 }
 
 // Validates the body is a JSON object; the individual fields are narrowed below
@@ -122,14 +156,20 @@ export async function POST(req: NextRequest) {
     }),
   );
 
+  const client = getClientIp(req);
   let emailOk = false;
   let slotDay: string | null = null;
   if (env.SENDLY_API_KEY) {
-    slotDay = takeEmailSlot();
-    if (slotDay === null) {
-      logWarn("leads", "daily lead email cap reached, lead stored without notification", {
-        id: persisted?.id ?? null,
-      });
+    const slot = takeEmailSlot(client);
+    slotDay = slot.day;
+    if (slot.day === null) {
+      logWarn(
+        "leads",
+        `daily lead email cap reached (${slot.reason}), lead stored without notification`,
+        {
+          id: persisted?.id ?? null,
+        },
+      );
     }
   }
   if (env.SENDLY_API_KEY && slotDay !== null) {
@@ -158,7 +198,7 @@ export async function POST(req: NextRequest) {
       // A non-2xx (bad key, unverified domain, rate limit), a network error
       // and the deadline all land here; the lead is already persisted.
       captureException("leads.email", err);
-      releaseEmailSlot(slotDay);
+      releaseEmailSlot(slotDay, client);
     }
   }
 

@@ -495,7 +495,8 @@ describe("POST /api/leads abuse limits", () => {
     vi.setSystemTime(new Date("2031-06-03T23:59:00Z"));
     const ip = "198.51.100.9";
     mockFetch.mockImplementation(async () => sendlyProblem(503, "unavailable"));
-    for (let i = 0; i < SHARE; i += 1) await POST(fromIp(ip));
+    // Two failed sends, then SHARE good ones: five requests, inside the 5/min per-IP rate limit.
+    for (let i = 0; i < 2; i += 1) await POST(fromIp(ip));
     mockFetch.mockReset().mockImplementation(async () => sendlyAccepted());
     for (let i = 0; i < SHARE; i += 1) await POST(fromIp(ip));
     expect(mockFetch).toHaveBeenCalledTimes(SHARE);
