@@ -991,6 +991,13 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   `maxOutputTokens`, the model, retries and the agent config (BuiltInAgent has no overridable
   properties, so `forwardedProps` cannot change the model). Re-check the tool allow-list on a
   CopilotKit upgrade and whenever a new `useCopilotAction` is added.
+  T-6259: the runtime gets a bounded `InMemoryAgentRunner` (`THREAD_STORE_*` in `route.ts`: 200
+  threads, 20 runs per thread, 32 MiB of retained history; the default is 1000, 100 and 512 MiB).
+  Every distinct `threadId` is a new thread and the content is the client's, and compose.yml sets no
+  memory limit, so the default let one client pin up to 512 MiB in the process. The store is
+  process-global and the runner is built once at module scope (only the per-request
+  `CopilotRuntime` must not be hoisted). `maxBytes` bounds committed history, not a single
+  in-flight run. Import path is `@copilotkit/runtime/v2` (the main entry does not export it).
   T-6382: `forwardedProps` is allow-listed to `toolChoice` (what a suggestions run sends; the
   `properties` prop is unset). The runtime reads `a2uiCatalogAvailable` from it (switches on the A2UI
   middleware: a `render_a2ui` tool and ~2.3K of server prompt per run), plus `__proxiedMCPRequest`,
