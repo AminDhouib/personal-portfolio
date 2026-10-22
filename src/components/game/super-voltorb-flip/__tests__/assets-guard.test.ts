@@ -22,8 +22,15 @@ const IMAGE_EXT = /\.(png|gif|jpe?g|webp|svg)$/i;
 
 // The original Voltorb creature art (T-6535): the revealed-tile Voltorb and the nine bomb-burst
 // frames. Number, memo, chrome, coin and button sprites stay gone.
+//
+// Plus one derived file, sprites/voltorb-icon.png: tile/voltorb.png with the salmon tile and its
+// border made transparent (same pixels, 16 x 16, palette PNG). Amin's 2026-10-22 ruling for #174,
+// "one consistent sprite everywhere" (T-6535), puts the Voltorb on the clue cards, the legend and
+// the memo bar, where the whole 22 px tile would read as a small salmon square, so the bare body
+// is needed there. It is the same art, not a new one.
 const RESTORED_SPRITES = [
   "sprites/tile/voltorb.png",
+  "sprites/voltorb-icon.png",
   ...Array.from({ length: 9 }, (_, i) => `sprites/tile/explode_${i}.png`),
 ];
 
@@ -114,7 +121,7 @@ describe("Super Voltorb Flip assets", () => {
     expect(existsSync(join(GAME_DIR, "sprites", "upstream"))).toBe(false);
     for (const file of shippedFiles().filter((f) => f.startsWith("sprites/"))) {
       expect(file, `${file} is a sprite that was not restored`).toMatch(
-        /^sprites\/(tile\/(voltorb|explode_[0-8])\.png|LICENSE|NOTICE\.md)$/,
+        /^sprites\/(tile\/(voltorb|explode_[0-8])\.png|voltorb-icon[.]png|LICENSE|NOTICE\.md)$/,
       );
     }
   });
@@ -166,10 +173,15 @@ describe("Super Voltorb Flip assets", () => {
     for (const base of bases) expect(base).toBe("super-voltorb-flip/audio");
   });
 
-  it("loads only the restored Voltorb tile sprites from source", () => {
+  it("loads only the restored Voltorb sprites from source", () => {
     const paths = sourceText.match(/super-voltorb-flip\/sprites[^"'`\s]*/g) ?? [];
     expect(paths.length).toBeGreaterThan(0);
-    for (const path of paths) expect(path).toBe("super-voltorb-flip/sprites/tile");
+    for (const path of paths) {
+      expect([
+        "super-voltorb-flip/sprites/tile",
+        "super-voltorb-flip/sprites/voltorb-icon.png",
+      ]).toContain(path);
+    }
     expect(sourceText).not.toMatch(/sprites\/upstream/);
   });
 
