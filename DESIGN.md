@@ -986,17 +986,21 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   runner (module-global, shared by every visitor), read other visitors' messages and events
   (including `collectLead` arguments) and `POST /threads/clear` to wipe them all. `transcribe`,
   `inspector/learning`, `trajectory/connect` and memories are refused for the same reason;
-  `inspector/metadata` is refused too (the client asks for it on load but treats any non-OK answer
-  as "none", and it answers 204 here anyway). What is
+  `inspector/metadata` is refused too (the client sends it only when `info` reports
+  `inspectorMetadata: true`, which only an Intelligence runtime does, so this route's `info` never
+  triggers it; if it were sent, the client treats a non-OK answer as "none"). What is
   still reachable: `agent/connect` and `agent/stop` take a `threadId`, so a caller who already
   knows another visitor's thread id (a client-generated random UUID) could replay its events or
-  stop its run; nothing served to a visitor lists thread ids any more, so that needs a guess of a
-  UUID. Binding a thread to a visitor would need a server-issued session and is not done.
+  stop its run, and `agent/run` on a known `threadId` overwrites what a later connect replays;
+  nothing served to a visitor lists thread ids any more, so all of that needs a guess of a UUID v4
+  (infeasible). Binding a thread to a visitor would need a server-issued session and is not done.
   (2) A run's `body` must be a plain object (400 otherwise). The runtime also accepts it as a JSON
   string and parses it after this layer, which used to walk past every cap and the tool and
   system-message drops. `state` (the runtime injects it into the system prompt, like context) is
   capped at 8,000 characters and `forwardedProps` at 2,000 (the client sends `{}` or one ~80
-  character `toolChoice`), 413 over; `context` is capped whatever its type. `agent/connect` is
+  character `toolChoice`), 413 over; `context` is capped whatever its type; a run that carries
+  `resume` is 400 (it belongs to the interrupt flow, which the site does not use, and the runtime put
+  its payload into the model prompt uncapped: 300 KB in, 300 KB out). `agent/connect` is
   checked like a run because it carries the same RunAgentInput. Re-check the method list against
   the client on a CopilotKit upgrade (`route.integration.test.ts` runs the real runtime).
 - **Chat errors never reach the visitor verbatim** (T-5532, `src/lib/copilot-error-sanitizer.ts`).

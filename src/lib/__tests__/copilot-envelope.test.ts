@@ -262,7 +262,7 @@ describe("sanitizeCopilotEnvelope: malformed input", () => {
 
 // T-6255. The runtime serves more than the chat needs, and one of its methods (resource/request)
 // reads and wipes the process-wide thread store every visitor shares. The methods below are the
-// ones the site's own client sends: info and inspector/metadata on load, agent/connect when the
+// ones the site's own client sends: info on load, agent/connect when the
 // chat mounts, agent/run per turn, agent/stop on the stop button.
 describe("sanitizeCopilotEnvelope: method allow-list", () => {
   it.each(["info", "agent/run", "agent/connect", "agent/stop"])("lets %s through", (method) => {

@@ -308,9 +308,10 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     expect(upstreamCalls).toHaveLength(0);
   });
 
-  // The client asks for inspector metadata on load, but treats any non-OK answer as "none"
-  // (core refreshInspectorMetadata), so it is refused rather than served.
-  it("refuses inspector/metadata and still serves agent/connect, which the chat sends on load", async () => {
+  // The client sends inspector/metadata only when info reports inspectorMetadata: true, which only
+  // an Intelligence runtime does; this route's info omits it. If something sends it anyway, the
+  // client treats a non-OK answer as "none" (core refreshInspectorMetadata), so refusing is safe.
+  it("refuses inspector/metadata and still serves agent/connect, which the chat sends on mount", async () => {
     const metadata = await POST(makeReq({ method: "inspector/metadata" }));
     expect(metadata.status).toBe(400);
 
