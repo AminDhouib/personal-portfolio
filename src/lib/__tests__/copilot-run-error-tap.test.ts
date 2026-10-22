@@ -248,4 +248,41 @@ describe("tapRunErrors", () => {
       expect(mockCaptureException).toHaveBeenCalledTimes(MAX_CODES + PER_WINDOW);
     });
   });
+
+  it("evicts buckets whose window has ended, so a new code long after 20 old ones still gets its own first capture", async () => {
+    for (let i = 0; i < MAX_CODES; i += 1) await run({ ...RUN_ERROR, code: `old-${i}` });
+    expect(mockCaptureException).toHaveBeenCalledTimes(MAX_CODES);
+
+    vi.setSystemTime(new Date(Date.now() + WINDOW_MS + 1));
+    mockCaptureException.mockClear();
+    for (let i = 0; i < PER_WINDOW; i += 1) await run({ ...RUN_ERROR, code: "brand-new" });
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+  });
+
+  it("keeps the overflow bucket while all MAX_CODES buckets are still in an active window", async () => {
+    for (let i = 0; i < MAX_CODES; i += 1) await run({ ...RUN_ERROR, code: `live-${i}` });
+    mockCaptureException.mockClear();
+    for (let i = 0; i < PER_WINDOW + 3; i += 1) await run({ ...RUN_ERROR, code: "twenty-first" });
+    expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+    mockCaptureException.mockClear();
+    // The overflow bucket is shared, so another unseen code finds it already spent.
+    await run({ ...RUN_ERROR, code: "twenty-second" });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("logs the suppressed count of a bucket it evicts", async () => {
+    for (let i = 0; i < PER_WINDOW + 4; i += 1) await run({ ...RUN_ERROR, code: "noisy" });
+    for (let i = 0; i < MAX_CODES - 1; i += 1) await run({ ...RUN_ERROR, code: `other-${i}` });
+
+    vi.setSystemTime(new Date(Date.now() + WINDOW_MS + 1));
+    mockLogWarn.mockClear();
+    await run({ ...RUN_ERROR, code: "fresh" });
+
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      "copilotkit:run-error",
+      expect.stringMatching(/suppressed/i),
+      expect.objectContaining({ code: "noisy", suppressed: 4 }),
+    );
+  });
 });
