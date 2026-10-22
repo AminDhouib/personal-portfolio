@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
-import { render, cleanup, screen, fireEvent, act } from "@testing-library/react";
+import { render, cleanup, fireEvent, act } from "@testing-library/react";
 
 // Pins the tile wrapper's class list. The anxious modifier used to be glued to
 // the perspective utility with no separator, which left the shake CSS
