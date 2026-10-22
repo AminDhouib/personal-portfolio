@@ -1,0 +1,7 @@
+Prod 553b89ae, read only, same-origin GETs from the Password Game 2 page:
+2026-10-22T15:19:41.344Z GET /api/password-game-2/leaderboard?daily=1 -> 200 {"entries":[]}
+2026-10-22T15:19:41.404Z GET /api/password-game-2/leaderboard?seed=1  -> 200 {"entries":[]}
+No POST sent.
+CI: run 39802340707 (CI #472) for 553b89ae was CANCELLED, superseded by the next push (69f36d79, run 39803308616, which contains 553b89ae, was queued at the time). Postgres integration and Build jobs were green in the cancelled run.
+
+Update: green descendant run 39804924428 (0556ce8c, contains 553b89ae): all six jobs success, see ci-run-0556ce8c-green.png. Run 39803308616 (69f36d79) was also cancelled.
