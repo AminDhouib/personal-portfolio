@@ -21,17 +21,16 @@ import { POSTHOG_PROXY_PATH, isPosthogProxyPath } from "@/lib/posthog-proxy";
  */
 
 /**
- * Capture's own paths, a subset of what `posthogProxyRewrites` allows (`/e`, and `/i/v0` under
- * `/i`). A capture path outside the allow-list (`/batch`, `/capture`) is not hopped: the SDK never
- * calls it, and the public route does not forward it either.
+ * Capture's own paths, exactly the two literal rules `posthogProxyRewrites` allows for capture
+ * (`/e` and `/i/v0/e`), each with or without its single trailing slash. Anything else under `/e`
+ * or `/i/v0` (`/i/v0`, `/e/x`, `/i/v0/anything`) is not allowed publicly, so it is not hopped
+ * either; a hop must never reach a PostHog path the public route refuses.
  */
-const POSTHOG_CAPTURE_PREFIXES = ["/e", "/i/v0"];
+const POSTHOG_CAPTURE_PATHS = new Set(["/e", "/e/", "/i/v0/e", "/i/v0/e/"]);
 
 /** Is this proxied sub-path (the part after the proxy path) a capture endpoint? */
 function isPosthogCapturePath(subPath: string): boolean {
-  return POSTHOG_CAPTURE_PREFIXES.some(
-    (prefix) => subPath === prefix || subPath.startsWith(`${prefix}/`),
-  );
+  return POSTHOG_CAPTURE_PATHS.has(subPath);
 }
 
 /**
@@ -85,9 +84,14 @@ export function planPosthogProxyForward(input: {
   return { internalRewrite, forwardedFor };
 }
 
+// Client-controlled address headers PostHog could prefer over the decided X-Forwarded-For. They
+// are dropped on every proxied request; the plan has already read CF-Connecting-IP.
+const CLIENT_ADDRESS_HEADERS = ["x-real-ip", "forwarded", "cf-connecting-ip"];
+
 /** The request headers to send upstream, given the plan's forwarded-for. */
 export function posthogUpstreamHeaders(incoming: Headers, forwardedFor: string | null): Headers {
   const headers = new Headers(incoming);
+  for (const name of CLIENT_ADDRESS_HEADERS) headers.delete(name);
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   else headers.delete("x-forwarded-for");
   return headers;
