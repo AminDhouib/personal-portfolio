@@ -68,6 +68,25 @@ describe("submitLead", () => {
     expect(reportErrorMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not report a blocked network to Sentry, and still returns { ok: false }", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const result = await submitLead("chatbot", { name: "Ada", email: "ada@example.com" });
+
+    expect(result).toEqual({ ok: false });
+    expect(reportErrorMock).not.toHaveBeenCalled();
+    expect(trackLeadSubmitted).not.toHaveBeenCalled();
+  });
+
+  it("still reports a TypeError that is not a network failure", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("x is undefined"));
+
+    const result = await submitLead("chatbot", { name: "Ada", email: "ada@example.com" });
+
+    expect(result).toEqual({ ok: false });
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+  });
+
   it("reports a saved lead to analytics with the surface, never the note", async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
