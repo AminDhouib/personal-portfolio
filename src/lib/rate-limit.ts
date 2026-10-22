@@ -14,6 +14,13 @@ export interface RateLimitOptions {
   limit: number;
   /** Length of the sliding window in milliseconds. */
   windowMs: number;
+  /**
+   * A process-wide bucket (one budget shared by every caller, such as the failover replay cap). It
+   * lives in its own map that is never evicted, so churning per-client keys cannot forgive it. Only
+   * for a small, fixed set of keys chosen by the code: a key built from client input must not set
+   * this, because that map has no cap.
+   */
+  global?: boolean;
 }
 
 export interface RateLimitResult {
@@ -30,6 +37,12 @@ interface Bucket {
 }
 
 const buckets = new Map<string, Bucket>();
+
+/**
+ * Process-wide buckets (`global: true`). Kept out of `buckets` so the LRU eviction at MAX_BUCKETS
+ * cannot reach them; expired entries are still pruned with the rest.
+ */
+const globalBuckets = new Map<string, Bucket>();
 
 /**
  * Pruning only kicks in once the map grows large, so the common path stays
@@ -51,8 +64,10 @@ let lastPruneAt = Number.NEGATIVE_INFINITY;
 
 function prune(now: number): void {
   lastPruneAt = now;
-  for (const [key, bucket] of buckets) {
-    if (bucket.expiresAt <= now) buckets.delete(key);
+  for (const store of [buckets, globalBuckets]) {
+    for (const [key, bucket] of store) {
+      if (bucket.expiresAt <= now) store.delete(key);
+    }
   }
 }
 
@@ -74,9 +89,9 @@ function makeRoom(now: number): void {
 }
 
 /** Store a bucket as the most recently used (delete first so `Map` re-inserts it at the back). */
-function setBucket(key: string, bucket: Bucket): void {
-  buckets.delete(key);
-  buckets.set(key, bucket);
+function setBucket(store: Map<string, Bucket>, key: string, bucket: Bucket): void {
+  store.delete(key);
+  store.set(key, bucket);
 }
 
 /**
@@ -89,8 +104,9 @@ export function checkRateLimit(key: string, opts: RateLimitOptions): RateLimitRe
 
   if (buckets.size > PRUNE_THRESHOLD && now - lastPruneAt >= PRUNE_INTERVAL_MS) prune(now);
 
-  const existing = buckets.get(key);
-  if (!existing && buckets.size >= MAX_BUCKETS) makeRoom(now);
+  const store = opts.global ? globalBuckets : buckets;
+  const existing = store.get(key);
+  if (!existing && !opts.global && buckets.size >= MAX_BUCKETS) makeRoom(now);
   const hits = existing ? existing.hits.filter((t) => t > windowStart) : [];
 
   if (hits.length >= opts.limit) {
@@ -101,12 +117,12 @@ export function checkRateLimit(key: string, opts: RateLimitOptions): RateLimitRe
       return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil(opts.windowMs / 1000)) };
     }
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + opts.windowMs - now) / 1000));
-    setBucket(key, { hits, expiresAt: newest + opts.windowMs });
+    setBucket(store, key, { hits, expiresAt: newest + opts.windowMs });
     return { allowed: false, retryAfterSeconds };
   }
 
   hits.push(now);
-  setBucket(key, { hits, expiresAt: now + opts.windowMs });
+  setBucket(store, key, { hits, expiresAt: now + opts.windowMs });
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
@@ -142,6 +158,7 @@ function warnMissingCloudflareIp(fallback: "x-forwarded-for" | "unknown"): void 
  */
 export function resetRateLimitForTests(): void {
   buckets.clear();
+  globalBuckets.clear();
   lastPruneAt = Number.NEGATIVE_INFINITY;
   lastMissingCfWarnAt = Number.NEGATIVE_INFINITY;
 }
