@@ -533,6 +533,14 @@ Pageviews working but wrong geo means the hop is off or `CF-Connecting-IP` is no
 app (check the Cloudflare proxy status of the amindhou.com record). A local stack has no such
 router: set the variable blank in `.env` if it captures at all.
 
+### Search indexing (IndexNow)
+
+The site hosts an IndexNow key file at `public/924e95a6967d10429f3fa42b3c3a2975.txt` (served at
+`https://amindhou.com/924e95a6967d10429f3fa42b3c3a2975.txt`); its whole body is the key, no newline. The key is public by design.
+The Google Indexing API allotment is 0 for this site (T-1985), so after a content-changing deploy
+submit the changed URLs through IndexNow instead: run `indexnow_submit` with site `amindhou.com` and
+key `924e95a6967d10429f3fa42b3c3a2975`. A `src/__tests__/indexnow-key.test.ts` guard fails if the file name and body ever diverge.
+
 ## Development environment (maintainer's Windows/OneDrive machine)
 
 The following are pitfalls specific to this machine's setup (Windows 11, OneDrive-synced working
