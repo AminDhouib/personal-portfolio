@@ -206,7 +206,7 @@ export async function POST(req: Request) {
             AND id NOT IN (
               SELECT id FROM pg2_leaderboard_entries
                WHERE seed = $1
-               ORDER BY time_ms ASC
+               ORDER BY time_ms ASC, id ASC
                LIMIT $2
             )`,
         [seed, MAX_ENTRIES_PER_SEED],

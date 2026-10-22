@@ -103,7 +103,7 @@ function run(sql: string, params?: unknown[]): { rows: unknown[] } {
     const keep = new Set(
       entries
         .filter((e) => e.seed === seed)
-        .sort((a, b) => (a.timeMs as number) - (b.timeMs as number))
+        .sort((a, b) => (a.timeMs as number) - (b.timeMs as number) || a.id - b.id)
         .slice(0, limit)
         .map((e) => e.id),
     );
@@ -416,6 +416,10 @@ describe("/api/password-game-2/leaderboard", () => {
       expect(del?.sql.toUpperCase()).toContain("WHERE SEED = $1");
       // The inner keep-set subselect is also scoped to the same seed.
       expect(del?.sql.toUpperCase().match(/WHERE SEED = \$1/g)?.length).toBe(2);
+      // Older rows win ties, matching the strictly-faster rank.
+      expect(del?.sql.replace(/s+/g, " ").toUpperCase()).toContain(
+        "ORDER BY TIME_MS ASC, ID ASC LIMIT $2",
+      );
       expect(del?.params?.[0]).toBe(123);
       expect(del?.params?.[1]).toBe(500);
     });
