@@ -25,6 +25,22 @@ describe("serializeJsonLd", () => {
     expect(out).not.toContain("<");
     expect(JSON.parse(out)).toEqual({ text: "</script><script>alert(1)</script>" });
   });
+
+  it("escapes U+2028 and U+2029 and still parses back to the same value", () => {
+    const ls = String.fromCharCode(0x2028);
+    const ps = String.fromCharCode(0x2029);
+    const data = { text: `a${ls}b${ps}c`, nested: [ls] };
+    const out = serializeJsonLd(data);
+    expect(out).not.toContain(ls);
+    expect(out).not.toContain(ps);
+    expect(out).toContain("\\u2028");
+    expect(out).toContain("\\u2029");
+    expect(JSON.parse(out)).toEqual(data);
+  });
+
+  it("leaves the < escaping and ordinary text unchanged", () => {
+    expect(serializeJsonLd({ a: "<b>", c: "plain" })).toBe('{"a":"\\u003cb>","c":"plain"}');
+  });
 });
 
 describe("personNode", () => {
