@@ -412,6 +412,14 @@ Captures are sampled per error code (T-6263): the first of each code in a 10 min
 arrives, at most 5 do, and the rest are only counted. The warn lines `suppressing further RUN_ERROR
 captures` and `suppressed RUN_ERROR captures in the previous window` (with the count) are in the app
 logs, so a quiet Sentry during a failing chat can be read against them.
+At most 20 codes are tracked (the `(none)` bucket for frames with no code is one of them); further
+codes share one `(other)` overflow bucket, and a bucket whose window has ended is evicted to make
+room for a new code. State is per process and in memory, so a restart drops pending counts. A
+suppressed total is logged only when that code's window rolls over or its bucket is evicted, so a
+code that goes quiet may never log its total. Runtime 1.77's `RUN_ERROR` frames mostly carry no code,
+so in practice the cap of 5 per 10 minutes applies to most failures combined in `(none)`: a second
+distinct failure inside the same window can be suppressed, so read the Sentry count against the
+suppression warns.
 
 Note what this does and does not buy you: a broken chat now raises Sentry events, but there is
 still no alerting (see above), so nobody is paged — you have to look. And a chat that fails

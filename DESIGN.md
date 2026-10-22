@@ -1848,8 +1848,8 @@ trigger revisiting it.
   chat-run errors as `RUN_ERROR` events inside the SSE stream (plus the browser console) and
   swallowed them server-side, so the multi-day dead-chat outage fixed by the per-request
   `CopilotRuntime` produced zero Sentry events. `src/lib/copilot-run-error-tap.ts` now tees the
-  response body and forwards any `RUN_ERROR` frame to `captureException`, returning the client
-  branch untouched. It reads the stream rather than using a library hook because 1.54.1 had none
+  response body and forwards `RUN_ERROR` frames to `captureException` (sampled per error code since T-6263, see
+  RUNBOOK's AI-chat run failures), returning the client branch untouched. It reads the stream rather than using a library hook because 1.54.1 had none
   that worked: `CopilotRuntime`'s `onError` was declared but never read on this path (and its
   own docs called it a paid Cloud feature), the `observability_c` call sites were commented-out
   TODOs, and `createCopilotEndpointSingleRoute` accepted only `{ runtime, basePath, cors }`.

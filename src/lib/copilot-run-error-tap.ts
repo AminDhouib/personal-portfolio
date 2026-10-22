@@ -62,9 +62,10 @@ interface RunErrorFrame {
 // Captures are limited per error code: the first of each code in a window always goes through, at
 // most RUN_ERROR_CAPTURES_PER_WINDOW do, and the rest are only counted. The count is logged when
 // suppression starts and again, with the total, when the next window opens. Distinct failures keep
-// distinct codes and so keep their own first capture; the number of tracked codes is bounded
-// (MAX_TRACKED_CODES), with later codes sharing one overflow bucket. State is per process, in
-// memory: a restart loosens it, which is harmless.
+// distinct codes and so keep their own first capture. At most MAX_TRACKED_CODES real buckets are
+// kept (the no-code bucket is one of them), plus the one shared overflow bucket that later codes
+// fall into, so the map never holds more than MAX_TRACKED_CODES + 1 entries. State is per process,
+// in memory: a restart loosens it, which is harmless.
 const RUN_ERROR_CAPTURES_PER_WINDOW = 5;
 const RUN_ERROR_WINDOW_MS = 10 * 60_000;
 const MAX_TRACKED_CODES = 20;
@@ -94,6 +95,11 @@ function reportSuppressed(key: string, bucket: SampleBucket): void {
   }
 }
 
+/** Buckets that count toward MAX_TRACKED_CODES: every one except the overflow bucket. */
+function realBuckets(): number {
+  return buckets.size - (buckets.has(OVERFLOW_BUCKET) ? 1 : 0);
+}
+
 /**
  * The bucket a code is counted in. When the map is full and the code is new, buckets whose window
  * has ended are evicted first (so a failure type first seen weeks after twenty others still gets
@@ -101,14 +107,14 @@ function reportSuppressed(key: string, bucket: SampleBucket): void {
  */
 function bucketKey(code: string | undefined, now: number): string {
   const key = code ? code.slice(0, 64) : NO_CODE_BUCKET;
-  if (buckets.has(key) || buckets.size < MAX_TRACKED_CODES) return key;
+  if (buckets.has(key) || realBuckets() < MAX_TRACKED_CODES) return key;
   for (const [other, bucket] of buckets) {
     if (other !== OVERFLOW_BUCKET && now - bucket.windowStart >= RUN_ERROR_WINDOW_MS) {
       reportSuppressed(other, bucket);
       buckets.delete(other);
     }
   }
-  return buckets.size < MAX_TRACKED_CODES ? key : OVERFLOW_BUCKET;
+  return realBuckets() < MAX_TRACKED_CODES ? key : OVERFLOW_BUCKET;
 }
 
 /** True when this frame should be captured; counts and logs it otherwise. */
