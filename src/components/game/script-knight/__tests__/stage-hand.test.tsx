@@ -6,6 +6,7 @@ import { PROGRESS_KEY } from "../progress";
 import type { Runner } from "../run-floor";
 import type { RunOutcome } from "../sandbox/run-client";
 import { Stage } from "../stage";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => {
@@ -272,7 +273,7 @@ describe("Stage, Today's floor by hand", () => {
       detail: body.detail as Record<string, number>,
       proof: body.proof as string,
       now: new Date(`${DAY}T12:00:00Z`),
-      deadline: Date.now() + 5_000,
+      deadline: Date.now() + CPU_BOUND_TEST_TIMEOUT_MS,
     });
     expect(verdict).toEqual({ ok: true });
   });

@@ -7,9 +7,12 @@ import { replayAsync } from "../replay";
 import { resetSim, S } from "../state";
 import { stateHash } from "../hash";
 import { BUDGET, CHUNK, SEED, TICKS, recordRun } from "./replay-cost-fixture";
-import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
 afterEach(() => resetSim({ seed: "after-scale" }));
+
+// Both tests record and replay a run of up to 36,000 ticks (the old bench allowed 120 s for the same
+// work): 15 s each at twice the host's cores busy under coverage, so 60 s would be thin at more.
+const SCALE_TEST_TIMEOUT_MS = 120_000;
 
 // The correctness half of the replay cost spike: what a daily submit re-simulates must come out
 // the same at full scale (15 minutes, 40 services, 700 actions, a save at the 36,000 tick cap).
@@ -42,7 +45,7 @@ describe("replay at the daily scale", () => {
       // CHUNK ticks, which is what the per-chunk budget in the perf test is about.
       expect(yields).toBe(Math.ceil(endedLive / CHUNK) - 1);
     },
-    CPU_BOUND_TEST_TIMEOUT_MS,
+    SCALE_TEST_TIMEOUT_MS,
   );
 
   it(
@@ -63,6 +66,6 @@ describe("replay at the daily scale", () => {
       expect(S.tick).toBe(MAX_SAVE_TICKS);
       expect(stateHash()).toBe(liveHash);
     },
-    CPU_BOUND_TEST_TIMEOUT_MS,
+    SCALE_TEST_TIMEOUT_MS,
   );
 });
