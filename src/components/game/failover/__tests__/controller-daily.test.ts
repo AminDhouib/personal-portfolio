@@ -166,7 +166,8 @@ describe("a finished daily", () => {
       },
       proof: result.proof,
       now: new Date(`${DAY}T12:00:00Z`),
-      deadline: Date.now() + 5000,
+      // Not what this test is about: a tight wall-clock deadline made a slow host refuse a valid proof.
+      deadline: Date.now() + CPU_BOUND_TEST_TIMEOUT_MS,
     });
     expect(verdict).toEqual({ ok: true });
   });

@@ -186,7 +186,7 @@ const advance = (ms: number) => {
 };
 const savedStats = () => JSON.parse(window.localStorage.getItem("svf:stats") ?? "{}");
 const memoLabelled = () =>
-  Array.from(document.querySelectorAll<HTMLElement>("button[data-cell]")).filter((b) =>
+  Array.from(document.querySelectorAll<HTMLElement>("[data-cell]")).filter((b) =>
     /memo/.test(b.getAttribute("aria-label") ?? ""),
   );
 

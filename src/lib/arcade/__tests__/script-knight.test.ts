@@ -9,6 +9,7 @@ import {
   LEGACY_ARCADE_GAME_SLUGS,
   validateArcadeSubmission,
 } from "../games";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
 const NOW = new Date("2026-10-15T12:00:00Z");
 const DAY = 20261015;
@@ -45,7 +46,7 @@ function verdict(
     detail: detail() as Record<string, number>,
     proof: today.log,
     now: NOW,
-    deadline: Date.now() + 2_000,
+    deadline: Date.now() + CPU_BOUND_TEST_TIMEOUT_MS,
     ...over,
   });
 }
