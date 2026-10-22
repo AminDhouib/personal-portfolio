@@ -15,6 +15,7 @@
  */
 
 import { logError } from "@/lib/log";
+import { safeJsonParse } from "@/lib/safe-json";
 
 export const GENERIC_CHAT_ERROR = "The assistant ran into a problem. Please try again.";
 
@@ -55,14 +56,16 @@ function sanitizeLine(line: string): string {
 
   const cr = line.endsWith("\r") ? "\r" : "";
   const payload = trimmed.slice("data:".length).trim();
-  let frame: { type?: unknown; timestamp?: unknown } | null;
-  try {
-    frame = JSON.parse(payload) as { type?: unknown; timestamp?: unknown } | null;
-  } catch {
-    // silent-ok: an unparseable line that names RUN_ERROR is replaced below, not forwarded
-    return `data: ${genericFrame(undefined)}${cr}`;
-  }
-  if (frame === null || typeof frame !== "object" || frame.type !== "RUN_ERROR") return line;
+  // An unparseable line that names RUN_ERROR is replaced by the generic frame (fail closed), and
+  // is not reported per frame: the no-op reporter keeps a hostile stream from flooding Sentry.
+  const frame = safeJsonParse<{ type?: unknown; timestamp?: unknown }>(
+    payload,
+    "copilotkit:error-frame",
+    null,
+    () => undefined,
+  );
+  if (frame === null || typeof frame !== "object") return `data: ${genericFrame(undefined)}${cr}`;
+  if (frame.type !== "RUN_ERROR") return line;
   const timestamp = typeof frame.timestamp === "number" ? frame.timestamp : undefined;
   return `data: ${genericFrame(timestamp)}${cr}`;
 }
