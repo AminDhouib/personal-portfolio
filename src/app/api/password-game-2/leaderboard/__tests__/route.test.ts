@@ -434,6 +434,184 @@ describe("/api/password-game-2/leaderboard", () => {
       expect(res.status).toBe(400);
     });
 
+    // T-6414 pins: the body validation as the hand-rolled checks answer it, so the move to a zod
+    // schema can be proven to change nothing a client sees. Bodies are raw JSON text so values that
+    // cannot be built from an object (1e999, -0) are covered too.
+    describe("body validation (pinned for the zod move)", () => {
+      const raw = (text: string) => POST(makeJsonPostRequest(text));
+      // A body with all four keys the route reads. A field given as null is left out of the JSON.
+      const body = (f: {
+        seed?: string | null;
+        timeMs?: string | null;
+        daily?: string | null;
+        name?: string | null;
+      }) => {
+        const fields = {
+          seed: f.seed === undefined ? "7" : f.seed,
+          timeMs: f.timeMs === undefined ? "120000" : f.timeMs,
+          daily: f.daily === undefined ? "false" : f.daily,
+          name: f.name === undefined ? '"Ada"' : f.name,
+        };
+        const parts = Object.entries(fields)
+          .filter(([, v]) => v !== null)
+          .map(([k, v]) => `"${k}":${v}`);
+        return raw(`{${parts.join(",")}}`);
+      };
+      const rejected = async (res: Response, status: number, error: string) => {
+        expect(res.status).toBe(status);
+        expect(await res.json()).toEqual({ error });
+        expect(entries).toHaveLength(0);
+        expect(captured.filter((q) => q.sql.trim().toUpperCase().startsWith("INSERT"))).toEqual([]);
+        expect(captureExceptionMock).not.toHaveBeenCalled();
+      };
+
+      it.each([
+        ["an array", "[]"],
+        ["null", "null"],
+        ["a number", "7"],
+        ["a string", '"seed"'],
+        ["a boolean", "true"],
+        ["an empty object", "{}"],
+      ])("answers %s as 400 invalid body", async (_label, text) => {
+        await rejected(await raw(text), 400, "invalid body");
+      });
+
+      // Preserved quirk: the body schema lists all four keys as required (an unknown value may
+      // still be null or anything), so a body that omits name or daily is "invalid body" even
+      // though the later code would default them. The game always sends all four.
+      it.each([
+        ["seed", { seed: null }],
+        ["timeMs", { timeMs: null }],
+        ["daily", { daily: null }],
+        ["name", { name: null }],
+      ])("answers a body without %s as 400 invalid body", async (_label, fields) => {
+        await rejected(await body(fields), 400, "invalid body");
+      });
+
+      it.each([
+        ["a string", '"7"'],
+        ["null", "null"],
+        ["a boolean", "true"],
+        ["an array", "[7]"],
+        ["an object", "{}"],
+        ["a float", "7.5"],
+        ["a negative", "-1"],
+        ["over the max", "4294967296"],
+        ["an overflowing literal", "1e999"],
+      ])("rejects a seed that is %s as 400 invalid seed", async (_label, seed) => {
+        await rejected(await body({ seed }), 400, "invalid seed");
+      });
+
+      it.each([
+        ["a string", '"120000"'],
+        ["null", "null"],
+        ["a boolean", "true"],
+        ["an array", "[120000]"],
+        ["an object", "{}"],
+        ["below the floor", "9999"],
+        ["just below the floor after flooring", "9999.9"],
+        ["above the ceiling", "3600001"],
+        ["negative", "-120000"],
+        ["an overflowing literal", "1e999"],
+      ])("rejects a timeMs that is %s as 400 invalid timeMs", async (_label, timeMs) => {
+        await rejected(await body({ timeMs }), 400, "invalid timeMs");
+      });
+
+      it("reports the seed first when both seed and timeMs are bad", async () => {
+        await rejected(await body({ seed: "-1", timeMs: "1" }), 400, "invalid seed");
+      });
+
+      it("reports a bad timeMs before the daily-seed check", async () => {
+        await rejected(await body({ timeMs: "1", daily: "true" }), 400, "invalid timeMs");
+      });
+
+      it("reports a bad seed before the daily-seed check", async () => {
+        await rejected(await body({ seed: "-1", daily: "true" }), 400, "invalid seed");
+      });
+
+      it("rejects daily:true off the daily seed as 400 not the daily seed", async () => {
+        await rejected(await body({ daily: "true" }), 400, "not the daily seed");
+      });
+
+      it.each([
+        ["0", "0", 0],
+        ["1", "1", 1],
+        ["a float with a zero fraction", "7.0", 7],
+        ["the max", "4294967295", 4294967295],
+      ])("accepts a seed that is %s", async (_label, seed, stored) => {
+        const res = await body({ seed });
+        expect(res.status).toBe(200);
+        expect(entries[0]?.seed).toBe(stored);
+      });
+
+      it("accepts a seed of -0 and stores it as -0 (the hand-rolled check let it through)", async () => {
+        const res = await body({ seed: "-0" });
+        expect(res.status).toBe(200);
+        expect(Object.is(entries[0]?.seed, -0)).toBe(true);
+      });
+
+      it.each([
+        ["the floor", "10000", 10_000],
+        ["a float just over the floor", "10000.9", 10_000],
+        ["the ceiling", "3600000", 3_600_000],
+        ["a float just over the ceiling", "3600000.5", 3_600_000],
+        ["a float", "120000.7", 120_000],
+      ])("accepts a timeMs that is %s and stores it floored", async (_label, timeMs, stored) => {
+        const res = await body({ timeMs });
+        expect(res.status).toBe(200);
+        expect(entries[0]?.timeMs).toBe(stored);
+      });
+
+      it.each([
+        ["a string", '"true"'],
+        ["1", "1"],
+        ["null", "null"],
+        ["an object", "{}"],
+      ])("treats daily that is %s as false", async (_label, daily) => {
+        const res = await body({ daily });
+        expect(res.status).toBe(200);
+        expect(entries[0]?.daily).toBe(false);
+      });
+
+      it.each([
+        ["a number", "42"],
+        ["null", "null"],
+        ["an object", '{"a":1}'],
+        ["an empty string", '""'],
+      ])("stores Anonymous when name is %s", async (_label, name) => {
+        const res = await body({ name });
+        expect(res.status).toBe(200);
+        expect(entries[0]?.name).toBe("Anonymous");
+      });
+
+      it("ignores unknown keys", async () => {
+        const res = await raw(
+          '{"seed":7,"timeMs":120000,"daily":false,"name":"Ada","rank":1,"extra":[1]}',
+        );
+        expect(res.status).toBe(200);
+        expect(entries[0]).toMatchObject({ name: "Ada", seed: 7, timeMs: 120_000, daily: false });
+      });
+
+      it("answers an oversize body as 413 before validating it", async () => {
+        const res = await body({ name: JSON.stringify("x".repeat(17_000)) });
+        expect(res.status).toBe(413);
+        expect(await res.json()).toEqual({ error: "payload too large" });
+        expect(entries).toHaveLength(0);
+      });
+
+      it("answers non-JSON text as 400 invalid json", async () => {
+        const res = await raw("seed=7&timeMs=120000");
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: "invalid json" });
+      });
+
+      it("answers an empty body as 400 invalid json", async () => {
+        const res = await raw("");
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: "invalid json" });
+      });
+    });
+
     describe("daily submissions", () => {
       it("accepts today's daily seed", async () => {
         const res = await POST(makeJsonPostRequest(validBody({ seed: dailySeed(), daily: true })));
