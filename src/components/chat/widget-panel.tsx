@@ -3,9 +3,10 @@
 import { useEffect, useRef } from "react";
 import { CopilotKit } from "@copilotkit/react-core";
 import { useCopilotReadable } from "@copilotkit/react-core";
-import { CopilotPopup, useCopilotChatSuggestions } from "@copilotkit/react-ui";
+import { CopilotPopup } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 import { useLeadCollectorAction } from "@/hooks/use-lead-collector-action";
+import { CHAT_SUGGESTIONS } from "./suggestions";
 
 // The assistant's grounding is not passed here: on CopilotKit's AG-UI chat
 // path (1.54 through 1.77) the `instructions` prop never reaches the model. The system prompt is
@@ -19,15 +20,6 @@ function ChatActions({ pathname }: { pathname: string }) {
   });
 
   useLeadCollectorAction("chatbot");
-
-  useCopilotChatSuggestions(
-    {
-      instructions:
-        "ALWAYS suggest EXACTLY these 3 options (do not deviate or rephrase): 1. 'What has Amin built?' 2. 'Is Amin available for hire?' 3. 'How do I book a call with Amin?'",
-      maxSuggestions: 3,
-    },
-    [],
-  );
 
   return null;
 }
@@ -118,6 +110,7 @@ export function ChatWidgetPanel({
             initial: "Hi! Ask me anything about Amin's work, skills, or how we can work together.",
             placeholder: "Ask about Amin's projects, skills...",
           }}
+          suggestions={CHAT_SUGGESTIONS}
           defaultOpen={Boolean(initiallyOpen)}
         />
       </div>
