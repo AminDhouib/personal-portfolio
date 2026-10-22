@@ -73,17 +73,17 @@ describe("SuperVoltorbFlip board", () => {
     }
   });
 
-  it("leaks no Voltorb orb through a face-down tile", () => {
+  it("leaks no Voltorb sprite through a face-down tile", () => {
     const { container } = render(<SuperVoltorbFlipGame />);
     for (const tile of faceDownTiles(container)) {
-      // The orb is an inline <svg class="voltorb">, so an empty textContent
+      // The Voltorb is an <img class="voltorb">, so an empty textContent
       // alone would not prove it is hidden -- assert the element itself is
       // unmounted.
       expect(tile.querySelector(".voltorb")).toBeNull();
     }
   });
 
-  it("renders no <img> anywhere: all art is inline SVG", () => {
+  it("renders no <img> on a face-down board: the Voltorb sprite mounts only once revealed", () => {
     const { container } = render(<SuperVoltorbFlipGame />);
     expect(container.querySelector("img")).toBeNull();
   });
