@@ -188,16 +188,16 @@ describe("POST /api/copilotkit", () => {
   // The default runner keeps up to 1000 threads, 100 runs each, 512 MiB of attacker-chosen
   // content in memory (T-6259). The route must hand the runtime a bounded one.
   it("builds the runtime with a bounded in-memory thread store", async () => {
-    mockHandleRequest.mockResolvedValue(new Response("ok"));
-    await POST(makeReq({ method: "info" }, { ip: "10.6.259.1" }));
+    process.env.OPENROUTER_KEY = "test-key-abc";
+    mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
+    await POST(makeReq({ method: "info" }, { ip: "10.30.0.59" }));
 
     expect(mockInMemoryRunner).toHaveBeenCalledWith({
       maxThreads: 200,
       maxRunsPerThread: 20,
       maxBytes: 32 * 1024 * 1024,
     });
-    const options = mockCopilotRuntime.mock.calls[0]?.[0] as { runner?: unknown } | undefined;
-    expect(options?.runner).toBeInstanceOf(mockInMemoryRunner);
+    expect(mockCopilotRuntime).toHaveBeenCalledWith({ runner: expect.any(mockInMemoryRunner) });
   });
 
   it("constructs a fresh CopilotRuntime per request", async () => {

@@ -3,6 +3,7 @@ import {
   OpenAIAdapter,
   copilotRuntimeNextJSAppRouterEndpoint,
 } from "@copilotkit/runtime";
+import { InMemoryAgentRunner } from "@copilotkit/runtime/v2";
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextRequest, NextResponse } from "next/server";
 import { guardRequest } from "@/lib/route-guard";
@@ -52,6 +53,21 @@ function printable(name: string): string {
     return code < 0x20 || code === 0x7f ? "?" : ch;
   }).join("");
 }
+
+// The runtime's default in-memory thread store keeps up to 1000 threads, 100 runs each and 512 MiB
+// of content the client chose (every distinct threadId is a new thread), and compose.yml sets no
+// memory limit (T-6259). These bounds are far above the real use (one thread per visitor tab, a
+// handful of runs) and hold the retained history to 32 MiB. The store is process-global, so
+// building the runner once here is safe: only the per-request CopilotRuntime below may not be
+// hoisted.
+const THREAD_STORE_MAX_THREADS = 200;
+const THREAD_STORE_MAX_RUNS_PER_THREAD = 20;
+const THREAD_STORE_MAX_BYTES = 32 * 1024 * 1024;
+const THREAD_STORE_RUNNER = new InMemoryAgentRunner({
+  maxThreads: THREAD_STORE_MAX_THREADS,
+  maxRunsPerThread: THREAD_STORE_MAX_RUNS_PER_THREAD,
+  maxBytes: THREAD_STORE_MAX_BYTES,
+});
 
 export const POST = async (req: NextRequest) => {
   // Guard the open LLM proxy before any work: reject cross-origin callers and
@@ -166,7 +182,7 @@ export const POST = async (req: NextRequest) => {
   // the first POST after a deploy, every upstream call is born aborted and the
   // stream fails with RUN_ERROR. Hoisting this line back out as an
   // "optimization" reintroduces exactly that bug.
-  const runtime = new CopilotRuntime();
+  const runtime = new CopilotRuntime({ runner: THREAD_STORE_RUNNER });
 
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
     runtime,
