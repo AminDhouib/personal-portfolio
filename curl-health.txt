@@ -1,0 +1,3 @@
+GET https://amindhou.com/api/health  -> 200 redirect=
+GET https://amindhou.com/api/health/  -> 308 redirect=https://amindhou.com/api/health
+2026-10-22T16:08:13Z
