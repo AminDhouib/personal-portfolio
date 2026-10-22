@@ -113,6 +113,15 @@ function reject(reason: string): Verdict {
   return { ok: false, reason };
 }
 
+// Run-length ceilings, enforced in the checks (the schemas keep the legacy 86_399 limit). The
+// score envelopes grow with the claimed seconds, and at a day-long claim 2 * rawMax sits above
+// ARCADE_SCORE_CAP, so no score was ever too high. Space Shooter's 2400 s (40 minutes) is the
+// longest run whose ceiling still lies below the cap at the maximum kills and distance the
+// other bounds allow; Hextris takes the same two hours as Tower Stacker (its quadratic envelope
+// stays above the cap for any long run, so length is the only bound it can add).
+const SPACE_SHOOTER_MAX_SECONDS = 2_400;
+const HEXTRIS_MAX_SECONDS = 7_200;
+
 // Detail limits are the legacy route's: seconds < 86400, kills < 100000, distance < 1000000.
 const spaceShooterDetailSchema = z.strictObject({
   seconds: z.number().int().min(0).max(86_399),
@@ -193,6 +202,7 @@ type FailoverDetail = z.infer<typeof failoverDetailSchema>;
  * Region is not accepted in v2 (spoofable and unverifiable).
  */
 function checkSpaceShooter(score: number, detail: SpaceShooterDetail): Verdict {
+  if (detail.seconds > SPACE_SHOOTER_MAX_SECONDS) return reject("run too long");
   const s = detail.seconds + 2;
   if (detail.kills > 6 * s + 20) return reject("too many kills for the run length");
   if (detail.distance > 2000 + 132 * s) return reject("distance too long for the run length");
@@ -213,6 +223,7 @@ function checkSpaceShooter(score: number, detail: SpaceShooterDetail): Verdict {
  * it mainly rejects small-kills claims of huge scores.
  */
 function checkHextris(score: number, detail: HextrisDetail): Verdict {
+  if (detail.seconds > HEXTRIS_MAX_SECONDS) return reject("run too long");
   if (detail.level < 1 || detail.level > 35) return reject("level out of range");
   const minLevel = Math.min(35, Math.floor(1 + 0.05525 * detail.kills)) - 1;
   if (detail.level < minLevel) return reject("level too low for the pieces cleared");

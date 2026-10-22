@@ -474,3 +474,37 @@ describe("typing-speed daily", () => {
     }
   });
 });
+
+describe("run-length ceilings (T-5530)", () => {
+  // The envelope's 2 * rawMax grows with the claimed seconds; at the schema's 86_399 s it sits far
+  // above ARCADE_SCORE_CAP, so a score at the cap used to pass for any long enough claim.
+  it("space-shooter: a cap-sized score on a day-long claim is implausible", () => {
+    expect(spaceShooter(ARCADE_SCORE_CAP, 86_399, 99_999, 999_999).ok).toBe(false);
+  });
+
+  it("space-shooter: the longest allowed run cannot hold a cap-sized score either", () => {
+    const longest = spaceShooter(ARCADE_SCORE_CAP, 2_400, 14_420, 318_800);
+    expect(longest).toMatchObject({ ok: false, kind: "implausible" });
+    expect(reasonOf(longest)).toBe("score too high for the run");
+  });
+
+  it("space-shooter: runs past 40 minutes are rejected on length alone", () => {
+    expect(spaceShooter(0, 2_400, 0, 0).ok).toBe(true);
+    const over = spaceShooter(0, 2_401, 0, 0);
+    expect(over).toMatchObject({ ok: false, kind: "implausible" });
+    expect(reasonOf(over)).toBe("run too long");
+  });
+
+  it("hextris: runs past two hours are rejected on length alone", () => {
+    expect(hextris(0, 7_200, 100, 6).ok).toBe(true);
+    const over = hextris(0, 7_201, 100, 6);
+    expect(over).toMatchObject({ ok: false, kind: "implausible" });
+    expect(reasonOf(over)).toBe("run too long");
+    expect(hextris(ARCADE_SCORE_CAP, 86_399, 99_999, 35).ok).toBe(false);
+  });
+
+  it("real-looking runs still pass", () => {
+    expect(spaceShooter(25_000, 300, 200, 20_000).ok).toBe(true);
+    expect(hextris(40_000, 240, 150, 10).ok).toBe(true);
+  });
+});
