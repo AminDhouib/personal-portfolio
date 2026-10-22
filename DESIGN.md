@@ -1404,6 +1404,24 @@ request failed`). The read and submit catches in `src/hooks/use-arcade-board.ts`
   throw and are handled by status. A real origin outage normally arrives as a 5xx through
   Cloudflare, not as a network `TypeError`, and Uptimely covers uptime, so this hides no signal. Do
   not widen the match to every `TypeError`.
+- **The lead email caps are soft, on purpose (T-6387, SEC LOW from the T-6261 review).**
+  `POST /api/leads` (`src/app/api/leads/route.ts`) sends at most 50 notification emails per UTC day,
+  3 per client. Every lead is stored whatever the caps do; they only bound emails. Three weaknesses
+  are accepted. (a) The per-client share is only as strong as the rate limiter's key: IPv6 is
+  bucketed by /64 (a /48 is 65k keys) and proxy pools mint addresses, so a determined sender can
+  still spend the global 50. At this volume that costs that day's notification emails and nothing
+  else, and the `daily lead email cap reached` warn log says when it happened (RUNBOOK, leads
+  section). A "cap reached" notification or slots reserved for distinct addresses were rejected as
+  more machinery than the loss justifies. (b) Timing is a side channel: a request that takes a slot
+  awaits `sendSendlyEmail` (up to 10 s) before answering, while an over-share or over-cap request
+  answers at once, so timing tells a sent lead from a capped one. It reveals only "the cap is not
+  spent yet", which a sender learns by posting anyway. Moving the send into Next's `after()` was
+  rejected: a lead cannot be submitted on prod to prove it live, and it adds a shutdown edge
+  (Dokploy's stop grace period against the 10 s Sendly deadline), while the DB-failure case must
+  still await the send to decide 200 or 500. A fixed delay floor would slow every real visitor.
+  (c) `MAX_TRACKED_CLIENTS` (5000) is unreachable, because the per-client map holds at most 50
+  entries (one per taken slot). It is a harmless safety net and is left as is. Do not "fix" any of
+  these without a real abuse event.
 - **Arcade player ids are client-generated (trust on first use).** There are no accounts. The
   token protects an id from being taken over after its first submit; it does not stop one person
   minting many ids. A cleared browser starts a new player. Both are accepted for a portfolio
