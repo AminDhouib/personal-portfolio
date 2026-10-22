@@ -35,9 +35,20 @@ const SPACE_FILLERS = /[\u{2800}\u{3164}\u{ffa0}]/gu;
  * supplement: VS16 is what makes a heart or a keycap an emoji), U+034F (combining grapheme joiner,
  * used in sequences of combining marks), the Khmer inherent vowels U+17B4/U+17B5 and the Mongolian
  * free variation selectors and vowel separator U+180B-U+180F (needed to spell Mongolian words).
+ * Built from a string like STRIPPED: the combining marks in this set trip the
+ * no-misleading-character-class lint when written as a regex literal.
  */
-const BLANK_OR_SELECTOR =
-  /[\s\u{34f}\u{17b4}\u{17b5}\u{180b}-\u{180f}\u{fe00}-\u{fe0f}\u{e0100}-\u{e01ef}]/gu;
+const BLANK_OR_SELECTOR = new RegExp(
+  "[" +
+    "\\s" + // whitespace
+    "\\u034f" + // combining grapheme joiner
+    "\\u17b4\\u17b5" + // Khmer inherent vowels
+    "\\u180b-\\u180f" + // Mongolian free variation selectors, vowel separator
+    "\\ufe00-\\ufe0f" + // variation selectors 1-16
+    "\\u{e0100}-\\u{e01ef}" + // variation selectors supplement
+    "]",
+  "gu",
+);
 
 export function sanitizePlayerName(
   raw: unknown,
