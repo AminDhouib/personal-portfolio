@@ -1,0 +1,6 @@
+HogQL: $pageview/$exception, last 40 min, project 22, read 06:57Z. $pageview rows (lib web, $lib_custom_api_host /_p/4qe):
+2026-10-22T06:55:37 https://amindhou.com/games/space-shooter
+2026-10-22T06:54:02 https://amindhou.com/   <- my fresh desktop homepage load (capture POST /_p/4qe/i/v0/e/ returned 200 at ~06:54:03)
+2026-10-22T06:53:37 https://amindhou.com/   (my reload at 360 menu check)
+2026-10-22T06:53:22 https://amindhou.com/   (earlier 360 load)
+$exception rows: none.

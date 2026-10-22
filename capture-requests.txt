@@ -1,0 +1,6 @@
+Homepage load 2026-10-22T06:54Z desktop 1440, fresh navigation. /_p/4qe requests (PerformanceResourceTiming responseStatus):
+/_p/4qe/static/posthog-recorder.js?v=1.399.2 200 script
+/_p/4qe/array/<project key>/config.js 200 script
+/_p/4qe/static/surveys.js?v=1.399.2 200 script
+/_p/4qe/i/v0/e/?_=1792652043345 200 fetch  (capture)
+Console on load: only warn "THREE.THREE.Clock: This module has been deprecated. Please use THREE.Timer instead." (no errors)
