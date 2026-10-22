@@ -294,11 +294,17 @@ function sanitizeParsed(envelope: Record<string, unknown>): EnvelopeResult {
 
     if ("tools" in run) {
       const tools = Array.isArray(run.tools) ? run.tools : [];
+      // At most one copy per name: each entry becomes a ~630-byte server copy, so a list of tiny
+      // repeats would grow ~21x on its way to the response and the thread store. A repeat is not
+      // reported as dropped content (the server copy is forwarded either way).
+      const seen = new Set<string>();
       run.tools = tools.flatMap((tool) => {
         const name = toolName(tool);
         const own = name !== null && Object.hasOwn(COPILOT_TOOL_DEFINITIONS, name);
         if (!own) droppedTools.push(name ?? "?");
-        return own ? [COPILOT_TOOL_DEFINITIONS[name]] : [];
+        if (!own || seen.has(name)) return [];
+        seen.add(name);
+        return [COPILOT_TOOL_DEFINITIONS[name]];
       });
     }
   }
