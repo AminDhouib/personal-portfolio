@@ -174,5 +174,7 @@ export function admitReplay(client: string | undefined): Admission {
   return checkRateLimit(`failover-replay:${generation}:all`, {
     limit: REPLAY_GLOBAL_LIMIT,
     windowMs: REPLAY_WINDOW_MS,
+    // Process-wide: client-key churn must not evict it and hand the cap back (T-6262).
+    global: true,
   });
 }

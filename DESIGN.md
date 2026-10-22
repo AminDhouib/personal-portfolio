@@ -1779,7 +1779,10 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   `captureException`, so no Sentry or PostHog event): that line means the edge was bypassed. The
   bucket map is bounded: at most 10,000 keys, expired buckets pruned at most once a second, then
   least-recently-used buckets evicted (eviction forgives that key's spent budget, the price of a
-  bounded map). Local and e2e runs have no `CF-Connecting-IP`, so a test that needs its own bucket
+  bounded map). A process-wide bucket (`global: true`, today only the failover replay cap) is the
+  exception: it lives in a separate map that eviction never touches, so churning 10,000+ client keys
+  cannot hand back a spent shared budget (T-6262); that map has no cap, so only fixed keys chosen by
+  the code may set the flag. Local and e2e runs have no `CF-Connecting-IP`, so a test that needs its own bucket
   must send a distinct `CF-Connecting-IP` (a random `X-Forwarded-For` no longer separates
   callers). Pinned in `src/lib/__tests__/rate-limit.test.ts` and, at the guard level, in
   `src/lib/__tests__/route-guard.test.ts`. Residual risk, accepted until T-5533: the origin is
