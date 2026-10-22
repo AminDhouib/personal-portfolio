@@ -287,5 +287,27 @@ describe("tapRunErrors", () => {
         expect.objectContaining({ code: "noisy", suppressed: 4 }),
       );
     });
+
+    it("makes room for a new code when ONE real bucket expires while the overflow bucket exists and is spent", async () => {
+      await run({ ...RUN_ERROR, code: "code-0" });
+      vi.setSystemTime(new Date(Date.now() + WINDOW_MS / 2));
+      for (let i = 1; i < MAX_CODES; i += 1) await run({ ...RUN_ERROR, code: `code-${i}` });
+      // Unseen codes now share (and here spend) the overflow bucket's five captures.
+      for (let i = 0; i < PER_WINDOW; i += 1) await run({ ...RUN_ERROR, code: `spill-${i}` });
+
+      // Only code-0's window has ended.
+      vi.setSystemTime(new Date(Date.now() + WINDOW_MS / 2 + 1));
+      mockCaptureException.mockClear();
+      await run({ ...RUN_ERROR, code: "fresh" });
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it("treats codes that share their first 64 characters as one code", async () => {
+      const stem = "a".repeat(64);
+      for (let i = 0; i < PER_WINDOW; i += 1) await run({ ...RUN_ERROR, code: `${stem}-${i}` });
+      await run({ ...RUN_ERROR, code: `${stem}-other` });
+      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+    });
   });
 });
