@@ -425,6 +425,19 @@ describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)"
     expect(mockHandleRequest).not.toHaveBeenCalled();
   });
 
+  // A "__proto__" key survives JSON.parse as an own property and becomes the prototype in the
+  // runtime's schema parse, so it can supply resume / state / forwardedProps the checks never saw.
+  it("answers 400 for a body-level __proto__ carrying a resume payload, and never reaches the runtime", async () => {
+    const resume = [{ interruptId: "c1", status: "resolved", payload: { x: "y".repeat(300_000) } }];
+    const body = { ...runBody({}).body, __pr0to__: { resume } };
+    const text = JSON.stringify({ method: "agent/run", params: { agentId: "default" }, body })
+      .split("__pr0to__")
+      .join("__proto__");
+    const response = await POST(makeRawReq(text, "10.33.0.6"));
+    expect(response.status).toBe(400);
+    expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
   it.each(["info"])("still forwards %s to the runtime", async (method) => {
     mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
     const response = await POST(makeRawReq(JSON.stringify({ method }), "10.33.0.4"));
