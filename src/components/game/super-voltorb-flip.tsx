@@ -94,7 +94,7 @@ import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
 import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
 import {
   VoltorbIcon,
-  LoopingExplosion,
+  LegendVoltorb,
   LoopingSparkle,
   CoinSpinner,
   InstructionsBtns,
@@ -1325,11 +1325,8 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
             <div className="mt-3 flex items-center gap-2 text-lg">
               <div className="relative">
                 <Card fake>
-                  <VoltorbIcon size={24} className="picture-outline voltorb" />
+                  <LegendVoltorb size={24} burstSize={36} className="picture-outline voltorb" />
                 </Card>
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <LoopingExplosion size={36} />
-                </div>
               </div>
               <span>Game Over! 0!</span>
             </div>
@@ -1358,11 +1355,8 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
               <div className="flex flex-col items-center gap-1">
                 <div className="relative">
                   <Card fake>
-                    <VoltorbIcon size={22} className="picture-outline voltorb" />
+                    <LegendVoltorb size={22} burstSize={38} className="picture-outline voltorb" />
                   </Card>
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <LoopingExplosion size={38} />
-                  </div>
                 </div>
                 <span className="text-xs text-gray-500">Avoid Voltorbs</span>
               </div>
@@ -1826,7 +1820,7 @@ export function SuperVoltorbFlipGame() {
     setMusicMuted(muted);
   }, [muted]);
 
-  // The first bomb of a visit should not stall on ten network round trips.
+  // The first bomb of a visit should not stall on eleven network round trips.
   useEffect(() => {
     preloadOriginalSprites();
   }, []);

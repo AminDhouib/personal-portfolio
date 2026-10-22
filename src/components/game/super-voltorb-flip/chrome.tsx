@@ -2,8 +2,13 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { CoinFrame, SparkleFrame } from "./art/frames";
-import { BURST_FRAMES, COIN_FRAMES, SPARKLE_FRAMES } from "./art/fx";
-import { EXPLODE_FRAME_MAX_PX, EXPLODE_FRAME_PX, crispIconSize } from "./art/original-sprites";
+import { COIN_FRAMES, SPARKLE_FRAMES } from "./art/fx";
+import {
+  EXPLODE_FRAME_MAX_PX,
+  EXPLODE_FRAME_PX,
+  LEGEND_BURST_FRAMES,
+  crispIconSize,
+} from "./art/original-sprites";
 import { ExplodeFrameImg, VoltorbSprite } from "./art/voltorb-sprite";
 
 // ---------------------------------------------------------------------------
@@ -22,7 +27,7 @@ export function VoltorbIcon({
   className?: string;
 }) {
   // A CSS length (the clue cards, which scale with the tile) is used as given. A pixel box keeps
-  // its exact size, with the sprite drawn at a whole multiple of its 22 px art inside it.
+  // its exact size, with the sprite drawn at a whole multiple of its 16 px art inside it.
   if (cssSize) return <VoltorbSprite variant="icon" cssSize={cssSize} className={className} />;
   return (
     <span
@@ -82,22 +87,48 @@ function LoopingFrames({
   );
 }
 
-// The legend and modal draw the original burst frames over a card that already shows the sprite.
-// Every frame is scaled by size/64 (64 px is the largest frame), so the burst stays proportional
-// and never leaves its box: it must not spill onto the text beside the card or get clipped by the
-// modal's scroll container. That shrinks the Voltorb baked into the frames, which is fine here.
-export const LoopingExplosion = ({ size }: { size: number }) => (
+// The legend and modal Voltorb: the bare icon held for a pause, then the original burst, then the
+// icon again. Only the burst frames drawn on transparency play (LEGEND_BURST_FRAMES): the opaque
+// 22 px tile frames would cover the icon with a small salmon square. While a frame shows, the static
+// icon is hidden (its box kept), as the hub banner does. Every frame is scaled by burstSize/64 (64
+// px is the largest frame), so the burst stays proportional and never leaves its box: it must not
+// spill onto the text beside the card or get clipped by the modal's scroll container. That shrinks
+// the Voltorb baked into the later frames, which is fine here.
+export const LegendVoltorb = ({
+  size,
+  burstSize,
+  className,
+}: {
+  size: number;
+  burstSize: number;
+  className?: string;
+}) => (
   <LoopingFrames
-    count={BURST_FRAMES}
+    count={1 + LEGEND_BURST_FRAMES.length}
     size={size}
     interval={70}
     pauseMs={500}
-    render={(f) => (
-      <ExplodeFrameImg
-        frame={f}
-        cssSize={`${(((EXPLODE_FRAME_PX[f] ?? 0) * size) / EXPLODE_FRAME_MAX_PX).toFixed(2)}px`}
-      />
-    )}
+    render={(step) => {
+      const frame = step === 0 ? undefined : LEGEND_BURST_FRAMES[step - 1];
+      return (
+        <>
+          <span
+            style={{
+              display: "inline-flex",
+              visibility: frame === undefined ? "visible" : "hidden",
+            }}
+          >
+            <VoltorbIcon size={size} className={className} />
+          </span>
+          {frame !== undefined && (
+            <ExplodeFrameImg
+              frame={frame}
+              cssSize={`${(((EXPLODE_FRAME_PX[frame] ?? 0) * burstSize) / EXPLODE_FRAME_MAX_PX).toFixed(2)}px`}
+            />
+          )}
+        </>
+      );
+    }}
   />
 );
 

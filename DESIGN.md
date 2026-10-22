@@ -882,13 +882,15 @@ current tree on 2026-07-07.
   rows, clue cards and memo flags to the real Voltorb too, one consistent sprite everywhere". The
   indigo orb (`ORB`), the burst geometry and the orb-core burst are deleted. They are the GPL-3.0 sprites from samualtnorman/voltorb-flip, shipped with their
   `LICENSE` and `NOTICE.md`; the creature belongs to Nintendo, Game Freak and Creatures Inc. and is
-  shown in an unofficial non-commercial fan recreation. The ten files are preloaded when the game
+  shown in an unofficial non-commercial fan recreation. The eleven images are preloaded when the game
   mounts, and the images carry `draggable={false}` and `SPRITE_NO_GRAB_STYLE` (no iOS long-press
   Save Image sheet, no selection). The burst frames grow from 22 px to 64 px
   with the Voltorb baked into the middle at one fixed pixel size, so each frame is scaled by the
   same factor as the 22 px tile sprite (`explodeFrameCssSize` on the board; native size in the
   banner) and the baked Voltorb lands exactly on the face underneath. The legend's looping burst
-  is scaled by box/64 for every frame instead, so it stays inside its box and never spills onto the
+  holds the bare icon for a pause, then plays only explode_3 to explode_8 (explode_0 to explode_2 are
+  opaque 22 px tile frames with no transparency, which would cover the icon with a salmon square),
+  hiding the static icon while a frame shows, and scales every frame by box/64 instead, so it stays inside its box and never spills onto the
   text beside the card or into the modal's scroll clip;
   `original-art.test.tsx` pins the paths, the native sizes (read from the PNG headers) and that
   scaling, and `voltorb-everywhere.test.tsx` pins every call site. There are two sprite files for the
@@ -914,7 +916,7 @@ current tree on 2026-07-07.
   `art/frames.tsx`. The game keeps its CSS look and the "Super
   Voltorb Flip" name, and shows an unofficial-fan-recreation disclaimer in the About credits and
   in the How to play modal, which now also say the Voltorb sprites and the music are the originals.
-  `__tests__/assets-guard.test.ts` is an explicit allowlist of exactly the restored files (ten
+  `__tests__/assets-guard.test.ts` is an explicit allowlist of exactly the restored files (eleven
   sprites, the sprites `LICENSE` and `NOTICE.md`, the four audio files, the three kept CC0 tracks):
   any other image or audio file, any `sprites/upstream` path, any `sfx` folder, any asset-prep
   script, and any audio outside this game's `audio/` and `music/` folders (Tower Stacker relies on

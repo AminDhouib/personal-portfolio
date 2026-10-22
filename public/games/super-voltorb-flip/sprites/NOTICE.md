@@ -20,4 +20,4 @@ tile) and `tile/explode_0.png` to `tile/explode_8.png` (the bomb burst). The num
 coin and button sprites of the original set are not shipped. The original music is credited in
 `../music/CREDITS.md`.
 
-`voltorb-icon.png` is `tile/voltorb.png` with the tile background made transparent.
+`voltorb-icon.png` is `tile/voltorb.png` with the tile background made transparent, cropped to the Voltorb's 16x16 bounding box.
