@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
-import { render, cleanup, fireEvent, act } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent, act } from "@testing-library/react";
 
 // Pins the tile wrapper's class list. The anxious modifier used to be glued to
 // the perspective utility with no separator, which left the shake CSS
@@ -71,7 +71,9 @@ describe("tile wrapper classes", () => {
     expect(idle.classList.contains("svf-tile-anxious")).toBe(false);
 
     fireEvent.click(idle);
-    const held = firstButton(RISKY_TILE);
+    // After the click the tile's accessible name no longer comes from an aria-label or its text, so
+    // this lookup keeps the role query (one scan).
+    const held = screen.getByRole("button", { name: RISKY_TILE });
     expect(held.classList.contains("[perspective:1000px]")).toBe(true);
     expect(held.classList.contains("svf-tile-anxious")).toBe(true);
     expect(held.className).not.toContain("]svf-tile-anxious");
