@@ -1,0 +1,5 @@
+Home page https://amindhou.com/ loaded, waited 75 s (page clock 75.4 s at click), opened the chat widget. No message typed or sent.
+PerformanceResourceTiming responseStatus for /api/copilotkit (POST per network capture, ids 78896.508 and .509):
+ 1) start 75986 ms  status 200
+ 2) start 76454 ms  status 200
+Screenshot chat-open-3-chips.png: chips "What has Amin built?", "Is Amin available for hire?", "How do I book a call with Amin?".
