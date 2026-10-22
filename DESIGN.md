@@ -1365,16 +1365,19 @@ The following Password Game 2 entries were verified against the current tree on 
   Hextris over 2 hours); it cannot catch moderate inflation on a long run, and
   it is not meant to. Do not "fix" it by adding client signatures or telemetry: nothing in the
   browser is secret from the player.
-- **The arcade board does not report a network-level fetch failure.** The read and submit catches in
-  `src/hooks/use-arcade-board.ts` skip `reportError` for a `TypeError` that looks like "the request
-  never got a response" (`Failed to fetch`, `NetworkError ...`, `Load failed`, `Network request
-failed`). `reportError` reaches `window.onerror`, so Sentry filed a visitor's offline or ad-blocked
-  request as an unhandled error (PORTFOLIO-V); the board already degrades (a read error, `{ ok:
-false }`), so the event was only noise. Still reported: timeouts and aborts, any other thrown
-  error, and any `TypeError` with a different message (a parsing bug); HTTP errors never throw and
-  are handled by status. A real origin outage normally arrives as a 5xx through Cloudflare, not as a
-  network `TypeError`, and Uptimely covers uptime, so this hides no signal. Do not widen the match to
-  every `TypeError`.
+- **The arcade board and the lead collector do not report a network-level fetch failure.**
+  `isNetworkFailure` (`src/lib/network-failure.ts`) is true for a `TypeError` that looks like "the
+  request never got a response" (`Failed to fetch`, `NetworkError ...`, `Load failed`, `Network
+request failed`). The read and submit catches in `src/hooks/use-arcade-board.ts` and the POST
+  catch in `src/hooks/use-lead-collector-action.ts` skip `reportError` for it. `reportError`
+  reaches `window.onerror`, so Sentry filed a visitor's offline or ad-blocked request as an
+  unhandled error (PORTFOLIO-V); both callers already degrade visibly (the board shows a read error
+  or `{ ok: false }`, and the lead path still returns `{ ok: false }`, so the visitor is told the
+  lead did not send), so the event was only noise. Still reported: timeouts and aborts, any other
+  thrown error, and any `TypeError` with a different message (a parsing bug); HTTP errors never
+  throw and are handled by status. A real origin outage normally arrives as a 5xx through
+  Cloudflare, not as a network `TypeError`, and Uptimely covers uptime, so this hides no signal. Do
+  not widen the match to every `TypeError`.
 - **Arcade player ids are client-generated (trust on first use).** There are no accounts. The
   token protects an id from being taken over after its first submit; it does not stop one person
   minting many ids. A cleared browser starts a new player. Both are accepted for a portfolio
