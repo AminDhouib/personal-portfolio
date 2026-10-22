@@ -7,6 +7,7 @@ import type { z } from "zod";
 import type { BoardPeriod } from "@/lib/arcade/boards";
 import type { ARCADE_GAMES, ArcadeGameSlug } from "@/lib/arcade/games";
 import { getIdentity, peekIdentity, resetIdentity } from "@/lib/arcade/identity";
+import { isNetworkFailure } from "@/lib/network-failure";
 
 /** One leaderboard row as the games render it. */
 export interface ArcadeBoardEntry {
@@ -219,19 +220,6 @@ async function readJsonBody(res: Response): Promise<Record<string, unknown>> {
     // silent-ok: an empty or non-JSON error body is fully described by its status code
     return {};
   }
-}
-
-/**
- * A fetch that never got a response (offline, an ad blocker or a firewall dropping the request).
- * Browsers throw a TypeError whose text differs by engine. Both callers already degrade to a read
- * error / { ok: false }; reporting it via the global reportError reached window.onerror and
- * Sentry as an unhandled "Failed to fetch" for something the visitor's network caused.
- */
-function isNetworkFailure(err: unknown): boolean {
-  return (
-    err instanceof TypeError &&
-    /failed to fetch|networkerror|load failed|network request failed/i.test(err.message)
-  );
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import { useCopilotAction } from "@copilotkit/react-core";
 import { trackLeadSubmitted } from "@/lib/lead-analytics";
+import { isNetworkFailure } from "@/lib/network-failure";
 
 export interface LeadCollectorArgs {
   name: string;
@@ -34,7 +35,9 @@ export async function submitLead(
     });
     ok = res.ok;
   } catch (err) {
-    reportError(err);
+    // A blocked or offline request is the visitor's network, not a bug; the caller still tells the
+    // visitor the lead did not send (ok: false).
+    if (!isNetworkFailure(err)) reportError(err);
     return { ok: false };
   }
   // Outside the try: only a lead the server accepted is reported, and analytics (which never
