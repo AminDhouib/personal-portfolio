@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { COPILOT_TOOL_DEFINITIONS } from "@/lib/copilot-envelope";
 
 const mockHandleRequest = vi.hoisted(() => vi.fn());
 const mockCreateOpenAI = vi.hoisted(() => vi.fn((_options: unknown) => ({ chat: vi.fn() })));
@@ -255,14 +256,35 @@ describe("POST /api/copilotkit: cost bounds (T-5525)", () => {
 
     const forwarded = (await firstForwarded().json()) as ReturnType<typeof runBody>;
     expect(forwarded.body.messages).toEqual([{ id: "1", role: "user", content: "hi" }]);
-    expect(forwarded.body.tools).toEqual([
-      { name: "collectLead", description: "Collect a lead", parameters: {} },
-    ]);
+    // The registered tool is the server's own copy, not what the client wrote.
+    expect(forwarded.body.tools).toEqual([COPILOT_TOOL_DEFINITIONS.collectLead]);
     expect(forwarded.params).toEqual({ agentId: "default" });
     // Something was dropped, so it is logged once (names only, never the message text).
     expect(mockLogWarn).toHaveBeenCalledOnce();
     expect(JSON.stringify(mockLogWarn.mock.calls[0])).toContain("runShell");
     expect(JSON.stringify(mockLogWarn.mock.calls[0])).not.toContain("general assistant");
+  });
+
+  it("never lets a client-chosen regex in a tool schema reach the runtime (T-6364)", async () => {
+    mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
+    const envelope = runBody({
+      tools: [
+        {
+          name: "collectLead",
+          description: "Collect a lead",
+          parameters: {
+            type: "object",
+            properties: { name: { type: "string", pattern: "^(a+)+$" } },
+          },
+        },
+      ],
+    });
+
+    await POST(makeRawReq(JSON.stringify(envelope), "10.31.0.20"));
+
+    const sent = await firstForwarded().text();
+    expect(sent).not.toContain("(a+)+");
+    expect(sent).toContain("collectLead");
   });
 
   it("strips control characters from a dropped tool name before logging it", async () => {
