@@ -49,7 +49,13 @@ export const config = {
   // before the route handler runs, which would defeat the tunnel's read deadlines. The proxy does
   // nothing the tunnel needs (no PostHog path, and the tunnel is POST-only so no page duplicate);
   // `/monitoring/` still runs and gets its slashless 308.
+  // `api/.*[^/]$` skips API routes for the same reason (T-5526): the proxy clones the request
+  // body into memory before the route's own origin, rate-limit and body-cap guards run, and API
+  // routes need nothing else from it (no PostHog path lives under /api; the one thing it would do,
+  // the slashless 308, is only wanted for the slash form). So only an /api path that does NOT end
+  // in a slash skips it: `/api/leads/` still runs and still gets its 308, and a bare `/api` or a
+  // lookalike (`/apix`) is unaffected.
   matcher: [
-    "/((?!_next/static|_next/image|monitoring$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|woff2?|map|webmanifest)$).*)",
+    "/((?!_next/static|_next/image|monitoring$|api/.*[^/]$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|woff2?|map|webmanifest)$).*)",
   ],
 };
