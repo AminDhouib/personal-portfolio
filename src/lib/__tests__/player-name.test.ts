@@ -98,4 +98,76 @@ describe("sanitizePlayerName", () => {
       );
     });
   });
+
+  // T-6413. These characters draw nothing (or only a blank cell) but are not whitespace to
+  // String.prototype.trim and were not in the stripped set, so a name made of them was stored and
+  // rendered as an empty-looking leaderboard row.
+  describe("invisible fillers that are not whitespace", () => {
+    const FILLERS: Array<[string, string]> = [
+      ["U+00AD soft hyphen", "\u00ad"],
+      ["U+115F Hangul choseong filler", "\u115f"],
+      ["U+1160 Hangul jungseong filler", "\u1160"],
+      ["U+2060 word joiner", "\u2060"],
+      ["U+2061 function application", "\u2061"],
+      ["U+2062 invisible times", "\u2062"],
+      ["U+2063 invisible separator", "\u2063"],
+      ["U+2064 invisible plus", "\u2064"],
+      ["U+2800 braille pattern blank", "\u2800"],
+      ["U+3164 Hangul filler", "\u3164"],
+      ["U+FFA0 halfwidth Hangul filler", "\uffa0"],
+    ];
+
+    it.each(FILLERS)("a name of only %s gives the fallback", (_label, ch) => {
+      expect(sanitizePlayerName(ch, { maxLength: 16, fallback: "Pilot" })).toBe("Pilot");
+      expect(sanitizePlayerName(ch.repeat(12), { maxLength: 16, fallback: "Anonymous" })).toBe(
+        "Anonymous",
+      );
+      expect(
+        sanitizePlayerName(" " + ch + " \u200b" + ch, { maxLength: 16, fallback: "Pilot" }),
+      ).toBe("Pilot");
+    });
+
+    it.each(FILLERS)("%s is removed from a name that has visible letters", (_label, ch) => {
+      const opts = { maxLength: 16, fallback: "Pilot" };
+      expect(sanitizePlayerName("Ada" + ch, opts)).toBe("Ada");
+      expect(sanitizePlayerName(ch + "Ada", opts)).toBe("Ada");
+      expect(sanitizePlayerName("A" + ch + "da", opts)).toBe("Ada");
+    });
+
+    it("gives the fallback for a mix of all of them", () => {
+      const all = FILLERS.map(([, ch]) => ch).join("");
+      expect(sanitizePlayerName(all, { maxLength: 16, fallback: "Pilot" })).toBe("Pilot");
+    });
+  });
+
+  describe("variation selectors", () => {
+    const first = Array.from({ length: 16 }, (_, i) => String.fromCharCode(0xfe00 + i));
+    const supplement = [0xe0100, 0xe0101, 0xe01ef].map((cp) => String.fromCodePoint(cp));
+
+    it("a name of only variation selectors gives the fallback", () => {
+      const opts = { maxLength: 16, fallback: "Pilot" };
+      for (const selector of [...first, ...supplement]) {
+        expect(sanitizePlayerName(selector, opts)).toBe("Pilot");
+        expect(sanitizePlayerName(" " + selector + selector + " ", opts)).toBe("Pilot");
+      }
+      expect(sanitizePlayerName(first.join("") + supplement.join(""), opts)).toBe("Pilot");
+    });
+
+    it("a name of selectors and the other invisibles together gives the fallback", () => {
+      const mixed = "\ufe0f\u3164\u2800\u00ad\ufe0e\u{e0100}\u1160 \u200b";
+      expect(sanitizePlayerName(mixed, { maxLength: 16, fallback: "Pilot" })).toBe("Pilot");
+    });
+
+    it("decides emptiness after the length cut, so padding cannot push the letters out", () => {
+      // 16 selectors then a name: the cut keeps only the selectors, which render as nothing.
+      const padded = "\ufe0f".repeat(16) + "Ada";
+      expect(sanitizePlayerName(padded, { maxLength: 16, fallback: "Pilot" })).toBe("Pilot");
+    });
+
+    it("still keeps the selector inside a name that has visible content", () => {
+      expect(sanitizePlayerName("Ada \u2764\ufe0f", { maxLength: 16, fallback: "Pilot" })).toBe(
+        "Ada \u2764\ufe0f",
+      );
+    });
+  });
 });
