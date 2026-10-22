@@ -657,6 +657,19 @@ const Gameboard = ({
   // and gates handleFlip so no other tap can land while it's playing.
   const [warningTile, setWarningTile] = useState<{ row: number; col: number } | null>(null);
   const warningTileRef = useRef<{ row: number; col: number } | null>(null);
+  // The Daily board saves a flip when it commits. A risk hold that is still pending when the board
+  // unmounts (Back to the game) is saved here, at once, so leaving cannot undo a warned tile: the
+  // timer that would have committed it is cleared with the component. Storage only, no state.
+  const dailyRef = useRef(daily);
+  useEffect(() => {
+    dailyRef.current = daily;
+  });
+  useEffect(() => {
+    return () => {
+      const held = warningTileRef.current;
+      if (held) dailyRef.current?.onFlipped(held.row, held.col);
+    };
+  }, []);
   // Keyboard cursor: the tile that holds the single tab stop. Real DOM focus
   // follows it, so the :focus-visible ring is the on-screen cursor.
   const [cursor, setCursor] = useState<Cursor>({ row: 0, col: 0 });

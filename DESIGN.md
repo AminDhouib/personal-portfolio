@@ -825,7 +825,13 @@ current tree on 2026-07-07.
   (T-6453): a timer left armed past unmount ran after a test environment was torn down and threw
   "window is not defined" from react-dom, failing a whole vitest run although every test passed. A
   `sleep` pending at unmount is never resolved, so the async round-end chain simply stops, like
-  `waitForUserInteraction` already did. Pinned in `unmount-timers.test.tsx`.
+  `waitForUserInteraction` already did. The reveal, the fold-down, the payout drain and the level
+  flash are pinned in `unmount-timers.test.tsx`. The risk-warning release is the one timer whose work
+  must not be lost: on the Daily board it is what saves a warned flip, and "Back to the game" stays
+  clickable during the hold, so the board's unmount cleanup saves that pending flip itself (storage
+  only, through `daily.onFlipped`, no state and no timer) before the timer is dropped. Leaving
+  mid-hold therefore still counts the tile and re-entering replays it, as when the timer outlived the
+  unmount (the "one counted attempt per device" entry); pinned in `daily-risk-hold-unmount.test.tsx`.
   The wait ignores keys whose target is a text field (`game/text-entry.ts` `isTextEntryTarget`), so the AI
   chat can be typed in while a banner is up. The banner wording lives in `round-result-copy.ts`
   (original text; paraphrase, never Nintendo's strings) and keeps the reserved height, 72px below
