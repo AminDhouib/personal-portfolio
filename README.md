@@ -89,16 +89,7 @@ The site is self-hosted via [Dokploy](https://dokploy.com/) (Docker) on a home s
 
 This exists because Dokploy's built-in GitHub `autoDeploy` webhook **cannot** work here: the Dokploy panel is reachable only over Tailscale, and GitHub's servers can't reach into the tailnet to deliver a webhook. Instead, the GitHub Actions runner joins the tailnet itself and pushes the deploy trigger from inside it.
 
-**Manual deploy fallback**, from a machine on the tailnet:
-
-```bash
-curl -sf -X POST "$DOKPLOY_URL/api/application.deploy" \
-  -H "x-api-key: $DOKPLOY_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"applicationId":"9ZeLiZVLfBtm0OwzIWBxI"}'
-```
-
-or use the "Deploy" button in the Dokploy panel directly.
+**Manual deploy fallback**, from a machine on the tailnet: deploy the compose service (id `hnV_k4WYHOmodXzsvQeDk`, via `compose.deploy` or its "Deploy" button in the Dokploy panel). The full procedure is in [RUNBOOK.md](RUNBOOK.md)'s Deploy section. Do not use the old standalone application: it has no domain and crashes on boot.
 
 **Verifying a deploy.** Check the deployment list in Dokploy for the new commit hash with status `done` (build takes roughly 45s), then spot-check [amindhou.com](https://amindhou.com).
 
