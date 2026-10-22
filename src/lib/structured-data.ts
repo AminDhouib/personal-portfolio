@@ -16,10 +16,14 @@ type JsonLdNode = Record<string, unknown>;
 /**
  * JSON for a `<script type="application/ld+json">` body. `<` is escaped so no
  * string in the payload can close the script tag (the Next.js JSON-LD guide's
- * recommended sanitization).
+ * recommended sanitization). U+2028 and U+2029 are escaped too: JSON allows them raw but older
+ * JavaScript string literals do not, so a consumer that evaluates the payload would break on them.
  */
 export function serializeJsonLd(data: unknown): string {
-  return JSON.stringify(data).replace(/</g, "\\u003c");
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 export function graph(...nodes: JsonLdNode[]): JsonLdNode {
