@@ -19,28 +19,32 @@ export default defineConfig({
     // without the exclude their in-progress test files leak into root runs.
     // e2e/ holds the Playwright suites: they need a running server and a real
     // browser, and run through `pnpm test:e2e`, never vitest.
-    //
-    // *.perf.test.ts hold wall-clock budgets and run only in the "perf" project below.
-    exclude: [
-      ...configDefaults.exclude,
-      "**/.next/**",
-      "**/.claude/**",
-      "e2e/**",
-      "**/*.perf.test.ts",
-    ],
+    exclude: [...configDefaults.exclude, "**/.next/**", "**/.claude/**", "e2e/**"],
     // Two projects. "unit" is every test file, run in parallel (`pnpm test`, `pnpm test:coverage`).
     // "perf" is the files whose assertions are milliseconds on the wall clock: run alone, one
     // worker, after the unit run (`pnpm test:perf`), because a wall-clock budget cannot hold
     // while hundreds of other test files compete for the same cores (T-6247). The scripts name
     // the project, so a bare `vitest run` would run both at once; do not use it for the gate.
     projects: [
-      { extends: true, test: { name: "unit" } },
+      // *.perf.test.ts hold wall-clock budgets and run only in the "perf" project.
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          exclude: [
+            ...configDefaults.exclude,
+            "**/.next/**",
+            "**/.claude/**",
+            "e2e/**",
+            "**/*.perf.test.ts",
+          ],
+        },
+      },
       {
         extends: true,
         test: {
           name: "perf",
           include: ["**/*.perf.test.ts"],
-          exclude: [...configDefaults.exclude, "**/.next/**", "**/.claude/**", "e2e/**"],
           fileParallelism: false,
           maxWorkers: 1,
         },
