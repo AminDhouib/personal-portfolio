@@ -1022,7 +1022,12 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   input, so `resume`, `state` and `forwardedProps` (300 KB of it) were read from it past every check
   here. The `state` and `forwardedProps` caps had this hole before this change, including in prod
   (ef0dd228); `context` and `tools` are safe because the runtime defaults them. It is rejected, not
-  stripped; `constructor` and `prototype` keys stay legal, they copy as ordinary own properties.
+  stripped (a unicode-escaped spelling parses to the same key, so the parsed object is walked, never
+  the text); `constructor` and `prototype` keys stay legal, they copy as ordinary own properties.
+  The same walk caps nesting at depth 32 (400 "nested too deeply"; the site's deepest real request
+  is 7): `JSON.stringify`, behind every size measurement, overflows the stack on a few thousand
+  levels, a 10 KB body, which used to escape the route as an unhandled 500. A throw from the
+  measurements is mapped to 400 as a backstop.
   Re-check the method list against the client on a CopilotKit upgrade (`route.integration.test.ts`
   runs the real runtime).
 - **Chat errors never reach the visitor verbatim** (T-5532, `src/lib/copilot-error-sanitizer.ts`).

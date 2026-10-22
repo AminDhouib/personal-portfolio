@@ -66,6 +66,16 @@ export const COPILOT_MAX_STATE_CHARS = 8000;
 export const COPILOT_MAX_FORWARDED_PROPS_CHARS = 2000;
 
 /**
+ * How deeply the envelope may nest (the envelope itself is depth 1, its body 2). The deepest thing
+ * the site's own client sends, a tool definition (envelope > body > tools > tool > parameters >
+ * properties > property) or an assistant tool call (envelope > body > messages > message >
+ * toolCalls > call > function), is 7 deep; 32 is more than four times that. It exists because
+ * JSON.stringify, which every size measurement below uses, overflows the call stack on a few
+ * thousand levels ("[[[...]]]" is a 10 KB body), and the byte cap does not stop that.
+ */
+export const COPILOT_MAX_DEPTH = 32;
+
+/**
  * The single-route methods the site's own client sends (CopilotKit 1.77, `useSingleEndpoint`):
  *   - `info` when the provider mounts;
  *   - `agent/connect` when CopilotChat mounts (it replays a thread's history; none exists here);
@@ -132,29 +142,32 @@ function toolName(tool: unknown): string | null {
 }
 
 /**
- * True when any object anywhere in the parsed envelope has an own key named "__proto__".
- * JSON.parse keeps such a key as an ordinary own property, JSON.stringify writes it back out, and
- * the runtime's schema parse of the forwarded copy then makes it the prototype of the object it
- * validates, so a field the body did not carry itself (resume, state, forwardedProps) is read from
- * it and never passed through the checks below. It is walked with an explicit stack so that a body
- * nested hundreds of thousands of levels deep, which the 512 KiB cap still admits, cannot overflow
- * the call stack here.
+ * Walks the parsed envelope once, before anything is serialised, and names the first thing wrong:
+ * an object with an own key named "__proto__" at any depth, or nesting deeper than
+ * COPILOT_MAX_DEPTH. JSON.parse keeps a "__proto__" key as an ordinary own property (however it was
+ * spelled, including with unicode escapes, which is why this walks the parsed value and never the
+ * text), JSON.stringify writes it back out, and the runtime's schema parse of the forwarded copy
+ * then makes it the prototype of the object it validates, so a field the body did not carry itself
+ * (resume, state, forwardedProps) is read from it and never passed through the checks below. The
+ * walk uses an explicit stack, not recursion, so that no body the 512 KiB cap admits can overflow
+ * the call stack here; the depth bound is what keeps the later stringify calls safe too.
  */
-function hasProtoKey(root: unknown): boolean {
-  const stack: unknown[] = [root];
+function findForbidden(root: unknown): "proto" | "deep" | null {
+  const stack: Array<[unknown, number]> = [[root, 1]];
   while (stack.length > 0) {
-    const value = stack.pop();
+    const [value, depth] = stack.pop() as [unknown, number];
     if (typeof value !== "object" || value === null) continue;
+    if (depth > COPILOT_MAX_DEPTH) return "deep";
     if (Array.isArray(value)) {
-      for (const item of value) stack.push(item);
+      for (const item of value) stack.push([item, depth + 1]);
       continue;
     }
     for (const key of Object.keys(value)) {
-      if (key === "__proto__") return true;
-      stack.push((value as Record<string, unknown>)[key]);
+      if (key === "__proto__") return "proto";
+      stack.push([(value as Record<string, unknown>)[key], depth + 1]);
     }
   }
-  return false;
+  return null;
 }
 
 export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
@@ -162,7 +175,21 @@ export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
   // it out of console.error / reportError / PostHog: one bad request must not be one $exception.
   const envelope = safeJsonParse<unknown>(text, "copilotkit:envelope", null, () => undefined);
   if (!isRecord(envelope)) return { ok: false, status: 400, error: "invalid json" };
-  if (hasProtoKey(envelope)) return { ok: false, status: 400, error: "unsupported field" };
+  const forbidden = findForbidden(envelope);
+  if (forbidden === "proto") return { ok: false, status: 400, error: "unsupported field" };
+  if (forbidden === "deep") return { ok: false, status: 400, error: "nested too deeply" };
+
+  // Backstop: the route calls this outside any try/catch, so a throw from the size measurements
+  // (a stack overflow in JSON.stringify, were the depth bound ever bypassed) would be an unhandled
+  // 500 and a Sentry event per request. Any such throw is a client error here.
+  try {
+    return sanitizeParsed(envelope);
+  } catch {
+    return { ok: false, status: 400, error: "invalid body" };
+  }
+}
+
+function sanitizeParsed(envelope: Record<string, unknown>): EnvelopeResult {
 
   const { method } = envelope;
   if (typeof method !== "string" || !COPILOT_ALLOWED_METHODS.has(method)) {
