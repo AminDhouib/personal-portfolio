@@ -1,0 +1,1 @@
+09:12:18Z home, resource timings cleared, launcher el.click(), waited 15s: /api/copilotkit requests = 2 (both 200, 0 x 429). Chips visible: 'What has Amin built?', 'Is Amin available for hire?', 'How do I book a call with Amin?' (3, no duplicates). Console errors/warnings after open: none. Nothing typed.

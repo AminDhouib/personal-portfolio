@@ -1,0 +1,12 @@
+Prod main ef0dd228, 2026-10-22 ~06:55Z, desktop 1440, homepage scrolled to #contact, launcher (Amin AI) clicked via el.click(), nothing typed.
+Widget rendered: greeting + 6 suggestion chips (3 titles each shown twice: "What has Amin built?", "Is Amin available for hire?", "How do I book a call with Amin?") + input (see chat-open.png).
+Network, /api/copilotkit within ~5 s of opening (PerformanceResourceTiming, startTime 46254-51244 ms): 23 requests, 20 x 200, 3 x 429.
+Console errors (RED, expected none):
+ [CopilotKit] sendMessage error: HTTP 429: {"error":"too many requests"}
+ [CopilotKit] Error (agent_run_failed_event): HTTP 429 ...
+ Agent execution failed: Error: HTTP 429 ...
+ [CopilotKit] Error (agent_connect_failed): HTTP 429
+ Runtime answered the identification request with status 429 (/api/copilotkit/info)
+ [CopilotKit] Error (runtime_info_fetch_failed): status 429
+Console warn: THREE.Clock deprecated.
+Context: this browser shares egress IP 184.146.10.33 with the prod host and dev machine, other agents were also hitting prod, so the 429 may come from a shared per-IP bucket; not verified.
