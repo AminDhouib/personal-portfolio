@@ -1,0 +1,1 @@
+prod 64ce3c5e health uptime 532s at 09:10Z. /games/space-shooter loaded (canvas 1, Record+Play), Play clicked, mid-run screenshot at 5s run time (65 / 72m / 0 kills). Left by navigating away, no game over. /api/arcade/scores blocked via CDP as safety. Console errors 0; warn only: THREE.Clock deprecated.
