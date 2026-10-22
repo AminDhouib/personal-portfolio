@@ -887,7 +887,9 @@ current tree on 2026-07-07.
   Save Image sheet, no selection). The burst frames grow from 22 px to 64 px
   with the Voltorb baked into the middle at one fixed pixel size, so each frame is scaled by the
   same factor as the 22 px tile sprite (`explodeFrameCssSize` on the board; native size in the
-  legend and the banner) and the baked Voltorb lands exactly on the face underneath;
+  banner) and the baked Voltorb lands exactly on the face underneath. The legend's looping burst
+  is scaled by box/64 for every frame instead, so it stays inside its box and never spills onto the
+  text beside the card or into the modal's scroll clip;
   `original-art.test.tsx` pins the paths, the native sizes (read from the PNG headers) and that
   scaling, and `voltorb-everywhere.test.tsx` pins every call site. Icon boxes keep their exact size
   and draw the sprite at a whole multiple of its 22 px (`crispIconSize`: a 28 px box gets 22 px), the

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { CoinFrame, SparkleFrame } from "./art/frames";
 import { BURST_FRAMES, COIN_FRAMES, SPARKLE_FRAMES } from "./art/fx";
-import { crispIconSize } from "./art/original-sprites";
+import { EXPLODE_FRAME_MAX_PX, EXPLODE_FRAME_PX, crispIconSize } from "./art/original-sprites";
 import { ExplodeFrameImg, VoltorbSprite } from "./art/voltorb-sprite";
 
 // ---------------------------------------------------------------------------
@@ -83,15 +83,21 @@ function LoopingFrames({
 }
 
 // The legend and modal draw the original burst frames over a card that already shows the sprite.
-// Each frame is at its native pixel size, so the Voltorb baked into it is the icon's 22 px sprite
-// exactly, and the larger frames overflow the box (it is only the layout footprint).
+// Every frame is scaled by size/64 (64 px is the largest frame), so the burst stays proportional
+// and never leaves its box: it must not spill onto the text beside the card or get clipped by the
+// modal's scroll container. That shrinks the Voltorb baked into the frames, which is fine here.
 export const LoopingExplosion = ({ size }: { size: number }) => (
   <LoopingFrames
     count={BURST_FRAMES}
     size={size}
     interval={70}
     pauseMs={500}
-    render={(f) => <ExplodeFrameImg frame={f} />}
+    render={(f) => (
+      <ExplodeFrameImg
+        frame={f}
+        cssSize={`${(((EXPLODE_FRAME_PX[f] ?? 0) * size) / EXPLODE_FRAME_MAX_PX).toFixed(2)}px`}
+      />
+    )}
   />
 );
 
