@@ -100,7 +100,7 @@ describe("revealed Voltorb tile", () => {
         await act(async () => {
           await vi.advanceTimersByTimeAsync(3000);
         });
-        revealed = screen.queryByRole("button", { name: /revealed, Voltorb$/ });
+        revealed = screen.queryAllByRole("button", { name: /revealed, Voltorb$/ })[0] ?? null;
       }
     }
     expect(revealed, "no Voltorb was revealed on the seeded board").not.toBeNull();
