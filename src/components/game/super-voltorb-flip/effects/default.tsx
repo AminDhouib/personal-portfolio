@@ -3,11 +3,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { EffectProps, EffectTheme } from ".";
 import { SparkleFrame } from "../art/frames";
 import { BURST_FRAMES, SPARKLE_FRAMES } from "../art/fx";
-import {
-  EXPLODE_FRAME_SRCS,
-  SPRITE_NO_GRAB_STYLE,
-  explodeFrameCssSize,
-} from "../art/original-sprites";
+import { explodeFrameCssSize } from "../art/original-sprites";
+import { ExplodeFrameImg } from "../art/voltorb-sprite";
 
 // Both overlays sit centred over the revealed tile and overflow its edges. The
 // Voltorb stays visible underneath (the tile's own face); the burst frames carry
@@ -34,27 +31,7 @@ function ExplosionSprite({ onDone }: EffectProps) {
   }, [frame, onDone]);
   // The original frames grow from the tile's size to well past the cell, so the blast radius
   // extends past it; each frame is sized from its native pixels (explodeFrameCssSize).
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- original pixel-art frames, scaled with CSS and never optimized
-    <img
-      src={EXPLODE_FRAME_SRCS[frame]}
-      alt=""
-      draggable={false}
-      style={{
-        ...SPRITE_NO_GRAB_STYLE,
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-        width: explodeFrameCssSize(frame),
-        height: explodeFrameCssSize(frame),
-        maxWidth: "none",
-        maxHeight: "none",
-        imageRendering: "pixelated",
-        pointerEvents: "none",
-      }}
-    />
-  );
+  return <ExplodeFrameImg frame={frame} cssSize={explodeFrameCssSize(frame)} />;
 }
 
 function SparkleSprite({ onDone }: EffectProps) {

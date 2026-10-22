@@ -2,8 +2,8 @@
 // the revealed-tile Voltorb and the nine bomb-burst frames. They are the cartridge sprites
 // from an open-source recreation (GPL-3.0; its LICENSE and NOTICE.md ship beside them); the
 // creature belongs to Nintendo, Game Freak and Creatures Inc., shown in an unofficial
-// non-commercial fan recreation. Only these two uses load an image: the orb in the legend, on
-// the clue cards and in the memo flags is still the inline sprite in sprites.ts.
+// non-commercial fan recreation. They are the game's one Voltorb: every place that shows the
+// hazard draws them (voltorb-sprite.tsx); the memo digits and marks stay inline SVG (sprites.ts).
 
 import { BURST_FRAMES } from "./fx";
 
@@ -44,6 +44,15 @@ export const VOLTORB_TILE_PX = 22;
  * around it, so one native pixel must be the same size in every frame.
  */
 export const EXPLODE_FRAME_PX: readonly number[] = [22, 22, 22, 34, 42, 56, 60, 62, 64];
+
+/**
+ * The size to draw the sprite at inside an icon box of `box` px: a whole multiple of the 22 px
+ * art (never below 1x), so every source pixel lands on whole screen pixels. 28 px boxes get 22,
+ * 44 px boxes get 44.
+ */
+export function crispIconSize(box: number): number {
+  return Math.max(VOLTORB_TILE_PX, VOLTORB_TILE_PX * Math.floor(box / VOLTORB_TILE_PX));
+}
 
 /** How much of the tile the revealed Voltorb sprite fills. */
 export const VOLTORB_FACE_SCALE = 0.95;

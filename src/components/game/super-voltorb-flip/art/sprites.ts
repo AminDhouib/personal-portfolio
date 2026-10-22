@@ -1,34 +1,14 @@
-// Original pixel art for Super Voltorb Flip, drawn as text. One character is
-// one pixel; "." is transparent. PixelSprite renders a sprite as inline SVG,
-// so nothing here is a binary asset and nothing is copied from any game.
-// The orb is our own design (an indigo sphere with a lightning bolt), not the
-// Pokemon creature. To redraw it, edit the strings and keep the grid size.
+// Pixel glyphs for Super Voltorb Flip, drawn as text: the memo digits and the clear and undo
+// marks. One character is one pixel; "." is transparent. PixelSprite renders a sprite as inline
+// SVG, so nothing here is a binary asset. The Voltorb itself is not drawn here: it is the
+// original sprite (voltorb-sprite.tsx, original-sprites.ts). To redraw a glyph, edit the strings
+// and keep the grid size.
 
 export type Sprite = readonly string[];
 
 export const PALETTE: Record<string, string> = {
-  o: "#16213e", // outline
-  d: "#2b3f8f", // shadow side
-  b: "#3e63d8", // body
-  h: "#8fb4ff", // highlight
-  y: "#ffc933", // bolt
-  w: "#fff3b0", // bolt core
   k: "currentColor", // glyph ink: takes the surrounding CSS colour
 };
-
-export const ORB: Sprite = [
-  "...ooooo...",
-  "..ohhbbbo..",
-  ".ohhbbywbo.",
-  ".ohbbywbbo.",
-  "ohbyywwybdo",
-  "obbbbwybbdo",
-  "obbbwybbbdo",
-  ".obywbbbdo.",
-  ".obbbbbddo.",
-  "..odddddo..",
-  "...ooooo...",
-];
 
 export const GLYPH_1: Sprite = ["..k..", ".kk..", "..k..", "..k..", "..k..", "..k..", ".kkk."];
 
@@ -58,8 +38,8 @@ export const GLYPH_UNDO: Sprite = [
   "..kkk..",
 ];
 
-/** Sprite for each memo flag; "V" (Voltorb) is the orb itself. */
-export const GLYPHS = { 1: GLYPH_1, 2: GLYPH_2, 3: GLYPH_3, V: ORB } as const;
+/** Glyph for each digit memo flag. The "V" (Voltorb) flag is the original sprite, not a glyph. */
+export const GLYPHS = { 1: GLYPH_1, 2: GLYPH_2, 3: GLYPH_3 } as const;
 
 export interface Run {
   color: string;

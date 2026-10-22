@@ -1,17 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  BURST_BOX,
-  CORE_OFFSET,
-  CORE_SCALE,
-  SPARKLE_BOX,
-  burstRects,
-  coinHalfWidth,
-  sparkleRects,
-  type Rect,
-} from "./fx";
-import { ORB, spritePaths } from "./sprites";
-
-const ORB_PATHS = spritePaths(ORB);
+import { SPARKLE_BOX, coinHalfWidth, sparkleRects, type Rect } from "./fx";
 
 interface FrameSize {
   /** Pixel size; ignored when cssSize is given. */
@@ -55,31 +43,6 @@ function Rects({ rects }: { rects: Rect[] }) {
         <rect key={`${i}:${r.x}:${r.y}`} x={r.x} y={r.y} width={r.w} height={r.h} fill={r.fill} />
       ))}
     </>
-  );
-}
-
-/**
- * One frame of the bomb burst. `core` also draws the orb at the burst's centre,
- * for callers with no static orb underneath (the hub banner hides its orb while
- * the burst plays); in-game overlays leave it off because the revealed tile's
- * orb is already there.
- */
-export function BurstFrame({
-  frame,
-  core = false,
-  ...size
-}: FrameSize & { frame: number; core?: boolean }) {
-  return (
-    <Frame box={BURST_BOX} {...size}>
-      {core && (
-        <g transform={`translate(${CORE_OFFSET} ${CORE_OFFSET}) scale(${CORE_SCALE})`}>
-          {ORB_PATHS.map((p) => (
-            <path key={p.color} d={p.d} fill={p.color} />
-          ))}
-        </g>
-      )}
-      <Rects rects={burstRects(frame)} />
-    </Frame>
   );
 }
 
