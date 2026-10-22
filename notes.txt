@@ -1,0 +1,5 @@
+T-6535b / PR #175 headed proof, prod 3569f3cd, 2026-10-22 ~19:25Z, headed Chrome desktop, no session.
+Console: page-level hook (window error, unhandledrejection, console.error) installed before the first navigation, persisted in sessionStorage. Errors recorded: 0 across /games/super-voltorb-flip (board, How to play dialog, 2 rounds, memo flag) and /games.
+Network (PerformanceResourceTiming responseStatus): sprites/voltorb-icon.png 200; sprites/tile/voltorb.png 200; sprites/tile/explode_0..explode_8.png all 200 (on both the game page and the /games hub).
+Played: round 1 hit a Voltorb on my first flip (Row 3 Col 3) and lost, so the whole board revealed; Continue; round 2 flipped one safe tile (Row 5 Col 5 = 2), memo V flag set on Row 1 Col 1. No score or name submitted, no POST, Daily untouched.
+Overlays: none injected in this set; all screenshots are plain page captures. The *-zoom/montage PNGs are local nearest-neighbour crops of those captures.
