@@ -1,23 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-vi.mock("@/lib/log", () => ({
+// The real log module runs on purpose: mocking it would make "never reaches Sentry or PostHog"
+// pass whatever the code under test calls. Only the outermost sinks are replaced.
+vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
-  logWarn: vi.fn(),
-  logError: vi.fn(),
+  withScope: vi.fn((callback: (scope: { setTag: () => void }) => void) =>
+    callback({ setTag: vi.fn() }),
+  ),
 }));
 
-import { captureException, logWarn } from "@/lib/log";
+import * as Sentry from "@sentry/nextjs";
 import { checkRateLimit, getClientIp, isSameOrigin, resetRateLimitForTests } from "../rate-limit";
+
+let warnSpy: ReturnType<typeof vi.spyOn>;
+let errorSpy: ReturnType<typeof vi.spyOn>;
 
 // Module state (the bucket map, the missing-header warning throttle) must not leak between tests.
 beforeEach(() => {
   resetRateLimitForTests();
-  vi.mocked(logWarn).mockClear();
-  vi.mocked(captureException).mockClear();
+  vi.mocked(Sentry.captureException).mockClear();
+  warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  warnSpy.mockRestore();
+  errorSpy.mockRestore();
 });
 
 describe("checkRateLimit", () => {
@@ -269,38 +278,37 @@ describe("getClientIp", () => {
 
     it("logs a structured warning through logWarn when the header is missing in production", () => {
       getClientIp(noCf());
-      expect(logWarn).toHaveBeenCalledTimes(1);
-      const [scope, message, detail] = vi.mocked(logWarn).mock.calls[0] ?? [];
-      expect(scope).toBe("rate-limit");
-      expect(message).toMatch(/CF-Connecting-IP/);
-      expect(detail).toMatchObject({ fallback: "x-forwarded-for" });
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const line = String(warnSpy.mock.calls[0]?.[0]);
+      expect(line).toMatch(/^\[rate-limit\] .*CF-Connecting-IP/);
+      expect(line).toContain('{"fallback":"x-forwarded-for"}');
     });
 
     it("reports the fallback in use and never logs an address", () => {
       getClientIp(new Request("http://localhost/"));
-      expect(vi.mocked(logWarn).mock.calls[0]?.[2]).toMatchObject({ fallback: "unknown" });
+      expect(String(warnSpy.mock.calls[0]?.[0])).toContain('{"fallback":"unknown"}');
       vi.setSystemTime(1_000_000 + WARN_INTERVAL_MS);
       getClientIp(req({ "cf-connecting-ip": "not-an-ip", "x-forwarded-for": "198.51.100.5" }));
-      expect(logWarn).toHaveBeenCalledTimes(2);
-      expect(JSON.stringify(vi.mocked(logWarn).mock.calls)).not.toContain("198.51.100.5");
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("198.51.100.5");
     });
 
     it("warns at most once per minute however many requests arrive", () => {
       for (let i = 0; i < 500; i++) getClientIp(noCf());
-      expect(logWarn).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
 
       vi.setSystemTime(1_000_000 + WARN_INTERVAL_MS - 1);
       getClientIp(noCf());
-      expect(logWarn).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
 
       vi.setSystemTime(1_000_000 + WARN_INTERVAL_MS);
       for (let i = 0; i < 500; i++) getClientIp(noCf());
-      expect(logWarn).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
     });
 
     it("does not warn when a valid CF-Connecting-IP is present", () => {
       getClientIp(req({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "198.51.100.5" }));
-      expect(logWarn).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it("does not warn outside production", () => {
@@ -308,19 +316,27 @@ describe("getClientIp", () => {
       getClientIp(noCf());
       vi.stubEnv("NODE_ENV", "test");
       getClientIp(noCf());
-      expect(logWarn).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it("never reaches Sentry or PostHog: no captureException", () => {
-      for (let i = 0; i < 5; i++) getClientIp(noCf());
-      expect(captureException).not.toHaveBeenCalled();
+    it("never reaches Sentry or PostHog: the real logger runs and only console.warn fires", () => {
+      vi.setSystemTime(1_000_000);
+      for (let i = 0; i < 5; i++) {
+        vi.setSystemTime(1_000_000 + i * WARN_INTERVAL_MS);
+        getClientIp(noCf());
+      }
+      expect(warnSpy).toHaveBeenCalledTimes(5);
+      // log.ts captureException logs through console.error AND calls Sentry; neither happened.
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+      expect(Sentry.withScope).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
     });
 
     it("starts a fresh throttle window after the module state is reset", () => {
       getClientIp(noCf());
       resetRateLimitForTests();
       getClientIp(noCf());
-      expect(logWarn).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
     });
   });
 });

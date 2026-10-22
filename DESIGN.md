@@ -62,8 +62,9 @@ this same engine (planned for T7-5); player code never runs on the server and no
 (`next.config.ts`, `playwright.config.ts` for its `E2E_*` variables, `src/instrumentation.ts`,
 `src/instrumentation-client.ts`, and `src/components/game/space-shooter.tsx` for `NODE_ENV`-gated
 dev-only affordances: an FPS overlay and a boss-cycle hotkey, not a schema-covered integration
-var), plus one line of `src/components/game/hextris.tsx` that reads `NODE_ENV` through a
-justified `eslint-disable-next-line` for its dev-only `?seed=` replay seam. Everywhere else,
+var), plus one line each of `src/components/game/hextris.tsx` (a dev-only `?seed=` replay seam)
+and `src/lib/rate-limit.ts` (the production-only diagnostic gate on the missing-`CF-Connecting-IP`
+warning) that read `NODE_ENV` through a justified `eslint-disable-next-line`. Everywhere else,
 `no-restricted-properties` bans reading `process.env` directly.
 
 ## Conventions in force
