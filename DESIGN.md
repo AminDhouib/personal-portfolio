@@ -891,11 +891,21 @@ current tree on 2026-07-07.
   is scaled by box/64 for every frame instead, so it stays inside its box and never spills onto the
   text beside the card or into the modal's scroll clip;
   `original-art.test.tsx` pins the paths, the native sizes (read from the PNG headers) and that
-  scaling, and `voltorb-everywhere.test.tsx` pins every call site. Icon boxes keep their exact size
-  and draw the sprite at a whole multiple of its 22 px (`crispIconSize`: a 28 px box gets 22 px), the
-  clue-card sprite stays on its tile-relative size, and the memo face keeps its size with the
-  sprite at 62% of it. The sprite file carries its own salmon square and dark border, so it reads
-  as a small tile on the clue cards and legend cards; that is the accepted look. Nothing else is a
+  scaling, and `voltorb-everywhere.test.tsx` pins every call site. There are two sprite files for the
+  Voltorb. `sprites/tile/voltorb.png` is the face-up TILE (22 px, salmon square and dark border):
+  the revealed board tile and the hub banner's bomb tile. `sprites/voltorb-icon.png` is the bare
+  body for every small icon (clue cards, legend cards, How to play icons, the memo V face and the
+  tile V memo corner flag, where a bare mark reads better than a tile inside a tile). It is
+  derived from the tile sprite, not new art: a 16 x 16 palette PNG with the tile's border and
+  face (the indices connected to the image edge, found by a 4-connected flood fill, so the
+  Voltorb's own outline and eye indices are untouched) remapped to one transparent `tRNS` index and
+  the image cropped to the body's box; the Voltorb pixels are identical to the source, with no
+  partial alpha. The first anti-aliased upstream `voltorb.png` (28 px RGBA, 145 colours) was
+  rejected as not pixel art. The icon is in the assets-guard allowlist with a comment citing the
+  "one consistent sprite everywhere" ruling. Icon boxes keep their exact size and draw the icon at
+  a whole multiple of its 16 px (`crispIconSize`: boxes under 32 px get 16, 36 and 44 px get 32),
+  the clue-card icon stays on its tile-relative size, and the memo face keeps its size with the
+  icon at 62% of it. Nothing else is a
   sprite image, on purpose, and a standing owner rule keeps it so: the CSS legend layout and colours,
   `CoinSpinner`, the chrome, the frames, the text labels and the other memo glyphs (1, 2, 3, the
   clear X and the undo arrow, `art/sprites.ts`, inline SVG through `PixelSprite`) never become

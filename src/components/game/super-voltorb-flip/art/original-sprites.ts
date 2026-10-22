@@ -11,6 +11,13 @@ const SPRITES = "/games/super-voltorb-flip/sprites/tile";
 
 export const VOLTORB_TILE_SRC = `${SPRITES}/voltorb.png`;
 
+/**
+ * The bare Voltorb body for the small icons (clue cards, legend, memo, How to play): the tile
+ * sprite with the salmon tile and its border made transparent, same pixels, 16 x 16. See
+ * sprites/NOTICE.md.
+ */
+export const VOLTORB_ICON_SRC = "/games/super-voltorb-flip/sprites/voltorb-icon.png";
+
 export const EXPLODE_FRAME_SRCS: readonly string[] = Array.from(
   { length: BURST_FRAMES },
   (_, i) => `${SPRITES}/explode_${i}.png`,
@@ -28,12 +35,15 @@ const preloaded: HTMLImageElement[] = [];
 /** Warm the ten sprite files into the HTTP cache so the first bomb of a visit does not stall frame by frame. */
 export function preloadOriginalSprites(): void {
   if (typeof Image === "undefined") return;
-  for (const src of [VOLTORB_TILE_SRC, ...EXPLODE_FRAME_SRCS]) {
+  for (const src of [VOLTORB_TILE_SRC, VOLTORB_ICON_SRC, ...EXPLODE_FRAME_SRCS]) {
     const img = new Image();
     img.src = src;
     preloaded.push(img);
   }
 }
+
+/** Native size (px, square) of the bare Voltorb icon. */
+export const VOLTORB_ICON_PX = 16;
 
 /** Native size (px, square) of the Voltorb tile sprite. */
 export const VOLTORB_TILE_PX = 22;
@@ -46,12 +56,12 @@ export const VOLTORB_TILE_PX = 22;
 export const EXPLODE_FRAME_PX: readonly number[] = [22, 22, 22, 34, 42, 56, 60, 62, 64];
 
 /**
- * The size to draw the sprite at inside an icon box of `box` px: a whole multiple of the 22 px
- * art (never below 1x), so every source pixel lands on whole screen pixels. 28 px boxes get 22,
- * 44 px boxes get 44.
+ * The size to draw the bare icon at inside an icon box of `box` px: a whole multiple of its 16 px
+ * art (never below 1x), so every source pixel lands on whole screen pixels. Boxes under 32 px get
+ * 16, 36 and 44 px boxes get 32.
  */
 export function crispIconSize(box: number): number {
-  return Math.max(VOLTORB_TILE_PX, VOLTORB_TILE_PX * Math.floor(box / VOLTORB_TILE_PX));
+  return Math.max(VOLTORB_ICON_PX, VOLTORB_ICON_PX * Math.floor(box / VOLTORB_ICON_PX));
 }
 
 /** The largest burst frame (px): the size a burst scaled to fit a box is scaled from. */

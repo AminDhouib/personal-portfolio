@@ -3,6 +3,7 @@ import {
   EXPLODE_FRAME_PX,
   EXPLODE_FRAME_SRCS,
   SPRITE_NO_GRAB_STYLE,
+  VOLTORB_ICON_SRC,
   VOLTORB_TILE_SRC,
 } from "./original-sprites";
 
@@ -13,13 +14,19 @@ import {
 // eslint-disable-next-line @next/next/no-img-element -- a 22 px pixel sprite, scaled with CSS and never optimized
 const Img = (props: ImgHTMLAttributes<HTMLImageElement>) => <img alt="" {...props} />;
 
-/** The Voltorb tile sprite at `size` px or a CSS length, crisp at any scale. */
+/**
+ * The Voltorb at `size` px or a CSS length, crisp at any scale. By default it is the whole
+ * face-up tile (salmon square and border); `variant="icon"` is the bare body on transparency,
+ * for the small icons.
+ */
 export function VoltorbSprite({
+  variant = "tile",
   size,
   cssSize,
   className,
   style,
 }: {
+  variant?: "tile" | "icon";
   size?: number;
   cssSize?: string;
   className?: string;
@@ -27,7 +34,7 @@ export function VoltorbSprite({
 }) {
   return (
     <Img
-      src={VOLTORB_TILE_SRC}
+      src={variant === "icon" ? VOLTORB_ICON_SRC : VOLTORB_TILE_SRC}
       draggable={false}
       className={className}
       style={{
