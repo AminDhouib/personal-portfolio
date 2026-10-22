@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logWarn } from "@/lib/log";
-import { safeJsonParseServer } from "@/lib/safe-json-server";
+import { safeJsonParse } from "@/lib/safe-json";
 import { guardRequest } from "@/lib/route-guard";
 
 export const runtime = "nodejs";
@@ -200,7 +200,15 @@ export async function POST(request: NextRequest) {
   // line is decoded; everything after it is forwarded untouched.
   const newline = body.indexOf(NEWLINE);
   const headerLine = new TextDecoder().decode(newline === -1 ? body : body.subarray(0, newline));
-  const header = safeJsonParseServer<{ dsn?: string }>(headerLine, "monitoring.envelope");
+  // A malformed header is a client error, not a server fault: report it as one bounded warning
+  // (no payload, no error text) instead of captureException, which would fan out into a PostHog
+  // $exception per hostile request.
+  const header = safeJsonParse<{ dsn?: string }>(headerLine, "monitoring.envelope", null, () => {
+    logWarn("monitoring", "malformed envelope header", {
+      cause: "bad-envelope-header",
+      bytes: body.byteLength,
+    });
+  });
   if (!header) {
     return NextResponse.json({ error: "invalid envelope" }, { status: 400 });
   }
