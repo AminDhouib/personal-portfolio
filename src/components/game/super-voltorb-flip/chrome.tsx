@@ -114,7 +114,7 @@ export const LegendVoltorb = ({
         <>
           <span
             style={{
-              display: "inline-flex",
+              display: "flex",
               visibility: frame === undefined ? "visible" : "hidden",
             }}
           >
