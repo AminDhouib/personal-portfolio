@@ -8,7 +8,8 @@ import { STATS_KEY, emptyStats, loadStats } from "../stats";
 import { fakeVV, restoreViewport } from "./phone-helpers";
 import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
-// These tests type a whole passage, one keystroke or frame per React render; see src/test/heavy.ts for why the 5 s default is not enough.
+// These tests render the whole Word Rain view in jsdom and drive it frame by frame, a React render per frame or keystroke;
+// see src/test/heavy.ts for why the 5 s default is not enough.
 vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 vi.mock("../engine/text", async (importOriginal) => ({

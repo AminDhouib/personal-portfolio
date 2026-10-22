@@ -48,6 +48,7 @@ obtain it, and the one emergency bypass.
 | `pnpm test`          | Run the test suite once                             |
 | `pnpm test:watch`    | Run tests in watch mode                             |
 | `pnpm test:coverage` | Run the test suite once with coverage               |
+| `pnpm test:perf`     | Run the wall-clock budgets (`*.perf.test.ts`) alone |
 
 ## Project structure
 
