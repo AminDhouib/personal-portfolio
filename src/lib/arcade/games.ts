@@ -115,10 +115,10 @@ function reject(reason: string): Verdict {
 
 // Run-length ceilings, enforced in the checks (the schemas keep the legacy 86_399 limit). The
 // score envelopes grow with the claimed seconds, and at a day-long claim 2 * rawMax sits above
-// ARCADE_SCORE_CAP, so no score was ever too high. Space Shooter's 2400 s (40 minutes) is the
-// longest run whose ceiling still lies below the cap at the maximum kills and distance the
-// other bounds allow; Hextris takes the same two hours as Tower Stacker (its quadratic envelope
-// stays above the cap for any long run, so length is the only bound it can add).
+// ARCADE_SCORE_CAP, so no score was ever too high. Space Shooter's 2400 s (40 minutes) is a round
+// bound below the 2699 s point where its envelope (kills 6s + 20, distance 2000 + 132s) first
+// reaches the cap (8_888_053 at 2400 s); Hextris takes the same two hours as Tower Stacker (its
+// quadratic envelope stays above the cap for any long run, so length is the only bound it can add).
 const SPACE_SHOOTER_MAX_SECONDS = 2_400;
 const HEXTRIS_MAX_SECONDS = 7_200;
 
