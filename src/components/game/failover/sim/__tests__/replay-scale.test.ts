@@ -25,6 +25,7 @@ describe("replay at the daily scale", () => {
     async () => {
       const log = recordRun();
       const endedLive = S.tick;
+      const liveHash = stateHash();
       expect(endedLive).toBeGreaterThanOrEqual(TICKS);
       expect(log.length).toBe(MAX_LOGGED_ACTIONS);
 
@@ -41,6 +42,7 @@ describe("replay at the daily scale", () => {
       );
 
       expect(result.endedAtTick).toBe(endedLive);
+      expect(result.hash).toBe(liveHash);
       // One yield between chunks, none after the last: the server's event loop is released every
       // CHUNK ticks, which is what the per-chunk budget in the perf test is about.
       expect(yields).toBe(Math.ceil(endedLive / CHUNK) - 1);

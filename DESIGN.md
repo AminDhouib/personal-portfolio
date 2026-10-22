@@ -88,7 +88,7 @@ style suggestions.
   (replay equals the live run, a save loads to the same state) is asserted in an ordinary test
   (`replay-scale.test.ts`). (2) A test that is CPU-bound by design (a whole game rendered in jsdom
   and played through a round, a 15 minute re-simulation) takes `CPU_BOUND_TEST_TIMEOUT_MS`
-  (`src/test/heavy.ts`, 30 s) with `vi.setConfig` in its file; the global 5 s default stays for
+  (`src/test/heavy.ts`, 60 s) with `vi.setConfig` in its file; the global 5 s default stays for
   everything else, and the constant's comment says why. (3) Do not look up buttons with
   `screen.getAllByRole("button", { name })[0]` in a helper or a loop on a big page: testing-library
   runs jsdom `matches()` against ~100 implicit-role selectors for every element, which was a third or more of

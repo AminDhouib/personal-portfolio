@@ -2,6 +2,9 @@ import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+// Shared by the root config and the unit project, so they cannot diverge.
+const BASE_EXCLUDE = [...configDefaults.exclude, "**/.next/**", "**/.claude/**", "e2e/**"];
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -19,7 +22,7 @@ export default defineConfig({
     // without the exclude their in-progress test files leak into root runs.
     // e2e/ holds the Playwright suites: they need a running server and a real
     // browser, and run through `pnpm test:e2e`, never vitest.
-    exclude: [...configDefaults.exclude, "**/.next/**", "**/.claude/**", "e2e/**"],
+    exclude: BASE_EXCLUDE,
     // Two projects. "unit" is every test file, run in parallel (`pnpm test`, `pnpm test:coverage`).
     // "perf" is the files whose assertions are milliseconds on the wall clock: run alone, one
     // worker, after the unit run (`pnpm test:perf`), because a wall-clock budget cannot hold
@@ -31,13 +34,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "unit",
-          exclude: [
-            ...configDefaults.exclude,
-            "**/.next/**",
-            "**/.claude/**",
-            "e2e/**",
-            "**/*.perf.test.ts",
-          ],
+          exclude: [...BASE_EXCLUDE, "**/*.perf.test.ts"],
         },
       },
       {
