@@ -29,6 +29,7 @@ import { theme } from "../effects/default";
 import {
   EXPLODE_FRAME_PX,
   EXPLODE_FRAME_SRCS,
+  SPRITE_NO_GRAB_STYLE,
   VOLTORB_FACE_SCALE,
   VOLTORB_TILE_PX,
   VOLTORB_TILE_SRC,
@@ -60,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
   window.localStorage.clear();
 });
@@ -112,6 +114,55 @@ describe("revealed Voltorb tile", () => {
     expect(revealed!.querySelector("svg.voltorb")).toBeNull();
     expect(container.querySelector("img")).not.toBeNull();
   });
+
+  it("cannot be dragged or saved, and a click on it still reaches the tile", async () => {
+    render(<SuperVoltorbFlipGame />);
+    let revealed: HTMLElement | null = null;
+    for (let row = 1; row <= 5 && !revealed; row++) {
+      for (let col = 1; col <= 5 && !revealed; col++) {
+        const tile = screen.queryByRole("button", { name: `Row ${row}, Col ${col}, face down` });
+        if (!tile) continue;
+        fireEvent.click(tile);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+        revealed = screen.queryAllByRole("button", { name: /revealed, Voltorb$/ })[0] ?? null;
+      }
+    }
+    const img = revealed!.querySelector<HTMLImageElement>("img.voltorb")!;
+    expect(img.getAttribute("draggable")).toBe("false");
+    expect(img.style.userSelect).toBe("none");
+    const reachedTile = vi.fn();
+    revealed!.addEventListener("click", reachedTile);
+    fireEvent.click(img);
+    expect(reachedTile).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sprite preload", () => {
+  it("requests the Voltorb tile and all nine explode frames when the game mounts", () => {
+    const requested: string[] = [];
+    vi.stubGlobal(
+      "Image",
+      class {
+        set src(value: string) {
+          requested.push(value);
+        }
+      },
+    );
+    render(<SuperVoltorbFlipGame />);
+    expect([...new Set(requested)].sort()).toEqual(
+      [VOLTORB_TILE_SRC, ...EXPLODE_FRAME_SRCS].sort(),
+    );
+  });
+});
+
+describe("sprite grab guard", () => {
+  it("suppresses the iOS long-press sheet and text selection", () => {
+    // jsdom drops the vendor-prefixed property from an element's style, so the shared object
+    // both sprite images spread is what is pinned.
+    expect(SPRITE_NO_GRAB_STYLE).toEqual({ WebkitTouchCallout: "none", userSelect: "none" });
+  });
 });
 
 describe("bomb burst", () => {
@@ -156,6 +207,8 @@ describe("bomb burst", () => {
     expect(img.getAttribute("alt")).toBe("");
     expect(img.style.imageRendering).toBe("pixelated");
     expect(img.style.pointerEvents).toBe("none");
+    expect(img.getAttribute("draggable")).toBe("false");
+    expect(img.style.userSelect).toBe("none");
   });
 
   it("leaves the success sparkle as inline SVG", () => {

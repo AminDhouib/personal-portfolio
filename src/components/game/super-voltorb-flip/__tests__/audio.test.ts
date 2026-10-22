@@ -9,12 +9,22 @@ class FakeAudio {
   volume = 1;
   muted = false;
   paused = true;
+  currentTime = 0;
+  preload = "";
+  /** Number of play() calls, and whether the element was muted at the last one. */
+  plays = 0;
+  mutedAtPlay = false;
+  /** The src it was created with: `src` changes when the intro hands over to the loop. */
+  readonly origSrc: string;
   private listeners = new Map<string, (() => void)[]>();
   constructor(src: string) {
     this.src = src;
+    this.origSrc = src;
     FakeAudio.all.push(this);
   }
   play() {
+    this.plays += 1;
+    this.mutedAtPlay = this.muted;
     this.paused = false;
     return Promise.resolve();
   }
@@ -33,6 +43,18 @@ class FakeAudio {
 }
 
 let ctx: FakeCtx;
+
+/** The background-music elements, in creation order (the jingle elements are not among them). */
+function musicEls(): FakeAudio[] {
+  return FakeAudio.all.filter((el) => /music_(intro|loop).mp3$/.test(el.origSrc));
+}
+
+/** The persistent jingle element whose file name contains `name`. */
+function jingleEl(name: string): FakeAudio {
+  const el = FakeAudio.all.find((e) => e.origSrc.includes(name));
+  if (!el) throw new Error(`no ${name} element was created`);
+  return el;
+}
 
 function lastStop(s: FakeSource): number {
   return s.stopped[s.stopped.length - 1]!;
@@ -186,13 +208,13 @@ describe("level-clear fanfare", () => {
   it("plays the original round-cleared jingle once, not the synthesized fanfare", async () => {
     const { playLevelWin } = await load();
     playLevelWin();
-    expect(FakeAudio.all).toHaveLength(1);
-    const el = FakeAudio.all[0]!;
+    const el = jingleEl("music_level_win");
     expect(el.src).toBe(`${AUDIO}/music_level_win.mp3`);
     expect(el.loop).toBe(false);
     expect(el.volume).toBeCloseTo(0.5, 6);
     expect(el.paused).toBe(false);
     expect(ctx.oscillators).toHaveLength(0);
+    expect(jingleEl("game_over").paused).toBe(true);
   });
 
   it("calls onEnded once, at LEVEL_WIN_MS", async () => {
@@ -215,7 +237,7 @@ describe("level-clear fanfare", () => {
     stopLevelWin();
     await vi.advanceTimersByTimeAsync(LEVEL_WIN_MS * 2);
     expect(onEnded).not.toHaveBeenCalled();
-    expect(FakeAudio.all[0]!.paused).toBe(true);
+    expect(jingleEl("music_level_win").paused).toBe(true);
   });
 
   it("still calls onEnded on time when there is no AudioContext", async () => {
@@ -227,16 +249,20 @@ describe("level-clear fanfare", () => {
     expect(onEnded).toHaveBeenCalledTimes(1);
   });
 
-  it("restarting the fanfare cancels the first callback and the first jingle", async () => {
+  it("restarting the fanfare cancels the first callback and replays the same element from 0", async () => {
     const { playLevelWin } = await load();
     const first = vi.fn();
     const second = vi.fn();
     playLevelWin(first);
+    const el = jingleEl("music_level_win");
+    const count = FakeAudio.all.length;
     await vi.advanceTimersByTimeAsync(500);
+    el.currentTime = 0.5;
     playLevelWin(second);
-    expect(FakeAudio.all).toHaveLength(2);
-    expect(FakeAudio.all[0]!.paused).toBe(true);
-    expect(FakeAudio.all[1]!.paused).toBe(false);
+    expect(FakeAudio.all).toHaveLength(count);
+    expect(jingleEl("music_level_win")).toBe(el);
+    expect(el.currentTime).toBe(0);
+    expect(el.paused).toBe(false);
     await vi.advanceTimersByTimeAsync(LEVEL_WIN_MS + 1);
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
@@ -247,7 +273,8 @@ describe("level-clear fanfare", () => {
     setMusicMuted(true);
     const onEnded = vi.fn();
     playLevelWin(onEnded);
-    expect(FakeAudio.all).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeAudio.all.every((el) => el.paused)).toBe(true);
     await vi.advanceTimersByTimeAsync(LEVEL_WIN_MS + 1);
     expect(onEnded).toHaveBeenCalledTimes(1);
   });
@@ -255,7 +282,7 @@ describe("level-clear fanfare", () => {
   it("a mute in flight reaches the jingle, and an unmute reaches it again", async () => {
     const { playLevelWin, setMusicMuted } = await load();
     playLevelWin();
-    const el = FakeAudio.all[0]!;
+    const el = jingleEl("music_level_win");
     setMusicMuted(true);
     expect(el.muted).toBe(true);
     setMusicMuted(false);
@@ -283,34 +310,41 @@ describe("game-over jingle", () => {
   it("plays the original round-lost jingle once, not the synthesized one", async () => {
     const { playGameOver } = await load();
     playGameOver();
-    expect(FakeAudio.all).toHaveLength(1);
-    const el = FakeAudio.all[0]!;
+    const el = jingleEl("game_over");
     expect(el.src).toBe(`${AUDIO}/game_over.mp3`);
     expect(el.loop).toBe(false);
     expect(el.volume).toBeCloseTo(0.5, 6);
     expect(el.paused).toBe(false);
     expect(ctx.oscillators).toHaveLength(0);
+    expect(jingleEl("music_level_win").paused).toBe(true);
   });
 
   it("stopGameOver halts it", async () => {
     const { playGameOver, stopGameOver } = await load();
     playGameOver();
     stopGameOver();
-    expect(FakeAudio.all[0]!.paused).toBe(true);
+    expect(jingleEl("game_over").paused).toBe(true);
   });
 
   it("is not cut at the cue nominal length: the file plays out", async () => {
     const { playGameOver } = await load();
     playGameOver();
     await vi.advanceTimersByTimeAsync(CUES.gameOver.ms + 1);
-    expect(FakeAudio.all[0]!.paused).toBe(false);
+    expect(jingleEl("game_over").paused).toBe(false);
+  });
+
+  it("arms no timer: nothing awaits the game-over jingle", async () => {
+    const { playGameOver } = await load();
+    playGameOver();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("makes no sound while muted", async () => {
     const { playGameOver, setMusicMuted } = await load();
     setMusicMuted(true);
     playGameOver();
-    expect(FakeAudio.all).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeAudio.all.every((el) => el.paused)).toBe(true);
   });
 
   it("leaves the level-clear jingle alone", async () => {
@@ -318,8 +352,129 @@ describe("game-over jingle", () => {
     playLevelWin();
     playGameOver();
     stopGameOver();
-    expect(FakeAudio.all[0]!.paused).toBe(false);
-    expect(FakeAudio.all[1]!.paused).toBe(true);
+    expect(jingleEl("music_level_win").paused).toBe(false);
+    expect(jingleEl("game_over").paused).toBe(true);
+  });
+
+  it("replays the same element from 0 on a restart", async () => {
+    const { playGameOver } = await load();
+    playGameOver();
+    const el = jingleEl("game_over");
+    el.currentTime = 2.5;
+    playGameOver();
+    expect(jingleEl("game_over")).toBe(el);
+    expect(el.currentTime).toBe(0);
+    expect(el.paused).toBe(false);
+  });
+});
+
+describe("jingle elements and the iOS unlock", () => {
+  it("creates the two jingle elements once, however many rounds end", async () => {
+    const { playGameOver, playLevelWin, stopGameOver } = await load();
+    playLevelWin();
+    playGameOver();
+    const count = FakeAudio.all.length;
+    stopGameOver();
+    playLevelWin();
+    playGameOver();
+    expect(FakeAudio.all).toHaveLength(count);
+    expect(FakeAudio.all.filter((el) => /music_level_win|game_over/.test(el.origSrc))).toHaveLength(
+      2,
+    );
+  });
+
+  it("unlocks both jingle elements when the music first starts: muted play, then pause and rewind", async () => {
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    for (const name of ["music_level_win", "game_over"]) {
+      const el = jingleEl(name);
+      expect(el.plays, name).toBe(1);
+      expect(el.mutedAtPlay, `${name} must play muted while unlocking`).toBe(true);
+      expect(el.paused, name).toBe(true);
+      expect(el.currentTime, name).toBe(0);
+      expect(el.muted, `${name} goes back to the player's mute setting`).toBe(false);
+    }
+  });
+
+  it("restores a mute that was on while it unlocked", async () => {
+    const { playMusic, setMusicMuted } = await load();
+    setMusicMuted(true);
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(jingleEl("game_over").muted).toBe(true);
+    setMusicMuted(false);
+    expect(jingleEl("game_over").muted).toBe(false);
+  });
+
+  it("a jingle asked for before any music still unlocks the other element", async () => {
+    const { playLevelWin } = await load();
+    playLevelWin();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(jingleEl("game_over").plays).toBe(1);
+    // The jingle that was asked for plays; the other one is unlocked and parked.
+    expect(jingleEl("music_level_win").paused).toBe(false);
+    expect(jingleEl("game_over").paused).toBe(true);
+  });
+
+  it("a jingle started before its unlock settles is not paused by the unlock", async () => {
+    const releases: (() => void)[] = [];
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          this.plays += 1;
+          this.mutedAtPlay = this.muted;
+          this.paused = false;
+          if (!this.origSrc.includes("music_level_win")) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            releases.push(resolve);
+          });
+        }
+      },
+    );
+    const { playMusic, playLevelWin } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    playLevelWin();
+    for (const release of releases) release();
+    await vi.advanceTimersByTimeAsync(0);
+    const el = jingleEl("music_level_win");
+    expect(el.paused).toBe(false);
+    expect(el.muted).toBe(false);
+  });
+
+  it("when the browser blocks the unlock, retries on the first gesture and only once", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          if (this.origSrc.includes("game_over") && this.plays === 0) {
+            this.plays += 1;
+            this.mutedAtPlay = this.muted;
+            return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+          }
+          return super.play();
+        }
+      },
+    );
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = jingleEl("game_over");
+    expect(el.plays).toBe(1);
+    expect(el.muted).toBe(false);
+
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(2);
+    expect(el.paused).toBe(true);
+    expect(el.muted).toBe(false);
+
+    document.dispatchEvent(new Event("pointerup"));
+    document.dispatchEvent(new Event("keydown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(2);
   });
 });
 
@@ -327,8 +482,8 @@ describe("background music", () => {
   it("starts the original intro first, played once at its trimmed volume", async () => {
     const { playMusic } = await load();
     playMusic(1);
-    expect(FakeAudio.all).toHaveLength(1);
-    const el = FakeAudio.all[0]!;
+    expect(musicEls()).toHaveLength(1);
+    const el = musicEls()[0]!;
     expect(el.src).toBe(`${AUDIO}/music_intro.mp3`);
     expect(el.loop).toBe(false);
     expect(el.volume).toBeCloseTo(0.3, 6);
@@ -338,10 +493,10 @@ describe("background music", () => {
   it("moves on to the original loop when the intro ends, looping on the same element", async () => {
     const { playMusic } = await load();
     playMusic(1);
-    const el = FakeAudio.all[0]!;
+    const el = musicEls()[0]!;
     el.finish();
     await vi.advanceTimersByTimeAsync(0);
-    expect(FakeAudio.all).toHaveLength(1);
+    expect(musicEls()).toHaveLength(1);
     expect(el.src).toBe(`${AUDIO}/music_loop.mp3`);
     expect(el.loop).toBe(true);
     expect(el.volume).toBeCloseTo(0.3, 6);
@@ -355,52 +510,53 @@ describe("background music", () => {
     const { playMusic } = await load();
     playMusic(1);
     playMusic(8);
-    expect(FakeAudio.all).toHaveLength(1);
-    FakeAudio.all[0]!.finish();
+    expect(musicEls()).toHaveLength(1);
+    musicEls()[0]!.finish();
     await vi.advanceTimersByTimeAsync(0);
     playMusic(4);
-    expect(FakeAudio.all).toHaveLength(1);
+    expect(musicEls()).toHaveLength(1);
   });
 
   it("carries a mute across the intro-to-loop hand-over", async () => {
     const { playMusic, setMusicMuted } = await load();
     playMusic(1);
     setMusicMuted(true);
-    FakeAudio.all[0]!.finish();
+    musicEls()[0]!.finish();
     await vi.advanceTimersByTimeAsync(0);
-    expect(FakeAudio.all[0]!.muted).toBe(true);
+    expect(musicEls()[0]!.muted).toBe(true);
     setMusicMuted(false);
-    expect(FakeAudio.all[0]!.muted).toBe(false);
+    expect(musicEls()[0]!.muted).toBe(false);
   });
 
   it("mutes the playing element and any element started while muted", async () => {
     const { playMusic, setMusicMuted, stopMusic } = await load();
     playMusic(1);
     setMusicMuted(true);
-    expect(FakeAudio.all[0]!.muted).toBe(true);
+    expect(musicEls()[0]!.muted).toBe(true);
     stopMusic();
     playMusic(5);
-    expect(FakeAudio.all[1]!.muted).toBe(true);
+    expect(musicEls()[1]!.muted).toBe(true);
     setMusicMuted(false);
-    expect(FakeAudio.all[1]!.muted).toBe(false);
+    expect(musicEls()[1]!.muted).toBe(false);
   });
 
   it("stopMusic pauses, and the next playMusic starts a fresh intro", async () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
-    FakeAudio.all[0]!.finish();
+    musicEls()[0]!.finish();
     await vi.advanceTimersByTimeAsync(0);
     stopMusic();
-    expect(FakeAudio.all[0]!.paused).toBe(true);
+    expect(musicEls()[0]!.paused).toBe(true);
     playMusic(1);
-    expect(FakeAudio.all).toHaveLength(2);
-    expect(FakeAudio.all[1]!.src).toBe(`${AUDIO}/music_intro.mp3`);
+    expect(musicEls()).toHaveLength(2);
+    expect(musicEls()[1]!.src).toBe(`${AUDIO}/music_intro.mp3`);
+    expect(musicEls()[1]!.loop).toBe(false);
   });
 
   it("a stopped intro that finishes late does not start the loop", async () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
-    const el = FakeAudio.all[0]!;
+    const el = musicEls()[0]!;
     stopMusic();
     el.finish();
     await vi.advanceTimersByTimeAsync(0);
@@ -413,14 +569,14 @@ describe("background music", () => {
     playMusic(1);
     fadeOutMusic(1000);
     await vi.advanceTimersByTimeAsync(100);
-    expect(FakeAudio.all[0]!.paused).toBe(false);
+    expect(musicEls()[0]!.paused).toBe(false);
     setMusicMuted(true);
-    expect(FakeAudio.all[0]!.muted).toBe(true);
+    expect(musicEls()[0]!.muted).toBe(true);
     await vi.advanceTimersByTimeAsync(1200);
-    expect(FakeAudio.all[0]!.paused).toBe(true);
+    expect(musicEls()[0]!.paused).toBe(true);
     // Done fading: a later unmute no longer touches it.
     setMusicMuted(false);
-    expect(FakeAudio.all[0]!.muted).toBe(true);
+    expect(musicEls()[0]!.muted).toBe(true);
   });
 
   it("fadeOutMusic pauses the old element and frees the slot", async () => {
@@ -428,15 +584,15 @@ describe("background music", () => {
     playMusic(1);
     fadeOutMusic(100);
     await vi.advanceTimersByTimeAsync(300);
-    expect(FakeAudio.all[0]!.paused).toBe(true);
+    expect(musicEls()[0]!.paused).toBe(true);
     playMusic(1);
-    expect(FakeAudio.all).toHaveLength(2);
+    expect(musicEls()).toHaveLength(2);
   });
 
   it("an intro that finishes mid-fade does not start the loop", async () => {
     const { playMusic, fadeOutMusic } = await load();
     playMusic(1);
-    const el = FakeAudio.all[0]!;
+    const el = musicEls()[0]!;
     fadeOutMusic(100);
     el.finish();
     await vi.advanceTimersByTimeAsync(300);
@@ -445,15 +601,144 @@ describe("background music", () => {
   });
 });
 
+describe("the intro plays once per real start, not once per round", () => {
+  it("a fade between rounds restarts straight on the loop, looping", async () => {
+    const { playMusic, fadeOutMusic } = await load();
+    playMusic(1);
+    fadeOutMusic(250);
+    await vi.advanceTimersByTimeAsync(400);
+    playMusic(2);
+    expect(musicEls()).toHaveLength(2);
+    const next = musicEls()[1]!;
+    expect(next.src).toBe(`${AUDIO}/music_loop.mp3`);
+    expect(next.loop).toBe(true);
+    expect(next.volume).toBeCloseTo(0.3, 6);
+    expect(next.paused).toBe(false);
+  });
+
+  it("keeps going on the loop through every later round", async () => {
+    const { playMusic, fadeOutMusic } = await load();
+    playMusic(1);
+    for (const level of [2, 3, 4]) {
+      fadeOutMusic(100);
+      await vi.advanceTimersByTimeAsync(200);
+      playMusic(level);
+    }
+    const srcs = musicEls().map((el) => el.src);
+    expect(srcs).toEqual([
+      `${AUDIO}/music_intro.mp3`,
+      `${AUDIO}/music_loop.mp3`,
+      `${AUDIO}/music_loop.mp3`,
+      `${AUDIO}/music_loop.mp3`,
+    ]);
+  });
+
+  it("a restart on the loop honours a mute and has no hand-over to make", async () => {
+    const { playMusic, fadeOutMusic, setMusicMuted } = await load();
+    playMusic(1);
+    fadeOutMusic(100);
+    await vi.advanceTimersByTimeAsync(200);
+    setMusicMuted(true);
+    playMusic(2);
+    const next = musicEls()[1]!;
+    expect(next.muted).toBe(true);
+    next.finish();
+    expect(next.src).toBe(`${AUDIO}/music_loop.mp3`);
+  });
+
+  it("a real stop makes the next start play the intro again", async () => {
+    const { playMusic, fadeOutMusic, stopMusic } = await load();
+    playMusic(1);
+    fadeOutMusic(100);
+    await vi.advanceTimersByTimeAsync(200);
+    playMusic(2);
+    stopMusic();
+    playMusic(1);
+    const srcs = musicEls().map((el) => el.src);
+    expect(srcs).toEqual([
+      `${AUDIO}/music_intro.mp3`,
+      `${AUDIO}/music_loop.mp3`,
+      `${AUDIO}/music_intro.mp3`,
+    ]);
+    expect(musicEls()[2]!.loop).toBe(false);
+  });
+
+  it("a fade after a real stop does not count as the intro having played", async () => {
+    const { playMusic, fadeOutMusic, stopMusic } = await load();
+    playMusic(1);
+    stopMusic();
+    fadeOutMusic(100);
+    playMusic(1);
+    expect(musicEls()[1]!.src).toBe(`${AUDIO}/music_intro.mp3`);
+  });
+});
+
+describe("loop preload", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  it("warms the loop into the HTTP cache shortly after the intro starts", async () => {
+    const { playMusic } = await load();
+    playMusic(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(`${AUDIO}/music_loop.mp3`);
+  });
+
+  it("does it once per session, not once per start", async () => {
+    const { playMusic, stopMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    stopMusic();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("never warms again after a restart onto the loop", async () => {
+    const { playMusic, fadeOutMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    fadeOutMusic(100);
+    await vi.advanceTimersByTimeAsync(200);
+    playMusic(2);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("swallows a failed warm-up", async () => {
+    fetchMock.mockRejectedValue(new TypeError("network down"));
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(musicEls()[0]!.paused).toBe(false);
+  });
+
+  it("is a no-op in a browser without fetch", async () => {
+    vi.stubGlobal("fetch", undefined);
+    const { playMusic } = await load();
+    expect(() => playMusic(1)).not.toThrow();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(musicEls()[0]!.paused).toBe(false);
+  });
+});
+
 // Every element created while `remaining` is above zero has its first play() rejected,
 // as a browser does before the page has had a user gesture.
 class BlockedOnceAudio extends FakeAudio {
   static remaining = 1;
-  plays = 0;
   override play() {
-    this.plays += 1;
-    if (BlockedOnceAudio.remaining > 0) {
+    // Only the music elements are blocked; the jingle elements unlock without a fuss.
+    if (/music_(intro|loop)/.test(this.origSrc) && BlockedOnceAudio.remaining > 0) {
       BlockedOnceAudio.remaining -= 1;
+      this.plays += 1;
       return Promise.reject(new DOMException("blocked", "NotAllowedError"));
     }
     return super.play();
@@ -516,7 +801,7 @@ describe("blocked autoplay", () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const el = musicEls()[0] as BlockedOnceAudio;
     expect(el.paused).toBe(true);
     expect(el.plays).toBe(1);
 
@@ -538,7 +823,7 @@ describe("blocked autoplay", () => {
       const { playMusic, stopMusic } = await load();
       playMusic(1);
       await vi.advanceTimersByTimeAsync(0);
-      const el = FakeAudio.all[0] as BlockedOnceAudio;
+      const el = musicEls()[0] as BlockedOnceAudio;
 
       await gesture(new Event(name));
       expect(el.plays).toBe(2);
@@ -552,7 +837,7 @@ describe("blocked autoplay", () => {
     BlockedOnceAudio.remaining = 2;
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const el = musicEls()[0] as BlockedOnceAudio;
 
     await gesture(new Event("pointerdown"));
     expect(el.plays).toBe(2);
@@ -569,7 +854,7 @@ describe("blocked autoplay", () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const el = musicEls()[0] as BlockedOnceAudio;
     const input = document.createElement("input");
     document.body.append(input);
 
@@ -588,7 +873,7 @@ describe("blocked autoplay", () => {
     const { playMusic, setMusicMuted, stopMusic } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const el = musicEls()[0] as BlockedOnceAudio;
     setMusicMuted(true);
 
     await gesture(new Event("pointerdown"));
@@ -613,7 +898,7 @@ describe("blocked autoplay", () => {
     expect(listeners.armed()).toBe(0);
 
     BlockedOnceAudio.remaining = 0;
-    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    const first = musicEls()[0] as BlockedOnceAudio;
     await gesture(new Event("pointerdown"));
     expect(first.plays).toBe(1);
     expect(first.paused).toBe(true);
@@ -628,7 +913,7 @@ describe("blocked autoplay", () => {
     expect(listeners.armed()).toBe(0);
     await vi.advanceTimersByTimeAsync(300);
 
-    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    const first = musicEls()[0] as BlockedOnceAudio;
     await gesture(new Event("pointerdown"));
     expect(first.plays).toBe(1);
   });
@@ -639,8 +924,8 @@ describe("blocked autoplay", () => {
     stopMusic(); // a restart swaps the element before the first rejection lands
     playMusic(8);
     await vi.advanceTimersByTimeAsync(0);
-    const first = FakeAudio.all[0] as BlockedOnceAudio;
-    const second = FakeAudio.all[1] as BlockedOnceAudio;
+    const first = musicEls()[0] as BlockedOnceAudio;
+    const second = musicEls()[1] as BlockedOnceAudio;
     expect(second.plays).toBe(1);
     expect(second.paused).toBe(false); // the single block was spent on the first element
     expect(listeners.armed()).toBe(0);
@@ -655,7 +940,7 @@ describe("blocked autoplay", () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    const first = musicEls()[0] as BlockedOnceAudio;
     expect(listeners.armed()).toBe(RETRY_EVENTS.length);
 
     stopMusic();
@@ -672,14 +957,14 @@ describe("blocked autoplay", () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const first = FakeAudio.all[0] as BlockedOnceAudio;
+    const first = musicEls()[0] as BlockedOnceAudio;
     expect(listeners.armed()).toBe(RETRY_EVENTS.length);
 
     BlockedOnceAudio.remaining = 1;
     stopMusic();
     playMusic(8);
     await vi.advanceTimersByTimeAsync(0);
-    const second = FakeAudio.all[1] as BlockedOnceAudio;
+    const second = musicEls()[1] as BlockedOnceAudio;
     expect(listeners.armed()).toBe(RETRY_EVENTS.length);
 
     await gesture(new Event("pointerdown"));
@@ -694,7 +979,7 @@ describe("blocked autoplay", () => {
     BlockedOnceAudio.remaining = 0;
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const el = musicEls()[0] as BlockedOnceAudio;
     expect(listeners.armed()).toBe(0);
 
     BlockedOnceAudio.remaining = 1;
@@ -714,7 +999,7 @@ describe("blocked autoplay", () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
-    const el = FakeAudio.all[0] as BlockedOnceAudio;
+    const el = musicEls()[0] as BlockedOnceAudio;
     stopMusic();
 
     await gesture(new Event("pointerdown"));
