@@ -965,7 +965,11 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   come from the site's own chat: a long real conversation is a few tens of KB and the test fixture of
   40 turns (80 messages) is well under every cap. The
   grounding prompt is still injected server-side (`applySystemPrompt`); this only removes the
-  client's ability to add to it. Application context (`useCopilotReadable`) is capped, not dropped,
+  client's ability to add to it. Dropping client system and developer messages is defence in depth:
+  the 1.77 BuiltInAgent already ignores them unless `forwardSystemMessages` /
+  `forwardDeveloperMessages` is set (`@copilotkit/runtime/dist/agent/index.mjs`), which this route
+  never sets, so the real exposure was the unbounded size and the client tools, not injected system
+  text. Re-check that default on a CopilotKit upgrade. Application context (`useCopilotReadable`) is capped, not dropped,
   because the site sends the page path through it. Deliberately untouched, a different lane:
   `maxOutputTokens`, the model, retries and the agent config (BuiltInAgent has no overridable
   properties, so `forwardedProps` cannot change the model). Not restricted: the envelope's `method`
