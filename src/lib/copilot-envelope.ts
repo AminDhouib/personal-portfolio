@@ -131,11 +131,38 @@ function toolName(tool: unknown): string | null {
   return isRecord(tool) && typeof tool.name === "string" ? tool.name : null;
 }
 
+/**
+ * True when any object anywhere in the parsed envelope has an own key named "__proto__".
+ * JSON.parse keeps such a key as an ordinary own property, JSON.stringify writes it back out, and
+ * the runtime's schema parse of the forwarded copy then makes it the prototype of the object it
+ * validates, so a field the body did not carry itself (resume, state, forwardedProps) is read from
+ * it and never passed through the checks below. It is walked with an explicit stack so that a body
+ * nested hundreds of thousands of levels deep, which the 512 KiB cap still admits, cannot overflow
+ * the call stack here.
+ */
+function hasProtoKey(root: unknown): boolean {
+  const stack: unknown[] = [root];
+  while (stack.length > 0) {
+    const value = stack.pop();
+    if (typeof value !== "object" || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) stack.push(item);
+      continue;
+    }
+    for (const key of Object.keys(value)) {
+      if (key === "__proto__") return true;
+      stack.push((value as Record<string, unknown>)[key]);
+    }
+  }
+  return false;
+}
+
 export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
   // A body that is not JSON is a client error, answered as the 400 below. The no-op reporter keeps
   // it out of console.error / reportError / PostHog: one bad request must not be one $exception.
   const envelope = safeJsonParse<unknown>(text, "copilotkit:envelope", null, () => undefined);
   if (!isRecord(envelope)) return { ok: false, status: 400, error: "invalid json" };
+  if (hasProtoKey(envelope)) return { ok: false, status: 400, error: "unsupported field" };
 
   const { method } = envelope;
   if (typeof method !== "string" || !COPILOT_ALLOWED_METHODS.has(method)) {
