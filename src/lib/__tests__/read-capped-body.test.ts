@@ -84,6 +84,29 @@ describe("readCappedBody", () => {
     expect(observe.pulls).toBeLessThan(20);
   });
 
+  it("returns the 413 at once even when cancelling the stream never settles", async () => {
+    // A stalled upload can leave cancel() waiting on the socket; the answer must not wait with it.
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(1024).fill(120));
+      },
+      cancel() {
+        return new Promise<void>(() => undefined);
+      },
+    });
+    const req = new Request("https://amindhou.com/api/test", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit);
+
+    const outcome = await Promise.race([
+      readCappedBody(req, 4096),
+      new Promise<"timed-out">((resolve) => setTimeout(() => resolve("timed-out"), 100)),
+    ]);
+    expect(outcome).toEqual({ ok: false, reason: "too-large" });
+  });
+
   it("reports an errored stream as unreadable", async () => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
