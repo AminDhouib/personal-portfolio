@@ -25,6 +25,8 @@
  * so none of them trims a conversation a person actually has.
  */
 
+import { safeJsonParse } from "@/lib/safe-json";
+
 /** Hard ceiling on the request body, read as a stream (see read-capped-body.ts). */
 // English chat JSON is ~1 byte per character; 512 KiB also holds the message-character cap below
 // written in CJK at 3 bytes per character (360 KB) plus tools and context, and stays under the
@@ -88,13 +90,9 @@ function toolName(tool: unknown): string | null {
 }
 
 export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
-  let envelope: unknown;
-  try {
-    envelope = JSON.parse(text);
-  } catch {
-    // silent-ok: a body that is not JSON is a client error, answered as the 400 below
-    return { ok: false, status: 400, error: "invalid json" };
-  }
+  // A body that is not JSON is a client error, answered as the 400 below. The no-op reporter keeps
+  // it out of console.error / reportError / PostHog: one bad request must not be one $exception.
+  const envelope = safeJsonParse<unknown>(text, "copilotkit:envelope", null, () => undefined);
   if (!isRecord(envelope)) return { ok: false, status: 400, error: "invalid json" };
 
   const droppedTools: string[] = [];

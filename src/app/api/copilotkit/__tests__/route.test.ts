@@ -33,6 +33,10 @@ import { POST } from "../route";
 import { COPILOT_MAX_BODY_BYTES, COPILOT_MAX_MESSAGES } from "@/lib/copilot-envelope";
 import { GENERIC_CHAT_ERROR } from "@/lib/copilot-error-sanitizer";
 
+// Next's own RequestInit (signal is `AbortSignal | undefined`, not the DOM's `| null`); the stream
+// body also needs `duplex`, which the DOM type has no member for.
+type NextRequestInit = NonNullable<ConstructorParameters<typeof NextRequest>[1]>;
+
 // Requests must clear the same-origin + rate-limit guards before reaching the
 // runtime, so every request carries a matching Origin/host and its own IP.
 function makeReq(body: unknown, opts: { ip?: string; origin?: string | null } = {}): NextRequest {
@@ -62,7 +66,7 @@ function makeRawReq(body: string | ReadableStream<Uint8Array>, ip: string): Next
     headers: sameOriginHeaders(ip),
     body,
     ...(typeof body === "string" ? {} : { duplex: "half" }),
-  } as RequestInit);
+  } as NextRequestInit);
 }
 
 /** The Request the route handed to the runtime on its first call. */
