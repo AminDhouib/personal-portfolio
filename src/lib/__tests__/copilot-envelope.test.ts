@@ -557,7 +557,8 @@ describe("sanitizeCopilotEnvelope: nesting depth", () => {
   it("answers 400 for 5000 nested objects as well as arrays", () => {
     let nested = "{}";
     for (let i = 0; i < 5000; i++) nested = '{"a":' + nested + "}";
-    const text = '{"method":"agent/run","params":{"agentId":"default"},"body":{"state":' + nested + "}}";
+    const text =
+      '{"method":"agent/run","params":{"agentId":"default"},"body":{"state":' + nested + "}}";
     expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
   });
 

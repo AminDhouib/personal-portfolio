@@ -443,18 +443,21 @@ describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)"
   it.each([
     ["state", "10.33.0.40"],
     ["context", "10.33.0.41"],
-  ])("answers 400, not a 500, for %s nested 5000 deep, and never reaches the runtime", async (field, ip) => {
-    const text =
-      '{"method":"agent/run","params":{"agentId":"default"},"body":{"threadId":"t","runId":"r","' +
-      field +
-      '":' +
-      "[".repeat(5000) +
-      "]".repeat(5000) +
-      "}}";
-    const response = await POST(makeRawReq(text, ip));
-    expect(response.status).toBe(400);
-    expect(mockHandleRequest).not.toHaveBeenCalled();
-  });
+  ])(
+    "answers 400, not a 500, for %s nested 5000 deep, and never reaches the runtime",
+    async (field, ip) => {
+      const text =
+        '{"method":"agent/run","params":{"agentId":"default"},"body":{"threadId":"t","runId":"r","' +
+        field +
+        '":' +
+        "[".repeat(5000) +
+        "]".repeat(5000) +
+        "}}";
+      const response = await POST(makeRawReq(text, ip));
+      expect(response.status).toBe(400);
+      expect(mockHandleRequest).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["info"])("still forwards %s to the runtime", async (method) => {
     mockHandleRequest.mockResolvedValueOnce(new Response("ok"));

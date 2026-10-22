@@ -190,7 +190,6 @@ export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
 }
 
 function sanitizeParsed(envelope: Record<string, unknown>): EnvelopeResult {
-
   const { method } = envelope;
   if (typeof method !== "string" || !COPILOT_ALLOWED_METHODS.has(method)) {
     return { ok: false, status: 400, error: "unsupported method" };
