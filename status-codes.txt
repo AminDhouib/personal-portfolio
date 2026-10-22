@@ -1,0 +1,5 @@
+Measured in the page on https://amindhou.com (prod 45b9948d) via fetch(url,{redirect:'manual'}), 2026-10-22 ~13:54Z
+/blog/quality-gates-that-earn-their-keep  -> 200, canonical https://amindhou.com/blog/quality-gates-that-earn-their-keep
+/blog/Caramel-Open-Source-Story           -> 404
+/blog/%2e%2e%2fadmin                      -> 404
+/blog/%2E%2E                              -> 200, HOME page, canonical https://amindhou.com
