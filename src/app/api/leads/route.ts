@@ -28,16 +28,21 @@ const LEAD_EMAIL_DAILY_CAP = 50;
 let emailDay = "";
 let emailsToday = 0;
 
-/** Reserves one email slot for today (UTC); false once the daily cap is spent. */
-function takeEmailSlot(): boolean {
+/** Reserves one email slot for today (UTC) and returns its day key; null once the cap is spent. */
+function takeEmailSlot(): string | null {
   const day = new Date().toISOString().slice(0, 10);
   if (day !== emailDay) {
     emailDay = day;
     emailsToday = 0;
   }
-  if (emailsToday >= LEAD_EMAIL_DAILY_CAP) return false;
+  if (emailsToday >= LEAD_EMAIL_DAILY_CAP) return null;
   emailsToday += 1;
-  return true;
+  return day;
+}
+
+/** Gives back a slot whose send failed, so an outage cannot spend the day's budget. */
+function releaseEmailSlot(day: string): void {
+  if (day === emailDay && emailsToday > 0) emailsToday -= 1;
 }
 
 // Validates the body is a JSON object; the individual fields are narrowed below
@@ -48,8 +53,6 @@ const leadSchema = z.object({
   email: z.unknown(),
   note: z.unknown().optional(),
   source: z.unknown().optional(),
-  // Honeypot: the real client never sends it, so any non-empty value is a form-filling bot.
-  website: z.unknown().optional(),
 });
 
 /**
@@ -77,12 +80,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
-  const { name, email, note, source, website } = parsed.data;
-
-  if (typeof website === "string" ? website !== "" : website !== undefined && website !== null) {
-    logWarn("leads", "honeypot field filled, lead dropped");
-    return NextResponse.json({ ok: true, id: null, createdAt: null });
-  }
+  const { name, email, note, source } = parsed.data;
 
   if (typeof name !== "string" || !name || typeof email !== "string" || !email) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
@@ -125,14 +123,16 @@ export async function POST(req: NextRequest) {
   );
 
   let emailOk = false;
-  let sendEmail = Boolean(env.SENDLY_API_KEY);
-  if (sendEmail && !takeEmailSlot()) {
-    sendEmail = false;
-    logWarn("leads", "daily lead email cap reached, lead stored without notification", {
-      id: persisted?.id ?? null,
-    });
+  let slotDay: string | null = null;
+  if (env.SENDLY_API_KEY) {
+    slotDay = takeEmailSlot();
+    if (slotDay === null) {
+      logWarn("leads", "daily lead email cap reached, lead stored without notification", {
+        id: persisted?.id ?? null,
+      });
+    }
   }
-  if (env.SENDLY_API_KEY && sendEmail) {
+  if (env.SENDLY_API_KEY && slotDay !== null) {
     try {
       await sendSendlyEmail({
         apiKey: env.SENDLY_API_KEY,
@@ -158,6 +158,7 @@ export async function POST(req: NextRequest) {
       // A non-2xx (bad key, unverified domain, rate limit), a network error
       // and the deadline all land here; the lead is already persisted.
       captureException("leads.email", err);
+      releaseEmailSlot(slotDay);
     }
   }
 
