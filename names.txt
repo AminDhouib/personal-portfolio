@@ -1,0 +1,4 @@
+Prod 553b89ae, 2026-10-22 ~15:19Z, read only.
+/games hub Today strip: every board (Password Game 2, Orbital Dodge, Hextris, Super Voltorb Flip, Tower Stacker, Typing Speed, Script Knight, Failover) reads "No runs yet today. Be the first." Visible name texts: none (0 names), so there is nothing empty or whitespace-only; the assertion holds vacuously.
+GET /api/password-game-2/leaderboard?daily=1 -> 200 {"entries":[]}; ?seed=1 -> 200 {"entries":[]}. 0 names.
+The Password Game 2 board UI renders only on the end-of-run receipt card, so it was not on screen; no run was played or posted.
