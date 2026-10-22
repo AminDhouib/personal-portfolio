@@ -250,15 +250,23 @@ describe("the board", () => {
 
   it("marks a tile with the Voltorb sprite for the V memo and the digits as SVG", () => {
     render(<SuperVoltorbFlipGame />);
+    // The memo is radio-style: one mark at a time, so mark two tiles in turn.
+    const flagsOf = (cell: string) =>
+      document
+        .querySelector<HTMLElement>(`[data-cell="${cell}"]`)!
+        .querySelector(".pointer-events-none.grid")!;
     fireEvent.click(firstButton("Memo V"));
+    fireEvent.click(document.querySelector<HTMLElement>('[data-cell="0-0"]')!);
+    const voltorbMark = flagsOf("0-0");
+    expectOriginalSprite(voltorbMark.querySelector("img"));
+    expect(voltorbMark.querySelectorAll("img")).toHaveLength(1);
+    expect(voltorbMark.querySelectorAll("svg")).toHaveLength(0);
+
     fireEvent.click(firstButton("Memo 2"));
-    const tile = document.querySelector<HTMLElement>('[data-cell="0-0"]')!;
-    fireEvent.click(tile);
-    expect(tile.getAttribute("aria-label")).toContain("memo");
-    const flags = tile.querySelector(".pointer-events-none.grid")!;
-    expectOriginalSprite(flags.querySelector("img"));
-    expect(flags.querySelectorAll("img")).toHaveLength(1);
-    expect(flags.querySelectorAll("svg")).toHaveLength(1);
+    fireEvent.click(document.querySelector<HTMLElement>('[data-cell="0-1"]')!);
+    const digitMark = flagsOf("0-1");
+    expect(digitMark.querySelectorAll("img")).toHaveLength(0);
+    expect(digitMark.querySelectorAll("svg")).toHaveLength(1);
   });
 
   it("shows the sprite and the original burst in the How to play legend", async () => {
