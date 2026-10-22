@@ -1,0 +1,16 @@
+PR #143 merged as b669e075 (ancestor of 0556ce8c, checked with git merge-base --is-ancestor). PR head 437da796.
+CI Checks Summary:
+  [ok] Passed: 4
+  [FAIL] Failed: 0
+
+Green main CI run 39804924428 (CI #475, 0556ce8c, contains b669e075):
+  Lint, Typecheck, Test success
+  Lighthouse (all public pages) success
+  Postgres integration (arcade store) success
+  Build (standalone artifact for e2e) success
+  E2E (Playwright, production build) success
+  Deploy to Dokploy success
+
+Test files on origin/main (git ls-tree):
+  src/lib/__tests__/copilot-error-sanitizer.test.ts  (covers src/lib/copilot-error-sanitizer.ts)
+  src/lib/__tests__/read-capped-body.test.ts  (covers src/lib/read-capped-body.ts)
