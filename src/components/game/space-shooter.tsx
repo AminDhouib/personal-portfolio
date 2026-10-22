@@ -49,10 +49,7 @@ import {
   type Achievement,
 } from "./achievements";
 import {
-  type GameStatus,
-  type PowerUpType,
   type BossId,
-  type BossPhase,
   type GameRefs,
   ARENA_W,
   ARENA_H,
