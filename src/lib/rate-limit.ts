@@ -120,6 +120,10 @@ let lastMissingCfWarnAt = Number.NEGATIVE_INFINITY;
  * means the edge was bypassed or misconfigured. One `logWarn` a minute at most (never
  * `captureException`: no Sentry or PostHog event, so a flood of such requests cannot amplify into
  * either). The detail names the fallback in use and never an address.
+ *
+ * `logWarn` is console-only (`src/lib/log.ts`): it writes one `console.warn` line and has no path
+ * to Sentry or PostHog, which is why this cannot amplify. Keep it that way; only `captureException`
+ * there creates those events.
  */
 function warnMissingCloudflareIp(fallback: "x-forwarded-for" | "unknown"): void {
   // eslint-disable-next-line no-restricted-properties -- production-only diagnostic gate, the same NODE_ENV precedent as hextris.tsx; not an integration var
