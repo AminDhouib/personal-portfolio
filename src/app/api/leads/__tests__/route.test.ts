@@ -450,4 +450,58 @@ describe("POST /api/leads abuse limits", () => {
     for (let i = 0; i < CAP + 1; i += 1) await POST(lead());
     expect(mockFetch).toHaveBeenCalledTimes(CAP);
   });
+
+  // Mirrors LEAD_EMAIL_PER_IP_DAILY_CAP in route.ts.
+  const SHARE = 3;
+  const fromIp = (ip: string) =>
+    makeJsonPostRequest({ name: "Ada", email: "ada@example.com" }, { ip });
+
+  it("gives one client only its share of the day's emails, still storing the rest with the same response", async () => {
+    vi.setSystemTime(new Date("2031-06-01T10:00:00Z"));
+    const ip = "198.51.100.7";
+    for (let i = 0; i < SHARE; i += 1) await POST(fromIp(ip));
+    expect(mockFetch).toHaveBeenCalledTimes(SHARE);
+
+    const over = await POST(fromIp(ip));
+    expect(over.status).toBe(200);
+    expect(await over.json()).toEqual({
+      ok: true,
+      id: "test-uuid",
+      createdAt: "2026-07-08T00:00:00.000Z",
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(SHARE);
+    expect(mockAppendLead).toHaveBeenCalledTimes(SHARE + 1);
+    expect(logWarn).toHaveBeenCalledWith(
+      "leads",
+      expect.stringContaining("per-client"),
+      expect.anything(),
+    );
+  });
+
+  it("leaves the global budget to everyone else: a client over its share spends none of it", async () => {
+    vi.setSystemTime(new Date("2031-06-02T10:00:00Z"));
+    const greedy = "198.51.100.8";
+    for (let i = 0; i < SHARE + 2; i += 1) await POST(fromIp(greedy));
+    expect(mockFetch).toHaveBeenCalledTimes(SHARE);
+
+    // 47 other clients still fit under the 50 global cap; the 48th is the first refused.
+    for (let i = 0; i < CAP - SHARE; i += 1) await POST(fromIp(`203.0.113.${i + 1}`));
+    expect(mockFetch).toHaveBeenCalledTimes(CAP);
+    await POST(fromIp("203.0.113.200"));
+    expect(mockFetch).toHaveBeenCalledTimes(CAP);
+  });
+
+  it("gives the share back when the send fails, and resets it on a new UTC day", async () => {
+    vi.setSystemTime(new Date("2031-06-03T23:59:00Z"));
+    const ip = "198.51.100.9";
+    mockFetch.mockImplementation(async () => sendlyProblem(503, "unavailable"));
+    for (let i = 0; i < SHARE; i += 1) await POST(fromIp(ip));
+    mockFetch.mockReset().mockImplementation(async () => sendlyAccepted());
+    for (let i = 0; i < SHARE; i += 1) await POST(fromIp(ip));
+    expect(mockFetch).toHaveBeenCalledTimes(SHARE);
+
+    vi.setSystemTime(new Date("2031-06-04T00:01:00Z"));
+    await POST(fromIp(ip));
+    expect(mockFetch).toHaveBeenCalledTimes(SHARE + 1);
+  });
 });
