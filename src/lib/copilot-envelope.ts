@@ -185,6 +185,7 @@ export function sanitizeCopilotEnvelope(text: string): EnvelopeResult {
   try {
     return sanitizeParsed(envelope);
   } catch {
+    // silent-ok: only client-shaped input can make the measurements throw, and a bad request must not be one $exception
     return { ok: false, status: 400, error: "invalid body" };
   }
 }
