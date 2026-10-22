@@ -367,6 +367,37 @@ describe("sanitizeCopilotEnvelope: the run body must be a plain object", () => {
   });
 });
 
+describe("sanitizeCopilotEnvelope: resume", () => {
+  // `resume` belongs to CopilotKit's interrupt flow, which this site does not use (collectLead is
+  // a plain handler). The runtime puts a resolved interrupt's payload into the model prompt, and
+  // nothing else caps it, so a 300 KB payload became a 300 KB prompt.
+  it.each(["agent/run", "agent/connect"])("answers 400 for a run with resume on %s", (method) => {
+    const resume = [
+      { interruptId: "call1", status: "resolved", payload: { x: "y".repeat(300_000) } },
+    ];
+    const text = JSON.stringify({ ...runEnvelope({ messages: [turn(0)], resume }), method });
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("answers 400 for even a tiny or empty resume, whatever its type", () => {
+    for (const resume of [[], {}, null, "x", 0, [{ interruptId: "a", status: "cancelled" }]]) {
+      const text = JSON.stringify(runEnvelope({ messages: [turn(0)], resume }));
+      expect(sanitizeCopilotEnvelope(text), JSON.stringify(resume)).toMatchObject({
+        ok: false,
+        status: 400,
+      });
+    }
+  });
+
+  it("still accepts a run without resume", () => {
+    expect(
+      sanitizeCopilotEnvelope(JSON.stringify(runEnvelope({ messages: [turn(0)] }))),
+    ).toMatchObject({
+      ok: true,
+    });
+  });
+});
+
 describe("sanitizeCopilotEnvelope: state and forwardedProps caps", () => {
   it("answers 413 for a run whose state is over the cap", () => {
     const state = { notes: "s".repeat(COPILOT_MAX_STATE_CHARS) };

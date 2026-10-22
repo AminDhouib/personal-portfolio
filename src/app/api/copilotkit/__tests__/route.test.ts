@@ -416,6 +416,15 @@ describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)"
     expect(mockHandleRequest).not.toHaveBeenCalled();
   });
 
+  it("answers 400 for a run carrying a resume payload and never reaches the runtime", async () => {
+    const resume = [
+      { interruptId: "call1", status: "resolved", payload: { x: "y".repeat(300_000) } },
+    ];
+    const response = await POST(makeRawReq(JSON.stringify(runBody({ resume })), "10.33.0.5"));
+    expect(response.status).toBe(400);
+    expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
   it.each(["info"])("still forwards %s to the runtime", async (method) => {
     mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
     const response = await POST(makeRawReq(JSON.stringify({ method }), "10.33.0.4"));
