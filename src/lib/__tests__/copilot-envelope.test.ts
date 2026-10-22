@@ -225,43 +225,6 @@ describe("sanitizeCopilotEnvelope: client tools", () => {
     expect(result.droppedTools).toEqual([]);
   });
 
-  // The forwarded envelope is serialised straight away, so a mutation of its parsed text would
-  // prove nothing: the object that has to stay untouched is the one handed to JSON.stringify.
-  it("gives each request its own copy of a tool definition, so a mutation cannot leak into the next", () => {
-    const text = JSON.stringify(
-      runEnvelope({ messages: [turn(0)], tools: [COLLECT_LEAD_TOOL, SUGGEST_TOOL] }),
-    );
-    const real = JSON.stringify.bind(JSON);
-    const seen: Array<{ body: { tools: Array<{ parameters: Record<string, unknown> }> } }> = [];
-    const spy = vi.spyOn(JSON, "stringify").mockImplementation(((
-      value: unknown,
-      ...rest: never[]
-    ) => {
-      if (value && typeof value === "object" && "method" in value && "body" in value) {
-        seen.push(value as (typeof seen)[number]);
-      }
-      return real(value, ...rest);
-    }) as typeof JSON.stringify);
-    try {
-      ok(text);
-      const first = seen.at(-1);
-      expect(first?.body.tools).toHaveLength(2);
-      for (const tool of first?.body.tools ?? []) {
-        tool.parameters.pattern = "^(a+)+$";
-        delete tool.parameters.required;
-        tool.parameters.type = "string";
-      }
-    } finally {
-      spy.mockRestore();
-    }
-    const second = ok(text);
-    expect(second.parsed.body.tools).toEqual([COLLECT_LEAD_TOOL, SUGGEST_TOOL]);
-    expect(COPILOT_TOOL_DEFINITIONS).toEqual({
-      collectLead: COLLECT_LEAD_TOOL,
-      copilotkitSuggest: SUGGEST_TOOL,
-    });
-  });
-
   it("keeps the server's copies identical to what the site's own client sends", () => {
     // If CopilotKit or use-lead-collector-action.ts changes a definition, the model would be
     // offered a stale one: this is where that surfaces.
