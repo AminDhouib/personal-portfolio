@@ -991,6 +991,11 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   `maxOutputTokens`, the model, retries and the agent config (BuiltInAgent has no overridable
   properties, so `forwardedProps` cannot change the model). Re-check the tool allow-list on a
   CopilotKit upgrade and whenever a new `useCopilotAction` is added.
+  T-6382: `forwardedProps` is allow-listed to `toolChoice` (what a suggestions run sends; the
+  `properties` prop is unset). The runtime reads `a2uiCatalogAvailable` from it (switches on the A2UI
+  middleware: a `render_a2ui` tool and ~2.3K of server prompt per run), plus `__proxiedMCPRequest`,
+  `cloud.guardrails` and `command.resume`; the site sends none of them, so they are stripped, not
+  refused. The 2,000 character cap still applies first. Re-check the list on a CopilotKit upgrade.
   T-6255 closed two gaps in this layer, one of them a data leak, not a cost issue:
   (1) the envelope's `method` is allow-listed (`COPILOT_ALLOWED_METHODS`) to what the site's own
   client sends with `useSingleEndpoint`: `info` on provider mount,

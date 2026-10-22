@@ -66,6 +66,13 @@ export const COPILOT_MAX_STATE_CHARS = 8000;
 export const COPILOT_MAX_FORWARDED_PROPS_CHARS = 2000;
 
 /**
+ * The `forwardedProps` keys kept on a run. The site's client sends the CopilotKit `properties`
+ * prop (unset, so nothing) and, on a suggestions run, `toolChoice` forcing `copilotkitSuggest`.
+ * Anything else is dropped; see the strip in sanitizeParsed for what the runtime reads from it.
+ */
+const COPILOT_ALLOWED_FORWARDED_PROPS: readonly string[] = ["toolChoice"];
+
+/**
  * How deeply the envelope may nest. Depth counts objects and arrays only, a scalar leaf adds no
  * level: the envelope is depth 1, its body 2, and so on, so 32 nested objects are allowed and 33
  * are refused. The deepest thing the site's own client sends is the suggestions tool (envelope >
@@ -290,6 +297,21 @@ function sanitizeParsed(envelope: Record<string, unknown>): EnvelopeResult {
 
     if (serializedLength(run.forwardedProps) > COPILOT_MAX_FORWARDED_PROPS_CHARS) {
       return { ok: false, status: 413, error: "forwardedProps too large" };
+    }
+
+    // Keep only the forwardedProps keys the site's client sends. The runtime also reads
+    // a2uiCatalogAvailable (switches on the A2UI middleware: a render_a2ui tool and ~2.3K of
+    // server prompt text per run), __proxiedMCPRequest, cloud.guardrails and command.resume, which a
+    // client-controlled value could trigger and the site never uses. Stripped, not refused: the
+    // run still proceeds without them (T-6382).
+    if (isRecord(run.forwardedProps)) {
+      const props = run.forwardedProps;
+      run.forwardedProps = Object.fromEntries(
+        COPILOT_ALLOWED_FORWARDED_PROPS.filter((key) => Object.hasOwn(props, key)).map((key) => [
+          key,
+          props[key],
+        ]),
+      );
     }
 
     if ("tools" in run) {
