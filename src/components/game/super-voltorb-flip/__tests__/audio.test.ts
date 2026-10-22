@@ -214,6 +214,7 @@ describe("level-clear fanfare", () => {
     expect(el.volume).toBeCloseTo(0.5, 6);
     expect(el.paused).toBe(false);
     expect(ctx.oscillators).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(0);
     expect(jingleEl("game_over").paused).toBe(true);
   });
 
@@ -290,11 +291,16 @@ describe("level-clear fanfare", () => {
   });
 
   it("keeps its pacing when the browser rejects the jingle play()", async () => {
+    // The first two play() calls of each element are rejected: the unlock, then the jingle itself.
     vi.stubGlobal(
       "Audio",
       class extends FakeAudio {
         override play() {
-          return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+          if (this.plays < 2) {
+            this.plays += 1;
+            return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+          }
+          return super.play();
         }
       },
     );
@@ -303,6 +309,9 @@ describe("level-clear fanfare", () => {
     playLevelWin(onEnded);
     await vi.advanceTimersByTimeAsync(LEVEL_WIN_MS + 1);
     expect(onEnded).toHaveBeenCalledTimes(1);
+    // Let the armed unlock retry run, so no document listener outlives this test.
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
   });
 });
 
@@ -316,6 +325,7 @@ describe("game-over jingle", () => {
     expect(el.volume).toBeCloseTo(0.5, 6);
     expect(el.paused).toBe(false);
     expect(ctx.oscillators).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(0);
     expect(jingleEl("music_level_win").paused).toBe(true);
   });
 
