@@ -744,6 +744,50 @@ describe("sanitizeCopilotEnvelope: state and forwardedProps caps", () => {
     expect(ok(JSON.stringify(envelope)).parsed).toEqual(envelope);
   });
 
+  // The site's client sends forwardedProps = the CopilotKit `properties` prop (unset: {}), plus
+  // toolChoice on a suggestions run. The runtime also reads a2uiCatalogAvailable (switches on the
+  // A2UI middleware: a render_a2ui tool and ~2.3K of server prompt), __proxiedMCPRequest,
+  // cloud.guardrails and command.resume, none of which the site sends (T-6382).
+  it("strips every forwardedProps key the site does not send, keeping toolChoice", () => {
+    const toolChoice = { type: "function", function: { name: "copilotkitSuggest" } };
+    const result = ok(
+      JSON.stringify(
+        runEnvelope({
+          messages: [turn(0)],
+          forwardedProps: {
+            a2uiCatalogAvailable: true,
+            __proxiedMCPRequest: true,
+            cloud: { guardrails: {} },
+            command: { resume: "x" },
+            toolChoice,
+          },
+        }),
+      ),
+    );
+    expect(result.parsed.body.forwardedProps).toEqual({ toolChoice });
+  });
+
+  it("leaves an empty forwardedProps empty and a missing one missing", () => {
+    expect(
+      ok(JSON.stringify(runEnvelope({ messages: [turn(0)], forwardedProps: {} }))).parsed.body
+        .forwardedProps,
+    ).toEqual({});
+    const without = runEnvelope({ messages: [turn(0)] });
+    delete (without.body as Record<string, unknown>).forwardedProps;
+    expect("forwardedProps" in ok(JSON.stringify(without)).parsed.body).toBe(false);
+  });
+
+  it("does not change what a suggestions run sends (tools, context, toolChoice survive)", () => {
+    const envelope = runEnvelope({
+      messages: [turn(0)],
+      tools: [SUGGEST_TOOL],
+      forwardedProps: { toolChoice: { type: "function", function: { name: "copilotkitSuggest" } } },
+    });
+    const result = ok(JSON.stringify(envelope));
+    expect(result.parsed.body.forwardedProps).toEqual(envelope.body.forwardedProps);
+    expect(result.droppedTools).toEqual([]);
+  });
+
   it("accepts state and forwardedProps just under their caps", () => {
     expect(COPILOT_MAX_STATE_CHARS).toBeGreaterThan(0);
     const state = { n: "s".repeat(COPILOT_MAX_STATE_CHARS - 20) };
