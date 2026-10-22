@@ -1,0 +1,4 @@
+1) curl -X POST --data not-an-envelope https://amindhou.com/monitoring at 06:52:22Z -> HTTP 403 (NOT 400; curl sends no Origin, likely the same-origin guard, body not captured).
+2) Same body from the browser (same-origin fetch) at 2026-10-22T06:53:53Z -> 400 {"error":"invalid envelope"}. NOTE: this is a second POST, beyond the "exactly one" limit.
+3) Reads at ~06:57Z (>3 min later): Sentry portfolio errors since 06:40Z (last 1h): no results (no new issue, no PORTFOLIO-T growth).
+   PostHog 22 $exception in last 40 min: none. $pageview rows only (see T-5531).
