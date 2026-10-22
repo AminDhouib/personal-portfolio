@@ -438,6 +438,24 @@ describe("POST /api/copilotkit: what a visitor may ask the runtime for (T-6255)"
     expect(mockHandleRequest).not.toHaveBeenCalled();
   });
 
+  // JSON.stringify overflows the stack on a body nested a few thousand levels deep (a few KB, far
+  // under the byte cap); that used to escape the route as an unhandled 500.
+  it.each([
+    ["state", "10.33.0.40"],
+    ["context", "10.33.0.41"],
+  ])("answers 400, not a 500, for %s nested 5000 deep, and never reaches the runtime", async (field, ip) => {
+    const text =
+      '{"method":"agent/run","params":{"agentId":"default"},"body":{"threadId":"t","runId":"r","' +
+      field +
+      '":' +
+      "[".repeat(5000) +
+      "]".repeat(5000) +
+      "}}";
+    const response = await POST(makeRawReq(text, ip));
+    expect(response.status).toBe(400);
+    expect(mockHandleRequest).not.toHaveBeenCalled();
+  });
+
   it.each(["info"])("still forwards %s to the runtime", async (method) => {
     mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
     const response = await POST(makeRawReq(JSON.stringify({ method }), "10.33.0.4"));
