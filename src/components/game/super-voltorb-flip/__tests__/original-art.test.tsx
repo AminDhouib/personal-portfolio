@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, cleanup, screen, fireEvent, act } from "@testing-library/react";
 
 // Pins the original Voltorb creature art (T-6535): a revealed Voltorb tile shows the sprite
@@ -24,7 +26,14 @@ vi.mock("../audio", () => ({
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 import { theme } from "../effects/default";
-import { EXPLODE_FRAME_SRCS, VOLTORB_TILE_SRC } from "../art/original-sprites";
+import {
+  EXPLODE_FRAME_PX,
+  EXPLODE_FRAME_SRCS,
+  VOLTORB_FACE_SCALE,
+  VOLTORB_TILE_PX,
+  VOLTORB_TILE_SRC,
+  explodeFrameCssSize,
+} from "../art/original-sprites";
 import { BURST_FRAMES } from "../art/fx";
 import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
@@ -60,6 +69,22 @@ describe("original sprite paths", () => {
     expect(VOLTORB_TILE_SRC).toBe(`${SPRITES}/voltorb.png`);
     expect(EXPLODE_FRAME_SRCS).toHaveLength(BURST_FRAMES);
     EXPLODE_FRAME_SRCS.forEach((src, i) => expect(src).toBe(`${SPRITES}/explode_${i}.png`));
+  });
+
+  it("records each sprite's native size, as the PNG header says", () => {
+    const size = (src: string) => {
+      const png = readFileSync(join(process.cwd(), "public", src));
+      return [png.readUInt32BE(16), png.readUInt32BE(20)];
+    };
+    expect(size(VOLTORB_TILE_SRC)).toEqual([VOLTORB_TILE_PX, VOLTORB_TILE_PX]);
+    EXPLODE_FRAME_SRCS.forEach((src, i) =>
+      expect(size(src)).toEqual([EXPLODE_FRAME_PX[i], EXPLODE_FRAME_PX[i]]),
+    );
+  });
+
+  it("grows the burst from the tile size up to its largest frame", () => {
+    expect(EXPLODE_FRAME_PX[0]).toBe(VOLTORB_TILE_PX);
+    expect([...EXPLODE_FRAME_PX]).toEqual([...EXPLODE_FRAME_PX].sort((a, b) => a - b));
   });
 });
 
@@ -104,6 +129,24 @@ describe("bomb burst", () => {
     }
     expect(seen).toEqual(EXPLODE_FRAME_SRCS);
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("scales every frame so the Voltorb baked into it matches the tile face", async () => {
+    const Burst = theme.BombFlip;
+    const { container } = render(<Burst row={0} col={0} onDone={() => {}} />);
+    for (let i = 0; i < BURST_FRAMES; i++) {
+      const img = container.querySelector("img")!;
+      // One native pixel is the same size in every frame, and the tile face draws its 22 px
+      // Voltorb at VOLTORB_FACE_SCALE of the tile, so a frame is (frame px / 22) faces wide.
+      expect(img.style.width).toBe(explodeFrameCssSize(i));
+      expect(img.style.height).toBe(explodeFrameCssSize(i));
+      expect(explodeFrameCssSize(i)).toBe(
+        `calc(var(--svf-tile) * ${((VOLTORB_FACE_SCALE * EXPLODE_FRAME_PX[i]!) / VOLTORB_TILE_PX).toFixed(4)})`,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60);
+      });
+    }
   });
 
   it("is a pixelated image over the tile that never takes the pointer", () => {

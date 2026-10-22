@@ -69,6 +69,18 @@ describe("GAME_CONTENT", () => {
     expect(credits).toMatch(/Nintendo/);
   });
 
+  it("says the Voltorb sprites and the music are the Nintendo originals, and the rest is not", () => {
+    const byLabel = new Map(
+      GAME_CONTENT["super-voltorb-flip"].credits.map((c) => [c.label, c.detail]),
+    );
+    for (const label of ["Music", "Voltorb sprites"]) {
+      expect(byLabel.get(label), label).toMatch(/original/i);
+      expect(byLabel.get(label), label).toMatch(/Nintendo, Creatures Inc. and GAME FREAK inc./);
+      expect(byLabel.get(label), label).toMatch(/non-commercial fan recreation/);
+    }
+    expect(byLabel.get("Sound effects and other artwork")).toMatch(/^Original/);
+  });
+
   it("credits Neal Agarwal's The Password Game on The Password Game 2", () => {
     const credits = GAME_CONTENT["password-game"].credits;
     expect(credits.some((c) => c.href === "https://neal.fun/password-game/")).toBe(true);
