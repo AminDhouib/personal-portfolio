@@ -1307,7 +1307,8 @@ The following Password Game 2 entries were verified against the current tree on 
   never break a link.
 - **Arcade scores are trusted up to plausibility ceilings; this is not anti-cheat.** The games run
   entirely in the browser, so every submitted value is client supplied. The registry rejects
-  fabricated short runs and absurd claims; it cannot catch moderate inflation on a long run, and
+  fabricated short runs, absurd claims and implausibly long runs (Space Shooter over 40 minutes,
+  Hextris over 2 hours); it cannot catch moderate inflation on a long run, and
   it is not meant to. Do not "fix" it by adding client signatures or telemetry: nothing in the
   browser is secret from the player.
 - **Arcade player ids are client-generated (trust on first use).** There are no accounts. The
@@ -1605,8 +1606,8 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   reads only the LEFTMOST `X-Forwarded-For`, and the devino.ca Cloudflare zone strips
   `X-Forwarded-For` on posthog.devino.ca on purpose (anti-spoof; never work around it). Through
   the public rewrite every event would arrive from this server's address and geo-IP would collapse
-  to one city. So `src/proxy.ts` rewrites capture sub-paths (`/e` and `/i/v0` and below, exact
-  prefix match, no lookalikes; both are on the allow-list above) to `POSTHOG_CAPTURE_INTERNAL_ORIGIN` (compose
+  to one city. So `src/proxy.ts` rewrites capture sub-paths (exactly `/e` and `/i/v0/e`, each with or
+  without one trailing slash; nothing below them matches, and both are on the allow-list above) to `POSTHOG_CAPTURE_INTERNAL_ORIGIN` (compose
   default `http://posthog-capture.internal`, mapped by `extra_hosts: host-gateway`), where a
   Traefik router (host infra owned by the Uptimely repo, see RUNBOOK.md) answers over the bridge.
   It sets `X-Forwarded-For` to the visitor's `CF-Connecting-IP` (shape-validated; Cloudflare
