@@ -993,14 +993,16 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   CopilotKit upgrade and whenever a new `useCopilotAction` is added.
   T-6255 closed two gaps in this layer, one of them a data leak, not a cost issue:
   (1) the envelope's `method` is allow-listed (`COPILOT_ALLOWED_METHODS`) to what the site's own
-  client sends with `useSingleEndpoint`: `info` and `inspector/metadata` on provider mount,
+  client sends with `useSingleEndpoint`: `info` on provider mount,
   `agent/connect` when CopilotChat mounts, `agent/run` per turn (the suggestions run is an
   `agent/run` too, because the stateless `agent/suggest` route is only used off the single
   endpoint), and `agent/stop` from the stop button; anything else is 400. Before this, `method:
 "resource/request"` let any visitor list the thread ids in the runtime's default in-memory
   runner (module-global, shared by every visitor), read other visitors' messages and events
   (including `collectLead` arguments) and `POST /threads/clear` to wipe them all. `transcribe`,
-  `inspector/learning`, `trajectory/connect` and memories are refused for the same reason. What is
+  `inspector/learning`, `trajectory/connect` and memories are refused for the same reason;
+  `inspector/metadata` is refused too (the client asks for it on load but treats any non-OK answer
+  as "none", and it answers 204 here anyway). What is
   still reachable: `agent/connect` and `agent/stop` take a `threadId`, so a caller who already
   knows another visitor's thread id (a client-generated random UUID) could replay its events or
   stop its run; nothing served to a visitor lists thread ids any more, so that needs a guess of a

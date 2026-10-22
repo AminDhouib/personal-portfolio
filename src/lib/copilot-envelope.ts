@@ -67,20 +67,19 @@ export const COPILOT_MAX_FORWARDED_PROPS_CHARS = 2000;
 
 /**
  * The single-route methods the site's own client sends (CopilotKit 1.77, `useSingleEndpoint`):
- *   - `info` and `inspector/metadata` when the provider mounts (the latter answers 204 here, there
- *     being no Intelligence backend);
+ *   - `info` when the provider mounts;
  *   - `agent/connect` when CopilotChat mounts (it replays a thread's history; none exists here);
  *   - `agent/run` for each turn and for the suggestions run;
  *   - `agent/stop` from the stop button.
  * Everything else the runtime serves is refused: `resource/request` (the thread list, thread
  * messages and events, and `POST /threads/clear`, all on a store shared by every visitor),
- * `transcribe`, `agent/suggest` (the stateless suggestions route; the client uses agent/run on a
+ * `inspector/metadata` (the client also asks for it on load, but treats any non-OK answer as "no
+ * metadata", and this runtime has none to give), `transcribe`, `agent/suggest` (the stateless suggestions route; the client uses agent/run on a
  * single endpoint), `inspector/learning`, `trajectory/connect` and memories. Exact string match,
  * as the runtime's own router does.
  */
 export const COPILOT_ALLOWED_METHODS: ReadonlySet<string> = new Set([
   "info",
-  "inspector/metadata",
   "agent/run",
   "agent/connect",
   "agent/stop",
