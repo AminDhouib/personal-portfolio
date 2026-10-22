@@ -60,11 +60,25 @@ function ensureTable(pool: Pool): Promise<void> {
 
 const SELECT_COLUMNS = `name, seed, time_ms AS "timeMs", daily, created_at AS "createdAt"`;
 
-const pg2BodySchema = z.object({
+// Two passes, in this order, because the status text depends on it. The envelope says the body is an
+// object carrying all four keys (their values may be anything, null included): anything else is
+// "invalid body". Only then do the field rules run, and the first failing field names the error.
+const pg2EnvelopeSchema = z.object({
   seed: z.unknown(),
   timeMs: z.unknown(),
   daily: z.unknown(),
   name: z.unknown(),
+});
+
+const pg2FieldsSchema = z.object({
+  seed: z.number().int().min(0).max(SEED_MAX),
+  // A fractional time is floored first, then bounded: 10000.9 is the floor, 9999.9 is not.
+  timeMs: z
+    .number()
+    .transform((n) => Math.floor(n))
+    .pipe(z.number().min(TIME_MS_MIN).max(TIME_MS_MAX)),
+  // Accept only a strict boolean true as daily; anything else defaults to false.
+  daily: z.unknown().transform((v) => v === true),
 });
 
 export async function GET(req: Request) {
@@ -148,22 +162,18 @@ export async function POST(req: Request) {
     windowMs: 60_000,
   });
   if (!guard.ok) return guard.response;
-  const parsed = pg2BodySchema.safeParse(guard.body);
-  if (!parsed.success) {
+  const envelope = pg2EnvelopeSchema.safeParse(guard.body);
+  if (!envelope.success) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-  const o = parsed.data;
-  const seed = typeof o.seed === "number" ? o.seed : NaN;
-  const timeMs = typeof o.timeMs === "number" ? Math.floor(o.timeMs) : NaN;
-  // Accept only a strict boolean true as daily; anything else defaults to false.
-  const daily = o.daily === true;
-
-  if (!Number.isInteger(seed) || seed < 0 || seed > SEED_MAX) {
-    return NextResponse.json({ error: "invalid seed" }, { status: 400 });
+  const o = envelope.data;
+  const fields = pg2FieldsSchema.safeParse(o);
+  if (!fields.success) {
+    // Issues arrive in schema order, so a bad seed is reported before a bad timeMs.
+    const error = fields.error.issues[0]?.path[0] === "seed" ? "invalid seed" : "invalid timeMs";
+    return NextResponse.json({ error }, { status: 400 });
   }
-  if (!Number.isFinite(timeMs) || timeMs < TIME_MS_MIN || timeMs > TIME_MS_MAX) {
-    return NextResponse.json({ error: "invalid timeMs" }, { status: 400 });
-  }
+  const { seed, timeMs, daily } = fields.data;
   // A daily run must be on the server's own daily seed, so the daily board cannot be seeded with
   // arbitrary rows. This is a consistency check, not anti-cheat: the board stays display-only.
   if (daily && !isAcceptedDailySeed(seed)) {
