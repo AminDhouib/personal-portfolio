@@ -7,6 +7,13 @@ const mockCreateOpenAI = vi.hoisted(() => vi.fn((_options: unknown) => ({ chat: 
 // Constructor mock must be a function expression, not an arrow -- arrows have
 // no [[Construct]] and `new` on one throws (vitest 4 quirk, see RUNBOOK).
 const mockCopilotRuntime = vi.hoisted(() => vi.fn(function MockCopilotRuntime() {}));
+// A real `new`-able constructor that records its options and instance (see the arrow-function note
+// above).
+const mockInMemoryRunner = vi.hoisted(() =>
+  vi.fn(function MockInMemoryAgentRunner(this: { options?: unknown }, options?: unknown) {
+    this.options = options;
+  }),
+);
 const mockEndpoint = vi.hoisted(() =>
   vi.fn((_options: unknown) => ({ handleRequest: mockHandleRequest })),
 );
@@ -24,6 +31,10 @@ vi.mock("@copilotkit/runtime", () => ({
   CopilotRuntime: mockCopilotRuntime,
   OpenAIAdapter: class MockOpenAIAdapter {},
   copilotRuntimeNextJSAppRouterEndpoint: mockEndpoint,
+}));
+
+vi.mock("@copilotkit/runtime/v2", () => ({
+  InMemoryAgentRunner: mockInMemoryRunner,
 }));
 
 vi.mock("@ai-sdk/openai", () => ({
@@ -174,6 +185,21 @@ describe("POST /api/copilotkit", () => {
   // 60s deadline signal. Every run after that signal fired was born aborted
   // (instant TimeoutError -> SSE RUN_ERROR), so chat only worked for ~60s after
   // each deploy. The runtime must be constructed per request.
+  // The default runner keeps up to 1000 threads, 100 runs each, 512 MiB of attacker-chosen
+  // content in memory (T-6259). The route must hand the runtime a bounded one.
+  it("builds the runtime with a bounded in-memory thread store", async () => {
+    mockHandleRequest.mockResolvedValue(new Response("ok"));
+    await POST(makeReq({ method: "info" }, { ip: "10.6.259.1" }));
+
+    expect(mockInMemoryRunner).toHaveBeenCalledWith({
+      maxThreads: 200,
+      maxRunsPerThread: 20,
+      maxBytes: 32 * 1024 * 1024,
+    });
+    const options = mockCopilotRuntime.mock.calls[0]?.[0] as { runner?: unknown } | undefined;
+    expect(options?.runner).toBeInstanceOf(mockInMemoryRunner);
+  });
+
   it("constructs a fresh CopilotRuntime per request", async () => {
     process.env.OPENROUTER_KEY = "test-key-abc";
     mockHandleRequest.mockResolvedValue(new Response("ok", { status: 200 }));
