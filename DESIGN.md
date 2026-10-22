@@ -1795,6 +1795,16 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   `CF-Connecting-IP`, so a direct-to-origin attacker can still choose their key. The fix is
   infrastructure (restrict the origin to Cloudflare's ranges or use authenticated origin pulls),
   not application code.
+- **Player names strip invisible fillers, but keep variation selectors** (T-6413,
+  `src/lib/player-name.ts`, shared by the arcade, Password Game 2, legacy import and the hub).
+  Besides controls, zero-width and bidi characters, it now removes U+00AD, U+115F, U+1160, U+2800
+  (the blank braille pattern only), U+3164 and U+FFA0, which draw nothing yet are not whitespace to
+  `trim`, so a name made of them used to be stored as an empty-looking row. A name left empty
+  (checked after the length cut) gets the caller's fallback, exactly like an all-whitespace one.
+  Variation selectors (U+FE00-FE0F, U+E0100-E01EF) are deliberately NOT stripped: VS16 is what
+  makes a heart or a keycap an emoji. They only count as empty when nothing else is left. Name
+  length rules and the storage schema are unchanged; rows already stored keep their text and are
+  cleaned on the hub's read path.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
