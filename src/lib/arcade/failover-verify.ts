@@ -250,7 +250,7 @@ async function check(
   // Before anything is queued or replayed: what no recorded run can claim, then what was already
   // played (judged afresh, so the verdict is the replay's), then the caps. A refusal here costs
   // next to nothing, and only a replay that is about to start spends an admission.
-  const structural = structuralReason(log, score, ticks);
+  const structural = structuralReason(log, ticks);
   if (structural !== null) return refuse(structural);
   const key = replayKey(today, ticks, proof);
   const remembered = recentReplay(key);
