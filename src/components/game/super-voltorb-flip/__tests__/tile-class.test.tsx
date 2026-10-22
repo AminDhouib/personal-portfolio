@@ -31,7 +31,6 @@ vi.mock("../effects/context", () => ({
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 import { RISK_WARNING_MS } from "../sound-cues";
 import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
-import { firstButton } from "@/test/first-button";
 
 // These tests render the whole Super Voltorb Flip board in jsdom; see src/test/heavy.ts for why the
 // 5 s default is not enough.
@@ -66,13 +65,11 @@ afterEach(() => {
 describe("tile wrapper classes", () => {
   it("keeps the perspective utility and the anxious modifier as separate tokens", async () => {
     render(<SuperVoltorbFlipGame />);
-    const idle = firstButton(RISKY_TILE);
+    const idle = screen.getByRole("button", { name: RISKY_TILE });
     expect(idle.classList.contains("[perspective:1000px]")).toBe(true);
     expect(idle.classList.contains("svf-tile-anxious")).toBe(false);
 
     fireEvent.click(idle);
-    // After the click the tile's accessible name no longer comes from an aria-label or its text, so
-    // this lookup keeps the role query (one scan).
     const held = screen.getByRole("button", { name: RISKY_TILE });
     expect(held.classList.contains("[perspective:1000px]")).toBe(true);
     expect(held.classList.contains("svf-tile-anxious")).toBe(true);
