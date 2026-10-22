@@ -254,9 +254,12 @@ describe("tapRunErrors", () => {
 
       vi.setSystemTime(new Date(Date.now() + WINDOW_MS + 1));
       mockCaptureException.mockClear();
-      for (let i = 0; i < PER_WINDOW; i += 1) await run({ ...RUN_ERROR, code: "brand-new" });
+      // Junk codes first: with no eviction they would spend the shared overflow bucket's five
+      // captures, and the real new failure after them would be suppressed.
+      for (let i = 0; i < PER_WINDOW; i += 1) await run({ ...RUN_ERROR, code: `junk-${i}` });
+      await run({ ...RUN_ERROR, code: "brand-new" });
 
-      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW);
+      expect(mockCaptureException).toHaveBeenCalledTimes(PER_WINDOW + 1);
     });
 
     it("keeps the overflow bucket while all MAX_CODES buckets are still in an active window", async () => {
