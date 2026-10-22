@@ -100,27 +100,18 @@ export const COPILOT_ALLOWED_METHODS: ReadonlySet<string> = new Set([
 /** Methods whose `body` is a RunAgentInput: it must be a plain object, and is capped. */
 const RUN_METHODS: ReadonlySet<string> = new Set(["agent/run", "agent/connect"]);
 
-function deepFreeze<T>(value: T): T {
-  if (typeof value === "object" && value !== null) {
-    for (const child of Object.values(value)) deepFreeze(child);
-    Object.freeze(value);
-  }
-  return value;
-}
-
 /**
  * The client tools the site really registers, as the server's own copies: `collectLead`
  * (use-lead-collector-action.ts) and the `copilotkitSuggest` tool CopilotKit's core attaches to a
  * chat-suggestions run (SUGGEST_TOOL in @copilotkit/core 1.77, verbatim). A tool the client sends
- * under one of these names is replaced by a fresh clone of the copy here (frozen, and cloned per
- * request so nothing downstream can change what the next request sees), not forwarded: its `parameters` is a
+ * under one of these names is replaced by the copy here, not forwarded: its `parameters` is a
  * JSON schema the runtime builds a validator from, and a schema keyword such as `pattern` or
  * `patternProperties` is a regex compiled and run on the model's tool-call arguments, so a
  * client-chosen "^(a+)+$" blocks the event loop; its description is client-written model
  * instructions. Every other tool is dropped. The copies are pinned against what the client sends in
  * copilot-envelope.test.ts, so a CopilotKit upgrade that changes one surfaces there.
  */
-export const COPILOT_TOOL_DEFINITIONS: Readonly<Record<string, unknown>> = deepFreeze({
+export const COPILOT_TOOL_DEFINITIONS: Readonly<Record<string, unknown>> = {
   collectLead: {
     name: "collectLead",
     description:
@@ -168,7 +159,7 @@ export const COPILOT_TOOL_DEFINITIONS: Readonly<Record<string, unknown>> = deepF
       required: ["suggestions"],
     },
   },
-});
+};
 
 const SERVER_ONLY_ROLES = new Set(["system", "developer"]);
 
@@ -307,7 +298,7 @@ function sanitizeParsed(envelope: Record<string, unknown>): EnvelopeResult {
         const name = toolName(tool);
         const own = name !== null && Object.hasOwn(COPILOT_TOOL_DEFINITIONS, name);
         if (!own) droppedTools.push(name ?? "?");
-        return own ? [structuredClone(COPILOT_TOOL_DEFINITIONS[name])] : [];
+        return own ? [COPILOT_TOOL_DEFINITIONS[name]] : [];
       });
     }
   }
