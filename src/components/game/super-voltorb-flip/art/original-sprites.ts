@@ -32,7 +32,7 @@ export const SPRITE_NO_GRAB_STYLE = { WebkitTouchCallout: "none", userSelect: "n
 // Held so a browser cannot drop a request it considers unreferenced.
 const preloaded: HTMLImageElement[] = [];
 
-/** Warm the ten sprite files into the HTTP cache so the first bomb of a visit does not stall frame by frame. */
+/** Warm the eleven sprite images into the HTTP cache so the first bomb of a visit does not stall frame by frame. */
 export function preloadOriginalSprites(): void {
   if (typeof Image === "undefined") return;
   for (const src of [VOLTORB_TILE_SRC, VOLTORB_ICON_SRC, ...EXPLODE_FRAME_SRCS]) {
@@ -60,9 +60,18 @@ export const EXPLODE_FRAME_PX: readonly number[] = [22, 22, 22, 34, 42, 56, 60, 
  * art (never below 1x), so every source pixel lands on whole screen pixels. Boxes under 32 px get
  * 16, 36 and 44 px boxes get 32.
  */
+// Callers must pass a box of at least 16 px: the icon never draws below 1x, so a smaller box
+// would be overflowed by it.
 export function crispIconSize(box: number): number {
   return Math.max(VOLTORB_ICON_PX, VOLTORB_ICON_PX * Math.floor(box / VOLTORB_ICON_PX));
 }
+
+/**
+ * The burst frames that are drawn on transparency (explode_3 to explode_8). explode_0 to
+ * explode_2 are opaque 22 px tile shake frames: they belong over a board tile, not over a bare
+ * icon, so the legend loop skips them.
+ */
+export const LEGEND_BURST_FRAMES: readonly number[] = [3, 4, 5, 6, 7, 8];
 
 /** The largest burst frame (px): the size a burst scaled to fit a box is scaled from. */
 export const EXPLODE_FRAME_MAX_PX = Math.max(...EXPLODE_FRAME_PX);
