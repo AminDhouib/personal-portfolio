@@ -40,6 +40,7 @@ import {
   TICKS_MISMATCH_REASON,
 } from "../failover-gates";
 import { createFailoverVerifier, MAX_WAITING, resetVerifierForTests } from "../failover-verify";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { VERIFY_RATE_LIMITED_REASON } from "../verify-reasons";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
@@ -480,6 +481,22 @@ describe("the replay-attempt cap", () => {
     }
     expect(admitted).toBe(REPLAY_GLOBAL_LIMIT);
     expect(admitReplay("10.3.0.1").allowed).toBe(false);
+  });
+
+  // T-6262: the process-wide cap lives in the same limiter as the per-client buckets, whose map
+  // evicts its oldest live keys past 10,000. Churning keys must not hand the cap back.
+  it("keeps the global cap spent through a flood of unrelated limiter keys", () => {
+    for (let n = 0; n < REPLAY_GLOBAL_LIMIT; n++) {
+      expect(admitReplay(`10.6.${Math.floor(n / 200)}.${n % 200}`).allowed).toBe(true);
+    }
+    expect(admitReplay("10.7.0.1").allowed).toBe(false);
+
+    for (let i = 0; i < 12_000; i++) {
+      checkRateLimit(`churn-${i}`, { limit: 1, windowMs: REPLAY_WINDOW_MS });
+    }
+
+    expect(admitReplay("10.7.0.2").allowed).toBe(false);
+    expect(admitReplay(undefined).allowed).toBe(false);
   });
 
   it("lets a client back in once its window has passed", () => {
