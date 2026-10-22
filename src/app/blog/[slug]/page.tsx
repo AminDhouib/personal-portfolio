@@ -8,6 +8,7 @@ import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getBlogPost, getAllBlogSlugs, extractToc } from "@/lib/blog";
 import { formatDate, formatRelativeDate } from "@/lib/date-utils";
+import { serializeJsonLd } from "@/lib/structured-data";
 import { ShareButton, TableOfContents } from "@/components/blog/toc-share";
 import { BookCallCta } from "@/components/ui/book-call-cta";
 import type { Metadata } from "next";
@@ -102,7 +103,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(blogPostingLd).replace(/</g, "\\u003c"),
+          __html: serializeJsonLd(blogPostingLd),
         }}
       />
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
