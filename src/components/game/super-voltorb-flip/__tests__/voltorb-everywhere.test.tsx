@@ -36,6 +36,7 @@ import { MemoBar, type MemoFlagSet } from "../memo-button";
 import { InstructionsBtns, LoopingExplosion, VoltorbIcon } from "../chrome";
 import { ExplodeFrameImg, VoltorbSprite } from "../art/voltorb-sprite";
 import {
+  EXPLODE_FRAME_MAX_PX,
   EXPLODE_FRAME_PX,
   EXPLODE_FRAME_SRCS,
   SPRITE_NO_GRAB_STYLE,
@@ -173,7 +174,7 @@ describe("VoltorbIcon", () => {
 });
 
 describe("LoopingExplosion", () => {
-  it("loops the original explode frames at native size, holding the first, in a box that keeps its size", async () => {
+  it("loops the original explode frames, holding the first, in a box that keeps its size", async () => {
     const { container } = render(<LoopingExplosion size={36} />);
     const box = container.firstElementChild as HTMLElement;
     expect(box.style.width).toBe("36px");
@@ -189,11 +190,29 @@ describe("LoopingExplosion", () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(70);
       });
-      const img = container.querySelector("img")!;
-      expect(img.getAttribute("src")).toBe(EXPLODE_FRAME_SRCS[f]);
-      expect(img.style.width).toBe(`${EXPLODE_FRAME_PX[f]}px`);
+      expect(container.querySelector("img")!.getAttribute("src")).toBe(EXPLODE_FRAME_SRCS[f]);
     }
   });
+
+  it.each([36, 38])(
+    "scales every frame by box/64 so the burst never leaves its %ipx box",
+    async (size) => {
+      expect(EXPLODE_FRAME_MAX_PX).toBe(64);
+      const { container } = render(<LoopingExplosion size={size} />);
+      for (let f = 0; f < EXPLODE_FRAME_SRCS.length; f++) {
+        const img = container.querySelector("img")!;
+        const width = parseFloat(img.style.width);
+        expect(img.style.width.endsWith("px")).toBe(true);
+        expect(width).toBeCloseTo((EXPLODE_FRAME_PX[f]! * size) / EXPLODE_FRAME_MAX_PX, 1);
+        expect(width).toBeLessThanOrEqual(size);
+        expect(img.style.height).toBe(img.style.width);
+        expect(img.style.imageRendering).toBe("pixelated");
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(f === 0 ? 500 : 70);
+        });
+      }
+    },
+  );
 });
 
 describe("MemoBar", () => {
