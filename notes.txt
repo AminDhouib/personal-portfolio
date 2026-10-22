@@ -1,0 +1,2 @@
+Prod c6457e6f 2026-10-22 ~11:32Z. Home page, launcher el.click(), chips rendered (3: What has Amin built? / Is Amin available for hire? / How do I book a call with Amin?), no duplicates. chat-chips.png.
+Network after open (resource timings cleared first): /api/copilotkit 200, /api/copilotkit 200 (2 requests, 0 x 429). Console errors: none. Nothing typed.
