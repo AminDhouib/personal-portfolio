@@ -131,7 +131,8 @@ style suggestions.
   rises — never lowered except with a stated reason in that commit's message (the pass-2 drop
   from 67/63/61/54 was the denominator becoming honest, documented in that commit).
 - **Lighthouse gate over every public page** (CI-only — needs a built, booted server, so it is
-  not part of the local sweep): the `lighthouse` CI job boots the standalone bundle and runs
+  not part of the local sweep): the `lighthouse` CI job does its own build (no `NEXT_PUBLIC_GA4_ID`: the shared e2e build's gtag
+  bootstrap cost the homepage performance score, 0.48 to 0.41), boots the standalone bundle and runs
   `node scripts/run-lighthouse.mjs`, which derives the URL list from the server's own
   `/sitemap.xml` (plus `EXTRA_PATHS` for public routes deliberately kept out of the sitemap,
   currently `/ai`) — a new public page enters the audit the moment it enters the sitemap.
@@ -139,7 +140,8 @@ style suggestions.
   and ratchet like coverage (raise when measured scores rise, never lower to make CI pass);
   performance and best-practices stay **warn**-only because CI runner timing is too noisy for a
   hard floor. The deploy job requires this gate.
-- **E2E gate** (CI job `e2e`; runs locally only against a booted build, see RUNBOOK.md): Playwright
+- **E2E gate** (CI job `e2e`, which downloads the standalone tarball the `build` job made; runs
+  locally only against a booted build, see RUNBOOK.md): Playwright
   (`e2e/`, `playwright.config.ts`) drives Chrome against the standalone production build.
   Nothing is mocked. The specs read the server's own sitemap, robots.txt, llms.txt and JSON-LD, and
   walk the funnel (Book a Call links, conversion events, the chat launcher, phone width). Every
