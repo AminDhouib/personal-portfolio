@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { NextRequest } from "next/server";
+import * as nextStaticInfo from "next/dist/build/analysis/get-page-static-info";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { config, proxy } from "@/proxy";
 import { POSTHOG_PROXY_PATH } from "@/lib/posthog-proxy";
@@ -189,21 +190,32 @@ describe("proxy: trailing slashes on ordinary paths", () => {
 });
 
 describe("proxy: matcher", () => {
-  const matcher = config.matcher[0] ?? "";
-  // Next compiles matcher sources with path-to-regexp; the leading-slash negative lookahead is
-  // plain regex, so anchoring it directly is the same test.
-  const matches = (path: string) => new RegExp(`^${matcher}$`).test(path);
+  // Next compiles the matcher source with path-to-regexp and wraps it (data-route prefix and
+  // suffix, optional trailing delimiter); getMiddlewareMatchers is that exact step, so the tests
+  // below run the regexp the server really uses instead of a hand-anchored stand-in. It is a Next
+  // internal that the package types do not export: re-check it resolves on every Next upgrade.
+  const { getMiddlewareMatchers } = nextStaticInfo as unknown as {
+    getMiddlewareMatchers(
+      matcher: string[],
+      nextConfig: Record<string, never>,
+    ): Array<{ regexp: string }>;
+  };
+  const compiled = getMiddlewareMatchers(config.matcher, {})[0];
+  if (!compiled) throw new Error("expected one compiled matcher");
+  const matcherRegExp = new RegExp(compiled.regexp);
+  const matches = (path: string) => matcherRegExp.test(path);
 
   it("is a single statically-analysable pattern", () => {
     expect(config.matcher).toHaveLength(1);
   });
 
-  it("runs for pages, API routes, the proxy path and trailing-slash lookalikes of files", () => {
+  it("runs for pages, the proxy path and trailing-slash lookalikes of files", () => {
     for (const path of [
       "/",
+      "/about",
       "/about/",
       "/games/hextris",
-      "/api/health",
+      "/games/hextris/",
       `${POSTHOG_PROXY_PATH}/e/`,
       "/robots.txt/",
       "/favicon.ico/",
@@ -224,10 +236,39 @@ describe("proxy: matcher", () => {
       "/monitoringx",
       "/monitoring-extra",
       "/monitoring/x",
-      "/api/monitoring",
       "/x/monitoring",
       "/Monitoring",
     ]) {
+      expect(matches(path), path).toBe(true);
+    }
+  });
+
+  // T-5526: with the proxy in front, Next clones every matched request body (up to
+  // proxyClientMaxBodySize, 10 MB) into memory before any route runs, ahead of the origin and
+  // rate-limit guards. API routes do their own capped read, so they skip the proxy.
+  it("skips API routes, so their bodies are not cloned ahead of the route's own guards", () => {
+    for (const path of [
+      "/api/leads",
+      "/api/copilotkit",
+      "/api/arcade/scores",
+      "/api/password-game-2/leaderboard",
+      "/api/health",
+      "/api/leaderboard",
+    ]) {
+      expect(matches(path), path).toBe(false);
+    }
+  });
+
+  // The slashless 308 is the one thing the proxy does for an /api path, so the slash form keeps
+  // running it: it must answer 308, never reach the route as a duplicate URL.
+  it("still runs for the trailing-slash form of an API path, which gets the slashless 308", () => {
+    for (const path of ["/api/leads/", "/api/arcade/scores/", "/api/health/", "/api//"]) {
+      expect(matches(path), path).toBe(true);
+    }
+  });
+
+  it("does not skip lookalikes of the API prefix", () => {
+    for (const path of ["/api", "/apix/y", "/x/api/y", "/API/leads", "/apidocs/leads"]) {
       expect(matches(path), path).toBe(true);
     }
   });
