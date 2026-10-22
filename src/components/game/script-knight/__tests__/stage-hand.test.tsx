@@ -8,6 +8,10 @@ import type { RunOutcome } from "../sandbox/run-client";
 import { Stage } from "../stage";
 import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
+// These tests render the full Stage and solve daily floors in jsdom; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
+
 beforeEach(() => localStorage.clear());
 afterEach(() => {
   cleanup();
