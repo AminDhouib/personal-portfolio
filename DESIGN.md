@@ -1044,6 +1044,10 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   cost is that the copies must track the client. A test pins them equal to the definitions the
   client sends (`collectLead` from `use-lead-collector-action.ts`, `copilotkitSuggest` verbatim from
   `SUGGEST_TOOL` in `@copilotkit/core`), so a CopilotKit upgrade or a changed action fails there.
+  At most one copy of each name is forwarded (so `tools` has at most two entries): every entry becomes
+  a ~630-byte server copy, and 5,000 repeats of a 29-byte `{"name":"copilotkitSuggest"}` would have
+  grown 21x into the response (RUN_STARTED echoes the input) and the in-memory thread store. A repeat
+  is not logged as dropped content.
   Not covered: `format` keywords run fixed regexes the client cannot choose.
   Re-check the method list against the client on a CopilotKit upgrade (`route.integration.test.ts`
   runs the real runtime).
