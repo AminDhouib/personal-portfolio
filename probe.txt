@@ -1,0 +1,4 @@
+One request only, from the page https://amindhou.com/ (headed Chrome), 2026-10-22T14:03:26.959Z (UTC, taken just before the fetch)
+fetch('/monitoring', {method:'POST', headers:{'content-type':'application/x-sentry-envelope'}, body:'x\n{}'})
+status: 400
+response body: {"error":"invalid envelope"}
