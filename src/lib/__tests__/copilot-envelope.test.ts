@@ -1,8 +1,9 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   COPILOT_MAX_BODY_BYTES,
   COPILOT_MAX_CONTEXT_CHARS,
+  COPILOT_MAX_DEPTH,
   COPILOT_MAX_FORWARDED_PROPS_CHARS,
   COPILOT_MAX_MESSAGES,
   COPILOT_MAX_MESSAGE_CHARS,
@@ -461,12 +462,128 @@ describe("sanitizeCopilotEnvelope: __proto__ keys", () => {
     expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false });
   });
 
+  // JSON lets a key be written with unicode escapes, and it parses to the very same own key, so a
+  // scan of the raw text (or a regex) would miss it: the parsed object is what has to be walked.
+  it("answers 400 for a unicode-escaped __proto__ key, which parses to the same own key", () => {
+    const body = { ...runEnvelope({ messages: [turn(0)] }).body, __pr0to__: { resume } };
+    const text = JSON.stringify({ method: "agent/run", params: { agentId: "default" }, body })
+      .split("__pr0to__")
+      .join("\\u005f\\u005fproto\\u005f\\u005f");
+    expect(text).not.toContain('"__proto__"');
+    expect(Object.keys(JSON.parse(text).body)).toContain("__proto__");
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("answers 400 for a __proto__ inside messages[0] that would make toolCalls inherited", () => {
+    const messages = [
+      { id: "m-0", role: "assistant", __pr0to__: { toolCalls: [{ id: "c1", type: "function" }] } },
+    ];
+    const text = withProtoKey(runEnvelope({ messages }));
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
   it("does not mistake the string __proto__ or other lookalike keys for the key", () => {
     const run = runEnvelope({
       messages: [{ ...turn(0), content: "talk about __proto__ and prototype" }],
       state: { constructor: "c", prototype: "p", proto: "q" },
     });
     expect(sanitizeCopilotEnvelope(JSON.stringify(run))).toMatchObject({ ok: true });
+  });
+});
+
+// A body of "[[[...]]]" is a few KB, so the byte cap does not stop it, and JSON.stringify (which
+// every size measurement below uses) overflows the call stack on it. The depth is bounded in the
+// same walk that looks for __proto__, before anything is serialised.
+function nest(levels: number, leaf = ""): string {
+  return "[".repeat(levels) + leaf + "]".repeat(levels);
+}
+
+function depthOf(root: unknown): number {
+  let deepest = 0;
+  const stack: Array<[unknown, number]> = [[root, 1]];
+  while (stack.length > 0) {
+    const [value, depth] = stack.pop() as [unknown, number];
+    if (typeof value !== "object" || value === null) continue;
+    deepest = Math.max(deepest, depth);
+    for (const child of Object.values(value)) stack.push([child, depth + 1]);
+  }
+  return deepest;
+}
+
+describe("sanitizeCopilotEnvelope: nesting depth", () => {
+  // The envelope is depth 1, its body 2, and so on. The deepest thing the site's own client sends
+  // is a tool definition (envelope > body > tools > tool > parameters > properties > property) and
+  // an assistant tool call (envelope > body > messages > message > toolCalls > call > function),
+  // both 7 deep. COPILOT_MAX_DEPTH is more than four times that.
+  const toolCallMessages = [
+    { id: "1", role: "user", content: "email me" },
+    {
+      id: "2",
+      role: "assistant",
+      toolCalls: [
+        { id: "c1", type: "function", function: { name: "collectLead", arguments: "{}" } },
+      ],
+    },
+    { id: "3", role: "tool", toolCallId: "c1", content: "Lead saved" },
+  ];
+  const real = [
+    runEnvelope({ messages: [turn(0)], tools: [COLLECT_LEAD_TOOL] }),
+    runEnvelope({ messages: [turn(0)], tools: [SUGGEST_TOOL], forwardedProps: { toolChoice: {} } }),
+    runEnvelope({ messages: toolCallMessages }),
+  ];
+
+  it("leaves the cap well above the deepest request the site's own client sends", () => {
+    for (const envelope of real) {
+      expect(depthOf(envelope)).toBeLessThanOrEqual(7);
+      expect(ok(JSON.stringify(envelope)).parsed).toEqual(envelope);
+    }
+    expect(COPILOT_MAX_DEPTH).toBeGreaterThanOrEqual(4 * 7);
+  });
+
+  it.each(["state", "context", "forwardedProps", "messages", "tools"])(
+    "answers 400, not a throw, for %s nested 5000 deep",
+    (field) => {
+      const text =
+        '{"method":"agent/run","params":{"agentId":"default"},"body":{"threadId":"t","runId":"r","' +
+        field +
+        '":' +
+        nest(5000) +
+        "}}";
+      expect(text.length).toBeLessThan(COPILOT_MAX_BODY_BYTES);
+      expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+    },
+  );
+
+  it("answers 400 for 5000 nested objects as well as arrays", () => {
+    let nested = "{}";
+    for (let i = 0; i < 5000; i++) nested = '{"a":' + nested + "}";
+    const text = '{"method":"agent/run","params":{"agentId":"default"},"body":{"state":' + nested + "}}";
+    expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("allows state down to exactly COPILOT_MAX_DEPTH and refuses one level more", () => {
+    // envelope 1 > body 2 > state 3, so state may hold COPILOT_MAX_DEPTH - 2 levels of arrays.
+    const at = (levels: number) =>
+      '{"method":"agent/run","params":{"agentId":"default"},"body":{"threadId":"t","runId":"r","state":' +
+      nest(levels) +
+      "}}";
+    expect(sanitizeCopilotEnvelope(at(COPILOT_MAX_DEPTH - 2))).toMatchObject({ ok: true });
+    expect(sanitizeCopilotEnvelope(at(COPILOT_MAX_DEPTH - 1))).toMatchObject({
+      ok: false,
+      status: 400,
+    });
+  });
+
+  it("maps a throw from the size measurement to 400 instead of letting it escape", () => {
+    const text = JSON.stringify(runEnvelope({ messages: [turn(0)] }));
+    const stringify = vi.spyOn(JSON, "stringify").mockImplementation(() => {
+      throw new RangeError("Maximum call stack size exceeded");
+    });
+    try {
+      expect(sanitizeCopilotEnvelope(text)).toMatchObject({ ok: false, status: 400 });
+    } finally {
+      stringify.mockRestore();
+    }
   });
 });
 
