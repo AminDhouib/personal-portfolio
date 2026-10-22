@@ -14,7 +14,7 @@ vi.mock("@/lib/log", () => ({
 }));
 
 import { POST } from "../route";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 import { makeJsonPostRequest } from "@/test/api-route-helpers";
 
 function sendlyAccepted(): Response {
@@ -368,5 +368,90 @@ describe("POST /api/leads", () => {
   it("returns 400 for an invalid email format", async () => {
     const res = await POST(makeJsonPostRequest({ name: "Ada", email: "not-an-email" }));
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/leads abuse limits", () => {
+  // Mirrors LEAD_EMAIL_DAILY_CAP in route.ts.
+  const CAP = 50;
+  let savedSendlyKey: string | undefined;
+
+  function lead(extra: Record<string, unknown> = {}) {
+    return makeJsonPostRequest({ name: "Ada", email: "ada@example.com", ...extra });
+  }
+
+  beforeEach(() => {
+    savedSendlyKey = process.env.SENDLY_API_KEY;
+    process.env.SENDLY_API_KEY = "sk_test_key";
+    mockFetch.mockReset().mockImplementation(async () => sendlyAccepted());
+    vi.stubGlobal("fetch", mockFetch);
+    vi.mocked(logWarn).mockClear();
+    mockAppendLead.mockReset().mockResolvedValue({
+      id: "test-uuid",
+      name: "Ada",
+      email: "ada@example.com",
+      note: "",
+      source: "chatbot",
+      page: "",
+      createdAt: "2026-07-08T00:00:00.000Z",
+    });
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    if (savedSendlyKey === undefined) delete process.env.SENDLY_API_KEY;
+    else process.env.SENDLY_API_KEY = savedSendlyKey;
+  });
+
+  it("emails the cap-th lead of a UTC day but not the next, still storing it with the same response", async () => {
+    vi.setSystemTime(new Date("2031-03-01T10:00:00Z"));
+    for (let i = 0; i < CAP; i += 1) {
+      expect((await POST(lead())).status).toBe(200);
+    }
+    expect(mockFetch).toHaveBeenCalledTimes(CAP);
+
+    const over = await POST(lead());
+    expect(over.status).toBe(200);
+    expect(await over.json()).toEqual({
+      ok: true,
+      id: "test-uuid",
+      createdAt: "2026-07-08T00:00:00.000Z",
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(CAP);
+    expect(mockAppendLead).toHaveBeenCalledTimes(CAP + 1);
+    expect(logWarn).toHaveBeenCalledWith(
+      "leads",
+      expect.stringContaining("daily lead email cap"),
+      expect.anything(),
+    );
+  });
+
+  it("resets the budget when the UTC day rolls over", async () => {
+    vi.setSystemTime(new Date("2031-04-01T23:59:00Z"));
+    for (let i = 0; i < CAP + 1; i += 1) await POST(lead());
+    expect(mockFetch).toHaveBeenCalledTimes(CAP);
+
+    vi.setSystemTime(new Date("2031-04-02T00:00:01Z"));
+    await POST(lead());
+    expect(mockFetch).toHaveBeenCalledTimes(CAP + 1);
+  });
+
+  it("answers the normal success shape for a filled honeypot without storing or emailing", async () => {
+    const res = await POST(lead({ website: "http://spam.example" }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, id: null, createdAt: null });
+    expect(mockAppendLead).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(logWarn).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an empty honeypot as a normal lead", async () => {
+    const res = await POST(lead({ website: "" }));
+    expect(res.status).toBe(200);
+    expect(mockAppendLead).toHaveBeenCalledOnce();
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 });

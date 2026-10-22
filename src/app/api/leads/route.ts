@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { appendLead } from "@/lib/leads-store";
 import { guardedJsonRoute } from "@/lib/route-guard";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 import { sendSendlyEmail } from "@/lib/sendly";
 import { env } from "@/env";
 
@@ -20,6 +20,26 @@ const NOTE_MAX = 5000;
 const SOURCE_MAX = 100;
 const PAGE_MAX = 200;
 
+// Process-wide ceiling on notification emails per UTC day. The per-IP limit (5/min) alone lets a
+// botnet turn every lead into a Sendly email; past this many, leads are still stored but no email
+// is sent. The response is identical either way so the cap is not an oracle. The counter is
+// in-memory and resets on restart, which only ever loosens it by a handful of emails.
+const LEAD_EMAIL_DAILY_CAP = 50;
+let emailDay = "";
+let emailsToday = 0;
+
+/** Reserves one email slot for today (UTC); false once the daily cap is spent. */
+function takeEmailSlot(): boolean {
+  const day = new Date().toISOString().slice(0, 10);
+  if (day !== emailDay) {
+    emailDay = day;
+    emailsToday = 0;
+  }
+  if (emailsToday >= LEAD_EMAIL_DAILY_CAP) return false;
+  emailsToday += 1;
+  return true;
+}
+
 // Validates the body is a JSON object; the individual fields are narrowed below
 // (gate rule 3: API routes must zod-parse their input). Fields stay `unknown` so
 // the existing hand-rolled field checks remain the source of truth.
@@ -28,6 +48,8 @@ const leadSchema = z.object({
   email: z.unknown(),
   note: z.unknown().optional(),
   source: z.unknown().optional(),
+  // Honeypot: the real client never sends it, so any non-empty value is a form-filling bot.
+  website: z.unknown().optional(),
 });
 
 /**
@@ -55,7 +77,12 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
-  const { name, email, note, source } = parsed.data;
+  const { name, email, note, source, website } = parsed.data;
+
+  if (typeof website === "string" ? website !== "" : website != null) {
+    logWarn("leads", "honeypot field filled, lead dropped");
+    return NextResponse.json({ ok: true, id: null, createdAt: null });
+  }
 
   if (typeof name !== "string" || !name || typeof email !== "string" || !email) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
@@ -98,7 +125,14 @@ export async function POST(req: NextRequest) {
   );
 
   let emailOk = false;
-  if (env.SENDLY_API_KEY) {
+  let sendEmail = Boolean(env.SENDLY_API_KEY);
+  if (sendEmail && !takeEmailSlot()) {
+    sendEmail = false;
+    logWarn("leads", "daily lead email cap reached, lead stored without notification", {
+      id: persisted?.id ?? null,
+    });
+  }
+  if (env.SENDLY_API_KEY && sendEmail) {
     try {
       await sendSendlyEmail({
         apiKey: env.SENDLY_API_KEY,
