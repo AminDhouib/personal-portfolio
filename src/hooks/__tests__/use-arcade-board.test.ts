@@ -301,6 +301,18 @@ describe("useArcadeBoard", () => {
       expect(reportErrorMock).toHaveBeenCalledTimes(1);
     });
 
+    it.each(["Failed to fetch", "NetworkError when attempting to fetch resource.", "Load failed"])(
+      "does not report a blocked network (%s) on a GET, and still shows the read error",
+      async (message) => {
+        fetchMock.mockRejectedValueOnce(new TypeError(message));
+        const { result } = renderHook(() => useArcadeBoard("space-shooter"));
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.readError).toBeTruthy();
+        expect(reportErrorMock).not.toHaveBeenCalled();
+      },
+    );
+
     it("clears the rows and the you row the moment the period changes, before the new board lands", async () => {
       fetchMock.mockResolvedValueOnce(
         okResponse(board([serverEntry({ handle: "Today" })], { rank: 1, score: 10 })),
@@ -907,6 +919,23 @@ describe("useArcadeBoard", () => {
       });
       expect(submitResult).toEqual({ ok: false });
       expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not report a blocked network on a POST and returns { ok:false }", async () => {
+      const { result } = await mounted();
+      fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      let submitResult: unknown;
+      await act(async () => {
+        submitResult = await result.current.submit({
+          name: "Ada",
+          score: 5,
+          seconds: 1,
+          kills: 1,
+          distance: 1,
+        });
+      });
+      expect(submitResult).toEqual({ ok: false });
+      expect(reportErrorMock).not.toHaveBeenCalled();
     });
 
     it("clips an over-long handle to 200 characters before sending", async () => {
