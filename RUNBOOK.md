@@ -398,6 +398,8 @@ you.
 (warn level, scope `arcade:failover-verify`, a JSON body with `outcome`, `reason`, `drift`, the
 claim and the replay). Find them by searching the app container's logs (see Logs above) for
 `failover.verify`; count `"outcome":"rejected"` and `"outcome":"shadow-accepted"` against the passes.
+From #141 on, `failover.verify` lines with reason `too many replays, try again shortly` are per-client/process
+cap 429s and are excluded from the legitimate-failure count.
 
 **AI-chat run failures**: these now reach Sentry, as of 2026-07-31. CopilotKit reports them as
 `RUN_ERROR` events inside the SSE stream while still answering HTTP 200, so nothing throws
