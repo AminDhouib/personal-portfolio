@@ -277,6 +277,38 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     expect(sent).toContain("Who is Amin?");
   });
 
+  // T-6364: a registered tool's name used to be enough to get its client-written schema through.
+  // The real runtime builds a JSON-schema validator from it, and @cfworker/json-schema compiles and
+  // runs `pattern` on the model's tool-call arguments, so a catastrophic one blocks the event loop.
+  // Before the fix this request put "^(a+)+$" into the upstream tool definition, which shows the
+  // runtime accepted and kept it.
+  it.each([
+    ["pattern", { type: "string", pattern: "^(a+)+$" }],
+    ["patternProperties", { type: "object", patternProperties: { "^(a+)+$": { type: "string" } } }],
+  ])(
+    "keeps a client-chosen regex (%s) out of the upstream tool definition",
+    async (_k, property) => {
+      const envelope = runEnvelope("hi");
+      envelope.body.tools = [
+        {
+          name: "collectLead",
+          description: "Collect a visitor's name and email.",
+          parameters: { type: "object", properties: { name: property } },
+        },
+      ] as never;
+
+      const response = await POST(makeReq(envelope));
+      await readBody(response);
+
+      expect(upstreamCalls).toHaveLength(1);
+      const sent = JSON.stringify(upstreamCalls[0]?.body);
+      expect(sent).not.toContain("(a+)+");
+      // The site's own definition is what the model is offered.
+      expect(sent).toContain("collectLead");
+      expect(sent).toContain("The visitor's full name");
+    },
+  );
+
   // T-6255: with the real runtime, resource/request reached the process-wide thread store.
   it("does not let a visitor list, read or wipe the shared thread store", async () => {
     for (const params of [
