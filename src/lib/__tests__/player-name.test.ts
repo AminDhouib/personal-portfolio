@@ -170,4 +170,54 @@ describe("sanitizePlayerName", () => {
       );
     });
   });
+
+  // T-6452, pinned before the change: what a long name keeps today, so that only the case being
+  // fixed (a cut through a surrogate pair) changes.
+  describe("what the length cut keeps today", () => {
+    const cut = (name: string, maxLength: number) =>
+      sanitizePlayerName(name, { maxLength, fallback: "Pilot" });
+
+    it("keeps the first maxLength characters of a long ASCII name", () => {
+      expect(cut("abcdefghijklmnopqrstuvwxyz", 12)).toBe("abcdefghijkl");
+      expect(cut("abcdefghijklmnopqrstuvwxyz", 16)).toBe("abcdefghijklmnop");
+    });
+
+    it("keeps the first maxLength characters of a long accented name", () => {
+      expect(cut("\u00c9mile \u00c7a va tr\u00e8s bien", 12)).toBe("\u00c9mile \u00c7a va ");
+    });
+
+    it("keeps the first maxLength characters of a long CJK name", () => {
+      const name = "\u5c71\u7530\u592a\u90ce".repeat(5);
+      expect(cut(name, 12)).toBe(name.slice(0, 12));
+      expect(cut(name, 12)).toHaveLength(12);
+    });
+
+    it("does not trim again after the cut, so a cut can end on a space", () => {
+      expect(cut("Ada Lovelace", 4)).toBe("Ada ");
+    });
+
+    it("keeps a whole name that is exactly maxLength", () => {
+      expect(cut("abcdefghijkl", 12)).toBe("abcdefghijkl");
+    });
+
+    it("keeps emoji that are not cut, and counts a decomposed accent as two", () => {
+      expect(cut("ab\u{1f600}", 4)).toBe("ab\u{1f600}");
+      expect(cut("e\u0301e\u0301e\u0301", 4)).toBe("e\u0301e\u0301");
+    });
+  });
+
+  describe("blank-looking marks that are legitimate inside real words (T-6452)", () => {
+    it.each([
+      ["U+034F combining grapheme joiner", "\u034f"],
+      ["U+17B4 Khmer inherent vowel Aq", "\u17b4"],
+      ["U+17B5 Khmer inherent vowel Aa", "\u17b5"],
+      ["U+180B Mongolian free variation selector one", "\u180b"],
+      ["U+180C Mongolian free variation selector two", "\u180c"],
+      ["U+180D Mongolian free variation selector three", "\u180d"],
+      ["U+180F Mongolian free variation selector four", "\u180f"],
+    ])("keeps %s inside a name with visible letters", (_label, ch) => {
+      const name = "\u1780" + ch + "\u1781";
+      expect(sanitizePlayerName(name, { maxLength: 16, fallback: "Pilot" })).toBe(name);
+    });
+  });
 });
