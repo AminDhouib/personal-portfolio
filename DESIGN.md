@@ -974,10 +974,29 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   text. Re-check that default on a CopilotKit upgrade. Application context (`useCopilotReadable`) is capped, not dropped,
   because the site sends the page path through it. Deliberately untouched, a different lane:
   `maxOutputTokens`, the model, retries and the agent config (BuiltInAgent has no overridable
-  properties, so `forwardedProps` cannot change the model). Not restricted: the envelope's `method`
-  (the runtime also serves `transcribe`, `resource/request` and the inspector methods; the byte cap
-  bounds them, but nothing here narrows them to the three the site uses). Re-check the tool allow-list
-  on a CopilotKit upgrade and whenever a new `useCopilotAction` is added.
+  properties, so `forwardedProps` cannot change the model). Re-check the tool allow-list on a
+  CopilotKit upgrade and whenever a new `useCopilotAction` is added.
+  T-6255 closed two gaps in this layer, one of them a data leak, not a cost issue:
+  (1) the envelope's `method` is allow-listed (`COPILOT_ALLOWED_METHODS`) to what the site's own
+  client sends with `useSingleEndpoint`: `info` and `inspector/metadata` on provider mount,
+  `agent/connect` when CopilotChat mounts, `agent/run` per turn (the suggestions run is an
+  `agent/run` too, because the stateless `agent/suggest` route is only used off the single
+  endpoint), and `agent/stop` from the stop button; anything else is 400. Before this, `method:
+"resource/request"` let any visitor list the thread ids in the runtime's default in-memory
+  runner (module-global, shared by every visitor), read other visitors' messages and events
+  (including `collectLead` arguments) and `POST /threads/clear` to wipe them all. `transcribe`,
+  `inspector/learning`, `trajectory/connect` and memories are refused for the same reason. What is
+  still reachable: `agent/connect` and `agent/stop` take a `threadId`, so a caller who already
+  knows another visitor's thread id (a client-generated random UUID) could replay its events or
+  stop its run; nothing served to a visitor lists thread ids any more, so that needs a guess of a
+  UUID. Binding a thread to a visitor would need a server-issued session and is not done.
+  (2) A run's `body` must be a plain object (400 otherwise). The runtime also accepts it as a JSON
+  string and parses it after this layer, which used to walk past every cap and the tool and
+  system-message drops. `state` (the runtime injects it into the system prompt, like context) is
+  capped at 8,000 characters and `forwardedProps` at 2,000 (the client sends `{}` or one ~80
+  character `toolChoice`), 413 over; `context` is capped whatever its type. `agent/connect` is
+  checked like a run because it carries the same RunAgentInput. Re-check the method list against
+  the client on a CopilotKit upgrade (`route.integration.test.ts` runs the real runtime).
 - **Chat errors never reach the visitor verbatim** (T-5532, `src/lib/copilot-error-sanitizer.ts`).
   A `RUN_ERROR` frame's `message`, and the body of a runtime 4xx/5xx, carry upstream and
   internal text (an OpenRouter error body, a stack-shaped string). The route wraps the response
