@@ -4,13 +4,15 @@
  * layers. `guardRequest` is the common lower layer (origin + rate-limit,
  * headers only, body untouched) that all five routes share; `guardedJsonRoute`
  * adds the JSON body parse that three of the five routes also share.
- * copilotkit (never reads the body itself -- CopilotKit does) and monitoring
- * (reads text, not JSON) use `guardRequest` only. See audit/plans/P3.md
+ * copilotkit (reads the body with `readCappedBody`, then hands CopilotKit a
+ * sanitised copy) and monitoring (reads text, not JSON, on its own deadline
+ * reader) use `guardRequest` only. See audit/plans/P3.md
  * section 2.1 for why one shape does not fit all five routes.
  */
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { checkRateLimit, getClientIp, isSameOrigin } from "@/lib/rate-limit";
+import { readCappedBody } from "@/lib/read-capped-body";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
 
 const DEFAULT_JSON_MAX_BYTES = 16 * 1024; // 16 KiB — leads' 5 KB note is the largest real field
@@ -87,7 +89,9 @@ type GuardedJson =
  * `unknown` -- callers keep their own zod/schema validation) or a Response
  * (403 origin / 429 rate / 413 over maxBytes / 400 invalid-json), checked in
  * that precedence order: reject unauthorized/abusive requests before ever
- * touching the body, and reject an oversized body before parsing it.
+ * touching the body, and reject an oversized body before parsing it. The body
+ * is stream-read against maxBytes, so a chunked upload with no Content-Length
+ * is cut off at the cap instead of being buffered whole.
  */
 export async function guardedJsonRoute(req: Request, opts: GuardOptions): Promise<GuardedJson> {
   const { requestId, response: blocked } = guardRequest(req, opts);
@@ -103,24 +107,20 @@ export async function guardedJsonRoute(req: Request, opts: GuardOptions): Promis
     };
   }
 
-  let text: string;
-  try {
-    text = await req.text();
-  } catch {
-    // silent-ok: a broken/aborted request stream is a client error, surfaced as the 400 below
+  // Stream-read with the cap enforced as bytes arrive: Content-Length is only a hint (a chunked
+  // upload sends none, and a client can understate it), so req.text() would buffer the whole body.
+  const read = await readCappedBody(req, cap);
+  if (!read.ok) {
     return {
       ok: false,
       requestId,
-      response: NextResponse.json({ error: "invalid json" }, { status: 400 }),
+      response:
+        read.reason === "too-large"
+          ? NextResponse.json({ error: "payload too large" }, { status: 413 })
+          : NextResponse.json({ error: "invalid json" }, { status: 400 }),
     };
   }
-  if (Buffer.byteLength(text, "utf8") > cap) {
-    return {
-      ok: false,
-      requestId,
-      response: NextResponse.json({ error: "payload too large" }, { status: 413 }),
-    };
-  }
+  const text = read.text;
   const parsed = safeJsonParseServer<unknown>(text, "route-guard.guardedJsonRoute", PARSE_FAILED);
   if (parsed === PARSE_FAILED) {
     return {

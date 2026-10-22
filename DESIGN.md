@@ -76,7 +76,10 @@ style suggestions.
   API routes call `guardRequest` or `guardedJsonRoute` (`src/lib/route-guard.ts`) before doing any
   work, in strict precedence order — 403 (cross-origin) → 429 (rate limit) → 413 (body over the
   16 KiB default cap) → 400 (invalid JSON). Handlers receive an already-parsed-but-still-`unknown`
-  body and must run their own zod schema over it.
+  body and must run their own zod schema over it. The body is stream-read against the cap
+  (`readCappedBody`, `src/lib/read-capped-body.ts`): the `Content-Length` pre-check is only a cheap
+  early exit, and a chunked upload (no header) is cut off and its stream cancelled as soon as the
+  running byte count passes the cap, instead of being buffered whole by `req.text()`.
 - **Upstream calls carry a deadline**: outbound `fetch` calls use `createDeadlineFetch`
   (`src/lib/upstream-fetch.ts`), enforced by the `local/fetch-requires-signal` rule. The deadline
   `AbortSignal` is created once per handler invocation and merged (via `AbortSignal.any`) with any
@@ -1602,7 +1605,8 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   repo links with trailing slashes. Execution order, from the installed docs: config `redirects`,
   then proxy, then `beforeFiles` rewrites, then the filesystem, so the proxy sees the request
   before the PostHog rewrites. Cost: the proxy runs on every request except `_next/static`,
-  `_next/image`, the exact path `/monitoring`, `favicon.ico` and static files by extension (the
+  `_next/image`, the exact path `/monitoring`, `/api/...` paths without a trailing slash,
+  `favicon.ico` and static files by extension (the
   matcher in `src/proxy.ts`), a
   few string checks and no I/O; the site has no other proxy logic, so this is its only per-request
   overhead. If the proxy file is ever removed, remove `skipTrailingSlashRedirect` with it or pages
@@ -1616,6 +1620,19 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   the tunnel is POST-only so the slashless 308 has no page duplicate to stop. The matcher skips
   the exact path (`monitoring$`); `/monitoring/` and lookalikes still run it, pinned in
   `src/__tests__/proxy.test.ts`. Do not widen it.
+- **API routes bypass `src/proxy.ts` too, except their trailing-slash form** (T-5526). The same
+  body-cloning applies to every matched request, so with the proxy in front of `/api/*` a POST of up
+  to 10 MB was copied into memory before the origin check, the rate limit or the route's body cap
+  ran (a chunked upload has no `Content-Length` for the pre-check to see). The matcher's
+  `api/.*[^/]$` alternative skips an `/api/...` path that does not end in a slash. What the proxy did
+  for `/api` was only the slashless 308 (no PostHog path lives under `/api`, and it adds no headers
+  there), and that is exactly what the exception keeps: `/api/leads/` still runs the proxy and still
+  answers 308, so no API URL starts answering 200 on a duplicate slash form (the matcher is tested
+  with Next's own compiled regexp, `getMiddlewareMatchers`). Residual, accepted: a request that
+  deliberately adds the trailing slash still has its body cloned before that 308, exactly as any
+  non-API URL does (`POST /about` with a large body); the clone is bounded at 10 MB and the proxy
+  answers it immediately. Do not set `proxyClientMaxBodySize` to paper over it: it silently
+  truncates rather than rejects.
 - **Rate limits key on `CF-Connecting-IP`, never on the leftmost `X-Forwarded-For`.** Production
   is Cloudflare (proxied) to Traefik to the app. Cloudflare APPENDS the real client to whatever
   `X-Forwarded-For` the client sent, and Traefik trusts its peer so it passes the header through;
