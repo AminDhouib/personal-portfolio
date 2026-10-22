@@ -281,6 +281,12 @@ describe("LegendVoltorb", () => {
     },
   );
 
+  it("lays the icon out as a block, so no line-box strut from the card font pushes it low", () => {
+    const { container } = render(<LegendVoltorb size={22} burstSize={38} />);
+    const wrapper = holdOf(container).closest("span[style*='visibility']") as HTMLElement;
+    expect(wrapper.style.display).toBe("flex");
+  });
+
   it("keeps the icon box size, so the card layout does not change", () => {
     const { container } = render(<LegendVoltorb size={24} burstSize={36} />);
     const box = container.firstElementChild as HTMLElement;
