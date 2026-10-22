@@ -49,4 +49,53 @@ describe("sanitizePlayerName", () => {
     expect(sanitizePlayerName("Amin", OPTS)).toBe("Amin");
     expect(sanitizePlayerName("Am\u00e9lie", OPTS)).toBe("Am\u00e9lie");
   });
+
+  // T-6413, pinned before the change: ordinary names pass through untouched, so widening the
+  // stripped set cannot quietly eat something people really type.
+  describe("keeps ordinary names exactly as typed", () => {
+    it.each([
+      ["accented Latin", "Am\u00e9lie Dupont-\u00c7a"],
+      ["CJK", "\u5c71\u7530\u592a\u90ce"],
+      ["Hangul syllables", "\ud55c\uad6d\uc5b4"],
+      ["Hiragana and katakana", "\u3072\u3089\u304c\u306a\u30ab\u30bf\u30ab\u30ca"],
+      ["Cyrillic", "\u0410\u043b\u0435\u043a\u0441\u0435\u0439"],
+      ["Arabic", "\u0645\u062d\u0645\u062f"],
+      ["punctuation", "O'Brien, J.R.!"],
+      ["inner spaces", "Ada  Lovelace"],
+      ["digits and symbols", "p4ss_w0rd#1"],
+      ["a Braille letter that is not the blank pattern", "\u2801\u2803"],
+      ["a Hangul syllable next to the filler's neighbours", "\uac00\ub098"],
+    ])("%s", (_label, name) => {
+      expect(sanitizePlayerName(name, { maxLength: 16, fallback: "Pilot" })).toBe(name);
+    });
+
+    it("keeps an emoji and the variation selector that selects its emoji presentation", () => {
+      const heart = "I \u2764\ufe0f U";
+      expect(sanitizePlayerName(heart, { maxLength: 16, fallback: "Pilot" })).toBe(heart);
+      const keycap = "1\ufe0f\u20e3";
+      expect(sanitizePlayerName(keycap, { maxLength: 16, fallback: "Pilot" })).toBe(keycap);
+    });
+  });
+
+  describe("how an empty name is handled today", () => {
+    it.each([
+      ["empty", ""],
+      ["spaces", "   "],
+      ["tab and newline", "\t\n"],
+      ["no-break and ideographic spaces", "\u00a0\u3000"],
+      ["line and paragraph separators", "\u2028\u2029"],
+      ["en and em spaces", "\u2002\u2003\u2009"],
+      ["already-stripped invisibles", "\u200b\u2060\u2064\ufeff\u202e"],
+    ])("%s gives the caller's fallback", (_label, name) => {
+      expect(sanitizePlayerName(name, { maxLength: 16, fallback: "Pilot" })).toBe("Pilot");
+      expect(sanitizePlayerName(name, { maxLength: 16, fallback: "Anonymous" })).toBe("Anonymous");
+    });
+
+    it("applies the length cut before it decides a name is empty", () => {
+      // 20 spaces then a letter: trim removes the leading run, so the letter survives the cut.
+      expect(sanitizePlayerName(" ".repeat(20) + "A", { maxLength: 4, fallback: "Pilot" })).toBe(
+        "A",
+      );
+    });
+  });
 });
