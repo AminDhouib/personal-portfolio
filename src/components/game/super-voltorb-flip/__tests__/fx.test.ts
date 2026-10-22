@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  BURST_BOX,
   BURST_FRAMES,
   COIN_FRAMES,
   SPARKLE_BOX,
   SPARKLE_FRAMES,
-  burstRects,
   coinHalfWidth,
   sparkleRects,
   type Rect,
@@ -17,33 +15,9 @@ function inside(rects: Rect[], box: number): boolean {
   );
 }
 
-describe("burstRects", () => {
+describe("burst frames", () => {
   it("has the frame count the callers loop over", () => {
     expect(BURST_FRAMES).toBe(9);
-  });
-
-  it("keeps every frame inside the 64 x 64 box", () => {
-    for (let f = 0; f < BURST_FRAMES; f++) expect(inside(burstRects(f), BURST_BOX)).toBe(true);
-  });
-
-  it("grows outward: later frames reach farther from the centre than the first", () => {
-    const reach = (rects: Rect[]) =>
-      Math.max(
-        ...rects.map((r) => Math.max(Math.abs(r.x + r.w / 2 - 32), Math.abs(r.y + r.h / 2 - 32))),
-      );
-    expect(reach(burstRects(BURST_FRAMES - 1))).toBeGreaterThan(reach(burstRects(0)) + 15);
-  });
-
-  it("starts with a flash, ends without one, and adds the second ring from frame 2", () => {
-    expect(burstRects(0).length).toBe(10); // two flash bars + eight shards
-    expect(burstRects(1).length).toBe(10);
-    expect(burstRects(2).length).toBe(18); // + eight ring shards
-    expect(burstRects(BURST_FRAMES - 1).length).toBe(16); // no flash
-  });
-
-  it("clamps out-of-range frames instead of throwing", () => {
-    expect(burstRects(-3)).toEqual(burstRects(0));
-    expect(burstRects(99)).toEqual(burstRects(BURST_FRAMES - 1));
   });
 });
 

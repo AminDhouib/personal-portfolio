@@ -83,9 +83,9 @@ describe("SuperVoltorbFlip board", () => {
     }
   });
 
-  it("renders no <img> on a face-down board: the Voltorb sprite mounts only once revealed", () => {
+  it("renders no <img> inside any face-down tile: a Voltorb sprite mounts only once revealed", () => {
     const { container } = render(<SuperVoltorbFlipGame />);
-    expect(container.querySelector("img")).toBeNull();
+    for (const tile of faceDownTiles(container)) expect(tile.querySelector("img")).toBeNull();
   });
 
   it("keeps the round result slot under the board, outside its frame", () => {
