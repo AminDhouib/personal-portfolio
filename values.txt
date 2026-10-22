@@ -1,0 +1,1 @@
+closed: aria-expanded=false aria-controls=mobile-menu-panel panel element absent; open: aria-expanded=true panel present; scrollWidth 360
