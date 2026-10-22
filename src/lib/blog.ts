@@ -27,7 +27,15 @@ export function getAllBlogSlugs(): string[] {
     .map((f) => f.replace(/\.mdx?$/, ""));
 }
 
+/**
+ * What a post slug may look like: lowercase letters, digits and hyphens, starting with a letter or
+ * digit. Every file in content/blog fits (blog.test.ts reads them all). It keeps a path separator,
+ * a dot segment, a NUL or a percent escape out of the path built below, whatever the caller passes.
+ */
+const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
 export function getBlogPost(slug: string): BlogPost | null {
+  if (!SLUG_PATTERN.test(slug)) return null;
   const mdxPath = path.join(BLOG_DIR, `${slug}.mdx`);
   const mdPath = path.join(BLOG_DIR, `${slug}.md`);
   const filePath = fs.existsSync(mdxPath) ? mdxPath : mdPath;

@@ -1826,7 +1826,9 @@ already-inline engine has no such bound).
 MDX file under `content/blog/` or the metadata in `games-meta.ts` / page component directly. A
 game's About copy lives in `src/app/games/content/<slug>.ts`; any gameplay change that makes a
 sentence there untrue updates it in the same change. No gate beyond the standard sweep applies
-specifically to content changes.
+specifically to content changes. A post's file name is its URL slug and must match
+`^[a-z0-9][a-z0-9-]*$`: `getBlogPost` returns null for any other slug before it builds a path
+(T-6264), and `blog.test.ts` loads every post, so a badly named file fails there.
 
 **Gameplay change** (a game's rules, scoring, or engine behavior): follow the extract-before-edit
 doctrine above first if the target game doesn't already have an extracted engine module. Add or
