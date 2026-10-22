@@ -408,6 +408,10 @@ cap 429s) or `the verifier is busy, try again` (503s) are excluded from the legi
 server-side and the 2026-07 multi-day dead-chat outage produced zero Sentry events.
 `src/lib/copilot-run-error-tap.ts` mirrors the response body and forwards those frames to
 `captureException`, so they arrive tagged `copilotkit:run-error` under a `CopilotRunError` issue.
+Captures are sampled per error code (T-6263): the first of each code in a 10 minute window always
+arrives, at most 5 do, and the rest are only counted. The warn lines `suppressing further RUN_ERROR
+captures` and `suppressed RUN_ERROR captures in the previous window` (with the count) are in the app
+logs, so a quiet Sentry during a failing chat can be read against them.
 
 Note what this does and does not buy you: a broken chat now raises Sentry events, but there is
 still no alerting (see above), so nobody is paged — you have to look. And a chat that fails
