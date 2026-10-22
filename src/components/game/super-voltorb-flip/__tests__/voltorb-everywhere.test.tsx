@@ -348,7 +348,7 @@ describe("the hub banner", () => {
     });
     expect(container.querySelector(ORB_SVG)).toBeNull();
     const face = container.querySelector<HTMLImageElement>('img[src="' + VOLTORB_TILE_SRC + '"]');
-    expectOriginalSprite(face);
+    expectOriginalSprite(face, VOLTORB_TILE_SRC);
     expect(face!.style.width).toBe("22px");
 
     await act(async () => {
