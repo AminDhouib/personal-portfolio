@@ -1,5 +1,11 @@
 import { CUES, type CueName } from "./sound-cues";
-import { musicTrackForLevel } from "./music";
+import {
+  GAME_OVER_JINGLE,
+  LEVEL_WIN_JINGLE,
+  MUSIC_INTRO,
+  MUSIC_LOOP,
+  type MusicTrack,
+} from "./music";
 import { isTextEntryTarget } from "../text-entry";
 import {
   createMaster,
@@ -10,16 +16,16 @@ import {
   type Master,
 } from "./synth";
 
-// Super Voltorb Flip's audio facade. Sound effects and fanfares are synthesized
-// from the tables in sound-cues.ts; the background loop is one of three CC0
-// tracks picked by level band (music.ts). Every function here is safe to call
-// during SSR and when the browser has no AudioContext: cues then still "play"
-// for their nominal length, so the round flow's timing does not depend on audio.
+// Super Voltorb Flip's audio facade. Sound effects and the risk-warning fanfare
+// are synthesized from the tables in sound-cues.ts; the background music (intro,
+// then loop) and the round-cleared and round-lost jingles are the original
+// recordings (music.ts). Every function here is safe to call during SSR and when
+// the browser has no AudioContext: cues and jingles then still "end" at their
+// nominal cue length, so the round flow's timing does not depend on audio.
 
 let globalMuted = false;
 let master: Master | null = null;
 let music: HTMLAudioElement | null = null;
-let musicSrc: string | null = null;
 // Loops being faded out; they have left the `music` slot but still sound.
 const fading = new Set<HTMLAudioElement>();
 
@@ -170,78 +176,92 @@ export const sfx = {
   riskWarning: () => playCue("riskWarning"),
 };
 
-// ---- Fanfares: a cue plus an end-of-cue timer, cancellable as one. ----------
+// ---- Jingles: the original recording plus an end-of-cue timer, cancellable as one. ----
 
-interface FanfareSlot {
+// The timer runs for the cue's nominal length (LEVEL_WIN_MS, GAME_OVER_MS), which is the round
+// flow's timing contract, not for the recording's own length: the lost-round jingle is longer than
+// its cue and simply plays out under the next screen until stopGameOver() (or a restart) silences it.
+interface JingleSlot {
   timer: number | null;
-  handle: CueHandle | null;
+  audio: HTMLAudioElement | null;
 }
 
-const levelWinSlot: FanfareSlot = { timer: null, handle: null };
-const gameOverSlot: FanfareSlot = { timer: null, handle: null };
+const levelWinSlot: JingleSlot = { timer: null, audio: null };
+const gameOverSlot: JingleSlot = { timer: null, audio: null };
 
-function stopFanfare(slot: FanfareSlot): void {
+function stopJingle(slot: JingleSlot): void {
   if (typeof window === "undefined") return;
   if (slot.timer !== null) window.clearTimeout(slot.timer);
   slot.timer = null;
-  slot.handle?.stop();
-  slot.handle = null;
+  slot.audio?.pause();
+  slot.audio = null;
 }
 
-function startFanfare(slot: FanfareSlot, name: CueName, onEnded?: () => void): void {
-  stopFanfare(slot);
+function startJingle(slot: JingleSlot, track: MusicTrack, ms: number, onEnded?: () => void): void {
+  stopJingle(slot);
   if (typeof window === "undefined") return;
-  const cue = CUES[name];
   if (!globalMuted) {
-    const m = getMaster();
-    if (m) {
-      wake(m);
-      slot.handle = scheduleCue(m.ctx, m.out, cue, m.ctx.currentTime);
-    }
+    const el = new Audio(track.src);
+    el.volume = track.volume;
+    slot.audio = el;
+    // silent-ok: a blocked or failed jingle stays silent; the round flow runs on the timer below.
+    Promise.resolve(el.play()).catch(() => undefined);
   }
   slot.timer = window.setTimeout(() => {
     slot.timer = null;
-    slot.handle = null;
     onEnded?.();
-  }, cue.ms);
+  }, ms);
 }
 
 /** Round-lost jingle. */
 export function playGameOver(): void {
-  startFanfare(gameOverSlot, "gameOver");
+  startJingle(gameOverSlot, GAME_OVER_JINGLE, CUES.gameOver.ms);
 }
 
 export function stopGameOver(): void {
-  stopFanfare(gameOverSlot);
+  stopJingle(gameOverSlot);
 }
 
-/** Round-cleared fanfare. `onEnded` fires once at its end unless stopLevelWin() cancels it. */
+/** Round-cleared jingle. `onEnded` fires once at LEVEL_WIN_MS unless stopLevelWin() cancels it. */
 export function playLevelWin(onEnded?: () => void): void {
-  startFanfare(levelWinSlot, "levelClear", onEnded);
+  startJingle(levelWinSlot, LEVEL_WIN_JINGLE, CUES.levelClear.ms, onEnded);
 }
 
 export function stopLevelWin(): void {
-  stopFanfare(levelWinSlot);
+  stopJingle(levelWinSlot);
 }
 
 // ---- Background music --------------------------------------------------------
 
-/** Start (or keep) the loop for `level`'s band; a different band swaps the element. */
-export function playMusic(level: number): void {
+/**
+ * Start the background music, or keep it if it is already playing: the original intro once, then
+ * the original loop, the same at every level. One element plays both so the loop starts without a
+ * fresh user gesture (a browser that let the intro start lets the same element carry on).
+ */
+export function playMusic(_level: number): void {
   if (typeof window === "undefined") return;
-  const track = musicTrackForLevel(level);
-  if (music && musicSrc === track.src) return;
+  if (music) return;
   cancelGestureRetry?.();
-  music?.pause();
-  const el = new Audio(track.src);
+  const el = new Audio(MUSIC_INTRO.src);
   music = el;
-  musicSrc = track.src;
-  el.loop = true;
-  el.volume = track.volume;
+  el.loop = false;
+  el.volume = MUSIC_INTRO.volume;
   el.muted = globalMuted;
-  // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not
-  // surface. Only the element still in the slot may arm the retry: a swapped-out element's
-  // late rejection (pause() before play() settled) must not cancel the new one's.
+  el.addEventListener("ended", () => {
+    // A stopped or fading intro has left the slot: nothing may start the loop for it.
+    if (music !== el) return;
+    el.src = MUSIC_LOOP.src;
+    el.loop = true;
+    el.volume = MUSIC_LOOP.volume;
+    startPlaying(el);
+  });
+  startPlaying(el);
+}
+
+// silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not
+// surface. Only the element still in the slot may arm the retry: a swapped-out element's
+// late rejection (pause() before play() settled) must not cancel the new one's.
+function startPlaying(el: HTMLAudioElement): void {
   el.play().catch(() => {
     if (music === el) retryMusicOnGesture(el);
   });
@@ -251,7 +271,6 @@ export function stopMusic(): void {
   cancelGestureRetry?.();
   music?.pause();
   music = null;
-  musicSrc = null;
 }
 
 export function fadeOutMusic(ms = 400): void {
@@ -259,7 +278,6 @@ export function fadeOutMusic(ms = 400): void {
   cancelGestureRetry?.();
   const m = music;
   music = null;
-  musicSrc = null;
   // The slot is already free, but a mute during the fade must still reach it.
   fading.add(m);
   const startVol = m.volume;
@@ -277,11 +295,12 @@ export function fadeOutMusic(ms = 400): void {
   requestAnimationFrame(tick);
 }
 
-/** Mutes the music element and zeroes the master gain, silencing fanfares in flight. */
+/** Mutes the music and jingle elements and zeroes the master gain, silencing cues in flight. */
 export function setMusicMuted(muted: boolean): void {
   globalMuted = muted;
   if (music) music.muted = muted;
   for (const m of fading) m.muted = muted;
+  for (const slot of [levelWinSlot, gameOverSlot]) if (slot.audio) slot.audio.muted = muted;
   if (master) setMasterMuted(master, muted);
   // A loop that was waiting for a gesture while muted starts now: unmuting is one.
   if (!muted) runGestureRetry?.();

@@ -836,37 +836,63 @@ current tree on 2026-07-07.
   chat can be typed in while a banner is up. The banner wording lives in `round-result-copy.ts`
   (original text; paraphrase, never Nintendo's strings) and keeps the reserved height, 72px below
   sm and 60px from sm, which `round-result.test.tsx` pins.
-- **Super Voltorb Flip's sound is original and mostly synthesized, and its cue lengths are a
-  timing contract.** Effects and the three fanfares (round cleared, round lost, risk warning) are
-  generated at runtime with Web Audio from the pure tables in `super-voltorb-flip/sound-cues.ts`
-  (scheduled by `synth.ts`, behind the `audio.ts` facade); no ripped game audio ships. The
-  background loop is one of three CC0 tracks picked by level band in `music.ts` (Lv.1-3, 4-6,
-  7-8), with per-track volumes trimmed to equal loudness. A cue's `ms` is what the round flow
-  waits on: the win sequence awaits the clear fanfare, the risk fanfare locks the board for
-  `RISK_WARNING_MS` (2100) plus a 500 ms beat before the flip commits (muted waits the same
-  `RISK_WARNING_MS + 500`, so muted and unmuted pacing match; `__tests__/audio-timing.test.tsx`
-  pins both), and `sfx.*` promises resolve at the cue's end even with no `AudioContext`. Changing a
-  cue length is a gameplay-timing change, not a sound tweak. The synth helpers are copied from
-  Password Game 2's rather than imported, by the cross-game convention.
-  `__tests__/assets-guard.test.ts` fails if ripped audio paths, unreferenced files or
-  unattributed music come back.
-  The muted clear wait is `LEVEL_WIN_MS`, not a literal (T2d-1): `audio-timing.test.tsx` runs the
-  clear wait in both modes and pins the payout start at exactly that length.
-- **Super Voltorb Flip's art is original and defined as text.** The orb, memo glyphs and clear
-  mark are character maps in `super-voltorb-flip/art/sprites.ts` rendered as inline SVG by
-  `PixelSprite`; the bomb burst, success sparkle and spinning coin are pure frame geometry in
-  `art/fx.ts` drawn by `art/frames.tsx`. No sprite image ships, and the GPL-3.0 cartridge sprites
-  that used to ship (samualtnorman/voltorb-flip) were removed along with the scripts that fetched
-  and processed them. The orb is deliberately not the Pokemon creature (an indigo sphere with a
-  lightning bolt); to redraw anything, edit the strings and keep the grid size. The game keeps
-  its CSS look and the "Super Voltorb Flip" name, and shows an unofficial-fan-recreation
-  disclaimer in the About credits and in the How to play modal.
-  `__tests__/assets-guard.test.ts` fails on any image under the game's public folder, any
-  reference to a sprites or upstream path, and any asset-prep script that targets them.
+- **Super Voltorb Flip's background music and round jingles are the original recordings; its
+  effects are synthesized; and its cue lengths are a timing contract.** On 2026-10-22 Amin asked
+  for the original music back ("we need to use those assets to make the right recreation", T-6535),
+  reversing the 2026-10-07 cleanup for the music only. `audio/music_intro.mp3` plays once and then
+  `audio/music_loop.mp3` loops, at every level (`music.ts`; one `HTMLAudioElement` carries both so the
+  loop starts without a fresh gesture), and `audio/music_level_win.mp3` and `audio/game_over.mp3` are
+  the round-cleared and round-lost jingles (`audio.ts`). The recordings belong to Nintendo, Game
+  Freak and Creatures Inc. and are used in an unofficial non-commercial fan recreation; the
+  About credits, the How to play disclaimer and `public/games/super-voltorb-flip/music/CREDITS.md`
+  say so. The sound effects and the risk-warning fanfare are still generated at runtime with Web
+  Audio from the pure tables in `super-voltorb-flip/sound-cues.ts` (scheduled by `synth.ts`, behind
+  the `audio.ts` facade). The three CC0 level-band tracks are gone (git keeps them); the three CC0
+  `theme-*.mp3` files stay, unplayed, with their credits. A cue's `ms` is what the round flow waits
+  on, and that did not change with the recordings: the win sequence awaits `LEVEL_WIN_MS` (2000),
+  the risk fanfare locks the board for `RISK_WARNING_MS` (2100) plus a 500 ms beat before the flip
+  commits (muted waits the same `RISK_WARNING_MS + 500`, so muted and unmuted pacing match;
+  `__tests__/audio-timing.test.tsx` pins both), and `sfx.*` promises resolve at the cue's end even
+  with no `AudioContext`. A jingle's end timer is its cue's `ms`, not the file's length: the clear
+  jingle is 2.02 s against 2000 ms (inside the ~300 ms tolerance), the game-over jingle is 4.06 s
+  against `GAME_OVER_MS` 2600, so it plays out under the next screen until `stopGameOver()` or a
+  restart silences it, and a mute reaches it in flight. The `levelClear` and `gameOver` note
+  tables no longer sound and only supply those lengths. Changing a cue length is a gameplay-timing
+  change, not a sound tweak. The synth helpers are copied from Password Game 2's rather than
+  imported, by the cross-game convention. `__tests__/assets-guard.test.ts` is an explicit
+  allowlist (below): any audio file that is not the four originals or the three kept CC0 tracks
+  fails it. The muted clear wait is `LEVEL_WIN_MS`, not a literal (T2d-1): `audio-timing.test.tsx`
+  runs the clear wait in both modes and pins the payout start at exactly that length.
+- **Super Voltorb Flip shows the original Voltorb creature art in two places and draws everything
+  else itself.** The revealed Voltorb tile is `sprites/tile/voltorb.png` and the bomb burst plays
+  `sprites/tile/explode_0..8.png` (`art/original-sprites.ts`, `effects/default.tsx`), restored on
+  Amin's 2026-10-22 instruction (T-6535) after the 2026-10-07 cleanup had removed all cartridge
+  sprites. They are the GPL-3.0 sprites from samualtnorman/voltorb-flip, shipped with their
+  `LICENSE` and `NOTICE.md`; the creature belongs to Nintendo, Game Freak and Creatures Inc. and is
+  shown in an unofficial non-commercial fan recreation. The burst frames grow from 22 px to 64 px
+  with the Voltorb baked into the middle at one fixed pixel size, so each frame is scaled by the
+  same factor as the 22 px tile sprite (`explodeFrameCssSize`) and the baked Voltorb lands exactly
+  on the face underneath; `original-art.test.tsx` pins the paths, the native sizes (read from the PNG
+  headers) and that scaling. Nothing else is a sprite image, on purpose, and a standing owner rule
+  keeps it so: the CSS legend rows, the clue cards, the memo glyphs (`art/sprites.ts`, inline SVG
+  through `PixelSprite`), `CoinSpinner`, the chrome and the responsive text labels never become
+  sprites, and the number, memo, chrome, coin and button sprites of the old set stay deleted. The
+  indigo orb (`ORB`) is therefore still what the legend, the clue cards, the memo flags and the hub
+  banner draw; it is deliberately not the creature, and swapping any of those to the sprite is the
+  owner's call, not a cleanup. The success sparkle and the spinning coin are still pure frame
+  geometry in `art/fx.ts` drawn by `art/frames.tsx`. The game keeps its CSS look and the "Super
+  Voltorb Flip" name, and shows an unofficial-fan-recreation disclaimer in the About credits and
+  in the How to play modal, which now also say the Voltorb sprites and the music are the originals.
+  `__tests__/assets-guard.test.ts` is an explicit allowlist of exactly the restored files (ten
+  sprites, the sprites `LICENSE` and `NOTICE.md`, the four audio files, the three kept CC0 tracks):
+  any other image or audio file, any `sprites/upstream` path, any `sfx` folder, any asset-prep
+  script, and any audio outside this game's `audio/` and `music/` folders (Tower Stacker relies on
+  that last rule) still fails it. Widening the allowlist needs the owner's say-so and a comment
+  citing it.
 - **Tower Stacker is first-party; its rules are pinned.** No third-party code or asset ships in
   the game: the vendored upstream bundle is deleted, `no-third-party-tags.test.ts` pins that
   there is no such folder under `public/`, and `assets-guard.test.ts` allows no audio outside
-  Voltorb's music folder (so there is no NOTICE entry; the credits say "Original game built for
+  Voltorb's `audio/` and `music/` folders (so there is no NOTICE entry; the credits say "Original game built for
   this site"). The numbers that define the game are pinned by
   `tower-stacker/__tests__/engine.test.ts` and `scoring.test.ts`: perfect within 8 units of
   centre, a trim needs 4 units of overlap or the run ends, every third perfect regrows 12

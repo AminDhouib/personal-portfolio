@@ -141,12 +141,18 @@ export const superVoltorbFlipContent: GameContent = {
     {
       label: "Music",
       detail:
-        "Chiptune loops by TinyWorlds, Juhani Junkala (SubspaceAudio) and celestialghost8, all released under CC0.",
+        "The background music and the round-cleared and round-lost jingles are the original recordings from Pokemon HeartGold and SoulSilver, the property of Nintendo, Creatures Inc. and GAME FREAK inc., used here in an unofficial, non-commercial fan recreation.",
     },
     {
-      label: "Sound effects and artwork",
+      label: "Voltorb sprites",
       detail:
-        "Original: the sounds are generated in your browser and the pixel art is drawn for this site. No audio or sprites from the Pokemon games are used.",
+        "The Voltorb on a revealed tile and its explosion are the original sprites from Pokemon HeartGold and SoulSilver, the property of Nintendo, Creatures Inc. and GAME FREAK inc., used here in an unofficial, non-commercial fan recreation. The sprite files come from samualtnorman's voltorb-flip recreation, GPL-3.0.",
+      href: "https://github.com/samualtnorman/voltorb-flip",
+    },
+    {
+      label: "Sound effects and other artwork",
+      detail:
+        "Original: the sound effects and the risk warning are generated in your browser, and every other piece of art (the clue cards, the legend, the memo marks, the coin and the sparkle) is drawn for this site.",
     },
   ],
 };

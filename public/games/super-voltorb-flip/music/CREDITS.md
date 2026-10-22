@@ -1,32 +1,40 @@
 # Music credits
 
-The background loops are CC0 (public domain) chiptunes from OpenGameArt. They play by level
-band (see `src/components/game/super-voltorb-flip/music.ts`): Lv.1-3 `rookie.mp3`, Lv.4-6
-`veteran.mp3`, Lv.7-8 `master.mp3`. The three `theme-*.mp3` tracks are kept for the skin variants
-that were never built and are not played. No game audio from Nintendo or the Pokemon franchise
-ships with this site.
+The background music and the round-cleared and round-lost jingles are the original recordings
+from Pokemon HeartGold and SoulSilver (the Voltorb Flip Game Corner minigame). They belong to
+Nintendo, Game Freak and Creatures Inc. They are used here in an unofficial, non-commercial fan
+recreation; this site is not affiliated with or endorsed by those companies, and the recordings are
+not licensed to it. They live in `audio/` and play as set out in
+`src/components/game/super-voltorb-flip/music.ts`: `music_intro.mp3` once, then `music_loop.mp3`
+for as long as the game plays, with `music_level_win.mp3` when a round is cleared and
+`game_over.mp3` when it is lost. The files were mirrored from the samualtnorman/voltorb-flip
+recreation (GPL-3.0, see `../sprites/LICENSE`).
+
+The three `theme-*.mp3` tracks in this folder are CC0 chiptunes kept for the skin variants that
+were never built; nothing plays them.
 
 | File | Title | Author | License | Source |
 |---|---|---|---|---|
-| `rookie.mp3` | Happy Adventure (Loop) | TinyWorlds | CC0 | https://opengameart.org/content/happy-adventure-loop |
-| `veteran.mp3` | Level 3 (from 5 Chiptunes Action) | SubspaceAudio (Juhani Junkala) | CC0 | https://opengameart.org/content/5-chiptunes-action |
-| `master.mp3` | Summer Sunday | celestialghost8 | CC0 | https://opengameart.org/content/summer-sunday |
+| `music_intro.mp3` | Voltorb Flip intro (HGSS) | Nintendo, Game Freak, Creatures Inc. | Not licensed: fan use | Pokemon HeartGold and SoulSilver |
+| `music_loop.mp3` | Voltorb Flip loop (HGSS) | Nintendo, Game Freak, Creatures Inc. | Not licensed: fan use | Pokemon HeartGold and SoulSilver |
+| `music_level_win.mp3` | Level cleared jingle (HGSS) | Nintendo, Game Freak, Creatures Inc. | Not licensed: fan use | Pokemon HeartGold and SoulSilver |
+| `game_over.mp3` | Game over jingle (HGSS) | Nintendo, Game Freak, Creatures Inc. | Not licensed: fan use | Pokemon HeartGold and SoulSilver |
 | `theme-classic.mp3` | Talking Cute Chiptune | Pro Sensory (Alex McCulloch) | CC0 | https://opengameart.org/content/talking-cute-chiptune |
 | `theme-meadow.mp3` | Flowerbed Fields Loop | Zane Little Music | CC0 | https://opengameart.org/content/flowerbed-fields-loop |
 | `theme-twilight.mp3` | Slow Melancholic Theme C64 Style | skrjablin | CC0 | https://opengameart.org/content/slow-melancholic-theme-c64-style |
 
-## Attribution
+## Attribution of the CC0 tracks
 
-All tracks above are CC0 (public domain). No attribution is legally required, but is appreciated per the authors' wishes.
+The three `theme-*.mp3` tracks are CC0 (public domain). No attribution is legally required, but is
+appreciated per the authors' wishes.
 
-- **TinyWorlds** - Happy tune generated using Autotracker and edited with Audacity.
-- **SubspaceAudio (Juhani Junkala)** - Part of the "5 Action Chiptunes" pack released as CC0 for game developers.
-- **celestialghost8** - Famitracker/VRC6 chiptune composition.
 - **Pro Sensory (Alex McCulloch)** - "Just include my name Alex McCulloch. Attribution appreciated but not required."
 - **Zane Little Music** - A cute chiptune loop for adventure games.
 - **skrjablin** - Commodore SID chip chiptune made with Goat Tracker. Loopable. Dual-licensed CC-BY 3.0 and CC0; used here under CC0.
 
-## Sound effects and fanfares
+## Sound effects and the risk warning
 
 Original. They are generated in the browser with the Web Audio API from the tables in
-`src/components/game/super-voltorb-flip/sound-cues.ts` and ship as code, not audio files.
+`src/components/game/super-voltorb-flip/sound-cues.ts` and ship as code, not audio files. The two
+jingle entries in that file (round cleared, round lost) no longer sound; only their lengths are used,
+as the round flow's timing.

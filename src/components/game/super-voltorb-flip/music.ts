@@ -1,31 +1,25 @@
-// Which background loop plays at which level. The tracks are CC0 chiptunes
-// (attribution in public/games/super-voltorb-flip/music/CREDITS.md). Volumes
-// equalize loudness: measured mean levels were rookie -16.1 dB, veteran
-// -9.4 dB and master -19.6 dB, and the old loop sat at -16.3 dB played at 0.3,
-// so each track is trimmed to land at the same output level.
+// The original HeartGold/SoulSilver Voltorb Flip music, restored on the owner's instruction
+// (T-6535, 2026-10-22). The background music is the original intro played once and then the
+// original loop, at every level; the round-cleared and round-lost jingles are the original
+// files too. The music belongs to Nintendo, Game Freak and Creatures Inc., used in an unofficial
+// non-commercial fan recreation (credits in public/games/super-voltorb-flip/music/CREDITS.md).
+// Sound effects and the risk-warning fanfare are still synthesized (sound-cues.ts).
 
 export interface MusicTrack {
   src: string;
   volume: number;
 }
 
-interface MusicBand {
-  /** Highest level (inclusive) this band covers. */
-  maxLevel: number;
-  track: MusicTrack;
-}
+const BASE = "/games/super-voltorb-flip/audio";
 
-const BASE = "/games/super-voltorb-flip/music";
+export const MUSIC_INTRO: MusicTrack = { src: `${BASE}/music_intro.mp3`, volume: 0.3 };
+export const MUSIC_LOOP: MusicTrack = { src: `${BASE}/music_loop.mp3`, volume: 0.3 };
 
-export const MUSIC_BANDS: readonly MusicBand[] = [
-  { maxLevel: 3, track: { src: `${BASE}/rookie.mp3`, volume: 0.29 } },
-  { maxLevel: 6, track: { src: `${BASE}/veteran.mp3`, volume: 0.14 } },
-  { maxLevel: Number.POSITIVE_INFINITY, track: { src: `${BASE}/master.mp3`, volume: 0.44 } },
-];
+/** Background music in order: the intro once, then the loop for as long as the game plays. */
+export const MUSIC_SEQUENCE: readonly MusicTrack[] = [MUSIC_INTRO, MUSIC_LOOP];
 
-export function musicTrackForLevel(level: number): MusicTrack {
-  const l = Number.isFinite(level) ? level : 1;
-  const band = MUSIC_BANDS.find((b) => l <= b.maxLevel) ?? MUSIC_BANDS[MUSIC_BANDS.length - 1];
-  // MUSIC_BANDS is a non-empty constant; the fallback only satisfies the index type.
-  return (band ?? MUSIC_BANDS[0]!).track;
-}
+/** Round cleared. Plays alongside the level-clear cue's timing (LEVEL_WIN_MS), which stays the contract. */
+export const LEVEL_WIN_JINGLE: MusicTrack = { src: `${BASE}/music_level_win.mp3`, volume: 0.5 };
+
+/** Round lost. Plays alongside the game-over cue's timing (GAME_OVER_MS), which stays the contract. */
+export const GAME_OVER_JINGLE: MusicTrack = { src: `${BASE}/game_over.mp3`, volume: 0.5 };
