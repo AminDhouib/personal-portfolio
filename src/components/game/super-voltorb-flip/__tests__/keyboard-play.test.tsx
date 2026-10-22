@@ -36,6 +36,11 @@ vi.mock("../effects/context", () => ({
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 import { RISK_WARNING_MS } from "../sound-cues";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole Super Voltorb Flip board in jsdom; see src/test/heavy.ts for why the
+// 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 function seededRandom(seed: number): () => number {
   let s = seed >>> 0;
