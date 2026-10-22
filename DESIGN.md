@@ -1001,8 +1001,15 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   character `toolChoice`), 413 over; `context` is capped whatever its type; a run that carries
   `resume` is 400 (it belongs to the interrupt flow, which the site does not use, and the runtime put
   its payload into the model prompt uncapped: 300 KB in, 300 KB out). `agent/connect` is
-  checked like a run because it carries the same RunAgentInput. Re-check the method list against
-  the client on a CopilotKit upgrade (`route.integration.test.ts` runs the real runtime).
+  checked like a run because it carries the same RunAgentInput. (3) A key named `__proto__`, at any
+  depth, is 400 "unsupported field", checked first: `JSON.parse` keeps it as an own property,
+  `JSON.stringify` forwards it, and the runtime's schema parse makes it the prototype of the run
+  input, so `resume`, `state` and `forwardedProps` (300 KB of it) were read from it past every check
+  here. The `state` and `forwardedProps` caps had this hole before this change, including in prod
+  (ef0dd228); `context` and `tools` are safe because the runtime defaults them. It is rejected, not
+  stripped; `constructor` and `prototype` keys stay legal, they copy as ordinary own properties.
+  Re-check the method list against the client on a CopilotKit upgrade (`route.integration.test.ts`
+  runs the real runtime).
 - **Chat errors never reach the visitor verbatim** (T-5532, `src/lib/copilot-error-sanitizer.ts`).
   A `RUN_ERROR` frame's `message`, and the body of a runtime 4xx/5xx, carry upstream and
   internal text (an OpenRouter error body, a stack-shaped string). The route wraps the response
