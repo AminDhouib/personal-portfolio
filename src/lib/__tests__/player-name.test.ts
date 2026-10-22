@@ -131,7 +131,9 @@ describe("sanitizePlayerName", () => {
       const opts = { maxLength: 16, fallback: "Pilot" };
       expect(sanitizePlayerName("Ada" + ch, opts)).toBe("Ada");
       expect(sanitizePlayerName(ch + "Ada", opts)).toBe("Ada");
-      expect(sanitizePlayerName("A" + ch + "da", opts)).toBe("Ada");
+      // A filler that takes up a blank cell (U+2800, U+3164, U+FFA0) is a gap, not nothing (T-6452).
+      const gap = ["\u2800", "\u3164", "\uffa0"].includes(ch) ? " " : "";
+      expect(sanitizePlayerName("A" + ch + "da", opts)).toBe("A" + gap + "da");
     });
 
     it("gives the fallback for a mix of all of them", () => {
@@ -218,6 +220,96 @@ describe("sanitizePlayerName", () => {
     ])("keeps %s inside a name with visible letters", (_label, ch) => {
       const name = "\u1780" + ch + "\u1781";
       expect(sanitizePlayerName(name, { maxLength: 16, fallback: "Pilot" })).toBe(name);
+    });
+  });
+
+  describe("more blank-looking marks (T-6452)", () => {
+    const opts = { maxLength: 16, fallback: "Pilot" };
+    const LEGIT = [
+      ["U+034F combining grapheme joiner", "\u034f"],
+      ["U+17B4 Khmer inherent vowel Aq", "\u17b4"],
+      ["U+17B5 Khmer inherent vowel Aa", "\u17b5"],
+      ["U+180B Mongolian free variation selector one", "\u180b"],
+      ["U+180C Mongolian free variation selector two", "\u180c"],
+      ["U+180D Mongolian free variation selector three", "\u180d"],
+      ["U+180E Mongolian vowel separator", "\u180e"],
+      ["U+180F Mongolian free variation selector four", "\u180f"],
+    ] as const;
+
+    it.each(LEGIT)("a name of only %s gives the fallback", (_label, ch) => {
+      expect(sanitizePlayerName(ch, opts)).toBe("Pilot");
+      expect(sanitizePlayerName(" " + ch.repeat(12) + " ", opts)).toBe("Pilot");
+    });
+
+    it("gives the fallback for all of them mixed with selectors and fillers", () => {
+      const all = LEGIT.map(([, ch]) => ch).join("") + "\ufe0f\u3164\u2800";
+      expect(sanitizePlayerName(all, opts)).toBe("Pilot");
+    });
+
+    it("decides after the cut, so padding with them cannot push the letters out", () => {
+      expect(sanitizePlayerName("\u180b".repeat(16) + "Ada", opts)).toBe("Pilot");
+    });
+
+    it("strips U+061C Arabic letter mark, a bidi control like LRM and RLM", () => {
+      expect(sanitizePlayerName("\u061c", opts)).toBe("Pilot");
+      expect(sanitizePlayerName("\u0645\u061c\u062d", opts)).toBe("\u0645\u062d");
+      expect(sanitizePlayerName("Ada\u061c", opts)).toBe("Ada");
+    });
+  });
+
+  describe("fillers that take up a cell become a space (T-6452)", () => {
+    const opts = { maxLength: 16, fallback: "Pilot" };
+
+    it.each(["\u2800", "\u3164", "\uffa0"])("%j between two words is a single space", (ch) => {
+      expect(sanitizePlayerName("A" + ch + "B", opts)).toBe("A B");
+      expect(sanitizePlayerName("Ada" + ch + "Lovelace", opts)).toBe("Ada Lovelace");
+    });
+
+    it("keeps one space per filler, as ordinary inner spaces are kept", () => {
+      expect(sanitizePlayerName("A\u3164\uffa0B", opts)).toBe("A  B");
+    });
+
+    it("trims one at either end and still falls back when nothing else is left", () => {
+      expect(sanitizePlayerName("\u2800Ada\u3164", opts)).toBe("Ada");
+      expect(sanitizePlayerName("\u2800\u3164\uffa0", opts)).toBe("Pilot");
+    });
+
+    it("leaves the zero-width fillers as nothing", () => {
+      expect(sanitizePlayerName("A\u00adB\u115fC\u1160D", opts)).toBe("ABCD");
+    });
+  });
+
+  describe("the length cut counts characters, not UTF-16 halves (T-6452)", () => {
+    const LONE = new RegExp(
+      "[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]",
+    );
+    const cut = (name: string, maxLength: number) =>
+      sanitizePlayerName(name, { maxLength, fallback: "Pilot" });
+
+    it("never leaves half of a surrogate pair", () => {
+      const result = cut("ab\u{1f600}\u{1f600}", 3);
+      expect(result).toBe("ab\u{1f600}");
+      expect(LONE.test(result)).toBe(false);
+    });
+
+    it("keeps maxLength whole emoji", () => {
+      const name = "\u{1f600}".repeat(20);
+      expect(Array.from(cut(name, 16))).toHaveLength(16);
+      expect(cut(name, 16)).toBe("\u{1f600}".repeat(16));
+      expect(LONE.test(cut(name, 12))).toBe(false);
+    });
+
+    it("keeps an astral letter whole", () => {
+      expect(cut("\u{20bb7}\u{20bb7}\u{20bb7}", 2)).toBe("\u{20bb7}\u{20bb7}");
+      expect(cut("\u{1d4d0}bc", 1)).toBe("\u{1d4d0}");
+    });
+
+    it("gives the fallback instead of a lone surrogate when only an astral blank is cut", () => {
+      expect(cut("\u{e0100}\u{e0101}\u{e0102}", 2)).toBe("Pilot");
+    });
+
+    it("is unchanged for names with no astral characters", () => {
+      expect(cut("abcdefghijklmnopqrstuvwxyz", 12)).toBe("abcdefghijkl");
     });
   });
 });
