@@ -1,136 +1,41 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
 import { stateHash } from "../hash";
-import { dispatch, MAX_LOGGED_ACTIONS, type Action, type LoggedAction } from "../action-log";
-import type { ServiceType } from "../config";
+import type { LoggedAction } from "../action-log";
 import { captureSave, loadSave } from "../../persist/save";
 import { MAX_SAVE_BUDGET, MAX_SAVE_TICKS } from "../../persist/save-schema";
 import { replayAsync } from "../replay";
 import { resetSim, S } from "../state";
-import { step } from "../tick";
+import { BUDGET, CHUNK, CHUNK_SMALL, SEED, recordRun } from "./replay-cost-fixture";
 
 afterEach(() => resetSim({ seed: "after-bench" }));
 
 // The go/no-go spike for server-side verification: what one daily submit costs
 // to re-simulate. The numbers print on every run; the assertions carry a wide
-// margin (4x the targets) so CI noise cannot flake them, while still failing on
+// margin (4x the targets) so a noisy box cannot flake them, while still failing on
 // a real regression. The targets on the dev machine are 1.5 s per submit and
 // 40 ms per chunk (the longest the server blocks its event loop).
-
-const SEED = "failover-bench";
-const TICKS = 18000; // 900 s of game time
-const CHUNK = 500;
-const CHUNK_SMALL = 100;
-const BUDGET = 5_000_000;
+//
+// WALL-CLOCK BUDGETS LIVE HERE, AND THIS FILE RUNS ALONE (T-6247). It is the "perf" vitest
+// project (vitest.config.ts): `pnpm test:perf`, one worker, no coverage, after the unit suite. In
+// the unit run it sat beside hundreds of other test files on every core, so a budget measured
+// in milliseconds failed whenever the host was busy (242 ms against a 160 ms chunk budget, with
+// nothing changed). What those runs must still prove, that the replay reproduces the live run
+// and that a save loads to the same state, is asserted without any clock in replay-scale.test.ts.
 
 const TARGET_TOTAL_MS = 1500;
 const TARGET_CHUNK_MS = 40;
 const MARGIN = 4;
-// A chunk's cost is a maximum over ~180 chunks, so one GC pause or a scheduler hiccup on a
-// loaded CI box can push a single run past the budget (it once read 160.4 ms against 160 ms)
-// without the code having changed. The assertion is on the median of the per-run maxima:
-// with 3 runs, two outlier runs are needed to fail it, while a real regression slows every
-// run and still trips it. Three, not more, because each run is a full replay and coverage
-// instrumentation roughly triples it against TEST_TIMEOUT_MS. The budget itself stays at 4x
-// the dev-machine target.
+// A chunk's cost is a maximum over ~180 chunks, so one GC pause or a scheduler hiccup can push a
+// single run past the budget (it once read 160.4 ms against 160 ms) without the code having
+// changed. The assertion is on the median of the per-run maxima: with 3 runs, two outlier runs are
+// needed to fail it, while a real regression slows every run and still trips it. The budget itself
+// stays at 4x the dev-machine target.
 const CHUNK_RUNS = 3;
-// Records one run and replays it five times (cold, warm, CHUNK_RUNS small-chunk); coverage
-// instrumentation roughly triples that (about 17 s uncovered on the dev box).
+// Records one run and replays it five times (cold, warm, CHUNK_RUNS small-chunk): about 17 s on
+// the dev box with nothing else running.
 const TEST_TIMEOUT_MS = 120_000;
 const SAVE_TEST_TIMEOUT_MS = 120_000; // unchanged: the save-load test does not repeat replays
-
-interface Placed {
-  type: ServiceType;
-  x: number;
-  z: number;
-}
-
-/** 40 services: a front door, a CDN path, an AI path, a cache, and 24 compute nodes. */
-function board(): { places: Placed[]; links: Array<[number, number]> } {
-  const places: Placed[] = [];
-  const links: Array<[number, number]> = []; // 1-based service numbers; 0 is the Internet
-  const add = (type: ServiceType): number => {
-    const n = places.length;
-    places.push({ type, x: (n % 8) * 8 - 28, z: Math.floor(n / 8) * 8 - 16 });
-    return n + 1;
-  };
-  const waf = add("waf");
-  const alb = add("alb");
-  links.push([0, waf], [waf, alb]);
-  const dbs = [add("db"), add("db"), add("db")];
-  const s3s = [add("s3"), add("s3")];
-  const cdn = add("cdn");
-  links.push([0, cdn], [cdn, s3s[0] ?? 0]);
-  const infgw = add("infgw");
-  links.push([alb, infgw]);
-  add("power");
-  add("power");
-  for (let g = 0; g < 3; g++) links.push([infgw, add("gpu")]);
-  const cache = add("cache");
-  const search = add("search");
-  for (const d of dbs) links.push([cache, d]);
-  for (let i = 0; i < 24; i++) {
-    const c = add("compute");
-    links.push([alb, c], [c, cache]);
-    links.push([c, dbs[i % dbs.length] ?? dbs[0] ?? 0]);
-    links.push([c, search]);
-    links.push([c, s3s[i % s3s.length] ?? s3s[0] ?? 0]);
-  }
-  return { places, links };
-}
-
-const idOf = (n: number): string => (n === 0 ? "internet" : `svc_${n}`);
-
-function copyLog(): LoggedAction[] {
-  return S.log.map((entry) => [...entry] as unknown as LoggedAction);
-}
-
-/** Play the run live: build the board, then issue actions up to the cap across the 15 minutes. */
-function recordRun(
-  mode: "survival" | "sandbox" = "survival",
-  runTicks = TICKS,
-  budget = BUDGET,
-): LoggedAction[] {
-  resetSim({ seed: SEED, mode, budget });
-  const { places, links } = board();
-  for (const p of places) dispatch({ op: 0, type: p.type, x: p.x, z: p.z });
-  for (const [from, to] of links) dispatch({ op: 1, from: idOf(from), to: idOf(to) });
-
-  // Tier the fleet up front, as a player with money to spare would.
-  for (let pass = 0; pass < 2; pass++) {
-    places.forEach((p, i) => {
-      if (p.type === "compute" || p.type === "db" || p.type === "cache") {
-        dispatch({ op: 4, id: idOf(i + 1) });
-      }
-    });
-  }
-
-  const computes = places.flatMap((p, i) => (p.type === "compute" ? [i + 1] : []));
-  let tick = 0;
-  while (tick < runTicks && !S.over) {
-    step(24);
-    tick += 24;
-    if (S.log.length < MAX_LOGGED_ACTIONS) {
-      const id = idOf(computes[(tick / 24) % computes.length] ?? 1);
-      const actions: Action[] = [
-        { op: 4, id },
-        { op: 6, id },
-      ];
-      const action = actions[(tick / 24) % actions.length];
-      if (action) dispatch(action);
-      // Refusals are not logged, so a pair of auto-repair flips (always accepted, net
-      // no change) is what carries the log to the cap across the run.
-      if ((tick / 24) % 2 === 0 && S.log.length + 2 <= MAX_LOGGED_ACTIONS) {
-        dispatch({ op: 7, on: true });
-        dispatch({ op: 7, on: false });
-      }
-    }
-  }
-  // Land exactly on the cap, however many of the attempts above were accepted.
-  while (S.log.length < MAX_LOGGED_ACTIONS && !S.over)
-    dispatch({ op: 7, on: S.log.length % 2 === 0 });
-  return copyLog();
-}
 
 interface Measured {
   endedAt: number;

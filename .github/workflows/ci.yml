@@ -71,6 +71,10 @@ jobs:
       - name: Vitest unit + integration tests
         run: pnpm test:coverage
 
+      # Wall-clock budgets (replay cost), run alone: see vitest.config.ts and DESIGN.md.
+      - name: Vitest performance budgets (run alone)
+        run: pnpm test:perf
+
   # Builds once for e2e, which downloads the tarball instead of rebuilding. Lighthouse keeps its
   # own build without the GA4 id: the gtag bootstrap cost the homepage performance score. Built with a
   # valid-format but unregistered GA4 id so the real gtag bootstrap renders and the e2e

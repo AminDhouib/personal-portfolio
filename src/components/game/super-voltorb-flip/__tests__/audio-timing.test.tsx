@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
 import { render, cleanup, screen, fireEvent, act } from "@testing-library/react";
+import { firstButton } from "@/test/first-button";
 
 // The audio cues are a timing contract: the round flow waits on them. Here the
 // audio layer is mocked so each cue resolves at exactly its nominal length (the
@@ -51,6 +52,10 @@ vi.mock("../effects/context", () => ({
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 import { LEVEL_WIN_MS, RISK_WARNING_MS } from "../sound-cues";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole board in jsdom and play a round; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 // A seeded generator so the board is the same every run. With this seed the
 // level-8 board's top-left tile sits in a column that is at least 75% Voltorb
@@ -92,9 +97,9 @@ function thisGameDigits(): string {
 
 function openDebugAndWin(): void {
   // Ten taps on the mute button open the debug panel (back where we began).
-  for (let i = 0; i < 10; i++) {
-    fireEvent.click(screen.getAllByRole("button", { name: /^(Mute|Unmute)$/ })[0]!);
-  }
+  // One lookup, not ten: the button is the same node whichever label it shows.
+  const mute = firstButton(/^(Mute|Unmute)$/);
+  for (let i = 0; i < 10; i++) fireEvent.click(mute);
   fireEvent.click(screen.getByRole("button", { name: "Open debug panel" }));
   fireEvent.click(screen.getByRole("button", { name: "Win current level" }));
 }

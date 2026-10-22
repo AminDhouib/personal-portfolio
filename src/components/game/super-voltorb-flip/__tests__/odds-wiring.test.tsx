@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
 import { render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { firstButton } from "@/test/first-button";
 
 vi.mock("next/font/local", () => ({
   default: () => ({ className: "mock-font", style: { fontFamily: "mock" } }),
@@ -23,6 +24,10 @@ vi.mock("../effects/context", () => ({
 }));
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole board in jsdom and play a round; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 const ODDS_LABEL =
   /(\d+|under 1|over 99) percent Voltorb|no chance of a Voltorb|certainly a Voltorb/;
@@ -83,7 +88,7 @@ describe("odds assist", () => {
 
   it("turning it on in Settings shows the odds, turning it off removes them", async () => {
     render(<SuperVoltorbFlipGame />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Settings" })[0]!);
+    fireEvent.click(firstButton("Settings"));
     fireEvent.click(screen.getByRole("switch", { name: /odds assist/i }));
     await waitFor(() => expect(labelled().length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("switch", { name: /odds assist/i }));
@@ -127,8 +132,9 @@ describe("odds assist", () => {
     window.localStorage.setItem("svf:settings", ASSIST_ON);
     render(<SuperVoltorbFlipGame />);
     await waitFor(() => expect(labelled()).toHaveLength(25));
-    const mute = () => screen.getAllByRole("button", { name: /^(un)?mute$/i })[0]!;
-    for (let i = 0; i < 10; i++) fireEvent.click(mute());
+    // One lookup, not ten: the button is the same node whichever label it shows.
+    const mute = firstButton(/^(un)?mute$/i);
+    for (let i = 0; i < 10; i++) fireEvent.click(mute);
     fireEvent.click(screen.getByRole("button", { name: "Open debug panel" }));
     const dialog = screen.getByRole("dialog", { name: "Debug panel" });
     fireEvent.click(within(dialog).getByRole("checkbox"));

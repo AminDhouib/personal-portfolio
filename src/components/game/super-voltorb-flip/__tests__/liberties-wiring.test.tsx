@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
 import { render, cleanup, screen, fireEvent, within, act } from "@testing-library/react";
+import { firstButton } from "@/test/first-button";
 
 vi.mock("next/font/local", () => ({
   default: () => ({ className: "mock-font", style: { fontFamily: "mock" } }),
@@ -23,6 +24,10 @@ vi.mock("../effects/context", () => ({
 }));
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole board in jsdom and play a round; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 // A test that times out is abandoned, not stopped: its body keeps awaiting
 // timers while the next tests start, and the open act scope leaves them an
@@ -44,9 +49,10 @@ afterEach(async () => {
 
 // The phone and desktop columns both render a MemoBar (one is CSS-hidden), so
 // controls appear twice in the DOM; always take the first.
-const first = (name: string | RegExp) => screen.getAllByRole("button", { name })[0]!;
+// No role scan: it was a large share of this file's time (see src/test/first-button.ts).
+const first = (name: string | RegExp) => firstButton(name);
 const tile = (row: number, col: number) =>
-  screen.getAllByRole("button").find((b) => b.getAttribute("data-cell") === `${row}-${col}`)!;
+  document.querySelector<HTMLElement>(`[data-cell="${row}-${col}"]`)!;
 
 describe("memo undo wiring", () => {
   it("undoes the last memo change from the button", () => {
@@ -180,9 +186,9 @@ const advance = (ms: number) => {
 };
 const savedStats = () => JSON.parse(window.localStorage.getItem("svf:stats") ?? "{}");
 const memoLabelled = () =>
-  screen
-    .getAllByRole("button")
-    .filter((b) => b.hasAttribute("data-cell") && /memo/.test(b.getAttribute("aria-label") ?? ""));
+  Array.from(document.querySelectorAll<HTMLElement>("button[data-cell]")).filter((b) =>
+    /memo/.test(b.getAttribute("aria-label") ?? ""),
+  );
 
 describe("one record per round", () => {
   it("does not record a finished round again when the board re-renders", () => {

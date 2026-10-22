@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
 import { render, cleanup, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
+import { firstButton } from "@/test/first-button";
 
 vi.mock("next/font/local", () => ({
   default: () => ({ className: "mock-font", style: { fontFamily: "mock" } }),
@@ -23,13 +24,18 @@ vi.mock("../effects/context", () => ({
 }));
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole board in jsdom and play a round; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 const ODDS_LABEL =
   /(\d+|under 1|over 99) percent Voltorb|no chance of a Voltorb|certainly a Voltorb/;
 const ASSIST_ON = '{"v":1,"memoUndo":true,"stats":true,"assist":true}';
 const NOTE = /Assisted: not in your record\./;
 
-const first = (name: string | RegExp) => screen.getAllByRole("button", { name })[0]!;
+// No role scan: it dominated this file's time (see src/test/first-button.ts).
+const first = (name: string | RegExp) => firstButton(name);
 const tiles = () => Array.from(document.querySelectorAll<HTMLElement>("[data-cell]"));
 const oddsShown = () => tiles().some((t) => ODDS_LABEL.test(t.getAttribute("aria-label") ?? ""));
 const quitRound = () => {

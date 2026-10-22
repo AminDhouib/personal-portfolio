@@ -11,6 +11,10 @@ import { makeController } from "./ui-harness";
 vi.mock("@/lib/log", () => ({ captureException: vi.fn(), logWarn: vi.fn(), logError: vi.fn() }));
 
 import { createFailoverVerifier } from "@/lib/arcade/failover-verify";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests re-simulate a finished run to build its proof; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 // The Daily Incident in the live controller: it plays the day's own seed and incident, steps
 // one tick at a time so the incident's calls land on their ticks, ends at the 900 s cap, and

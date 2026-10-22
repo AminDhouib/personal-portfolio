@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactNode } from "react";
 import { render, cleanup, screen, fireEvent, within } from "@testing-library/react";
+import { firstButton } from "@/test/first-button";
 
 vi.mock("next/font/local", () => ({
   default: () => ({ className: "mock-font", style: { fontFamily: "mock" } }),
@@ -24,6 +25,10 @@ vi.mock("../effects/context", () => ({
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
 import { dailyBoard } from "../daily-board";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole board in jsdom and play a round; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 const DAY = "2026-10-07";
 const layout = dailyBoard(DAY).layout;
@@ -51,7 +56,8 @@ const dailyTile = (row: number, col: number) =>
     (b) => b.getAttribute("data-cell") === `${row}-${col}`,
   )!;
 const flipDaily = (index: number) => fireEvent.click(dailyTile(...at(index)));
-const openDaily = () => fireEvent.click(screen.getAllByRole("button", { name: "Daily" })[0]!);
+// The mode row's Daily entry by its own hook, not a role scan of the whole board.
+const openDaily = () => fireEvent.click(document.querySelector<HTMLElement>("[data-daily-open]")!);
 const savedDaily = () => JSON.parse(window.localStorage.getItem("svf:daily") ?? "{}");
 const savedStats = () => JSON.parse(window.localStorage.getItem("svf:stats") ?? "{}");
 const quitDaily = () => {
@@ -282,7 +288,7 @@ describe("the Daily board", () => {
     const saved = window.localStorage.getItem("svf:daily");
     expect(savedStats().dailyPlayed).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Back to the game" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Statistics" })[0]!);
+    fireEvent.click(firstButton("Statistics"));
     fireEvent.click(screen.getByRole("button", { name: "Reset statistics" }));
     fireEvent.click(screen.getByRole("button", { name: "Yes, reset" }));
     expect(savedStats().dailyPlayed).toBe(0);
