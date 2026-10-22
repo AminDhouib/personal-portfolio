@@ -289,6 +289,18 @@ describe("POST /api/copilotkit (real @copilotkit/runtime, stubbed network)", () 
     expect(upstreamCalls).toHaveLength(0);
   });
 
+  // With the real runtime a resume payload went straight into the model prompt (300 KB in, 300 KB
+  // out); the site never sends one.
+  it("does not let a resume payload reach the model prompt", async () => {
+    const envelope = runEnvelope("hi");
+    const resume = [
+      { interruptId: "call1", status: "resolved", payload: { x: "y".repeat(300_000) } },
+    ];
+    const response = await POST(makeReq({ ...envelope, body: { ...envelope.body, resume } }));
+    expect(response.status).toBe(400);
+    expect(upstreamCalls).toHaveLength(0);
+  });
+
   it("answers 400 for a run whose body is a JSON string", async () => {
     const envelope = runEnvelope("hi");
     const response = await POST(makeReq({ ...envelope, body: JSON.stringify(envelope.body) }));
