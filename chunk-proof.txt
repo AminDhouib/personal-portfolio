@@ -1,0 +1,12 @@
+T-6366 code-path proof on prod c6457e6f, 2026-10-22 ~11:33Z. Fetched the deployed home-page JS chunks (31 chunks from the page's resource list); no form opened, nothing submitted.
+
+Chunk A (lead flow): https://amindhou.com/_next/static/chunks/0szycfv4s0v9s.js
+  contains the user-facing failure string "Sorry, there was an issue saving your contact details. Please try emailing hello@amindhou.com directly."
+  and the collectLead action ("name:\"collectLead\"" ... useLeadCollectorAction).
+  The lead POST catch block (verbatim): catch(e){return(0,Ns.isNetworkFailure)(e)||reportError(e),{ok:!1}}
+  i.e. a network failure is NOT reported to Sentry, the call returns {ok:false}.
+  The POST uses signal:AbortSignal.timeout(8e3).
+
+Chunk B (the imported helper, module 121145): https://amindhou.com/_next/static/chunks/44f1w2niqmpla.js
+  t.s(["isNetworkFailure",0,function(t){return t instanceof TypeError&&/failed to fetch|networkerror|load failed|network request failed/i.test(t.message)}])
+  (the regex text "failed to fetch|networkerror|load failed|network request failed" is present)
