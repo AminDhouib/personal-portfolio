@@ -1031,7 +1031,8 @@ perfects, streak)` gives the lowest and highest total any run with those counts 
   10 KB body, which used to escape the route as an unhandled 500. A throw from the measurements is
   mapped to 400 as a backstop.
   (4) T-6364: a tool the site registers is no longer forwarded as the client wrote it; the envelope
-  swaps in the server's own copy (`COPILOT_TOOL_DEFINITIONS`) and drops every other tool. The
+  swaps in the server's own copy (`COPILOT_TOOL_DEFINITIONS`, frozen, and cloned for each request so
+  nothing downstream can change what the next request sees) and drops every other tool. The
   runtime turns each client tool's `parameters` into `new Validator(parameters, "7")`
   (`@copilotkit/runtime/dist/agent/index.mjs`, `convertToolsToVercelAITools`), and
   `@cfworker/json-schema` runs `new RegExp(pattern, "u")` (and `patternProperties` keys) on the
