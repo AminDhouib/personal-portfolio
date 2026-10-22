@@ -365,6 +365,35 @@ describe("bucket cap", () => {
     expect(checkRateLimit(`${tag}-11999`, opts).allowed).toBe(false);
   });
 
+  // T-6262: a process-wide bucket (global: true) is not part of the evictable set, so a flood of
+  // distinct per-client keys cannot forgive a spent shared budget.
+  it("does not let a flood of per-client keys evict a spent global bucket", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const tag = `global-${Math.random()}`;
+    const shared = { limit: 2, windowMs: 3_600_000, global: true };
+    expect(checkRateLimit(`${tag}-all`, shared).allowed).toBe(true);
+    expect(checkRateLimit(`${tag}-all`, shared).allowed).toBe(true);
+    expect(checkRateLimit(`${tag}-all`, shared).allowed).toBe(false);
+
+    for (let i = 0; i < 12_000; i++) checkRateLimit(`${tag}-client-${i}`, opts);
+
+    expect(checkRateLimit(`${tag}-all`, shared).allowed).toBe(false);
+    // Per-client eviction still bounds the map: the oldest client key started over.
+    expect(checkRateLimit(`${tag}-client-0`, opts).allowed).toBe(true);
+    expect(checkRateLimit(`${tag}-client-11999`, opts).allowed).toBe(false);
+  });
+
+  it("still expires a global bucket when its window passes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const shared = { limit: 1, windowMs: 60_000, global: true };
+    expect(checkRateLimit("global-expiry", shared).allowed).toBe(true);
+    expect(checkRateLimit("global-expiry", shared).allowed).toBe(false);
+    vi.setSystemTime(60_001);
+    expect(checkRateLimit("global-expiry", shared).allowed).toBe(true);
+  });
+
   it("drops expired keys before evicting live ones when the cap is reached", () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
