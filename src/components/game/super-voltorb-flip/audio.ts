@@ -176,46 +176,111 @@ export const sfx = {
   riskWarning: () => playCue("riskWarning"),
 };
 
-// ---- Jingles: the original recording plus an end-of-cue timer, cancellable as one. ----
+// ---- Jingles: the original recording, one persistent element each, plus an end-of-cue timer. ----
 
-// The timer runs for the cue's nominal length (LEVEL_WIN_MS, GAME_OVER_MS), which is the round
-// flow's timing contract, not for the recording's own length: the lost-round jingle is longer than
-// its cue and simply plays out under the next screen until stopGameOver() (or a restart) silences it.
+// The timer runs for the cue's nominal length (LEVEL_WIN_MS), which is the round flow's timing
+// contract, not for the recording's own length: the lost-round jingle is longer than its cue and
+// simply plays out under the next screen until stopGameOver() (or a restart) silences it. Nothing
+// awaits the lost-round jingle, so it arms no timer at all.
+//
+// Each jingle has ONE element, created with the first music or jingle and reused every round. A
+// jingle starts from a timer long after the last gesture, and iOS Safari only lets an element
+// play without a gesture once that same element has been played from one; so the elements are
+// unlocked with a muted play-then-pause on the first gesture (right away if the call that creates
+// them is itself a gesture, otherwise on the first gesture after it), then replayed from 0.
 interface JingleSlot {
+  track: MusicTrack;
+  el: HTMLAudioElement | null;
   timer: number | null;
-  audio: HTMLAudioElement | null;
 }
 
-const levelWinSlot: JingleSlot = { timer: null, audio: null };
-const gameOverSlot: JingleSlot = { timer: null, audio: null };
+const levelWinSlot: JingleSlot = { track: LEVEL_WIN_JINGLE, el: null, timer: null };
+const gameOverSlot: JingleSlot = { track: GAME_OVER_JINGLE, el: null, timer: null };
+const jingleSlots = [levelWinSlot, gameOverSlot];
+
+// Jingle elements whose muted unlock play() is still in flight, and ones already unlocked.
+const unlocking = new Set<HTMLAudioElement>();
+const unlocked = new Set<HTMLAudioElement>();
+let jingleUnlockArmed = false;
+
+// A browser that blocks the unlock (no gesture yet) gets one retry on the first gesture.
+function armJingleUnlock(): void {
+  if (jingleUnlockArmed || typeof document === "undefined") return;
+  jingleUnlockArmed = true;
+  const events = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
+  function onGesture() {
+    for (const name of events) document.removeEventListener(name, onGesture, true);
+    jingleUnlockArmed = false;
+    for (const slot of jingleSlots) if (slot.el) unlockJingle(slot.el);
+  }
+  for (const name of events) document.addEventListener(name, onGesture, true);
+}
+
+function unlockJingle(el: HTMLAudioElement): void {
+  // A jingle sounding right now has played from a gesture-free timer fine, or is not ours to cut.
+  if (unlocked.has(el) || !el.paused) return;
+  unlocking.add(el);
+  el.muted = true;
+  Promise.resolve(el.play()).then(
+    () => {
+      // startJingle drops the element from `unlocking` when it takes it over: leave it playing.
+      if (!unlocking.delete(el)) return;
+      el.pause();
+      el.currentTime = 0;
+      el.muted = globalMuted;
+      unlocked.add(el);
+    },
+    () => {
+      if (unlocking.delete(el)) el.muted = globalMuted;
+      armJingleUnlock();
+    },
+  );
+}
+
+function ensureJingles(): void {
+  if (typeof window === "undefined" || levelWinSlot.el) return;
+  for (const slot of jingleSlots) {
+    const el = new Audio(slot.track.src);
+    el.preload = "auto";
+    el.volume = slot.track.volume;
+    el.muted = globalMuted;
+    slot.el = el;
+    unlockJingle(el);
+  }
+}
 
 function stopJingle(slot: JingleSlot): void {
   if (typeof window === "undefined") return;
   if (slot.timer !== null) window.clearTimeout(slot.timer);
   slot.timer = null;
-  slot.audio?.pause();
-  slot.audio = null;
+  // An element in the middle of its unlock is paused by the unlock itself.
+  if (slot.el && !unlocking.has(slot.el)) slot.el.pause();
 }
 
-function startJingle(slot: JingleSlot, track: MusicTrack, ms: number, onEnded?: () => void): void {
+function startJingle(slot: JingleSlot, ms: number, onEnded?: () => void): void {
   stopJingle(slot);
   if (typeof window === "undefined") return;
-  if (!globalMuted) {
-    const el = new Audio(track.src);
-    el.volume = track.volume;
-    slot.audio = el;
+  ensureJingles();
+  const el = slot.el;
+  if (el && !globalMuted) {
+    unlocking.delete(el);
+    el.muted = false;
+    el.currentTime = 0;
+    el.volume = slot.track.volume;
     // silent-ok: a blocked or failed jingle stays silent; the round flow runs on the timer below.
     Promise.resolve(el.play()).catch(() => undefined);
   }
-  slot.timer = window.setTimeout(() => {
-    slot.timer = null;
-    onEnded?.();
-  }, ms);
+  if (onEnded) {
+    slot.timer = window.setTimeout(() => {
+      slot.timer = null;
+      onEnded();
+    }, ms);
+  }
 }
 
 /** Round-lost jingle. */
 export function playGameOver(): void {
-  startJingle(gameOverSlot, GAME_OVER_JINGLE, CUES.gameOver.ms);
+  startJingle(gameOverSlot, CUES.gameOver.ms);
 }
 
 export function stopGameOver(): void {
@@ -224,7 +289,7 @@ export function stopGameOver(): void {
 
 /** Round-cleared jingle. `onEnded` fires once at LEVEL_WIN_MS unless stopLevelWin() cancels it. */
 export function playLevelWin(onEnded?: () => void): void {
-  startJingle(levelWinSlot, LEVEL_WIN_JINGLE, CUES.levelClear.ms, onEnded);
+  startJingle(levelWinSlot, CUES.levelClear.ms, onEnded);
 }
 
 export function stopLevelWin(): void {
@@ -233,29 +298,57 @@ export function stopLevelWin(): void {
 
 // ---- Background music --------------------------------------------------------
 
+// Whether the intro has played since the last real stop. A fade between rounds does not reset
+// it, so the next round goes straight to the loop, as the original game's music carries on.
+let introPlayed = false;
+let loopWarmScheduled = false;
+const LOOP_WARM_DELAY_MS = 3000;
+const LOOP_WARM_TIMEOUT_MS = 60_000;
+
+// The loop is ~1.4 MB. Fetch it into the HTTP cache once, a few seconds into the intro, so the
+// hand-over does not go silent on a slow link. Once per session; a failed warm-up costs nothing.
+function warmLoopSoon(): void {
+  if (loopWarmScheduled || typeof fetch !== "function") return;
+  loopWarmScheduled = true;
+  window.setTimeout(() => {
+    // silent-ok: a failed warm-up only means the loop loads when the hand-over needs it.
+    fetch(MUSIC_LOOP.src, { signal: AbortSignal.timeout(LOOP_WARM_TIMEOUT_MS) })
+      .then((res) => res.arrayBuffer())
+      .catch(() => undefined);
+  }, LOOP_WARM_DELAY_MS);
+}
+
 /**
- * Start the background music, or keep it if it is already playing: the original intro once, then
- * the original loop, the same at every level. One element plays both so the loop starts without a
- * fresh user gesture (a browser that let the intro start lets the same element carry on).
+ * Start the background music, or keep it if it is already playing. The first start after a real
+ * stop (the page opening, a hidden tab, an unmount) plays the original intro once and then the
+ * original loop; a restart after a fade goes straight to the loop. It is the same at every
+ * level. One element plays both so the loop starts without a fresh user gesture (a browser that
+ * let the intro start lets the same element carry on).
  */
 export function playMusic(_level: number): void {
   if (typeof window === "undefined") return;
   if (music) return;
   cancelGestureRetry?.();
-  const el = new Audio(MUSIC_INTRO.src);
+  const first = introPlayed ? MUSIC_LOOP : MUSIC_INTRO;
+  introPlayed = true;
+  const el = new Audio(first.src);
   music = el;
-  el.loop = false;
-  el.volume = MUSIC_INTRO.volume;
+  el.loop = first === MUSIC_LOOP;
+  el.volume = first.volume;
   el.muted = globalMuted;
-  el.addEventListener("ended", () => {
-    // A stopped or fading intro has left the slot: nothing may start the loop for it.
-    if (music !== el) return;
-    el.src = MUSIC_LOOP.src;
-    el.loop = true;
-    el.volume = MUSIC_LOOP.volume;
-    startPlaying(el);
-  });
+  if (first === MUSIC_INTRO) {
+    el.addEventListener("ended", () => {
+      // A stopped or fading intro has left the slot: nothing may start the loop for it.
+      if (music !== el) return;
+      el.src = MUSIC_LOOP.src;
+      el.loop = true;
+      el.volume = MUSIC_LOOP.volume;
+      startPlaying(el);
+    });
+    warmLoopSoon();
+  }
   startPlaying(el);
+  ensureJingles();
 }
 
 // silent-ok: autoplay is commonly blocked until a user gesture; a rejected play() must not
@@ -271,6 +364,7 @@ export function stopMusic(): void {
   cancelGestureRetry?.();
   music?.pause();
   music = null;
+  introPlayed = false;
 }
 
 export function fadeOutMusic(ms = 400): void {
@@ -300,7 +394,7 @@ export function setMusicMuted(muted: boolean): void {
   globalMuted = muted;
   if (music) music.muted = muted;
   for (const m of fading) m.muted = muted;
-  for (const slot of [levelWinSlot, gameOverSlot]) if (slot.audio) slot.audio.muted = muted;
+  for (const slot of jingleSlots) if (slot.el && !unlocking.has(slot.el)) slot.el.muted = muted;
   if (master) setMasterMuted(master, muted);
   // A loop that was waiting for a gesture while muted starts now: unmuting is one.
   if (!muted) runGestureRetry?.();

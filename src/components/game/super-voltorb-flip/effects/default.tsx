@@ -3,7 +3,11 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { EffectProps, EffectTheme } from ".";
 import { SparkleFrame } from "../art/frames";
 import { BURST_FRAMES, SPARKLE_FRAMES } from "../art/fx";
-import { EXPLODE_FRAME_SRCS, explodeFrameCssSize } from "../art/original-sprites";
+import {
+  EXPLODE_FRAME_SRCS,
+  SPRITE_NO_GRAB_STYLE,
+  explodeFrameCssSize,
+} from "../art/original-sprites";
 
 // Both overlays sit centred over the revealed tile and overflow its edges. The
 // Voltorb stays visible underneath (the tile's own face); the burst frames carry
@@ -35,7 +39,9 @@ function ExplosionSprite({ onDone }: EffectProps) {
     <img
       src={EXPLODE_FRAME_SRCS[frame]}
       alt=""
+      draggable={false}
       style={{
+        ...SPRITE_NO_GRAB_STYLE,
         position: "absolute",
         left: "50%",
         top: "50%",

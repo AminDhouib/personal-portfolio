@@ -688,7 +688,9 @@ describe("loop preload", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(3000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(`${AUDIO}/music_loop.mp3`);
+    expect(fetchMock).toHaveBeenCalledWith(`${AUDIO}/music_loop.mp3`, {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it("does it once per session, not once per start", async () => {
