@@ -3,7 +3,21 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "audit/**"
+      - LICENSE
+      - NOTICE
+      - ".claude/**"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "audit/**"
+      - LICENSE
+      - NOTICE
+      - ".claude/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -11,7 +25,7 @@ concurrency:
 
 jobs:
   lint-and-test:
-    name: Lint, Typecheck, Test, Build
+    name: Lint, Typecheck, Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -57,19 +71,18 @@ jobs:
       - name: Vitest unit + integration tests
         run: pnpm test:coverage
 
-      - name: Next.js production build
-        run: pnpm build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
-
-      # Reads the client chunks and the first-load manifests the build wrote (see the script's header).
-      - name: Bundle budget (Failover game chunks, 420 KB gzip)
-        run: node scripts/check-bundle-budget.mjs
-
-  lighthouse:
-    name: Lighthouse (all public pages)
+  # Builds once; lighthouse and e2e download the tarball instead of rebuilding. Built with a
+  # valid-format but unregistered GA4 id so the real gtag bootstrap renders and the e2e
+  # conversion specs can read dataLayer (the specs block googletagmanager.com, so nothing is
+  # ever sent). NEXT_PUBLIC_* is inlined at build time, so the id has to be set here.
+  # A tarball, not raw paths: upload-artifact drops hidden files (.next) and symlinks.
+  build:
+    name: Build (shared standalone artifact)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      NEXT_PUBLIC_GA4_ID: G-E2ETEST000
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
@@ -88,8 +101,50 @@ jobs:
 
       - name: Next.js production build
         run: pnpm build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
+
+      # Reads the client chunks and the first-load manifests the build wrote (see the script's header).
+      - name: Bundle budget (Failover game chunks, 420 KB gzip)
+        run: node scripts/check-bundle-budget.mjs
+
+      - name: Pack standalone bundle
+        run: tar -czf next-build.tgz .next/standalone .next/static public
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: next-build
+          path: next-build.tgz
+          retention-days: 1
+          if-no-files-found: error
+
+  lighthouse:
+    name: Lighthouse (all public pages)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: next-build
+
+      - name: Unpack standalone bundle
+        run: tar -xzf next-build.tgz
 
       # Assemble and boot the standalone bundle the same way the Dockerfile
       # does. CI has no secrets, so the boot uses the env gate's designed
@@ -134,14 +189,11 @@ jobs:
 
   e2e:
     name: E2E (Playwright, production build)
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       NEXT_TELEMETRY_DISABLED: 1
-      # A valid-format but unregistered measurement ID, so the build renders
-      # the real gtag bootstrap and the conversion specs can read dataLayer.
-      # The specs block googletagmanager.com, so nothing is ever sent.
-      NEXT_PUBLIC_GA4_ID: G-E2ETEST000
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
@@ -158,8 +210,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Next.js production build
-        run: pnpm build
+      - name: Download build artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: next-build
+
+      - name: Unpack standalone bundle
+        run: tar -xzf next-build.tgz
 
       # Same boot as the lighthouse job: the standalone bundle behind the env
       # gate's loud bypass sentinel, since CI has no secrets, with public/
