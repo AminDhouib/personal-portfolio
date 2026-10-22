@@ -1,0 +1,4 @@
+Page: https://amindhou.com/blog/quality-gates-that-earn-their-keep (prod 45b9948d), JSON.parse of every script[type="application/ld+json"]
+script count: 2
+#1 parse ok=true, @type (graph) = Person, Organization, WebSite, len=1671, raw "<" in text = false
+#2 parse ok=true, @type = BlogPosting, len=814, raw "<" in text = false
