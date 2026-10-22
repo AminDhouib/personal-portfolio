@@ -66,10 +66,12 @@ export const COPILOT_MAX_STATE_CHARS = 8000;
 export const COPILOT_MAX_FORWARDED_PROPS_CHARS = 2000;
 
 /**
- * How deeply the envelope may nest (the envelope itself is depth 1, its body 2). The deepest thing
- * the site's own client sends, a tool definition (envelope > body > tools > tool > parameters >
- * properties > property) or an assistant tool call (envelope > body > messages > message >
- * toolCalls > call > function), is 7 deep; 32 is more than four times that. It exists because
+ * How deeply the envelope may nest. Depth counts objects and arrays only, a scalar leaf adds no
+ * level: the envelope is depth 1, its body 2, and so on, so 32 nested objects are allowed and 33
+ * are refused. The deepest thing the site's own client sends is the suggestions tool (envelope >
+ * body > tools > tool > parameters > properties > suggestions > items > properties > title), 10
+ * deep; an assistant tool call (envelope > body > messages > message > toolCalls > call >
+ * function) is 7. 32 is more than three times the deepest. It exists because
  * JSON.stringify, which every size measurement below uses, overflows the call stack on a few
  * thousand levels ("[[[...]]]" is a 10 KB body), and the byte cap does not stop that.
  */
@@ -99,14 +101,65 @@ export const COPILOT_ALLOWED_METHODS: ReadonlySet<string> = new Set([
 const RUN_METHODS: ReadonlySet<string> = new Set(["agent/run", "agent/connect"]);
 
 /**
- * Client tools the site really registers: `collectLead` (use-lead-collector-action.ts) and the
- * `copilotkitSuggest` tool CopilotKit attaches to a chat-suggestions run. Dropping these would
- * break lead capture and the suggested prompts; everything else is dropped.
+ * The client tools the site really registers, as the server's own copies: `collectLead`
+ * (use-lead-collector-action.ts) and the `copilotkitSuggest` tool CopilotKit's core attaches to a
+ * chat-suggestions run (SUGGEST_TOOL in @copilotkit/core 1.77, verbatim). A tool the client sends
+ * under one of these names is replaced by the copy here, not forwarded: its `parameters` is a
+ * JSON schema the runtime builds a validator from, and a schema keyword such as `pattern` or
+ * `patternProperties` is a regex compiled and run on the model's tool-call arguments, so a
+ * client-chosen "^(a+)+$" blocks the event loop; its description is client-written model
+ * instructions. Every other tool is dropped. The copies are pinned against what the client sends in
+ * copilot-envelope.test.ts, so a CopilotKit upgrade that changes one surfaces there.
  */
-const ALLOWED_CLIENT_TOOLS = new Set(["collectLead", "copilotkitSuggest"]);
-
-/** The real definitions serialise to ~0.8 KB (collectLead) and ~1 KB (suggest). */
-const MAX_TOOL_DEFINITION_CHARS = 8000;
+export const COPILOT_TOOL_DEFINITIONS: Readonly<Record<string, unknown>> = {
+  collectLead: {
+    name: "collectLead",
+    description:
+      "Collect a visitor's name and email when they express interest in hiring or working with Amin. Use this after they decline or can't use the booking link.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "The visitor's full name" },
+        email: { type: "string", description: "The visitor's email address" },
+        note: {
+          type: "string",
+          description: "Brief note about what they're looking for (optional)",
+        },
+      },
+      required: ["name", "email"],
+    },
+  },
+  copilotkitSuggest: {
+    name: "copilotkitSuggest",
+    description: "Suggest what the user could say next",
+    parameters: {
+      type: "object",
+      properties: {
+        suggestions: {
+          type: "array",
+          description: "List of suggestions shown to the user as buttons.",
+          items: {
+            type: "object",
+            properties: {
+              title: {
+                type: "string",
+                description:
+                  "The title of the suggestion. This is shown as a button and should be short.",
+              },
+              message: {
+                type: "string",
+                description:
+                  "The message to send when the suggestion is clicked. This should be a clear, complete sentence and will be sent as an instruction to the AI.",
+              },
+            },
+            required: ["title", "message"],
+          },
+        },
+      },
+      required: ["suggestions"],
+    },
+  },
+};
 
 const SERVER_ONLY_ROLES = new Set(["system", "developer"]);
 
@@ -241,14 +294,11 @@ function sanitizeParsed(envelope: Record<string, unknown>): EnvelopeResult {
 
     if ("tools" in run) {
       const tools = Array.isArray(run.tools) ? run.tools : [];
-      run.tools = tools.filter((tool) => {
+      run.tools = tools.flatMap((tool) => {
         const name = toolName(tool);
-        const allowed =
-          name !== null &&
-          ALLOWED_CLIENT_TOOLS.has(name) &&
-          serializedLength(tool) <= MAX_TOOL_DEFINITION_CHARS;
-        if (!allowed) droppedTools.push(name ?? "?");
-        return allowed;
+        const own = name !== null && Object.hasOwn(COPILOT_TOOL_DEFINITIONS, name);
+        if (!own) droppedTools.push(name ?? "?");
+        return own ? [COPILOT_TOOL_DEFINITIONS[name]] : [];
       });
     }
   }
