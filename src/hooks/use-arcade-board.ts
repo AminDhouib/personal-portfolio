@@ -222,6 +222,19 @@ async function readJsonBody(res: Response): Promise<Record<string, unknown>> {
 }
 
 /**
+ * A fetch that never got a response (offline, an ad blocker or a firewall dropping the request).
+ * Browsers throw a TypeError whose text differs by engine. Both callers already degrade to a read
+ * error / { ok: false }; reporting it via the global reportError reached window.onerror and
+ * Sentry as an unhandled "Failed to fetch" for something the visitor's network caused.
+ */
+function isNetworkFailure(err: unknown): boolean {
+  return (
+    err instanceof TypeError &&
+    /failed to fetch|networkerror|load failed|network request failed/i.test(err.message)
+  );
+}
+
+/**
  * Reads one game's leaderboard (daily, weekly or all-time) from /api/arcade/scores and
  * submits scores with the browser's trust-on-first-use identity. Each game keeps its own
  * submit-UX state; this hook owns only fetch, parse, period and the request payload.
@@ -277,7 +290,7 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
       setReadError(null);
       return parsed;
     } catch (err) {
-      reportError(err);
+      if (!isNetworkFailure(err)) reportError(err);
       if (id === requestId.current) setReadError("failed to load leaderboard");
       return [];
     } finally {
@@ -354,7 +367,7 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
         const boards = toBoards(data.boards);
         return { ok: true, rank: boards.find((b) => b.period === "all-time")?.rank, boards };
       } catch (err) {
-        reportError(err);
+        if (!isNetworkFailure(err)) reportError(err);
         return { ok: false };
       }
     },
