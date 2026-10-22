@@ -105,7 +105,7 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("rejects a garbage envelope header with 400 and reports it", async () => {
+  it("rejects a garbage envelope header with 400 as a warning, not an exception", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
@@ -113,7 +113,12 @@ describe("POST /monitoring (Sentry envelope tunnel)", () => {
 
     expect(res.status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).not.toHaveBeenCalled();
+    expect(logWarn).toHaveBeenCalledTimes(1);
+    expect(logWarn).toHaveBeenCalledWith("monitoring", "malformed envelope header", {
+      cause: "bad-envelope-header",
+      bytes: "not-json\nstuff".length,
+    });
   });
 
   it("rejects cross-origin posts", async () => {
