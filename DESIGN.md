@@ -820,6 +820,12 @@ current tree on 2026-07-07.
   lives in a slot under the board, never over it (the revealed board is worth reading). While a
   round is live the slot shows a one-line hint plus the Quit button, so it keeps its height and
   the page never jumps.
+  Every timer of that flow (the reveal, the fold-down, the risk-warning release, the payout drain,
+  the level flash) is scheduled through `use-unmount-timers.ts` and dies with the component
+  (T-6453): a timer left armed past unmount ran after a test environment was torn down and threw
+  "window is not defined" from react-dom, failing a whole vitest run although every test passed. A
+  `sleep` pending at unmount is never resolved, so the async round-end chain simply stops, like
+  `waitForUserInteraction` already did. Pinned in `unmount-timers.test.tsx`.
   The wait ignores keys whose target is a text field (`game/text-entry.ts` `isTextEntryTarget`), so the AI
   chat can be typed in while a banner is up. The banner wording lives in `round-result-copy.ts`
   (original text; paraphrase, never Nintendo's strings) and keeps the reserved height, 72px below

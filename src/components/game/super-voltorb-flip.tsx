@@ -43,6 +43,7 @@ import { loadProgress } from "./super-voltorb-flip/progress";
 import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
+import { useUnmountTimers } from "./super-voltorb-flip/use-unmount-timers";
 import { isTextEntryTarget } from "./text-entry";
 import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
 import { translations, type Language } from "./super-voltorb-flip/translations";
@@ -641,6 +642,8 @@ const Gameboard = ({
   isAssisted,
   daily,
 }: GameboardProps) => {
+  // Every timer of the round-end flow (reveal, fold-down, risk release) dies with the board.
+  const { later, cancel } = useUnmountTimers();
   const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
     game.cells.flat().map((cell) => ({ isFlipped: daily?.restored ? true : cell.isFlipped })),
   );
@@ -804,7 +807,7 @@ const Gameboard = ({
         void sfx.flip();
         if (kind === "bomb") {
           // Stagger the buzzer so the flip click is audible first.
-          window.setTimeout(() => void sfx.voltorbPop(), 140);
+          later(() => void sfx.voltorbPop(), 140);
         }
       }
       daily?.onFlipped(row, col);
@@ -826,12 +829,12 @@ const Gameboard = ({
       };
       if (!muted) {
         void sfx.riskWarning().then(() => {
-          window.setTimeout(release, 500);
+          later(release, 500);
         });
       } else {
         // Muted: wait out the same fanfare length plus the same 500ms beat so
         // timing stays consistent regardless of audio state.
-        window.setTimeout(release, RISK_WARNING_MS + 500);
+        later(release, RISK_WARNING_MS + 500);
       }
       return;
     }
@@ -882,12 +885,12 @@ const Gameboard = ({
     // (voltorb_flip.c:1077) — covers the win/lose whole-board reveal.
     if (!muted) void sfx.flip();
     return new Promise<void>((resolve) => {
-      setTimeout(() => {
+      later(() => {
         setCardsFlipped((prev) => prev.map(() => ({ isFlipped: true })));
         resolve();
       }, 1000);
     });
-  }, [muted]);
+  }, [muted, later]);
 
   const flipCardsDown = useCallback(
     (delay = 1500, onStart?: () => void) => {
@@ -899,14 +902,14 @@ const Gameboard = ({
         [4, 9, 14, 19, 24],
       ];
 
-      setTimeout(() => {
+      later(() => {
         // Fire onStart at the exact frame the first column begins flipping
         // — keeps the level-up/down flash + SE in lockstep with the cards.
         onStart?.();
         setFlipDownStarted(true);
         let stagger = 0;
         for (let col = 0; col < 5; col++) {
-          setTimeout(() => {
+          later(() => {
             // PANERU_MEKURU once per column (not per card) — the cards in
             // a column flip together, so a single SE matches the visual.
             if (!muted) void sfx.flip();
@@ -920,13 +923,13 @@ const Gameboard = ({
           }, stagger);
           stagger += 200;
         }
-        setTimeout(() => {
+        later(() => {
           updateGame((g) => g.restartGame());
           setFlipDownStarted(false);
         }, stagger + 200);
       }, delay);
     },
-    [updateGame, muted],
+    [updateGame, muted, later],
   );
 
   useEffect(() => {
@@ -958,11 +961,11 @@ const Gameboard = ({
         await new Promise<void>((resolve) => {
           if (muted) {
             // Same length as the audible clear fanfare (the audio-timing contract).
-            window.setTimeout(resolve, LEVEL_WIN_MS);
+            later(resolve, LEVEL_WIN_MS);
           } else {
-            const fallback = window.setTimeout(resolve, 4000);
+            const fallback = later(resolve, 4000);
             playLevelWin(() => {
-              window.clearTimeout(fallback);
+              cancel(fallback);
               resolve();
             });
           }
@@ -1116,7 +1119,7 @@ const Gameboard = ({
             onCancel={() => {
               setQuitConfirmOpen(false);
               // The button is disabled while the confirmation is open; focus it once it is live again.
-              window.setTimeout(() => quitButtonRef.current?.focus(), 0);
+              later(() => quitButtonRef.current?.focus(), 0);
             }}
             onConfirm={() => {
               setQuitConfirmOpen(false);
@@ -1219,6 +1222,7 @@ type InstructionsModalProps = {
 
 const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) => {
   const { howToPlayTitle, instructions, tipsTitle, tips } = translations[language];
+  const { later } = useUnmountTimers();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -1235,8 +1239,8 @@ const InstructionsModal = ({ language, setModalOpen }: InstructionsModalProps) =
   const [closing, setClosing] = useState(false);
   const close = useCallback(() => {
     setClosing(true);
-    window.setTimeout(() => setModalOpen(false), 180);
-  }, [setModalOpen]);
+    later(() => setModalOpen(false), 180);
+  }, [setModalOpen, later]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -1624,6 +1628,8 @@ function DailyGame({
 
 export function SuperVoltorbFlipGame() {
   const { game, updateGame, size, setGameSize } = useGame();
+  // The payout drain, the game-over jingle delay and the level flash die with the game.
+  const { later, sleep } = useUnmountTimers();
   const [peek, setPeek] = useState(false);
   const [muted, toggleMute] = useMute();
   const svfRootRef = useRef<HTMLDivElement | null>(null);
@@ -1744,7 +1750,7 @@ export function SuperVoltorbFlipGame() {
     (outcome: DailyOutcome, dayKey: string, coins: number) => {
       if (outcome === "lost") {
         fadeOutMusic(350);
-        window.setTimeout(() => {
+        later(() => {
           if (!muted) playGameOver();
         }, 320);
       } else {
@@ -1752,7 +1758,7 @@ export function SuperVoltorbFlipGame() {
       }
       recordDayResult(dayKey, outcome === "won" || (outcome === "quit" && coins > 0));
     },
-    [muted, recordDayResult],
+    [muted, recordDayResult, later],
   );
 
   const exitDaily = useCallback(() => {
@@ -1942,9 +1948,9 @@ export function SuperVoltorbFlipGame() {
         if (dir === "up") void sfx.levelUp();
         else void sfx.levelDown();
       }
-      window.setTimeout(() => setLevelDir(null), 1200);
+      later(() => setLevelDir(null), 1200);
     },
-    [game, muted, displayLevel],
+    [game, muted, displayLevel, later],
   );
 
   // Click anywhere during the post-round drain to skip the counter.
@@ -1991,7 +1997,7 @@ export function SuperVoltorbFlipGame() {
     {
       const pauseEnd = Date.now() + 320;
       while (Date.now() < pauseEnd && !skipPayoutRef.current) {
-        await new Promise<void>((r) => window.setTimeout(r, 60));
+        await sleep(60);
       }
     }
 
@@ -2003,7 +2009,7 @@ export function SuperVoltorbFlipGame() {
     // while small earnings still tick one coin per step like HG/SS.
     const tickMs = 17;
     const { coinsPerTick, iterations } = payoutPlan(earned);
-    const tick = () => new Promise<void>((r) => window.setTimeout(r, tickMs));
+    const tick = () => sleep(tickMs);
 
     let didSkip = false;
     let drained = 0;
@@ -2027,14 +2033,14 @@ export function SuperVoltorbFlipGame() {
     if (!muted) void sfx.payoutFinal();
     // Breathing room so payoutFinal doesn't bleed into the level-up SE.
     // Shorter on skip so it still feels snappy.
-    await new Promise<void>((r) => window.setTimeout(r, didSkip ? 160 : 280));
+    await sleep(didSkip ? 160 : 280);
     skipPayoutRef.current = false;
 
     // Hold payoutAnimRef.current=true through onFlipDownStart / flipCardsDown.
     // The release effect above flips it back to false the instant
     // restartGame zeroes currentScore, so the rollup effect doesn't try
     // to re-tick 0 → earned while the round's old score lingers.
-  }, [game, muted]);
+  }, [game, muted, sleep]);
 
   // Restore the saved level + total once on mount. The persist effect below
   // waits for `hydrated`, which flips in the same batch as the restored game,
@@ -2078,7 +2084,7 @@ export function SuperVoltorbFlipGame() {
     if (cur === "lose" && prev !== "lose") {
       // Fade the loop fast, then the game_over jingle plays over the reveal.
       fadeOutMusic(350);
-      window.setTimeout(() => {
+      later(() => {
         if (!muted) playGameOver();
       }, 320);
     }
@@ -2122,7 +2128,7 @@ export function SuperVoltorbFlipGame() {
     return () => {
       if (clearMemoTimer) window.clearTimeout(clearMemoTimer);
     };
-  }, [game, game?.gameStatus, muted, clearMemoFlags, resetMemoUndo, recordStats]);
+  }, [game, game?.gameStatus, muted, clearMemoFlags, resetMemoUndo, recordStats, later]);
 
   // A round is assisted if the odds assist was on at any point while it was
   // live; switching it off mid-round does not clean the round. It must be
