@@ -232,6 +232,15 @@ describe("sanitizeCopilotErrors: RUN_ERROR frames in a stream", () => {
     expect(text).toContain(sse([delta]));
   });
 
+  it("does not silently drop a truncated multi-byte sequence at the end of the stream", async () => {
+    // The last chunk ends mid-character and no newline follows; the decoder must be flushed.
+    const bytes = encoder.encode(`data: caf${String.fromCharCode(0xe9)}`);
+    const { text } = await readAll(
+      await sanitizeCopilotErrors(sseResponse([bytes.slice(0, bytes.length - 1)])),
+    );
+    expect(text).toBe(`data: caf${String.fromCharCode(0xfffd)}`);
+  });
+
   it("passes a body-less stream response through", async () => {
     const response = new Response(null, {
       status: 200,

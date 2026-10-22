@@ -265,6 +265,25 @@ describe("POST /api/copilotkit: cost bounds (T-5525)", () => {
     expect(JSON.stringify(mockLogWarn.mock.calls[0])).not.toContain("general assistant");
   });
 
+  it("strips control characters from a dropped tool name before logging it", async () => {
+    mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
+    // CR, LF, tab, NUL and DEL, built from char codes so the source holds no control characters.
+    const dirty = `evil${String.fromCharCode(13, 10, 9, 0, 127)}FAKE LOG LINE`;
+    const envelope = runBody({
+      tools: [{ name: dirty, description: "x", parameters: {} }],
+    });
+
+    await POST(makeRawReq(JSON.stringify(envelope), "10.31.0.9"));
+
+    expect(mockLogWarn).toHaveBeenCalledOnce();
+    const detail = String((mockLogWarn.mock.calls[0] as unknown[])[2]);
+    expect(detail).toContain("evil");
+    const controls = [...detail].filter(
+      (ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f,
+    );
+    expect(controls).toEqual([]);
+  });
+
   it("does not log anything for a clean request", async () => {
     mockHandleRequest.mockResolvedValueOnce(new Response("ok"));
     await POST(makeRawReq(JSON.stringify(runBody({})), "10.31.0.2"));
