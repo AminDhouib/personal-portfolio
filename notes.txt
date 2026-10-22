@@ -1,0 +1,5 @@
+Prod c6457e6f. Network.setBlockedURLs ["*api/arcade/scores*"], loaded https://amindhou.com/games/space-shooter at 11:32Z, waited 15 s.
+Result: page loads with the game (Record + Play), console errors 0, resource timings show NO /api/arcade request at all on load (arc list empty). So the leaderboard read-error state
+(which the page shows "after each run", per its Quick facts "Leaderboard: Top 8 pilots shown after each run") is NOT OBSERVED: it needs a run to end, which I did not start.
+Screenshots: space-shooter-blocked.png (page), leaderboard-area.png (scrolled About/Quick facts section, not a leaderboard).
+Sentry PORTFOLIO-V before: 1 event, first/last seen ~2 h before 11:30Z. After: see sentry-after.txt.

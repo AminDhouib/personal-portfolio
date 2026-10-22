@@ -1,0 +1,5 @@
+PORTFOLIO-V after (read ~11:38Z): still 1 event, dateCreated 2026-10-22T09:11:16Z (that matches my T-5357 Play run at ~09:11Z with scores blocked, i.e. pre-fix behaviour). No event after 11:30Z. 'is:unresolved lastSeen:-1h' and 'firstSeen:-1h' for portfolio: no issues. Caveat: this session did not start a run on space-shooter, so the blocked-fetch path was not exercised after the fix.
+
+--- second re-check 2026-10-22T11:39Z (about 3-4 min after the 11:35-11:36Z run) ---
+PORTFOLIO-V (group 11531): still 1 event, e6a6dc2f2a7443ffb3fb6bf1cd423983, 2026-10-22T09:11:16Z (pre-deploy). No new events.
+portfolio project, lastSeen:-1h: no issues found.

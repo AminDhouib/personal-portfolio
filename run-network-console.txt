@@ -1,0 +1,6 @@
+T-6361 full-run proof, prod c6457e6f, 2026-10-22 ~11:35-11:36Z, headed Chrome 1440x900.
+Block: Network.setBlockedURLs ["*api/arcade/scores*"] set BEFORE navigation. Probe fetch('/api/arcade/scores?probe=1') -> rejected (status 0 in resource timing).
+Run: /games/space-shooter, Play via el.click(), ship destroyed after 13 s (score 372, 6 kills, 188 m). No pilot name typed, Submit not clicked, so no score POST was attempted.
+Game-over screen (run-end-state.png): TOP PILOTS panel shows "Could not load the board" (read-error state).
+list_network_requests (fetch): GET /api/arcade/scores?probe=1 and GET /api/arcade/scores?game=space-shooter&board=all-time (both blocked, resource timing status 0). No POST to /api/arcade/scores in the list.
+Console / page errors captured (error, unhandledrejection, console.error hook): 0 entries (no unhandled "Failed to fetch").
