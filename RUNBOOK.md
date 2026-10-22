@@ -339,8 +339,9 @@ what `/privacy` promises:
    subject `New lead from <name>` and a body line `Email: <address>`
    (`src/app/api/leads/route.ts`). Search the mailbox for the address, delete every match, and
    empty Trash too. The repo does not say whether Sendly keeps a copy, so check Sendly's email log
-   and remove it there too. A `daily lead email cap` warn in the logs means the day's notification
-   budget is spent: leads are still stored, so check the `leads` table, not the inbox.
+   and remove it there too. A `daily lead email cap reached (daily)` warn in the logs means the day's
+   notification budget is spent, and `(per-client share)` means one client used its 3 emails: in
+   both cases leads are still stored, so check the `leads` table, not the inbox.
 3. **PostHog** (project 22): delete the person whose distinct id is the trimmed, lowercased email,
    WITH its events and recordings. Either use the UI (Persons, open the person, Delete person, tick
    the options to delete events and recordings), or the API:
