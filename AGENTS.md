@@ -31,8 +31,9 @@ pnpm dev              # docker compose up --build — brings up Postgres (the db
                        # boot. No host port is published by default — see RUNBOOK for local
                        # browser access and the bare `next dev` escape hatch.
 pnpm start             # docker compose up -d — the same stack, detached
-pnpm test              # vitest run, once
+pnpm test              # vitest run, once (the `unit` project)
 pnpm test:coverage     # vitest run --coverage (ratcheted floors — see DESIGN.md)
+pnpm test:perf         # the wall-clock budgets (*.perf.test.ts), run alone; CI runs it after coverage
 pnpm test:e2e          # Playwright against a RUNNING production build (E2E_BASE_URL); not
                        # part of the sweep below — CI runs it, RUNBOOK has the local recipe
 pnpm format            # prettier --write
@@ -44,7 +45,7 @@ Full gate sweep — run before every commit; tests BEFORE build, `rm -rf .next` 
 pnpm format:check && pnpm exec oxlint -c .oxlintrc.json . && pnpm lint && pnpm typecheck && \
   node scripts/check-env-drift.mjs && node scripts/check-action-pins.mjs && \
   node scripts/check-root-files.mjs && pnpm exec knip && \
-  pnpm test && pnpm test:coverage && pnpm build
+  pnpm test && pnpm test:coverage && pnpm test:perf && pnpm build
 ```
 
 ## Architecture

@@ -80,6 +80,21 @@ style suggestions.
   (`readCappedBody`, `src/lib/read-capped-body.ts`): the `Content-Length` pre-check is only a cheap
   early exit, and a chunked upload (no header) is cut off and its stream cancelled as soon as the
   running byte count passes the cap, instead of being buffered whole by `req.text()`.
+- **Test timing (T-6247).** Three rules, all from tests that failed in a different set on every
+  loaded run. (1) A wall-clock budget is never asserted in the unit run: files named
+  `*.perf.test.ts` are the `perf` vitest project (`vitest.config.ts`), run alone with one worker
+  by `pnpm test:perf` (its own CI step, after coverage), while `pnpm test` and
+  `pnpm test:coverage` run the `unit` project; what such a file also proves without a clock
+  (replay equals the live run, a save loads to the same state) is asserted in an ordinary test
+  (`replay-scale.test.ts`). (2) A test that is CPU-bound by design (a whole game rendered in jsdom
+  and played through a round, a 15 minute re-simulation) takes `CPU_BOUND_TEST_TIMEOUT_MS`
+  (`src/test/heavy.ts`, 30 s) with `vi.setConfig` in its file; the global 5 s default stays for
+  everything else, and the constant's comment says why. (3) Do not look up buttons with
+  `screen.getAllByRole("button", { name })[0]` in a helper or a loop on a big page: testing-library
+  runs jsdom `matches()` against ~100 implicit-role selectors for every element, which was a third or more of
+  the time of the Super Voltorb Flip tests (measured with `--cpu-prof`). Use a data hook or
+  `firstButton` (`src/test/first-button.ts`), and keep `getByRole` where the assertion is about what
+  assistive technology can reach.
 - **Upstream calls carry a deadline**: outbound `fetch` calls use `createDeadlineFetch`
   (`src/lib/upstream-fetch.ts`), enforced by the `local/fetch-requires-signal` rule. The deadline
   `AbortSignal` is created once per handler invocation and merged (via `AbortSignal.any`) with any

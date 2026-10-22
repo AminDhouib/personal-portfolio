@@ -28,6 +28,10 @@ vi.mock("../effects/context", () => ({
 }));
 
 import { SuperVoltorbFlipGame } from "../../super-voltorb-flip";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests render the whole board in jsdom and play a round; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 afterEach(() => {
   cleanup();

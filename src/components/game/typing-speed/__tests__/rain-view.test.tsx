@@ -6,6 +6,10 @@ import type { RainState } from "../engine/rain";
 import { RainGame } from "../rain-view";
 import { STATS_KEY, emptyStats, loadStats } from "../stats";
 import { fakeVV, restoreViewport } from "./phone-helpers";
+import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
+
+// These tests type a whole passage, one keystroke or frame per React render; see src/test/heavy.ts for why the 5 s default is not enough.
+vi.setConfig({ testTimeout: CPU_BOUND_TEST_TIMEOUT_MS });
 
 vi.mock("../engine/text", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../engine/text")>()),
