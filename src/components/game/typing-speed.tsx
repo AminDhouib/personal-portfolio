@@ -141,6 +141,8 @@ export function TypingSpeedGame() {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const burstIdRef = useRef(0);
+  // The 700 ms timers that retire each burst, so they can be cancelled with the game.
+  const burstTimersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
   const restartRef = useRef<HTMLButtonElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const phone = usePhone();
@@ -184,9 +186,22 @@ export function TypingSpeedGame() {
       y: elRect.top - cRect.top + elRect.height / 2,
     };
     setBursts((prev) => [...prev, burst]);
-    setTimeout(() => {
+    const timers = burstTimersRef.current;
+    const timer = setTimeout(() => {
+      timers.delete(timer);
       setBursts((prev) => prev.filter((b) => b.id !== id));
     }, 700);
+    timers.add(timer);
+  }, []);
+
+  // A burst timer left armed past unmount would set state on a game that is gone (and, after a
+  // test environment is torn down, throw from react-dom); cancel whatever is still pending.
+  useEffect(() => {
+    const timers = burstTimersRef.current;
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+      timers.clear();
+    };
   }, []);
 
   const onKey = useCallback(
