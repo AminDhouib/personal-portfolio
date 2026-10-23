@@ -135,9 +135,9 @@ it; it is flagged for deletion.
    build's prerender of `/` carries fallback figures and `/work/<slug>` has no prerender at all.
    The `/work` pages need no wait: each answers `MISS` once, then `HIT`. `/` only regenerates
    once the build-time page is more than 300 s old, and the build takes about 3 minutes, so wait
-   until 300 s after the build finished (its `age` header, or the deployment's finish time) before
-   the first request. Inside that window it answers `HIT` on the baked fallback, which is not a GA4
-   fault. Then:
+   until 300 s after the deployment finished before the first request (Next sends no `age` header,
+   so the deployment's finish time is the clock). Inside that window it answers `HIT` on the baked
+   fallback, which is not a GA4 fault. Then:
    ```bash
    for p in /work/shorty /work/unotes /work/caramel /work/upup /work/getitdone; do
      curl -s -o /dev/null "https://amindhou.com$p"; done
