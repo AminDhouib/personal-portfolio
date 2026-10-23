@@ -1918,6 +1918,18 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   (U+E0000 tags, U+FFF9-FFFB, the musical-symbol format characters) are not covered. Name length
   rules and the storage schema are unchanged; rows already stored keep their text and are cleaned
   on the hub's read path.
+- **Sentry v11 runs with the v10 privacy default and the static trace lifecycle, both pinned in
+  `src/lib/sentry-options.ts`.** v11 replaced `sendDefaultPii` with `dataCollection`, and an
+  unset `dataCollection` collects user info (the IP), cookies and request/response bodies, so the
+  server, edge and browser inits all pass `SENTRY_DATA_COLLECTION`: the migration guide's own
+  "keep the v10 default" block (user info, cookies, bodies, database query data, queues and GenAI
+  payloads off; the header and query-string deny lists kept). `sentry-options.test.ts` pins the
+  literal values, so loosening one is a visible test change. `SENTRY_TRACE_LIFECYCLE` is
+  `"static"`, the opt-out from v11's span streaming: transactions stay on the v10 model, though
+  the browser still sends the INP web vital as a small standalone span item. The self-hosted
+  Sentry at sentry.devino.ca (26.10.0, above the 26.4.2 floor the guide names) probably takes
+  streamed spans, but that is unconfirmed. Revisit dropping `static` once a streamed span is
+  seen ingested, and before the SDK major that removes it.
 
 ## Adversarial standoffs (restated from the audit's final report)
 
