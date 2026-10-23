@@ -1,0 +1,14 @@
+T-6920 (#192) after-deploy proof, prod afab354a, headed stealth-chrome 1440x900, no session.
+Console across all pages: 0 errors, 4 warnings. All 4 are "THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+  home (3 loads): 3 warnings; /games/space-shooter: 1 warning. /games/failover, /blog, post, /games, voltorb: 0 entries.
+
+1 home PASS    WebGL canvas, rAF ~116/s, frames differ (158110 px changed between home.png and home-frame2.png)
+2 chat PASS    3 chips, textarea enabled, 2x /api/copilotkit 200, waited >60 s, no message sent
+3 posthog PASS /_p/4qe config.js, e/, i/v0/e/, static/surveys.js, static/posthog-recorder.js all 200.
+               OBSERVATION: versioned /_p/4qe/static/1.438.19/surveys.js and /posthog-recorder.js return 404
+               (upstream 302 to /login?next=..., redirect lands on 404). SDK falls back to the unversioned path (200).
+4 failover PASS canvas 1916x1127 WebGL, rAF advancing, Resume clicked, elapsed 0:05 and load 1.4 rps after 5 s; no submit
+5 blog PASS    listing 9 posts; post quality-gates-that-earn-their-keep: 6 code blocks, 5-8 distinct token colors each
+               OBSERVATION: inline code shows literal backticks (source has single backticks)
+6 games PASS   hub 24 game links, 0 broken images; space-shooter WebGL canvas 1533x977; voltorb 25 cells, 0 broken images
+7 icons PASS   home: 328 svgs, 0 empty visible, 44 imgs, 0 broken; services tech chips render logos
