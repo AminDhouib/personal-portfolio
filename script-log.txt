@@ -1,0 +1,8 @@
+Stealth Chrome 155, prod, last Blog attempt (full body-script event log from document start, 6 s after load, before the click):
+MO-added  t=46ms   /_p/4qe/static/posthog-recorder.js?v=1.438.19   (no versioned /static/1.438.19/ URL anywhere)
+MO-added  t=46ms   /_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js
+MO-added  t=152ms  /_p/4qe/static/surveys.js?v=1.438.19
+removals of any script: none (no removeChild, no remove(), no MO-removed)
+Resource timing (responseStatus): posthog-recorder.js?v= 200, config.js 200, surveys.js?v= 200, /_p/4qe/i/v0/e/ 200
+Before the fix (same page, 12:2x Z): insert .../static/1.438.19/posthog-recorder.js t=39, .../surveys.js t=96;
+ removeChild of both from s.onerror at t=1260-1279, then ?v= fallbacks inserted -> crash on next client navigation.

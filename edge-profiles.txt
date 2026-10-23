@@ -1,0 +1,33 @@
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-SLle1u
+file:///C:/Users/amind/AppData/Local/Temp/t7017-scripts/edge-proof.mjs:31
+const page = targets.find((t) => t.type === "page");
+                     ^
+
+TypeError: Cannot read properties of undefined (reading 'find')
+    at file:///C:/Users/amind/AppData/Local/Temp/t7017-scripts/edge-proof.mjs:31:22
+
+Node.js v24.18.0
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-ShgmpR
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-gtk3sx
+file:///C:/Users/amind/AppData/Local/Temp/t7017-scripts/edge-proof.mjs:31
+const page = targets.find((t) => t.type === "page");
+                     ^
+
+TypeError: Cannot read properties of undefined (reading 'find')
+    at file:///C:/Users/amind/AppData/Local/Temp/t7017-scripts/edge-proof.mjs:31:22
+
+Node.js v24.18.0
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-g6yH1g
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-qm4YnU
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-vPL72t
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-vAOeXd
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-YSGPx1
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-BRITGd
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-DnP5rL
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-T1oPe6
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-dIZM5n
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-6S0E8U
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-7sjSgR
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-PVV6UY
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-Bw2Grr
+profile-dir C:\Users\amind\AppData\Local\Temp\t7017-edge-9plPR5

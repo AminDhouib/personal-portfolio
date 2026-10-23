@@ -1,0 +1,32 @@
+edge nav 1: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+edge nav 2: edge nav 3: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+edge nav 4: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+edge nav 5: edge nav 6: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 7: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 8: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 9: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 10: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 11: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 12: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge nav 13: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/games","h1":"Games","errs":[],"phRemovals":0}}
+
+edge blog 1: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/","h1":"AMINDHOUIB","errs":[],"phRemovals":0}}
+
+edge blog 2: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/","h1":"AMINDHOUIB","errs":[],"phRemovals":0}}
+
+edge blog 3: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/","h1":"AMINDHOUIB","errs":[],"phRemovals":0}}
+
+-- blog reruns (first 3 clicks missed the footer link: smooth scroll; script fixed)
+edge blog 4: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/blog","h1":"Blog","errs":[],"phRemovals":0}}
+
+edge blog 5: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/blog","h1":"Blog","errs":[],"phRemovals":0}}
+
+edge blog 6: {"product":"Edg/155.0.4283.62","pre":{"res":["/_p/4qe/array/phc_m3vGCiUBJv5b9qM6ntTGLUn3tvMv5yd5VVHBbNzgypwJ/config.js 200","/_p/4qe/static/surveys.js?v=1.438.19 200","/_p/4qe/static/posthog-recorder.js?v=1.438.19 200"],"versioned":0,"removals":0},"post":{"url":"https://amindhou.com/blog","h1":"Blog","errs":[],"phRemovals":0}}
+

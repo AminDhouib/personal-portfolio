@@ -1,0 +1,34 @@
+T-7017 prod proof, main 93197fad (#198, strict_script_versioning:false), container up 12:30:12Z. Run 2026-10-23 ~12:31-12:41Z.
+Per attempt: fresh navigation to https://amindhou.com/, wait 6 s, check, real mouse click, wait 3 s, check.
+Pass = zero /static/<ver>/ requests; every PostHog script ?v= form, HTTP 200; zero removeChild/remove/MO-removed of a _p/4qe script;
+h1 correct after the click; window.__errs empty. Scores+leaderboard blocked via CDP. No POSTs/forms/chat.
+
+== Stealth Chrome 155 (headed, fresh session, real click_element coordinate clicks)
+nav Games link (header a[href=/games])
+ 1  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 2  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 3  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 4  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 5  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 6  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 7  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 8  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+ 9  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+10  PASS  versioned=0 removals=0 ph200x3  h1=Games  errs=[]
+footer Blog link (nav a[href=/blog])
+ 1  PASS  h1=Blog errs=[] removals=0 versioned=0
+ 2  PASS  h1=Blog errs=[] removals=0 versioned=0
+ 3  PASS  h1=Blog errs=[] removals=0 versioned=0
+Stealth totals: 13/13 pass (10 Games, 3 Blog). Baseline before fix: about 3 of 5 crashed.
+
+== Edge 155.0.4283.62 (headless=new, fresh profile per attempt, CDP Input.dispatchMouseEvent real click)
+nav Games link: 11 valid attempts, 11 PASS (h1=Games, errs=[], versioned=0, removals=0, all PostHog scripts ?v= 200).
+  2 further launches (nav #2 and #5) never started Edge (CDP port not up, TypeError before any page load); not counted, infra only.
+footer Blog link: first 3 runs missed the footer link (smooth scroll moved it; url stayed /); script fixed (instant scroll), not counted.
+  3 valid reruns, 3 PASS (url=/blog, h1=Blog, errs=[], versioned=0, removals=0).
+Edge totals: 14/14 valid pass. Raw JSON lines: edge-raw.txt.
+
+== Sentry (devino/portfolio), checked ~12:41Z
+PORTFOLIO-Y 7 events, Z 7, 10 3, 11 3: identical counts to the pre-fix check, last seen ~45 min earlier (before 12:30Z). No new events after the deploy.
+
+Overall: 27/27 valid attempts pass, 0 crashes. Not tested: Firefox/Safari.
