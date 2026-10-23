@@ -202,29 +202,46 @@ const jingleSlots = [levelWinSlot, gameOverSlot];
 const unlocking = new Set<HTMLAudioElement>();
 const unlocked = new Set<HTMLAudioElement>();
 let jingleUnlockArmed = false;
+let disarmUnlockListeners: (() => void) | null = null;
 
-// A browser that blocks the unlock (no gesture yet) gets one retry on the first gesture.
+// A browser that blocks the unlock (no gesture yet) gets ONE retry on the first gesture; a retry
+// the browser rejects too (a 404, a decode error) is not re-armed, so a broken file cannot make
+// every later gesture replay it.
 function armJingleUnlock(): void {
   if (jingleUnlockArmed || typeof document === "undefined") return;
   jingleUnlockArmed = true;
   const events = ["pointerdown", "pointerup", "touchend", "keydown"] as const;
-  function onGesture() {
+  const disarm = () => {
     for (const name of events) document.removeEventListener(name, onGesture, true);
     jingleUnlockArmed = false;
-    for (const slot of jingleSlots) if (slot.el) unlockJingle(slot.el);
+    if (disarmUnlockListeners === disarm) disarmUnlockListeners = null;
+  };
+  function onGesture() {
+    disarm();
+    for (const slot of jingleSlots) if (slot.el) unlockJingle(slot.el, true);
   }
   for (const name of events) document.addEventListener(name, onGesture, true);
+  disarmUnlockListeners = disarm;
 }
 
-function unlockJingle(el: HTMLAudioElement): void {
+/** Remove the armed jingle-unlock gesture listeners, if any (the game unmounting). */
+export function disarmJingleUnlock(): void {
+  disarmUnlockListeners?.();
+}
+
+function unlockJingle(el: HTMLAudioElement, isRetry = false): void {
   // A jingle sounding right now has played from a gesture-free timer fine, or is not ours to cut.
   if (unlocked.has(el) || !el.paused) return;
   unlocking.add(el);
   el.muted = true;
   Promise.resolve(el.play()).then(
     () => {
-      // startJingle drops the element from `unlocking` when it takes it over: leave it playing.
-      if (!unlocking.delete(el)) return;
+      // startJingle drops the element from `unlocking` when it takes it over and plays it
+      // itself: leave it playing, but it has now played, so it counts as unlocked.
+      if (!unlocking.delete(el)) {
+        unlocked.add(el);
+        return;
+      }
       el.pause();
       el.currentTime = 0;
       el.muted = globalMuted;
@@ -232,7 +249,7 @@ function unlockJingle(el: HTMLAudioElement): void {
     },
     () => {
       if (unlocking.delete(el)) el.muted = globalMuted;
-      armJingleUnlock();
+      if (!isRetry) armJingleUnlock();
     },
   );
 }
@@ -305,7 +322,8 @@ let loopWarmScheduled = false;
 const LOOP_WARM_DELAY_MS = 3000;
 const LOOP_WARM_TIMEOUT_MS = 60_000;
 
-// The loop is ~1.4 MB. Fetch it into the HTTP cache once, a few seconds into the intro, so the
+// The loop is ~1.4 MB. Fetch it into the HTTP cache once, a few seconds after the intro starts
+// playing (the element's `playing` event, not the play attempt), so the
 // hand-over does not go silent on a slow link. Once per session; a failed warm-up costs nothing.
 function warmLoopSoon(): void {
   if (loopWarmScheduled || typeof fetch !== "function") return;
@@ -345,7 +363,8 @@ export function playMusic(_level: number): void {
       el.volume = MUSIC_LOOP.volume;
       startPlaying(el);
     });
-    warmLoopSoon();
+    // Only a started intro earns the 1.4 MB fetch: autoplay may be blocked and never retried.
+    el.addEventListener("playing", warmLoopSoon, { once: true });
   }
   startPlaying(el);
   ensureJingles();

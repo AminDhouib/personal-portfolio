@@ -31,10 +31,12 @@ export const SPRITE_NO_GRAB_STYLE = { WebkitTouchCallout: "none", userSelect: "n
 
 // Held so a browser cannot drop a request it considers unreferenced.
 const preloaded: HTMLImageElement[] = [];
+let preloadStarted = false;
 
-/** Warm the eleven sprite images into the HTTP cache so the first bomb of a visit does not stall frame by frame. */
+/** Warm the eleven sprite images (once per page load) into the HTTP cache so the first bomb of a visit does not stall frame by frame. */
 export function preloadOriginalSprites(): void {
-  if (typeof Image === "undefined") return;
+  if (preloadStarted || typeof Image === "undefined") return;
+  preloadStarted = true;
   for (const src of [VOLTORB_TILE_SRC, VOLTORB_ICON_SRC, ...EXPLODE_FRAME_SRCS]) {
     const img = new Image();
     img.src = src;

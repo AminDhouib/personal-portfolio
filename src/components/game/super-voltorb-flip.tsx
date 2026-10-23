@@ -35,6 +35,7 @@ import {
   playLevelWin,
   stopLevelWin,
   stopAllCues,
+  disarmJingleUnlock,
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
 import { LEVEL_WIN_MS, RISK_WARNING_MS } from "./super-voltorb-flip/sound-cues";
@@ -1831,6 +1832,7 @@ export function SuperVoltorbFlipGame() {
       stopGameOver();
       stopLevelWin();
       stopAllCues();
+      disarmJingleUnlock();
       musicStartedRef.current = false;
     };
   }, []);

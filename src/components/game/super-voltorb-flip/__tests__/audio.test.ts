@@ -34,6 +34,14 @@ class FakeAudio {
   addEventListener(type: string, listener: () => void) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
   }
+  /** Fire a media event (`playing`, ...) at the listeners, as the browser does. */
+  emit(type: string) {
+    for (const listener of this.listeners.get(type) ?? []) listener();
+  }
+  /** Fire a media event (`playing`, ...) at the listeners, as the browser does. */
+  emit(type: string) {
+    for (const listener of this.listeners.get(type) ?? []) listener();
+  }
   /** The file played to its end (never fires for a looping element, as in a browser). */
   finish() {
     if (this.loop) return;
@@ -486,6 +494,130 @@ describe("jingle elements and the iOS unlock", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(el.plays).toBe(2);
   });
+
+  it("a retry the browser rejects again does not re-arm on every gesture", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          if (this.origSrc.includes("game_over")) {
+            this.plays += 1;
+            return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+          }
+          return super.play();
+        }
+      },
+    );
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = jingleEl("game_over");
+    expect(el.plays).toBe(1);
+
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(2);
+
+    for (const type of ["pointerdown", "pointerup", "touchend", "keydown"]) {
+      document.dispatchEvent(new Event(type));
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(2);
+  });
+
+  it("disarmJingleUnlock removes the armed gesture listeners, so an unmount leaves none", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          if (this.origSrc.includes("game_over")) {
+            this.plays += 1;
+            return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+          }
+          return super.play();
+        }
+      },
+    );
+    const { playMusic, disarmJingleUnlock } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const el = jingleEl("game_over");
+    expect(el.plays).toBe(1);
+
+    disarmJingleUnlock();
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(1);
+    // Safe to call again, with nothing armed.
+    expect(() => disarmJingleUnlock()).not.toThrow();
+  });
+
+  it("a jingle that took over a pending unlock leaves the element marked unlocked", async () => {
+    const releases: (() => void)[] = [];
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          this.plays += 1;
+          this.mutedAtPlay = this.muted;
+          this.paused = false;
+          if (!this.origSrc.includes("music_level_win")) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            releases.push(resolve);
+          });
+        }
+      },
+    );
+    const { playMusic, playLevelWin, stopLevelWin } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    playLevelWin();
+    for (const release of releases) release();
+    await vi.advanceTimersByTimeAsync(0);
+    const el = jingleEl("music_level_win");
+    const plays = el.plays;
+    stopLevelWin();
+    // Unlocked: a later gesture must not run another muted unlock play.
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(plays);
+  });
+
+  it("a jingle that took over an unlock the browser then rejects stays unmuted and arms one retry", async () => {
+    const rejects: ((e: unknown) => void)[] = [];
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          this.plays += 1;
+          this.mutedAtPlay = this.muted;
+          this.paused = false;
+          if (!this.origSrc.includes("music_level_win")) return Promise.resolve();
+          // The first play (the unlock) hangs, then rejects; the jingle's own play resolves.
+          if (this.plays > 1) return Promise.resolve();
+          return new Promise<void>((_resolve, reject) => {
+            rejects.push(reject);
+          });
+        }
+      },
+    );
+    const { playMusic, playLevelWin, stopLevelWin, disarmJingleUnlock } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    playLevelWin();
+    const el = jingleEl("music_level_win");
+    for (const reject of rejects) reject(new DOMException("blocked", "NotAllowedError"));
+    await vi.advanceTimersByTimeAsync(0);
+    // The take-over unmuted it; the late rejection must not mute it again.
+    expect(el.muted).toBe(false);
+    stopLevelWin();
+    const plays = el.plays;
+    // Not unlocked, so the next gesture retries once.
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBe(plays + 1);
+    disarmJingleUnlock();
+  });
 });
 
 describe("background music", () => {
@@ -692,9 +824,10 @@ describe("loop preload", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("warms the loop into the HTTP cache shortly after the intro starts", async () => {
+  it("warms the loop into the HTTP cache shortly after the intro starts playing", async () => {
     const { playMusic } = await load();
     playMusic(1);
+    musicEls()[0]!.emit("playing");
     expect(fetchMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(3000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -703,12 +836,52 @@ describe("loop preload", () => {
     });
   });
 
+  it("does not fetch the loop while the intro has not started playing", async () => {
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch the loop when autoplay is blocked and the visitor never plays", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+        }
+      },
+    );
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Let the armed gesture retry run, so no document listener outlives this test.
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+  });
+
+  it("fetches the loop once, after the playing event, not before", async () => {
+    const { playMusic } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const intro = musicEls()[0]!;
+    intro.emit("playing");
+    intro.emit("playing");
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("does it once per session, not once per start", async () => {
     const { playMusic, stopMusic } = await load();
     playMusic(1);
+    musicEls()[0]!.emit("playing");
     await vi.advanceTimersByTimeAsync(3000);
     stopMusic();
     playMusic(1);
+    musicEls()[1]!.emit("playing");
     await vi.advanceTimersByTimeAsync(3000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -716,10 +889,12 @@ describe("loop preload", () => {
   it("never warms again after a restart onto the loop", async () => {
     const { playMusic, fadeOutMusic } = await load();
     playMusic(1);
+    musicEls()[0]!.emit("playing");
     await vi.advanceTimersByTimeAsync(3000);
     fadeOutMusic(100);
     await vi.advanceTimersByTimeAsync(200);
     playMusic(2);
+    musicEls()[1]!.emit("playing");
     await vi.advanceTimersByTimeAsync(5000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -728,6 +903,7 @@ describe("loop preload", () => {
     fetchMock.mockRejectedValue(new TypeError("network down"));
     const { playMusic } = await load();
     playMusic(1);
+    musicEls()[0]!.emit("playing");
     await vi.advanceTimersByTimeAsync(3000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(musicEls()[0]!.paused).toBe(false);
@@ -737,6 +913,7 @@ describe("loop preload", () => {
     vi.stubGlobal("fetch", undefined);
     const { playMusic } = await load();
     expect(() => playMusic(1)).not.toThrow();
+    musicEls()[0]!.emit("playing");
     await vi.advanceTimersByTimeAsync(3000);
     expect(musicEls()[0]!.paused).toBe(false);
   });
