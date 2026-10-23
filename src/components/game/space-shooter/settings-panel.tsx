@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { PanelClose } from "./panel-close";
 import { SettingsToggle } from "./settings-toggle";
 import type { Dispatch, SetStateAction } from "react";
