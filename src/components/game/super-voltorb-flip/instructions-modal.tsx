@@ -19,18 +19,6 @@ export const InstructionsModal = ({ language, setModalOpen }: InstructionsModalP
   const { howToPlayTitle, instructions, tipsTitle, tips } = translations[language];
   const { later } = useUnmountTimers();
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setModalOpen(false);
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [setModalOpen]);
-
   const [closing, setClosing] = useState(false);
   const close = useCallback(() => {
     setClosing(true);
