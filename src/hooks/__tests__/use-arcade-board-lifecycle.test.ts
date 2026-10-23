@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import type { ArcadeGameSlug } from "@/lib/arcade/games";
 
@@ -43,6 +45,15 @@ describe("useArcadeBoard lifecycle", () => {
       await Promise.resolve();
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
+  });
+
+  it("renders the server markup as not loading, whatever the mount read will do", () => {
+    function Probe() {
+      const { loading, entries } = useArcadeBoard("hextris");
+      return createElement("p", null, `loading=${loading} rows=${entries.length}`);
+    }
+    expect(renderToString(createElement(Probe))).toContain("loading=false rows=0");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("never reports loading, nor reads, on mount when fetchOnMount is false", async () => {

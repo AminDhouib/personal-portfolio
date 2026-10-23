@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 // Type-only imports are erased, so the server-side arcade modules (and zod) never reach the
 // client bundle.
 import type { z } from "zod";
@@ -222,6 +222,41 @@ async function readJsonBody(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
+/** What one board read came back with; applied by the caller only if the read is still the latest. */
+type ReadOutcome =
+  | { kind: "board"; entries: ArcadeBoardEntry[]; you: ArcadeYou | null }
+  | { kind: "status"; status: number }
+  | { kind: "failed" };
+
+// One GET of a board. It touches no React state, so the hook can start it from an effect and
+// apply the outcome from the callback.
+async function readBoard(game: ArcadeGameSlug, period: BoardPeriod): Promise<ReadOutcome> {
+  try {
+    const query = new URLSearchParams({ game, board: period });
+    const player = peekIdentity();
+    if (player) query.set("player", player.playerId);
+    const res = await fetch(`/api/arcade/scores?${query.toString()}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) return { kind: "status", status: res.status };
+    const data = await readJsonBody(res);
+    const entries: ArcadeBoardEntry[] = [];
+    if (Array.isArray(data.entries)) {
+      for (const raw of data.entries) {
+        const entry = toEntry(raw);
+        if (entry) entries.push(entry);
+      }
+    }
+    return { kind: "board", entries, you: toYou(data.you) };
+  } catch (err) {
+    if (!isNetworkFailure(err)) reportError(err);
+    return { kind: "failed" };
+  }
+}
+
+const subscribeNever = () => () => {};
+
 /**
  * Reads one game's leaderboard (daily, weekly or all-time) from /api/arcade/scores and
  * submits scores with the browser's trust-on-first-use identity. Each game keeps its own
@@ -240,55 +275,67 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
   // through submit()'s return value and the caller's own submit state, never through here, so
   // an empty board after a failed submit does not claim the board could not load.
   const [readError, setReadError] = useState<string | null>(null);
+  // The game whose mount read has settled, or was taken over by a refresh() (see autoPending).
+  const [settledGame, setSettledGame] = useState<ArcadeGameSlug | null>(null);
+  // False on the server and for the hydrating render, true on the client after that.
+  const mounted = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
   const gameRef = useRef<ArcadeGameSlug>(game);
-  gameRef.current = game;
+  // Kept current after each commit; declared ahead of the mount read below, which runs in the
+  // same commit.
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
   // Written synchronously by setPeriod so the refresh it triggers reads the new period.
   const periodRef = useRef(initialPeriod);
   // Only the latest request may write state; a slower earlier one is dropped.
   const requestId = useRef(0);
 
+  // Applies a read's outcome if it is still the latest request. Returns the rows it landed.
+  const finish = useCallback(
+    (id: number, startedFor: ArcadeGameSlug, outcome: ReadOutcome): ArcadeBoardEntry[] => {
+      if (id !== requestId.current) return [];
+      let landed: ArcadeBoardEntry[] = [];
+      if (outcome.kind === "board") {
+        landed = outcome.entries;
+        setEntries(outcome.entries);
+        setYou(outcome.you);
+        setReadError(null);
+      } else if (outcome.kind === "status") {
+        setReadError(`failed to load leaderboard (status ${outcome.status})`);
+      } else {
+        setReadError("failed to load leaderboard");
+      }
+      setLoading(false);
+      setSettledGame(startedFor);
+      return landed;
+    },
+    [],
+  );
+
   const refresh = useCallback(async (): Promise<ArcadeBoardEntry[]> => {
     requestId.current += 1;
     const id = requestId.current;
+    const startedFor = gameRef.current;
     setLoading(true);
-    try {
-      const query = new URLSearchParams({ game: gameRef.current, board: periodRef.current });
-      const player = peekIdentity();
-      if (player) query.set("player", player.playerId);
-      const res = await fetch(`/api/arcade/scores?${query.toString()}`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (id !== requestId.current) return [];
-      if (!res.ok) {
-        setReadError(`failed to load leaderboard (status ${res.status})`);
-        return [];
-      }
-      const data = await readJsonBody(res);
-      if (id !== requestId.current) return [];
-      const parsed: ArcadeBoardEntry[] = [];
-      if (Array.isArray(data.entries)) {
-        for (const raw of data.entries) {
-          const entry = toEntry(raw);
-          if (entry) parsed.push(entry);
-        }
-      }
-      setEntries(parsed);
-      setYou(toYou(data.you));
-      setReadError(null);
-      return parsed;
-    } catch (err) {
-      if (!isNetworkFailure(err)) reportError(err);
-      if (id === requestId.current) setReadError("failed to load leaderboard");
-      return [];
-    } finally {
-      if (id === requestId.current) setLoading(false);
-    }
-  }, []);
+    // A refresh takes over the mount read, if one is still pending: `loading` is its own now.
+    setSettledGame(startedFor);
+    return finish(id, startedFor, await readBoard(startedFor, periodRef.current));
+  }, [finish]);
 
+  // Reads the board on mount and when the game changes. The read is pending, as far as
+  // `loading` goes, from the render that wants it until it settles or a refresh() takes over;
+  // derived here rather than set from the effect that starts it.
+  const autoPending = mounted && fetchOnMount && settledGame !== game;
   useEffect(() => {
-    if (fetchOnMount) void refresh();
-  }, [refresh, game, fetchOnMount]);
+    if (!fetchOnMount) return;
+    requestId.current += 1;
+    const id = requestId.current;
+    void readBoard(game, periodRef.current).then((outcome) => finish(id, game, outcome));
+  }, [finish, game, fetchOnMount]);
 
   const setPeriod = useCallback(
     (next: BoardPeriod) => {
@@ -362,5 +409,14 @@ export function useArcadeBoard<G extends ArcadeGameSlug>(
     [],
   );
 
-  return { entries, you, period, setPeriod, loading, readError, refresh, submit };
+  return {
+    entries,
+    you,
+    period,
+    setPeriod,
+    loading: loading || autoPending,
+    readError,
+    refresh,
+    submit,
+  };
 }
