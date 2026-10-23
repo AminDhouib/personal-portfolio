@@ -115,6 +115,12 @@ describe("instrumentation-client replay wiring", () => {
     expect(options.ui_host).toBe("https://posthog.devino.ca");
   });
 
+  it("loads PostHog's lazy scripts from the legacy URL only, never a versioned one", async () => {
+    await loadClientInit();
+    const options = posthogInit.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(options.strict_script_versioning).toBe(false);
+  });
+
   it("uses the configured host for the UI link, never as the api host", async () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://ph.example.com");
     await loadClientInit();

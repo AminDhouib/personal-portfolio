@@ -1791,6 +1791,12 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   fixed at build time). Server-side capture (`src/lib/log.ts`,
   `POSTHOG_HOST`) stays DIRECT to PostHog: no blocker on a server, and a hop through our own app
   could only fail. There is no CSP in `next.config.ts`, so no `connect-src` entry is needed.
+  `posthog.init` sets `strict_script_versioning: false` (pinned in
+  `src/__tests__/instrumentation-client.test.ts`): posthog-js 1.438's default `'fallback'` first
+  loads `/static/<version>/*.js`, which our PostHog redirects to `/login`, and on that failure the
+  SDK removes the script node that React had already hydrated, so a later navigation threw
+  insertBefore/removeChild NotFoundError. `false` keeps the legacy `/static/<kind>.js?v=` URL the
+  proxy serves (T-7017). Do not remove it on an upgrade without re-testing client-side navigation.
 - **Capture takes an internal hop so PostHog sees the visitor's IP.** PostHog's capture service
   reads only the LEFTMOST `X-Forwarded-For`, and the devino.ca Cloudflare zone strips
   `X-Forwarded-For` on posthog.devino.ca on purpose (anti-spoof; never work around it). Through

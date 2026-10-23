@@ -97,6 +97,12 @@ if (POSTHOG_KEY) {
     capture_pageleave: true,
     autocapture: true,
     person_profiles: "identified_only",
+    // posthog-js 1.438 defaults this to "fallback": it injects /static/<version>/*.js into <body>
+    // before hydration, the PostHog host redirects that path to /login, and on the failure the SDK
+    // removes the node, which React had hydrated a fiber onto, so a later navigation threw
+    // insertBefore/removeChild NotFoundError. false keeps the legacy /static/<kind>.js?v=<version>
+    // URL, which loads and is never removed.
+    strict_script_versioning: false,
     // Session recording is switched on and sampled (about 10%) server-side, in PostHog
     // project 22's settings, not here; do not add disable_session_recording. These are the
     // masking rules for whatever the project records: every input is masked, and anything
