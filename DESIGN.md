@@ -179,7 +179,8 @@ style suggestions.
   repository is private and this one is owned by a personal account, which cannot call it. The
   composite action lives unmodified in `.github/actions/security-audit/` (each file's header names
   its source path and commit; the one change is `astral-sh/setup-uv` pinned by SHA instead of
-  `@v5`, which `check-action-pins.mjs` enforces for local actions too). The workflow drops the org
+  `@v5`, which `check-action-pins.mjs` enforces for local actions too; its `action.yml` is the
+  one path in `.prettierignore` so it stays diffable against the source). The workflow drops the org
   file's inputs and the npm, yarn and bun branches. To resync, diff each vendored file against the
   same path at a newer `DevinoSolutions/.github` commit
   (`gh api repos/DevinoSolutions/.github/contents/<path>?ref=<sha>`), copy the changes, update the
