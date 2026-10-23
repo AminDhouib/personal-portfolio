@@ -44,7 +44,6 @@ export default async function Icon() {
           background: ACCENT_GREEN,
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photoSrc}
           alt=""
