@@ -1,0 +1,185 @@
+# Vendored from DevinoSolutions/.github, path actions/security-audit/action.yml, commit 27fb535cbd0228d069c0d36e6b888a8bcc85e726.
+# Vendored because this repo is owned by a personal account and cannot call the private org action.
+# Unmodified except the astral-sh/setup-uv ref, which is pinned by commit SHA (was @v5). To resync, diff against a newer commit of the source path (see DESIGN.md).
+# DevinoSolutions rails — security-audit (composite action)
+#
+# The two checks behind `.github/workflows/security-audit.yml`, packaged as an
+# action so the reusable workflow can reach `security_audit.py` at all.
+#
+# WHY THIS IS AN ACTION AND NOT A `run:` BLOCK. A reusable workflow's steps run
+# against the CALLER's checkout; nothing from this repository is on disk, and
+# `DevinoSolutions/.github` is private, so a second `actions/checkout` would
+# need a token the caller does not have. A composite action is the one shape
+# the runner materialises from this repository on the caller's behalf, which is
+# why every reusable workflow here already resolves its helpers as
+# `DevinoSolutions/.github/actions/<name>@main`. The alternative — a 650-line
+# heredoc inlined into the workflow — would be unreviewable and untestable.
+#
+# MODES
+#   report      Parse a package manager's `audit --json` output into a severity
+#               table. One parser for pnpm, npm, yarn (berry) and bun. Also
+#               validates and applies the `ignore-advisories` list.
+#   overrides   Read every `overrides` / `resolutions` / `pnpm.overrides` entry
+#               in the tree and ask the GitHub advisory database whether the
+#               LOWEST version each entry still admits is vulnerable. This is
+#               the check no package manager and no Dependabot feature performs.
+#
+# NO SECRETS. The advisory database is the public `GET /advisories` endpoint.
+# `GITHUB_TOKEN` is used when present only to raise the rate limit; the action
+# works without it. Nothing here reads or writes a repository secret.
+#
+# The script exits non-zero when the advisory database cannot be reached, so a
+# lookup failure reads as a failure rather than as a clean audit.
+
+name: security-audit
+description: >-
+  Dependency audit reporting and the stale-security-override check, for
+  DevinoSolutions/.github/.github/workflows/security-audit.yml.
+
+inputs:
+  mode:
+    description: "'report' or 'overrides'."
+    required: true
+  root:
+    description: 'Directory to scan for override tables (mode: overrides).'
+    required: false
+    default: '.'
+  audit-json:
+    description: "Path to the package manager's audit JSON (mode: report)."
+    required: false
+    default: ''
+  package-manager:
+    description: 'Package manager name, for the summary heading.'
+    required: false
+    default: ''
+  audit-command:
+    description: 'The exact command that produced the JSON, for the summary.'
+    required: false
+    default: ''
+  audit-exit:
+    description: "The audit command's exit code, for the summary."
+    required: false
+    default: '0'
+  fail-on:
+    description: 'Comma-separated severities that fail the check.'
+    required: false
+    default: 'critical,high'
+  ignore-advisories:
+    description: >-
+      Mode report only. One advisory per line, `GHSA-xxxx-xxxx-xxxx |
+      expires=YYYY-MM-DD | reason`; blank lines and `#` lines are skipped. Every
+      line needs a reason and an expiry between tomorrow and 30 days out, or the
+      step fails. Never given to mode overrides.
+    required: false
+    default: ''
+  json-out:
+    description: 'Optional path for the machine-readable result.'
+    required: false
+    default: ''
+  offline-advisories:
+    description: >-
+      Test-only. A JSON file of `{"pkg@version": [advisory, ...]}` used instead
+      of the network, so the self-test can assert the stale/clean split without
+      depending on what the advisory database says on the day it runs.
+    required: false
+    default: ''
+  request-delay:
+    description: 'Seconds between advisory requests. Raise it on a large table.'
+    required: false
+    default: '0.2'
+  github-token:
+    description: >-
+      Used ONLY to raise the advisory endpoint's rate limit. The endpoint is
+      public and the action works without it; `contents: read` is enough. Passed
+      as an input rather than inherited so the value is explicit at the call
+      site instead of depending on composite env inheritance.
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    # NO `python-version:` HERE, AND THAT IS THE WHOLE POINT.
+    #
+    # `security-audit.yml` invokes this action TWICE in one job — once for
+    # `report`, once for `overrides`. Given `python-version`, setup-uv v5
+    # creates a project venv and exports VIRTUAL_ENV. On the SECOND invocation
+    # that variable is already set and pointing at an existing `.venv`, so uv
+    # refuses to recreate it and the action dies:
+    #
+    #   Set UV_PYTHON to 3.12
+    #   Activating python venv...
+    #   ##[error]The process '…/uv' failed with exit code 2
+    #
+    # The composite's own `Run the audit` step is then SKIPPED, so the override
+    # check never runs and the job fails with no audit output to read. Every one
+    # of the twelve callers would have failed identically (run 34662287032,
+    # job 103467100573).
+    #
+    # Without `python-version`, setup-uv only puts `uv` on PATH — no venv, no
+    # VIRTUAL_ENV, nothing to collide on a second call. The interpreter is then
+    # the run step's business, via `uv run --python`, which provisions a managed
+    # CPython per invocation and needs no activation.
+    #
+    # setup-uv v5 has no `activate-environment` input (that arrived in v6), so
+    # dropping `python-version` is how this is expressed on the major the rest
+    # of this repository is pinned to.
+    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      with:
+        # This repository has no packaging; do not fail the post-run cache save.
+        ignore-nothing-to-cache: true
+
+    - name: Run the audit
+      shell: bash
+      env:
+        SA_MODE: ${{ inputs.mode }}
+        SA_ROOT: ${{ inputs.root }}
+        SA_AUDIT_JSON: ${{ inputs.audit-json }}
+        SA_PM: ${{ inputs.package-manager }}
+        SA_COMMAND: ${{ inputs.audit-command }}
+        SA_EXIT: ${{ inputs.audit-exit }}
+        SA_FAIL_ON: ${{ inputs.fail-on }}
+        SA_JSON_OUT: ${{ inputs.json-out }}
+        SA_OFFLINE: ${{ inputs.offline-advisories }}
+        SA_IGNORE: ${{ inputs.ignore-advisories }}
+        SA_DELAY: ${{ inputs.request-delay }}
+        SA_SCRIPT: ${{ github.action_path }}/security_audit.py
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+
+        # Belt and braces for the bug above: a CALLER's repository may export
+        # VIRTUAL_ENV for its own reasons, and `uv run` would then warn about a
+        # mismatched environment or try to use it. This action's interpreter is
+        # whatever `--python` says and nothing else, so drop the variable for
+        # the length of this step only.
+        unset VIRTUAL_ENV
+
+        # `--python 3.12` rather than a bare `python`: the ARC runner image is
+        # minimal and may ship no system interpreter at all. uv provisions a
+        # managed CPython and runs in an ephemeral environment, so nothing here
+        # depends on a venv existing, being activated, or being absent.
+        case "$SA_MODE" in
+          report)
+            uv run --no-project --python 3.12 python "$SA_SCRIPT" report \
+              --input "$SA_AUDIT_JSON" \
+              --package-manager "$SA_PM" \
+              --command "$SA_COMMAND" \
+              --audit-exit "$SA_EXIT" \
+              --fail-on "$SA_FAIL_ON" \
+              --ignore-advisories "$SA_IGNORE" \
+              --json-out "$SA_JSON_OUT"
+            ;;
+          overrides)
+            uv run --no-project --python 3.12 --with pyyaml==6.0.2 python "$SA_SCRIPT" overrides \
+              --root "$SA_ROOT" \
+              --fail-on "$SA_FAIL_ON" \
+              --json-out "$SA_JSON_OUT" \
+              --offline-advisories "$SA_OFFLINE" \
+              --delay "$SA_DELAY"
+            ;;
+          *)
+            echo "::error::mode must be 'report' or 'overrides', got '$SA_MODE'"
+            exit 1
+            ;;
+        esac

@@ -168,6 +168,26 @@ style suggestions.
   test timeout. No spec drives the 3D scenes themselves. `e2e/webgl-fallback.spec.ts` pins what a
   visitor without WebGL gets instead: no uncaught errors, no canvas, the notice in place of the
   game (see the `WebGLOnly` register entry). The deploy job requires this gate.
+- **Security audit gate** (workflow `security-audit.yml`, a PR check beside `ci.yml`'s
+  `dependency-audit` job, which stays): runs `pnpm audit --audit-level=high` through a severity
+  report, plus the stale-override check no package manager performs. For every entry in
+  `pnpm-workspace.yaml`'s `overrides` it asks the GitHub advisory database whether the LOWEST
+  version the entry still admits is vulnerable; a vulnerable floor means the override has become a
+  ceiling below a fixed version and fails the job at critical/high, and an exact unconditional pin
+  that is clean today is only a warning. It is vendored from the DevinoSolutions org check
+  (`DevinoSolutions/.github`, commit `27fb535cbd0228d069c0d36e6b888a8bcc85e726`) because that
+  repository is private and this one is owned by a personal account, which cannot call it. The
+  composite action lives unmodified in `.github/actions/security-audit/` (each file's header names
+  its source path and commit; the one change is `astral-sh/setup-uv` pinned by SHA instead of
+  `@v5`, which `check-action-pins.mjs` enforces for local actions too). The workflow drops the org
+  file's inputs and the npm, yarn and bun branches. To resync, diff each vendored file against the
+  same path at a newer `DevinoSolutions/.github` commit
+  (`gh api repos/DevinoSolutions/.github/contents/<path>?ref=<sha>`), copy the changes, update the
+  SHA in the headers, in the workflow header and here, and re-pin any new third-party `uses:`. The
+  action's `ignore-advisories` input (`GHSA-... | expires=YYYY-MM-DD | reason`, at most 30 days
+  out) is the only way to mute a pnpm-audit advisory in this job; it never applies to the override
+  check. The vendored `.py` files are not covered by the JS gates and are not run in CI here (the
+  org repo runs their pytest suite).
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
