@@ -75,6 +75,10 @@ type ActiveEffect = {
   onDone: () => void;
 };
 
+// What each card shows: the cell's own flipped state, or revealed on a restored Daily board.
+const cardsOf = (game: VoltorbFlip, restored: boolean | undefined) =>
+  game.cells.flat().map((cell) => ({ isFlipped: restored ? true : cell.isFlipped }));
+
 export const Gameboard = ({
   game,
   updateGame,
@@ -93,9 +97,16 @@ export const Gameboard = ({
 }: GameboardProps) => {
   // Every timer of the round-end flow (reveal, fold-down, risk release) dies with the board.
   const { later, cancel } = useUnmountTimers();
-  const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(
-    game.cells.flat().map((cell) => ({ isFlipped: daily?.restored ? true : cell.isFlipped })),
+  const [cardsFlipped, setCardsFlipped] = useState<{ isFlipped: boolean }[]>(() =>
+    cardsOf(game, daily?.restored),
   );
+  // The cards follow the engine's cells: a new game object (every update clones it, a restart
+  // deals a new board) or a restored Daily board re-reads them.
+  const [seenCells, setSeenCells] = useState({ cells: game.cells, restored: daily?.restored });
+  if (seenCells.cells !== game.cells || seenCells.restored !== daily?.restored) {
+    setSeenCells({ cells: game.cells, restored: daily?.restored });
+    setCardsFlipped(cardsOf(game, daily?.restored));
+  }
   const [effects, setEffects] = useState<ActiveEffect[]>([]);
   // True from the first frame of the flip-down until the next board is dealt:
   // the old round's memos must not show on the face-down tiles in between.
@@ -393,12 +404,6 @@ export const Gameboard = ({
     },
     [updateGame, muted, later],
   );
-
-  useEffect(() => {
-    setCardsFlipped(() =>
-      game.cells.flat().map((cell) => ({ isFlipped: daily?.restored ? true : cell.isFlipped })),
-    );
-  }, [game.cells, daily?.restored]);
 
   useEffect(() => {
     const status = game.gameStatus;
