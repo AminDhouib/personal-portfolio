@@ -1,5 +1,4 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SOUND_KEY } from "../audio";
 import { Stage } from "../stage";
@@ -48,12 +47,5 @@ describe("Stage sound toggle", () => {
     localStorage.setItem(SOUND_KEY, "0");
     fireEvent.click(screen.getByRole("button", { name: "Sound on" }));
     expect(screen.getByRole("button", { name: "Sound off" })).toBeInTheDocument();
-  });
-
-  it("renders the server markup as sound on, whatever is stored", () => {
-    localStorage.setItem(SOUND_KEY, "0");
-    const html = renderToString(<Stage />);
-    expect(html).toContain("Sound on");
-    expect(html).not.toContain("Sound off");
   });
 });

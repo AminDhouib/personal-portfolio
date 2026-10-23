@@ -3,7 +3,7 @@
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { AbilityList } from "./ability-list";
-import { createKnightAudio, type KnightAudio } from "./audio";
+import { createKnightAudio, type KnightAudio, readMuted } from "./audio";
 import {
   CODE_MAX_CHARS,
   type CodeStore,
@@ -136,7 +136,8 @@ export function Stage({
   const [floorRun, setFloorRun] = useState<FloorRun | null>(null);
   const [epicRuns, setEpicRuns] = useState<FloorRun[] | null>(null);
   const [notice, setNotice] = useState<string | null>(begin.notice);
-  const [muted, setMuted] = useState(false);
+  // The stage is client-only (the game loads with ssr: false), so the stored preference is read here.
+  const [muted, setMuted] = useState(readMuted);
   // Watch the bot: the reference bot's run on the floor in view. Local, never scored or posted.
   const [bot, setBot] = useState<Played | null>(null);
   // Today's floor: the UTC day is fixed when the player opens the tab, so a run that crosses
@@ -262,7 +263,6 @@ export function Stage({
   useEffect(() => {
     const audio = createKnightAudio();
     audioRef.current = audio;
-    setMuted(audio.isMuted());
     return () => {
       audio.close();
       audioRef.current = null;
