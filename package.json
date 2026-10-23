@@ -37,7 +37,7 @@
     "@lezer/highlight": "^1.2.5",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
-    "@sentry/nextjs": "^10.76.2",
+    "@sentry/nextjs": "^11.8.0",
     "chess.js": "^1.4.0",
     "framer-motion": "^12.38.0",
     "gray-matter": "^4.0.3",
