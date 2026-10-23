@@ -1,0 +1,5 @@
+T-6749, prod a5387668, 2026-10-23 ~03:25Z, https://amindhou.com
+curl -D of GET /: HTTP/1.1 200 OK, Server: cloudflare, x-nextjs-cache: HIT, x-nextjs-prerender: 1. x-powered-by: ABSENT (not present in the response headers). /api/health: {"status":"ok","uptime":926,"checks":{"db":"connected"}}.
+Chunk loading with 200 (PerformanceResourceTiming, 22 chunks on home, all checked ones 200): /_next/static/chunks/333eij9az5mu1.js 200; curl of the same URL: 200 application/javascript.
+Next version marker: window.next.version = "16.4.2" (window.next keys: version, appDir, turbopack, router, __internal_src_page). Same value on /games.
+Sentry SDK version: window.__SENTRY__.version = "10.76.2", found via execute_script; the carrier also has a "10.76.2" key (defaultCurrentScope, defaultIsolationScope, stack, loggerSettings, globalScope). Same value on /games. I did not grep the bundle text for the string.

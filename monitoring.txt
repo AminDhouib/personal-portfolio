@@ -1,0 +1,6 @@
+The page itself sent NO POST to /monitoring on / or /games (PerformanceResourceTiming shows none after 6 s each; Sentry only posts on errors, and there were none).
+So I sent exactly ONE minimal client_report-only envelope (no error event) from the page, 2026-10-23T03:25:31.989Z, content-type application/x-sentry-envelope:
+  {"sent_at":"...","dsn":"<redacted, read from the page's Sentry client options>"}
+  {"type":"client_report"}
+  {"timestamp":1792725931.989,"discarded_events":[]}
+Result: status 200, empty body.

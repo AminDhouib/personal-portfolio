@@ -1,0 +1,4 @@
+Page /: /_next/image?url=%2Fprofile.png&w=640&q=75 -> 200 (also shorty.webp w=3840, shorty.png w=3840, unotes.png w=1920 all 200).
+In-page fetch with Accept image/avif,image/webp,image/png,*/*: 200, content-type image/avif, 14184 bytes.
+curl cross-check (no Accept header): 200, Content-Type image/png, Content-Length 109158.
+/games makes no /_next/image requests on load (0).
