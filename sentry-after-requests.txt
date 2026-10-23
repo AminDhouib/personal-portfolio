@@ -1,0 +1,19 @@
+time | path | status | bodyChars | item types | sdk | dsn tail | sent_at
+09:15:28 | /monitoring | 200 | 105510 | transaction | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:15:35 | /monitoring | 200 | 176995 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:15:41 | /monitoring | 200 | 34388 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:15:46 | /monitoring | 200 | 32587 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:15:51 | /monitoring | 200 | 62151 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:15:52 | /monitoring | 200 | 28327 | transaction | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:15:57 | /monitoring | 200 | 56327 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:02 | /monitoring | 200 | 61870 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:08 | /monitoring | 200 | 63411 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:13 | /monitoring | 200 | 60369 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:15 | /monitoring | 200 | 24313 | transaction | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:19 | /monitoring | 200 | 83679 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:24 | /monitoring | 200 | 62797 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:30 | /monitoring | 200 | 64283 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:35 | /monitoring | 200 | 66225 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:39 | /monitoring | 200 | 10199 | event | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:41 | /monitoring | 200 | 63111 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes
+09:16:46 | /monitoring | 200 | 63554 | replay_event+replay_recording | sentry.javascript.nextjs@11.9.0 | a/35 | yes

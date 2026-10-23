@@ -1,0 +1,24 @@
+time | path | status | bodyChars | item types | sdk | dsn tail | sent_at
+07:28:56 | /monitoring | 200 | 104521 | transaction | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:29:12 | /monitoring | 200 | 103962 | transaction | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:29:34 | /monitoring | 200 | 16069 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:29:34 | /monitoring | 200 | 25376 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:29:34 | /monitoring | 200 | 268889 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:29:35 | /monitoring | 200 | 20983 | transaction | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:29:39 | /monitoring | 200 | 30012 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:30:35 | /monitoring | 200 | 176092 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:30:38 | /monitoring | 200 | 15239 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:30:38 | /monitoring | 200 | 24546 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:30:41 | /monitoring | 200 | 16109 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:30:58 | /monitoring | 200 | 15147 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:30:58 | /monitoring | 200 | 24455 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:31:22 | /monitoring | 200 | 15239 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:31:22 | /monitoring | 200 | 24546 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:31:26 | /monitoring | 200 | 150573 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:31:43 | /monitoring | 200 | 15139 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:31:43 | /monitoring | 200 | 24446 | event | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:31:57 | /monitoring | 200 | 97060 | transaction | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:32:04 | /monitoring | 200 | 120499 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:32:09 | /monitoring | 200 | 63171 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:32:15 | /monitoring | 200 | 62511 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
+07:32:20 | /monitoring | 200 | 66698 | replay_event+replay_recording | sentry.javascript.nextjs@10.76.2 | a/35 | yes
