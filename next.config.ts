@@ -32,6 +32,18 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "@radix-ui/react-dialog"],
   },
+  // Sentry's diagnostics-channel injection hook is loaded at runtime from a path the file tracer
+  // copies as an asset, so the standalone output gets build/esm/hook.js without the vendored files
+  // it imports, and boot logs "Failed to register diagnostics-channel injection hooks" (no pg or AI
+  // spans). Upstream: getsentry/sentry-javascript#25480 (the includes workaround); drop this once
+  // Sentry traces build/esm itself. The pnpm store path is the one the package resolves to, with the
+  // version wildcarded so a bump keeps matching; withSentryConfig leaves this key alone.
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/.pnpm/@sentry+server-runtime-injection@*/node_modules/@sentry/server-runtime-injection/build/esm/**/*.js",
+      "./node_modules/.pnpm/@sentry+server-runtime-injection@*/node_modules/@sentry/server-runtime-injection/build/esm/package.json",
+    ],
+  },
   // First-party PostHog path: the browser SDK posts to a same-origin path and these rules
   // forward it to PostHog, so an ad blocker has no third-party host to match. The path and the
   // rules (an allow-list of what the SDK calls, not a catch-all) live in
