@@ -14,11 +14,11 @@ overrides:
   katex@>=0.11.0 <0.18.2: 0.18.3
   '@langchain/langgraph>uuid': ^11.1.1
   '@langchain/langgraph-checkpoint>uuid': ^11.1.1
-  '@lhci/cli>tmp': ^0.2.6
-  external-editor>tmp: ^0.2.6
+  '@lhci/cli>tmp': ^0.2.7
+  external-editor>tmp: ^0.2.7
   '@lhci/cli>uuid': ^11.1.1
   get-uri>basic-ftp: ^6.2.2
-  '@graphql-tools/utils@<12.0.1': ^12.0.1
+  '@graphql-tools/utils@<12.0.2': ^12.0.2
   lighthouse>puppeteer-core: 25.13.0
 
 importers:
