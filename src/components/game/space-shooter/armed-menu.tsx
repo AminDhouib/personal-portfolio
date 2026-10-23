@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Play, ShoppingCart, Coins as CoinsIcon } from "lucide-react";
+import { Trophy, ShoppingCart, Coins as CoinsIcon } from "lucide-react";
 import { startRun } from "./run-init";
 import type { RefObject } from "react";
 import type { Profile } from "../profile";
