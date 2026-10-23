@@ -393,9 +393,13 @@ describe("the how to play modal", () => {
     await advance(181);
     expect(screen.queryByRole("dialog", { name: "How to play" })).toBeNull();
 
-    open();
-    // Escape closes at once: the modal registers a second, unanimated Escape listener.
+    modal = open();
+    // Escape takes the same animated exit as the close button and the backdrop.
     fireEvent.keyDown(window, { key: "Escape" });
+    expect(modal.className).toContain("svf-modal-closing");
+    await advance(179);
+    expect(screen.queryByRole("dialog", { name: "How to play" })).not.toBeNull();
+    await advance(2);
     expect(screen.queryByRole("dialog", { name: "How to play" })).toBeNull();
   });
 });
