@@ -136,6 +136,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
     if (typeof window === "undefined") return true;
     return window.localStorage.getItem(SOUND_KEY) !== "0";
   });
+  const recorderRef = useRef<MediaRecorder | null>(null);
   useEffect(
     () => () => {
       // Tear down a recorder left running by navigating away mid-run — the
@@ -168,7 +169,6 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   }, [achievementToasts.length]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startRecording = useCallback(() => {
     try {
