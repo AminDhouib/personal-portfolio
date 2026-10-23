@@ -8,15 +8,16 @@ import {
   type TargetAndTransition,
   type Transition,
 } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BURST_FRAMES } from "./super-voltorb-flip/art/fx";
 import { preloadOriginalSprites } from "./super-voltorb-flip/art/original-sprites";
 import { ExplodeFrameImg, VoltorbSprite } from "./super-voltorb-flip/art/voltorb-sprite";
 import {
   pickCellValue,
   pickCellValueSeeded,
-  randomFlipDelay,
+  rollCell,
   seededFlipDelay,
+  type CellRoll,
 } from "./banners/cell-values";
 
 // ---------- shared ----------
@@ -905,6 +906,8 @@ function BombExplosionOverlay({
 // time without forcing a global board reset). The flip animation runs
 // continuously via motion.div's `repeat: Infinity` — values just swap at
 // the cycle boundaries when the cell is face-down.
+const subscribeNever = () => () => {};
+
 function BoardCell({
   r,
   c,
@@ -930,22 +933,26 @@ function BoardCell({
   tileOuterStyle: React.CSSProperties;
   tileInnerStyle: React.CSSProperties;
 }) {
-  // Stable per-cell flip delay — derived deterministically from (r,c) so
-  // SSR matches client hydration. Re-roll happens in useEffect post-mount.
-  const [flipDelay, setFlipDelay] = useState(() => seededFlipDelay(r, c, FLIP_CYCLE_S));
+  // Post-hydration: replace the deterministic (r,c) seeds with real randomness so the
+  // banner doesn't repeat the same starting pattern on every page load. The roll is
+  // read through useSyncExternalStore: the server and the hydrating render get null (so
+  // the markup matches), and the first client read rolls once and keeps it.
+  const [rollHolder] = useState<{ roll: CellRoll | null }>(() => ({ roll: null }));
+  const rolled = useSyncExternalStore(
+    subscribeNever,
+    () => (rollHolder.roll ??= rollCell(FLIP_CYCLE_S)),
+    () => null,
+  );
+  // Stable per-cell flip delay — the seed from (r,c) until the roll lands.
+  const flipDelay = rolled ? rolled.flipDelay : seededFlipDelay(r, c, FLIP_CYCLE_S);
   // cycleTick increments at the start of each cell cycle (face-down moment
   // between flip-down and the next flip-up). The BombExplosionOverlay's
   // React key includes cycleTick, so it remounts cleanly each cycle when
   // the value happens to be "bomb".
   const [cycleTick, setCycleTick] = useState(0);
-  const [value, setValue] = useState<number | "bomb">(() => pickCellValueSeeded(r, c));
-  // Post-hydration: replace deterministic seeds with real randomness so the
-  // banner doesn't repeat the same starting pattern on every page load.
-  useEffect(() => {
-    setFlipDelay(randomFlipDelay(FLIP_CYCLE_S));
-    setValue(pickCellValue());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The face re-rolled at the latest cycle boundary; null until the first one.
+  const [cycleValue, setCycleValue] = useState<number | "bomb" | null>(null);
+  const value = cycleValue ?? (rolled ? rolled.value : pickCellValueSeeded(r, c));
   const [exploding, setExploding] = useState(false);
 
   useEffect(() => {
@@ -954,10 +961,10 @@ function BoardCell({
     const initial = setTimeout(
       () => {
         setCycleTick((n) => n + 1);
-        setValue(pickCellValue());
+        setCycleValue(pickCellValue());
         interval = setInterval(() => {
           setCycleTick((n) => n + 1);
-          setValue(pickCellValue());
+          setCycleValue(pickCellValue());
         }, cycleMs);
       },
       (flipDelay + FLIP_CYCLE_S) * 1000,
