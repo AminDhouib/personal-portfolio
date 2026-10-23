@@ -29,7 +29,7 @@ overrides:
   # 0.18.2. 0.18.3 is the smallest fixed release and keeps katex's own dependencies as they
   # are; later 0.18.x pulls commander 15, and 0.18.11 is deprecated upstream. Crosses a
   # pre-1.0 minor (0.18 prefixes the generated CSS classes). @copilotkit/react-core (its
-  # latest, 1.77.0) and streamdown (rehype-katex, remark-math, mermaid) all pin ^0.16, so no
+  # latest, 1.79.1) and streamdown (rehype-katex, remark-math, mermaid) all pin ^0.16, so no
   # parent update reaches the fix.
   "katex@>=0.11.0 <0.18.2": "0.18.3"
   # GHSA-w5hq-g745-h8pq (moderate). Crosses a major, scoped to its two consumers:
