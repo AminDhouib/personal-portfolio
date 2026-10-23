@@ -53,6 +53,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Node majors move with .nvmrc, @types/node and the prod runtime together (all 22),
+      # so a base-image major is a deliberate migration, not a routine bump.
+      - dependency-name: "node"
+        update-types:
+          - version-update:semver-major
 
   # compose.yml pins the postgres image.
   - package-ecosystem: docker-compose
