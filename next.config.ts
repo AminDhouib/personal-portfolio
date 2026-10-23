@@ -39,9 +39,11 @@ const nextConfig: NextConfig = {
   // block once Sentry traces the hook's imports itself. The pnpm store paths are the ones the
   // packages resolve to, with the version wildcarded so a bump keeps matching; withSentryConfig
   // leaves this key alone. Everything here is the hook's ESM import closure:
-  // server-runtime-injection is the hook itself, @sentry/core is imported by its debug.js and
-  // hook.js, @sentry/server-utils supplies the orchestrion instrumentation config, and
-  // @sentry/conventions is the attribute names @sentry/core imports.
+  // server-runtime-injection is the hook itself, @sentry/core is imported by its register.js and
+  // debug.js, @sentry/server-utils supplies the orchestrion instrumentation config that register.js
+  // imports, and @sentry/conventions is the attribute names @sentry/core imports; plus each
+  // package's root package.json, which Node needs for the exports map (nft only emits it for .js
+  // files, and conventions ships none).
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/.pnpm/@sentry+server-runtime-injection@*/node_modules/@sentry/server-runtime-injection/build/esm/**/*.js",
@@ -51,6 +53,9 @@ const nextConfig: NextConfig = {
       "./node_modules/.pnpm/@sentry+server-utils@*/node_modules/@sentry/server-utils/build/esm/orchestrion/config/*.js",
       "./node_modules/.pnpm/@sentry+server-utils@*/node_modules/@sentry/server-utils/build/esm/package.json",
       "./node_modules/.pnpm/@sentry+conventions@*/node_modules/@sentry/conventions/dist/{index,attributes,op}.mjs",
+      "./node_modules/.pnpm/@sentry+core@*/node_modules/@sentry/core/package.json",
+      "./node_modules/.pnpm/@sentry+server-utils@*/node_modules/@sentry/server-utils/package.json",
+      "./node_modules/.pnpm/@sentry+conventions@*/node_modules/@sentry/conventions/package.json",
     ],
   },
   // First-party PostHog path: the browser SDK posts to a same-origin path and these rules
