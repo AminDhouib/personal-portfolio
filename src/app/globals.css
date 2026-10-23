@@ -664,6 +664,13 @@ html {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* @tailwindcss/typography adds a literal backtick as ::before/::after content on
+   `code`; inside the pill above it would draw as `oxlint` with visible ticks. */
+.prose code:not(pre code)::before,
+.prose code:not(pre code)::after {
+  content: none;
+}
+
 .prose pre {
   position: relative;
   border-radius: 12px;

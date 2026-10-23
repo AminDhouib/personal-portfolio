@@ -483,8 +483,8 @@ export function SuperVoltorbFlipGame() {
               {game && <Scoreboard currentScore={displayCurrent} totalScore={displayTotal} />}
             </div>
 
-            {/* Right column: board + footer (and mobile bar at <lg, sized
-            to match board width). */}
+            {/* Right column: the board, preceded at <lg by the mobile bar
+            (level, mode row, memo bar), sized to match board width. */}
             <div className="flex flex-col items-center gap-2">
               {game && (
                 <div className="flex w-full flex-col gap-1.5 lg:hidden">
