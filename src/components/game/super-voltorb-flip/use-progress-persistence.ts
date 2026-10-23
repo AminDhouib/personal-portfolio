@@ -15,18 +15,21 @@ export function useProgressPersistence(
   updateGame: (callback: (game: VoltorbFlip) => void) => void,
   raiseHighestLevel: (level: number) => void,
 ): boolean {
-  // Restore the saved level + total once on mount. The persist effect below
-  // waits for `hydrated`, which flips in the same batch as the restored game,
-  // so the first render's Lv1/0 defaults can never overwrite a save.
-  const [hydrated, setHydrated] = useState(false);
+  // Restore the saved level + total once on mount. The restore always replaces the game this hook
+  // was first given (with no save it is an unchanged copy), and `hydrated` is that replacement
+  // having arrived, so it flips in the same render as the restored game. The persist effect below
+  // waits for it, so the first render's Lv1/0 defaults can never overwrite a save.
+  const [firstGame] = useState(game);
+  const hydrated = game !== firstGame;
   useEffect(() => {
     const saved = loadProgress();
+    updateGame((g) => {
+      if (saved) g.restore(saved.currentLevel, saved.totalScore, saved.history);
+    });
     if (saved) {
-      updateGame((g) => g.restore(saved.currentLevel, saved.totalScore, saved.history));
       // Statistics only mirror the save here; svf:progress is never written from them.
       raiseHighestLevel(saved.currentLevel);
     }
-    setHydrated(true);
     // Mount-only by design; updateGame is recreated every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
