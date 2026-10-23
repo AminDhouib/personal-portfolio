@@ -38,10 +38,6 @@ class FakeAudio {
   emit(type: string) {
     for (const listener of this.listeners.get(type) ?? []) listener();
   }
-  /** Fire a media event (`playing`, ...) at the listeners, as the browser does. */
-  emit(type: string) {
-    for (const listener of this.listeners.get(type) ?? []) listener();
-  }
   /** The file played to its end (never fires for a looping element, as in a browser). */
   finish() {
     if (this.loop) return;
