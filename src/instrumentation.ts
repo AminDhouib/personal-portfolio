@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { validateRequiredEnv } from "@/env";
+import { SENTRY_DATA_COLLECTION, SENTRY_TRACE_LIFECYCLE } from "@/lib/sentry-options";
 
 export function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -17,6 +18,8 @@ export function register() {
       dsn: process.env.SENTRY_DSN,
       tracesSampleRate: 0.1,
       environment: process.env.NODE_ENV,
+      traceLifecycle: SENTRY_TRACE_LIFECYCLE,
+      dataCollection: SENTRY_DATA_COLLECTION,
     });
   }
 
@@ -25,6 +28,8 @@ export function register() {
       dsn: process.env.SENTRY_DSN,
       tracesSampleRate: 0.1,
       environment: process.env.NODE_ENV,
+      traceLifecycle: SENTRY_TRACE_LIFECYCLE,
+      dataCollection: SENTRY_DATA_COLLECTION,
     });
   }
 }
