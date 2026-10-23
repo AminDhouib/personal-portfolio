@@ -31,7 +31,6 @@ export function usePayoutDisplay({
   // Level-card flash. "up" flashes green, "down" flashes red, both clear
   // automatically once the SE finishes.
   const [levelDir, setLevelDir] = useState<"up" | "down" | null>(null);
-  const prevLevelRef = useRef<number | undefined>(undefined);
   const payoutAnimRef = useRef(false);
   const tallyTimerRef = useRef<number | null>(null);
   const tallyStepRef = useRef<number>(0);
@@ -141,7 +140,6 @@ export function usePayoutDisplay({
         syncLevelTimer = window.setTimeout(() => setDisplayLevel(game.currentLevel), 0);
       }
     }
-    prevLevelRef.current = game.currentLevel;
 
     return () => {
       if (syncLevelTimer) window.clearTimeout(syncLevelTimer);
