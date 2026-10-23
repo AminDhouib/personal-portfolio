@@ -2,27 +2,6 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Rocket,
-  Trophy,
-  Shield,
-  RotateCcw,
-  Send,
-  Volume2,
-  VolumeX,
-  Crosshair,
-  Zap,
-  Target,
-  Maximize2,
-  Minimize2,
-  Pause,
-  Play,
-  ShoppingCart,
-  Magnet,
-  Coins as CoinsIcon,
-  Share2,
-} from "lucide-react";
 import {
   addCoins,
   addRunStats,
@@ -33,29 +12,16 @@ import {
   setUpgradeLevel,
   spendCoins,
 } from "./profile";
-import { UPGRADES, upgradeById, SHIPS, CONSUMABLES, COSMETICS } from "./shop-data";
-import {
-  ShipPreview,
-  UpgradePreview,
-  ConsumablePreview,
-  CosmeticPreview,
-} from "./space-shooter/shop-previews";
+import { upgradeById } from "./shop-data";
 import { PostFx } from "./post-fx";
 import { RunBanner } from "./space-shooter/run-banner";
-import {
-  ACHIEVEMENTS,
-  checkAchievements,
-  grantAchievements,
-  type Achievement,
-} from "./achievements";
+import { checkAchievements, grantAchievements, type Achievement } from "./achievements";
 import {
   type BossId,
   type GameRefs,
   ARENA_W,
   ARENA_H,
-  POWERUP_DURATION_MS,
   envForTime,
-  POWERUP_DEFS,
   tryDash,
 } from "./space-shooter/types";
 import { isWorldRecord, personalBestKind } from "./space-shooter/celebration";
@@ -65,25 +31,19 @@ import {
   createUiStateFromGame,
   type UiState,
 } from "./space-shooter/ui-state";
-import { PanelClose } from "./space-shooter/panel-close";
-import { CountUp } from "./space-shooter/count-up";
-import { coinBreakdown, postRunGoals, unownedCatalog } from "./space-shooter/post-run";
-import { shareRun } from "./space-shooter/share";
+import { postRunGoals, unownedCatalog } from "./space-shooter/post-run";
 import { CountdownOverlay } from "./space-shooter/countdown-overlay";
 import { useCountdown } from "./space-shooter/use-countdown";
 import { canvasLayout, SHOOTER_CAPTION, type CanvasVariant } from "./space-shooter/canvas-layout";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
-import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
 import { useArcadeBoard } from "@/hooks/use-arcade-board";
-import { comboColor } from "./space-shooter/difficulty";
 import { sounds } from "./space-shooter/sound-manager";
-import { BOSS_DISPLAY_NAMES, spawnBoss } from "./space-shooter/boss-behaviors";
+import { spawnBoss } from "./space-shooter/boss-behaviors";
 import { createRefs, startRun, pauseRun, resumeRun, resetToArmed } from "./space-shooter/run-init";
 import { Scene } from "./space-shooter/scene-components";
 import { keyboardStep, orbitalKeyDecision, shouldCaptureTouch } from "./space-shooter/input";
 import { isTextEntryTarget } from "./text-entry";
-import { SettingsToggle } from "./space-shooter/settings-toggle";
 import {
   HS_KEY,
   NAME_KEY,
@@ -93,6 +53,17 @@ import {
   type SpaceShooterPrefs,
 } from "./space-shooter/prefs";
 import { renderShareImage } from "./space-shooter/share-image";
+import { ShopPanel, type ShopTab } from "./space-shooter/shop-panel";
+import { TrophiesPanel } from "./space-shooter/trophies-panel";
+import { RunHud } from "./space-shooter/run-hud";
+import { TopControls } from "./space-shooter/top-controls";
+import { PauseOverlay } from "./space-shooter/pause-overlay";
+import { AchievementToasts } from "./space-shooter/achievement-toasts";
+import { SettingsPanel } from "./space-shooter/settings-panel";
+import { BossBanners } from "./space-shooter/boss-banners";
+import { ArmedMenu } from "./space-shooter/armed-menu";
+import { DeathOverlay, type CelebrationKind } from "./space-shooter/death-overlay";
+import { CrashOverlay } from "./space-shooter/crash-overlay";
 
 // ---------- leaderboard helpers ----------
 // The board is read and written through useArcadeBoard("space-shooter") (leaderboard v2):
@@ -100,8 +71,6 @@ import { renderShareImage } from "./space-shooter/share-image";
 // country lookup any more; the v2 board does not store one.
 
 // ---------- main component ----------
-
-type CelebrationKind = "first" | "personal" | "world" | null;
 
 export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVariant } = {}) {
   const gameRefs = useRef<GameRefs>(createRefs());
@@ -184,9 +153,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
-  const [shopTab, setShopTab] = useState<
-    "upgrades" | "consumables" | "ships" | "cosmetics" | "missions" | "achievements"
-  >("upgrades");
+  const [shopTab, setShopTab] = useState<ShopTab>("upgrades");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefs, setPrefs] = useState<SpaceShooterPrefs>(loadInitialPrefs);
   const [achievementToasts, setAchievementToasts] = useState<(Achievement & { firedAt: number })[]>(
@@ -924,487 +891,41 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
           <>
             {/* Top-left: score + distance + kills — styled to match game aesthetic */}
             {/* Shop modal — only reachable for returning players */}
-            <AnimatePresence>
-              {shopOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-10 flex flex-col bg-black/80 backdrop-blur-md"
-                >
-                  {/* Sticky header + tabs — always visible so the player can
-                      navigate between sub-sections without being forced to
-                      close the shop. */}
-                  <div className="sticky top-0 z-20 border-b border-white/10 bg-black/85 px-4 pt-4 pb-2 backdrop-blur-md">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <ShoppingCart className="h-5 w-5 text-accent-amber" />
-                        <h3 className="text-lg font-bold text-white">Shop</h3>
-                        <div className="flex items-center gap-1.5 rounded-md border border-accent-amber/40 bg-accent-amber/20 px-2 py-1 font-mono text-sm text-accent-amber">
-                          <CoinsIcon className="h-3.5 w-3.5" />
-                          {profile.walletCoins}
-                        </div>
-                      </div>
-                      <PanelClose label="Close shop" onClose={() => setShopOpen(false)} />
-                    </div>
-                    <div className="mx-auto flex w-full max-w-3xl items-center gap-1 overflow-x-auto">
-                      {(["upgrades", "consumables", "ships", "cosmetics"] as const).map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setShopTab(t)}
-                          className={`min-h-11 rounded border px-3 py-1.5 text-xs font-semibold tracking-wide uppercase ${
-                            shopTab === t
-                              ? "border-accent-blue/60 bg-accent-blue/25 text-white"
-                              : "border-white/10 bg-white/5 text-slate-400 hover:text-white"
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Scrollable tab body */}
-                  <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4">
-                    {shopTab === "upgrades" && (
-                      <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
-                        {UPGRADES.map((u) => {
-                          const level = profile.ownedUpgrades[u.id] ?? 0;
-                          const maxed = level >= u.maxLevel;
-                          const nextCost = maxed ? 0 : u.costAtLevel(level + 1);
-                          const affordable = profile.walletCoins >= nextCost;
-                          return (
-                            <button
-                              key={u.id}
-                              onClick={() => !maxed && affordable && buyUpgrade(u.id)}
-                              disabled={maxed || !affordable}
-                              className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
-                                maxed
-                                  ? "border-emerald-500/40 bg-emerald-500/10"
-                                  : affordable
-                                    ? "border-accent-blue/50 bg-white/5 hover:bg-white/10"
-                                    : "border-white/10 bg-white/5 opacity-50"
-                              }`}
-                            >
-                              <UpgradePreview icon={u.iconKey} />
-                              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                <div className="flex w-full items-center gap-2">
-                                  <span className="flex-1 truncate font-semibold text-white">
-                                    {u.label}
-                                  </span>
-                                  <div
-                                    className="flex items-center gap-0.5"
-                                    aria-label={`Level ${level} of ${u.maxLevel}`}
-                                  >
-                                    {Array.from({ length: u.maxLevel }).map((_, i) => (
-                                      <span
-                                        key={i}
-                                        className={`h-1.5 w-2.5 rounded-sm ${
-                                          i < level
-                                            ? maxed
-                                              ? "bg-emerald-400"
-                                              : "bg-accent-blue"
-                                            : "bg-white/15"
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="text-xs text-white/70">{u.description}</div>
-                                <div className="mt-1 flex items-center gap-1.5 font-mono text-xs">
-                                  {maxed ? (
-                                    <span className="text-emerald-400">MAXED</span>
-                                  ) : (
-                                    <>
-                                      <CoinsIcon className="h-3 w-3 text-accent-amber" />
-                                      <span
-                                        className={
-                                          affordable ? "text-accent-amber" : "text-white/40"
-                                        }
-                                      >
-                                        {nextCost}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {shopTab === "consumables" && (
-                      <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
-                        {CONSUMABLES.map((c) => {
-                          const owned = profile.consumableInventory[c.id] ?? 0;
-                          const affordable = profile.walletCoins >= c.cost;
-                          return (
-                            <div
-                              key={c.id}
-                              className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
-                            >
-                              <ConsumablePreview icon={c.icon} />
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-white">
-                                  {c.label} <span className="text-xs text-slate-400">x{owned}</span>
-                                </div>
-                                <div className="text-xs text-slate-400">{c.description}</div>
-                              </div>
-                              <button
-                                type="button"
-                                disabled={!affordable}
-                                onClick={() => {
-                                  if (!affordable) return;
-                                  const r = spendCoins(c.cost);
-                                  if (r.ok) {
-                                    const p = loadProfile();
-                                    p.consumableInventory[c.id] =
-                                      (p.consumableInventory[c.id] ?? 0) + 1;
-                                    saveProfile(p);
-                                    sounds.play("purchase");
-                                    refreshProfile();
-                                  }
-                                }}
-                                className={`min-h-11 rounded px-3 py-1.5 text-xs font-bold tracking-wide uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
-                              >
-                                Buy · {c.cost}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {shopTab === "ships" && (
-                      <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
-                        {SHIPS.map((s) => {
-                          const owned =
-                            s.id === "falcon" || profile.ownedCosmetics.includes(`ship:${s.id}`);
-                          const equipped = profile.equippedShip === s.id;
-                          const affordable = profile.walletCoins >= s.unlockCost;
-                          return (
-                            <div
-                              key={s.id}
-                              className={`flex gap-3 rounded-lg border p-3 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
-                            >
-                              <ShipPreview color={s.hullTint} shipId={s.id} />
-                              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-semibold text-white">
-                                    {s.label}
-                                  </span>
-                                  <span
-                                    className="inline-block h-4 w-4 rounded border border-white/20"
-                                    style={{ background: s.hullTint }}
-                                  />
-                                </div>
-                                <div className="text-xs text-slate-400">{s.description}</div>
-                                <div className="mt-1 flex items-center gap-2">
-                                  {owned ? (
-                                    <button
-                                      type="button"
-                                      disabled={equipped}
-                                      onClick={() => {
-                                        const p = loadProfile();
-                                        p.equippedShip = s.id;
-                                        saveProfile(p);
-                                        refreshProfile();
-                                      }}
-                                      className={`min-h-11 rounded px-3 py-1 text-xs font-bold uppercase ${equipped ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300" : "border border-accent-blue/40 bg-accent-blue/20 text-accent-blue"}`}
-                                    >
-                                      {equipped ? "Equipped" : "Equip"}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      disabled={!affordable}
-                                      onClick={() => {
-                                        if (!affordable) return;
-                                        const r = spendCoins(s.unlockCost);
-                                        if (r.ok) {
-                                          const p = loadProfile();
-                                          const key = `ship:${s.id}`;
-                                          if (!p.ownedCosmetics.includes(key))
-                                            p.ownedCosmetics.push(key);
-                                          saveProfile(p);
-                                          sounds.play("purchase");
-                                          refreshProfile();
-                                        }
-                                      }}
-                                      className={`min-h-11 rounded px-3 py-1 text-xs font-bold uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
-                                    >
-                                      Unlock · {s.unlockCost}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {shopTab === "cosmetics" && (
-                      <div className="mx-auto grid w-full max-w-3xl grid-cols-2 gap-2 sm:grid-cols-3">
-                        {COSMETICS.map((c) => {
-                          const owned = profile.ownedCosmetics.includes(c.id);
-                          const cond = c.unlockCondition;
-                          let locked = false;
-                          if (cond && cond !== "always") {
-                            const val =
-                              cond.stat === "totalAsteroidsDestroyed"
-                                ? profile.totalAsteroidsDestroyed
-                                : cond.stat === "totalDistance"
-                                  ? profile.totalDistance
-                                  : profile.totalRunsPlayed;
-                            locked = val < cond.atLeast;
-                          }
-                          const equippedId =
-                            c.slot === "hull"
-                              ? profile.equippedHull
-                              : c.slot === "engine"
-                                ? profile.equippedEngine
-                                : profile.equippedDeathFx;
-                          const equipped = equippedId === c.id;
-                          const affordable = profile.walletCoins >= c.cost;
-                          return (
-                            <div
-                              key={c.id}
-                              className={`flex flex-col items-start gap-1 rounded-lg border p-2 ${equipped ? "border-emerald-500/50 bg-emerald-500/10" : "border-white/10 bg-white/5"} ${locked ? "opacity-60" : ""}`}
-                            >
-                              <div className="flex w-full items-center gap-2">
-                                <CosmeticPreview slot={c.slot} value={c.value} />
-                                <span className="flex-1 truncate text-xs font-semibold text-white">
-                                  {c.label}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-slate-400">{c.slot}</div>
-                              {locked ? (
-                                <div className="text-[10px] text-slate-500">Locked</div>
-                              ) : owned ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const p = loadProfile();
-                                    if (c.slot === "hull") p.equippedHull = equipped ? null : c.id;
-                                    else if (c.slot === "engine")
-                                      p.equippedEngine = equipped ? null : c.id;
-                                    else p.equippedDeathFx = equipped ? null : c.id;
-                                    saveProfile(p);
-                                    refreshProfile();
-                                  }}
-                                  className={`min-h-11 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${equipped ? "border border-emerald-500/40 bg-emerald-500/20 text-emerald-300" : "border border-accent-blue/40 bg-accent-blue/20 text-accent-blue"}`}
-                                >
-                                  {equipped ? "Equipped" : "Equip"}
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={!affordable}
-                                  onClick={() => {
-                                    if (!affordable) return;
-                                    const r = spendCoins(c.cost);
-                                    if (r.ok) {
-                                      const p = loadProfile();
-                                      if (!p.ownedCosmetics.includes(c.id))
-                                        p.ownedCosmetics.push(c.id);
-                                      saveProfile(p);
-                                      sounds.play("purchase");
-                                      refreshProfile();
-                                    }
-                                  }}
-                                  className={`min-h-11 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${affordable ? "border border-accent-amber/50 bg-accent-amber/20 text-accent-amber" : "border border-white/10 bg-white/5 text-slate-500"}`}
-                                >
-                                  Buy · {c.cost}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <ShopPanel
+              shopOpen={shopOpen}
+              setShopOpen={setShopOpen}
+              shopTab={shopTab}
+              setShopTab={setShopTab}
+              profile={profile}
+              buyUpgrade={buyUpgrade}
+              refreshProfile={refreshProfile}
+            />
 
             {/* Achievements modal — separate surface from shop so progress
                 and spending are not conflated. */}
-            <AnimatePresence>
-              {achievementsOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-10 flex flex-col bg-black/80 backdrop-blur-md"
-                >
-                  <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-black/85 px-4 pt-4 pb-3 backdrop-blur-md">
-                    <div className="flex items-center gap-3">
-                      <Trophy className="h-5 w-5 text-accent-amber" />
-                      <h3 className="text-lg font-bold text-white">Trophies</h3>
-                      <div className="text-[10px] font-bold tracking-[0.25em] text-white/50 uppercase">
-                        {profile.unlockedAchievements.length} / {ACHIEVEMENTS.length}
-                      </div>
-                    </div>
-                    <PanelClose label="Close trophies" onClose={() => setAchievementsOpen(false)} />
-                  </div>
-                  <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4">
-                    <div className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
-                      {ACHIEVEMENTS.map((a) => {
-                        const owned = profile.unlockedAchievements.includes(a.id);
-                        return (
-                          <div
-                            key={a.id}
-                            className={`flex items-start gap-3 rounded-lg border p-3 ${
-                              owned
-                                ? "border-amber-500/50 bg-amber-900/20"
-                                : "border-white/10 bg-white/5 opacity-70"
-                            }`}
-                          >
-                            <div
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded text-xs font-black ${
-                                owned
-                                  ? "bg-amber-400 text-amber-900"
-                                  : "bg-slate-700 text-slate-500"
-                              }`}
-                            >
-                              {a.icon}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div
-                                className={`text-sm font-bold ${owned ? "text-white" : "text-slate-400"}`}
-                              >
-                                {a.name}
-                              </div>
-                              <div className="text-xs text-slate-400">{a.description}</div>
-                              {a.unlocksCosmeticId && owned && (
-                                <div className="mt-1 text-[10px] text-emerald-400">
-                                  Unlocked cosmetic: {a.unlocksCosmeticId}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <TrophiesPanel
+              achievementsOpen={achievementsOpen}
+              setAchievementsOpen={setAchievementsOpen}
+              profile={profile}
+            />
 
             {ui.status === "playing" && <RunBanner startedAt={0} now={ui.seconds * 1000} />}
 
             {/* The run HUD shows only during a run, never behind a modal on the
                 armed or dead screen. */}
-            {(ui.status === "playing" || ui.status === "paused") && (
-              <div className="pointer-events-none absolute top-3 right-3 left-3 flex flex-col gap-1.5 text-[10px] sm:right-auto sm:text-sm">
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 backdrop-blur-sm sm:gap-4 sm:px-3">
-                  <span className="flex items-center gap-1.5 font-mono font-bold text-accent-blue tabular-nums">
-                    <Rocket className="h-3.5 w-3.5" />
-                    {ui.score}
-                  </span>
-                  <span className="font-mono text-white/80 tabular-nums">{ui.distance}m</span>
-                  <span className="font-mono text-white/80 tabular-nums">{ui.kills} kills</span>
-                  {ui.combo > 1 && (
-                    <motion.span
-                      key={ui.combo}
-                      initial={{ scale: 0.7, opacity: 0 }}
-                      animate={{ scale: ui.comboFlash ? 1.5 : 1, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                      className="font-mono font-bold tabular-nums"
-                      style={{
-                        color: comboColor(ui.combo),
-                        textShadow: ui.comboFlash ? `0 0 10px ${comboColor(ui.combo)}` : "none",
-                      }}
-                    >
-                      {"\u00d7"}
-                      {ui.combo}
-                    </motion.span>
-                  )}
-                  <span className="font-mono text-white/50 tabular-nums">
-                    {ui.seconds.toFixed(0)}s
-                  </span>
-                </div>
-                {/* Active power-ups */}
-                {ui.active.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    {ui.active.map((a) => {
-                      const def = POWERUP_DEFS[a.type];
-                      const Icon =
-                        a.type === "shield"
-                          ? Shield
-                          : a.type === "triple"
-                            ? Crosshair
-                            : a.type === "rapid"
-                              ? Zap
-                              : a.type === "warp"
-                                ? Rocket
-                                : a.type === "magnet"
-                                  ? Magnet
-                                  : Target;
-                      const pct = Math.min(100, (a.remainingMs / POWERUP_DURATION_MS) * 100);
-                      return (
-                        <div
-                          key={a.type}
-                          className="flex items-center gap-1 rounded-md border border-white/10 bg-black/50 px-2 py-1 backdrop-blur-sm"
-                          style={{ borderColor: `${def.color}55` }}
-                        >
-                          <Icon className="h-3 w-3" style={{ color: def.color }} />
-                          <div className="h-1 w-10 overflow-hidden rounded-full bg-white/15">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${pct}%`, background: def.color }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+            {(ui.status === "playing" || ui.status === "paused") && <RunHud ui={ui} />}
 
             {/* Top-right: best + controls (pause / mute / fullscreen) */}
             {!shopOpen && !achievementsOpen && (
-              <div className="absolute top-3 right-3 flex items-center gap-2">
-                {highScore > 0 && (
-                  <div className="pointer-events-none flex items-center gap-1 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-accent-amber tabular-nums backdrop-blur-sm">
-                    <Trophy className="h-3 w-3" />
-                    {highScore}
-                  </div>
-                )}
-                <button
-                  onClick={togglePause}
-                  aria-label={ui.status === "paused" ? "Resume" : "Pause"}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
-                >
-                  {ui.status === "paused" ? (
-                    <Play className="h-3.5 w-3.5" />
-                  ) : (
-                    <Pause className="h-3.5 w-3.5" />
-                  )}
-                </button>
-                <button
-                  onClick={toggleSound}
-                  aria-label={soundEnabled ? "Mute" : "Unmute"}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
-                >
-                  {soundEnabled ? (
-                    <Volume2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <VolumeX className="h-3.5 w-3.5" />
-                  )}
-                </button>
-                <button
-                  onClick={toggleFullscreen}
-                  aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur-sm transition-colors hover:text-white"
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
+              <TopControls
+                ui={ui}
+                highScore={highScore}
+                togglePause={togglePause}
+                soundEnabled={soundEnabled}
+                toggleSound={toggleSound}
+                isFullscreen={isFullscreen}
+                toggleFullscreen={toggleFullscreen}
+              />
             )}
 
             {/* Biome label — bottom center */}
@@ -1423,54 +944,11 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
         {/* Pulsing instruction overlay — anchored low so the ship in the
             centre of the canvas stays visible behind it. */}
         {/* Pause overlay */}
-        <AnimatePresence>
-          {ui.status === "paused" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={togglePause}
-              className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-3 bg-black/50 backdrop-blur-[2px]"
-            >
-              <div className="text-xs font-bold tracking-[0.3em] text-white/60 uppercase">
-                Paused
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  // The overlay behind this button resumes too — don't let the
-                  // same click reach it and toggle twice.
-                  e.stopPropagation();
-                  togglePause();
-                }}
-                className="rounded-xl border border-white/20 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white backdrop-blur-md"
-              >
-                Resume
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <PauseOverlay ui={ui} togglePause={togglePause} />
 
         {/* Achievement toasts */}
         {achievementToasts.length > 0 && (
-          <div className="pointer-events-none absolute top-14 right-4 z-40 flex flex-col gap-2">
-            {achievementToasts.map((a) => (
-              <div
-                key={`${a.id}-${a.firedAt}`}
-                className="flex min-w-[220px] items-center gap-3 rounded-lg border border-amber-400/60 bg-amber-900/80 px-4 py-2 backdrop-blur-sm"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded bg-amber-400 text-xs font-black text-amber-900">
-                  {a.icon}
-                </div>
-                <div className="flex-1">
-                  <div className="text-[10px] tracking-wide text-amber-200">ACHIEVEMENT</div>
-                  <div className="text-sm font-bold text-white">{a.name}</div>
-                  <div className="text-xs text-amber-100">{a.description}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <AchievementToasts achievementToasts={achievementToasts} />
         )}
 
         {/* Dev-only FPS + object counts */}
@@ -1532,519 +1010,63 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
           </button>
         )}
         {settingsOpen && (
-          <div
-            className="absolute inset-0 z-40 flex items-center justify-center bg-black/80"
-            onClick={() => setSettingsOpen(false)}
-          >
-            <div
-              className="max-w-[90%] min-w-[260px] rounded-lg border border-white/20 bg-slate-900 p-5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-bold text-white">Settings</h3>
-                <PanelClose label="Close settings" onClose={() => setSettingsOpen(false)} />
-              </div>
-              <div className="space-y-3">
-                <SettingsToggle
-                  label="Reduced motion"
-                  checked={prefs.reducedMotion}
-                  onChange={(v) => setPrefs((p) => ({ ...p, reducedMotion: v }))}
-                />
-                <SettingsToggle
-                  label="Bloom / glow"
-                  checked={prefs.bloomEnabled}
-                  onChange={(v) => setPrefs((p) => ({ ...p, bloomEnabled: v }))}
-                />
-                <SettingsToggle
-                  label="Music"
-                  checked={prefs.musicEnabled}
-                  onChange={(v) => setPrefs((p) => ({ ...p, musicEnabled: v }))}
-                />
-                <SettingsToggle
-                  label="SFX"
-                  checked={prefs.sfxEnabled}
-                  onChange={(v) => setPrefs((p) => ({ ...p, sfxEnabled: v }))}
-                />
-                {gyroSupported && (
-                  <div>
-                    <SettingsToggle
-                      label="Gyro controls"
-                      checked={prefs.gyroEnabled}
-                      onChange={(v) => {
-                        void (async () => {
-                          if (v && gyroPermission !== "granted") {
-                            const ok = await requestGyroPermission();
-                            if (!ok) return;
-                          }
-                          setPrefs((p) => ({ ...p, gyroEnabled: v }));
-                        })();
-                      }}
-                    />
-                    {gyroPermission === "denied" && (
-                      <div className="mt-1 text-[10px] text-red-400">
-                        Permission denied. Enable motion access in iOS Settings.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <SettingsPanel
+            prefs={prefs}
+            setPrefs={setPrefs}
+            setSettingsOpen={setSettingsOpen}
+            gyroSupported={gyroSupported}
+            gyroPermission={gyroPermission}
+            requestGyroPermission={requestGyroPermission}
+          />
         )}
 
         {/* Boss intro banner */}
-        {ui.boss?.phase === "intro" && (
-          <div className="pointer-events-none absolute inset-x-0 top-[18%] z-30 flex flex-col items-center">
-            <div className="animate-pulse text-xs tracking-[0.4em] text-red-400">INCOMING</div>
-            <div className="text-3xl font-black text-white drop-shadow-[0_0_12px_rgba(239,68,68,0.6)] sm:text-5xl">
-              {BOSS_DISPLAY_NAMES[ui.boss.id]}
-            </div>
-            {!firstBossSeen && (
-              <div className="mt-2 max-w-xs text-center text-xs text-slate-300">
-                Bosses interrupt normal flight. Shoot them to progress. Dodge their attacks.
-              </div>
-            )}
-          </div>
-        )}
-        {/* Boss HP bar */}
-        {ui.boss?.phase === "fighting" && (
-          <div className="pointer-events-none absolute top-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1">
-            <div className="text-[10px] tracking-[0.3em] text-red-300">
-              {BOSS_DISPLAY_NAMES[ui.boss.id]}
-            </div>
-            <div className="h-2 w-48 overflow-hidden rounded-sm border border-red-500/50 bg-black/60 sm:w-64">
-              <div
-                className="h-full bg-linear-to-r from-red-600 to-red-400 transition-[width] duration-100"
-                style={{ width: `${ui.boss.hpPct}%` }}
-              />
-            </div>
-            {ui.boss.id === "swarm-mother" && ui.boss.hasDrone && (
-              <div className="animate-pulse text-[10px] tracking-[0.3em] text-fuchsia-300">
-                CLEAR DRONES
-              </div>
-            )}
-          </div>
-        )}
+        <BossBanners ui={ui} firstBossSeen={firstBossSeen} />
 
         {/* Armed instructions: first-timer sees the pulsing pill; returning player sees Play/Shop buttons */}
-        <AnimatePresence>
-          {ui.status === "armed" && !isReturningPlayer && (
-            <motion.div
-              inert={panelOpen}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.4 }}
-              className="absolute inset-x-0 bottom-6 flex flex-col items-center gap-3"
-            >
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  const g = gameRefs.current;
-                  if (g.status === "armed") startRun(g);
-                }}
-                className="rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-10 py-3 text-lg font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/30"
-                type="button"
-              >
-                Play
-              </motion.button>
-              <div className="text-[10px] tracking-[0.25em] text-white/50 uppercase">
-                Cannons fire automatically · {isTouch ? "drag to steer" : "mouse or WASD"}
-              </div>
-            </motion.div>
-          )}
-          {ui.status === "armed" && isReturningPlayer && (
-            <motion.div
-              // An open panel covers these buttons; inert keeps Tab off them.
-              inert={panelOpen}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.4 }}
-              className="absolute inset-x-0 bottom-6 flex flex-col items-center gap-3"
-            >
-              <div className="flex items-center gap-1.5 rounded-md border border-accent-amber/40 bg-accent-amber/15 px-2.5 py-1 font-mono text-xs text-accent-amber">
-                <CoinsIcon className="h-3.5 w-3.5" />
-                {profile.walletCoins}
-              </div>
-              <div className="flex w-full flex-wrap items-center justify-center gap-2 px-3 sm:gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    const g = gameRefs.current;
-                    if (g.status === "armed") startRun(g);
-                  }}
-                  className="min-h-11 rounded-xl bg-linear-to-br from-accent-blue to-accent-pink px-5 py-3 text-base font-bold tracking-wider text-white uppercase shadow-lg shadow-accent-blue/30 sm:px-7"
-                >
-                  Play
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShopOpen(true)}
-                  className="flex min-h-11 items-center gap-2 rounded-xl border border-accent-amber/50 bg-accent-amber/20 px-4 py-3 text-sm font-bold tracking-wider text-accent-amber uppercase sm:px-5"
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  Shop
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setAchievementsOpen(true)}
-                  className="flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold tracking-wider text-white/80 uppercase sm:px-5"
-                >
-                  <Trophy className="h-4 w-4" />
-                  Trophies
-                </motion.button>
-              </div>
-              <div className="text-[10px] tracking-[0.25em] text-white/50 uppercase">
-                {isTouch
-                  ? "Drag to steer · cannons auto-fire"
-                  : "Mouse or WASD to steer · cannons auto-fire"}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ArmedMenu
+          ui={ui}
+          gameRefs={gameRefs}
+          profile={profile}
+          isReturningPlayer={isReturningPlayer}
+          isTouch={isTouch}
+          panelOpen={panelOpen}
+          setShopOpen={setShopOpen}
+          setAchievementsOpen={setAchievementsOpen}
+        />
 
         {/* Death overlay with leaderboard */}
-        <AnimatePresence>
-          {ui.status === "dead" && (
-            <motion.div
-              inert={panelOpen}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/70 p-4 backdrop-blur-md"
-            >
-              <motion.div
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 240, damping: 16 }}
-                className="relative text-center"
-              >
-                {/* Confetti burst — bigger when world record */}
-                {celebration && (
-                  <>
-                    {(celebration === "world" ? WORLD_CONFETTI : PERSONAL_CONFETTI).map((c) => (
-                      <motion.div
-                        key={c.id}
-                        className="absolute top-1/2 left-1/2 h-2 w-2 rounded-sm"
-                        initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-                        animate={{ x: c.dx, y: c.dy, opacity: 0, rotate: c.rot }}
-                        transition={{
-                          duration: celebration === "world" ? 1.8 : 1.3,
-                          ease: "easeOut",
-                          delay: c.id * 0.012,
-                        }}
-                        style={{ background: c.color }}
-                      />
-                    ))}
-                  </>
-                )}
-                <div className="text-xs font-bold tracking-[0.3em] text-red-400 uppercase">
-                  Ship destroyed
-                </div>
-                <div className="mt-1 font-display text-4xl font-black text-white tabular-nums sm:text-5xl">
-                  <CountUp target={ui.score} reducedMotion={prefs.reducedMotion} />
-                </div>
-                {celebration === "world" && (
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.2 }}
-                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-linear-to-br from-accent-amber via-accent-pink to-accent-blue px-4 py-1.5 text-sm font-black tracking-widest text-black uppercase"
-                  >
-                    <Trophy className="h-4 w-4" />
-                    World Record
-                  </motion.div>
-                )}
-                {(celebration === "personal" || celebration === "first") && (
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.15 }}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-accent-amber/60 bg-accent-amber/20 px-3 py-1 text-xs font-bold tracking-widest text-accent-amber uppercase"
-                  >
-                    <Trophy className="h-3.5 w-3.5" />
-                    {celebration === "first" ? "First Flight" : "Personal Best"}
-                  </motion.div>
-                )}
-                {goals.bar && (
-                  <div className="mx-auto mt-3 w-full max-w-xs px-2">
-                    <div
-                      className="h-2 overflow-hidden rounded-full bg-white/10"
-                      role="progressbar"
-                      aria-label="Score compared with your best"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={Math.round(goals.bar.fraction * 100)}
-                    >
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${goals.bar.fraction * 100}%` }}
-                        transition={{ duration: 0.9, ease: "easeOut" }}
-                        className={
-                          goals.bar.beaten
-                            ? "h-full rounded-full bg-accent-amber"
-                            : "h-full rounded-full bg-accent-blue"
-                        }
-                      />
-                    </div>
-                    <div className="mt-1 text-xs text-white/70">{goals.bar.label}</div>
-                  </div>
-                )}
-                {goals.unlock && (
-                  <div className="mt-1 text-xs text-white/70">
-                    {goals.unlock.coinsNeeded > 0
-                      ? `${goals.unlock.coinsNeeded} coins to ${goals.unlock.label}`
-                      : `${goals.unlock.label} is ready in the Shop`}
-                  </div>
-                )}
-                {ui.coinsThisRun > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="mt-2 flex items-center justify-center gap-1.5 font-mono text-sm text-accent-amber"
-                  >
-                    <CoinsIcon className="h-4 w-4" />+
-                    <CountUp target={ui.coinsThisRun} reducedMotion={prefs.reducedMotion} /> coins
-                  </motion.div>
-                )}
-                {ui.coinsThisRun > 0 && (
-                  <ul className="mt-1 text-xs text-white/60">
-                    {coinBreakdown({
-                      total: ui.coinsThisRun,
-                      boostBonus: ui.coinBoostBonus,
-                      pickups: ui.coinPickups,
-                    }).map((row) => (
-                      <li key={row.label}>
-                        {row.label}: +{row.amount}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="mx-auto mt-3 grid max-w-md grid-cols-2 gap-2 px-2 text-xs text-white/75 sm:grid-cols-4">
-                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
-                    <div className="text-[10px] tracking-wider text-white/50 uppercase">
-                      Survived
-                    </div>
-                    <div className="font-mono text-white tabular-nums">
-                      {ui.seconds.toFixed(0)}s
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
-                    <div className="text-[10px] tracking-wider text-white/50 uppercase">
-                      Distance
-                    </div>
-                    <div className="font-mono text-white tabular-nums">{ui.distance}m</div>
-                  </div>
-                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
-                    <div className="text-[10px] tracking-wider text-white/50 uppercase">Kills</div>
-                    <div className="font-mono text-white tabular-nums">{ui.kills}</div>
-                  </div>
-                  <div className="rounded-md border border-white/15 bg-white/5 px-2 py-1.5">
-                    <div className="text-[10px] tracking-wider text-white/50 uppercase">
-                      Peak Combo
-                    </div>
-                    <div
-                      className="font-mono text-white tabular-nums"
-                      style={{ color: comboColor(ui.comboPeak) }}
-                    >
-                      {"\u00d7"}
-                      {ui.comboPeak}
-                    </div>
-                  </div>
-                </div>
-                {ui.bossesDefeatedThisRun > 0 && (
-                  <div className="mt-2 flex items-center justify-center gap-1.5 font-mono text-sm text-red-300">
-                    <span>Bosses Defeated:</span>
-                    <span className="font-bold text-white">{ui.bossesDefeatedThisRun}</span>
-                  </div>
-                )}
-              </motion.div>
-
-              <div className="flex w-full max-w-md items-center gap-2">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value.slice(0, 12))}
-                  placeholder="Pilot name"
-                  maxLength={12}
-                  className="min-h-11 flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-base text-white placeholder-white/40 focus:border-accent-blue focus:outline-none"
-                />
-                <motion.button
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => {
-                    void submit();
-                  }}
-                  disabled={submitted || submitting || rejected}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent-amber px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  {submitted
-                    ? "Submitted"
-                    : rejected
-                      ? "Not accepted"
-                      : submitting
-                        ? "Submitting"
-                        : "Submit"}
-                </motion.button>
-              </div>
-
-              <div className="w-full max-w-md rounded-lg border border-white/15 bg-white/5 p-3 text-sm">
-                <div className="mb-2 text-xs font-bold tracking-widest text-white/60 uppercase">
-                  Top pilots
-                </div>
-                <ArcadeBoardTabs
-                  label="Leaderboard period"
-                  period={boardPeriod}
-                  onChange={setBoardPeriod}
-                  className="mb-2"
-                  activeClassName="border-indigo-400/60 bg-indigo-500/20 text-indigo-300"
-                  inactiveClassName="border-white/15 bg-white/5 text-white/60 hover:text-white"
-                />
-                {leaderboard.length === 0 ? (
-                  <p className="py-2 text-center text-xs text-white/50">
-                    {boardLoading
-                      ? "Loading"
-                      : boardError
-                        ? "Could not load the board"
-                        : boardPeriod === "daily"
-                          ? "No scores yet today"
-                          : boardPeriod === "weekly"
-                            ? "No scores yet this week"
-                            : "No scores yet"}
-                  </p>
-                ) : (
-                  <ol className="space-y-1">
-                    {leaderboard.slice(0, 8).map((e) => (
-                      <li
-                        key={`${e.rank}-${e.name}-${e.createdAt}`}
-                        className={
-                          e.isYou
-                            ? "flex items-center gap-2 font-semibold text-indigo-300"
-                            : "flex items-center gap-2 text-white/85"
-                        }
-                      >
-                        <span className="w-6 text-white/40 tabular-nums">{e.rank}.</span>
-                        <span className="flex-1 truncate">{e.name}</span>
-                        {typeof e.seconds === "number" && (
-                          <span className="text-xs text-white/45 tabular-nums">{e.seconds}s</span>
-                        )}
-                        <span className="font-mono tabular-nums">{e.score}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-                {leaderboardYou && !leaderboard.slice(0, 8).some((e) => e.isYou) && (
-                  <div className="mt-2 text-xs text-white/60">
-                    Your best: #{leaderboardYou.rank} ({leaderboardYou.score})
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-2 px-2 sm:gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={flyAgain}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Fly again
-                </motion.button>
-                {isReturningPlayer && (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShopOpen(true)}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-amber/50 bg-accent-amber/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-amber uppercase sm:px-5 sm:py-2.5 sm:text-sm"
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    Shop
-                  </motion.button>
-                )}
-                {recordingBlob && (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      const url = URL.createObjectURL(recordingBlob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `orbital-dodge-run-${Date.now()}.webm`;
-                      a.click();
-                      setTimeout(() => URL.revokeObjectURL(url), 1000);
-                    }}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-blue-400/50 bg-blue-500/20 px-4 py-2 text-xs font-bold tracking-wider text-blue-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
-                  >
-                    Download Replay
-                  </motion.button>
-                )}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    void (async () => {
-                      const blob = await captureShareImage({
-                        score: ui.score,
-                        distance: ui.distance,
-                        kills: ui.kills,
-                      });
-                      if (!blob) return;
-                      const file = new File([blob], `orbital-dodge-${Date.now()}.png`, {
-                        type: "image/png",
-                      });
-                      await shareRun({
-                        score: ui.score,
-                        file,
-                        nav: navigator,
-                        download: () => {
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = file.name;
-                          a.click();
-                          setTimeout(() => URL.revokeObjectURL(url), 1000);
-                        },
-                      });
-                    })();
-                  }}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-xs font-bold tracking-wider text-emerald-300 uppercase sm:px-5 sm:py-2.5 sm:text-sm"
-                >
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <DeathOverlay
+          ui={ui}
+          panelOpen={panelOpen}
+          celebration={celebration}
+          PERSONAL_CONFETTI={PERSONAL_CONFETTI}
+          WORLD_CONFETTI={WORLD_CONFETTI}
+          goals={goals}
+          prefs={prefs}
+          name={name}
+          setName={setName}
+          submit={submit}
+          submitted={submitted}
+          submitting={submitting}
+          rejected={rejected}
+          boardPeriod={boardPeriod}
+          setBoardPeriod={setBoardPeriod}
+          boardLoading={boardLoading}
+          boardError={boardError}
+          leaderboard={leaderboard}
+          leaderboardYou={leaderboardYou}
+          flyAgain={flyAgain}
+          isReturningPlayer={isReturningPlayer}
+          setShopOpen={setShopOpen}
+          recordingBlob={recordingBlob}
+          captureShareImage={captureShareImage}
+        />
 
         {/* Crash overlay — a game-loop or death-handler throw stopped play;
             reload is the honest recovery (a "retry" that reruns the same
             crashing frame could re-crash). Reuses the death overlay's classes. */}
-        {crashed && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/70 p-4 backdrop-blur-md">
-            <div className="text-center">
-              <div className="text-xs font-bold tracking-[0.3em] text-red-400 uppercase">
-                Game Error
-              </div>
-              <div className="mt-2 text-sm text-white/70">This game hit an error and stopped.</div>
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent-blue/50 bg-accent-blue/20 px-4 py-2 text-xs font-bold tracking-wider text-accent-blue uppercase sm:px-5 sm:py-2.5 sm:text-sm"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reload
-              </button>
-            </div>
-          </div>
-        )}
+        {crashed && <CrashOverlay />}
       </div>
 
       <p className="text-xs text-(--muted)">{SHOOTER_CAPTION}</p>
