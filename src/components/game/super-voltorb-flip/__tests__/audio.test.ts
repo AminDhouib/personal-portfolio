@@ -521,7 +521,7 @@ describe("jingle elements and the iOS unlock", () => {
     expect(el.plays).toBe(2);
   });
 
-  it("disarmJingleUnlock removes the armed gesture listeners, so an unmount leaves none", async () => {
+  it("stopAllCues (the unmount teardown) removes the armed unlock listeners, so none outlive the game", async () => {
     vi.stubGlobal(
       "Audio",
       class extends FakeAudio {
@@ -534,18 +534,18 @@ describe("jingle elements and the iOS unlock", () => {
         }
       },
     );
-    const { playMusic, disarmJingleUnlock } = await load();
+    const { playMusic, stopAllCues } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
     const el = jingleEl("game_over");
     expect(el.plays).toBe(1);
 
-    disarmJingleUnlock();
+    stopAllCues();
     document.dispatchEvent(new Event("pointerdown"));
     await vi.advanceTimersByTimeAsync(0);
     expect(el.plays).toBe(1);
     // Safe to call again, with nothing armed.
-    expect(() => disarmJingleUnlock()).not.toThrow();
+    expect(() => stopAllCues()).not.toThrow();
   });
 
   it("a jingle that took over a pending unlock leaves the element marked unlocked", async () => {
@@ -597,7 +597,7 @@ describe("jingle elements and the iOS unlock", () => {
         }
       },
     );
-    const { playMusic, playLevelWin, stopLevelWin, disarmJingleUnlock } = await load();
+    const { playMusic, playLevelWin, stopLevelWin, stopAllCues } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(0);
     playLevelWin();
@@ -612,7 +612,7 @@ describe("jingle elements and the iOS unlock", () => {
     document.dispatchEvent(new Event("pointerdown"));
     await vi.advanceTimersByTimeAsync(0);
     expect(el.plays).toBe(plays + 1);
-    disarmJingleUnlock();
+    stopAllCues();
   });
 });
 
@@ -848,13 +848,13 @@ describe("loop preload", () => {
         }
       },
     );
-    const { playMusic } = await load();
+    const { playMusic, stopMusic, stopAllCues } = await load();
     playMusic(1);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(fetchMock).not.toHaveBeenCalled();
-    // Let the armed gesture retry run, so no document listener outlives this test.
-    document.dispatchEvent(new Event("pointerdown"));
-    await vi.advanceTimersByTimeAsync(0);
+    // No document listener may outlive this test.
+    stopMusic();
+    stopAllCues();
   });
 
   it("fetches the loop once, after the playing event, not before", async () => {

@@ -46,6 +46,7 @@ import {
   VOLTORB_TILE_SRC,
   crispIconSize,
   explodeFrameCssSize,
+  resetOriginalSpritePreloadForTests,
 } from "../art/original-sprites";
 import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
 
@@ -405,6 +406,7 @@ describe("the hub banner", () => {
         }
       },
     );
+    resetOriginalSpritePreloadForTests();
     const { container } = render(<SuperVoltorbFlipBanner />);
     expect(container.querySelector(ORB_SVG)).toBeNull();
     expect([...new Set(requested)].sort()).toEqual(

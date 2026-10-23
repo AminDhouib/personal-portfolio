@@ -37,6 +37,7 @@ import {
   VOLTORB_TILE_PX,
   VOLTORB_TILE_SRC,
   explodeFrameCssSize,
+  resetOriginalSpritePreloadForTests,
 } from "../art/original-sprites";
 import { BURST_FRAMES } from "../art/fx";
 import { CPU_BOUND_TEST_TIMEOUT_MS } from "@/test/heavy";
@@ -189,6 +190,7 @@ describe("sprite preload", () => {
         }
       },
     );
+    resetOriginalSpritePreloadForTests();
     render(<SuperVoltorbFlipGame />);
     expect([...new Set(requested)].sort()).toEqual(
       [VOLTORB_TILE_SRC, VOLTORB_ICON_SRC, ...EXPLODE_FRAME_SRCS].sort(),
