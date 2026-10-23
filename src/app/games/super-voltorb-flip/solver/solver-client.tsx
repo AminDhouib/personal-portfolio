@@ -71,7 +71,7 @@ export function SolverClient() {
   const [cols, setCols] = useState<ClueBox[]>(emptyClues);
   const [revealed, setRevealed] = useState<Revealed[]>(emptyRevealed);
   const [level, setLevel] = useState<number | null>(null);
-  const fields = useRef(new Map<string, HTMLInputElement>());
+  const grid = useRef<HTMLDivElement>(null);
 
   const input = useMemo<SolverInput | null>(() => {
     const r = parseClues(rows);
@@ -98,18 +98,14 @@ export function SolverClient() {
       const order = kind === "Row" ? index : 5 + index;
       const next = order + 1;
       if (next >= 10) return;
-      const key = `${next < 5 ? "Row" : "Column"} ${(next % 5) + 1} coins`;
-      fields.current.get(key)?.focus();
+      const label = `${next < 5 ? "Row" : "Column"} ${(next % 5) + 1} coins`;
+      grid.current?.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)?.focus();
     }
   };
 
   const clueCell = (kind: Kind, index: number, boxes: ClueBox[]) => {
     const box = boxes[index] ?? EMPTY_CLUE;
     const label = `${kind} ${index + 1}`;
-    const bind = (suffix: string) => (el: HTMLInputElement | null) => {
-      if (el) fields.current.set(`${label} ${suffix}`, el);
-      else fields.current.delete(`${label} ${suffix}`);
-    };
     return (
       <div
         key={`${kind}-${index}`}
@@ -117,7 +113,6 @@ export function SolverClient() {
         style={{ backgroundColor: COLORS[index] }}
       >
         <input
-          ref={bind("coins")}
           className={FIELD}
           inputMode="numeric"
           maxLength={2}
@@ -127,7 +122,6 @@ export function SolverClient() {
           onChange={(e) => setClue(kind, index, "coins", e.target.value)}
         />
         <input
-          ref={bind("Voltorbs")}
           className={FIELD}
           inputMode="numeric"
           maxLength={1}
@@ -247,7 +241,7 @@ export function SolverClient() {
         </button>
       </div>
 
-      <div className="grid grid-cols-6 gap-1.5">
+      <div ref={grid} className="grid grid-cols-6 gap-1.5">
         {Array.from({ length: 5 }, (_, r) => [
           ...Array.from({ length: 5 }, (_, c) => tile(r * 5 + c)),
           clueCell("Row", r, rows),
