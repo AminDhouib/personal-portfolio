@@ -186,8 +186,9 @@ style suggestions.
   (`gh api repos/DevinoSolutions/.github/contents/<path>?ref=<sha>`), copy the changes, update the
   SHA in the headers, in the workflow header and here, and re-pin any new third-party `uses:`. The
   action's `ignore-advisories` input (`GHSA-... | expires=YYYY-MM-DD | reason`, at most 30 days
-  out) is the only way to mute a pnpm-audit advisory in this job; it never applies to the override
-  check. The vendored `.py` files are not covered by the JS gates and are not run in CI here (the
+  out) is not wired in this workflow, so using it means editing the workflow's report step; it
+  never applies to the override check. `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` (the
+  braces GHSA) already applies to both audit jobs. The vendored `.py` files are not covered by the JS gates and are not run in CI here (the
   org repo runs their pytest suite).
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
