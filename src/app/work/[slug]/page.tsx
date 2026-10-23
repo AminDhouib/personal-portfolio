@@ -10,8 +10,12 @@ import { getBlogPost } from "@/lib/blog";
 import { fetchMAU } from "@/lib/ga4";
 import { breadcrumbNode, graph, projectNode, serializeJsonLd } from "@/lib/structured-data";
 
-// ISR: revalidate every 24h so live MAU stays fresh
-export const revalidate = 86400;
+// GA4 credentials exist only at runtime, so a slug prerendered by `next build`
+// would bake mauFallback into the HTML. Nothing is prerendered: each slug
+// renders on its first request with the runtime env, then follows ISR. The
+// hour (the GA4 reading itself is cached for a day, see src/lib/ga4.ts) lets a
+// first render that missed GA4 heal. See DESIGN.md.
+export const revalidate = 3600;
 
 const SITE_ORIGIN = "https://amindhou.com";
 
@@ -48,7 +52,7 @@ const TECH_ICON_MAP: Record<string, string> = {
 };
 
 export function generateStaticParams() {
-  return projects.map((p) => ({ slug: p.slug }));
+  return [];
 }
 
 export async function generateMetadata({

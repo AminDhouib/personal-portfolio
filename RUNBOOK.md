@@ -131,7 +131,25 @@ it; it is flagged for deletion.
    A change with no success-path effect on the homepage does not alter the served markup, so
    trust the uptime reset and the deployment status, never a diff of the HTML.
 
-Do not consider a change shipped until steps 3 and 4 both pass. A push to `main`, a green CI
+5. Warm the live-data pages. The image is built without the GA4 and GitHub credentials, so a fresh
+   container's first `/` response is the build's prerender (fallback figures) and `/work/<slug>`
+   has no prerender at all. Request each once so no visitor pays for it, then check the live data:
+   ```bash
+   for p in / /work/shorty /work/unotes /work/caramel /work/upup /work/getitdone; do
+     curl -s -o /dev/null "https://amindhou.com$p"; done
+   sleep 10
+   curl -s https://amindhou.com/work/unotes | grep -o 'live · last 30 days'
+   curl -s https://amindhou.com/ | grep -o '>live<' | wc -l
+   curl -sI https://amindhou.com/ | grep -i x-nextjs-cache
+   ```
+   The first pass answers `STALE` for `/` (it regenerates in the background) and `MISS` once per
+   `/work/*` page. Afterwards the unotes page carries the live badge, the home Work cards show a
+   `live` marker for each product with a GA4 reading, and `/` answers `HIT`. No badge means GA4
+   returned nothing: look for a `[ga4]` warning in the app log (key or property id missing) or a
+   `ga4.fetchMAU` Sentry event (the call failed). The reading itself is a 24 h cache that starts
+   empty on every deploy.
+
+Do not consider a change shipped until steps 3 to 5 all pass. A push to `main`, a green CI
 run, and a "Deployment queued" reply are each not that.
 
 **Fallback — deploy from the server when the Dokploy API is unavailable** (exercised

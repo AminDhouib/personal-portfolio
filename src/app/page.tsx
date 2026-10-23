@@ -30,8 +30,13 @@ import {
   serializeJsonLd,
 } from "@/lib/structured-data";
 
-// ISR: revalidate every 24h for live MAU + GitHub data
-export const revalidate = 86400;
+// The build prerender has no GA4 or GitHub credentials, so it bakes mauFallback and
+// unauthenticated GitHub data. Five minutes is shorter than the gap between that build and
+// the first request of the container it ships in, so that request serves the baked page and
+// regenerates it in the background with the runtime env. The GA4 reading and the GitHub
+// fetches keep their own 24h caches, so the short clock costs renders, not upstream calls.
+// See DESIGN.md.
+export const revalidate = 300;
 
 const SITE_ORIGIN = "https://amindhou.com";
 

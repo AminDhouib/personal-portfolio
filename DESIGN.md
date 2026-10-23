@@ -1930,6 +1930,31 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   Sentry at sentry.devino.ca (26.10.0, above the 26.4.2 floor the guide names) probably takes
   streamed spans, but that is unconfirmed. Revisit dropping `static` once a streamed span is
   seen ingested, and before the SDK major that removes it.
+- **The MAU routes are not prerendered at build: `/work/[slug]` returns no static params and `/`
+  revalidates every 300 s.** GA4 (`GA4_SERVICE_ACCOUNT_KEY`, `GA4_PROPERTY_*`) and `GITHUB_TOKEN`
+  exist only at runtime (the Dockerfile's builder stage takes the `NEXT_PUBLIC_*` build args and
+  nothing secret enters the image), so a page prerendered by `next build` bakes `mauFallback` and
+  unauthenticated GitHub data: the contribution graph from the public mirror, and repo stars and
+  forks of 0 when the shared-IP rate limit bites. A 24 h `revalidate` never fixed that, because the
+  clock runs from build time and the app redeploys several times a day. `/work/[slug]` therefore
+  has `generateStaticParams() { return [] }` (Next's "all paths at runtime": each slug renders on
+  its first request with the runtime env, then follows ISR; `dynamicParams` stays at its default)
+  and `revalidate = 3600`, so a first render that missed GA4 heals within the hour. Putting the
+  slugs back into `generateStaticParams` re-bakes the fallback. The home page cannot skip its
+  prerender, so it uses `revalidate = 300`: the build's page ages from build time (checked on
+  Next 16.4.2: five minutes after the build it answered `x-nextjs-cache: STALE` once, regenerated
+  in the background, then `HIT`), so a container's first request, or RUNBOOK's post-deploy warm-up,
+  replaces the baked page with one rendered under the runtime env. `revalidate = 0` would avoid the
+  baked page entirely but gives up ISR on the most visited, Lighthouse-gated page. The short clock
+  costs renders, not upstream calls: the GA4 reading is a 24 h `unstable_cache` entry shared by
+  both routes and the GitHub fetches use `next.revalidate = 86400`. The one visitor who can still
+  see the baked home page after a deploy is accepted. `fetchMAU` logs one `[ga4]` warning per
+  cause per process when the key or a property id is missing, never during the build
+  (`isProductionBuild()` in `src/env.ts`). **Accepted, existing design:** the home hero and
+  Experience figures use live readings while `amin-ai-prompt.ts` calls `combinedMonthlyUsers()` with
+  no argument and keeps quoting the fallback-only floor, so the two can differ (live "200K+" against
+  fallback "120K+"). Pinned by `work/__tests__/work-page.test.tsx`, `app/__tests__/page.test.tsx`
+  and `lib/__tests__/ga4.test.ts`.
 
 ## Adversarial standoffs (restated from the audit's final report)
 

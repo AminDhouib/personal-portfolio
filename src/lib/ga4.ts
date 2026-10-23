@@ -1,13 +1,13 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import { unstable_cache } from "next/cache";
-import { captureException } from "@/lib/log";
+import { captureException, logWarn } from "@/lib/log";
 import { safeJsonParseServer } from "@/lib/safe-json-server";
-import { env } from "@/env";
+import { env, isProductionBuild } from "@/env";
 
 // Project slug (matches `slug` in src/data/projects.ts) -> that project's GA4
 // numeric property ID. IDs come only from GA4_PROPERTY_<SLUG> env vars (see
 // src/env), never hard-coded; a slug whose var is unset stays undefined here
-// and fetchMAU/fetchAllMAU report null for it instead of throwing.
+// and fetchMAU/fetchAllMAU report null for it (and warn once) instead of throwing.
 const propertyIds: Record<string, string | undefined> = {
   shorty: env.GA4_PROPERTY_SHORTY,
   unotes: env.GA4_PROPERTY_UNOTES,
@@ -21,6 +21,17 @@ const propertyIds: Record<string, string | undefined> = {
 const GA4_TIMEOUT_MS = 8000;
 
 let _client: BetaAnalyticsDataClient | null = null;
+
+// An unconfigured deployment shows every product's mauFallback, which looks
+// the same as a quiet product. Say so once per cause per process, at runtime
+// only: a build never has the credentials, so warning there would be noise.
+const warnedUnconfigured = new Set<string>();
+
+function warnUnconfigured(cause: string, missing: string): void {
+  if (isProductionBuild() || warnedUnconfigured.has(cause)) return;
+  warnedUnconfigured.add(cause);
+  logWarn("ga4", `${missing} is not set: MAU falls back to the static mauFallback figures`);
+}
 
 function getClient(): BetaAnalyticsDataClient | null {
   const keyJson = env.GA4_SERVICE_ACCOUNT_KEY;
@@ -76,8 +87,16 @@ const cachedActiveUsers = unstable_cache(
 );
 
 export async function fetchMAU(slug: string): Promise<number | null> {
+  if (!Object.hasOwn(propertyIds, slug)) return null;
+  if (!env.GA4_SERVICE_ACCOUNT_KEY) {
+    warnUnconfigured("key", "GA4_SERVICE_ACCOUNT_KEY");
+    return null;
+  }
   const propertyId = propertyIds[slug];
-  if (!propertyId) return null;
+  if (!propertyId) {
+    warnUnconfigured(slug, `GA4_PROPERTY_${slug.toUpperCase()}`);
+    return null;
+  }
   if (!getClient()) return null;
 
   try {
