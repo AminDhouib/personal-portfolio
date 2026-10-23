@@ -37,3 +37,11 @@ export function seededFlipDelay(r: number, c: number, flipCycleS: number): numbe
 export function randomFlipDelay(flipCycleS: number, rng: Rng = Math.random): number {
   return rng() * (flipCycleS - 1.5);
 }
+
+export type CellRoll = { flipDelay: number; value: number | "bomb" };
+
+/** The post-mount roll for one cell: its random flip delay, then its random face. */
+export function rollCell(flipCycleS: number, rng: Rng = Math.random): CellRoll {
+  const flipDelay = randomFlipDelay(flipCycleS, rng);
+  return { flipDelay, value: pickCellValue(rng) };
+}
