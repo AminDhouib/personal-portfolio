@@ -61,7 +61,10 @@ export function getAllBlogPosts(): BlogPostMeta[] {
   return getAllBlogSlugs()
     .map((slug) => getBlogPost(slug))
     .filter((p): p is BlogPost => p !== null)
-    .map(({ content: _, ...meta }) => meta)
+    .map((post): BlogPostMeta => {
+      const { content: _content, ...meta } = post;
+      return meta;
+    })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
