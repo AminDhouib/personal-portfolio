@@ -33,7 +33,7 @@
     "@copilotkit/react-core": "^1.79.1",
     "@copilotkit/react-ui": "^1.79.1",
     "@copilotkit/runtime": "^1.79.1",
-    "@google-analytics/data": "^6.1.0",
+    "@google-analytics/data": "^7.3.0",
     "@lezer/highlight": "^1.2.5",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.1",
