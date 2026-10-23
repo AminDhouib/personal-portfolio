@@ -88,6 +88,15 @@ export const REQUIRED_ENV_VARS = [
   "GA4_PROPERTY_GETITDONE",
 ] as const;
 
+/**
+ * True while `next build` runs, prerendering included. The runtime-only
+ * secrets (GA4, GitHub) are absent then, so a module that logs "not
+ * configured" must stay quiet here.
+ */
+export function isProductionBuild(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
 // The ONLY bypass is this exact name=value pair. It is long and unpleasant on
 // purpose: booting without required env is a decision someone must own, not a
 // `SKIP_ENV=1` reflex. Simple boolean-ish values ("true", "1", "yes") are
