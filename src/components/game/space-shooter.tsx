@@ -72,7 +72,6 @@ import { shareRun } from "./space-shooter/share";
 import { CountdownOverlay } from "./space-shooter/countdown-overlay";
 import { useCountdown } from "./space-shooter/use-countdown";
 import { canvasLayout, SHOOTER_CAPTION, type CanvasVariant } from "./space-shooter/canvas-layout";
-import { safeJsonParse } from "@/lib/safe-json";
 import { safeLocalSet } from "@/lib/safe-storage";
 import { gameCrashToReport } from "@/lib/report-game-error";
 import { ArcadeBoardTabs } from "@/components/game/arcade-board-tabs";
@@ -84,44 +83,16 @@ import { createRefs, startRun, pauseRun, resumeRun, resetToArmed } from "./space
 import { Scene } from "./space-shooter/scene-components";
 import { keyboardStep, orbitalKeyDecision, shouldCaptureTouch } from "./space-shooter/input";
 import { isTextEntryTarget } from "./text-entry";
-
-// ---------- constants ----------
-
-const HS_KEY = "space-shooter-hs";
-const NAME_KEY = "space-shooter-name";
-const SOUND_KEY = "space-shooter-sound";
-
-// ---------- UI helpers ----------
-
-function SettingsToggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-4 text-sm text-slate-200">
-      <span>{label}</span>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className="flex h-11 w-14 shrink-0 items-center justify-center"
-        aria-pressed={checked}
-      >
-        <span
-          className={`relative block h-6 w-10 rounded-full transition ${checked ? "bg-emerald-500" : "bg-slate-600"}`}
-        >
-          <span
-            className={`absolute top-0.5 left-0 block h-5 w-5 rounded-full bg-white transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}
-          />
-        </span>
-      </button>
-    </label>
-  );
-}
+import { SettingsToggle } from "./space-shooter/settings-toggle";
+import {
+  HS_KEY,
+  NAME_KEY,
+  SOUND_KEY,
+  loadInitialPrefs,
+  detectGyroSupported,
+  type SpaceShooterPrefs,
+} from "./space-shooter/prefs";
+import { renderShareImage } from "./space-shooter/share-image";
 
 // ---------- leaderboard helpers ----------
 // The board is read and written through useArcadeBoard("space-shooter") (leaderboard v2):
@@ -131,50 +102,6 @@ function SettingsToggle({
 // ---------- main component ----------
 
 type CelebrationKind = "first" | "personal" | "world" | null;
-
-const DEFAULT_SPACE_SHOOTER_PREFS = {
-  reducedMotion: false,
-  gyroEnabled: false,
-  bloomEnabled: true,
-  musicEnabled: true,
-  sfxEnabled: true,
-};
-
-type SpaceShooterPrefs = typeof DEFAULT_SPACE_SHOOTER_PREFS;
-
-function loadInitialPrefs(): SpaceShooterPrefs {
-  const prefs: SpaceShooterPrefs = { ...DEFAULT_SPACE_SHOOTER_PREFS };
-
-  try {
-    const profile = loadProfile();
-    if (profile.preferences) {
-      return { ...prefs, ...profile.preferences };
-    }
-
-    if (typeof window !== "undefined") {
-      const raw = window.localStorage.getItem("orbital-dodge-prefs");
-      if (raw) {
-        const parsed = safeJsonParse<Partial<SpaceShooterPrefs>>(raw, "space-shooter:prefs");
-        if (parsed) return { ...prefs, ...parsed };
-        return prefs;
-      }
-
-      const osReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      if (osReduced) return { ...prefs, reducedMotion: true };
-    }
-  } catch {
-    // silent-ok: best-effort profile/localStorage read; fall back to default prefs
-  }
-
-  return prefs;
-}
-
-function detectGyroSupported() {
-  if (typeof window === "undefined") return false;
-  const hasOrientation = "DeviceOrientationEvent" in window;
-  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  return hasOrientation && isMobile;
-}
 
 export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVariant } = {}) {
   const gameRefs = useRef<GameRefs>(createRefs());
@@ -314,29 +241,7 @@ export function SpaceShooterGame({ variant = "embed" }: { variant?: CanvasVarian
       // document is the background scene.
       const canvas = containerRef.current?.querySelector("canvas") ?? null;
       if (!canvas) return null;
-      const w = 1200,
-        h = 630;
-      const outCanvas = document.createElement("canvas");
-      outCanvas.width = w;
-      outCanvas.height = h;
-      const ctx = outCanvas.getContext("2d");
-      if (!ctx) return null;
-      ctx.drawImage(canvas, 0, 0, w, h);
-      ctx.fillStyle = "rgba(0,0,0,0.5)";
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 64px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("ORBITAL DODGE", w / 2, 120);
-      ctx.font = "36px system-ui";
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillText(`Score: ${stats.score.toLocaleString()}`, w / 2, 280);
-      ctx.fillText(`Distance: ${stats.distance}m`, w / 2, 340);
-      ctx.fillText(`Kills: ${stats.kills}`, w / 2, 400);
-      ctx.font = "20px system-ui";
-      ctx.fillStyle = "#64748b";
-      ctx.fillText("amindhou.com/games/space-shooter", w / 2, 580);
-      return new Promise((resolve) => outCanvas.toBlob((b) => resolve(b), "image/png"));
+      return renderShareImage(canvas, stats);
     },
     [],
   );
