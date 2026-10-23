@@ -353,6 +353,8 @@ export const Gameboard = ({
     toggleMemoAt(activeCursor.row, activeCursor.col, flag);
   }
 
+  const N = game.cells.length;
+
   const flipCardsUp = useCallback(() => {
     // HG/SS plays the panel-flip SE once at the start of RevealBoard_Main
     // (voltorb_flip.c:1077) — covers the win/lose whole-board reveal.
@@ -367,13 +369,11 @@ export const Gameboard = ({
 
   const flipCardsDown = useCallback(
     (delay = 1500, onStart?: () => void) => {
-      const columns = [
-        [0, 5, 10, 15, 20],
-        [1, 6, 11, 16, 21],
-        [2, 7, 12, 17, 22],
-        [3, 8, 13, 18, 23],
-        [4, 9, 14, 19, 24],
-      ];
+      // Column c of an N-wide board is every index with index % N === c (`?size=N` and the
+      // debug panel make boards 2 to 10 wide).
+      const columns = Array.from({ length: N }, (_, col) =>
+        Array.from({ length: N }, (_, row) => row * N + col),
+      );
 
       later(() => {
         // Fire onStart at the exact frame the first column begins flipping
@@ -381,13 +381,13 @@ export const Gameboard = ({
         onStart?.();
         setFlipDownStarted(true);
         let stagger = 0;
-        for (let col = 0; col < 5; col++) {
+        for (let col = 0; col < N; col++) {
           later(() => {
             // PANERU_MEKURU once per column (not per card) — the cards in
             // a column flip together, so a single SE matches the visual.
             if (!muted) void sfx.flip();
             const activeColumn = columns[col];
-            if (!activeColumn) return; // provably never fires: col < 5 === columns.length
+            if (!activeColumn) return; // provably never fires: col < N === columns.length
             setCardsFlipped((prev) =>
               prev.map((card, index) =>
                 activeColumn.includes(index) ? { isFlipped: false } : card,
@@ -402,7 +402,7 @@ export const Gameboard = ({
         }, stagger + 200);
       }, delay);
     },
-    [updateGame, muted, later],
+    [updateGame, muted, later, N],
   );
 
   useEffect(() => {
@@ -469,8 +469,6 @@ export const Gameboard = ({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameStatus]);
-
-  const N = game.cells.length;
 
   return (
     // The board plus the result slot under it; a tap anywhere here continues
