@@ -9,7 +9,6 @@ import { DailyPanel } from "./daily-panel";
 import { useDailyRound } from "./use-daily-round";
 import type { DailyOutcome } from "./daily-store";
 import { Gameboard } from "./gameboard";
-import { Footer } from "./footer";
 
 /**
  * The Daily screen. It renders three grid children (header and memo bar, board,
@@ -127,7 +126,6 @@ export function DailyGame({
             onFinished: () => {},
           }}
         />
-        <Footer />
       </div>
       <div className="order-3 w-full lg:col-start-1 lg:row-start-2 lg:w-[360px]">
         <DailyPanel

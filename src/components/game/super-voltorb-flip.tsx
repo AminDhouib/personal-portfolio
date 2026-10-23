@@ -67,17 +67,9 @@ import {
 } from "./super-voltorb-flip/chrome";
 import { DailyGame } from "./super-voltorb-flip/daily-game";
 import { DebugPanel } from "./super-voltorb-flip/debug-panel";
-import { Footer } from "./super-voltorb-flip/footer";
 import { Gameboard } from "./super-voltorb-flip/gameboard";
 import { InstructionsModal } from "./super-voltorb-flip/instructions-modal";
 import { Scoreboard } from "./super-voltorb-flip/scoreboard";
-
-// ---------------------------------------------------------------------------
-// src/components/Settings.tsx (1:1 port).
-// ---------------------------------------------------------------------------
-
-// Settings panel (upstream's "wait for click" toggle) removed — upstream's
-// default behavior is always-on in this portfolio build.
 
 // ---------------------------------------------------------------------------
 // Exported root component — mirrors upstream src/pages/index.tsx layout, but
@@ -603,7 +595,6 @@ export function SuperVoltorbFlipGame() {
                     odds={odds}
                     isAssisted={() => assistedRoundRef.current}
                   />
-                  <Footer />
                 </>
               )}
             </div>
