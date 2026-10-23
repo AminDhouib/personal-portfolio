@@ -35,13 +35,22 @@ const nextConfig: NextConfig = {
   // Sentry's diagnostics-channel injection hook is loaded at runtime from a path the file tracer
   // copies as an asset, so the standalone output gets build/esm/hook.js without the vendored files
   // it imports, and boot logs "Failed to register diagnostics-channel injection hooks" (no pg or AI
-  // spans). Upstream: getsentry/sentry-javascript#25480 (the includes workaround); drop this once
-  // Sentry traces build/esm itself. The pnpm store path is the one the package resolves to, with the
-  // version wildcarded so a bump keeps matching; withSentryConfig leaves this key alone.
+  // spans). Upstream: getsentry/sentry-javascript#25480 (the includes workaround); drop this whole
+  // block once Sentry traces the hook's imports itself. The pnpm store paths are the ones the
+  // packages resolve to, with the version wildcarded so a bump keeps matching; withSentryConfig
+  // leaves this key alone. Everything here is the hook's ESM import closure:
+  // server-runtime-injection is the hook itself, @sentry/core is imported by its debug.js and
+  // hook.js, @sentry/server-utils supplies the orchestrion instrumentation config, and
+  // @sentry/conventions is the attribute names @sentry/core imports.
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/.pnpm/@sentry+server-runtime-injection@*/node_modules/@sentry/server-runtime-injection/build/esm/**/*.js",
       "./node_modules/.pnpm/@sentry+server-runtime-injection@*/node_modules/@sentry/server-runtime-injection/build/esm/package.json",
+      "./node_modules/.pnpm/@sentry+core@*/node_modules/@sentry/core/build/esm/**/*.js",
+      "./node_modules/.pnpm/@sentry+core@*/node_modules/@sentry/core/build/esm/package.json",
+      "./node_modules/.pnpm/@sentry+server-utils@*/node_modules/@sentry/server-utils/build/esm/orchestrion/config/*.js",
+      "./node_modules/.pnpm/@sentry+server-utils@*/node_modules/@sentry/server-utils/build/esm/package.json",
+      "./node_modules/.pnpm/@sentry+conventions@*/node_modules/@sentry/conventions/dist/{index,attributes,op}.mjs",
     ],
   },
   // First-party PostHog path: the browser SDK posts to a same-origin path and these rules
