@@ -1,7 +1,7 @@
-# Exact version + digest: CI resolves Node from .nvmrc (22.23.1) and this base
+# Exact version + digest: CI resolves Node from .nvmrc (22.23.3) and this base
 # must match it; the digest pins the image content so a re-tagged upstream
-# cannot silently change what prod runs. Dependabot does not bump digests in
-# Dockerfiles -- update version + digest together when bumping .nvmrc.
+# cannot silently change what prod runs. Dependabot bumps the tag and digest
+# together but not .nvmrc, so its node PRs need .nvmrc moved by hand.
 FROM node:22.23.3-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS base
 
 # --- Dependencies ---
