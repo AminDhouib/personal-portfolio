@@ -1,0 +1,6 @@
+BEFORE baseline, prod a5387668 (pre-split), 2026-10-23 ~05:42Z. next 16.4.2. Headed Chrome, 1440x900 window, no session. Same blocking as T-6765 (score/leaderboard URLs blocked; no POST).
+Page: /games/super-voltorb-flip. Hook installed before navigation; counted from the page load of this route.
+Result: 0 errors, 0 warnings across: fresh board, 3 safe flips, memo mode, How to play dialog, Daily tab.
+Played: Level 1 main game. Row 1 had a clue of 0 Voltorbs, so I flipped Row 1 Col 1/2/3 (revealed 1, 2, 1), no level end. Memo: set memo 2 on Row 3 Col 4 and memo V on Row 4 Col 4 (face down). Opened the instructions dialog, closed it, opened the Daily tab (view only, no tile flipped there).
+Oddity: the Daily panel shows "Board unavailable right now." because I blocked the daily GET (/api/arcade/scores?game=super-voltorb-flip&board=daily, status 0). Expect the AFTER run to show the real daily state unless blocked the same way; to compare like for like, block the same URLs.
+Files: before-board.png, before-flipped.png, before-memo.png, before-instructions.png, before-daily.png.
