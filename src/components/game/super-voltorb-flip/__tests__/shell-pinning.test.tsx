@@ -190,9 +190,13 @@ describe("svf:progress save and restore", () => {
   });
 
   it("ignores an unreadable save and overwrites it with the defaults", () => {
+    // safeJsonParse reports the bad text to the console; that report is expected here.
+    const reported = vi.spyOn(console, "error").mockImplementation(() => {});
     window.localStorage.setItem("svf:progress", "not json {");
     render(<SuperVoltorbFlipGame />);
     expect(savedProgress()).toMatchObject({ currentLevel: 1, totalScore: 0 });
+    expect(reported).toHaveBeenCalled();
+    reported.mockRestore();
   });
 
   it("saves a won round: the new total, the next level and the round in the history", async () => {
