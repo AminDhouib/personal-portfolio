@@ -188,6 +188,18 @@ test("/work links every project page, and each carries CreativeWork and breadcru
   }
 });
 
+test("every project page server-renders its monthly-active-users line", async ({ request }) => {
+  const projectUrls = (await sitemapUrls(request)).filter((url) =>
+    pathOf(url).startsWith("/work/"),
+  );
+  expect(projectUrls.length).toBeGreaterThan(0);
+  for (const url of projectUrls) {
+    const response = await request.get(pathOf(url));
+    expect.soft(response.status(), url).toBe(200);
+    expect.soft(await response.text(), url).toMatch(/monthly active users/);
+  }
+});
+
 test("blog posts carry BlogPosting markup with a working image and a known author", async ({
   page,
   request,

@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const runReport = vi.fn();
 const captureException = vi.fn();
+const logWarn = vi.fn();
 const cacheOptions: Array<{ keyParts: string[]; options: unknown }> = [];
 
 vi.mock("@google-analytics/data", () => ({
@@ -15,7 +16,7 @@ vi.mock("@google-analytics/data", () => ({
   }),
 }));
 
-vi.mock("@/lib/log", () => ({ captureException }));
+vi.mock("@/lib/log", () => ({ captureException, logWarn }));
 
 // Stand-in for Next's data cache with the two properties the fix relies on:
 // one entry per argument list, and a rejected call is never stored.
@@ -57,6 +58,7 @@ describe("fetchMAU with GA4 configured", () => {
     vi.stubEnv("GA4_PROPERTY_SHORTY", "222");
     runReport.mockReset();
     captureException.mockReset();
+    logWarn.mockReset();
   });
 
   afterEach(() => {
@@ -83,6 +85,13 @@ describe("fetchMAU with GA4 configured", () => {
       ([req]) => (req as { property: string }).property === "properties/111",
     );
     expect(unotesCalls).toHaveLength(1);
+  });
+
+  it("does not warn about missing configuration when the key and property id are set", async () => {
+    const { fetchMAU } = await loadGa4();
+    runReport.mockResolvedValue(reportWith("192100"));
+    await fetchMAU("unotes");
+    expect(logWarn).not.toHaveBeenCalled();
   });
 
   it("reports a failed call, returns null, and retries it next time instead of caching it", async () => {
