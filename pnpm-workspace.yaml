@@ -64,3 +64,13 @@ overrides:
   # puppeteer.connect({browserURL}) only, in its navigation runner, and never launches or
   # downloads a browser through puppeteer.
   "lighthouse>puppeteer-core": "25.13.0"
+
+# The one documented exception to `pnpm audit --audit-level=high` (the CI dependency-audit
+# job). GHSA-vfj7-8cjw-p6xm (high): braces <=3.0.3 stack exhaustion on deeply nested
+# patterns, no patched release exists. Dev only: it is reached through
+# eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces, which
+# globs this repo's own patterns, never untrusted input. Drop this entry when a patched
+# braces ships.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm
