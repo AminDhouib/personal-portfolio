@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useEffect, useState } from "react";
+import { useId, useRef, useEffect, useState, useSyncExternalStore } from "react";
 import {
   Volume2,
   VolumeX,
@@ -88,6 +88,12 @@ function formatRunTime(elapsedMs: number): string {
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════
 
+// Touch is read from the browser once the game is on the page; the server and the hydrating
+// render answer no, so the markup matches.
+const subscribeNever = () => () => {};
+const readIsTouchDevice = () => "ontouchstart" in window || navigator.maxTouchPoints > 0;
+const serverIsTouchDevice = () => false;
+
 export function HextrisGame() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -131,11 +137,15 @@ export function HextrisGame() {
     }
   });
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const isTouchDevice = useSyncExternalStore(
+    subscribeNever,
+    readIsTouchDevice,
+    serverIsTouchDevice,
+  );
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Fallback "fixed inset-0" fullscreen for mobile where the native API is flaky (iOS Safari).
   const [mobileImmersive, setMobileImmersive] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
   // The one-time Panic Clear tip, shown above the button the first time the meter fills.
   const [panicTip, setPanicTip] = useState(false);
   // The player has gone AFK_AFTER_MS without input, so clears score nothing (spec 6.9).
@@ -174,9 +184,24 @@ export function HextrisGame() {
     "idle" | "submitting" | "submitted" | "failed" | "rejected"
   >("idle");
 
+  // Starting a run shows the tutorial and clears the last run's sheet state (rank, submit button,
+  // collapsed strip, share note); leaving a run hides the tutorial. Adjusted while rendering, so
+  // the new run's first frame already has it.
+  const [seenUiState, setSeenUiState] = useState(uiState);
+  if (seenUiState !== uiState) {
+    setSeenUiState(uiState);
+    setShowTutorial(uiState === "playing");
+    if (uiState === "playing") {
+      setRank(null);
+      setSubmitState("idle");
+      setSheetHidden(false);
+      setShareNote(null);
+    }
+  }
+
   // Sound manager — created once per component lifetime
   const soundsRef = useRef<HextrisSounds | null>(null);
-  if (!soundsRef.current) soundsRef.current = new HextrisSounds();
+  if (soundsRef.current == null) soundsRef.current = new HextrisSounds();
 
   const restartRef = useRef<() => void>(() => {});
   const pauseRef = useRef<() => void>(() => {});
@@ -187,13 +212,6 @@ export function HextrisGame() {
     soundsRef.current!.setEnabled(soundEnabled);
     safeLocalSet("hextris_sound", soundEnabled ? "on" : "off");
   }, [soundEnabled]);
-
-  // Detect device type once on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const touch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-    setIsTouchDevice(touch);
-  }, []);
 
   // Fullscreen API wiring
   useEffect(() => {
@@ -311,15 +329,11 @@ export function HextrisGame() {
     setShowTutorial(false);
   }
 
-  // Show tutorial DURING the first few seconds of gameplay (the first block
-  // is mostly cosmetic anyway — perfect teaching moment). Hide on menu / pause /
-  // gameover. Auto-fades after ~6s; user can also tap to dismiss earlier.
+  // The tutorial shows DURING the first few seconds of gameplay (the first block
+  // is mostly cosmetic anyway — perfect teaching moment); it is shown and hidden
+  // with the run state above. Auto-fades after ~6s; user can also tap to dismiss earlier.
   useEffect(() => {
-    if (uiState !== "playing") {
-      setShowTutorial(false);
-      return;
-    }
-    setShowTutorial(true);
+    if (uiState !== "playing") return;
     const t = window.setTimeout(() => setShowTutorial(false), 6500);
     return () => window.clearTimeout(t);
   }, [uiState]);
@@ -374,12 +388,6 @@ export function HextrisGame() {
       // score once. Space, Enter and R still restart from it after the lockout.
       sheetRef.current?.focus({ preventScroll: true });
       void refreshLeaderboard();
-    }
-    if (uiState === "playing") {
-      setRank(null);
-      setSubmitState("idle");
-      setSheetHidden(false);
-      setShareNote(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiState]);
