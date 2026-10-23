@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 // Relative, not the `@/` alias: Next's own config loader reads this file before any tsconfig
 // path mapping is in play.
 import { posthogProxyHeaders, posthogProxyRewrites } from "./src/lib/posthog-proxy";
