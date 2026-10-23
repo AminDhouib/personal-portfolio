@@ -13,7 +13,7 @@ const audio = vi.hoisted(() => ({
   stop: vi.fn(),
   close: vi.fn(),
 }));
-vi.mock("../audio", () => ({ createKnightAudio: () => audio }));
+vi.mock("../audio", () => ({ createKnightAudio: () => audio, readMuted: () => false }));
 
 beforeEach(() => {
   localStorage.clear();
