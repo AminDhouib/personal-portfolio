@@ -7,6 +7,9 @@ ignoredBuiltDependencies:
 # one. Drop an entry once the parent ships the fix itself (pnpm audit without the entry
 # stays clean).
 overrides:
+  # GHSA-cg2g-xh64-v4q7 (critical), GHSA-mrv2-3pqr-j5jr (high). DOMPurify <=3.4.16 (transitive,
+  # the lock resolved 3.4.16); 3.4.17 is the first fixed release, same major.
+  "dompurify@<3.4.17": "^3.4.17"
   # GHSA-866g-f22w-33x8 (low). @ai-sdk/google-vertex 3.0.x (via @copilotkit/runtime) pins
   # 3.0.23. 3.0.30 is the newest fixed 3.0.x without undici ^5, whose 5.x line has
   # advisories that are only fixed in 6.x.
