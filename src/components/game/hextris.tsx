@@ -201,7 +201,7 @@ export function HextrisGame() {
 
   // Sound manager — created once per component lifetime
   const soundsRef = useRef<HextrisSounds | null>(null);
-  if (soundsRef.current == null) soundsRef.current = new HextrisSounds();
+  if (soundsRef.current === null) soundsRef.current = new HextrisSounds();
 
   const restartRef = useRef<() => void>(() => {});
   const pauseRef = useRef<() => void>(() => {});
