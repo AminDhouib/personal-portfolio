@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import posthog from "posthog-js";
 import { isLoopbackHost } from "@/lib/loopback-host";
+import { SENTRY_DATA_COLLECTION, SENTRY_TRACE_LIFECYCLE } from "@/lib/sentry-options";
 import { POSTHOG_PROXY_PATH, posthogUpstreamHost } from "@/lib/posthog-proxy";
 
 // A DSN is a public identifier, not a secret — it ships in every browser
@@ -34,6 +35,8 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   environment: process.env.NODE_ENV,
+  traceLifecycle: SENTRY_TRACE_LIFECYCLE,
+  dataCollection: SENTRY_DATA_COLLECTION,
 });
 
 // Replay stays out of the first-load bundle: the dynamic import puts the recorder in its own

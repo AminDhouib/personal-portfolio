@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POSTHOG_PROXY_PATH } from "@/lib/posthog-proxy";
+import { SENTRY_DATA_COLLECTION, SENTRY_TRACE_LIFECYCLE } from "@/lib/sentry-options";
 
 // Pins the browser-side monitoring wiring: Sentry's replay sampling and masking, the lazy add
 // of the replay integration, and PostHog's recording masks. The tunnel's own behavior lives in
@@ -65,6 +66,13 @@ describe("instrumentation-client replay wiring", () => {
     expect(options.replaysSessionSampleRate).toBe(0.1);
     expect(options.replaysOnErrorSampleRate).toBe(1.0);
     expect(options.tunnel).toBe("/monitoring");
+  });
+
+  it("holds the v10 data collection and trace lifecycle", async () => {
+    await loadClientInit();
+    const options = sentryInit.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(options.dataCollection).toEqual(SENTRY_DATA_COLLECTION);
+    expect(options.traceLifecycle).toBe(SENTRY_TRACE_LIFECYCLE);
   });
 
   it("does not put the replay integration in init, and waits for a first interaction", async () => {
