@@ -59,11 +59,12 @@ function getClient(): BetaAnalyticsDataClient | null {
 }
 
 // A GA4 activeUsers reading is shared by every page that shows it. The home
-// page's Work cards and /work/<slug> are each ISR-cached on their own 24h
-// clock; when each fetched GA4 itself, the two regenerated at different
-// moments and showed different figures for the same product side by side
-// (192.1K on the home card vs 189.2K on /work/unotes). One data-cache entry
-// per property, revalidated daily like the pages, keeps them on one reading.
+// page's Work cards (ISR, 300s) and /work/<slug> (ISR, 3600s) regenerate on
+// their own clocks; when each fetched GA4 itself, the two regenerated at
+// different moments and showed different figures for the same product side by
+// side (192.1K on the home card vs 189.2K on /work/unotes). One data-cache
+// entry per property, kept for 24h whatever the page clocks, keeps them on
+// one reading and keeps the short page clocks from costing GA4 calls.
 // A failed call throws instead of returning, which unstable_cache does not
 // store, so a GA4 outage is retried on the next render rather than pinned for
 // a day; fetchMAU reports it and returns null.

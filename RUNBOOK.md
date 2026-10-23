@@ -131,23 +131,28 @@ it; it is flagged for deletion.
    A change with no success-path effect on the homepage does not alter the served markup, so
    trust the uptime reset and the deployment status, never a diff of the HTML.
 
-5. Warm the live-data pages. The image is built without the GA4 and GitHub credentials, so a fresh
-   container's first `/` response is the build's prerender (fallback figures) and `/work/<slug>`
-   has no prerender at all. Request each once so no visitor pays for it, then check the live data:
+5. Warm the live-data pages. The image is built without the GA4 and GitHub credentials, so the
+   build's prerender of `/` carries fallback figures and `/work/<slug>` has no prerender at all.
+   The `/work` pages need no wait: each answers `MISS` once, then `HIT`. `/` only regenerates
+   once the build-time page is more than 300 s old, and the build takes about 3 minutes, so wait
+   until 300 s after the build finished (its `age` header, or the deployment's finish time) before
+   the first request. Inside that window it answers `HIT` on the baked fallback, which is not a GA4
+   fault. Then:
    ```bash
-   for p in / /work/shorty /work/unotes /work/caramel /work/upup /work/getitdone; do
+   for p in /work/shorty /work/unotes /work/caramel /work/upup /work/getitdone; do
      curl -s -o /dev/null "https://amindhou.com$p"; done
-   sleep 10
+   curl -sI https://amindhou.com/ | grep -i x-nextjs-cache   # STALE: regeneration started
+   sleep 5
+   curl -sI https://amindhou.com/ | grep -i x-nextjs-cache   # HIT: the regenerated page
    curl -s https://amindhou.com/work/unotes | grep -o 'live · last 30 days'
    curl -s https://amindhou.com/ | grep -o '>live<' | wc -l
-   curl -sI https://amindhou.com/ | grep -i x-nextjs-cache
    ```
-   The first pass answers `STALE` for `/` (it regenerates in the background) and `MISS` once per
-   `/work/*` page. Afterwards the unotes page carries the live badge, the home Work cards show a
-   `live` marker for each product with a GA4 reading, and `/` answers `HIT`. No badge means GA4
-   returned nothing: look for a `[ga4]` warning in the app log (key or property id missing) or a
-   `ga4.fetchMAU` Sentry event (the call failed). The reading itself is a 24 h cache that starts
-   empty on every deploy.
+   Read `x-nextjs-cache` before blaming GA4: a `HIT` on the first `/` request means the window had
+   not elapsed, so wait and repeat. Once `/` has gone `STALE` then `HIT`, the unotes page should
+   carry the live badge and the home Work cards a `live` marker for each product with a GA4
+   reading. Only if they do not, look for a `[ga4]` warning in the app log (key or property id
+   missing) or a `ga4.fetchMAU` Sentry event (the call failed). The reading itself is a 24 h cache
+   that starts empty on every deploy.
 
 Do not consider a change shipped until steps 3 to 5 all pass. A push to `main`, a green CI
 run, and a "Deployment queued" reply are each not that.
