@@ -548,6 +548,38 @@ describe("jingle elements and the iOS unlock", () => {
     expect(() => stopAllCues()).not.toThrow();
   });
 
+  it("a remount after the unmount teardown re-arms the unlock, and a gesture unlocks the jingles", async () => {
+    let blocked = true;
+    vi.stubGlobal(
+      "Audio",
+      class extends FakeAudio {
+        override play() {
+          if (blocked && this.origSrc.includes("game_over")) {
+            this.plays += 1;
+            return Promise.reject(new DOMException("blocked", "NotAllowedError"));
+          }
+          return super.play();
+        }
+      },
+    );
+    const { playMusic, stopMusic, stopAllCues } = await load();
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    stopMusic();
+    stopAllCues();
+    const el = jingleEl("game_over");
+    const before = el.plays;
+    // Still blocked on remount: the attempt re-arms the listeners.
+    playMusic(1);
+    await vi.advanceTimersByTimeAsync(0);
+    blocked = false;
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(el.plays).toBeGreaterThan(before + 1);
+    expect(el.paused).toBe(true);
+    stopAllCues();
+  });
+
   it("a jingle that took over a pending unlock leaves the element marked unlocked", async () => {
     const releases: (() => void)[] = [];
     vi.stubGlobal(
