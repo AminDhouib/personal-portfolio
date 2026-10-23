@@ -130,11 +130,13 @@ function playCue(name: CueName): Promise<void> {
 }
 
 /**
- * Silence every one-shot cue still sounding and drop its end timer. A cancelled
+ * The game's teardown for cues and gesture listeners: silence every one-shot cue still sounding,
+ * drop its end timer and remove the armed jingle-unlock listeners. A cancelled
  * cue's promise never resolves: its only awaiter is the component being torn
  * down, and resolving it would release a lock on a board nobody sees.
  */
 export function stopAllCues(): void {
+  disarmUnlockListeners?.();
   if (typeof window === "undefined") return;
   for (const live of liveCues) {
     window.clearTimeout(live.timer);
@@ -222,11 +224,6 @@ function armJingleUnlock(): void {
   }
   for (const name of events) document.addEventListener(name, onGesture, true);
   disarmUnlockListeners = disarm;
-}
-
-/** Remove the armed jingle-unlock gesture listeners, if any (the game unmounting). */
-export function disarmJingleUnlock(): void {
-  disarmUnlockListeners?.();
 }
 
 function unlockJingle(el: HTMLAudioElement, isRetry = false): void {

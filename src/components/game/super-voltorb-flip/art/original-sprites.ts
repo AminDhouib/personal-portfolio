@@ -44,6 +44,12 @@ export function preloadOriginalSprites(): void {
   }
 }
 
+/** Test seam: forget that the sprites were preloaded, so a test can mount the game again. */
+export function resetOriginalSpritePreloadForTests(): void {
+  preloadStarted = false;
+  preloaded.length = 0;
+}
+
 /** Native size (px, square) of the bare Voltorb icon. */
 export const VOLTORB_ICON_PX = 16;
 
