@@ -12,3 +12,7 @@ pnpm-lock.yaml
 next-env.d.ts
 *.tsbuildinfo
 public/
+
+# Vendored verbatim from DevinoSolutions/.github (see DESIGN.md "Security audit gate"); kept
+# as the source wrote it (plus the provenance header and one SHA pin) so a resync is a plain diff.
+.github/actions/security-audit/action.yml
