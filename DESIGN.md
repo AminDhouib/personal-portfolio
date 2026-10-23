@@ -1943,8 +1943,9 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   slugs back into `generateStaticParams` re-bakes the fallback. The home page cannot skip its
   prerender, so it uses `revalidate = 300`: the build's page ages from build time (checked on
   Next 16.4.2: five minutes after the build it answered `x-nextjs-cache: STALE` once, regenerated
-  in the background, then `HIT`), so a container's first request, or RUNBOOK's post-deploy warm-up,
-  replaces the baked page with one rendered under the runtime env. `revalidate = 0` would avoid the
+  in the background, then `HIT`), so once the build-time page is more than 300 s old, a container's first
+  request, or RUNBOOK's post-deploy warm-up, replaces it with one rendered under the runtime env
+  (a warm-up inside that window gets a `HIT` on the baked page). `revalidate = 0` would avoid the
   baked page entirely but gives up ISR on the most visited, Lighthouse-gated page. The short clock
   costs renders, not upstream calls: the GA4 reading is a 24 h `unstable_cache` entry shared by
   both routes and the GitHub fetches use `next.revalidate = 86400`. The one visitor who can still
