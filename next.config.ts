@@ -66,8 +66,8 @@ const nextConfig: NextConfig = {
       },
       {
         // The Super Voltorb Flip music and jingles (1.4 MB loop). Plain files in public/ with
-        // stable names, so a replaced recording must still reach returning visitors: a month
-        // fresh then a week of background revalidation, no `immutable`.
+        // stable names, so no `immutable`: a replaced recording reaches returning visitors within about a
+        // month (30 days fresh, then up to a week of background revalidation).
         source: "/games/super-voltorb-flip/audio/(.*)\\.mp3",
         headers: [
           { key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=604800" },

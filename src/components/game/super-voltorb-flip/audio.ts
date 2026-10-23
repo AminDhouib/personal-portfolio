@@ -228,7 +228,7 @@ function armJingleUnlock(): void {
 
 function unlockJingle(el: HTMLAudioElement, isRetry = false): void {
   // A jingle sounding right now has played from a gesture-free timer fine, or is not ours to cut.
-  if (unlocked.has(el) || !el.paused) return;
+  if (unlocked.has(el) || unlocking.has(el) || !el.paused) return;
   unlocking.add(el);
   el.muted = true;
   Promise.resolve(el.play()).then(
@@ -252,7 +252,13 @@ function unlockJingle(el: HTMLAudioElement, isRetry = false): void {
 }
 
 function ensureJingles(): void {
-  if (typeof window === "undefined" || levelWinSlot.el) return;
+  if (typeof window === "undefined") return;
+  if (levelWinSlot.el) {
+    // A remount after stopAllCues disarmed the unlock listeners: ones still locked try again
+    // (a blocked attempt re-arms the gesture listeners).
+    for (const slot of jingleSlots) if (slot.el && !unlocked.has(slot.el)) unlockJingle(slot.el);
+    return;
+  }
   for (const slot of jingleSlots) {
     const el = new Audio(slot.track.src);
     el.preload = "auto";
