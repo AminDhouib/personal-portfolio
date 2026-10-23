@@ -23,7 +23,6 @@ import React, {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import localFont from "next/font/local";
 import { EffectsProvider, useEffectsTheme } from "./super-voltorb-flip/effects/context";
 import {
   sfx,
@@ -38,25 +37,23 @@ import {
   setMusicMuted,
 } from "./super-voltorb-flip/audio";
 import { LEVEL_WIN_MS, RISK_WARNING_MS } from "./super-voltorb-flip/sound-cues";
-import { safeLocalSet } from "@/lib/safe-storage";
-import { loadProgress } from "./super-voltorb-flip/progress";
 import { QuitConfirm } from "./super-voltorb-flip/quit-confirm";
 import { RoundResult, type RoundResultProps } from "./super-voltorb-flip/round-result";
 import { useMute } from "./super-voltorb-flip/use-mute";
 import { useUnmountTimers } from "./super-voltorb-flip/use-unmount-timers";
 import { isTextEntryTarget } from "./text-entry";
-import { BOARD_FRAME_CSS } from "./super-voltorb-flip/board-size";
+import { numberFont, pokemonFont, scoreFont } from "./super-voltorb-flip/fonts";
+import { SCOPED_STYLES } from "./super-voltorb-flip/scoped-styles";
+import { useGame } from "./super-voltorb-flip/use-game";
+import { usePayoutDisplay } from "./super-voltorb-flip/use-payout-display";
+import { useProgressPersistence } from "./super-voltorb-flip/use-progress-persistence";
 import { translations, type Language } from "./super-voltorb-flip/translations";
 import { afterPageLoad } from "./super-voltorb-flip/startup";
 import {
-  clampBoardSize,
   isRoundLive,
   isRoundOver,
   padDigits,
-  parseBoardSize,
-  payoutPlan,
   roundStatsResult,
-  tallyStride,
   tileRisk,
 } from "./super-voltorb-flip/play-rules";
 import { isCursorKey, memoKeyFlag, moveCursor, type Cursor } from "./super-voltorb-flip/cursor";
@@ -91,7 +88,7 @@ import {
 import { VoltorbSprite } from "./super-voltorb-flip/art/voltorb-sprite";
 import { GLYPHS } from "./super-voltorb-flip/art/sprites";
 import { COLORS, type FlagValues } from "./super-voltorb-flip/types";
-import { VoltorbFlip, cloneGame, indexToCoordinate } from "./super-voltorb-flip/engine";
+import { VoltorbFlip, indexToCoordinate } from "./super-voltorb-flip/engine";
 import {
   VoltorbIcon,
   LegendVoltorb,
@@ -102,254 +99,6 @@ import {
   PixelFullscreenButton,
   useFullscreen,
 } from "./super-voltorb-flip/chrome";
-
-// ---------------------------------------------------------------------------
-// Fonts — 1:1 with upstream (pokemon-ds-font / m5x7 / stacked-pixel).
-// ---------------------------------------------------------------------------
-
-const pokemonFont = localFont({
-  src: "../../../public/games/voltorb-flip/fonts/pokemon-ds-font.ttf",
-  variable: "--font-voltorb-ds",
-  display: "swap",
-});
-const numberFont = localFont({
-  src: "../../../public/games/voltorb-flip/fonts/m5x7.ttf",
-  variable: "--font-voltorb-m5x7",
-  display: "swap",
-});
-const scoreFont = localFont({
-  src: "../../../public/games/voltorb-flip/fonts/stacked-pixel.ttf",
-  variable: "--font-voltorb-stacked",
-  display: "swap",
-});
-
-// ---------------------------------------------------------------------------
-// src/hooks/useGame.tsx (1:1, with cloneGame replacing lodash's cloneDeep).
-// ---------------------------------------------------------------------------
-
-function initialGameSize() {
-  // `?size=N` (N in 2..10) creates a non-default board for layout testing.
-  // Game logic is scaled proportionally but authored for 5x5 — use at your
-  // own risk for "real" play.
-  if (typeof window === "undefined") return 5;
-  return parseBoardSize(window.location.search);
-}
-
-const useGame = () => {
-  const [size, setSize] = useState(initialGameSize);
-  const [game, setGame] = useState<VoltorbFlip>(() => new VoltorbFlip(size));
-
-  function updateGame(callback: (game: VoltorbFlip) => void): void {
-    if (!game) return;
-    const newGame = cloneGame(game);
-    callback(newGame);
-    setGame(newGame);
-  }
-
-  function setGameSize(n: number) {
-    const clamped = clampBoardSize(n);
-    setSize(clamped);
-    setGame(new VoltorbFlip(clamped));
-  }
-
-  return { game, updateGame, size, setGameSize };
-};
-
-// ---------------------------------------------------------------------------
-// Inlined utility styles (from upstream src/styles/globals.css and
-// tailwind.config.js). Rendered once on mount and scoped by class name so
-// we don't pollute the global stylesheet across the portfolio.
-// ---------------------------------------------------------------------------
-
-const SCOPED_STYLES = `
-.svf-root {
-  --svf-n: 5;
-  --svf-tile: 40px;
-  --svf-gap: 16px;
-}
-${BOARD_FRAME_CSS}
-.svf-root { font-family: var(--font-voltorb-ds), ui-monospace, monospace; color: #fff; background-color: #58a66c; }
-.svf-root *, .svf-root *::before, .svf-root *::after { box-sizing: border-box; text-rendering: geometricPrecision; }
-.svf-root .text-shadow-white {
-  text-shadow: 2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff, 1px 1px #fff,
-    -1px -1px #fff, 1px -1px #fff, -1px 1px #fff;
-}
-.svf-root .picture-outline {
-  -webkit-filter: drop-shadow(1px 1px white) drop-shadow(-1px -1px white)
-    drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
-  filter: drop-shadow(1px 1px white) drop-shadow(-1px -1px white)
-    drop-shadow(1px -1px white) drop-shadow(-1px 1px white);
-}
-.svf-root .voltorb { height: 28px; width: 28px; }
-.svf-root .rounded-5 { border-radius: 5px; }
-.svf-root .drop-shadow-default {
-  filter: drop-shadow(1px 1px 0 rgba(0,0,0,1)) drop-shadow(1px 1px 0 rgba(75,85,99,1));
-}
-.svf-root .drop-shadow-soft {
-  filter: drop-shadow(1px 1px 0 rgba(75,85,99,.25)) drop-shadow(2px 2px 0 rgba(75,85,99,.25));
-}
-/* Row/col colored connector bars linking adjacent tiles (matches Pokémon HG/SS).
-   Gap between tile wrappers is 16px; we center the bar at +8 (the midpoint).
-   Tile outline is 4px, so bar overlaps each adjacent tile's outline by a few
-   pixels to sit flush against the tile bodies like the reference. */
-/* Bars span slightly past the 16px gap so their ends tuck under each
-   adjacent tile/clue-card outline (z-index 0 keeps them behind the tile
-   bodies — the reference shows the bar visually ending inside the frame). */
-.svf-root .svf-conn-e {
-  position: absolute;
-  right: calc(-1 * var(--svf-gap) - 1px);
-  top: 50%;
-  width: calc(var(--svf-gap) + 2px);
-  height: 8px;
-  transform: translateY(-50%);
-  z-index: 0;
-  pointer-events: none;
-  box-shadow: 0 1px 0 #e5e7eb, 0 -1px 0 #e5e7eb;
-}
-.svf-root .svf-conn-s {
-  position: absolute;
-  bottom: calc(-1 * var(--svf-gap) - 1px);
-  left: 50%;
-  height: calc(var(--svf-gap) + 2px);
-  width: 8px;
-  transform: translateX(-50%);
-  z-index: 0;
-  pointer-events: none;
-  box-shadow: 1px 0 0 #e5e7eb, -1px 0 0 #e5e7eb;
-}
-/* Cursor/hover selection — matches the red frame on the active tile in HG/SS.
-   Two overlapping shadows give the pixel-art look: dark inner hairline +
-   solid red outside. */
-.svf-root .svf-tile-wrap::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 3px;
-  box-shadow: 0 0 0 1px #6a0a0a, 0 0 0 4px #ef2020;
-  opacity: 0;
-  transition: opacity 80ms ease-out;
-  pointer-events: none;
-  z-index: 3;
-}
-.svf-root .svf-tile-wrap:hover::before,
-.svf-root .svf-tile-wrap:focus-visible::before {
-  opacity: 1;
-}
-.svf-root .svf-coin {
-  image-rendering: pixelated;
-  shape-rendering: crispEdges;
-  animation: svf-coin-spin 1.3s steps(1, end) infinite;
-  transform-origin: center center;
-}
-/* Peek mode: force every tile to its face-up state with no flip animation.
-   Used by the debug panel to preview the whole board without disturbing
-   game state (cells.isFlipped stays unchanged). */
-.svf-root .svf-peek .svf-tile-wrap > div {
-  transition-duration: 0ms !important;
-}
-.svf-root .svf-modal-backdrop {
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(1px);
-}
-.svf-root .svf-modal-open {
-  animation: svf-modal-backdrop-in 220ms ease-out both;
-}
-.svf-root .svf-modal-open .svf-modal-card {
-  animation: svf-modal-card-in 320ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
-}
-.svf-root .svf-modal-closing {
-  animation: svf-modal-backdrop-out 180ms ease-in both;
-}
-.svf-root .svf-modal-closing .svf-modal-card {
-  animation: svf-modal-card-out 180ms ease-in both;
-}
-@keyframes svf-modal-backdrop-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes svf-modal-backdrop-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-@keyframes svf-modal-card-in {
-  0%   { transform: translateY(-18px) scale(0.92); opacity: 0; }
-  60%  { transform: translateY(4px)   scale(1.02); opacity: 1; }
-  100% { transform: translateY(0)     scale(1);    opacity: 1; }
-}
-@keyframes svf-modal-card-out {
-  from { transform: scale(1);    opacity: 1; }
-  to   { transform: scale(0.92); opacity: 0; }
-}
-@keyframes svf-coin-spin {
-  0%   { transform: scaleX(1);    }
-  16%  { transform: scaleX(0.7);  }
-  32%  { transform: scaleX(0.25); }
-  48%  { transform: scaleX(-0.4); }
-  64%  { transform: scaleX(-0.9); }
-  80%  { transform: scaleX(-0.4); }
-  100% { transform: scaleX(1);    }
-}
-/* Level transition flashes — keyed by .svf-lv-flash-up / -down.
-   Rest stops are the banner's #3D7757, not the board's sprite-palette
-   #448563: the banner green is darkened so its white 12px text clears the
-   4.5:1 floor (white on #448563 is only 4.42:1). Board tiles keep #448563. */
-.svf-lv-flash-up   { animation: svf-lv-flash-up   1.1s ease-out 1 both; }
-.svf-lv-flash-down { animation: svf-lv-flash-down 1.1s ease-out 1 both; }
-@keyframes svf-lv-flash-up {
-  0%   { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
-  20%  { background-color: #4ade80; box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.55); transform: scale(1.18); }
-  60%  { background-color: #6ee08e; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.20); transform: scale(1.06); }
-  100% { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); transform: scale(1); }
-}
-@keyframes svf-lv-flash-down {
-  0%   { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
-  20%  { background-color: #b45353; box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.55); transform: scale(0.94) rotate(-1.5deg); }
-  60%  { background-color: #6e4848; box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.20); transform: scale(0.98) rotate(0.5deg); }
-  100% { background-color: #3D7757; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); transform: scale(1); }
-}
-
-/* Risk-warning tile shake — keyed by .svf-tile-anxious on the wrap.
-   Animation lives on the wrap's non-connector children so the row/col
-   connector lines (.svf-conn-e / .svf-conn-s) stay still while the
-   actual tile shakes. Plays while ME_CARDGAME1 fanfare is playing and
-   other taps are locked out. */
-.svf-tile-anxious > *:not(.svf-conn-e):not(.svf-conn-s) {
-  animation: svf-tile-shake 0.32s linear infinite;
-  filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.55));
-}
-@keyframes svf-tile-shake {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  20%  { transform: translate(-2px, 1px) rotate(-1.4deg); }
-  40%  { transform: translate(2px, -1px) rotate(1.4deg); }
-  60%  { transform: translate(-1px, 2px) rotate(-0.8deg); }
-  80%  { transform: translate(1px, -2px) rotate(0.8deg); }
-}
-/* Keyboard cursor: real DOM focus, drawn only for keyboard users as the same
-   red frame hover uses plus a dark rim (red alone is under 3:1 on the green
-   board). One rounded ring, lifted above its neighbours. */
-.svf-root .svf-tile-wrap:focus-visible {
-  outline: none;
-  z-index: 5;
-}
-.svf-root .svf-tile-wrap:focus-visible::before {
-  box-shadow: 0 0 0 1px #6a0a0a, 0 0 0 4px #ef2020, 0 0 0 6px #111827;
-}
-
-/* When the game element is fullscreened, fill the viewport with the
-   board background so the surrounding chrome doesn't bleed through. */
-.svf-root:fullscreen,
-.svf-root:-webkit-full-screen {
-  width: 100vw;
-  height: 100vh;
-  background: #2d4f3c;
-  padding: 24px;
-  overflow: auto;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .svf-root * { transition-duration: 150ms !important; animation-duration: 150ms !important; }
-}
-`;
 
 // ---------------------------------------------------------------------------
 // src/components/Card.tsx (1:1 port).
@@ -1796,26 +1545,6 @@ export function SuperVoltorbFlipGame() {
     (buttons.find((b) => b.getClientRects().length > 0) ?? buttons[0])?.focus();
   }, [mode]);
 
-  // Smoothly-rolled scoreboard values. Default to the live game values; the
-  // payout animation overrides them while a round wraps up. Reading game
-  // state via optional chaining since Gameboard mounts before the first
-  // restart settles.
-  const [displayTotal, setDisplayTotal] = useState(0);
-  const [displayCurrent, setDisplayCurrent] = useState(0);
-  // Level-card flash. "up" flashes green, "down" flashes red, both clear
-  // automatically once the SE finishes.
-  const [levelDir, setLevelDir] = useState<"up" | "down" | null>(null);
-  const prevLevelRef = useRef<number | undefined>(undefined);
-  const payoutAnimRef = useRef(false);
-  const tallyTimerRef = useRef<number | null>(null);
-  const tallyStepRef = useRef<number>(0);
-  const prevCurrentScoreRef = useRef<number>(0);
-  const skipPayoutRef = useRef(false);
-  // Held back from game.currentLevel during win/lose so the visible Lv
-  // value stays put while the fanfare + drain run; the new level is set
-  // here in the same beat as the flash + SE inside flipCardsDown.
-  const [displayLevel, setDisplayLevel] = useState<number>(() => 1);
-
   useEffect(() => {
     setMusicMuted(muted);
   }, [muted]);
@@ -1851,249 +1580,16 @@ export function SuperVoltorbFlipGame() {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, []);
 
-  // Roll displayed scores toward the live game values. When currentScore
-  // climbs (player flipped a 2x/3x tile), tick up one coin per frame at
-  // ~60Hz (matches NDS frame rate; voltorb_flip.c runs the counter from
-  // its main loop) and play the OKOZUKAI counter SE every 4 frames —
-  // the cadence used by the original "Coins received" banner, surfaced
-  // here so each multiplier reveal feels rewarding. Drops (restart,
-  // voltorb-zero) snap. Once a round ends (gameStatus leaves "playing"
-  // / "memo") we stop ticking so the rollup doesn't overlap the fanfare
-  // or drain SE — runPostFanfare owns both displays from there.
-  useEffect(() => {
-    if (!game) return;
-    if (payoutAnimRef.current) return;
-
-    const status = game.gameStatus;
-    if (status !== "playing" && status !== "memo") {
-      if (tallyTimerRef.current) {
-        window.clearTimeout(tallyTimerRef.current);
-        tallyTimerRef.current = null;
-      }
-      return;
-    }
-
-    const targetCurrent = game.currentScore;
-    const targetTotal = game.totalScore;
-
-    const scheduled: number[] = [];
-    const schedule = (fn: () => void) => {
-      scheduled.push(window.setTimeout(fn, 0));
-    };
-
-    if (displayTotal !== targetTotal) {
-      schedule(() => setDisplayTotal(targetTotal));
-    }
-
-    if (displayCurrent >= targetCurrent) {
-      tallyStepRef.current = 0;
-      if (displayCurrent !== targetCurrent) {
-        schedule(() => setDisplayCurrent(targetCurrent));
-      }
-      return () => scheduled.forEach((id) => window.clearTimeout(id));
-    }
-
-    // Stride scales with the rollup target (matches the drain formula),
-    // so a 1→500 climb takes ~100 ticks instead of dragging out the
-    // last 100 coins one at a time as a gap-based stride would.
-    const stride = tallyStride(targetCurrent);
-    tallyTimerRef.current = window.setTimeout(() => {
-      tallyTimerRef.current = null;
-      setDisplayCurrent((prev) => Math.min(prev + stride, targetCurrent));
-      const step = tallyStepRef.current;
-      if (!muted && step % 4 === 0) void sfx.payoutTickEarn();
-      tallyStepRef.current = step + 1;
-    }, 17);
-
-    return () => {
-      scheduled.forEach((id) => window.clearTimeout(id));
-      if (tallyTimerRef.current) {
-        window.clearTimeout(tallyTimerRef.current);
-        tallyTimerRef.current = null;
-      }
-    };
-  }, [
-    game,
-    game?.currentScore,
-    game?.totalScore,
-    game?.gameStatus,
-    displayCurrent,
+  const {
     displayTotal,
-    muted,
-  ]);
+    displayCurrent,
+    displayLevel,
+    levelDir,
+    runPostFanfare,
+    triggerLevelTransition,
+  } = usePayoutDisplay({ game, muted, later, sleep });
 
-  // Release the post-payout freeze when restartGame zeroes currentScore.
-  // We hold payoutAnimRef.current=true through flipCardsDown / level-flash
-  // so the rollup effect doesn't try to re-tick from 0 → earned while the
-  // old round's currentScore is still non-zero.
-  useEffect(() => {
-    if (!game) return;
-    const prev = prevCurrentScoreRef.current;
-    if (prev > 0 && game.currentScore === 0 && payoutAnimRef.current) {
-      payoutAnimRef.current = false;
-    }
-    prevCurrentScoreRef.current = game.currentScore;
-  }, [game, game?.currentScore]);
-
-  // Hold the visible Lv value at its old number while a round is wrapping
-  // up (win/lose). The game already advances currentLevel as soon as the
-  // round ends, but the player shouldn't *see* it change until the
-  // flip-down animation runs — that's when the flash + SLOT01/03 SE fire.
-  // While playing/memo, displayLevel mirrors game.currentLevel.
-  useEffect(() => {
-    if (!game) return;
-    const status = game.gameStatus;
-    let syncLevelTimer: number | null = null;
-
-    if (status === "playing" || status === "memo") {
-      if (displayLevel !== game.currentLevel) {
-        syncLevelTimer = window.setTimeout(() => setDisplayLevel(game.currentLevel), 0);
-      }
-    }
-    prevLevelRef.current = game.currentLevel;
-
-    return () => {
-      if (syncLevelTimer) window.clearTimeout(syncLevelTimer);
-    };
-  }, [game, game?.currentLevel, game?.gameStatus, displayLevel]);
-
-  const triggerLevelTransition = useCallback(
-    (dir: "up" | "down") => {
-      if (!game) return;
-      const newLevel = game.currentLevel;
-      const oldLevel = displayLevel;
-      // Skip when the level didn't actually move — e.g. lose at Lv 1
-      // floors at 1, win at Lv 8 caps at 8. No flash, no SE.
-      if (newLevel === oldLevel) return;
-      setDisplayLevel(newLevel);
-      setLevelDir(dir);
-      if (!muted) {
-        if (dir === "up") void sfx.levelUp();
-        else void sfx.levelDown();
-      }
-      later(() => setLevelDir(null), 1200);
-    },
-    [game, muted, displayLevel, later],
-  );
-
-  // Click anywhere during the post-round drain to skip the counter.
-  // Pointerdown so it covers both mouse and touch. Gated on payoutAnimRef
-  // so tile clicks during normal play are unaffected.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handler = () => {
-      if (payoutAnimRef.current) skipPayoutRef.current = true;
-    };
-    window.addEventListener("pointerdown", handler);
-    return () => window.removeEventListener("pointerdown", handler);
-  }, []);
-
-  // Promise-returning post-fanfare runner: drains the round's "This Game"
-  // pot into "Total Coins". Phase 1 (the OKOZUKAI tally-up) is now driven
-  // by the per-flip rollup effect above so the player hears each coin as
-  // they collect it; here we only run Phase 2 — COIN_PAYOUT_ONE per 4
-  // ticks, COIN_PAYOUT_LAST closes the chain. Matches voltorb_flip.c
-  // AwardCoins_Main step 2; the BGM scene swap is a JP-only Game-Corner
-  // detail and the NA build lets gameplay BGM ride through.
-  const runPostFanfare = useCallback(async () => {
-    if (!game) return;
-    const finalTotal = game.totalScore;
-    const finalCurrent = game.currentScore;
-    const startTotal = Math.max(0, finalTotal - finalCurrent);
-    const earned = finalCurrent;
-    if (earned <= 0) return;
-
-    skipPayoutRef.current = false;
-    payoutAnimRef.current = true;
-    // Cancel any in-flight per-flip tally-up — earned has already been
-    // heard during play; we own the displays from here.
-    if (tallyTimerRef.current) {
-      window.clearTimeout(tallyTimerRef.current);
-      tallyTimerRef.current = null;
-    }
-    // Snap to the round-end read in case the rollup didn't finish before
-    // the level-clear fanfare ended (covers wins on a final huge multiplier).
-    setDisplayCurrent(earned);
-    setDisplayTotal(startTotal);
-    // Beat of pause so the player can read the earned amount before drain.
-    // Pollable in 60ms slices so skipping during the pause works too.
-    {
-      const pauseEnd = Date.now() + 320;
-      while (Date.now() < pauseEnd && !skipPayoutRef.current) {
-        await sleep(60);
-      }
-    }
-
-    // 17ms/step ≈ NDS 60Hz frame rate; SE every 4 steps matches
-    // COIN_PAYOUT_ONE cadence in voltorb_flip.c:1381. payoutPlan caps
-    // the loop at 100 iterations so a 10k-coin haul doesn't take 170s —
-    // instead each iteration drains ceil(earned / 100) coins. That keeps total
-    // drain time bounded at ~1.7s regardless of how big "earned" is,
-    // while small earnings still tick one coin per step like HG/SS.
-    const tickMs = 17;
-    const { coinsPerTick, iterations } = payoutPlan(earned);
-    const tick = () => sleep(tickMs);
-
-    let didSkip = false;
-    let drained = 0;
-    for (let j = 0; j < iterations; j++) {
-      if (skipPayoutRef.current) {
-        didSkip = true;
-        break;
-      }
-      drained = Math.min(earned, drained + coinsPerTick);
-      setDisplayCurrent(earned - drained);
-      setDisplayTotal(startTotal + drained);
-      if (j % 4 === 0 && !muted) void sfx.payoutTickBank();
-      await tick();
-    }
-    // Snap to final wallet state — covers both natural completion and skip.
-    setDisplayCurrent(0);
-    setDisplayTotal(startTotal + earned);
-    // COIN_PAYOUT_LAST always closes the chain, including on skip — the
-    // closing chime is the audible "money's in the bank" cue and should
-    // fire whether the player let it run or tapped through.
-    if (!muted) void sfx.payoutFinal();
-    // Breathing room so payoutFinal doesn't bleed into the level-up SE.
-    // Shorter on skip so it still feels snappy.
-    await sleep(didSkip ? 160 : 280);
-    skipPayoutRef.current = false;
-
-    // Hold payoutAnimRef.current=true through onFlipDownStart / flipCardsDown.
-    // The release effect above flips it back to false the instant
-    // restartGame zeroes currentScore, so the rollup effect doesn't try
-    // to re-tick 0 → earned while the round's old score lingers.
-  }, [game, muted, sleep]);
-
-  // Restore the saved level + total once on mount. The persist effect below
-  // waits for `hydrated`, which flips in the same batch as the restored game,
-  // so the first render's Lv1/0 defaults can never overwrite a save.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    const saved = loadProgress();
-    if (saved) {
-      updateGame((g) => g.restore(saved.currentLevel, saved.totalScore, saved.history));
-      // Statistics only mirror the save here; svf:progress is never written from them.
-      raiseHighestLevel(saved.currentLevel);
-    }
-    setHydrated(true);
-    // Mount-only by design; updateGame is recreated every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Persist level + total score to localStorage on change.
-  useEffect(() => {
-    if (!game || !hydrated) return;
-    if (typeof window === "undefined") return;
-    safeLocalSet(
-      "svf:progress",
-      JSON.stringify({
-        currentLevel: game.currentLevel,
-        totalScore: game.totalScore,
-        history: game.history,
-      }),
-    );
-  }, [game, game?.currentLevel, game?.totalScore, game?.history, hydrated]);
+  const hydrated = useProgressPersistence(game, updateGame, raiseHighestLevel);
 
   // Reset memo mode + drive music/game-over audio on status transitions.
   // restartGame sets status back to "playing" after cards flip down.
