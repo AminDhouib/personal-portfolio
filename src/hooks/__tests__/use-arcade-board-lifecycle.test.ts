@@ -93,6 +93,115 @@ describe("useArcadeBoard lifecycle", () => {
     expect(urls(fetchMock)).toEqual(["/api/arcade/scores?game=space-shooter&board=all-time"]);
   });
 
+  describe("overlapping reads", () => {
+    function boardOf(handle: string): Response {
+      const entry = { rank: 1, handle, score: 5, achievedAt: "2026-10-06T10:00:00.000Z" };
+      return new Response(JSON.stringify({ entries: [entry], you: null }), { status: 200 });
+    }
+
+    function deferred() {
+      let resolve: (res: Response) => void = () => {};
+      const promise = new Promise<Response>((r) => (resolve = r));
+      return { promise, resolve };
+    }
+
+    const settle = () =>
+      act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+    it("lets a refresh() during the mount read take over, and drops the late mount answer", async () => {
+      const mount = deferred();
+      const manual = deferred();
+      fetchMock.mockReturnValueOnce(mount.promise).mockReturnValueOnce(manual.promise);
+      const { result } = renderHook(() => useArcadeBoard("hextris"));
+      await waitFor(() => expect(result.current.loading).toBe(true));
+
+      let refreshed: Promise<unknown> = Promise.resolve();
+      act(() => {
+        refreshed = result.current.refresh();
+      });
+      expect(result.current.loading).toBe(true);
+
+      // The mount read answers first: it is stale, so nothing lands and loading stays up.
+      mount.resolve(boardOf("Stale"));
+      await settle();
+      expect(result.current.entries).toEqual([]);
+      expect(result.current.loading).toBe(true);
+
+      manual.resolve(boardOf("Fresh"));
+      await act(async () => {
+        await refreshed;
+      });
+      expect(result.current.entries.map((e) => e.name)).toEqual(["Fresh"]);
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("drops the first game's late answer after the game changed, and settles on the new game", async () => {
+      const first = deferred();
+      const second = deferred();
+      fetchMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      const { result, rerender } = renderHook(
+        ({ game }: { game: ArcadeGameSlug }) => useArcadeBoard(game),
+        { initialProps: { game: "hextris" as ArcadeGameSlug } },
+      );
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      rerender({ game: "space-shooter" });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(result.current.loading).toBe(true);
+
+      second.resolve(boardOf("Second"));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.entries.map((e) => e.name)).toEqual(["Second"]);
+
+      first.resolve(boardOf("First"));
+      await settle();
+      expect(result.current.entries.map((e) => e.name)).toEqual(["Second"]);
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("stays loading when the first game's answer lands before the second's", async () => {
+      const first = deferred();
+      const second = deferred();
+      fetchMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      const { result, rerender } = renderHook(
+        ({ game }: { game: ArcadeGameSlug }) => useArcadeBoard(game),
+        { initialProps: { game: "hextris" as ArcadeGameSlug } },
+      );
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      rerender({ game: "space-shooter" });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+      first.resolve(boardOf("First"));
+      await settle();
+      expect(result.current.entries).toEqual([]);
+      expect(result.current.loading).toBe(true);
+
+      second.resolve(boardOf("Second"));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.entries.map((e) => e.name)).toEqual(["Second"]);
+    });
+
+    it("lets a refresh() started for the old game finish after the game changed", async () => {
+      const manual = deferred();
+      fetchMock.mockReturnValueOnce(manual.promise);
+      const { result, rerender } = renderHook(
+        ({ game }: { game: ArcadeGameSlug }) => useArcadeBoard(game, { fetchOnMount: false }),
+        { initialProps: { game: "hextris" as ArcadeGameSlug } },
+      );
+      act(() => {
+        void result.current.refresh();
+      });
+      expect(result.current.loading).toBe(true);
+      // fetchOnMount is off, so a game change reads nothing by itself; the refresh is still open.
+      rerender({ game: "space-shooter" });
+      manual.resolve(boardOf("Manual"));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.entries.map((e) => e.name)).toEqual(["Manual"]);
+    });
+  });
+
   it("keeps refresh and submit stable across re-renders of the same game", async () => {
     fetchMock.mockImplementation(() => Promise.resolve(emptyBoard()));
     const { result, rerender } = renderHook(() =>
