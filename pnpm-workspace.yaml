@@ -7,6 +7,13 @@ ignoredBuiltDependencies:
 # one. Drop an entry once the parent ships the fix itself (pnpm audit without the entry
 # stays clean).
 overrides:
+  # GHSA-27r3-jxmh-p828 (high). body-parser 1.20.8 (express 4, via @lhci/cli) and 2.3.0
+  # (express 5, via the MCP SDK); 1.20.9 / 2.4.0 are the first fixed releases, same majors.
+  "body-parser@1": "1.20.9"
+  "body-parser@2": "2.4.0"
+  # GHSA-2m5v-pch6-74hx, GHSA-qrxm-fqhp-jwvm, GHSA-xjj6-f33q-929c (high). undici 6.29.0
+  # pinned exactly by its parents; 6.29.1 is the first fixed 6.x release.
+  "undici@6": "6.29.1"
   # GHSA-cg2g-xh64-v4q7 (critical), GHSA-mrv2-3pqr-j5jr (high). DOMPurify <=3.4.16 (transitive,
   # the lock resolved 3.4.16); 3.4.17 is the first fixed release, same major.
   "dompurify@<3.4.17": "^3.4.17"
