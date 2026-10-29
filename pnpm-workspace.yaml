@@ -21,9 +21,10 @@ overrides:
   # GHSA-866g-f22w-33x8 (low). @ai-sdk/mcp (via @copilotkit/runtime) pins 4.0.22; 4.0.57 is
   # the version @ai-sdk/openai already uses.
   "@ai-sdk/provider-utils@>=4.0.0 <4.0.33": "4.0.57"
-  # GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx (moderate). Dev only:
-  # express 4 under @lhci/cli pins ~6.14.0. GHSA-6pq8-jhm2-2vcw (moderate) is fixed in
-  # 6.16.1, the floor now (the lock resolved 6.16.0); same major.
+  # GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx (moderate). Added for
+  # express 4 under @lhci/cli (dev), which pins ~6.14.0; the range also lifts the prod copies
+  # under express 5 and body-parser 2. GHSA-6pq8-jhm2-2vcw (moderate) is fixed in 6.16.1, the
+  # floor now (the lock resolved 6.16.0); same major.
   "qs@>=6.11.1 <6.16.1": "^6.16.1"
   # GHSA-27r3-jxmh-p828 (high). body-parser 1.20.8 (the lock resolved it) comes in through
   # express 4.22.1 under @lhci/cli (dev only); 1.20.9 is the first fixed release, same major
@@ -84,8 +85,9 @@ overrides:
   "@graphql-tools/utils@<12.0.2": "^12.0.2"
   # GHSA-x8rm-f576-gq67 (high): PhoneNumber scalar ReDoS, fixed only in 2.0.1. graphql-scalars
   # 1.25.0 (the lock resolved it) comes in through @copilotkit/runtime 1.79.1 and, as a peer,
-  # type-graphql 2.0.0-rc.1 (^1.22.4); crosses a major, scoped to those two consumers by
-  # the version range. The 2.0.0 breaking changes are dropping graphql-js below 16 (the lock
+  # type-graphql 2.0.0-rc.1 (^1.22.4), today its only two consumers; crosses a major. The
+  # range selector is not parent-scoped, so any new consumer of graphql-scalars 1.x also gets
+  # 2.x: recheck its imports against this proof before adding one. The 2.0.0 breaking changes are dropping graphql-js below 16 (the lock
   # has 16.13.2) and Node 20 (.nvmrc and the Dockerfile are on 22). Compared against the
   # 1.25.0 build, 2.0.1 ships the same files and the same 285 CommonJS exports, with the same
   # "type": "module" plus cjs/ esm/ export map; only the PhoneNumber scalar and error.js
