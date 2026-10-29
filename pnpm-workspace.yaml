@@ -22,8 +22,24 @@ overrides:
   # the version @ai-sdk/openai already uses.
   "@ai-sdk/provider-utils@>=4.0.0 <4.0.33": "4.0.57"
   # GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx (moderate). Dev only:
-  # express 4 under @lhci/cli pins ~6.14.0.
-  "qs@>=6.11.1 <6.16.0": "^6.16.0"
+  # express 4 under @lhci/cli pins ~6.14.0. GHSA-6pq8-jhm2-2vcw (moderate) is fixed in
+  # 6.16.1, the floor now (the lock resolved 6.16.0); same major.
+  "qs@>=6.11.1 <6.16.1": "^6.16.1"
+  # GHSA-27r3-jxmh-p828 (high). body-parser 1.20.8 (the lock resolved it) comes in through
+  # express 4.22.1 under @lhci/cli (dev only); 1.20.9 is the first fixed release, same major
+  # (express 4 expects ^1).
+  "body-parser@>=1.0.0 <1.20.9": "^1.20.9"
+  # GHSA-27r3-jxmh-p828 (high). body-parser 2.3.0 (the lock resolved it) comes in through
+  # express 5.2.1 (prod: @modelcontextprotocol/sdk, reached via @copilotkit/react-core >
+  # @copilotkit/mcp-apps-renderer, and @copilotkit/runtime itself); 2.4.0 is the first fixed
+  # release, same major (express 5 expects ^2).
+  "body-parser@>=2.0.0 <2.4.0": "^2.4.0"
+  # GHSA-xjj6-f33q-929c, GHSA-2m5v-pch6-74hx, GHSA-qrxm-fqhp-jwvm (high), GHSA-4qv8-2p9j-2685,
+  # GHSA-9fm3-97px-rjf6 (moderate). undici 6.29.0 (the lock resolved it) comes in through
+  # @ai-sdk/provider-utils 4.0.57 and 4.0.62 (under @ai-sdk/openai and @ai-sdk/mcp); 6.29.1 is
+  # the first fixed release, same major. The selector stops at 6.x, so the 8.x line and
+  # undici-types stay as they are.
+  "undici@>=6.0.0 <6.29.1": "^6.29.1"
   # GHSA-rj75-hqrm-r3gf (moderate). Crosses a major, scoped to its only consumer:
   # @tailwindcss/typography (0.5.19 and 0.5.20 alike) pins 6.0.10, and the fix is 7.1.6.
   # 7.0's one breaking change makes inserting nodes while iterating safe; the compiled
@@ -66,6 +82,17 @@ overrides:
   # 12.x keeps every export those parents import and only swaps @whatwg-node/promise-helpers
   # to 2.x; the chat route is the only consumer.
   "@graphql-tools/utils@<12.0.2": "^12.0.2"
+  # GHSA-x8rm-f576-gq67 (high): PhoneNumber scalar ReDoS, fixed only in 2.0.1. graphql-scalars
+  # 1.25.0 (the lock resolved it) comes in through @copilotkit/runtime 1.79.1 and, as a peer,
+  # type-graphql 2.0.0-rc.1 (^1.22.4); crosses a major, scoped to those two consumers by
+  # the version range. The 2.0.0 breaking changes are dropping graphql-js below 16 (the lock
+  # has 16.13.2) and Node 20 (.nvmrc and the Dockerfile are on 22). Compared against the
+  # 1.25.0 build, 2.0.1 ships the same files and the same 285 CommonJS exports, with the same
+  # "type": "module" plus cjs/ esm/ export map; only the PhoneNumber scalar and error.js
+  # differ, and the JSON, JSONObject, DateTimeISO and Timestamp scalars are byte-identical.
+  # Those four are everything the parents import: runtime takes GraphQLJSON and
+  # GraphQLJSONObject, type-graphql takes GraphQLTimestamp and GraphQLDateTimeISO.
+  "graphql-scalars@<2.0.1": "^2.0.1"
   # GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv (high): extract-zip 2.0.1 is the last release
   # and has no patch. It was only reached through puppeteer-core 24 > @puppeteer/browsers 2.x;
   # puppeteer-core 25 pins @puppeteer/browsers 3.x, which unpacks with modern-tar instead.
