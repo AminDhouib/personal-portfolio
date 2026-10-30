@@ -527,7 +527,9 @@ trailing slashes.
 **Allowed paths.** Only what posthog-js calls is forwarded (`POSTHOG_ALLOWED_PATHS` in
 `src/lib/posthog-proxy.ts`), each also with or without its trailing slash: `/_p/4qe/e/`,
 `/_p/4qe/i/v0/e/`, `/_p/4qe/i/v1/...` (`/i/v1/logs`, `/i/v1/metrics`), `/_p/4qe/s/` (session recording),
-`/_p/4qe/flags/` (`?v=2`), `/_p/4qe/static/...`, `/_p/4qe/array/...`, and the exact reads
+`/_p/4qe/flags/` (`?v=2`), `/_p/4qe/static/...` (a versioned `/static/<semver>/<bundle>.js` is
+mapped to the flat `/static/<bundle>.js`; the PostHog host answers `302 /login` for versioned
+paths), `/_p/4qe/array/...`, and the exact reads
 `/_p/4qe/api/surveys/`, `/api/web_experiments/`, `/api/product_tours/`,
 `/api/early_access_features/`. Anything else under `/_p/4qe` (the bare path, `/login`, `/admin`,
 other `/api/...`) answers 404 from this app by design. If a new PostHog feature "stops working"
