@@ -103,9 +103,11 @@ overrides:
   # downloads a browser through puppeteer.
   "lighthouse>puppeteer-core": "25.13.0"
 
-# The one documented exception to `pnpm audit --audit-level=high` (the CI dependency-audit
-# job). GHSA-vfj7-8cjw-p6xm (high): braces <=3.0.3 stack exhaustion on deeply nested
-# patterns, no patched release exists. Dev only: it is reached through
+# Not where a new audit exception goes: approved exceptions are the expiring
+# ignore-advisories lists in both audit workflows (DESIGN.md says why a mute here would fail
+# their parity check). This entry is dormant: the lock's braces is a patched release, so
+# nothing it mutes appears. GHSA-vfj7-8cjw-p6xm (high): braces <=3.0.3 stack exhaustion on
+# deeply nested patterns. Dev only: it is reached through
 # eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces, which
 # globs this repo's own patterns, never untrusted input. Drop this entry when a patched
 # braces ships.

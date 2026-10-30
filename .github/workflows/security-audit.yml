@@ -88,6 +88,19 @@ jobs:
           audit-exit: ${{ steps.audit.outputs.exit }}
           fail-on: critical,high
           json-out: ${{ runner.temp }}/security-audit/report.json
+          # The approved exceptions. Each line expires at most 30 days out and turns this job
+          # red until a human re-reviews it. The same list is in ci.yml's dependency-audit job:
+          # change both together. They live here, not in pnpm-workspace.yaml's
+          # auditConfig.ignoreGhsas: that mute drops the advisory but keeps pnpm's totals, so
+          # this report would fail its own parity check (see DESIGN.md).
+          # GHSA-mrhx-c7xc-m3w5 (high), approved by Amin 2026-10-30 (T-7156): zod 3.25.76 stays
+          # in the lock because @copilotkit/runtime, @copilotkit/shared and @ag-ui/client|proto
+          # hard-depend on zod 3, and @a2ui/web_core and @copilotkit/a2ui-renderer break on zod 4.
+          # It is reachable (the runtime parses request data with @ag-ui/core's zod/v4 schema), but
+          # only after the copilotkit route's guardRequest, readCappedBody (512 KiB) and
+          # sanitizeCopilotEnvelope caps. On expiry, check for a zod-4 release of that chain first.
+          ignore-advisories: |
+            GHSA-mrhx-c7xc-m3w5 | expires=2026-11-28 | zod 3.25.76 is pinned by @copilotkit and @ag-ui (no zod-4 release); reachable only after the copilotkit route caps (T-7156)
 
       - name: Audit the override / resolutions table
         id: overrides

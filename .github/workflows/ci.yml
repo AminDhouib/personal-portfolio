@@ -77,7 +77,10 @@ jobs:
 
   # Known-vulnerable dependencies fail the PR. Its own job so a registry hiccup or a new
   # advisory shows as one red check and does not mask the lint, typecheck and test results.
-  # The one documented exception lives in pnpm-workspace.yaml (auditConfig).
+  # The approved exceptions are the ignore-advisories list below, the same list as in
+  # security-audit.yml, and expire like it. The vendored action applies them by recounting
+  # pnpm's JSON. `pnpm audit --ignore` is not an option: it only writes config and exits 0
+  # without auditing.
   dependency-audit:
     name: Dependency audit (high and critical)
     runs-on: ubuntu-latest
@@ -94,8 +97,28 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # A non-zero exit here is information, not the verdict: the next step reads the JSON.
       - name: pnpm audit (high and above)
-        run: pnpm audit --audit-level=high
+        id: audit
+        run: |
+          set -uo pipefail
+          mkdir -p "$RUNNER_TEMP/dependency-audit"
+          set +e
+          pnpm audit --audit-level=high --json > "$RUNNER_TEMP/dependency-audit/audit.json"
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Gate on high and above, less the approved exceptions
+        uses: ./.github/actions/security-audit
+        with:
+          mode: report
+          audit-json: ${{ runner.temp }}/dependency-audit/audit.json
+          package-manager: pnpm
+          audit-command: pnpm audit --audit-level=high --json
+          audit-exit: ${{ steps.audit.outputs.exit }}
+          fail-on: critical,high
+          # Keep in step with security-audit.yml, which documents each line.
+          ignore-advisories: |
+            GHSA-mrhx-c7xc-m3w5 | expires=2026-11-28 | zod 3.25.76 is pinned by @copilotkit and @ag-ui (no zod-4 release); reachable only after the copilotkit route caps (T-7156)
 
   # Builds once for e2e, which downloads the tarball instead of rebuilding. Lighthouse keeps its
   # own build without the GA4 id: the gtag bootstrap cost the homepage performance score. Built with a
