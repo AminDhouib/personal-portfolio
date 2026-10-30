@@ -186,10 +186,17 @@ style suggestions.
   (`gh api repos/DevinoSolutions/.github/contents/<path>?ref=<sha>`), copy the changes, update the
   SHA in the headers, in the workflow header and here, and re-pin any new third-party `uses:`. The
   action's `ignore-advisories` input (`GHSA-... | expires=YYYY-MM-DD | reason`, at most 30 days
-  out) is not wired in this workflow, so using it means editing the workflow's report step; it
-  never applies to the override check. `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` (the
-  braces GHSA) already applies to both audit jobs. The vendored `.py` files are not covered by the JS gates and are not run in CI here (the
-  org repo runs their pytest suite).
+  out) is how an approved advisory exception is made, and it never applies to the override
+  check. The same list sits in this workflow's report step and in ci.yml's dependency-audit job,
+  which also gates through the action in report mode; change both together. One is in effect:
+  GHSA-mrhx-c7xc-m3w5, zod 3.25.76 under @copilotkit and @ag-ui (T-7156). An expired line turns
+  both jobs red until it is re-reviewed. `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` is
+  not a substitute. pnpm drops a muted advisory from its list but keeps it in
+  `metadata.vulnerabilities`, which is what the action reads. So with no ignores the job stays
+  red, and with ignores the action's parity check fails closed. The braces entry there is dormant
+  (the lock's braces is patched). `pnpm audit --ignore <id>` is no substitute either: it writes
+  config and exits 0 without auditing. The vendored `.py` files are not covered by the JS gates
+  and are not run in CI here (the org repo runs their pytest suite).
 - **Gate-disable conventions**: the only sanctioned escape hatch is
   `// eslint-disable-next-line <rule> -- <reason>`. File-level or blanket disables, downgrading a
   rule to `"warn"`, and quietly widening `FS_ALLOWLIST` are all banned outright — fix the code, not
