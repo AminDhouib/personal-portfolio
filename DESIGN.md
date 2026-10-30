@@ -194,7 +194,7 @@ style suggestions.
   not a substitute. pnpm drops a muted advisory from its list but keeps it in
   `metadata.vulnerabilities`, which is what the action reads. So with no ignores the job stays
   red, and with ignores the action's parity check fails closed. The braces entry there is dormant
-  (the lock's braces is patched). `pnpm audit --ignore <id>` is no substitute either: it writes
+  (GitHub withdrew that advisory on 2026-10-23). `pnpm audit --ignore <id>` is no substitute either: it writes
   config and exits 0 without auditing. The vendored `.py` files are not covered by the JS gates
   and are not run in CI here (the org repo runs their pytest suite).
 - **Gate-disable conventions**: the only sanctioned escape hatch is

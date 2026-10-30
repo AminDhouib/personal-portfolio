@@ -97,15 +97,26 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # A non-zero exit here is information, not the verdict: the next step reads the JSON.
+      # A non-zero exit here is information, not the verdict: the next step reads the JSON. But
+      # the report counts only what the JSON holds, so an error object or `{}` from a registry
+      # hiccup would count as clean once no ignore is given. Anything that is not a full audit
+      # report fails here.
       - name: pnpm audit (high and above)
         id: audit
         run: |
           set -uo pipefail
           mkdir -p "$RUNNER_TEMP/dependency-audit"
           set +e
-          pnpm audit --audit-level=high --json > "$RUNNER_TEMP/dependency-audit/audit.json"
-          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          pnpm audit --audit-level=high --json > "$RUNNER_TEMP/dependency-audit/audit.json" 2> "$RUNNER_TEMP/dependency-audit/audit.err"
+          code=$?
+          set -e
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+          if ! node -e 'const o = (v) => v !== null && typeof v === "object" && !Array.isArray(v); const d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.exit(o(d.advisories) && o(d.metadata?.vulnerabilities) ? 0 : 1)' "$RUNNER_TEMP/dependency-audit/audit.json" > /dev/null 2>&1; then
+            echo "::error::pnpm audit (exit $code) produced no usable report; stdout and stderr follow"
+            cat "$RUNNER_TEMP/dependency-audit/audit.json" || true
+            cat "$RUNNER_TEMP/dependency-audit/audit.err" || true
+            exit 1
+          fi
 
       - name: Gate on high and above, less the approved exceptions
         uses: ./.github/actions/security-audit
