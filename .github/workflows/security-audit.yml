@@ -98,7 +98,9 @@ jobs:
           # hard-depend on zod 3, and @a2ui/web_core and @copilotkit/a2ui-renderer break on zod 4.
           # It is reachable (the runtime parses request data with @ag-ui/core's zod/v4 schema), but
           # only after the copilotkit route's guardRequest, readCappedBody (512 KiB) and
-          # sanitizeCopilotEnvelope caps. On expiry, check for a zod-4 release of that chain first.
+          # sanitizeCopilotEnvelope caps. The match is the GHSA id, not a version: on expiry, run
+          # `pnpm why zod` to check that no other zod below 4.6.6 has come in, and check for a
+          # zod-4 release of that chain first.
           ignore-advisories: |
             GHSA-mrhx-c7xc-m3w5 | expires=2026-11-28 | zod 3.25.76 is pinned by @copilotkit and @ag-ui (no zod-4 release); reachable only after the copilotkit route caps (T-7156)
 
