@@ -84,6 +84,24 @@ function resolveRewrite(
   return null;
 }
 
+// The flat bundles the self-hosted PostHog serves under /static (probed with GETs on 2026-10-30).
+// Everything else under /static, versioned or not, is answered 302 /login by the upstream.
+const VERSIONED_STATIC_FILES = [
+  "array",
+  "recorder",
+  "lazy-recorder",
+  "surveys",
+  "dead-clicks-autocapture",
+  "exception-autocapture",
+  "product-tours",
+  "tracing-headers",
+  "toolbar",
+  "logs",
+  "web-vitals",
+  "web-vitals-with-attribution",
+  "conversations",
+];
+
 describe("posthogProxyRewrites", () => {
   const UPSTREAM = "https://ph.example.com";
   const rules = posthogProxyRewrites(UPSTREAM);
@@ -96,6 +114,7 @@ describe("posthogProxyRewrites", () => {
       "/i/v1/:path*",
       "/s",
       "/flags",
+      `/static/:version(\\d+\\.\\d+\\.\\d+)/:file(${VERSIONED_STATIC_FILES.join("|")}).js`,
       "/static/:path*",
       "/array/:path*",
       "/api/surveys",
@@ -122,7 +141,12 @@ describe("posthogProxyRewrites", () => {
     ["/flags", "/flags/"],
     // the SDK's bundles and remote config
     ["/static/recorder.js", "/static/recorder.js"],
-    ["/static/1.399.2/surveys.js", "/static/1.399.2/surveys.js"],
+    // a versioned bundle URL (strict script versioning) is mapped to the flat file the upstream
+    // serves: it answers 302 /login for /static/<version>/..., which ends in a failed script load
+    ["/static/1.438.19/surveys.js", "/static/surveys.js"],
+    ["/static/1.438.19/recorder.js", "/static/recorder.js"],
+    ["/static/1.438.19/web-vitals-with-attribution.js", "/static/web-vitals-with-attribution.js"],
+    ["/static/0.0.1/array.js", "/static/array.js"],
     ["/array/phc_key/config", "/array/phc_key/config"],
     ["/array/phc_key/config.js", "/array/phc_key/config.js"],
     // token-scoped public reads
@@ -166,6 +190,39 @@ describe("posthogProxyRewrites", () => {
     "/arrays/x.js",
   ])("does not forward %j (the app answers 404)", (subPath) => {
     expect(rewrite(subPath)).toBeNull();
+  });
+
+  it.each([
+    // not a semver segment
+    "/static/latest/surveys.js",
+    "/static/1.438/surveys.js",
+    "/static/1.438.19.1/surveys.js",
+    "/static/1.438.19-beta/surveys.js",
+    "/static/v1.438.19/surveys.js",
+    "/static/1.438.x/surveys.js",
+    // not a bundle the upstream serves (it would 302 to /login), nor a path-shaped trick
+    "/static/1.438.19/customizations.js",
+    "/static/1.438.19/heatmaps.js",
+    "/static/1.438.19/surveys.js.map",
+    "/static/1.438.19/surveys.css",
+    "/static/1.438.19/surveys",
+    "/static/1.438.19/x/surveys.js",
+    "/static/1.438.19/../login",
+  ])("does not map the versioned path %j onto a flat file", (subPath) => {
+    // passed through unchanged by the generic /static rule, never remapped
+    expect(rewrite(subPath)).toBe(`${UPSTREAM}${subPath}`);
+  });
+
+  it("maps every bundle the upstream serves, and only when the segment is a semver", () => {
+    for (const file of VERSIONED_STATIC_FILES) {
+      expect(rewrite(`/static/1.438.19/${file}.js`)).toBe(`${UPSTREAM}/static/${file}.js`);
+      expect(rewrite(`/static/${file}.js`)).toBe(`${UPSTREAM}/static/${file}.js`);
+    }
+  });
+
+  it("keeps the mapped destination on the allow-listed /static prefix", () => {
+    const mapped = rules.find((rule) => rule.source.includes(":version"));
+    expect(mapped?.destination).toBe(`${UPSTREAM}/static/:file.js`);
   });
 
   it("never forwards a path outside the proxy path, or a lookalike prefix of it", () => {

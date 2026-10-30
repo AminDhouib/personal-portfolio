@@ -1826,6 +1826,15 @@ position` there: `Detonate` damages the captive (which removes it), then its cha
   SDK removes the script node that React had already hydrated, so a later navigation threw
   insertBefore/removeChild NotFoundError. `false` keeps the legacy `/static/<kind>.js?v=` URL the
   proxy serves (T-7017). Do not remove it on an upgrade without re-testing client-side navigation.
+  As a second line of defence (T-6982), the proxy maps `/static/<semver>/<bundle>.js` onto the flat
+  `/static/<bundle>.js` for the 13 bundles the instance serves (`POSTHOG_STATIC_BUNDLES`, found
+  by GET probes; the instance answers `302 /login` for every other `/static` path, versioned or
+  not), so a versioned request loads instead of failing. A clean 404 would not have helped: the
+  SDK removes its node on any load failure, which is what crashed. The mapping drops the version
+  rather than honouring it: the browser gets the SERVER's PostHog bundle, exactly what the
+  unversioned request already gets, so a strict-versioning request is never actually pinned to the
+  SDK's version. That is why the `false` setting above stays. Real fix, if ever wanted: upstream
+  serving versioned `/static/<version>/` paths (host config, not this repo).
 - **Capture takes an internal hop so PostHog sees the visitor's IP.** PostHog's capture service
   reads only the LEFTMOST `X-Forwarded-For`, and the devino.ca Cloudflare zone strips
   `X-Forwarded-For` on posthog.devino.ca on purpose (anti-spoof; never work around it). Through
