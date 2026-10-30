@@ -60,10 +60,11 @@ describe("posthogUpstreamHost", () => {
 // This runs exactly those functions of the installed Next (16.3.8 at the time of writing), so
 // the rule list is checked against what Next really does, including that optional-slash modifier:
 // a `:path*` source swallows the final slash of the path it matches.
-function resolveRewrite(
+function resolveRewriteFull(
   rules: ReturnType<typeof posthogProxyRewrites>,
   pathname: string,
-): string | null {
+  requestQuery: Record<string, string> = {},
+) {
   for (const rule of rules) {
     const match = getPathMatch(rule.source, {
       strict: true,
@@ -77,15 +78,24 @@ function resolveRewrite(
       appendParamsToQuery: true,
       destination: rule.destination,
       params,
-      query: {},
+      query: requestQuery,
     });
-    return `${parsedDestination.origin}${parsedDestination.pathname}`;
+    return parsedDestination;
   }
   return null;
 }
 
+function resolveRewrite(
+  rules: ReturnType<typeof posthogProxyRewrites>,
+  pathname: string,
+): string | null {
+  const destination = resolveRewriteFull(rules, pathname);
+  return destination ? `${destination.origin}${destination.pathname}` : null;
+}
+
 // The flat bundles the self-hosted PostHog serves under /static (probed with GETs on 2026-10-30).
-// Everything else under /static, versioned or not, is answered 302 /login by the upstream.
+// Everything else under /static, versioned or not, is answered 302 /login by the upstream. The
+// two soft-navigation web-vitals variants posthog-js 1.438 can load are not served either.
 const VERSIONED_STATIC_FILES = [
   "array",
   "recorder",
@@ -203,6 +213,11 @@ describe("posthogProxyRewrites", () => {
     // not a bundle the upstream serves (it would 302 to /login), nor a path-shaped trick
     "/static/1.438.19/customizations.js",
     "/static/1.438.19/heatmaps.js",
+    // prerelease versions deliberately fall through (posthog-js does not publish them to latest)
+    "/static/1.440.0-beta.1/surveys.js",
+    // the soft-navs web-vitals variants are not served by the host (302 /login)
+    "/static/1.438.19/web-vitals-soft-navs.js",
+    "/static/1.438.19/web-vitals-with-attribution-soft-navs.js",
     "/static/1.438.19/surveys.js.map",
     "/static/1.438.19/surveys.css",
     "/static/1.438.19/surveys",
@@ -218,6 +233,31 @@ describe("posthogProxyRewrites", () => {
       expect(rewrite(`/static/1.438.19/${file}.js`)).toBe(`${UPSTREAM}/static/${file}.js`);
       expect(rewrite(`/static/${file}.js`)).toBe(`${UPSTREAM}/static/${file}.js`);
     }
+  });
+
+  it("maps the trailing-slash spelling too (Next's optional-slash modifier)", () => {
+    expect(rewrite("/static/1.438.19/surveys.js/")).toBe(`${UPSTREAM}/static/surveys.js`);
+  });
+
+  // The rewrite source is compiled case-insensitive by Next (getPathMatch, sensitive: false), so
+  // an upper-case path matches; the captured name is forwarded as written, the literal `.js` is the
+  // destination's own. Harmless: the request only reaches an upstream file name that is not served.
+  it("matches case-insensitively, forwarding the captured name as written, with the literal .js", () => {
+    expect(rewrite("/static/1.438.19/SURVEYS.JS")).toBe(`${UPSTREAM}/static/SURVEYS.js`);
+  });
+
+  // The request's query string is carried through untouched; the version segment is dropped and
+  // not added to it.
+  it("keeps the incoming query string through the mapping", () => {
+    const destination = resolveRewriteFull(
+      rules,
+      `${POSTHOG_PROXY_PATH}/static/1.438.19/surveys.js`,
+      {
+        v: "x",
+      },
+    );
+    expect(destination?.pathname).toBe("/static/surveys.js");
+    expect(destination?.query).toEqual({ v: "x" });
   });
 
   it("keeps the mapped destination on the allow-listed /static prefix", () => {

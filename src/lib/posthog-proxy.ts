@@ -31,6 +31,44 @@ export function posthogUpstreamHost(configuredHost: string | null | undefined): 
 }
 
 /**
+ * The flat bundles a self-hosted PostHog serves under `/static` (read off the live instance with
+ * plain GETs): the SDK's lazy extensions plus the main bundle. Anything else under `/static`, and
+ * every `/static/<version>/...` URL, is answered `302 /login` by that instance. posthog-js 1.438
+ * also loads `web-vitals-soft-navs` and `web-vitals-with-attribution-soft-navs` (its soft-navigation
+ * variants); both were probed on 2026-10-30 and are left out because the host does not serve them
+ * (302 /login), so mapping them would only trade one failed load for another.
+ */
+const POSTHOG_STATIC_BUNDLES = [
+  "array",
+  "recorder",
+  "lazy-recorder",
+  "surveys",
+  "dead-clicks-autocapture",
+  "exception-autocapture",
+  "product-tours",
+  "tracing-headers",
+  "toolbar",
+  "logs",
+  "web-vitals",
+  "web-vitals-with-attribution",
+  "conversations",
+];
+
+/**
+ * A versioned bundle URL, `/static/<semver>/<bundle>.js`, which posthog-js requests when
+ * `strict_script_versioning` is on or 'fallback' (its default from 1.438). The self-hosted instance
+ * has no versioned paths, so the request would end in `302 /login`, a failed script load, and the
+ * SDK removing its script node (T-7017). It is mapped to the flat bundle the instance does serve,
+ * for the allow-listed bundles only, so the load succeeds. This is the SAME bundle an unversioned
+ * request already gets (`strict_script_versioning: false` in `instrumentation-client.ts` stays),
+ * i.e. the server's PostHog version, not the SDK's: the version is dropped, never honoured.
+ * Only plain `major.minor.patch` matches: a prerelease such as 1.440.0-beta.1 deliberately falls
+ * through to the generic `/static/:path*` rule, since posthog-js does not publish prereleases to
+ * latest. Must precede that generic rule: the first match wins.
+ */
+const POSTHOG_VERSIONED_STATIC_SUBPATH = `/static/:version(\\d+\\.\\d+\\.\\d+)/:file(${POSTHOG_STATIC_BUNDLES.join("|")}).js`;
+
+/**
  * What the SDK may reach through the proxy: an allow-list grounded in posthog-js (1.399.x),
  * where every request goes through `endpointFor` (`api_host` is the proxy path). Nothing else
  * under the proxy path is forwarded: a catch-all would expose PostHog's whole app surface
@@ -58,39 +96,6 @@ export function posthogUpstreamHost(configuredHost: string | null | undefined): 
  * (`/static/...`, `/array/...`, `/i/v1/...`). `__tests__/posthog-proxy.test.ts` runs Next's real
  * matcher over this list to pin all of it.
  */
-/**
- * The flat bundles a self-hosted PostHog serves under `/static` (read off the live instance with
- * plain GETs): the SDK's lazy extensions plus the main bundle. Anything else under `/static`, and
- * every `/static/<version>/...` URL, is answered `302 /login` by that instance.
- */
-const POSTHOG_STATIC_BUNDLES = [
-  "array",
-  "recorder",
-  "lazy-recorder",
-  "surveys",
-  "dead-clicks-autocapture",
-  "exception-autocapture",
-  "product-tours",
-  "tracing-headers",
-  "toolbar",
-  "logs",
-  "web-vitals",
-  "web-vitals-with-attribution",
-  "conversations",
-];
-
-/**
- * A versioned bundle URL, `/static/<semver>/<bundle>.js`, which posthog-js requests when
- * `strict_script_versioning` is on or 'fallback' (its default from 1.438). The self-hosted instance
- * has no versioned paths, so the request would end in `302 /login`, a failed script load, and the
- * SDK removing its script node (T-7017). It is mapped to the flat bundle the instance does serve,
- * for the allow-listed bundles only, so the load succeeds. This is the SAME bundle an unversioned
- * request already gets (`strict_script_versioning: false` in `instrumentation-client.ts` stays),
- * i.e. the server's PostHog version, not the SDK's: the version is dropped, never honoured.
- * Must precede the generic `/static/:path*` rule: the first match wins.
- */
-const POSTHOG_VERSIONED_STATIC_SUBPATH = `/static/:version(\\d+\\.\\d+\\.\\d+)/:file(${POSTHOG_STATIC_BUNDLES.join("|")}).js`;
-
 const POSTHOG_ALLOWED_PATHS: ReadonlyArray<{ subPath: string; upstream: string }> = [
   { subPath: "/e", upstream: "/e/" },
   { subPath: "/i/v0/e", upstream: "/i/v0/e/" },
