@@ -25,7 +25,7 @@
 name: Dokploy
 on:
     push:
-        branches: [main, ci/ghcr-pull-mode-prep] # TEMP: removed before hand-over
+        branches: [main]
         paths-ignore:
             - "*.md"
             - "docs/**"
