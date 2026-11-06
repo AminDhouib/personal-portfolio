@@ -1,0 +1,178 @@
+# The compose file Dokploy STORES for this service (raw), instead of cloning the repository: the same stack as compose.yml with the
+# `app` build replaced by an image pinned by digest and db/init.sql inlined (a raw compose has no checkout, so no ./path mount can
+# work). A release of .github/workflows/dokploy.yml moves the image digest; everything else is changed here and stored by hand.
+# compose.yml stays the file for local `docker compose up --build`.
+#
+# THE infrastructure contract. Local, CI, and prod all use this exact file.
+# `docker compose up` builds and runs the same image everywhere.
+#
+# All env vars are read from `.env` (Docker Compose's default) via ${VAR}
+# substitution. Locally: create a `.env` file. Dokploy: set vars in the UI
+# (it creates `.env` automatically). CI: export vars in the runner.
+#
+# No host-port bindings: Dokploy's Traefik routes amindhou.com -> app:3000
+# via the domain config. For local use, add `ports: ["3000:3000"]` to the
+# app service in a local-only override, or access via `docker compose exec`.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portfolio
+      POSTGRES_USER: portfolio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    configs:
+      - source: init_sql
+        target: /docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    # Replaced by the digest of every release (Dokploy moves it; never edit it by hand).
+    image: ghcr.io/amindhouib/personal-portfolio/app:REPLACED_AT_CUTOVER
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD}@db:5432/portfolio
+      NODE_ENV: production
+      OPENROUTER_KEY: ${OPENROUTER_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENDLY_API_KEY: ${SENDLY_API_KEY:-}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
+      # Internal origin for the first-party PostHog proxy's capture hop (src/proxy.ts), mapped
+      # by extra_hosts below. NO-COLON default form on purpose: unset gets the default, but an
+      # explicit blank stays blank, which disables the hop (the fallback if the host Traefik
+      # router is missing, and the right setting for a local stack). RUNBOOK.md, Analytics proxy.
+      POSTHOG_CAPTURE_INTERNAL_ORIGIN: ${POSTHOG_CAPTURE_INTERNAL_ORIGIN-http://posthog-capture.internal}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GA4_SERVICE_ACCOUNT_KEY: ${GA4_SERVICE_ACCOUNT_KEY:-}
+      GA4_PROPERTY_SHORTY: ${GA4_PROPERTY_SHORTY:-}
+      GA4_PROPERTY_UNOTES: ${GA4_PROPERTY_UNOTES:-}
+      GA4_PROPERTY_CARAMEL: ${GA4_PROPERTY_CARAMEL:-}
+      GA4_PROPERTY_UPUP: ${GA4_PROPERTY_UPUP:-}
+      GA4_PROPERTY_GETITDONE: ${GA4_PROPERTY_GETITDONE:-}
+      # Emergency escape hatch for the strict env presence gate (src/env.ts
+      # validateRequiredEnv). Left unset in normal operation; set to the exact
+      # sentinel value in the Dokploy env ONLY to deliberately boot past a
+      # missing required var. Wired here so the override can actually reach the
+      # container -- without this line it would be silently unreachable in prod.
+      DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION: ${DANGEROUSLY_BOOT_WITH_MISSING_REQUIRED_ENV_AND_SKIP_VALIDATION:-}
+    # Resolves the internal capture origin above to the docker host, where Traefik's
+    # posthog-capture-internal router (host infra, owned by the Uptimely repo) answers it.
+    extra_hosts:
+      - "posthog-capture.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  db-data:
+
+# db/init.sql, inline: a stored raw compose has no checkout, so no file of the repository can be mounted. The workflow (job `check`)
+# fails when this text differs from db/init.sql. It runs once, on the first start of an empty data directory.
+configs:
+  init_sql:
+    content: |
+      -- Portfolio database schema.
+      -- Runs once on first container start (mounted into /docker-entrypoint-initdb.d/).
+      -- Matches the zod schemas in src/lib/persistence-schemas.ts.
+
+      CREATE TABLE IF NOT EXISTS leaderboard_entries (
+        id            SERIAL PRIMARY KEY,
+        game          TEXT        NOT NULL,
+        name          TEXT        NOT NULL,
+        score         INTEGER     NOT NULL,
+        level         INTEGER     NOT NULL,
+        seconds       INTEGER,
+        kills         INTEGER,
+        distance      INTEGER,
+        region        TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_leaderboard_game_score
+        ON leaderboard_entries (game, score DESC);
+
+      CREATE TABLE IF NOT EXISTS pg_leaderboard_entries (
+        id              SERIAL PRIMARY KEY,
+        name            TEXT        NOT NULL,
+        seed            INTEGER     NOT NULL,
+        elapsed_seconds INTEGER     NOT NULL,
+        rule_count      INTEGER     NOT NULL,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_pg_leaderboard_elapsed
+        ON pg_leaderboard_entries (elapsed_seconds ASC);
+
+      CREATE TABLE IF NOT EXISTS pg2_leaderboard_entries (
+        id              SERIAL PRIMARY KEY,
+        name            TEXT        NOT NULL,
+        seed            BIGINT      NOT NULL,
+        time_ms         INTEGER     NOT NULL,
+        daily           BOOLEAN     NOT NULL DEFAULT FALSE,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_pg2_leaderboard_seed_time
+        ON pg2_leaderboard_entries (seed, time_ms ASC);
+
+      CREATE INDEX IF NOT EXISTS idx_pg2_leaderboard_time_id
+        ON pg2_leaderboard_entries (time_ms ASC, id ASC);
+
+      CREATE TABLE IF NOT EXISTS leads (
+        id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        name        TEXT        NOT NULL,
+        email       TEXT        NOT NULL,
+        note        TEXT        NOT NULL DEFAULT '',
+        source      TEXT        NOT NULL DEFAULT 'chatbot',
+        page        TEXT        NOT NULL DEFAULT '',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      -- Arcade leaderboard v2 (src/lib/arcade). The app ALSO creates these at first use
+      -- (src/lib/arcade/schema.ts), because this file only runs on a fresh volume and prod's
+      -- volume already exists. schema.test.ts fails if the two copies drift.
+      CREATE TABLE IF NOT EXISTS arcade_players (
+        id           UUID        PRIMARY KEY,
+        token_hash   TEXT        NOT NULL,
+        handle       TEXT        NOT NULL,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS arcade_scores (
+        game        TEXT        NOT NULL,
+        board       TEXT        NOT NULL,
+        player_id   UUID        NOT NULL REFERENCES arcade_players (id) ON DELETE CASCADE,
+        score       BIGINT      NOT NULL,
+        detail      JSONB       NOT NULL DEFAULT '{}'::jsonb,
+        achieved_at TIMESTAMPTZ NOT NULL,
+        PRIMARY KEY (game, board, player_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_arcade_scores_rank
+        ON arcade_scores (game, board, score DESC, achieved_at ASC);
+
+      CREATE TABLE IF NOT EXISTS arcade_migrations (
+        key        TEXT        PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
