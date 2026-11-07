@@ -21,7 +21,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a push run that may be publishing a release; a superseded pull request run is cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint-and-test:
@@ -357,43 +358,134 @@ jobs:
         env:
           ARCADE_IT_DATABASE_URL: postgresql://postgres:arcade_it_ci_throwaway@localhost:5432/arcade_it
 
-  deploy:
-    name: Deploy to Dokploy
+  # --- Release to Dokploy (native pull mode). Replaces the old "Deploy to Dokploy" job (Tailscale + compose.deploy). ---
+  # Builds the app image ONCE per commit, only after every gate above is green, pushes it to GHCR by digest and publishes a Dokploy
+  # release. Dokploy polls GitHub, reads the release and deploys the digest into the stored compose (deploy/dokploy-compose.yml). This
+  # file holds no Dokploy address and no Dokploy API key. Dokploy accepts only push or workflow_dispatch releases, which is why
+  # this lives in the same workflow as the tests (needs:) and not in a workflow_run workflow.
+  # The image is inside ghcr.io/<owner>/<repo>/ (the namespace Dokploy accepts). The package must be PUBLIC (package settings on
+  # GitHub). NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_POSTHOG_HOST and NEXT_PUBLIC_GA4_ID are inlined into the browser bundle at build time:
+  # public client values, so repository VARIABLES. WHEN ONE CHANGES IN THE DOKPLOY ENVIRONMENT TAB, CHANGE THE SAME VARIABLE TOO.
+  image:
+    name: Build and push the app image
     needs: [lint-and-test, lighthouse, e2e, db-integration]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
+    # No `environment:` here on purpose: it would create a GitHub Deployment for the build.
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.verify.outputs.digest }}
     steps:
-      - name: Check deploy secrets
-        id: check
-        env:
-          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
-        run: |
-          if [ -n "$TS_OAUTH_CLIENT_ID" ] && [ -n "$TS_OAUTH_SECRET" ] && [ -n "$DOKPLOY_URL" ] && [ -n "$DOKPLOY_TOKEN" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Deploy skipped::deploy secrets not configured; this push did NOT deploy via CI (Dokploy autoDeploy may still fire independently)"
-          fi
-
-      - name: Connect to Tailscale
-        if: steps.check.outputs.enabled == 'true'
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          persist-credentials: false
 
-      - name: Trigger Dokploy deploy
-        if: steps.check.outputs.enabled == 'true'
+      - name: Collect the build arguments
+        id: args
         env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
-          DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
+          NEXT_PUBLIC_GA4_ID: ${{ vars.NEXT_PUBLIC_GA4_ID }}
         run: |
-          curl -sf -X POST "$DOKPLOY_URL/api/compose.deploy" \
-            -H "x-api-key: $DOKPLOY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"composeId":"hnV_k4WYHOmodXzsvQeDk"}'
+          set -euo pipefail
+          set_names=()
+          {
+            echo 'build-args<<EOF_BUILD_ARGS'
+            for name in NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_GA4_ID; do
+              value="${!name}"
+              case "${value}" in *$'\n'*|*$'\r'*) echo "::error::variable ${name} is not a single line" >&2; exit 1 ;; esac
+              [ -z "${value}" ] || { set_names+=("${name}"); echo "${name}=${value}"; }
+            done
+            echo 'EOF_BUILD_ARGS'
+          } >> "${GITHUB_OUTPUT}"
+          echo "build args set from repository variables (names only): ${set_names[*]:-none}"
+          echo "tag=main-${GITHUB_SHA:0:12}" >> "${GITHUB_OUTPUT}"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build once and push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+          DOCKER_BUILD_SUMMARY: false
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/amindhouib/personal-portfolio/app:${{ steps.args.outputs.tag }}
+          build-args: ${{ steps.args.outputs.build-args }}
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=portfolio-app
+          cache-to: type=gha,mode=min,scope=portfolio-app
+
+      - name: Check that GHCR serves the pushed digest anonymously
+        id: verify
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no image digest from the build"; exit 1; }
+          ref="ghcr.io/amindhouib/personal-portfolio/app@${DIGEST}"
+          raw=''
+          for attempt in 1 2 3; do
+            if docker buildx imagetools inspect --raw "${ref}" > "${RUNNER_TEMP}/manifest.raw"; then
+              raw="sha256:$(sha256sum "${RUNNER_TEMP}/manifest.raw" | cut -d' ' -f1)"; break
+            fi
+            sleep $((attempt * 5))
+          done
+          [ "${raw}" = "${DIGEST}" ] || { echo "::error::GHCR does not serve the pushed manifest by its digest"; exit 1; }
+          # Dokploy pulls without a credential: prove the package is public with an anonymous token and a manifest HEAD.
+          code=000
+          for attempt in 1 2 3; do
+            token="$(curl -fsS "https://ghcr.io/token?scope=repository:amindhouib/personal-portfolio/app:pull" | jq -r '.token // empty' || true)"
+            code="$(curl -s -o /dev/null -w '%{http_code}' -I -H "Authorization: Bearer ${token}" -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json' "https://ghcr.io/v2/amindhouib/personal-portfolio/app/manifests/${DIGEST}" || true)"
+            [ "${code}" = 200 ] && break
+            sleep $((attempt * 5))
+          done
+          [ "${code}" = 200 ] || { echo "::error::ghcr.io/amindhouib/personal-portfolio/app is not pullable anonymously (HTTP ${code}); make the package public"; exit 1; }
+          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "- \`${ref}\`" >> "${GITHUB_STEP_SUMMARY}"
+
+  release:
+    name: Publish the Dokploy release
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job with an environment: its deployment branch policy gates the release and Dokploy re-reads that policy.
+    environment: production
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Check the digest
+        env:
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no digest from the image job"; exit 1; }
+
+      - uses: DevinoSolutions/dokploy-release@d66a2e9a36c7c154f92f9aa18b7f7aced6e73b77 # v1.1.0
+        with:
+          service: portfolio
+          environment: production
+          delivery: pull
+          upload-artifact: "false"
+          compose: deploy/dokploy-compose.yml
+          existing-image: portfolio/app=ghcr.io/amindhouib/personal-portfolio/app@${{ needs.image.outputs.digest }}
