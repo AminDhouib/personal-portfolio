@@ -1,10 +1,7 @@
 # The compose file Dokploy STORES for this service (raw), instead of cloning the repository: the same stack as compose.yml with the
 # `app` build replaced by an image pinned by digest and db/init.sql inlined (a raw compose has no checkout, so no ./path mount can
-# work). A release of .github/workflows/dokploy.yml moves the image digest; everything else is changed here and stored by hand.
+# work). A release (ci.yml, job `release`) moves the image digest; everything else is changed here and stored by hand.
 # compose.yml stays the file for local `docker compose up --build`.
-#
-# THE infrastructure contract. Local, CI, and prod all use this exact file.
-# `docker compose up` builds and runs the same image everywhere.
 #
 # All env vars are read from `.env` (Docker Compose's default) via ${VAR}
 # substitution. Locally: create a `.env` file. Dokploy: set vars in the UI
@@ -34,8 +31,9 @@ services:
       retries: 5
 
   app:
-    # Replaced by the digest of every release (Dokploy moves it; never edit it by hand).
-    image: ghcr.io/amindhouib/personal-portfolio/app:REPLACED_AT_CUTOVER
+    # Pinned by digest, the only form Dokploy can move: at cutover the zeros are replaced by the digest of the first main build;
+    # after that every release moves it (never edit it by hand). A tag form (repo:tag@sha256:...) is never matched.
+    image: ghcr.io/amindhouib/personal-portfolio/app@sha256:0000000000000000000000000000000000000000000000000000000000000000
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://portfolio:${POSTGRES_PASSWORD}@db:5432/portfolio
@@ -87,7 +85,8 @@ volumes:
   db-data:
 
 # db/init.sql, inline: a stored raw compose has no checkout, so no file of the repository can be mounted. The workflow (job `check`)
-# fails when this text differs from db/init.sql. It runs once, on the first start of an empty data directory.
+# fails when this text differs from db/init.sql. It runs once, on the first start of an empty data directory. Compose interpolates `$`
+# inside `content:`: a future `$` in init.sql must be written `$$$$` here (the check compares the interpolated text).
 configs:
   init_sql:
     content: |

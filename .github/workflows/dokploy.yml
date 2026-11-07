@@ -1,55 +1,27 @@
-# Builds the portfolio image (Dockerfile) ONCE per commit on GitHub-hosted runners, pushes it to GHCR by digest and publishes a
-# Dokploy release. Dokploy never builds this repository from source: it polls GitHub (outbound only), reads the release, checks
-# it against this run and deploys the digest into the stored compose (deploy/dokploy-compose.yml: the same stack as compose.yml
-# with the app build replaced by the pinned image and db/init.sql inlined). This file holds no Dokploy address and no Dokploy API
-# key; the only step that talks to Dokploy's contract is the public action DevinoSolutions/dokploy-release (shape: UpUp #690).
+# Pull request check for the Dokploy side of the portfolio: the stored compose (deploy/dokploy-compose.yml, the file Dokploy
+# deploys with the image digest of each release) must stay the same stack as compose.yml, and the image must build.
+# The release itself (build once, push to GHCR by digest, publish the Dokploy release) lives in ci.yml, after the test gates,
+# because Dokploy accepts only push or workflow_dispatch releases and the release must wait for the tests.
 #
-#   main            -> GitHub Environment `production` -> release key `portfolio` (compose service `app`)
-#   pull request    -> the `check` job: the image builds with push: false, and deploy/dokploy-compose.yml is validated against
-#                      compose.yml and db/init.sql. Nothing is pushed or released.
-# Any other branch has no trigger.
-#
-# WHY HOSTED RUNNERS. This repository is public and lives under a personal account: the organisation's runner group and the
-# organisation's private shared workflows are out of reach, and nothing here needs the private network.
-#
-# THE IMAGE. ghcr.io/amindhouib/personal-portfolio/app (inside ghcr.io/<owner>/<repo>/, the namespace Dokploy accepts for this
-# repository), tagged main-<first 12 of the sha>. The package must be PUBLIC (package settings on GitHub) so Dokploy pulls without a
-# credential. NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_POSTHOG_HOST and NEXT_PUBLIC_GA4_ID are inlined into the browser bundle at build
-# time (see Dockerfile): they are public client values, so they are repository VARIABLES. WHEN ONE CHANGES IN THE DOKPLOY
-# ENVIRONMENT TAB, CHANGE THE SAME REPOSITORY VARIABLE TOO. Runtime secrets never appear here.
-#
-# THE RELEASE. The `release` job publishes ONE release for the compose service `app`; the image comes from a job output of THIS run
-# (a tag is refused). The manifest is read from the release job's log (`upload-artifact: false`). Dokploy deploys it only once a
-# Connect exists for the key `portfolio` (Dokploy Settings, GitHub Actions). Only the release job names an environment:
-# `production`, with a deployment branch policy that allows only `main`, re-read by Dokploy at every acceptance.
-name: Dokploy
+#   stored compose  deploy/dokploy-compose.yml vs compose.yml: after the two intended differences (the app build replaced by the
+#                   pinned image, the ./db/init.sql bind mount replaced by the inline configs.init_sql) every service must be
+#                   identical, db/init.sql must equal the inline content byte for byte, and the app image must be exactly
+#                   ghcr.io/amindhouib/personal-portfolio/app@sha256:<64 hex> (the one form Dokploy can pin). Nothing is pushed.
+#   image           the Dockerfile builds with push: false. No secret is used, so pull requests from forks run it too.
+name: Dokploy stored compose
 on:
-    push:
-        branches: [main]
-        paths-ignore:
-            - "*.md"
-            - "docs/**"
-            - "audit/**"
-            - LICENSE
-            - NOTICE
-            - ".claude/**"
     pull_request:
         branches: [main]
 concurrency:
-    # A newer push waits behind the running one. Never cancel a run that may be publishing a release; a superseded pull request
-    # check is cancelled.
     group: dokploy-${{ github.ref }}
-    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    cancel-in-progress: true
 permissions:
     contents: read
 jobs:
     check:
         name: check the image and the stored compose
-        if: ${{ github.ref != 'refs/heads/main' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         runs-on: ubuntu-latest
         timeout-minutes: 30
-        permissions:
-            contents: read
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
@@ -58,41 +30,53 @@ jobs:
               run: |
                   set -euo pipefail
                   export POSTGRES_PASSWORD=check
-                  docker compose -f deploy/dokploy-compose.yml config -q
-                  docker compose -f deploy/dokploy-compose.yml config --format json > "${RUNNER_TEMP}/stored.json"
-                  docker compose -f compose.yml config --format json > "${RUNNER_TEMP}/source.json"
-                  node - "${RUNNER_TEMP}/stored.json" "${RUNNER_TEMP}/source.json" <<'NODE'
+                  docker compose -p check -f deploy/dokploy-compose.yml config -q
+                  docker compose -p check -f deploy/dokploy-compose.yml config --format json > "${RUNNER_TEMP}/stored.json"
+                  docker compose -p check -f compose.yml config --format json > "${RUNNER_TEMP}/source.json"
+                  # The same two files without interpolation: `${A:-}`, `${A}` and "" must not compare equal.
+                  docker compose -p check -f deploy/dokploy-compose.yml config --no-interpolate --format json > "${RUNNER_TEMP}/stored-raw.json"
+                  docker compose -p check -f compose.yml config --no-interpolate --format json > "${RUNNER_TEMP}/source-raw.json"
+                  node - "${RUNNER_TEMP}" <<'NODE'
                   const fs = require('fs');
-                  const [storedFile, sourceFile] = process.argv.slice(2);
-                  const stored = JSON.parse(fs.readFileSync(storedFile, 'utf8'));
-                  const source = JSON.parse(fs.readFileSync(sourceFile, 'utf8'));
+                  const dir = process.argv[2];
+                  const load = (n) => JSON.parse(fs.readFileSync(`${dir}/${n}.json`, 'utf8'));
                   const fail = (m) => { console.error('::error::' + m); process.exit(1); };
+                  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+                  const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
+                  // Both views (interpolated and raw): drop only the intended differences, then every service must be identical.
+                  for (const view of ['', '-raw']) {
+                    const stored = sortKeys(load('stored' + view));
+                    const source = sortKeys(load('source' + view));
+                    const label = view === '' ? 'after interpolation' : 'before interpolation';
+                    if (!same(Object.keys(stored.services), Object.keys(source.services))) fail(`the two compose files define different services (${label})`);
+                    for (const [name, svc] of Object.entries(stored.services)) {
+                      const a = structuredClone(svc);
+                      const b = structuredClone(source.services[name]);
+                      if (name === 'app') { delete a.image; delete b.image; delete b.build; }
+                      if (name === 'db') {
+                        delete a.configs;
+                        b.volumes = (b.volumes || []).filter((v) => !(v.target || '').endsWith('/docker-entrypoint-initdb.d/init.sql'));
+                        if (!same(b.volumes, a.volumes || [])) fail(`db volumes differ beyond the init.sql mount (${label})`);
+                        delete a.volumes; delete b.volumes;
+                      }
+                      if (!same(a, b)) fail(`service ${name} differs between deploy/dokploy-compose.yml and compose.yml (${label})`);
+                    }
+                    for (const key of Object.keys({ ...stored, ...source })) {
+                      if (['services', 'configs', 'name'].includes(key)) continue;
+                      if (!same(stored[key], source[key])) fail(`top-level ${key} differs between the two compose files (${label})`);
+                    }
+                  }
+                  const stored = load('stored');
                   for (const [name, svc] of Object.entries(stored.services)) if (svc.build) fail(`${name} still has a build block in deploy/dokploy-compose.yml`);
-                  const image = stored.services.app && stored.services.app.image;
-                  if (!image || !image.startsWith('ghcr.io/amindhouib/personal-portfolio/')) fail('the app image is not inside ghcr.io/amindhouib/personal-portfolio/');
-                  if (JSON.stringify(Object.keys(stored.services).sort()) !== JSON.stringify(Object.keys(source.services).sort())) fail('the two compose files define different services');
+                  const image = stored.services.app.image || '';
+                  if (!/^ghcr\.io\/amindhouib\/personal-portfolio\/app@sha256:[0-9a-f]{64}$/.test(image)) fail(`the app image must be ghcr.io/amindhouib/personal-portfolio/app@sha256:<64 hex>, got ${image}`);
+                  const lines = fs.readFileSync('deploy/dokploy-compose.yml', 'utf8').split('\n').filter((l) => /^\s+image:\s*ghcr\.io\/amindhouib\/personal-portfolio\/app@sha256:[0-9a-f]{64}\s*$/.test(l));
+                  if (lines.length !== 1) fail(`expected exactly one pinned app image line, found ${lines.length}`);
                   const sql = fs.readFileSync('db/init.sql', 'utf8');
                   const inline = stored.configs && stored.configs.init_sql && stored.configs.init_sql.content;
                   if (inline !== sql) fail('configs.init_sql in deploy/dokploy-compose.yml differs from db/init.sql');
-                  const norm = (svc) => JSON.stringify({ environment: svc.environment, healthcheck: svc.healthcheck, depends_on: svc.depends_on, extra_hosts: svc.extra_hosts, restart: svc.restart });
-                  for (const name of Object.keys(source.services)) if (norm(stored.services[name]) !== norm(source.services[name])) fail(`service ${name} differs between the two compose files (environment, healthcheck, depends_on, extra_hosts or restart)`);
-                  console.log('deploy/dokploy-compose.yml matches compose.yml and db/init.sql');
+                  console.log('deploy/dokploy-compose.yml matches compose.yml, db/init.sql and the pin format');
                   NODE
-            - name: Collect the build arguments
-              id: args
-              env:
-                  VARS_JSON: ${{ toJSON(vars) }}
-              run: |
-                  set -euo pipefail
-                  {
-                    echo 'build-args<<EOF_BUILD_ARGS'
-                    for name in NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_GA4_ID; do
-                      value="$(printf '%s' "${VARS_JSON}" | jq -r --arg key "${name}" '.[$key] // ""')"
-                      case "${value}" in *$'\n'*|*$'\r'*) echo "::error::variable ${name} is not a single line" >&2; exit 1 ;; esac
-                      echo "${name}=${value}"
-                    done
-                    echo 'EOF_BUILD_ARGS'
-                  } >> "${GITHUB_OUTPUT}"
             - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
             - name: Build without pushing
               uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -104,122 +88,6 @@ jobs:
                   file: Dockerfile
                   platforms: linux/amd64
                   push: false
-                  build-args: ${{ steps.args.outputs.build-args }}
                   provenance: false
                   sbom: false
                   cache-from: type=gha,scope=portfolio-app
-
-    build:
-        name: build app
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
-        # No `environment:` here on purpose: it would create a GitHub Deployment for the build.
-        permissions:
-            contents: read
-            packages: write
-        outputs:
-            digest: ${{ steps.verify.outputs.digest }}
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with:
-                  persist-credentials: false
-            - name: Collect the build arguments
-              id: args
-              env:
-                  VARS_JSON: ${{ toJSON(vars) }}
-              run: |
-                  set -euo pipefail
-                  set_names=()
-                  {
-                    echo 'build-args<<EOF_BUILD_ARGS'
-                    for name in NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_GA4_ID; do
-                      value="$(printf '%s' "${VARS_JSON}" | jq -r --arg key "${name}" '.[$key] // ""')"
-                      case "${value}" in *$'\n'*|*$'\r'*) echo "::error::variable ${name} is not a single line" >&2; exit 1 ;; esac
-                      [ -z "${value}" ] || set_names+=("${name}")
-                      echo "${name}=${value}"
-                    done
-                    echo 'EOF_BUILD_ARGS'
-                  } >> "${GITHUB_OUTPUT}"
-                  echo "build args set from repository variables (names only): ${set_names[*]:-none}"
-                  echo "tag=main-${GITHUB_SHA:0:12}" >> "${GITHUB_OUTPUT}"
-            - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-            - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-            - name: Build once and push
-              id: build
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              env:
-                  DOCKER_BUILD_RECORD_UPLOAD: false
-                  DOCKER_BUILD_SUMMARY: false
-              with:
-                  context: .
-                  file: Dockerfile
-                  platforms: linux/amd64
-                  push: true
-                  tags: ghcr.io/amindhouib/personal-portfolio/app:${{ steps.args.outputs.tag }}
-                  build-args: ${{ steps.args.outputs.build-args }}
-                  provenance: false
-                  sbom: false
-                  labels: |
-                      org.opencontainers.image.source=https://github.com/${{ github.repository }}
-                      org.opencontainers.image.revision=${{ github.sha }}
-                  cache-from: type=gha,scope=portfolio-app
-                  cache-to: type=gha,mode=min,scope=portfolio-app
-            - name: Check that GHCR serves the pushed digest anonymously
-              id: verify
-              env:
-                  DIGEST: ${{ steps.build.outputs.digest }}
-              run: |
-                  set -euo pipefail
-                  [[ "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no image digest from the build"; exit 1; }
-                  ref="ghcr.io/amindhouib/personal-portfolio/app@${DIGEST}"
-                  raw=''
-                  for attempt in 1 2 3; do
-                    if docker buildx imagetools inspect --raw "${ref}" > "${RUNNER_TEMP}/manifest.raw"; then
-                      raw="sha256:$(sha256sum "${RUNNER_TEMP}/manifest.raw" | cut -d' ' -f1)"; break
-                    fi
-                    sleep $((attempt * 5))
-                  done
-                  [ "${raw}" = "${DIGEST}" ] || { echo "::error::GHCR does not serve the pushed manifest by its digest"; exit 1; }
-                  # Dokploy pulls without a credential: prove the package is public with an anonymous token and a manifest HEAD.
-                  code=000
-                  for attempt in 1 2 3; do
-                    token="$(curl -fsS "https://ghcr.io/token?scope=repository:amindhouib/personal-portfolio/app:pull" | jq -r '.token // empty' || true)"
-                    code="$(curl -s -o /dev/null -w '%{http_code}' -I -H "Authorization: Bearer ${token}" -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json' "https://ghcr.io/v2/amindhouib/personal-portfolio/app/manifests/${DIGEST}" || true)"
-                    [ "${code}" = 200 ] && break
-                    sleep $((attempt * 5))
-                  done
-                  [ "${code}" = 200 ] || { echo "::error::ghcr.io/amindhouib/personal-portfolio/app is not pullable anonymously (HTTP ${code}); make the package public"; exit 1; }
-                  echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
-                  echo "- \`${ref}\`" >> "${GITHUB_STEP_SUMMARY}"
-
-    release:
-        name: publish the Dokploy release
-        needs: build
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
-        # The only job with an environment: its deployment branch policy gates the release and Dokploy re-reads that policy.
-        environment: production
-        permissions:
-            contents: read
-            deployments: write
-        steps:
-            - name: Check the digest
-              env:
-                  DIGEST: ${{ needs.build.outputs.digest }}
-              run: |
-                  set -euo pipefail
-                  [[ "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no digest from the build job"; exit 1; }
-            - uses: DevinoSolutions/dokploy-release@d66a2e9a36c7c154f92f9aa18b7f7aced6e73b77 # v1.1.0
-              with:
-                  service: portfolio
-                  environment: production
-                  delivery: pull
-                  upload-artifact: 'false'
-                  compose: deploy/dokploy-compose.yml
-                  existing-image: portfolio/app=ghcr.io/amindhouib/personal-portfolio/app@${{ needs.build.outputs.digest }}
