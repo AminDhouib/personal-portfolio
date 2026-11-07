@@ -10,84 +10,84 @@
 #   image           the Dockerfile builds with push: false. No secret is used, so pull requests from forks run it too.
 name: Dokploy stored compose
 on:
-    pull_request:
-        branches: [main]
+  pull_request:
+    branches: [main]
 concurrency:
-    group: dokploy-${{ github.ref }}
-    cancel-in-progress: true
+  group: dokploy-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
-    contents: read
+  contents: read
 jobs:
-    check:
-        name: check the image and the stored compose
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with:
-                  persist-credentials: false
-            - name: The stored compose matches compose.yml and db/init.sql
-              run: |
-                  set -euo pipefail
-                  export POSTGRES_PASSWORD=check
-                  docker compose -p check -f deploy/dokploy-compose.yml config -q
-                  docker compose -p check -f deploy/dokploy-compose.yml config --format json > "${RUNNER_TEMP}/stored.json"
-                  docker compose -p check -f compose.yml config --format json > "${RUNNER_TEMP}/source.json"
-                  # The same two files without interpolation: `${A:-}`, `${A}` and "" must not compare equal.
-                  docker compose -p check -f deploy/dokploy-compose.yml config --no-interpolate --format json > "${RUNNER_TEMP}/stored-raw.json"
-                  docker compose -p check -f compose.yml config --no-interpolate --format json > "${RUNNER_TEMP}/source-raw.json"
-                  node - "${RUNNER_TEMP}" <<'NODE'
-                  const fs = require('fs');
-                  const dir = process.argv[2];
-                  const load = (n) => JSON.parse(fs.readFileSync(`${dir}/${n}.json`, 'utf8'));
-                  const fail = (m) => { console.error('::error::' + m); process.exit(1); };
-                  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-                  const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
-                  // Both views (interpolated and raw): drop only the intended differences, then every service must be identical.
-                  for (const view of ['', '-raw']) {
-                    const stored = sortKeys(load('stored' + view));
-                    const source = sortKeys(load('source' + view));
-                    const label = view === '' ? 'after interpolation' : 'before interpolation';
-                    if (!same(Object.keys(stored.services), Object.keys(source.services))) fail(`the two compose files define different services (${label})`);
-                    for (const [name, svc] of Object.entries(stored.services)) {
-                      const a = structuredClone(svc);
-                      const b = structuredClone(source.services[name]);
-                      if (name === 'app') { delete a.image; delete b.image; delete b.build; }
-                      if (name === 'db') {
-                        delete a.configs;
-                        b.volumes = (b.volumes || []).filter((v) => !(v.target || '').endsWith('/docker-entrypoint-initdb.d/init.sql'));
-                        if (!same(b.volumes, a.volumes || [])) fail(`db volumes differ beyond the init.sql mount (${label})`);
-                        delete a.volumes; delete b.volumes;
-                      }
-                      if (!same(a, b)) fail(`service ${name} differs between deploy/dokploy-compose.yml and compose.yml (${label})`);
-                    }
-                    for (const key of Object.keys({ ...stored, ...source })) {
-                      if (['services', 'configs', 'name'].includes(key)) continue;
-                      if (!same(stored[key], source[key])) fail(`top-level ${key} differs between the two compose files (${label})`);
-                    }
-                  }
-                  const stored = load('stored');
-                  for (const [name, svc] of Object.entries(stored.services)) if (svc.build) fail(`${name} still has a build block in deploy/dokploy-compose.yml`);
-                  const image = stored.services.app.image || '';
-                  if (!/^ghcr\.io\/amindhouib\/personal-portfolio\/app@sha256:[0-9a-f]{64}$/.test(image)) fail(`the app image must be ghcr.io/amindhouib/personal-portfolio/app@sha256:<64 hex>, got ${image}`);
-                  const lines = fs.readFileSync('deploy/dokploy-compose.yml', 'utf8').split('\n').filter((l) => /^\s+image:\s*ghcr\.io\/amindhouib\/personal-portfolio\/app@sha256:[0-9a-f]{64}\s*$/.test(l));
-                  if (lines.length !== 1) fail(`expected exactly one pinned app image line, found ${lines.length}`);
-                  const sql = fs.readFileSync('db/init.sql', 'utf8');
-                  const inline = stored.configs && stored.configs.init_sql && stored.configs.init_sql.content;
-                  if (inline !== sql) fail('configs.init_sql in deploy/dokploy-compose.yml differs from db/init.sql');
-                  console.log('deploy/dokploy-compose.yml matches compose.yml, db/init.sql and the pin format');
-                  NODE
-            - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-            - name: Build without pushing
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              env:
-                  DOCKER_BUILD_RECORD_UPLOAD: false
-                  DOCKER_BUILD_SUMMARY: false
-              with:
-                  context: .
-                  file: Dockerfile
-                  platforms: linux/amd64
-                  push: false
-                  provenance: false
-                  sbom: false
-                  cache-from: type=gha,scope=portfolio-app
+  check:
+    name: check the image and the stored compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The stored compose matches compose.yml and db/init.sql
+        run: |
+          set -euo pipefail
+          export POSTGRES_PASSWORD=check
+          docker compose -p check -f deploy/dokploy-compose.yml config -q
+          docker compose -p check -f deploy/dokploy-compose.yml config --format json > "${RUNNER_TEMP}/stored.json"
+          docker compose -p check -f compose.yml config --format json > "${RUNNER_TEMP}/source.json"
+          # The same two files without interpolation: `${A:-}`, `${A}` and "" must not compare equal.
+          docker compose -p check -f deploy/dokploy-compose.yml config --no-interpolate --format json > "${RUNNER_TEMP}/stored-raw.json"
+          docker compose -p check -f compose.yml config --no-interpolate --format json > "${RUNNER_TEMP}/source-raw.json"
+          node - "${RUNNER_TEMP}" <<'NODE'
+          const fs = require('fs');
+          const dir = process.argv[2];
+          const load = (n) => JSON.parse(fs.readFileSync(`${dir}/${n}.json`, 'utf8'));
+          const fail = (m) => { console.error('::error::' + m); process.exit(1); };
+          const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+          const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
+          // Both views (interpolated and raw): drop only the intended differences, then every service must be identical.
+          for (const view of ['', '-raw']) {
+            const stored = sortKeys(load('stored' + view));
+            const source = sortKeys(load('source' + view));
+            const label = view === '' ? 'after interpolation' : 'before interpolation';
+            if (!same(Object.keys(stored.services), Object.keys(source.services))) fail(`the two compose files define different services (${label})`);
+            for (const [name, svc] of Object.entries(stored.services)) {
+              const a = structuredClone(svc);
+              const b = structuredClone(source.services[name]);
+              if (name === 'app') { delete a.image; delete b.image; delete b.build; }
+              if (name === 'db') {
+                delete a.configs;
+                b.volumes = (b.volumes || []).filter((v) => !(v.target || '').endsWith('/docker-entrypoint-initdb.d/init.sql'));
+                if (!same(b.volumes, a.volumes || [])) fail(`db volumes differ beyond the init.sql mount (${label})`);
+                delete a.volumes; delete b.volumes;
+              }
+              if (!same(a, b)) fail(`service ${name} differs between deploy/dokploy-compose.yml and compose.yml (${label})`);
+            }
+            for (const key of Object.keys({ ...stored, ...source })) {
+              if (['services', 'configs', 'name'].includes(key)) continue;
+              if (!same(stored[key], source[key])) fail(`top-level ${key} differs between the two compose files (${label})`);
+            }
+          }
+          const stored = load('stored');
+          for (const [name, svc] of Object.entries(stored.services)) if (svc.build) fail(`${name} still has a build block in deploy/dokploy-compose.yml`);
+          const image = stored.services.app.image || '';
+          if (!/^ghcr\.io\/amindhouib\/personal-portfolio\/app@sha256:[0-9a-f]{64}$/.test(image)) fail(`the app image must be ghcr.io/amindhouib/personal-portfolio/app@sha256:<64 hex>, got ${image}`);
+          const lines = fs.readFileSync('deploy/dokploy-compose.yml', 'utf8').split('\n').filter((l) => /^\s+image:\s*ghcr\.io\/amindhouib\/personal-portfolio\/app@sha256:[0-9a-f]{64}\s*$/.test(l));
+          if (lines.length !== 1) fail(`expected exactly one pinned app image line, found ${lines.length}`);
+          const sql = fs.readFileSync('db/init.sql', 'utf8');
+          const inline = stored.configs && stored.configs.init_sql && stored.configs.init_sql.content;
+          if (inline !== sql) fail('configs.init_sql in deploy/dokploy-compose.yml differs from db/init.sql');
+          console.log('deploy/dokploy-compose.yml matches compose.yml, db/init.sql and the pin format');
+          NODE
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build without pushing
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+          DOCKER_BUILD_SUMMARY: false
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=portfolio-app

@@ -486,6 +486,6 @@ jobs:
           service: portfolio
           environment: production
           delivery: pull
-          upload-artifact: 'false'
+          upload-artifact: "false"
           compose: deploy/dokploy-compose.yml
           existing-image: portfolio/app=ghcr.io/amindhouib/personal-portfolio/app@${{ needs.image.outputs.digest }}
