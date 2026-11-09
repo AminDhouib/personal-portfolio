@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { ReviewsClient } from "./reviews-client";
 import { BOOKING_URL } from "@/data/nav";
+import { CLIENT_COUNT } from "@/data/profile";
 
 const SITE_ORIGIN = "https://amindhou.com";
 
@@ -32,7 +33,7 @@ export const metadata = {
 const trustStats = [
   { value: "5/5", label: "On Contra" },
   { value: "100%", label: "Job Success On Upwork" },
-  { value: "50+", label: "Satisfied Clients" },
+  { value: `${CLIENT_COUNT}+`, label: "Satisfied Clients" },
 ];
 
 export default function ReviewsPage() {

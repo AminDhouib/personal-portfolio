@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { motion, useInView, useMotionValue, useTransform, animate } from "framer-motion";
 import { Star, Server } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
+import { CLIENT_COUNT } from "@/data/profile";
 
 interface CounterProps {
   target: number;
@@ -76,7 +77,7 @@ export function ProofBar({ usersK }: { usersK: number }) {
       color: "var(--color-accent-green)",
     },
     {
-      target: 50,
+      target: CLIENT_COUNT,
       suffix: "+",
       label: "Clients",
       subtitle: "Successful projects shipped",

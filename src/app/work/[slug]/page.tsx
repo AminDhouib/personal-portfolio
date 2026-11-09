@@ -99,7 +99,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
 
   // Fetch live MAU from GA4 (falls back to null if not configured)
   const liveMAU = await fetchMAU(slug);
-  const displayMAU = liveMAU ?? project.mauFallback;
+  const displayMAU = liveMAU ?? project.mauFallback ?? null;
   const isLive = liveMAU !== null;
 
   const relatedPost = project.relatedPost ? getBlogPost(project.relatedPost) : null;
@@ -137,8 +137,8 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
               alt={`${project.name} logo`}
               width={project.logoWidth}
               height={project.logoHeight}
-              className="logo-tinted"
-              style={{ width: 96, height: "auto" }}
+              className={project.logoIsIcon ? "rounded-xl" : "logo-tinted"}
+              style={{ width: project.logoIsIcon ? 64 : 96, height: "auto" }}
             />
           </div>
           <div>
@@ -151,6 +151,11 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
               )}
             </div>
             <p className="mt-2 text-lg text-(--muted)">{project.tagline}</p>
+            {project.clientName && (
+              <p className="mt-1 text-sm font-medium text-accent-blue">
+                Client work for {project.clientName}, delivered through Devino Solutions
+              </p>
+            )}
           </div>
         </div>
 
@@ -198,25 +203,27 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
           )}
         </div>
 
-        {/* Live MAU */}
-        <div className="mb-8 flex items-center gap-2 rounded-lg border border-(--border) bg-(--card) p-4">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="pulse-dot absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent-green" />
-          </span>
-          <span className="text-base font-semibold">
-            {displayMAU >= 1000 ? `${(displayMAU / 1000).toFixed(1)}K` : displayMAU} monthly active
-            users
-          </span>
-          {project.mauGrowth && (
-            <span className="text-sm font-medium text-accent-green">{project.mauGrowth}</span>
-          )}
-          {isLive && (
-            <span className="ml-auto text-xs font-medium text-accent-green/80">
-              live · last 30 days
+        {/* Live MAU: only for products with a reading. Client work and unmeasured products show none. */}
+        {displayMAU !== null && (
+          <div className="mb-8 flex items-center gap-2 rounded-lg border border-(--border) bg-(--card) p-4">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="pulse-dot absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent-green" />
             </span>
-          )}
-        </div>
+            <span className="text-base font-semibold">
+              {displayMAU >= 1000 ? `${(displayMAU / 1000).toFixed(1)}K` : displayMAU} monthly
+              active users
+            </span>
+            {project.mauGrowth && (
+              <span className="text-sm font-medium text-accent-green">{project.mauGrowth}</span>
+            )}
+            {isLive && (
+              <span className="ml-auto text-xs font-medium text-accent-green/80">
+                live · last 30 days
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Description */}
         <p className="mb-8 text-base leading-relaxed text-(--foreground)">{project.description}</p>

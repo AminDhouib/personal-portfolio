@@ -2,12 +2,13 @@ import { projects } from "@/data/projects";
 
 /**
  * Combined monthly active users across every product: the live GA4 figure per
- * slug when one is available, otherwise that project's `mauFallback`. With no
+ * slug when one is available, otherwise that project's `mauFallback` (a project
+ * with neither, such as client work, counts as 0). With no
  * argument this is the fallback-only total, which is what static copy (the
  * experience bullet, the AI prompt) quotes so it never needs a GA4 call.
  */
 export function combinedMonthlyUsers(live: Record<string, number | null> = {}): number {
-  return projects.reduce((sum, p) => sum + (live[p.slug] ?? p.mauFallback), 0);
+  return projects.reduce((sum, p) => sum + (live[p.slug] ?? p.mauFallback ?? 0), 0);
 }
 
 /**
