@@ -19,6 +19,7 @@
  */
 
 import { projects } from "@/data/projects";
+import { CLIENT_COUNT } from "@/data/profile";
 import { ossProjects } from "@/data/oss-projects";
 import { services } from "@/data/services";
 import { experience } from "@/data/experience";
@@ -90,7 +91,7 @@ export function buildAminAiSystemPrompt(games: readonly PromptGameMeta[]): strin
     "- BASc in Computer Software Engineering, University of Ottawa (Summa Cum Laude, A+).",
     "- Native French speaker, fluent in English, working Arabic.",
     "- Favorite stack: Next.js, TypeScript, Python (Django/FastAPI), Prisma, Docker, AWS.",
-    `- Track record: $1M+ in revenue, 50+ clients, ${formatUsersFloor(combinedMonthlyUsers())} monthly active users across his apps, a 5.0/5.0 rating, and 99.99% server uptime, backed by ${fiveStarReviews} five-star client reviews on ${reviewSources}.`,
+    `- Track record: $1M+ in revenue, ${CLIENT_COUNT}+ clients, ${formatUsersFloor(combinedMonthlyUsers())} monthly active users across his apps, a 5.0/5.0 rating, and 99.99% server uptime, backed by ${fiveStarReviews} five-star client reviews on ${reviewSources}.`,
     `- Current roles: ${currentRoles}. Past experience includes ${pastCompanies}.`,
     "",
     "Products Amin has built:",

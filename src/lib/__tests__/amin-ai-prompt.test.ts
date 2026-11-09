@@ -11,8 +11,10 @@ describe("buildAminAiSystemPrompt", () => {
   const prompt = buildAminAiSystemPrompt(GAMES);
 
   it("names every product from the projects data source", () => {
-    // The five products: Shorty, uNotes, Caramel, UpUp, GetItDone.
-    expect(projects).toHaveLength(5);
+    // The shipped products and client studies from the Devino case studies.
+    expect(projects.map((p) => p.name)).toEqual(
+      expect.arrayContaining(["Postify", "SuperBooks", "BioFlow", "DoDomain", "Bitbuy", "Syncara"]),
+    );
     for (const project of projects) {
       expect(prompt).toContain(project.name);
       expect(prompt).toContain(project.url);

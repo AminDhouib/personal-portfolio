@@ -188,7 +188,14 @@ test("/work links every project page, and each carries CreativeWork and breadcru
   }
 });
 
-test("every project page server-renders its monthly-active-users line", async ({ request }) => {
+// Products with a GA4 property show a monthly-active-users line. The other products and the
+// client work (Bitbuy, Syncara) have no reading, so their pages carry none rather than an
+// invented figure.
+const MEASURED_PRODUCTS = ["shorty", "unotes", "caramel", "upup", "getitdone"];
+
+test("every project page server-renders, and measured products their monthly-active-users line", async ({
+  request,
+}) => {
   const projectUrls = (await sitemapUrls(request)).filter((url) =>
     pathOf(url).startsWith("/work/"),
   );
@@ -196,7 +203,11 @@ test("every project page server-renders its monthly-active-users line", async ({
   for (const url of projectUrls) {
     const response = await request.get(pathOf(url));
     expect.soft(response.status(), url).toBe(200);
-    expect.soft(await response.text(), url).toMatch(/monthly active users/);
+    const slug = pathOf(url).replace("/work/", "");
+    const pattern = /monthly active users/;
+    const body = await response.text();
+    if (MEASURED_PRODUCTS.includes(slug)) expect.soft(body, url).toMatch(pattern);
+    else expect.soft(body, url).not.toMatch(pattern);
   }
 });
 

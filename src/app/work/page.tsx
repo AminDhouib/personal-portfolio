@@ -8,7 +8,7 @@ import { SITE_ORIGIN } from "@/data/profile";
 import { breadcrumbNode, graph, projectListNode, serializeJsonLd } from "@/lib/structured-data";
 
 const DESCRIPTION =
-  "Products Amin Dhouib has built and self-hosts: AI summarizers, a student notes platform, an open-source Honey alternative, a React file uploader and a team check-in tool.";
+  "Products Amin Dhouib has built and self-hosts, plus client work delivered through Devino: AI summarizers, a student notes platform, an open-source Honey alternative, a React file uploader, a social scheduler, AI bookkeeping, a link-in-bio builder and a custom-domain API.";
 
 export const metadata: Metadata = {
   title: "Work",
@@ -81,8 +81,8 @@ export default function WorkPage() {
                     alt=""
                     width={project.logoWidth}
                     height={project.logoHeight}
-                    className="logo-tinted"
-                    style={{ width: 80, height: "auto" }}
+                    className={project.logoIsIcon ? "rounded-xl" : "logo-tinted"}
+                    style={{ width: project.logoIsIcon ? 56 : 80, height: "auto" }}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -90,6 +90,11 @@ export default function WorkPage() {
                     <h2 className="font-display text-xl font-bold tracking-tight transition-colors group-hover:text-accent-blue">
                       {project.name}
                     </h2>
+                    {project.clientName && (
+                      <span className="rounded-full border border-accent-blue/20 bg-accent-blue/10 px-2 py-0.5 text-[10px] font-bold text-accent-blue uppercase">
+                        Client work
+                      </span>
+                    )}
                     {project.isOSS && (
                       <span className="rounded-full border border-accent-green/20 bg-accent-green/10 px-2 py-0.5 text-[10px] font-bold text-accent-green uppercase">
                         Open Source

@@ -64,6 +64,32 @@ describe("/work/[slug] page", () => {
     expect(screen.queryByText(/live · last 30 days/)).toBeNull();
   });
 
+  it("shows one monthly-active-users figure on the uNotes page, with no second count in the prose", async () => {
+    fetchMAU.mockResolvedValue(69000);
+    const { container } = render(await WorkDetailPage(params("unotes")));
+    const text = container.textContent ?? "";
+    expect(text.match(/monthly active users/g)).toHaveLength(1);
+    expect(text).toContain("69.0K monthly active users");
+    expect(text).not.toMatch(/5,000/);
+    expect(text).toContain("100,000+");
+  });
+
+  it("renders client work with its client and no MAU block", async () => {
+    const { container } = render(await WorkDetailPage(params("bitbuy")));
+    expect(fetchMAU).toHaveBeenCalledWith("bitbuy");
+    expect(
+      screen.getByText(/Client work for Bitbuy, delivered through Devino Solutions/),
+    ).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/monthly active users/);
+    expect(screen.queryByText(/live · last 30 days/)).toBeNull();
+  });
+
+  it("renders a product with no known MAU without a MAU block", async () => {
+    const { container } = render(await WorkDetailPage(params("postify")));
+    expect(screen.getByRole("heading", { level: 1, name: "Postify" })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/monthly active users/);
+  });
+
   it("answers an unknown slug with a 404", async () => {
     await expect(WorkDetailPage(params("not-a-project"))).rejects.toMatchObject({
       digest: expect.stringContaining("404"),

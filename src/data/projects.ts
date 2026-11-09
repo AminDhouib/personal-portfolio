@@ -15,9 +15,17 @@ export interface Project {
   isOSS: boolean;
   githubUrl?: string;
   contraUrl?: string;
+  /**
+   * Set for client work Devino delivered (a named client, not a product Amin
+   * runs). Client work has no analytics property, so it shows no MAU.
+   */
+  clientName?: string;
+  /** The logo is a finished square app icon with its own background: render it untinted. */
+  logoIsIcon?: boolean;
   /** Blog slug of the post that tells this project's story; the work page links to it. */
   relatedPost?: string;
-  mauFallback: number;
+  /** Static MAU used when GA4 has no reading. Omitted when the product has no known figure. */
+  mauFallback?: number;
   mauGrowth?: string;
   gaPropertyDomain?: string;
   platforms: Platform[];
@@ -87,9 +95,9 @@ export const projects: readonly Project[] = Object.freeze([
   {
     slug: "unotes",
     name: "uNotes",
-    tagline: "30K+ docs shared by students",
+    tagline: "100K+ docs shared by students",
     description:
-      "Community-driven note-sharing platform with 30,000+ user-uploaded university docs. Free alternative to Chegg, CourseHero, StuDocu.",
+      "Community-driven note-sharing platform with 100,000+ user-uploaded university docs. Free alternative to Chegg, CourseHero, StuDocu.",
     heroImage: "/screenshots/unotes.webp",
     logo: "/logos/unotes.png",
     logoWidth: 727,
@@ -121,7 +129,7 @@ export const projects: readonly Project[] = Object.freeze([
     story: [
       "uNotes was born from a conversation with university students who were paying $30/month for CourseHero just to access past exams and lab reports. The content was created by students — it shouldn't be paywalled.",
       "I built a community platform where students can upload and download notes, exams, and assignments for free. The key insight was making it searchable by university, course code, and professor — not just generic file dumps.",
-      "uNotes now has 30,000+ documents from universities across Canada and the US, and is available on the App Store, Google Play, Microsoft Store, and web.",
+      "uNotes now has 100,000+ documents from universities across Canada and the US, and is available on the App Store, Google Play, Microsoft Store, and web.",
     ],
   },
   {
@@ -222,6 +230,188 @@ export const projects: readonly Project[] = Object.freeze([
       "GetItDone came from managing multiple development teams at Devino Solutions. Between Jira, Slack standups, time trackers, and task boards, the overhead was killing productivity.",
       "The app consolidates async standups (no more scheduling 15-minute meetings), task updates, and time tracking into a single dashboard. Teams submit daily check-ins in 2 minutes instead of meeting for 15.",
       "Built on Next.js with Prisma for the data layer.",
+    ],
+  },
+  {
+    slug: "postify",
+    name: "Postify",
+    tagline: "AI social media scheduler",
+    description:
+      "Write a post once, tailor it per platform with an AI copilot, then schedule or publish it to X, LinkedIn, Instagram, TikTok, YouTube and more from one dashboard.",
+    heroImage: "/screenshots/postify.webp",
+    logo: "/logos/postify.png",
+    logoWidth: 128,
+    logoHeight: 128,
+    logoIsIcon: true,
+    url: "https://usepostify.com",
+    isOSS: false,
+    platforms: [
+      { name: "Web", icon: "globe", url: "https://usepostify.com" },
+      {
+        name: "Google Play",
+        icon: "googleplay",
+        url: "https://play.google.com/store/apps/details?id=com.usepostify.app",
+      },
+      {
+        name: "Microsoft Store",
+        icon: "microsoft",
+        url: "https://apps.microsoft.com/detail/9nhhh4mqxx4f",
+      },
+    ],
+    techStack: ["Next.js", "TypeScript", "React", "Prisma", "PostgreSQL"],
+    story: [
+      "Postify is one of the products I build through Devino Solutions: a social media scheduler built around one loop. Compose once, tailor the post for each platform, then schedule or publish. It connects to X, LinkedIn, Facebook, Instagram, Threads, TikTok, Pinterest, YouTube, Bluesky and Reddit.",
+      "Scheduled posts land on a calendar with day, week, month and agenda views, and background workers handle publishing, token refresh, inbox sync and analytics snapshots. An AI copilot inside the composer is tuned to the channel you are writing for, and an MCP server lets outside assistants create drafts and reschedule posts.",
+      "It is a Next.js and TypeScript app on PostgreSQL with Prisma, with the Android app built on Capacitor and a Windows app on the Microsoft Store.",
+    ],
+  },
+  {
+    slug: "superbooks",
+    name: "SuperBooks",
+    tagline: "AI bookkeeping for small businesses",
+    description:
+      "Connect your bank accounts and let AI categorize each transaction and match it to its receipt or invoice, so the books keep up without manual reconciliation.",
+    heroImage: "/screenshots/superbooks.webp",
+    logo: "/logos/superbooks.png",
+    logoWidth: 128,
+    logoHeight: 128,
+    logoIsIcon: true,
+    url: "https://superbooks.io",
+    isOSS: false,
+    platforms: [
+      { name: "Web", icon: "globe", url: "https://superbooks.io" },
+      {
+        name: "Google Play",
+        icon: "googleplay",
+        url: "https://play.google.com/store/apps/details?id=com.devino.superbooks",
+      },
+    ],
+    techStack: ["Next.js", "TypeScript", "React", "Prisma", "Stripe"],
+    story: [
+      "SuperBooks is AI bookkeeping and accounting software for small businesses, built through Devino Solutions and now in beta. Bank connections run through Plaid, each transaction is categorized with AI, and a matching engine suggests the receipt or invoice it belongs to.",
+      "Receipts arrive through an inbox that collects documents from Gmail and Outlook. It also sends invoices, including recurring ones, handles multi-currency accounts, and syncs with QuickBooks, Xero and Fortnox.",
+      "For developers there is a documented API with TypeScript and Python SDKs, and an MCP server lets AI assistants work with the books directly. It is a Turborepo monorepo with a Next.js web app, a tRPC API, Prisma and Stripe billing.",
+    ],
+  },
+  {
+    slug: "bioflow",
+    name: "BioFlow",
+    tagline: "A link-in-bio page that builds itself",
+    description:
+      "A link-in-bio tool with an AI agent that builds the page, connects the tools you already use and keeps every link current on its own.",
+    heroImage: "/screenshots/bioflow.webp",
+    logo: "/logos/bioflow.png",
+    logoWidth: 128,
+    logoHeight: 128,
+    logoIsIcon: true,
+    url: "https://getbioflow.com",
+    isOSS: false,
+    platforms: [
+      { name: "Web", icon: "globe", url: "https://getbioflow.com" },
+      {
+        name: "Google Play",
+        icon: "googleplay",
+        url: "https://play.google.com/store/apps/details?id=com.devino.bioflow",
+      },
+      {
+        name: "Microsoft Store",
+        icon: "microsoft",
+        url: "https://apps.microsoft.com/detail/9n699lqbnxsj",
+      },
+    ],
+    techStack: ["Next.js", "TypeScript", "React", "Prisma"],
+    story: [
+      "BioFlow is a link-in-bio tool where an AI agent does the page building. You describe who you are and what you want, the agent asks a few questions and ships a page, and you keep changing it by talking to it instead of dragging blocks around.",
+      "It connects to 10 sources, including YouTube, Shopify, Instagram, TikTok, Calendly, Mailchimp and Google Calendar, so a new video, product or event shows up on the page without anyone editing it. An MCP server with 12 tools lets Claude, ChatGPT or your own agent read pages and analytics and create, edit and schedule drafts.",
+      "It is a pnpm and Turborepo monorepo: a Next.js web app with a tRPC API and Prisma, plus a worker service for connector syncs and scheduled publishing. The Android app wraps the web app with Capacitor.",
+    ],
+  },
+  {
+    slug: "dodomain",
+    name: "DoDomain",
+    tagline: "Custom domains for SaaS, minus the DNS support queue",
+    description:
+      "A custom-domain API and hosted connect flow for SaaS products: your users connect their own domain, DoDomain verifies the DNS and your app gets a signed webhook.",
+    heroImage: "/screenshots/dodomain.webp",
+    logo: "/logos/dodomain.png",
+    logoWidth: 128,
+    logoHeight: 128,
+    logoIsIcon: true,
+    url: "https://dodomain.io",
+    isOSS: false,
+    platforms: [
+      { name: "Web", icon: "globe", url: "https://dodomain.io" },
+      {
+        name: "Google Play",
+        icon: "googleplay",
+        url: "https://play.google.com/store/apps/details?id=io.dodomain.app",
+      },
+      {
+        name: "Microsoft Store",
+        icon: "microsoft",
+        url: "https://apps.microsoft.com/detail/9p3kbjkxv92p",
+      },
+    ],
+    techStack: ["Next.js", "TypeScript", "React", "Prisma", "PostgreSQL"],
+    story: [
+      "DoDomain is the layer a SaaS embeds so its users can connect a domain they already own. When a customer wants the product on their own domain, the SaaS opens DoDomain's connect flow and DoDomain handles the DNS instead of walking each customer through records by email.",
+      "It picks the smoothest path for each DNS provider: Cloudflare one-click, the Domain Connect standard, or guided setup as the fallback that works everywhere. Records are checked against the domain's authoritative nameservers, and the app is told over a webhook signed with HMAC-SHA256 and a timestamp.",
+      "Integrators get a REST API, a Node SDK, an embeddable widget and React bindings on npm, plus an MCP server with 7 tools. BioFlow, another of our products, connects its users' custom domains through it.",
+    ],
+  },
+  {
+    slug: "bitbuy",
+    name: "Bitbuy",
+    tagline: "A CMS-driven crypto converter landing system",
+    description:
+      "Client work through Devino: a scalable Webflow CMS template that powers 1,000+ crypto and fiat conversion pages for Bitbuy Canada, driven by the page slug.",
+    heroImage: "/screenshots/bitbuy.webp",
+    logo: "/logos/bitbuy.png",
+    logoWidth: 128,
+    logoHeight: 128,
+    logoIsIcon: true,
+    url: "https://bitbuy.ca/en-ca/convert/ethereum-to-usd",
+    isOSS: false,
+    clientName: "Bitbuy",
+    platforms: [
+      {
+        name: "Live page",
+        icon: "globe",
+        url: "https://bitbuy.ca/en-ca/convert/ethereum-to-usd",
+      },
+    ],
+    techStack: ["Webflow", "JavaScript", "CMS", "Technical SEO"],
+    story: [
+      "For Bitbuy Canada, we built a conversion landing-page system they can use to advertise specific crypto and fiat pairs on Contra and through search.",
+      "Instead of hard-coding each page, the slug controls the whole experience for that pair, for example ethereum-to-usd or bitcoin-to-cad. Each slug maps to a CMS entry that defines the titles, meta description, headings, on-page copy, FAQs and CTAs, so 1,000+ variants of USD, CAD and crypto pairs run from a single layout.",
+    ],
+  },
+  {
+    slug: "syncara",
+    name: "Syncara",
+    tagline: "A Figma-first MVP for Canadian healthcare",
+    description:
+      "Client work through Devino: an interactive Figma MVP for Syncara, a Canadian healthcare platform, validated with a clickable prototype before any code was written.",
+    heroImage: "/screenshots/syncara.webp",
+    logo: "/logos/syncara.png",
+    logoWidth: 128,
+    logoHeight: 128,
+    logoIsIcon: true,
+    url: "https://embed.figma.com/proto/bwVTdgcsiVhndxdcbzdzBy/Syncara?embed-host=contra.com&footer=false&theme=light&viewport-controls=true&node-id=505-8701",
+    isOSS: false,
+    clientName: "Syncara",
+    platforms: [
+      {
+        name: "Figma prototype",
+        icon: "figma",
+        url: "https://embed.figma.com/proto/bwVTdgcsiVhndxdcbzdzBy/Syncara?embed-host=contra.com&footer=false&theme=light&viewport-controls=true&node-id=505-8701",
+      },
+    ],
+    techStack: ["Figma", "Photoshop", "Illustrator", "Next.js"],
+    story: [
+      "We developed Syncara's MVP Phase 1 entirely in Figma, creating interactive wireframes that cover appointments, medications, providers and medical conditions, with no code involved. That let the client explore the platform and gather feedback early, without investing in development.",
+      "We also established the brand identity, refining assets in Photoshop and designing the logo in Figma, and used Figma's prototyping to demonstrate subscription flows and navigation through a fully clickable design.",
+      "With the prototype validated, the engagement moved from UI/UX into Next.js development, carrying the same design system straight into the build.",
     ],
   },
 ]);

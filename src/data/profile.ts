@@ -33,6 +33,12 @@ export const profile = Object.freeze({
   stack: ["Next.js", "TypeScript", "Python", "Django", "FastAPI", "Prisma", "Docker", "AWS"],
 });
 
+/**
+ * Clients served through Devino. The one figure behind every "50+ clients" on the site (hero
+ * counter, experience bullet, reviews stats, Amin AI prompt), so they cannot drift apart.
+ */
+export const CLIENT_COUNT = 50;
+
 // Profiles that belong to Amin but are not shown as icons in the site footer.
 const EXTRA_PROFILES = ["https://dev.to/amindhou"];
 

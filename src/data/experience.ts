@@ -1,3 +1,5 @@
+import { CLIENT_COUNT } from "./profile";
+
 /** A labeled cluster of bullets — used when one role spans distinct tracks. */
 export interface HighlightGroup {
   label: string;
@@ -46,7 +48,7 @@ export const experience: ExperienceItem[] = [
     location: "Ottawa, ON · Remote",
     current: true,
     highlights: [
-      "Successfully generated over $1M in project revenue, working with 50+ satisfied clients and earning an average 5-star rating.",
+      `Successfully generated over $1M in project revenue, working with ${CLIENT_COUNT}+ satisfied clients and earning an average 5-star rating.`,
       "Developed many great B2B relationships and long-term client partnerships.",
       `Published several apps, including uNotes and Shorty, reaching ${COMBINED_USERS_TOKEN} combined monthly active users.`,
     ],

@@ -4,8 +4,17 @@ import { projects } from "@/data/projects";
 
 describe("combinedMonthlyUsers", () => {
   it("sums every project's fallback when no live data is given", () => {
-    const expected = projects.reduce((sum, p) => sum + p.mauFallback, 0);
+    const expected = projects.reduce((sum, p) => sum + (p.mauFallback ?? 0), 0);
     expect(combinedMonthlyUsers()).toBe(expected);
+  });
+
+  it("counts a project with no figure, such as client work, as zero", () => {
+    const clientWork = projects.filter((p) => p.clientName);
+    expect(clientWork.length).toBeGreaterThan(0);
+    const withoutClientWork = projects
+      .filter((p) => !p.clientName)
+      .reduce((sum, p) => sum + (p.mauFallback ?? 0), 0);
+    expect(combinedMonthlyUsers()).toBe(withoutClientWork);
   });
 
   it("prefers a live figure per slug and falls back for null or missing slugs", () => {
@@ -13,7 +22,7 @@ describe("combinedMonthlyUsers", () => {
     if (!first || !second) throw new Error("expected at least two projects");
     const live = { [first.slug]: 1000, [second.slug]: null };
     const expected = projects.reduce(
-      (sum, p) => sum + (p.slug === first.slug ? 1000 : p.mauFallback),
+      (sum, p) => sum + (p.slug === first.slug ? 1000 : (p.mauFallback ?? 0)),
       0,
     );
     expect(combinedMonthlyUsers(live)).toBe(expected);
